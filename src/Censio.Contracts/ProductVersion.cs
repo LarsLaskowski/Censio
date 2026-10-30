@@ -1,5 +1,3 @@
-#pragma warning disable RH2003 // Skeleton body until the implementation task
-
 using System.Reflection;
 
 namespace Censio.Contracts;
@@ -27,7 +25,9 @@ public static class ProductVersion
     /// <returns>The informational version, or <see cref="Fallback" /> when the assembly carries none</returns>
     public static string Read(Assembly assembly)
     {
-        throw new NotImplementedException();
+        var version = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+
+        return string.IsNullOrWhiteSpace(version) ? Fallback : version;
     }
 
     #endregion // Methods

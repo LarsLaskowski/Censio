@@ -1,5 +1,3 @@
-#pragma warning disable RH2003 // Skeleton body until the implementation task
-
 using System.Reflection;
 
 namespace Censio.GameData;
@@ -14,7 +12,7 @@ public static class GameDataAssembly
     /// <summary>
     /// Gets the assembly of <c>Censio.GameData</c>.
     /// </summary>
-    public static Assembly Reference => throw new NotImplementedException();
+    public static Assembly Reference => typeof(GameDataAssembly).Assembly;
 
     #endregion // Properties
 }

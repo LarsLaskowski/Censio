@@ -1,5 +1,3 @@
-#pragma warning disable RH2003 // Skeleton body until the implementation task
-
 using System.Reflection;
 
 namespace Censio.Server.Data;
@@ -14,7 +12,7 @@ public static class ServerDataAssembly
     /// <summary>
     /// Gets the assembly of <c>Censio.Server.Data</c>.
     /// </summary>
-    public static Assembly Reference => throw new NotImplementedException();
+    public static Assembly Reference => typeof(ServerDataAssembly).Assembly;
 
     #endregion // Properties
 }
