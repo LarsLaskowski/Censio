@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Censio.Contracts\Censio.Contracts.csproj" />
+    <ProjectReference Include="..\Censio.Pipe\Censio.Pipe.csproj" />
+    <ProjectReference Include="..\Censio.GameData\Censio.GameData.csproj" />
+  </ItemGroup>
+</Project>

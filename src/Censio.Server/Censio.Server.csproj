@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Censio.Contracts\Censio.Contracts.csproj" />
+    <ProjectReference Include="..\Censio.Server.Data\Censio.Server.Data.csproj" />
+  </ItemGroup>
+</Project>
