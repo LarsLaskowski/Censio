@@ -163,3 +163,12 @@ No area exists yet (`docs/areas/README.md`); the plan decides the areas. In outl
   `docs/CONTRIBUTING.md` (*Versioning and releases*) how the version is passed to a build; `.squad/stack.md`
   (*Layout*) and the architecture block of `AGENTS.md` and `.github/copilot-instructions.md`, which say the
   projects are added "with the issues that need them", list the six projects.
+
+## Challenge notes
+
+Minor objections of the Devil's Advocate (spec challenge), verbatim.
+
+2. **CI step.** `.github/workflows/ci.yml`, the comment above *Detect solution*, reads: "Remove this step and the conditions when the solution exists." The spec allows a `ci.yml` edit "only as far as AC2 needs it". The plan should say whether this change removes the *Detect solution* step and its `if:` conditions, as the comment asks, or leaves them for #3 and says so. Either edit touches a CI workflow, so it goes under *Security areas touched*.
+3. **Blazor script URL in AC4.** The .NET 9+/10 Blazor Web App template writes `@Assets["_framework/blazor.web.js"]`, which renders a fingerprinted name (`_framework/blazor.web.<hash>.js`). A test that looks for the exact text `_framework/blazor.web.js` in the page would then fail on a correct build. Reword AC4 to: "the page references the Blazor script under `_framework/blazor.web` (fingerprinted name allowed), and the URL it references answers `200`". The plan's *Image build check* reproduction should list that file in `publish/wwwroot/_framework`.
+4. **What "no configuration" means in S3/AC9 and E3.** `dotnet run` applies `Properties/launchSettings.json` (Development environment, its own `applicationUrl`, often an HTTPS profile). Only a plain start of the built assembly gives Production on loopback `localhost:5000`. The plan should state that AC7 and AC9 are checked on a start without launch settings (`dotnet Censio.Server.dll`, or the test host in `Production`). It should also say whether a `launchSettings.json` is committed and, if so, with an HTTP-only profile.
+5. **Test runner.** `.squad/stack.md` (*Test with coverage*) and `ci.yml` (*Test*) use VSTest-only arguments: `--collect:"XPlat Code Coverage"`, `--logger trx`, and `-- DataCollectionRunSettings...Format=opencover`. `docs/UNIT_TESTS.md` line 13 names `coverlet.collector`. The plan should keep the VSTest runner: no `"test": {"runner": "Microsoft.Testing.Platform"}` in `global.json`, and `coverlet.collector` in every test project through Central Package Management. That way the stack's commands and CI run unchanged.
