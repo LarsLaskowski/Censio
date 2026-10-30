@@ -20,4 +20,4 @@ Plan: [plan.md](plan.md) — Status: Draft
 | 14 | G4 | Project blocks of `AGENTS.md` and `.github/copilot-instructions.md`, identically; no new API | `AGENTS.md`, `.github/copilot-instructions.md` | AC13 | 11 | Dev | [ ] |
 | 15 | G4 | `.squad/stack.md` (*Layout*, *Coverage exclusions*, *Known pitfalls*, *Image build check* sentence on `RequiresAspNetWebAssets`; the script's first copy gains `'*.razor'` only if fact 21 is refuted) and `.squad/project.md` (*Security areas*); no new API | `.squad/stack.md`, `.squad/project.md` | AC2, AC14 | 11 | Dev | [ ] |
 | 16 | G4 | `SECURITY.md` and `docs/CONTRIBUTING.md` (*Getting started*, *Versioning and releases*); no new API | `SECURITY.md`, `docs/CONTRIBUTING.md` | AC6, AC9 | 11 | Dev | [ ] |
-| 17 | G4 | `docs/UNIT_TESTS.md` *Test stack* (`WebApplicationFactory`); no new API | `docs/UNIT_TESTS.md` | AC1 | 11 | Tester | [ ] |
+| 17 | G4 | `docs/UNIT_TESTS.md` *Test stack* (`WebApplicationFactory`); no new API | `docs/UNIT_TESTS.md` | AC1 | 11 | Tester | [x] |

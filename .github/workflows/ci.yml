@@ -30,13 +30,6 @@ jobs:
         with:
           fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
 
-      # Until the first issue adds Censio.slnx there is nothing to restore, build or test; the steps below
-      # are skipped, and the job passes. Remove this step and the conditions when the solution exists.
-      - name: Detect solution
-        id: solution
-        run: |
-          if [ -f Censio.slnx ]; then echo "exists=true" >> "$GITHUB_OUTPUT"; else echo "exists=false" >> "$GITHUB_OUTPUT"; fi
-
       - name: Setup .NET
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
@@ -58,31 +51,28 @@ jobs:
           restore-keys: ${{ runner.os }}-sonar-scanner
 
       - name: Install SonarQube Cloud scanner
-        if: ${{ steps.solution.outputs.exists == 'true' && env.SONAR_TOKEN != '' && steps.cache-sonar-scanner.outputs.cache-hit != 'true' }}
+        if: ${{ env.SONAR_TOKEN != '' && steps.cache-sonar-scanner.outputs.cache-hit != 'true' }}
         run: |
           mkdir -p ${{ runner.temp }}/scanner
           dotnet tool update dotnet-sonarscanner --tool-path ${{ runner.temp }}/scanner
 
       - name: Restore
-        if: ${{ steps.solution.outputs.exists == 'true' }}
         run: dotnet restore Censio.slnx
 
       - name: Begin SonarQube analysis
-        if: ${{ steps.solution.outputs.exists == 'true' && env.SONAR_TOKEN != '' }}
+        if: ${{ env.SONAR_TOKEN != '' }}
         run: |
           ${{ runner.temp }}/scanner/dotnet-sonarscanner begin \
             /k:"LarsLaskowski_Censio" \
             /o:"larslaskowski" \
             /d:sonar.token="$SONAR_TOKEN" \
             /d:sonar.cs.opencover.reportsPaths="${{ runner.temp }}/TestResults/**/coverage.opencover.xml" \
-            /d:sonar.coverage.exclusions=".squad/**,.claude/**"
+            /d:sonar.coverage.exclusions=".squad/**,.claude/**,src/Censio.Companion/**"
 
       - name: Build
-        if: ${{ steps.solution.outputs.exists == 'true' }}
         run: dotnet build Censio.slnx -c Release --no-restore
 
       - name: Test
-        if: ${{ steps.solution.outputs.exists == 'true' }}
         run: >
           dotnet test Censio.slnx
           -c Release --no-build
@@ -93,7 +83,7 @@ jobs:
           DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=opencover
 
       - name: End SonarQube analysis
-        if: ${{ !cancelled() && steps.solution.outputs.exists == 'true' && env.SONAR_TOKEN != '' }}
+        if: ${{ !cancelled() && env.SONAR_TOKEN != '' }}
         run: |
           ${{ runner.temp }}/scanner/dotnet-sonarscanner end /d:sonar.token="$SONAR_TOKEN"
 
@@ -102,7 +92,7 @@ jobs:
         # Creating check runs needs a writable token, which Dependabot and
         # fork-triggered runs do not get. Skip there; the test step itself
         # still fails the job on a failing test.
-        if: ${{ !cancelled() && steps.solution.outputs.exists == 'true' && github.actor != 'dependabot[bot]' && github.event.pull_request.head.repo.fork != true }}
+        if: ${{ !cancelled() && github.actor != 'dependabot[bot]' && github.event.pull_request.head.repo.fork != true }}
         with:
           name: dotnet tests
           path: ${{ runner.temp }}/TestResults/**/*.trx
@@ -110,7 +100,7 @@ jobs:
 
       - name: Upload test & coverage artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: ${{ !cancelled() && steps.solution.outputs.exists == 'true' }}
+        if: ${{ !cancelled() }}
         with:
           name: test-results
           path: |

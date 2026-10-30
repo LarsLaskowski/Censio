@@ -11,6 +11,11 @@ neighboring test file before inventing a new pattern.
 - **No assertion library** (no FluentAssertions) and **no mocking library** — use real objects or the
   hand-written fakes and stubs listed in `.squad/project.md` (*Test doubles*).
 - Coverage is collected with `coverlet.collector`.
+- **Server endpoint tests** use `WebApplicationFactory` (`Microsoft.AspNetCore.Mvc.Testing`), which hosts the
+  real server in memory. It is a test host, not a mocking library, so it does not conflict with the rule above.
+- **Companion logic** (the tray menu entries, the single-instance guard) lives in the platform-neutral
+  `Censio.Companion.Core` and is tested in `Censio.Companion.Core.Tests`; the Windows shell `Censio.Companion`
+  only wires it to the tray and has no unit tests of its own.
 
 ## Where tests live
 
