@@ -5,15 +5,10 @@ Status: Draft
 
 ## Problem
 
-The repository holds the squad and the CI workflow but no code: there is no `Censio.slnx`, so the CI job skips
-restore, build and test (`.github/workflows/ci.yml`, step *Detect solution*), and every later issue (#3–#54)
-needs a project to put its code in. The issue asks for the agreed project split as a solution that already
-builds, tests and runs: a server that answers a start page and `/health` (what the Docker image of #4 and the
-release of #5 check), and a Companion that starts as a tray icon on Windows. Until it exists, no gate of
-`.squad/stack.md` can run and no artifact can be shipped.
-
-The users here are the developer (and the squad), who builds and tests the solution, and the operator or tester,
-who starts the server or the Companion and needs to see which version runs.
+There is no `Censio.slnx` yet, so CI skips restore, build and test (`ci.yml`, *Detect solution*), no gate of
+`.squad/stack.md` can run, and every later issue needs a project for its code. The developer needs the agreed
+project split as a solution that builds and tests; the operator or tester needs a server with a start page and
+`/health` (which #4 and #5 check) and a Companion tray icon, each showing which version runs.
 
 ## Scenarios
 
@@ -24,15 +19,15 @@ who starts the server or the Companion and needs to see which version runs.
   `Censio.Server`, `Censio.Server.Data` (each `net10.0`) and `Censio.Companion` (`net10.0-windows`) under
   `src/`, and `tests/<Project>.Tests/` for each.
 - S2: Given the same clone, when the developer runs *Test with coverage*, the *Coverage gate* and the
-  *Analyzer gate*, then both gates pass.
+  *Analyzer gate*, then both gates pass, and the *Coverage gate* measures the Companion's files: the tests of its
+  logic (menu items, texts and states, version text, single-instance rule) run on Linux like all others.
 - S3: Given a built server, when it is started with no configuration, then it logs the address it listens on,
   which is a loopback address, and a browser at that address shows a page titled `Censio` with the heading
   `Censio` and the line `Version 0.0.0`; the page loads the Blazor script `_framework/blazor.web.js`, which the
   server serves.
 - S4: Given a running server, when a client sends `GET /health`, then the server answers `200 OK` with the
   content type `text/plain` and the body `Healthy`, nothing else.
-- S5: Given a build that is passed a version (`-p:Version=1.2.3`, the way the release and edge workflows of #5
-  and #6 will pass theirs), when the server and the Companion run, then the start page shows `Version 1.2.3`,
+- S5: Given a build that is passed a version (`-p:Version=1.2.3`, as #5 and #6 will), when the server and the Companion run, then the start page shows `Version 1.2.3`,
   the tray menu shows `Version 1.2.3`, and every assembly of the solution carries `1.2.3` as its informational
   version. A version with build metadata, such as `0.0.0-edge+abc1234`, is shown exactly as passed.
 - S6: Given Windows, when the user starts `Censio.Companion.exe`, then one tray icon with the tooltip
@@ -59,8 +54,7 @@ who starts the server or the Companion and needs to see which version runs.
   user session.
 - E5: Windows Explorer restarts while the Companion runs: the tray icon appears again once the notification
   area is back.
-- E6: The user signs out or shuts Windows down while the Companion runs: it ends without a dialog and does not
-  hold up the sign-out.
+- E6: Sign-out or shutdown while the Companion runs: it ends without a dialog and does not hold it up.
 
 ## Non-functional requirements
 
@@ -77,18 +71,19 @@ who starts the server or the Companion and needs to see which version runs.
   environment). No secret, token or outbound call is added.
 - Configuration: no new setting. The listen address uses the standard ASP.NET Core settings (`--urls`,
   `ASPNETCORE_URLS`, `ASPNETCORE_HTTP_PORTS`); the version is the build property `Version`, default `0.0.0`.
-- Logs: the server logs to the console as ASP.NET Core does by default, including the listen address. The
-  Companion writes no log yet (#13).
-- Time: `/health` answers without touching any dependency, so it stays fast while the server runs.
+- Logs: the server logs to the console (ASP.NET Core default); the Companion logs nothing yet (#13).
+- Time: `/health` touches no dependency.
 
 ## Acceptance criteria
 
 - [ ] AC1: On Linux with a .NET 10 SDK, *Restore*, *Build* and *Test* succeed for `Censio.slnx` with no
-  `RH####` warning or error; the solution contains exactly the six production projects with the target
-  frameworks of S1 and one test project `tests/<Project>.Tests/` per production project, each running at least
-  one passing test (S1).
+  `RH####` warning or error; the solution contains the six production projects with the target frameworks of
+  S1 (plus a platform-neutral Companion project only if the plan places the Companion's logic there, named in
+  the decision record of AC13) and one test project `tests/<Project>.Tests/` per production project, each
+  running at least one passing test on Linux, `Censio.Companion.Tests` included (S1).
 - [ ] AC2: The *Analyzer gate* and, after *Test with coverage*, the *Coverage gate* pass on the change, and the
-  CI job on the pull request builds and tests the whole solution, the Companion included, and passes (S2).
+  CI job on the pull request (`ubuntu-latest`) builds the whole solution, the Companion included, runs every
+  test project, `Censio.Companion.Tests` included, and passes (S2).
 - [ ] AC3: `global.json` accepts every .NET 10 SDK from 10.0.100 on and refuses an older SDK and another major
   version (E1).
 - [ ] AC4: In the `Production` environment, `GET /` answers `200` with an HTML page whose title is `Censio`,
@@ -115,11 +110,16 @@ who starts the server or the Companion and needs to see which version runs.
 - [ ] AC13: `docs/ARCHITECTURE.md` lists every project with its responsibility and the project references
   between them, and the way the Windows-only projects build on Linux CI is recorded in a decision record
   (S1, S2).
+- [ ] AC14: Every source file of the Companion (`src/Censio.Companion/` and a platform-neutral Companion
+  project if one exists) appears with hit counts in the coverage reports of *Test with coverage* on Linux, so
+  the *Coverage gate* measures it, except startup and tray glue no unit test can reach: each such file is
+  excluded from the coverage measure in every place that computes it, by a means a product pull request may
+  change (`scope-check.py` rejects an edit of `.squad/tools/squad_settings.py`), with a decision record (S2).
 
 ## Out of scope
 
 - The Dockerfile and the image (#4), the release and edge workflows (#5, #6), README and user guide (#7), the
-  rest of the CI issue (#3: format check, CodeQL, a Windows runner unless the plan chooses one for AC2).
+  rest of the CI issue (#3: format check, CodeQL, a Windows runner, which may only add to the Linux job of AC2).
 - Any pipe, game-data, contract, persistence or ingest code: the four libraries hold no feature code yet.
 - Companion features: connection status, logging, settings, autostart, local mode (#13, #15, #39, #43); a
   localized (German) Companion UI; a final product icon (a placeholder icon is enough).
@@ -131,21 +131,18 @@ who starts the server or the Companion and needs to see which version runs.
 
 - `EnableWindowsTargeting` or a dedicated Windows job? Answered: the plan decides and records it (AC13). The
   spec fixes the constraint: the stack's commands and the CI job run on Linux and must pass for the whole
-  solution (AC1, AC2), so the Companion must at least compile on Linux; how its tests run there (a test
-  project for `net10.0-windows` cannot start without the Windows Desktop runtime) is the plan's to settle.
-- Which version does a build show without one? Answered: `0.0.0` (AC6). #5 passes the tag's version and #6
-  names `0.0.0-edge+<short sha>`, which S5 shows unchanged; #8 lists 0.1.0 as the first release, which is a
-  tag, not a default.
+  solution (AC1, AC2), so the Companion compiles on Linux and its logic is tested on Linux (AC14, *Challenge*
+  1); a Windows job is at most an addition, never the only place the Companion's tests run.
+- Which version does a build show without one? Answered: `0.0.0` (AC6); #5 and #6 pass their own (#6:
+  `0.0.0-edge+<short sha>`, shown unchanged per S5).
 - What does the start page show? Answered: the product name and the version (issue scope), with the exact text
   of S3; its layout is #31.
 - Single instance per machine or per user, and does the second start say anything? Answered: per Windows user
-  session, silently (S9, E4). The issue asks for a single instance only; who reads the pipe when two users run
-  the game is #11's single-reader handling, and a message is asked for nowhere.
+  session, silently (S9, E4); pipe ownership across users is #11's single-reader handling.
 - Companion UI language? Answered: English. #8 limits DE/EN to the names extracted from the game; the
   bilingual rule of `AGENTS.md` covers `README.md` and the user guides, not the UI.
-- Does this feature change CI? Answered: `ci.yml` already restores, builds and tests `Censio.slnx` on
-  `ubuntu-latest` once the file exists (*Detect solution*), so this pull request is the first whose CI builds
-  the solution; an edit to `ci.yml` is in scope only as far as AC2 needs it.
+- Does this feature change CI? Answered: `ci.yml` already builds and tests `Censio.slnx` on
+  `ubuntu-latest` once it exists (*Detect solution*); a `ci.yml` edit is in scope only as AC2 and AC14 need it.
 - How are AC10–AC12 verified, when the session and CI are Linux? Answered: the menu's items, texts and states
   and the single-instance rule by unit tests as far as they run on Linux; the tray behavior itself by a manual
   run of the Product Manager on Windows, which the plan schedules before the review — the issue's own criterion
@@ -163,6 +160,24 @@ No area exists yet (`docs/areas/README.md`); the plan decides the areas. In outl
   `docs/CONTRIBUTING.md` (*Versioning and releases*) how the version is passed to a build; `.squad/stack.md`
   (*Layout*) and the architecture block of `AGENTS.md` and `.github/copilot-instructions.md`, which say the
   projects are added "with the issues that need them", list the six projects.
+
+## Challenge
+
+The minor objections 2-5 stay below as *Challenge notes*; they are answered when the plan is written.
+
+1. (major) Companion tests cannot run on Linux as AC1 demanded, and the *Coverage gate* would drop the
+   Companion's files unnoticed. Accepted, option (a). Confirmed: `coverage-check.py` prints a changed file
+   without hits in any report as `n/a` and counts none of its lines (`new_code_coverage`), and
+   `overall_coverage` sums only files in a report. Option (b), a Windows job as the only place these tests
+   run, lost: the session and the CI job are Linux, so every gate run before the pull request would stay
+   blind to the Companion and the squad could not run the tests it writes. Changed: S2, AC1 and AC2 require
+   `Censio.Companion.Tests` to run on Linux and in the `ubuntu-latest` job, allowing one platform-neutral
+   Companion project if the plan prefers it to linked sources (its choice, recorded per AC13); the new AC14
+   requires every Companion source file in the coverage reports. Partly rejected: the exclusion cannot go into
+   `COVERAGE_EXCLUDES`, since `.squad/tools/squad_settings.py` is a squad file a product pull request may not
+   change (`scope-check.py`, `SQUAD_FILES_ALLOWED`); AC14 asks for an exclusion in every place that computes
+   coverage by a means the pull request may change (or keeping the glue small enough to pass unexcluded), and
+   the plan names it. An edit of `ci.yml` (`sonar.coverage.exclusions`) goes under *Security areas touched*.
 
 ## Challenge notes
 
