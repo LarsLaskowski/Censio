@@ -1,5 +1,3 @@
-#pragma warning disable RH2003 // Skeleton body until the implementation task
-
 namespace Censio.Companion.Core;
 
 /// <summary>
@@ -30,7 +28,7 @@ public static class TrayMenu
     /// <returns>The text of the version entry</returns>
     public static string FormatVersion(string version)
     {
-        throw new NotImplementedException();
+        return "Version " + version;
     }
 
     /// <summary>
@@ -40,7 +38,12 @@ public static class TrayMenu
     /// <returns>The entries in display order</returns>
     public static IReadOnlyList<TrayMenuEntry> Create(string version)
     {
-        throw new NotImplementedException();
+        return
+        [
+            new TrayMenuEntry(TrayMenuEntryKind.Version, FormatVersion(version), false),
+            new TrayMenuEntry(TrayMenuEntryKind.Separator, string.Empty, false),
+            new TrayMenuEntry(TrayMenuEntryKind.Exit, ExitText, true)
+        ];
     }
 
     #endregion // Methods

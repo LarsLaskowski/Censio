@@ -1,5 +1,3 @@
-#pragma warning disable RH2003 // Skeleton body until the implementation task
-
 namespace Censio.Companion.Core;
 
 /// <summary>
@@ -22,6 +20,16 @@ public sealed class SingleInstanceGuard : IDisposable
     /// The name of the mutex
     /// </summary>
     private readonly string _name;
+
+    /// <summary>
+    /// The mutex, once <see cref="TryAcquire" /> has run
+    /// </summary>
+    private Mutex? _mutex;
+
+    /// <summary>
+    /// Whether this guard created the mutex and therefore owns it
+    /// </summary>
+    private bool _isOwner;
 
     #endregion // Fields
 
@@ -46,7 +54,10 @@ public sealed class SingleInstanceGuard : IDisposable
     /// <returns><see langword="true" /> when this guard created the mutex; otherwise <see langword="false" /></returns>
     public bool TryAcquire()
     {
-        throw new NotImplementedException(_name);
+        _mutex = new Mutex(true, _name, out var createdNew);
+        _isOwner = createdNew;
+
+        return createdNew;
     }
 
     #endregion // Methods
@@ -56,7 +67,14 @@ public sealed class SingleInstanceGuard : IDisposable
     /// <inheritdoc />
     public void Dispose()
     {
-        throw new NotImplementedException();
+        if (_isOwner)
+        {
+            _mutex!.ReleaseMutex();
+            _isOwner = false;
+        }
+
+        _mutex?.Dispose();
+        _mutex = null;
     }
 
     #endregion // IDisposable

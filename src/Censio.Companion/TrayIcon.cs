@@ -1,6 +1,6 @@
-#pragma warning disable RH2003 // Skeleton body until the implementation task
-
 using System.Windows.Forms;
+
+using Censio.Companion.Core;
 
 namespace Censio.Companion;
 
@@ -12,14 +12,14 @@ internal sealed class TrayIcon : IDisposable
     #region Fields
 
     /// <summary>
-    /// The product version
+    /// The notification area icon
     /// </summary>
-    private readonly string _version;
+    private readonly NotifyIcon _notifyIcon;
 
     /// <summary>
-    /// The action the exit entry runs
+    /// The context menu of the icon
     /// </summary>
-    private readonly Action _exit;
+    private readonly ContextMenuStrip _menu;
 
     #endregion // Fields
 
@@ -32,8 +32,49 @@ internal sealed class TrayIcon : IDisposable
     /// <param name="exit">The action the exit entry runs</param>
     public TrayIcon(string version, Action exit)
     {
-        _version = version;
-        _exit = exit;
+        _menu = new ContextMenuStrip();
+
+        foreach (var entry in TrayMenu.Create(version))
+        {
+            switch (entry.Kind)
+            {
+                case TrayMenuEntryKind.Separator:
+                    {
+                        _menu.Items.Add(new ToolStripSeparator());
+                    }
+                    break;
+
+                case TrayMenuEntryKind.Exit:
+                    {
+                        var item = new ToolStripMenuItem(entry.Text)
+                                   {
+                                       Enabled = entry.IsEnabled
+                                   };
+
+                        item.Click += (_, _) => exit();
+
+                        _menu.Items.Add(item);
+                    }
+                    break;
+
+                default:
+                    {
+                        _menu.Items.Add(new ToolStripMenuItem(entry.Text)
+                                        {
+                                            Enabled = entry.IsEnabled
+                                        });
+                    }
+                    break;
+            }
+        }
+
+        _notifyIcon = new NotifyIcon
+                      {
+                          Icon = System.Drawing.SystemIcons.Application,
+                          Text = TrayMenu.ToolTip,
+                          ContextMenuStrip = _menu,
+                          Visible = true
+                      };
     }
 
     #endregion // Constructors
@@ -43,7 +84,9 @@ internal sealed class TrayIcon : IDisposable
     /// <inheritdoc />
     public void Dispose()
     {
-        throw new NotImplementedException(_version + _exit.Method.Name);
+        _notifyIcon.Visible = false;
+        _notifyIcon.Dispose();
+        _menu.Dispose();
     }
 
     #endregion // IDisposable
