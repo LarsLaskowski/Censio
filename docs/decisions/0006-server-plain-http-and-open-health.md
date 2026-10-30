@@ -31,3 +31,6 @@ Option 2. The server adds no HTTPS redirection and no HSTS, listens on the ASP.N
 - An operator who exposes the server beyond a trusted network must put a TLS proxy in front (`SECURITY.md`).
 - Web login stays out (none planned); a later login must exempt `/health`.
 - The start page shows the version to anyone who can reach it, accepted in a trusted network.
+- Host filtering is off (`AllowedHosts` `*`) and the Blazor hub checks no `Origin`, so a DNS-rebinding page can
+  read the start page; it shows only the version, accepted. The first change that puts game data on a page
+  revisits this choice.
