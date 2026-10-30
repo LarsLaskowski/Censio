@@ -2,6 +2,11 @@ using System.Text.RegularExpressions;
 
 using Censio.Contracts;
 
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Configuration.Json;
+using Microsoft.Extensions.DependencyInjection;
+
 namespace Censio.Server.Tests;
 
 /// <summary>
@@ -129,6 +134,114 @@ public sealed class ProgramTests
         Assert.AreEqual(System.Net.HttpStatusCode.OK, response.StatusCode, "The health endpoint should answer 200");
         Assert.AreEqual("text/plain", response.Content.Headers.ContentType?.MediaType, "The health endpoint should answer text/plain");
         Assert.AreEqual("Healthy", body, "The health endpoint should answer exactly Healthy");
+    }
+
+    /// <summary>
+    /// A request over HTTP is not redirected to HTTPS, even when an HTTPS port is known.
+    /// </summary>
+    /// <param name="path">The requested path</param>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [DataRow("/")]
+    [DataRow("/health")]
+    public async Task ProgramGetOverHttpWithHttpsPortDoesNotRedirect(string path)
+    {
+        // Arrange
+        var settings = new Dictionary<string, string?>
+                       {
+                           ["https_port"] = "443"
+                       };
+        using var factory = new CensioServerFactory("Production", settings);
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+                                                {
+                                                    AllowAutoRedirect = false,
+                                                    BaseAddress = new Uri("http://censio.example")
+                                                });
+
+        // Act
+        using var response = await client.GetAsync(path, TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(System.Net.HttpStatusCode.OK, response.StatusCode, "The request over HTTP should be answered, not redirected");
+        Assert.IsNull(response.Headers.Location, "The answer should carry no Location header");
+    }
+
+    /// <summary>
+    /// A request over HTTPS gets no HSTS header.
+    /// </summary>
+    /// <param name="path">The requested path</param>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [DataRow("/")]
+    [DataRow("/health")]
+    public async Task ProgramGetOverHttpsSendsNoHstsHeader(string path)
+    {
+        // Arrange
+        using var factory = new CensioServerFactory("Production");
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+                                                {
+                                                    AllowAutoRedirect = false,
+                                                    BaseAddress = new Uri("https://censio.example")
+                                                });
+
+        // Act
+        using var response = await client.GetAsync(path, TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(System.Net.HttpStatusCode.OK, response.StatusCode, "The request over HTTPS should be answered");
+        Assert.IsFalse(response.Headers.Contains("Strict-Transport-Security"), "The answer should carry no Strict-Transport-Security header");
+    }
+
+    /// <summary>
+    /// An unknown path answers 404 with an empty body.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    public async Task ProgramGetUnknownPathReturnsNotFound()
+    {
+        // Arrange
+        using var factory = new CensioServerFactory("Production");
+        using var client = factory.CreateClient();
+
+        // Act
+        using var response = await client.GetAsync("/does-not-exist", TestContext.CancellationToken);
+        var body = await response.Content.ReadAsStringAsync(TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(System.Net.HttpStatusCode.NotFound, response.StatusCode, "An unknown path should answer 404");
+        Assert.AreEqual(string.Empty, body, "The 404 answer should have an empty body");
+    }
+
+    /// <summary>
+    /// The committed settings files set no listen address.
+    /// </summary>
+    /// <param name="environment">The hosting environment</param>
+    [TestMethod]
+    [DataRow("Production")]
+    [DataRow("Development")]
+    public void ProgramProductionConfigurationSetsNoListenAddress(string environment)
+    {
+        // Arrange
+        // Only the JSON sources are read (the committed appsettings*.json), never environment variables, which machines set.
+        // That the server listens on loopback by default is not proven here but by starting the built server.
+        using var factory = new CensioServerFactory(environment);
+        var root = (IConfigurationRoot)factory.Services.GetRequiredService<IConfiguration>();
+        var forbidden = new[] { "urls", "http_ports", "https_ports" };
+
+        // Act
+        var jsonProviders = root.Providers.OfType<JsonConfigurationProvider>().ToList();
+        var keys = jsonProviders.SelectMany(provider => provider.GetChildKeys([], null)).ToList();
+        var endpoints = jsonProviders.Where(provider => provider.GetChildKeys([], "Kestrel").Contains("Endpoints", StringComparer.OrdinalIgnoreCase)).ToList();
+
+        // Assert
+        Assert.IsNotEmpty(jsonProviders, "The committed settings files should be loaded as JSON sources");
+
+        foreach (var key in forbidden)
+        {
+            Assert.IsFalse(keys.Contains(key, StringComparer.OrdinalIgnoreCase), $"The committed settings should not set {key}");
+        }
+
+        Assert.IsEmpty(endpoints, "The committed settings should not set Kestrel:Endpoints");
     }
 
     #endregion // Methods
