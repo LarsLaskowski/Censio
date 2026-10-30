@@ -18,3 +18,4 @@ are quoted in full.
 | 2026-10-30 20:00 | 4 Skeleton G1 | squad-dev | RESULT: DONE; 13 projects, root build files, stubs; Build 0 warnings 0 errors (sonnet/medium · 87,028 tokens · 10 tool uses · 101 s) |
 | 2026-10-30 20:01 | 5 Tests first G1 | squad-tester | RESULT: DONE; 6 tests in 4 files compile and fail (NotImplementedException), none deferred (sonnet/medium · 78,998 tokens · 8 tool uses · 67 s) |
 | 2026-10-30 20:02 | 6 Implement G1 | squad-dev | RESULT: PASS; version/marker tests green, -p:Version honoured, default 0.0.0; Coverage gate below threshold only on G2 Program.cs (sonnet/medium · 70,170 tokens · 6 tool uses · 54 s) |
+| 2026-10-30 20:05 | 4 Skeleton G2 | squad-dev | RESULT: DONE; server skeleton, fact 16 confirmed (Program public), build 0 warnings (sonnet/medium · usage pending) |
