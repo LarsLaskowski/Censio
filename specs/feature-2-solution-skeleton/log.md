@@ -25,4 +25,4 @@ are quoted in full.
 | 2026-10-30 20:13 | 6 Implement G2 (fix round) | squad-dev | RESULT: PASS; RequiresAspNetWebAssets in Censio.Server.csproj, restore-order reproduction lists blazor.web.js, tests green on default and -p:Version=1.2.3 (sonnet/medium · 3,263 tokens · 3 tool uses · 46 s · continued from 6 Implement G1) |
 | 2026-10-30 20:15 | 6 Coverage G2 (deferred tests) | squad-tester | RESULT: PASS; AC7/AC8/AC9 tests written, each fails under its mutation, 12 server tests green (sonnet/medium · 68,551 tokens · 7 tool uses · 122 s) |
 | 2026-10-30 20:16 | 4 Skeleton G3 | squad-dev | RESULT: DONE; Companion.Core stubs and shell App/TrayIcon, build 0 warnings (sonnet/medium · usage pending) |
-| 2026-10-30 20:18 | 5 Tests first G3 | squad-tester | RESULT: DONE; 7 tests compile and fail on skeleton; deferred: ToolTip, DefaultName, CoreAssemblyCarriesBuildVersion (sonnet/medium · usage pending) |
+| 2026-10-30 20:18 | 5 Tests first G3 | squad-tester | RESULT: DONE; 7 tests compile and fail on skeleton; deferred: ToolTip, DefaultName, CoreAssemblyCarriesBuildVersion (sonnet/medium · 9,397 tokens · 4 tool uses · 71 s · continued from 5 Tests first G1) |
