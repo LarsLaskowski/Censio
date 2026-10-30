@@ -27,3 +27,4 @@ are quoted in full.
 | 2026-10-30 20:16 | 4 Skeleton G3 | squad-dev | RESULT: DONE; Companion.Core stubs and shell App/TrayIcon, build 0 warnings (sonnet/medium · usage pending) |
 | 2026-10-30 20:18 | 5 Tests first G3 | squad-tester | RESULT: DONE; 7 tests compile and fail on skeleton; deferred: ToolTip, DefaultName, CoreAssemblyCarriesBuildVersion (sonnet/medium · 9,397 tokens · 4 tool uses · 71 s · continued from 5 Tests first G1) |
 | 2026-10-30 20:19 | 6 Implement G3 | squad-dev | RESULT: PASS; Core + shell implemented, 7/7 Core tests, coverage gate 100% (Core only), Companion.exe is PE32+ GUI; fact 19 unread (no sources) -> manual check (sonnet/medium · 11,695 tokens · 5 tool uses · 63 s · continued from 6 Implement G1) |
+| 2026-10-30 20:20 | 6 Coverage G3 (deferred tests) | squad-tester | RESULT: PASS; 4 deferred G3 tests written, 11 Core tests green, mutations fail the matching tests (AC6 build-version test not mutated) (sonnet/medium · usage pending) |

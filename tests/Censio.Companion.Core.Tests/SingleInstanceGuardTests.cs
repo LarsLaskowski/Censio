@@ -72,6 +72,48 @@ public sealed class SingleInstanceGuardTests
     }
 
     /// <summary>
+    /// Disposing a guard that did not acquire the name does not release the owner.
+    /// </summary>
+    [TestMethod]
+    public void SingleInstanceGuardDisposeOfNonOwnerKeepsNameHeld()
+    {
+        // Arrange
+        var name = CreateName();
+        using var first = new SingleInstanceGuard(name);
+        var firstAcquired = first.TryAcquire();
+        var second = new SingleInstanceGuard(name);
+        var secondAcquired = second.TryAcquire();
+
+        // Act
+        second.Dispose();
+
+        using var third = new SingleInstanceGuard(name);
+        var thirdAcquired = third.TryAcquire();
+
+        // Assert
+        Assert.IsTrue(firstAcquired, "The first guard should acquire the name");
+        Assert.IsFalse(secondAcquired, "The second guard should not acquire the name");
+        Assert.IsFalse(thirdAcquired, "The name should stay held by the first guard after the second one is disposed");
+    }
+
+    /// <summary>
+    /// The default name is session-local.
+    /// </summary>
+    [TestMethod]
+    public void SingleInstanceGuardDefaultNameIsSessionLocal()
+    {
+        // Arrange
+        const string expectedPrefix = "Local\\";
+
+        // Act
+        var name = SingleInstanceGuard.DefaultName;
+
+        // Assert
+        Assert.Contains("\\", name, "The default name should contain the backslash character");
+        Assert.StartsWith(expectedPrefix, name, StringComparison.Ordinal, "The default name should start with Local followed by a backslash");
+    }
+
+    /// <summary>
     /// Creates a mutex name that no other test or run uses.
     /// </summary>
     /// <returns>A unique session-local mutex name</returns>

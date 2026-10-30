@@ -1,3 +1,5 @@
+using System.Reflection;
+
 using Censio.Contracts;
 
 namespace Censio.Companion.Core.Tests;
@@ -75,6 +77,41 @@ public sealed class TrayMenuTests
 
         // Assert
         Assert.AreEqual("Version " + version, entries.Single(entry => entry.Kind == TrayMenuEntryKind.Version).Text, "The version entry should read Version followed by the product version");
+    }
+
+    /// <summary>
+    /// The tooltip names the application.
+    /// </summary>
+    [TestMethod]
+    public void TrayMenuToolTipIsCensioCompanion()
+    {
+        // Arrange
+        const string expected = "Censio Companion";
+
+        // Act
+        var toolTip = TrayMenu.ToolTip;
+
+        // Assert
+        Assert.AreEqual(expected, toolTip, "The tooltip of the tray icon should be Censio Companion");
+    }
+
+    /// <summary>
+    /// The Core assembly carries the build version of the solution.
+    /// </summary>
+    [TestMethod]
+    public void TrayMenuCoreAssemblyCarriesBuildVersion()
+    {
+        // Arrange
+        var assembly = typeof(TrayMenu).Assembly;
+        var expected = assembly.GetCustomAttributes<AssemblyMetadataAttribute>()
+                               .Single(attribute => attribute.Key == "CensioBuildVersion")
+                               .Value;
+
+        // Act
+        var actual = ProductVersion.Read(assembly);
+
+        // Assert
+        Assert.AreEqual(expected, actual, "The Core assembly should carry the build version as its informational version");
     }
 
     #endregion // Methods
