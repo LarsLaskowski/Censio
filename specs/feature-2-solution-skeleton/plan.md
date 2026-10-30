@@ -35,6 +35,7 @@ six test projects, a runnable server and a runnable Companion shell.
 | 18 | `Local\` scopes a named mutex to the Windows terminal-services session, so each signed-in user has their own | to verify: Windows documentation *Kernel Object Namespaces*; Product Manager's manual run (E4, if a second account is at hand) | unverified |
 | 19 | Windows Forms `NotifyIcon` re-adds its icon on the `TaskbarCreated` message (Explorer restart) | to verify: Dev, step 6, reads `NotifyIcon.cs` in a shallow clone of `dotnet/winforms` (release/10.0); Product Manager's manual run (E5) | unverified |
 | 20 | Issue: a release workflow ships artifacts from M0 on (#1, the dependency, is closed) | No release workflow exists yet (#5 open); not a precondition | refuted |
+| 21 | The SDK adds the Blazor web assets at restore only when `RequiresAspNetWebAssets` is `true`, which target `ResolveRequiredWebAssets` sets only if a `.razor` content item exists; setting the property in the `.csproj` makes the restore-order publish contain `wwwroot/_framework/blazor.web*.js` | to verify: Dev, task 6, runs the unchanged *Image build check* reproduction with the property set and lists `publish/wwwroot/_framework/`. Read so far: SDK 10.0.403 `Microsoft.NET.Sdk.Web.ProjectSystem.targets` (`ResolveRequiredWebAssets`) and `Microsoft.NET.Sdk.FrameworkReferenceResolution.targets` (default `false`, passed to `ProcessFrameworkReferences`); Dev's reproduction: no `_framework/` without a `.razor` file before restore, present with one | unverified |
 
 ## Acceptance criteria
 
@@ -100,7 +101,10 @@ Steps 4–6 apply in full; this section only names the criteria, or the parts of
   `"allowPrerelease": false`; `latestFeature` stays within 10.0 and refuses an older SDK, per the `global.json`
   documentation); the Dev's build with the session's 10.0.403 shows acceptance.
 - AC4 (image): the Dev runs the *Image build check* reproduction of `.squad/stack.md` (no Dockerfile yet, #4) and
-  confirms `publish/wwwroot/_framework/` holds `blazor.web.<hash>.js` (or `blazor.web.js`).
+  confirms `publish/wwwroot/_framework/` holds `blazor.web.<hash>.js` (or `blazor.web.js`). The reproduction stays
+  as written (only project and build files before the restore, record 0007); if the output still lacks the script
+  with `RequiresAspNetWebAssets` set (fact 21), the Dev adds `'*.razor'` to its first `git ls-files` copy in task 15
+  and reports it, and the #4 comment names the same rule (record 0007, option 2).
 - AC6 (default and override): the Dev builds once without and once with `-p:Version=1.2.3`, starts the server
   each time and reports the start page's `Version 0.0.0` and `Version 1.2.3`, and runs *Test* on the second build;
   the Reviewer reads `Version` `0.0.0` in `Directory.Build.props`. Both are mandatory: the tests cannot see a
@@ -159,6 +163,8 @@ empty body; `Production` never shows exception details). `appsettings.json`: `Lo
 `"AllowedHosts": "*"` (host filtering off, a deliberate choice in record 0006), the template's levels
 `"Default": "Information"` and `"Microsoft.AspNetCore": "Warning"` (so no request path or host reaches the
 console), no `Urls`/`Kestrel` keys. No `Properties/launchSettings.json` (spec *Challenge* 4).
+`Censio.Server.csproj` sets `<RequiresAspNetWebAssets>true</RequiresAspNetWebAssets>` with a one-line comment
+naming record 0007, so the restore requests the Blazor scripts without any `.razor` file present (fact 21).
 Components under `src/Censio.Server/Components/`: `App.razor` (HTML shell, `<HeadOutlet @rendermode="InteractiveServer" />`,
 `<Routes @rendermode="InteractiveServer" />`, script `@Assets["_framework/blazor.web.js"]`), `Routes.razor` (a `Router` without the obsolete `NotFound`
 fragment, CS0618), `_Imports.razor`, `Layout/MainLayout.razor` (`@Body` only), `Pages/Home.razor` (`@page "/"`).
@@ -208,6 +214,9 @@ argument to `/d:sonar.coverage.exclusions=".squad/**,.claude/**,src/Censio.Compa
 4. **Tray icon:** Windows Forms `NotifyIcon` (chosen) vs H.NotifyIcon — record 0004.
 5. **Version:** one MSBuild property (chosen) vs MinVer/Nerdbank.GitVersioning — record 0005.
 6. **HTTPS:** template's redirection and HSTS vs plain HTTP with TLS at the proxy (chosen) — record 0006.
+7. **Blazor scripts in a restore-first build:** `RequiresAspNetWebAssets` in the `.csproj` (chosen) vs copying
+   `*.razor` before the restore vs an empty `wwwroot` (no effect) — record 0007 (Lead decision on the Dev's
+   task-6 finding).
 
 ## Affected projects and types
 
@@ -294,7 +303,10 @@ All by the Dev after the code is green, unless noted; found by a sweep of `docs/
   replaces "listed here as they are created"; the Companion line names the shell/Core split.
 - `.squad/stack.md`: *Layout* lists the seven projects and the shell without test project; *Coverage exclusions*
   adds that `src/Censio.Companion/**` is excluded in `sonar.coverage.exclusions` and, locally, by construction
-  (record 0004); *Known pitfalls* adds fact 2 (CS0104 with `UseWPF` + `UseWindowsForms`).
+  (record 0004); *Known pitfalls* adds fact 2 (CS0104 with `UseWPF` + `UseWindowsForms`); *Image build check*
+  adds after the Vandox#24 sentence that a Blazor project sets `RequiresAspNetWebAssets` to `true` in its
+  `.csproj`, so the restore needs no `.razor` file (record 0007) — the reproduction script itself is unchanged
+  unless fact 21 is refuted (*Verification without tests*, AC4).
 - `.squad/project.md` *Security areas*: a new entry "Network exposure: the server's listener and its routes
   reachable without login (`/`, `/health`, the Blazor hub and static assets); plain HTTP, TLS at the reverse
   proxy (record 0006)".
@@ -342,6 +354,7 @@ true. *Security model* and `SECURITY.md` change together (record 0006).
 - `docs/decisions/0004-companion-shell-and-linux-build.md` (Proposed)
 - `docs/decisions/0005-product-version-from-one-build-property.md` (Proposed)
 - `docs/decisions/0006-server-plain-http-and-open-health.md` (Proposed)
+- `docs/decisions/0007-server-web-assets-independent-of-restore-inputs.md` (Proposed)
 
 ## Out of scope / follow-ups
 
@@ -354,6 +367,9 @@ As in the spec. Follow-ups for the orchestrator to open:
   and set `persist-credentials: false` on `actions/checkout` in `ci.yml`.
 - Product repository, comment on #4: the `aspnet` base image sets `ASPNETCORE_HTTP_PORTS=8080`, which binds all
   interfaces, so the loopback default of AC9 does not hold in the image; #4 states it in `docs/areas/server.md`.
+  Second point of the same comment: the Dockerfile copies only project and build files before `dotnet restore`;
+  the Blazor scripts reach the image because `Censio.Server.csproj` sets `RequiresAspNetWebAssets` (record 0007),
+  and the image build checks `wwwroot/_framework/blazor.web*.js` in the published output.
 - Product repository: "[Docs] Align the PR areas in CONTRIBUTING.md with the issue areas" — the list (`Companion`,
   `Server`, `Tests`, `Docker`, `CI`, `Docs`) lacks `Repo`, `Pipe`, `GameData`, `Contracts`, `Release`, `UI` and the
   other areas the issue titles use.

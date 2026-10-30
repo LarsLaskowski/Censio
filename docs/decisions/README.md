@@ -59,4 +59,5 @@ once in the [area document](../areas/README.md) of the record's area, and the re
 | [0004](0004-companion-shell-and-linux-build.md) | Companion logic in a platform-neutral project; the Windows shell builds on Linux | Proposed | 2026-10-30 |
 | [0005](0005-product-version-from-one-build-property.md) | The product version comes from one build property | Proposed | 2026-10-30 |
 | [0006](0006-server-plain-http-and-open-health.md) | The server serves plain HTTP; start page and health check need no login | Proposed | 2026-10-30 |
+| [0007](0007-server-web-assets-independent-of-restore-inputs.md) | The server project requests the Blazor web assets itself | Proposed | 2026-10-30 |
 <!-- project:end index -->
