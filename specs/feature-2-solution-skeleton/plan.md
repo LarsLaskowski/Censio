@@ -1,9 +1,10 @@
 # Plan: Solution skeleton with all projects
 
 Source: Issue #2 | [spec.md](spec.md)
-Status: Draft
+Status: Revised (1)
 Tier: security — the change opens the server's first network listener with routes reachable without login (`/`, `/health`, the Blazor hub and static assets) and changes the CI workflow, both security controls in the sense of `.squad/routing.md` (*Tiers*: network exposure, trust of the build).
 Security areas touched: network exposure (new Kestrel listener of `Censio.Server`, unauthenticated routes `/`, `/health`, `/_blazor`, `/_framework/*`; no HTTPS redirection, no HSTS, record 0006); CI workflow `.github/workflows/ci.yml` (step *Detect solution* removed, `sonar.coverage.exclusions` extended); build configuration (`global.json`, `Directory.Build.props`, `Directory.Packages.props`, all `.csproj`, `.gitignore`); dependencies (new NuGet packages: Reihitsu.Analyzer, SonarAnalyzer.CSharp, MSTest.TestFramework, MSTest.TestAdapter, MSTest.Analyzers, Microsoft.NET.Test.Sdk, coverlet.collector, Microsoft.AspNetCore.Mvc.Testing); `.squad/project.md` *Security areas* (one entry added). Not touched: ingest token, authentication, cache/recording paths, parsing of external input, outbound calls, logging of external data.
+Plan size: the skeleton creates thirteen projects, a runnable server and a Windows shell at once, and each needs its own build settings and a verification path outside unit tests.
 
 ## Problem / root cause
 
@@ -14,7 +15,7 @@ six test projects, a runnable server and a runnable Companion shell.
 
 | # | Claim | Evidence | Status |
 | - | ----- | -------- | ------ |
-| 1 | A `net10.0-windows` project with `UseWPF` and `UseWindowsForms` builds on Linux with `EnableWindowsTargeting`, SDK 10.0.403 | Scratch project in the session scratchpad (`dotnet new wpf`, both flags, `dotnet build -c Release`): 0 warnings, 0 errors | confirmed |
+| 1 | A `net10.0-windows` project with `UseWPF` and `UseWindowsForms` builds on Linux with `EnableWindowsTargeting`, SDK 10.0.403; without a `RuntimeIdentifier` its apphost is a Linux ELF (no `.exe`), with `RuntimeIdentifier` `win-x64` and `SelfContained` false it is `bin/Release/net10.0-windows/win-x64/<name>.exe` | Scratch project (`dotnet new wpf`, both flags, `dotnet build -c Release`): 0 warnings, 0 errors; DA's probe: ELF apphost without RID; Lead's rerun with both properties in the `.csproj`: `file` reports `PE32+ executable (GUI) x86-64, for MS Windows` | confirmed |
 | 2 | With `UseWPF` and `UseWindowsForms` together, implicit usings make `Application` ambiguous (CS0104); removing the `System.Windows.Forms` and `System.Drawing` global usings fixes it | Same scratch project: CS0104 in `App.xaml.cs` first; with `<Using Remove="System.Windows.Forms" />` and `<Using Remove="System.Drawing" />` the build passes | confirmed |
 | 3 | The Windows shell's runtime config requires `Microsoft.WindowsDesktop.App`, so no test project referencing it can start on Linux | Scratch `Probe.runtimeconfig.json` lists `Microsoft.WindowsDesktop.App` 10.0.0; the session has only `Microsoft.NETCore.App` and `Microsoft.AspNetCore.App` (DA, spec challenge) | confirmed |
 | 4 | The *Coverage gate* counts no line of a file that appears in no coverage report | `.squad/tools/coverage-check.py` `overall_coverage` (sums only `hits` entries) and `new_code_coverage` (`relevant` empty → `n/a`, adds 0) | confirmed |
@@ -33,8 +34,7 @@ six test projects, a runnable server and a runnable Companion shell.
 | 17 | A named `Mutex` with the prefix `Local\` works on Linux, and a second `new Mutex(true, name, out createdNew)` in the same process returns `createdNew == false` | to verify: Tester, step 5, `SingleInstanceGuardTests` on Linux | unverified |
 | 18 | `Local\` scopes a named mutex to the Windows terminal-services session, so each signed-in user has their own | to verify: Windows documentation *Kernel Object Namespaces*; Product Manager's manual run (E4, if a second account is at hand) | unverified |
 | 19 | Windows Forms `NotifyIcon` re-adds its icon on the `TaskbarCreated` message (Explorer restart) | to verify: Dev, step 6, reads `NotifyIcon.cs` in a shallow clone of `dotnet/winforms` (release/10.0); Product Manager's manual run (E5) | unverified |
-| 20 | The issue's claim "Depends on #1" is met | Issue #1 closed; template files present | confirmed |
-| 21 | The issue's claim that the release workflow can ship artifacts from M0 on | No release workflow exists yet (#5 open); not a precondition of this change | refuted |
+| 20 | Issue: a release workflow ships artifacts from M0 on (#1, the dependency, is closed) | No release workflow exists yet (#5 open); not a precondition | refuted |
 
 ## Acceptance criteria
 
@@ -74,12 +74,15 @@ What each test asserts:
   `Location` header.
 - `ProgramGetOverHttpsSendsNoHstsHeader`: `Production`, base address `https://censio.example` (not a localhost
   host, which HSTS skips); no `Strict-Transport-Security` header.
-- `ProgramProductionConfigurationSetsNoListenAddress`: `IConfiguration` of the `Production` host has no value for
-  `urls`, `http_ports`, `https_ports` and no section `Kestrel:Endpoints`.
+- `ProgramProductionConfigurationSetsNoListenAddress`: the JSON configuration sources of the committed
+  `appsettings*.json` (not environment variables, which machines set) hold no `urls`, `http_ports`, `https_ports`
+  and no `Kestrel:Endpoints`; a comment says the loopback default is proven by the Dev's start (fact 12).
 - `TrayMenuCreateReturnsVersionSeparatorExit`: `TrayMenu.Create("1.2.3")` gives exactly three entries, kinds
   `Version`, `Separator`, `Exit`, texts `Version 1.2.3`, empty, `Exit`.
 - `SingleInstanceGuardSecondGuardWithSameNameReturnsFalse`: two guards on one unique name (a GUID suffix per
   test, so runs never collide); the first `TryAcquire` is true, the second false, the first stays acquired.
+- `SingleInstanceGuardAfterDisposeNameCanBeAcquiredAgain`: disposes every guard on the name, the one that did not
+  acquire included, before the third (an open handle keeps the mutex alive).
 - `SingleInstanceGuardDefaultNameIsSessionLocal`: `DefaultName` starts with `Local\` (in C#: `"Local\\"`; the
   test asserts the string contains the backslash character, so a lost escape fails).
 
@@ -99,11 +102,15 @@ Steps 4–6 apply in full; this section only names the criteria, or the parts of
 - AC4 (image): the Dev runs the *Image build check* reproduction of `.squad/stack.md` (no Dockerfile yet, #4) and
   confirms `publish/wwwroot/_framework/` holds `blazor.web.<hash>.js` (or `blazor.web.js`).
 - AC6 (default and override): the Dev builds once without and once with `-p:Version=1.2.3`, starts the server
-  each time and reports the start page's `Version 0.0.0` and `Version 1.2.3`, and runs *Test* on the second build.
+  each time and reports the start page's `Version 0.0.0` and `Version 1.2.3`, and runs *Test* on the second build;
+  the Reviewer reads `Version` `0.0.0` in `Directory.Build.props`. Both are mandatory: the tests cannot see a
+  missing default (Challenge 7).
 - AC9 (log): the Dev starts `dotnet src/Censio.Server/bin/Release/net10.0/Censio.Server.dll` with no environment
   variables set, reports the `Now listening on:` line, `curl`s `/` and `/health`, and stops it.
 - AC10, AC11 (process), AC12: a manual run of the Product Manager on Windows (x64, .NET 10 Desktop Runtime) of
-  the built `Censio.Companion.exe`, before the review (step 8): one icon with tooltip `Censio Companion`, no
+  `src/Censio.Companion/bin/Release/net10.0-windows/win-x64/Censio.Companion.exe` with the files next to it, from
+  the *Build* of the work branch on Windows or copied from the Linux *Build* (the same files: fact 1), before the
+  review (step 8): one icon with tooltip `Censio Companion`, no
   window or taskbar button; menu `Version 0.0.0` (greyed), separator, `Exit`; `Exit` removes the icon
   (`echo %ERRORLEVEL%` after `start /wait` shows 0); a second start adds no icon and the first keeps running;
   after `taskkill /f /im explorer.exe` and `start explorer.exe` the icon is back; sign-out shows no dialog. E4
@@ -149,10 +156,12 @@ pipeline `UseAntiforgery()`, `MapStaticAssets()`, `MapHealthChecks("/health")`,
 `MapRazorComponents<App>().AddInteractiveServerRenderMode()`, `Run()`. Deliberately absent: `UseHttpsRedirection`,
 `UseHsts`, `UseExceptionHandler`, `UseStatusCodePages*` (record 0006; unknown paths get the routing 404 with an
 empty body; `Production` never shows exception details). `appsettings.json`: `Logging` defaults and
-`"AllowedHosts": "*"`, no `Urls`/`Kestrel` keys. No `Properties/launchSettings.json` (spec *Challenge* 4).
+`"AllowedHosts": "*"` (host filtering off, a deliberate choice in record 0006), the template's levels
+`"Default": "Information"` and `"Microsoft.AspNetCore": "Warning"` (so no request path or host reaches the
+console), no `Urls`/`Kestrel` keys. No `Properties/launchSettings.json` (spec *Challenge* 4).
 Components under `src/Censio.Server/Components/`: `App.razor` (HTML shell, `<HeadOutlet @rendermode="InteractiveServer" />`,
-`<Routes @rendermode="InteractiveServer" />`, script `@Assets["_framework/blazor.web.js"]`), `Routes.razor`,
-`_Imports.razor`, `Layout/MainLayout.razor` (`@Body` only), `Pages/Home.razor` (`@page "/"`).
+`<Routes @rendermode="InteractiveServer" />`, script `@Assets["_framework/blazor.web.js"]`), `Routes.razor` (a `Router` without the obsolete `NotFound`
+fragment, CS0618), `_Imports.razor`, `Layout/MainLayout.razor` (`@Body` only), `Pages/Home.razor` (`@page "/"`).
 
 Start page layout (fixed, spec S3): `<PageTitle>Censio</PageTitle>`, then `<h1>Censio</h1>`, then
 `<p>Version {version}</p>` with `version = ProductVersion.Read(typeof(Home).Assembly)`. Nothing else; theming is #31.
@@ -167,17 +176,20 @@ AC6). Feature issues may delete the marker once real code and tests exist.
 **Companion.Core.** `TrayMenu` builds the entries (layout fixed by spec S7: `Version <v>` disabled, separator,
 `Exit` enabled) and holds the texts `Censio Companion` and `Exit`. `SingleInstanceGuard` wraps a named `Mutex`
 created with `initiallyOwned: true`; `TryAcquire` returns `createdNew` (never `WaitOne`, which is reentrant on the
-owning thread and would let a second guard in the same process pass); `Dispose` releases the mutex when owned and
-disposes it. `DefaultName` = `Local\Censio.Companion.SingleInstance`.
+owning thread and would let a second guard in the same process pass); `Dispose` calls `ReleaseMutex` only when this guard's own `TryAcquire` returned `createdNew == true` (a
+field; no try-and-catch release, since on Windows ownership belongs to the thread), then disposes the handle. `DefaultName` = `Local\Censio.Companion.SingleInstance`.
 
 **Companion shell** (`src/Censio.Companion/`, `OutputType` `WinExe`, `UseWPF`, `UseWindowsForms`,
-`EnableWindowsTargeting`, `<Using Remove>` for `System.Windows.Forms` and `System.Drawing` — fact 2).
+`EnableWindowsTargeting`, `RuntimeIdentifier` `win-x64`, `SelfContained` false — so every build, Linux included,
+produces the Windows `Censio.Companion.exe` (fact 1); #5 publishes with `--self-contained`, which overrides it —
+and `<Using Remove>` for `System.Windows.Forms` and `System.Drawing`, fact 2).
 `App.xaml`: no `StartupUri`, `ShutdownMode="OnExplicitShutdown"`. `App.xaml.cs` `OnStartup`: create the guard with
 `DefaultName`; if `TryAcquire()` is false, `Shutdown(0)` and return (no icon, no message); else create `TrayIcon`.
 `OnExit`: dispose `TrayIcon` (removes the icon), then the guard (same UI thread, as `ReleaseMutex` requires).
 `TrayIcon` (`IDisposable`): a Windows Forms `NotifyIcon` with `SystemIcons.Application` as placeholder, `Text`
 `TrayMenu.ToolTip`, `Visible` true, and a `ContextMenuStrip` mapped one to one from `TrayMenu.Create(version)`
-(`ToolStripMenuItem` with `Enabled`, `ToolStripSeparator`); the `Exit` item calls `Application.Current.Shutdown(0)`.
+(`ToolStripMenuItem` with `Enabled`, `ToolStripSeparator`); the `Exit` item calls the `exit` action, which `App`
+passes as `() => Shutdown(0)`, so `TrayIcon.cs` never names the WPF `Application` type.
 Version: `ProductVersion.Read(typeof(App).Assembly)`. Session end needs no code: WPF shuts down on
 `SessionEnding` and runs `OnExit`.
 
@@ -188,18 +200,12 @@ argument to `/d:sonar.coverage.exclusions=".squad/**,.claude/**,src/Censio.Compa
 
 ## Options considered
 
-1. **Companion logic testable on Linux:** (a) platform-neutral `Censio.Companion.Core` — chosen; (b) linked
-   sources in a `net10.0` test project — lost: not measured by coverlet (fact 11) and the logic cannot use the
-   project's own types; (c) a Windows CI job running a `net10.0-windows` test project — lost: the session and the
-   existing job stay blind, second job to maintain. Record 0004.
-2. **Coverage exclusion of the shell:** (a) by construction locally (no test loads the shell, fact 4) plus
-   `sonar.coverage.exclusions` in `ci.yml` — chosen; (b) `COVERAGE_EXCLUDES` — impossible in a product PR (fact 5);
-   (c) `[ExcludeFromCodeCoverage]` on the shell types — lost: redundant locally (the assembly is never
-   instrumented) and Sonar computes coverable lines from the analysis, not from the attribute. A squad issue on
-   (b) is proposed in the result. Record 0004.
-3. **Windows build:** `EnableWindowsTargeting` (chosen) vs a Windows job — part of record 0004.
-4. **Tray icon:** Windows Forms `NotifyIcon` (chosen: in the SDK, no new dependency, handles Explorer restarts,
-   fact 19) vs a WPF tray package (H.NotifyIcon) — lost: a new third-party dependency for three menu items.
+1. **Companion logic on Linux:** platform-neutral `Censio.Companion.Core` (chosen) vs linked sources (not measured,
+   fact 11) vs a Windows job (gates stay blind) — record 0004.
+2. **Shell coverage exclusion:** by construction plus `sonar.coverage.exclusions` (chosen) vs `COVERAGE_EXCLUDES`
+   (fact 5) vs `[ExcludeFromCodeCoverage]` — record 0004.
+3. **Windows build:** `EnableWindowsTargeting` with `win-x64` (chosen) vs a Windows job — record 0004.
+4. **Tray icon:** Windows Forms `NotifyIcon` (chosen) vs H.NotifyIcon — record 0004.
 5. **Version:** one MSBuild property (chosen) vs MinVer/Nerdbank.GitVersioning — record 0005.
 6. **HTTPS:** template's redirection and HSTS vs plain HTTP with TLS at the proxy (chosen) — record 0006.
 
@@ -276,7 +282,8 @@ Two new areas (Lead decision), index rows in `docs/areas/README.md` written by t
 All by the Dev after the code is green, unless noted; found by a sweep of `docs/`, `AGENTS.md`, `.squad/stack.md`,
 `.squad/project.md` and `SECURITY.md` for enumerations the change extends.
 
-- `docs/areas/server.md`, `docs/areas/companion.md` (new, from `docs/areas/_template.md`) and their index rows.
+- `docs/areas/server.md`, `docs/areas/companion.md` (new, from `docs/areas/_template.md`) and their index rows;
+  `server.md` names host filtering off (`AllowedHosts` `*`) as deliberate, with record 0006.
 - `docs/ARCHITECTURE.md` (project block): *Components* lists the seven projects with one line of responsibility
   each (Pipe: reading and parsing the statistics pipe; GameData: reading the game files and the catalog;
   Contracts: the types shared by Companion and server, the product version; Server: web host, UI, later ingest;
@@ -293,7 +300,9 @@ All by the Dev after the code is green, unless noted; found by a sweep of `docs/
   proxy (record 0006)".
 - `SECURITY.md` *Deployment Security Considerations*: the server speaks plain HTTP only; TLS is the reverse
   proxy's; `/health` and the start page need no login. *Scope*: add "the server's HTTP endpoints".
-- `docs/CONTRIBUTING.md`: *Getting started* — the Companion builds on Linux but runs only on Windows; start the
+- `docs/CONTRIBUTING.md`: *Getting started* — the Companion builds on any platform and every build writes the
+  Windows executable `src/Censio.Companion/bin/<configuration>/net10.0-windows/win-x64/Censio.Companion.exe`
+  (framework-dependent, needs the .NET 10 Desktop Runtime), which runs only on Windows; start the
   server with `dotnet run --project src/Censio.Server` (Production, `http://localhost:5000`; set
   `ASPNETCORE_ENVIRONMENT=Development` for development); *Versioning and releases* — every assembly gets the
   version from the build property `Version` (`-p:Version=<v>`, default `0.0.0`), record 0005.
@@ -302,11 +311,9 @@ All by the Dev after the code is green, unless noted; found by a sweep of `docs/
 
 ## Architecture check
 
-`.squad/project.md` lists no guarantee yet; none is weakened. The components of `docs/ARCHITECTURE.md` stay: the
-Companion still reads the pipe (in Core, later) and the server still renders the UI. The ingest token and
-WebSocket are not built yet, so the statement "the server accepts data only from a client that presents the ingest
-token" stays true: there is no ingest route. The new unauthenticated routes expose no data and match the
-trusted-network deployment of `SECURITY.md`; *Security model* and `SECURITY.md` are updated together (record 0006).
+No guarantee exists yet (`.squad/project.md`). The components stay as `docs/ARCHITECTURE.md` describes them;
+there is no ingest route yet, so "the server accepts data only from a client that presents the ingest token" stays
+true. *Security model* and `SECURITY.md` change together (record 0006).
 
 ## Security considerations
 
@@ -319,7 +326,16 @@ trusted-network deployment of `SECURITY.md`; *Security model* and `SECURITY.md` 
   (`UseAntiforgery`). The start page reveals the version (accepted, record 0006); `/health` reveals only `Healthy`.
 - [ ] Default listen address loopback only (fact 12); exposure beyond it needs explicit configuration (#4 sets it
   in the image).
-- [ ] CI: no permission, trigger, secret or action pin changes; the removed step only produced a flag.
+- [ ] CI: no permission, trigger, secret or action pin changes. Removing *Detect solution* makes repository and
+  NuGet package code run for the first time in a job that holds `SONAR_TOKEN` (job-level `env`) and the
+  `checks: write` token (`persist-credentials` default). Not a weakened control: the trigger is `pull_request`, and
+  forks and Dependabot get neither; scoping both is left to #3 (follow-up below).
+- [ ] Host filtering is off (`"AllowedHosts": "*"`) and the Blazor hub checks no `Origin`, so a DNS-rebinding page
+  could read the start page; it shows only the version (record 0006). The first change that puts game data on a
+  page reviews this.
+- [ ] Dependencies: exact versions in `Directory.Packages.props`; *Restore* shows no NuGet audit warning
+  (`NU1901`–`NU1904`, transitive included); `Microsoft.AspNetCore.Mvc.Testing` only in `Censio.Server.Tests`;
+  analyzer packages `PrivateAssets="all"`.
 
 ## Decision records
 
@@ -334,27 +350,39 @@ As in the spec. Follow-ups for the orchestrator to open:
 - Template repository (`squad`): "Product PRs cannot set coverage exclusions" — routing *Code a unit test cannot
   cover* and `stack.md` *Coverage exclusions* tell a product change to edit `COVERAGE_EXCLUDES` in
   `.squad/tools/squad_settings.py`, which `scope-check.py` refuses in a product PR.
+- Product repository, comment on #3 (or a new CI issue): scope `SONAR_TOKEN` to the SonarQube begin and end steps
+  and set `persist-credentials: false` on `actions/checkout` in `ci.yml`.
+- Product repository, comment on #4: the `aspnet` base image sets `ASPNETCORE_HTTP_PORTS=8080`, which binds all
+  interfaces, so the loopback default of AC9 does not hold in the image; #4 states it in `docs/areas/server.md`.
 - Product repository: "[Docs] Align the PR areas in CONTRIBUTING.md with the issue areas" — the list (`Companion`,
   `Server`, `Tests`, `Docker`, `CI`, `Docs`) lacks `Repo`, `Pipe`, `GameData`, `Contracts`, `Release`, `UI` and the
   other areas the issue titles use.
 
-## Challenge notes
+## Challenge
 
-Minor objections of the Devil's Advocate (plan challenge), verbatim.
+Plan challenge of the Devil's Advocate.
 
-1. **Tester, `SingleInstanceGuardAfterDisposeNameCanBeAcquiredAgain`:** dispose every guard on the name, including the second one that did not get it, before you create the third. The probe showed that while any handle on the name is open, a new mutex gets `createdNew=False`, even after the owner has released and disposed it.
-2. **Dev, `SingleInstanceGuard.Dispose`:** call `ReleaseMutex` only when this guard's own `TryAcquire` returned `createdNew == true`, tracked in a field. Do not use "try release and catch". On Windows, ownership belongs to the thread, not the handle: a second guard on the owning thread that calls `ReleaseMutex` would release the first guard's ownership.
-3. **Dev, `Routes.razor`:** do not use the `<NotFound>` render fragment of `Router`. In the installed ASP.NET Core 10.0.14 reference assembly it is marked obsolete ("NotFound is deprecated. Use NotFoundPage instead."), so it raises CS0618 and fails the zero-diagnostic rule. Omit it, or use `NotFoundPage`. Either way add no `UseStatusCodePages*`, so AC8 keeps the empty-body routing 404.
-4. **Tester, `ProgramProductionConfigurationSetsNoListenAddress`:** `WebApplication.CreateBuilder` reads `ASPNETCORE_`-prefixed environment variables into `IConfiguration`. The official `mcr.microsoft.com/dotnet/sdk` and `aspnet` images set `ASPNETCORE_HTTP_PORTS=8080`, and a developer may have `ASPNETCORE_URLS` set, so the test fails on the machine rather than on the code. In the factory, override `urls`, `http_ports` and `https_ports` with empty values before the app's own sources, or assert on the committed `appsettings*.json` sources only. Note in a comment that the loopback default itself is proven by the Dev's start of the built server (fact 12).
-5. **Dev, `TrayIcon`:** the *Approach* says the `Exit` item calls `Application.Current.Shutdown(0)`, but the signature is `TrayIcon(string version, Action exit)`. Follow the signature: `App` passes `() => Shutdown(0)` and `TrayIcon` calls the action, so the WPF `Application` type stays out of `TrayIcon.cs` (fact 2, ambiguous `Application`).
-6. **Reviewer and Dev, AC6 default:** every version test compares two values that both come from `$(Version)`. If `Version=0.0.0` were missing from `Directory.Build.props`, the SDK default `1.0.0` would appear on both sides and all tests would pass. The default `0.0.0` is proven only by the Dev's start without `-p:Version` (*Verification without tests*, AC6) and by the Reviewer reading `Directory.Build.props`. Neither may be skipped.
+1. (major) A Linux build writes no `Censio.Companion.exe`: without a `RuntimeIdentifier` the apphost follows the
+   build machine. Accepted: `Censio.Companion.csproj` sets `RuntimeIdentifier` `win-x64` and `SelfContained`
+   false, so every build writes the Windows executable (fact 1, rechecked by the Lead). Effect: *Restore* also
+   fetches the `win-x64` apphost pack; no test project references the shell; #5's self-contained publish passes
+   its own options. Changed: fact 1, *Approach* (shell), *Verification without tests* (path of the executable),
+   *Documentation updates* (CONTRIBUTING wording), record 0004.
+2.–6. (minor) The guard's dispose order in its test, release only after an own `createdNew`, no obsolete
+   `NotFound` fragment, the listen-address test reading only the committed JSON sources, and `TrayIcon` calling
+   its `exit` action: all accepted and folded into *Tests per criterion* and *Approach*.
+7. (minor) AC6 default: both sides of every version test come from `$(Version)`. Accepted: the Dev's start without
+   `-p:Version` and the Reviewer's reading of `Directory.Build.props` (*Verification without tests*, AC6) are
+   mandatory.
 
-## Security notes
+## Security review
 
-Non-blocking findings of Security (plan review), verbatim.
+Security approved the plan; its non-blocking notes and what the plan does with them:
 
-1. **The CI claim understates the change** (*Security considerations*, last bullet: "the removed step only produced a flag"). In `ci.yml`, `SONAR_TOKEN` is set at job level and `actions/checkout` keeps its default `persist-credentials`, so the `checks: write` token sits in `.git/config`. Removing *Detect solution* means repository and NuGet package code runs for the first time in a job where both credentials can be read. Not a regression of a control: the trigger is `pull_request`, and forks and Dependabot get neither the secret nor a write token. Suggestion: reword the bullet, and add scoping `SONAR_TOKEN` to the begin and end steps, plus `persist-credentials: false`, to #3 or a new CI issue.
-2. **`"AllowedHosts": "*"` turns host filtering off** (*Approach*, Server). Host filtering is what stops DNS-rebinding against a listener bound to loopback, and the Blazor hub does not check `Origin` either. Today the only data exposed is the version, which record 0006 accepts. Record 0006 and `docs/areas/server.md` should name this setting as a deliberate choice, so the first change that puts live game data on the page reviews it again.
-3. **Logging of external data stays untouched only if the levels stay as they are.** "`Logging` defaults" means the template's `"Microsoft.AspNetCore": "Warning"`. At `Information`, the hosting logs would write request paths and hosts sent by clients to the console, which would touch the *Logging of external data* area.
-4. **Docker follow-up for #4.** The official `aspnet` base images set `ASPNETCORE_HTTP_PORTS=8080`, which binds all interfaces. The loopback default (AC9) does not hold inside the image. #4 should state this explicitly.
-5. **Dependencies.** In the diff review Security checks that `Directory.Packages.props` pins exact versions and that *Restore* reports no NuGet audit warnings (`NU1901`-`NU1904`, including transitive packages), that `Microsoft.AspNetCore.Mvc.Testing` is referenced only by `Censio.Server.Tests`, and that all analyzer packages are `PrivateAssets="all"`.
+1. The CI wording understated the change. Accepted: *Security considerations* rewords it; scoping `SONAR_TOKEN`
+   and `persist-credentials: false` go to #3 (follow-up).
+2. `"AllowedHosts": "*"` turns host filtering off. Accepted as a deliberate choice: named in record 0006, in
+   `docs/areas/server.md` and in *Security considerations*.
+3. Logging levels: the template's `Microsoft.AspNetCore` `Warning` is pinned in *Approach*.
+4. Docker: the loopback default does not hold in the `aspnet` image; follow-up comment on #4.
+5. Dependencies: the three checks are listed in *Security considerations* for the diff review.
