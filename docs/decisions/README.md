@@ -56,4 +56,7 @@ once in the [area document](../areas/README.md) of the record's area, and the re
 | [0001](0001-quality-gates-before-the-pull-request.md) | Quality gates before the pull request | Accepted | 2026-10-30 |
 | [0002](0002-squad-working-records-off-main.md) | Squad working records stay off main, and product PRs never change the squad | Accepted | 2026-10-30 |
 | [0003](0003-squash-merge-pull-requests.md) | Squash-merge pull requests | Accepted | 2026-10-30 |
+| [0004](0004-companion-shell-and-linux-build.md) | Companion logic in a platform-neutral project; the Windows shell builds on Linux | Proposed | 2026-10-30 |
+| [0005](0005-product-version-from-one-build-property.md) | The product version comes from one build property | Proposed | 2026-10-30 |
+| [0006](0006-server-plain-http-and-open-health.md) | The server serves plain HTTP; start page and health check need no login | Proposed | 2026-10-30 |
 <!-- project:end index -->
