@@ -7,7 +7,26 @@ web application. A Windows Companion extracts the data; a Blazor Server applicat
 ## Components
 
 - **Companion** (Windows): reads the Anno 117 statistics pipe and the game files and sends the data to the server.
+  Its logic lives in the platform-neutral `Censio.Companion.Core`; `Censio.Companion` is the thin Windows tray
+  shell around it ([`decisions/0004`](decisions/0004-companion-shell-and-linux-build.md)).
 - **Server** (Blazor Server): receives the data over a WebSocket (token-authenticated), keeps the live state and the history, and renders them.
+
+The solution `Censio.slnx` holds seven production projects under `src/`, each with a test project under `tests/`
+except the Windows shell:
+
+| Project | Responsibility | References |
+| ------- | -------------- | ---------- |
+| `Censio.Contracts` | The types shared by Companion and server, and the product version | — |
+| `Censio.Pipe` | Reading and parsing the statistics pipe | — |
+| `Censio.GameData` | Reading the game files and the catalog | — |
+| `Censio.Server.Data` | Persistence of the server | — |
+| `Censio.Server` | Web host, UI, later the ingest | Contracts, Server.Data |
+| `Censio.Companion.Core` | The Companion's platform-neutral logic (tray menu, single-instance rule) | Contracts, Pipe, GameData |
+| `Censio.Companion` | The Windows tray shell (WPF application, Windows Forms tray icon); no test project | Companion.Core |
+
+All assemblies carry the version of the build property `Version` (default `0.0.0`) as informational version
+([`decisions/0005`](decisions/0005-product-version-from-one-build-property.md)). What each component does is in
+[`areas/`](areas/README.md).
 
 ```mermaid
 flowchart LR
@@ -32,6 +51,10 @@ variables and is validated at startup. The rules per area are in [`areas/`](area
 Untrusted input: the statistics pipe, the game files and the WebSocket ingest. The ingest token authenticates the
 Companion; cache and recording paths are never derived from external input unchecked. Kept in sync with
 `SECURITY.md` and the *Security areas* in `.squad/project.md`.
+
+The server speaks plain HTTP only; TLS is the reverse proxy's job. Its start page and `/health` need no login, and
+`/health` reveals only its status ([`decisions/0006`](decisions/0006-server-plain-http-and-open-health.md),
+[`areas/server.md`](areas/server.md)).
 
 ## Deployment
 

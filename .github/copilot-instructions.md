@@ -86,11 +86,12 @@ All commands, with what each one checks, are listed in [`.squad/stack.md`](/.squ
 ## Architecture
 
 <!-- project:begin architecture -->
-- **Companion** (Windows): reads the Anno 117 statistics pipe, parses the game files, and sends the extracted data to the server over a WebSocket.
+- **Companion** (Windows): reads the Anno 117 statistics pipe, parses the game files, and sends the extracted data to the server over a WebSocket. Its logic is in `Censio.Companion.Core` (platform-neutral, tested on Linux); `Censio.Companion` is the thin Windows tray shell without a test project.
 - **Server** (Blazor Server): ingests the Companion's data, keeps the live state and the history, and shows both in the UI.
-- **Tests**: one test project per production project under `tests/`.
+- **Libraries**: `Censio.Contracts` (shared types, product version), `Censio.Pipe` (statistics pipe), `Censio.GameData` (game files and catalog), `Censio.Server.Data` (persistence).
+- **Tests**: one test project per production project under `tests/`, except `Censio.Companion`.
 
-The projects are listed here as they are created; the solution is `Censio.slnx`.
+The solution is `Censio.slnx`; `docs/ARCHITECTURE.md` lists the projects and their references.
 <!-- project:end architecture -->
 
 ## Project configuration

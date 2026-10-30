@@ -6,7 +6,7 @@
 ### Machine setup
 
 Git, the .NET SDK from `.squad/stack.md` (*Toolchain*), the formatter `reihitsu-format` and Python 3 for the
-gates under `.squad/tools/`. The Companion runs on Windows only; the server runs anywhere .NET and Docker do.
+gates under `.squad/tools/`. The Companion builds on any platform but runs on Windows only; the server runs anywhere .NET and Docker do.
 
 ### Cloning the repository
 
@@ -20,6 +20,19 @@ git clone https://github.com/LarsLaskowski/Censio.git
 dotnet restore Censio.slnx
 dotnet build Censio.slnx -c Release --no-restore
 ```
+
+Every build, on Linux too, writes the Windows executable
+`src/Censio.Companion/bin/<configuration>/net10.0-windows/win-x64/Censio.Companion.exe` (framework-dependent: it
+needs the .NET 10 Desktop Runtime and runs only on Windows).
+
+Start the server with:
+
+```shell
+dotnet run --project src/Censio.Server
+```
+
+It runs in `Production` and listens on `http://localhost:5000`; set `ASPNETCORE_ENVIRONMENT=Development` for
+development.
 
 ### Running tests
 
@@ -96,6 +109,10 @@ expected to arrive clean (see the decision record on quality gates in [`decision
 
 A release is a `v<major>.<minor>.<patch>` tag created manually on `main`; it publishes the Docker image and
 the Windows ZIP of the Companion. Merging a PR by itself never publishes a release.
+
+Every assembly of the solution gets its version from the build property `Version` (`-p:Version=<v>`, default
+`0.0.0`), shown unchanged by the server's start page and the Companion's tray menu
+([`decisions/0005`](decisions/0005-product-version-from-one-build-property.md)).
 <!-- project:end releases -->
 
 <!-- project:begin stability -->
