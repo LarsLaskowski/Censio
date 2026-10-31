@@ -31,7 +31,7 @@ For the formatter's version:
   workflow `run:` line, so CI drifts from the analyzer after its first release.
 - **Pinned in the repository's tool manifest (`.config/dotnet-tools.json`), used by CI and the local commands,
   plus a CI step that fails when formatter and analyzer are on different release lines** — one version everywhere;
-  the guard holds even where Dependabot leaves the manifest behind.
+  Dependabot raises both in one grouped pull request, and the guard catches a bump that raises only one.
 
 ## Decision
 
@@ -51,8 +51,8 @@ checks are described in `docs/CONTRIBUTING.md`.
   what CI still checks. The PR template checklist and the `create-pr` skill require the local gates; adding a CI
   step back is the remedy if unchecked code starts reaching `main`.
 - A Dependabot pull request that raises the analyzer and formatter can turn the format check red; a maintainer
-  runs *Format* on its branch. If Dependabot does not raise the manifest, the release-line check turns it red
-  until a maintainer raises the formatter there.
+  runs *Format* on its branch. The analyzer and the formatter may not be published the same day, and a hand-made
+  bump may raise only one of them; the release-line check then turns CI red until both are on one line.
 - The local analyzers may differ from the CI quality profile, and some checks (duplication, security
   hotspots, taint analysis) only run in CI; such findings arrive in squad step 11.
 - The 80 % rule applies to new or changed lines, so it does not force retroactive tests on old code.

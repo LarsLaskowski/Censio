@@ -1,7 +1,7 @@
 # Plan: CI, CodeQL, Dependabot and SonarQube Cloud
 
 Source: Issue #3 | [spec.md](spec.md)
-Status: Draft
+Status: Revised (1)
 Tier: security — the change moves where a CI secret (`SONAR_TOKEN`) and the job's GitHub token are exposed, a change to the trust of the build (`.squad/routing.md`, *Tiers*).
 Security areas touched: CI configuration (`.github/workflows/ci.yml` secrets, checkout credentials and permissions; `.github/workflows/codeql.yml` checkout credentials and its C# analysis condition), dependency update configuration (`.github/dependabot.yml`), build tooling pinned as dependencies (new `.config/dotnet-tools.json`)
 
@@ -18,11 +18,11 @@ See [spec.md](spec.md), *Problem*.
 | 3 | SonarQube Cloud has no organisation `larslaskowski`; `networlddev` exists, has no project `LarsLaskowski_Censio` yet and holds `LarsLaskowski_DockerUpdateGuard`, `LarsLaskowski_PiMonitor` | `api/organizations/search?organizations=larslaskowski` → 0; `api/projects/search?organization=networlddev` | confirmed |
 | 4 | `SONAR_TOKEN` is not set: the push run of CI on `main` (2026-10-31) skipped *Install scanner*, *Begin* and *End* | `gh api repos/LarsLaskowski/Censio/actions/runs/<id>/jobs` | confirmed |
 | 5 | `reihitsu-format --check` exits 1 and prints `Not formatted: <path>`; the branch passes today | scratch copy with broken indentation; `reihitsu-format --check ./` → `0 of 19 file(s) need formatting.` | confirmed |
-| 6 | `Reihitsu.Cli` and `Reihitsu.Analyzer` are released with the same versions (latest 1.1.0 both); latest `dotnet-sonarscanner` is 12.0.0 | NuGet flat container `index.json` of each package | confirmed |
+| 6 | `Reihitsu.Cli` and `Reihitsu.Analyzer` have identical version lists up to 1.1.0; `dotnet-sonarscanner` 12.0.0 exists (11.3.0 the fallback) | NuGet flat container `index.json` of each package (Lead, DA) | confirmed |
 | 7 | No tool manifest exists; the SessionStart hook runs `dotnet tool restore` when `.config/dotnet-tools.json` exists and installs the global formatter only when none is on `PATH` | `git ls-files`; `.claude/hooks/session-start.sh:27-33` | confirmed |
-| 8 | Dependabot's `nuget` ecosystem reads `.config/dotnet-tools.json` and raises its tools in the grouped NuGet pull request | to verify: Dev in step 6 reads GitHub's *Supported ecosystems* page or dependabot-core's NuGet file fetcher (not reachable from the Lead's session); the release-line guard (Approach 2) fails closed when it does not hold | unverified |
+| 8 | Dependabot's `nuget` ecosystem reads `.config/dotnet-tools.json` and raises its tools in the grouped NuGet pull request | dependabot-core `DiscoveryWorker.cs:105` (`DotNetToolsJsonDiscovery`), `MSBuildHelper.cs:989-993` (DA) | confirmed |
 | 9 | CI's test command writes `coverage.opencover.xml` per test project (VSTest with `coverlet.collector` 10.1.0) | to verify: Dev in step 6 runs CI's *Test* command locally with `--results-directory` in a scratch path and lists the `coverage.opencover.xml` files (expect 6); the main run's artifact could not be downloaded | unverified |
-| 10 | `dotnet-sonarscanner begin` does not write `sonar.token` under `.sonarqube/` (so it is not on disk while pull request code builds) | to verify: Security in step 3 from the SonarScanner for .NET source or documentation; Dev greps `.sonarqube/` for the token value after a step-7 *Sonar gate* run with `SONAR_TOKEN` set, where one runs | unverified |
+| 10 | `dotnet-sonarscanner begin` does not write `sonar.token` under `.sonarqube/`; `end` needs it again as `/d:sonar.token` | SonarScanner for .NET `AnalysisConfigProcessorBase.cs:42`, `SonarProperties.cs:95-102`, `InitializationProcessor.cs:40-42`, `PostProcessor.cs:146` (Security) | confirmed |
 | 11 | `secrets` is available in `jobs.<id>.env`, and a missing secret compares equal to `''` | to verify: `actionlint` in the *Analyzer gate* (step 7) checks context availability; AC12 run (with and without secret: this PR, a Dependabot PR) | unverified |
 | 12 | Scanner 12.0.0 runs with JDK 17 (`actions/setup-java`, `ci.yml:23-27`) | to verify: AC12 CI run; on failure the Dev pins 11.3.0 | unverified |
 | 13 | A rejected token or unreachable server makes `begin`/`end` exit non-zero; `end` does not wait for the quality gate unless `sonar.qualitygate.wait` is set | to verify: AC12 run on this PR (CI only: no session can present a rejected token through the agent proxy); design is fail closed — no `continue-on-error` | unverified |
@@ -57,10 +57,10 @@ the Dev runs `python3 .squad/tools/analyzer-check.py --lint-only` before handing
 | AC3 | `if:` conditions read (End, report, upload run after a failed test step); throwaway failing-test commit in AC12 | Reviewer 8; orchestrator 11 |
 | AC4 | `if:` conditions read; a Dependabot pull request's CI after merge shows the SonarQube steps and the report skipped | Reviewer 8; orchestrator 11 (first Dependabot PR) |
 | AC5 | `grep -n '/o:\|/k:' ci.yml .squad/stack.md` shows `networlddev` / `LarsLaskowski_Censio` only; no `continue-on-error`; fact 13 | Dev 6; Security 8; orchestrator 11 |
-| AC6 | `grep -n 'SONAR_TOKEN' ci.yml` shows it only in `SONAR_ENABLED` (boolean expression) and the `env` of *Begin* and *End*; every checkout has `persist-credentials: false` | Dev 6; Security 8 |
+| AC6 | `grep -n 'SONAR_TOKEN' ci.yml` shows it only in `SONAR_ENABLED` (boolean expression), the `env` of *Begin* and *End* and their `/d:sonar.token="$SONAR_TOKEN"`; every checkout has `persist-credentials: false`; `grep -n 'actions/cache' ci.yml` finds nothing | Dev 6; Security 8 |
 | AC7 | `codeql.yml` read: no *Detect C# sources* step, no `if:`; CodeQL checks on this PR | Reviewer 8; orchestrator 11 |
-| AC8 | `dependabot.yml` read; fact 8 checked; first weekly Dependabot run after merge | Dev 6; Reviewer 8 |
-| AC9 | `.config/dotnet-tools.json` lists `reihitsu.cli` 1.1.0 and `dotnet-sonarscanner` 12.0.0; `ci.yml` and `stack.md` *Format*, *Format check*, *Sonar gate* run them through the manifest; no scanner cache step remains; Dev runs the release-line check locally against the real files (pass) and against a scratch copy with `reihitsu.cli` set to 1.0.0 (fail, the error text below) | Dev 6; Reviewer 8 |
+| AC8 | `dependabot.yml` read (fact 8 confirmed); first weekly Dependabot run after merge | Reviewer 8; orchestrator after merge |
+| AC9 | `.config/dotnet-tools.json` lists `reihitsu.cli` 1.1.0 and `dotnet-sonarscanner` 12.0.0; `ci.yml` and `stack.md` *Format*, *Format check*, *Sonar gate* run them through the manifest; no `actions/cache` step remains; Dev runs the release-line check locally against the real files (pass) and against a scratch copy with `reihitsu.cli` set to 1.0.0 (fail, the error text below) | Dev 6; Reviewer 8 |
 | AC10 | `release.yml` read (unchanged); the `releases` block of `CONTRIBUTING.md` names `breaking-change`, `enhancement`, `feature`, `security`, `bug`, `ignore-for-release` | Reviewer 8 |
 | AC11 | `scope-check.py` (step 7) passes; Reviewer reads the new `getting-started` text against S7 and E10 | orchestrator 7; Reviewer 8 |
 | AC12 | On the draft PR (after the owner's prerequisites): CI, CodeQL and *SonarCloud Code Analysis* green; one throwaway commit breaking the format and one with a failing test, each pushed and reverted, turn CI red | orchestrator 11 |
@@ -70,27 +70,30 @@ the Dev runs `python3 .squad/tools/analyzer-check.py --lint-only` before handing
 1. **Tool manifest.** The Dev creates `.config/dotnet-tools.json` with `dotnet new tool-manifest`, then
    `dotnet tool install reihitsu.cli --version 1.1.0` and `dotnet tool install dotnet-sonarscanner --version 12.0.0`.
 2. **`ci.yml`, one job `build`, steps in this order:** *Checkout* (`fetch-depth: 0`, `persist-credentials: false`);
-   *Set up JDK 17* (as today); *Setup .NET*; *Cache SonarQube Cloud packages* (`~/.sonar/cache`, as today); *Restore
+   *Set up JDK 17* (as today); *Setup .NET*; *Restore
    tools* (`dotnet tool restore`); *Restore*; *Check tool versions* (new, below); *Format check*
    (`dotnet tool run reihitsu-format --check ./`); *Begin SonarQube analysis* (`id: sonar-begin`,
    `if: env.SONAR_ENABLED == 'true'`, `env: SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}`, `dotnet tool run
-   dotnet-sonarscanner begin /k:"LarsLaskowski_Censio" /o:"networlddev"`, the other arguments as today); *Build*;
+   dotnet-sonarscanner begin /k:"LarsLaskowski_Censio" /o:"networlddev"`, the other arguments as today, `/d:sonar.token="$SONAR_TOKEN"` included); *Build*;
    *Test* (`id: test`, command as today); *End SonarQube analysis* (`if: ${{ !cancelled() &&
-   steps.sonar-begin.outcome == 'success' }}`, the same step `env`); *Publish test report* (`if:` the current
+   steps.sonar-begin.outcome == 'success' }}`, the same step `env`, `end /d:sonar.token="$SONAR_TOKEN"` as today); *Publish test report* (`if:` the current
    actor/fork condition `&& (steps.test.outcome == 'success' || steps.test.outcome == 'failure')`); *Upload test &
    coverage artifacts* (`if: ${{ !cancelled() && (steps.test.outcome == 'success' || steps.test.outcome ==
-   'failure') }}`). Removed: the job-level `SONAR_TOKEN`, *Cache SonarQube Cloud scanner* and *Install SonarQube
-   Cloud scanner* (the manifest pins the scanner, so no cache can hold an old version). Job-level `env` holds only
+   'failure') }}`). Removed: the job-level `SONAR_TOKEN`, *Cache SonarQube Cloud packages*, *Cache SonarQube Cloud scanner* and
+   *Install SonarQube Cloud scanner*: no `actions/cache` remains, so nothing the build can write is saved for a
+   later run (Security B2, record 0008), and the manifest pins the scanner. Job-level `env` holds only
    `SONAR_ENABLED: ${{ secrets.SONAR_TOKEN != '' }}`, with the comment that it is a boolean and never the value.
    Workflow `permissions` unchanged. **Check tool versions** is a `run:` step that reads the `reihitsu.cli` version
    from `.config/dotnet-tools.json` (`jq`) and the `Reihitsu.Analyzer` `Version` from `Directory.Packages.props`,
    compares major.minor, and on a difference prints exactly
    `::error::Reihitsu.Cli <cli> (.config/dotnet-tools.json) and Reihitsu.Analyzer <analyzer> (Directory.Packages.props) are on different release lines; raise Reihitsu.Cli in the tool manifest`
-   and exits 1; a missing value is the same failure with `<missing>` (fails closed).
+   and exits 1; a missing value is the same failure with `<missing>` (fails closed). Its reason: Dependabot raises
+   both in one grouped pull request (fact 8), but the analyzer and the formatter may not be published the same
+   day, and a hand-made bump may raise only one.
 3. **`codeql.yml`:** `persist-credentials: false` on the checkout; the *Detect C# sources* step, its comment and the
    two `if:` lines removed. Nothing else changes.
 4. **`dependabot.yml`:** the `docker` entry's `directory` becomes `"/src/Censio.Server"`; nothing else (the `nuget`
-   entry at `/` covers the manifest, fact 8; groups stay version-update groups, security updates separate).
+   entry at `/` covers the manifest (fact 8); groups stay version-update groups, security updates separate).
 5. **`release.yml`, `fork-scope.yml`:** unchanged.
 6. **Outside the repository** (owner, before AC12; the orchestrator asks the Product Manager when the PR is
    drafted): SonarQube Cloud project `LarsLaskowski_Censio` in `networlddev`, bound to the repository, automatic
@@ -102,11 +105,11 @@ New user-visible output: the error line of *Check tool versions* (above, exact) 
 ## Options considered
 
 - **Formatter pin:** (a) `dotnet tool install -g Reihitsu.Cli --version` in a `run:` line — Dependabot never
-  raises it, CI drifts from the analyzer (spec M1); (b) tool manifest without a guard — rests on fact 8 alone;
-  (c) **tool manifest plus a release-line check in CI** — chosen: one version for CI and local, fails closed if
-  Dependabot skips the manifest. Recorded in 0001.
-- **Scanner cache:** a version in the cache key versus **no scanner cache, the manifest restores it** — chosen: the
-  scanner is one NuGet package (seconds), and no key can drift from the pin.
+  raises it, CI drifts from the analyzer (spec M1); (b) tool manifest without a guard — a bump that raises only one package (published on different days, or by
+  hand) goes unnoticed; (c) **tool manifest plus a release-line check in CI** — chosen. Recorded in 0001.
+- **Caches:** a version in the scanner cache key; a `~/.sonar/cache` restore before *Begin* and save right after it;
+  versus **no `actions/cache` at all** — chosen: no entry saved after build code ran (or by an earlier workflow
+  under the same key) can be restored and executed, and the downloads cost seconds. Recorded in 0008.
 - **Token check:** a step with the secret writing a boolean output versus **a job-level boolean
   `secrets.SONAR_TOKEN != ''`** — chosen: no extra step holds the secret. Separate SonarQube job: impossible
   (begin/build/end in one job). Recorded in 0008.
@@ -163,8 +166,11 @@ lessons, not edited. All owned by the Dev, written once the workflows are final:
   CodeQL (C#, Actions; pushes, pull requests, weekly), Dependabot (weekly grouped version updates per ecosystem,
   security updates separate), Fork scope — then one paragraph on fork and Dependabot pull requests (no secrets:
   SonarQube and the report skipped; a first-time contributor's run waits for a maintainer's approval) and one on
-  E10 (a red format check on a Dependabot analyzer bump: check out the branch, run *Format*, push; a red *Check
-  tool versions*: raise `reihitsu.cli` in the manifest).
+  E10 (a red format check on a Dependabot analyzer bump: review the Dependabot diff first, since a push to its
+  branch gives that run the secrets while the raised packages build; then check out the branch, run *Format*,
+  push; a raised `dotnet-sonarscanner` gets no SonarQube run on a Dependabot pull request, so before merging a
+  maintainer pushes a commit to its branch or runs the *Sonar gate* locally; a red *Check tool versions*: raise
+  the package that is behind).
 - `docs/CONTRIBUTING.md`, `releases` block: one sentence on release notes — labels `breaking-change`, `enhancement`
   or `feature`, `security`, `bug` decide the section, others land under *Other changes*, `ignore-for-release` is
   left out (`.github/release.yml`).
@@ -179,15 +185,40 @@ build are unchanged. The Companion keeps building on Linux (record 0004).
 - [ ] Byte or length limits on parsed input: no limits (no parser).
 - [ ] Exceptions reaching a user-visible message: none; the only new message is the *Check tool versions* line.
 - [ ] `SONAR_TOKEN` in `env` of *Begin* and *End* only; job `env` holds a boolean; no `actions/checkout` persists
-  credentials; permissions unchanged; actions stay SHA-pinned; tools pinned by exact version in the manifest.
-- [ ] Residual exposure (spec E5, record 0008) accepted for Security's review; fact 10 decides whether a token on
-  disk widens it.
+  credentials; no `actions/cache`; permissions unchanged; actions stay SHA-pinned; tools pinned by exact version.
+- [ ] Step scoping guards against accidental disclosure only; malicious code in the job (a compromised dependency
+  on `main`) can still reach both tokens (spec E5, record 0008), accepted. The token is not on disk (fact 10).
 
 ## Decision records
 
 - `docs/decisions/0001-quality-gates-before-the-pull-request.md` (Accepted, unreleased, edited in place: format
   check in CI, tools pinned in the manifest with the release-line check)
 - `docs/decisions/0008-ci-secrets-scoped-to-the-steps-that-use-them.md` (Proposed)
+
+## Security review
+
+- B1 (E5 and 0008 understate the residual exposure): accepted. Spec E5 and record 0008 now name runner memory
+  (passwordless `sudo`, secrets delivered at job start), `/proc/<pid>` of the SonarQube steps, and tampering with
+  later steps and actions; the `checks: write` `GITHUB_TOKEN` is reachable the same way; pushes to `main` and a
+  compromised NuGet dependency are the exposed case. Step scoping is justified as protection against accidental
+  disclosure; option 2 is kept on that basis.
+- B2 (poisonable `~/.sonar/cache`): accepted, option (b): every `actions/cache` step leaves `ci.yml` (Approach 2,
+  AC6 verification); record 0008 states that nothing the build can write is cached for a later run. Option (a)
+  lost because an entry saved under the same key by the current workflow could still be restored.
+- N1: fact 10 confirmed with Security's sources; the Dev's `.sonarqube/` grep is dropped; Approach 2 keeps
+  `/d:sonar.token` on both *Begin* and *End*.
+- N2, N3, N5, N6: no change (fact 8 confirmed, see *Challenge*).
+- N4: accepted; the CONTRIBUTING E10 paragraph says to review the Dependabot diff before pushing to its branch,
+  spec E10 says so, and 0008 says `SONAR_TOKEN` is never added as a Dependabot secret.
+
+## Challenge
+
+- 1 (facts 6 and 8 confirmed; justify the guard otherwise): accepted; facts 6 and 8 confirmed with the DA's
+  sources, the fact-8 research left task 1, *Check tool versions* and record 0001 now justify the guard by
+  packages published on different days or a hand-made bump.
+- 2 (`checks: write` token reachable like `SONAR_TOKEN`): accepted, in 0008 *Consequences* (with B1).
+- 3 (a raised scanner is never run with a token before merge): accepted; the CONTRIBUTING E10 paragraph and spec
+  E10 say a maintainer pushes a commit to the Dependabot branch or runs the *Sonar gate* locally first.
 
 ## Out of scope / follow-ups
 

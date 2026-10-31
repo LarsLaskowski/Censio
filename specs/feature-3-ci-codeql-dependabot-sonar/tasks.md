@@ -7,8 +7,8 @@ tests* in the plan). Every group: no new API.
 
 | # | Group | Task | Files | Criteria | Depends on | Owner | Done |
 | - | ----- | ---- | ----- | -------- | ---------- | ----- | ---- |
-| 1 | G1 | no new API — create the tool manifest with `reihitsu.cli` 1.1.0 and `dotnet-sonarscanner` 12.0.0 (plan *Approach* 1); verify facts 8, 14a | `.config/dotnet-tools.json` | AC8, AC9 | — | Dev | [ ] |
-| 2 | G1 | Rewrite `ci.yml` as plan *Approach* 2 (step order, `SONAR_ENABLED`, step-scoped token, `persist-credentials: false`, *Check tool versions*, `if:` conditions, scanner cache and install removed, `/o:"networlddev"`); run the local checks of *Verification without tests* for AC1, AC2, AC5, AC6, AC9 and facts 9, 10 | `.github/workflows/ci.yml` | AC1, AC2, AC3, AC4, AC5, AC6, AC9 | 1 | Dev | [ ] |
+| 1 | G1 | no new API — create the tool manifest with `reihitsu.cli` 1.1.0 and `dotnet-sonarscanner` 12.0.0 (plan *Approach* 1); verify fact 14a | `.config/dotnet-tools.json` | AC8, AC9 | — | Dev | [ ] |
+| 2 | G1 | Rewrite `ci.yml` as plan *Approach* 2 (step order, `SONAR_ENABLED`, step-scoped token, `persist-credentials: false`, *Check tool versions*, `if:` conditions, every `actions/cache` step and the scanner install removed, `/o:"networlddev"`); run the local checks of *Verification without tests* for AC1, AC2, AC5, AC6, AC9 and fact 9 | `.github/workflows/ci.yml` | AC1, AC2, AC3, AC4, AC5, AC6, AC9 | 1 | Dev | [ ] |
 | 3 | G1 | `codeql.yml` as plan *Approach* 3 | `.github/workflows/codeql.yml` | AC6, AC7 | — | Dev | [ ] |
 | 4 | G1 | `dependabot.yml` Docker entry to `/src/Censio.Server` (plan *Approach* 4) | `.github/dependabot.yml` | AC8 | — | Dev | [ ] |
 | 5 | G1 | `python3 .squad/tools/analyzer-check.py --lint-only` on the changed workflows | — | AC1, AC6, AC7 | 2, 3, 4 | Dev | [ ] |

@@ -67,11 +67,11 @@ AC7 and AC8 below), the test report, and the Companion built on Linux as part of
 - E4: `SONAR_TOKEN` set but rejected, or SonarQube Cloud unreachable: CI fails at the SonarQube step that hit it
   (fails closed), never reports green with the analysis silently missing.
 - E5: Code of the pull request (a test, an MSBuild target, a NuGet package's build script) reads its environment
-  and `.git/config`: it finds neither `SONAR_TOKEN` nor a GitHub token. Residual exposure, accepted for Security's
-  plan review to weigh: that code runs in the same job before SonarQube's end step (the .NET scanner needs begin,
-  build and end in one job), so it could append to `$GITHUB_ENV` or `$GITHUB_PATH` or replace the scanner binary
-  and reach the token in that later step. Only maintainers' branches and pushes to `main` get the secret; fork
-  and Dependabot runs get none.
+  and `.git/config`: it finds neither `SONAR_TOKEN` nor a GitHub token, so an environment dump, a crash or
+  telemetry report or a log does not disclose them. This guards against accidental disclosure only, not against
+  malicious code in the same job (a compromised NuGet dependency on `main` or a maintainer's branch), which can
+  still reach both tokens (runner memory, `/proc`, tampering with later steps: record 0008). Fork and Dependabot
+  runs get no secret. Nothing the build can write is cached for a later run.
 - E6: A compile error in the Windows-only Companion: the *build* job fails on the Linux runner at the build step.
 - E7: SonarQube's quality gate fails: the *SonarCloud Code Analysis* check is red; the CI *build* job's result
   does not depend on it.
@@ -80,8 +80,10 @@ AC7 and AC8 below), the test report, and the Companion built on Linux as part of
   names (`src/Censio.Server/`), its base images are updated weekly.
 - E9: A pull request label `release.yml` does not know: the pull request is listed under *Other changes*.
 - E10: A Dependabot pull request raises `Reihitsu.Analyzer` and the formatter together, and the new formatter
-  formats the code differently: the format check turns that pull request red (E1). A maintainer checks out its
-  branch, runs *Format*, and pushes the result to it; `docs/CONTRIBUTING.md` says so.
+  formats the code differently: the format check turns that pull request red (E1). A maintainer reviews the
+  Dependabot diff, checks out its branch, runs *Format*, and pushes the result to it (that run carries the secrets
+  while the raised packages build). A raised SonarQube scanner is tested with a token before merge the same way, by
+  a maintainer's commit on the branch or a local *Sonar gate*. `docs/CONTRIBUTING.md` says so.
 
 ## Non-functional requirements
 
@@ -192,11 +194,6 @@ None: development and release process are not areas (`docs/areas/README.md`). Th
   blocks unchanged (`PROJECT_BLOCK` in `scope-check.py`), but whether a template refresh keeps an unknown block
   could not be checked, so the plan prefers the existing `getting-started` and `releases` blocks. The template
   sentence and fork note are squad lessons (*Out of scope*).
-- m1 (`!cancelled()` steps after a format failure): accepted; E1, E2, AC2 and AC3 name which steps run.
-- m2 (static scanner cache key): accepted; NFR and AC9 require a raised version to take effect on the next run.
-- m3 (token-check mechanism open): accepted; AC6 names the two allowed mechanisms.
-- m4 (E5 overstates the scoping): accepted; E5 states the residual exposure for Security's plan review.
-- m5 (security updates are separate pull requests): accepted; `dependabot_security_updates` is `enabled`
-  (repository API). S4 and AC8 speak of version updates; security updates stay separate on purpose.
-- m6 (first-time fork runs wait for approval): accepted; S5 and S7 say so.
-- Unverified OpenCover output: accepted as Q6 and in AC1.
+- m1–m6 and the OpenCover note: accepted; E1, E2, AC2, AC3 (steps that run), AC9 (raised version takes effect),
+  AC6 (token mechanisms), E5 (residual exposure), S4 and AC8 (version updates; security updates enabled and
+  separate), S5 and S7 (approval of first-time fork runs), Q6 and AC1 (OpenCover).
