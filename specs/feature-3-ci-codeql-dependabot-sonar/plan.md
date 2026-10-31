@@ -225,3 +225,10 @@ build are unchanged. The Companion keeps building on Linux (record 0004).
 - Spec *Out of scope*. Squad lessons for step 12: `AGENTS.md`/`copilot-instructions.md` *Commands* still say the
   formatter is installed globally; the SessionStart hook installs an unpinned global formatter; the template text
   of `CONTRIBUTING.md` omits `feature` and the approval of first-time fork runs.
+
+## Security notes
+
+Non-blocking findings of Security's round 2 (plan review), appended verbatim:
+
+- N-a: The AC6/AC9 check `grep -n 'actions/cache' ci.yml` would not catch a cache turned on through the `cache:` input of `actions/setup-java` or `actions/setup-dotnet`. That would cache build-writable paths (`~/.m2`, `~/.nuget/packages`) through the same store, which goes against the 0008 rule "nothing the build can write is cached". Neither action sets `cache:` today (ci.yml:23-36), and the plan keeps both "as today". Suggest the Dev also confirms no `cache:` input is added, and Security will check this in the step-8 diff.
+- N-b: In 0008 *Options considered*, the scanner-cache sentence ("a restore before `begin` and a save directly after it, before the build, against **no cache** — chosen") is easy to misread about which option was chosen. The bold marks "no cache", which matches *Decision*. A wording clarification is optional.
