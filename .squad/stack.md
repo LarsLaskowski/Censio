@@ -17,7 +17,9 @@ profile and owned by this repository: keep it true when the build changes.
 
 ## Layout
 
-- Production code: `src/` (`Censio.Companion` (Windows Companion), `Censio.Server` (Blazor Server), projects added with the issues that need them).
+- Production code: `src/` — `Censio.Contracts`, `Censio.Pipe`, `Censio.GameData`, `Censio.Server.Data`,
+  `Censio.Server` (Blazor Server), `Censio.Companion.Core` (the Companion's platform-neutral logic) and
+  `Censio.Companion` (the Windows tray shell, `net10.0-windows`, no test project).
 - Tests: `tests/<Project>.Tests/`, one test class per type under test in `{TypeUnderTest}Tests.cs`,
   placed flat in the test project.
 
@@ -92,7 +94,9 @@ The Dockerfile copies the project files first, restores, then copies the sources
 `--no-restore`. The .NET SDK decides at restore time what the publish output holds (content items, static web
 assets, the `_framework/` scripts of a Blazor app), so a publish from the full working tree can contain files
 the image never gets (Vandox#24: `_framework/blazor.web.js` was in the local publish and missing from the
-image, because no `.razor` file existed at restore time). Where Docker runs, build the image. Where it does not
+image, because no `.razor` file existed at restore time). A Blazor project therefore sets
+`<RequiresAspNetWebAssets>true</RequiresAspNetWebAssets>` in its `.csproj`, so the restore requests the Blazor
+scripts without any `.razor` file present (`Censio.Server`, record 0007); the script below stays unchanged. Where Docker runs, build the image. Where it does not
 (the sandbox), reproduce the Dockerfile's order in a scratch directory; every change to a `.csproj`,
 `Directory.*.props`, a `.razor` or other content item, a static web asset or the Dockerfile runs it before the
 review:
@@ -120,6 +124,9 @@ default `src/*.cs` and `src/*.razor`, so own browser scripts do not count locall
 step of `.github/workflows/ci.yml`. A file no unit test can cover (`wwwroot/js/**`, a generated file) is added
 to that argument with a decision record — never to `sonar.exclusions`, which would drop it from the analysis
 too.
+
+`src/Censio.Companion/**` (the Windows shell) is excluded in `sonar.coverage.exclusions`, and locally by
+construction: no test project loads that assembly, so the *Coverage gate* counts none of its files (record 0004).
 
 ## Writing code
 
@@ -191,3 +198,9 @@ itself with a lock (`obj/analyzer-check.lock`), plain builds do not.
   the escapes of the changed files on disk (`grep -n '\\u' <file>`, *Escapes in files* in `.squad/team.md`);
   where the formatter keeps rewriting one, build the character at run time (`char.ConvertFromUtf32(0x2028)`)
   instead of writing it as an escape in a literal.
+- A project with `UseWPF` and `UseWindowsForms` together gets a `CS0104` ("`Application` is ambiguous") from the
+  implicit usings; the `.csproj` removes the `System.Windows.Forms` and `System.Drawing` global usings
+  (`<Using Remove="…" />`, `Censio.Companion`).
+- `Censio.Companion` sets `RuntimeIdentifier` `win-x64`, so every build, Linux included, writes the Windows
+  `Censio.Companion.exe`; check it with `file` (`PE32+ executable`). Without the identifier the apphost follows
+  the build machine (record 0004).

@@ -33,7 +33,7 @@ process.
 The server is meant to run in a trusted network (home network or behind a reverse proxy with TLS). Before
 exposing it: set a strong ingest token through an environment variable, never in a file in the repository, give
 the process write access only to its cache and recording directories, and restrict the WebSocket port to the
-hosts that run a Companion.
+hosts that run a Companion. The server speaks plain HTTP only: terminate TLS at a reverse proxy in front of it. Its start page and `/health` need no login, and without address configuration it listens on loopback only.
 
 ## Scope
 
@@ -41,6 +41,7 @@ The following are considered in scope for vulnerability reports:
 
 - Parsing of the Anno 117 statistics pipe and of game files (Companion)
 - The WebSocket ingest and its token (server)
+- The server's HTTP endpoints (start page, `/health`, the Blazor hub)
 - File paths for the cache and for recordings
 - Logging of external data
 - Dependency vulnerabilities in packages consumed by the project

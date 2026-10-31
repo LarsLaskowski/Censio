@@ -1,0 +1,19 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Censio.Companion.Core/Censio.Companion.Core.csproj" />
+    <Project Path="src/Censio.Companion/Censio.Companion.csproj" />
+    <Project Path="src/Censio.Contracts/Censio.Contracts.csproj" />
+    <Project Path="src/Censio.GameData/Censio.GameData.csproj" />
+    <Project Path="src/Censio.Pipe/Censio.Pipe.csproj" />
+    <Project Path="src/Censio.Server.Data/Censio.Server.Data.csproj" />
+    <Project Path="src/Censio.Server/Censio.Server.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Censio.Companion.Core.Tests/Censio.Companion.Core.Tests.csproj" />
+    <Project Path="tests/Censio.Contracts.Tests/Censio.Contracts.Tests.csproj" />
+    <Project Path="tests/Censio.GameData.Tests/Censio.GameData.Tests.csproj" />
+    <Project Path="tests/Censio.Pipe.Tests/Censio.Pipe.Tests.csproj" />
+    <Project Path="tests/Censio.Server.Data.Tests/Censio.Server.Data.Tests.csproj" />
+    <Project Path="tests/Censio.Server.Tests/Censio.Server.Tests.csproj" />
+  </Folder>
+</Solution>
