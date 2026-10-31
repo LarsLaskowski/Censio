@@ -21,4 +21,5 @@ are quoted in full.
 | 2026-10-31 17:48 | 3 Plan security review | Orchestrator | Plan approved by Security in round 2 (verdict APPROVED); N6-N8 appended verbatim to plan.md |
 | 2026-10-31 17:49 | 2b Plan (revise round 2) | squad-lead | RESULT: DONE: plan shortened to 3,869 words, N6-N8 folded in, status Approved by Security (opus/medium · 4,083 tokens · 5 tool uses · 28 s · continued) |
 | 2026-10-31 17:49 | 4-5 Skeleton and tests first | Orchestrator | Skipped: no production or test code (plan Verification without tests) |
-| 2026-10-31 17:49 | 6 Implement G1 | squad-dev | launched: check script, test script, CI job (sonnet/medium · usage pending) |
+| 2026-10-31 17:49 | 6 Implement G1 | squad-dev | launched: check script, test script, CI job (sonnet/medium · 131,392 tokens · 21 tool uses · 409 s) |
+| 2026-10-31 17:56 | 6 Implement G2 | squad-dev | launched (continued): release.yml (sonnet/medium · usage pending) |
