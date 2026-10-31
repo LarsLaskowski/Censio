@@ -35,8 +35,7 @@ entrypoint script. The behavior, the NAS command and the two ownership remedies 
 ## Consequences
 
 - An operator on a NAS passes `--user <uid>:<gid>` or gives the directory to 1654; the documentation shows both.
-- Under a UID without a home directory ASP.NET Core keeps its data-protection keys in memory and logs a warning;
-  under 1654 they lie in the container layer. Both lose the keys when the container is recreated, until the
-  key ring moves to `/config` with #29/#33/#42.
+- The data-protection key ring lies in `/config` ([0011](0011-data-protection-key-ring-in-the-data-directory.md)),
+  so `/config` must be writable for the user the container runs as; otherwise the server stops at start.
 - Revisit when a NAS host turns out to have no way to pass `--user`; option 2 then needs the Product Manager,
   because it changes the issue's requirement.

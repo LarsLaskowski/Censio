@@ -6,3 +6,4 @@ are quoted in full.
 | Date | Step | Member | Result |
 | ---- | ---- | ------ | ------ |
 | 2026-10-31 16:07 | 1 Intake | Orchestrator | Issue #64 read (no comments, no labels); bug: no feature label (user asked for squad to implement; no feature call); branch claude/keen-johnson-vsy5gm |
+| 2026-10-31 16:15 | 2 Plan | squad-lead | RESULT: DONE, tier security; plan.md + decision record 0011 (key ring in data directory, fail closed at start) (opus/medium · usage pending) |
