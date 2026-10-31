@@ -1,6 +1,6 @@
 # 0008: CI secrets are scoped to the steps that use them
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-10-31
 - **Area:** —
 - **Source:** Issue #3
