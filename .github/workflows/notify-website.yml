@@ -18,4 +18,4 @@ jobs:
           token: ${{ secrets.WEBSITE_DISPATCH_TOKEN }}
           repository: LarsLaskowski/e-networld
           event-type: release
-          client-payload: '{"repo": "${{ github.repository }}", "tag": "${{ github.event.release.tag_name }}"}'
+          client-payload: ${{ format('{{"repo":{0},"tag":{1}}}', toJSON(github.repository), toJSON(github.event.release.tag_name)) }}
