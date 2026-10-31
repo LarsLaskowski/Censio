@@ -66,15 +66,13 @@ tester runs.
 - Image tags: a run creates exactly `<version>` and `latest`, linux/amd64 only (as `docs/areas/server.md`); no
   `MAJOR.MINOR`, `MAJOR` or commit tags. `latest` moves only once both artifacts of the release exist.
 - ZIP: holds `Censio.Companion.exe` at its root; extracted to any folder, it starts without an installer, without
-  administrator rights and without an installed .NET. Windows versions: as the Product Manager answers (see *Open
-  questions*).
+  administrator rights and without an installed .NET, on Windows 10 22H2 and Windows 11, x64.
 - Security: Docker Hub credentials come only from the repository secrets `DOCKERHUB_USERNAME` and
   `DOCKERHUB_TOKEN`, available only to the steps that use them (record 0008), never printed; each job's token has
   the least permissions it needs (write access to the release only where it attaches or promotes); no persisted
   checkout credentials; third-party actions pinned by commit as in `ci.yml`. Only a user with write access to the
   repository can publish a release; a fork pull request cannot start the workflow.
-- New configuration: the two repository secrets above, required, no default; the maintainer sets them before the
-  first release.
+- New configuration: the two repository secrets above, required, no default; both already exist in the repository.
 - Logs: every failure of E1–E6 is an error annotation of the run with the text given there; E3 is a warning
   annotation.
 - Compatibility: CI (`ci.yml`), the image check and the Dockerfile keep their behavior; the image is the one of
@@ -116,6 +114,9 @@ tester runs.
 - Two releases published at the same time: no ordering is promised between their runs.
 - Removing a test release, its tag or its image tags; that stays a manual step.
 - A Windows job in CI that starts the exe; AC2 is checked by hand on Windows.
+- When `notify-website.yml` fires: it keeps firing on the publication of the pre-release, before its artifacts
+  exist.
+- The first real release `v0.1.0` (the issue's "test tag") stays published; it is the run that shows AC1–AC3.
 
 ## Open questions
 
@@ -130,15 +131,15 @@ tester runs.
   the merge.
 - Does the promotion start `notify-website.yml` a second time? Answered: no — it listens to `published`, which a
   promotion does not raise, and events raised with the workflow's own token start no workflow.
-- Does the issue's "Docker job pushes `:latest`" allow `latest` to move before the ZIP exists? The Lead's
-  reading, for the Product Manager to confirm: the issue's model is "pre-release first, then promote after the artifacts
-  exist", so `latest` moves with the promotion (NFR *Image tags*, AC9). Answered: no (Lead).
-- Target hosts and the first release. Answered: not yet — escalated to the Product Manager: which Windows versions
-  the ZIP must run on and whether the SmartScreen warning with a documented "More info → Run anyway" is
-  acceptable; whether the secrets `DOCKERHUB_USERNAME`/`DOCKERHUB_TOKEN` (a Docker Hub access token with write
-  access to `networlddev/censio`) are the names to use; which version the first real release uses and whether it
-  stays published; whether `notify-website.yml` may keep firing when the pre-release is published, before its
-  artifacts exist.
+- Does the issue's "Docker job pushes `:latest`" allow `latest` to move before the ZIP exists? Answered: (Product
+  Manager) no — `latest` moves with the promotion, after both artifacts exist (NFR *Image tags*, AC9), following
+  the issue's model "pre-release first, then promote".
+- Target hosts and the first release. Answered: (Product Manager, escalation of the spec step) the ZIP runs on
+  Windows 10 22H2 and Windows 11, x64, without .NET and without administrator rights; the exe stays unsigned and
+  the user guide documents SmartScreen's "More info → Run anyway" (E9, AC10). The Docker Hub credentials are the
+  repository secrets `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`, which already exist. The issue's "test tag" is the
+  first real release `v0.1.0`, published as a pre-release after the merge, and it stays published.
+  `notify-website.yml` keeps firing when the pre-release is published; changing that is out of scope.
 
 ## Area documents
 
