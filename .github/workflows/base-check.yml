@@ -1,0 +1,32 @@
+# Fails when the pinned .NET Alpine bases of the server image are frozen: a newer .NET patch exists only on
+# a newer Alpine minor, which Dependabot never proposes (issue 65, record 0010). It reads the public MCR tag
+# list anonymously and uses no secret.
+name: Base image check
+
+on:
+  schedule:
+    - cron: '30 5 * * 3'
+  workflow_dispatch:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - src/Censio.Server/Dockerfile
+      - .github/scripts/base-check.sh
+      - .github/workflows/base-check.yml
+
+permissions:
+  contents: read
+
+jobs:
+  base:
+    name: Base image check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check the pinned bases
+        run: bash .github/scripts/base-check.sh
