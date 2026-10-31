@@ -61,4 +61,6 @@ once in the [area document](../areas/README.md) of the record's area, and the re
 | [0006](0006-server-plain-http-and-open-health.md) | The server serves plain HTTP; start page and health check need no login | Accepted | 2026-10-30 |
 | [0007](0007-server-web-assets-independent-of-restore-inputs.md) | The server project requests the Blazor web assets itself | Accepted | 2026-10-30 |
 | [0008](0008-ci-secrets-scoped-to-the-steps-that-use-them.md) | CI secrets are scoped to the steps that use them | Accepted | 2026-10-31 |
+| [0009](0009-server-image-runs-as-a-fixed-non-root-user.md) | The server image runs as a fixed non-root user; other UIDs come from `--user` | Proposed | 2026-10-31 |
+| [0010](0010-server-image-base-pinned-by-amd64-manifest-digest.md) | The image bases are pinned by their amd64 manifest digest; the `base.digest` label is checked in CI | Proposed | 2026-10-31 |
 <!-- project:end index -->

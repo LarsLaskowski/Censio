@@ -1,7 +1,7 @@
 # Spec: Docker image for the server
 
 Source: Issue #4 (with its comment of the solution-skeleton follow-up)
-Status: Draft
+Status: Approved by Lead
 
 ## Problem
 
@@ -112,7 +112,8 @@ sources are copied can lose the Blazor script (record 0007, Vandox#24).
   with a bind mount owned by `99:100`, which the CI job runs as AC13.
 - Target host (Q1): Linux Docker Engine and Docker Desktop on Windows (Linux containers), Docker 23 or later
   with BuildKit, for building and running; Unraid and Synology NAS hosts for running, their shares owned by
-  other UIDs (S11, E4). The build needs access to `mcr.microsoft.com`. The container starts as non-root in
+  other UIDs (S11, E4); until #5 publishes the image, the documentation shows building it on the NAS or moving
+  it there with `docker save` and `docker load`. The build needs access to `mcr.microsoft.com`. The container starts as non-root in
   every documented command; root (`--user 0`) is never documented.
 
 ## Acceptance criteria
@@ -144,7 +145,8 @@ sources are copied can lose the Blazor script (record 0007, Vandox#24).
 - [ ] AC11: `docker stop` ends the container with exit code 0 within the default timeout (E6).
 - [ ] AC12: `README.md` and `docs/USER_GUIDE.md` each hold a Docker section, English first and then German with
   the same content, with the build and run commands of S1/S2 as single lines valid in bash and PowerShell, the
-  port mapping (E3), the named volume as the default, the NAS run command with `--user` of S11 and the two
+  port mapping (E3), the named volume as the default, the transfer to a NAS host (NFR *Target host*), the NAS
+  run command with `--user` of S11 and the two
   ownership remedies of E4, the all-interfaces note and TLS at the reverse proxy (S10); `docs/areas/server.md`
   and `SECURITY.md` state that inside the image the server listens on all interfaces on 8080 (S6, S10).
 - [ ] AC13: A container started with `--user 99:100` and a bind mount on `/config` owned by `99:100` reports

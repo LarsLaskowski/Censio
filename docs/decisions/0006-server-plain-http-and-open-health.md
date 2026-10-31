@@ -3,7 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-10-30
 - **Area:** server
-- **Source:** Issue #2
+- **Source:** Issue #2, Issue #4
 - **Supersedes:** —
 
 ## Context
@@ -23,12 +23,17 @@ redirect health probes and pin browsers to HTTPS on hosts that have none.
 ## Decision
 
 Option 2. The server adds no HTTPS redirection and no HSTS, listens on the ASP.NET Core default address
-(loopback only) unless configured, and answers `/health` with its status alone. The rules are in
+(loopback only) unless configured, and answers `/health` with its status alone. The Docker image configures it
+deliberately: it sets `ASPNETCORE_HTTP_PORTS=8080`, so inside the container the server listens on all interfaces,
+and the operator's `-p` mapping decides who can reach it (issue #4). The rules are in
 [`areas/server.md`](../areas/server.md).
 
 ## Consequences
 
 - An operator who exposes the server beyond a trusted network must put a TLS proxy in front (`SECURITY.md`).
+- In the image the loopback default does not protect the server: a `-p 8080:8080` mapping publishes it on every
+  interface of the host. Kept, because a container listening on loopback alone is unreachable, and Docker's
+  `-p 127.0.0.1:8080:8080` restricts it where needed (documented in the README).
 - Web login stays out (none planned); a later login must exempt `/health`.
 - The start page shows the version to anyone who can reach it, accepted in a trusted network.
 - Host filtering is off (`AllowedHosts` `*`) and the Blazor hub checks no `Origin`, so a DNS-rebinding page can
