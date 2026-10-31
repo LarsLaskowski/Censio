@@ -39,7 +39,9 @@ The checks themselves live in `.github/scripts/release-check.sh`, which the work
 ## Decision
 
 Option 2: build jobs hold no secret and a read-only token, publish and promote jobs run no build code, and
-`latest` is set at the promotion to the digest that passed the checks. What a release produces and shows is in
+`latest` is set at the promotion, registry-side, to the digest that passed the checks. Values passed between jobs
+and artifacts are treated as untrusted in the credentialed jobs, and the image is one `linux/amd64` manifest
+without a provenance attestation. What a release produces and shows is in
 [`areas/server.md`](../areas/server.md) (*Docker image*) and [`areas/companion.md`](../areas/companion.md)
 (*Platform*); how a maintainer runs a release is in `docs/CONTRIBUTING.md` (*Versioning and releases*).
 
@@ -51,5 +53,8 @@ Option 2: build jobs hold no secret and a read-only token, publish and promote j
   on a `main` commit from before this workflow starts no run.
 - The Companion exe built on Linux carries no Windows version resource of its own; the file properties show no
   product version. Revisit with a Windows build if testers need it, or with code signing.
+- Build code can write job outputs and upload artifacts; the publish and promote jobs therefore check the form of
+  every output, read one artifact file by fixed name from outside the checkout and execute nothing from it.
+- A failed run can be completed with "Re-run failed jobs" only while its artifacts are kept (7 days).
 - The promotion moves Docker Hub `latest` before GitHub's *Latest* mark; a failure between the two leaves them
   apart until the promote job is re-run.

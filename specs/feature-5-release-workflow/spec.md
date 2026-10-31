@@ -54,7 +54,7 @@ and every build shows `0.0.0` unless a workflow passes a version (record 0005).
   it pushes anything.
 - E7: Any job of a release published as a pre-release fails (build, check, upload, push, promote): the release
   stays a pre-release; `latest` and *Latest* stay where they were. The other artifact may already exist. The
-  maintainer re-runs the failed jobs; that run finishes as S1. Only a failure inside the promotion, after `latest`
+  maintainer re-runs the failed jobs within 7 days (later all jobs, E8); that run finishes as S1. Only a failure inside the promotion, after `latest`
   moved and before *Latest* is set, leaves the two apart until that re-run.
 - E8: A re-run meets an existing artifact: the ZIP asset is replaced and the tag `<version>` overwritten by the
   re-built image, checked again as in E5 and E6; the re-run does not fail on "already exists".
@@ -177,7 +177,7 @@ and every build shows `0.0.0` unless a workflow passes a version (record 0005).
   (AC3), AC7's logs; AC9's failure path is shown by review only.
 - m1 (E3 vs. E7/AC9): accepted. E7 and AC9 apply to pre-releases only; E3 states what a failed full release keeps.
   Reverting it to a pre-release is not added.
-- Plan step (Lead): E7 names the promotion's window; AC2 gained a dry run. m4 holds: a one-file publish was measured.
+- Plan step (Lead): E7 gained two windows, AC2 a dry run; m4 measured.
 - m2 (E2's limits): accepted (E2, AC5, AC10).
 - m3 ("product version"): accepted. E5 checks the informational version the tray reads; file properties are out of
   scope.
