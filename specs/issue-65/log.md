@@ -14,3 +14,4 @@ are quoted in full.
 | 2026-10-31 17:04 | 7 Code check | Orchestrator | no C# change: Format/Build/Coverage n/a; Analyzer gate --lint-only PASS, scope-check PASS, decision-check PASS; V1 re-run exit 0 |
 | 2026-10-31 17:07 | 8 Review | squad-reviewer | Round 1: BLOCKING 2 (jq error echoes registry text into log; leading-zero pin passes by numeric compare), NON-BLOCKING 1 (verbatim: fact 10 confirmed, add 60-day/notification statements) (opus/medium · 51,789 tokens · 13 tool uses · 139 s) |
 | 2026-10-31 17:07 | 8 Review | Orchestrator | verbatim doc fix applied (docs/CONTRIBUTING.md; record 0010 Consequences, sentence re-wrapped to the file's line width); decision-check, scope-check pass |
+| 2026-10-31 17:07 | 8 Fix | squad-dev | fixed jq error echo + leading-zero pin (string compare); stub-curl and real-registry checks pass; lint PASS (sonnet/medium · usage pending) |
