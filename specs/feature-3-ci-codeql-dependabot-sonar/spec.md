@@ -1,7 +1,7 @@
 # Spec: CI, CodeQL, Dependabot and SonarQube Cloud
 
 Source: Issue #3
-Status: Draft
+Status: Approved by Lead
 
 ## Problem
 

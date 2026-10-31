@@ -60,4 +60,5 @@ once in the [area document](../areas/README.md) of the record's area, and the re
 | [0005](0005-product-version-from-one-build-property.md) | The product version comes from one build property | Accepted | 2026-10-30 |
 | [0006](0006-server-plain-http-and-open-health.md) | The server serves plain HTTP; start page and health check need no login | Accepted | 2026-10-30 |
 | [0007](0007-server-web-assets-independent-of-restore-inputs.md) | The server project requests the Blazor web assets itself | Accepted | 2026-10-30 |
+| [0008](0008-ci-secrets-scoped-to-the-steps-that-use-them.md) | CI secrets are scoped to the steps that use them | Proposed | 2026-10-31 |
 <!-- project:end index -->
