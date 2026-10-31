@@ -211,3 +211,13 @@ checkout keeps no credentials.
 - A failure of the check opens no issue (option 3).
 - Unrelated: `docs/CONTRIBUTING.md` *Contributions from outside* says the workflows "come from a shared template",
   which is template text outside the project blocks; reported for a `squad` lesson, not changed here.
+
+## Security notes
+
+Non-blocking findings of Security's `APPROVED` plan review, verbatim:
+
+1. Some FROM forms are skipped without failing, which breaks the AC3 claim and record 0010's "fails closed when it cannot read the pins". Step 1 matches `^FROM ` only. Docker's parser also accepts lower or mixed case (`from`), leading whitespace, a tab after the keyword, and a UTF-8 BOM before line 1, which BuildKit strips. A FROM line in any of these forms is silently left out instead of reported. If line 1 carried a BOM, the build stage would go unchecked. These forms already fail safe: `FROM --platform=… img` (field 2 fails the check), `FROM \` with a continuation line (field 2 is empty), `FROM ${ARG}` (fails the image check). Fix: strip a BOM from line 1, select lines with a case-insensitive `^[[:space:]]*FROM[[:space:]]`, and take the first field that does not start with `--`, or reject such lines outright. Add one V4 case for each (lowercase, indented, BOM). Non-blocking because the check is detection, not a control, and today's Dockerfile uses plain `FROM`.
+2. Bash arithmetic on captured numbers. Compare with `10#$n`, so a leading-zero component such as `08` is not read as octal (that errors under `set -e` and gives a misleading exit). The captures are digits only, so the `a[$(cmd)]` arithmetic-injection pattern cannot occur. Never pass a raw registry string into `(( ))`.
+3. `jq -r '.tags[]'` splits a tag that contains a newline into several lines. A tampered answer could slip in a fake matching tag and change the result, which only flips red and green. Optional hardening: `jq -r '.tags | if type == "array" then .[] | strings | select(test("\n") | not) else error end'`.
+4. The response has no size limit, which the plan says openly; it is bounded only by `--max-time 30` and the job timeout. An optional `--max-filesize` (for example 8M; the answers today are about 450 kB) would make the bound explicit. Not required.
+5. Plan fact 1 has a wrong line number. It says the aspnet `FROM` is on line 31; on origin/main it is line 28 (`grep -n FROM src/Censio.Server/Dockerfile`: lines 1 and 28). This matters for the Dev's scratch copies in V2–V4.
