@@ -182,7 +182,7 @@ expect_equal "AC6 env" "true" "$(inspect_image "$clean_image" '{{range .Config.E
 expect_equal "AC6 exposed" "true" "$(inspect_image "$clean_image" '{{if index .Config.ExposedPorts "8080/tcp"}}true{{end}}')"
 
 step "AC5 config: health check timings"
-expect_equal "AC5 config" "10000000000/3000000000/30000000000/3" \
+expect_equal "AC5 config" "10s/3s/30s/3" \
     "$(inspect_image "$clean_image" '{{.Config.Healthcheck.Interval}}/{{.Config.Healthcheck.Timeout}}/{{.Config.Healthcheck.StartPeriod}}/{{.Config.Healthcheck.Retries}}')"
 
 step "AC2: container answers"
