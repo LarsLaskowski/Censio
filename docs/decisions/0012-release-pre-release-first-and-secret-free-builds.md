@@ -1,6 +1,6 @@
 # 0012: Releases run as pre-release first; artifacts are built without secrets and promoted by digest
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-10-31
 - **Area:** —
 - **Source:** Issue #5
@@ -50,7 +50,12 @@ without a provenance attestation. What a release produces and shows is in
 - Malicious build code can still produce a malicious artifact that a publish job then pushes; it cannot read the
   Docker Hub token or the write token. The checks (version, file list, health) are not a defense against that.
 - The tag check refuses mistakes, not attackers: a tag on a branch whose workflow differs is not refused, and a tag
-  on a `main` commit from before this workflow starts no run.
+  on a `main` commit from before this workflow starts no run. It checks the tag as the `check` job fetches it while
+  the build jobs check out the event's commit; a tag moved during the run is not noticed. The check is not also
+  tied to the event's commit: that gap needs the same write access as, and is narrower than, the branch-workflow one.
+- Runs of different releases are not serialized: two releases published close together may promote in either order
+  and leave `latest` and *Latest* on the older one, as a lower version does. A `concurrency` group was not added; the
+  spec of #5 leaves the order of releases out of scope.
 - The Companion exe built on Linux carries no Windows version resource of its own; the file properties show no
   product version. Revisit with a Windows build if testers need it, or with code signing.
 - Build code can write job outputs and upload artifacts; the publish and promote jobs therefore check the form of
