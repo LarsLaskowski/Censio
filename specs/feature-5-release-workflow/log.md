@@ -25,4 +25,5 @@ are quoted in full.
 | 2026-10-31 17:56 | 6 Implement G2 | squad-dev | launched (continued): release.yml (sonnet/medium · 13,132 tokens · 27 tool uses · 498 s · continued) |
 | 2026-10-31 17:58 | 6 Implement G3 | squad-dev | launched (continued): documentation tasks 6-10 (sonnet/medium · 31,973 tokens · 40 tool uses · 593 s · continued) |
 | 2026-10-31 18:00 | 7 Code check | Orchestrator | Format check, build, tests, scope-check pass; analyzer gate: 4 shell findings (S7679) in release-check-test.sh -> Code Officer |
-| 2026-10-31 18:00 | 7 Code check | squad-code-officer | launched: S7679 findings (haiku/medium · usage pending) |
+| 2026-10-31 18:00 | 7 Code check | squad-code-officer | launched: S7679 findings (haiku/medium · 68,560 tokens · 10 tool uses · 53 s) |
+| 2026-10-31 18:03 | 7 Code check | Orchestrator | Gates after Code Officer: analyzer PASS, Sonar branch scan uploaded (results NOT CHECKED for non-main branch; read on the PR in step 11); release-check-test.sh not rerun after refactor in this sandbox (Docker build blocked by proxy TLS), runs in CI |
