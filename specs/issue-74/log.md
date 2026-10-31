@@ -20,3 +20,5 @@ are quoted in full.
 | 2026-10-31 19:25 | 6 Implement | squad-dev | launched: release.yml, notify-website.yml, release-check.sh, docs (sonnet/medium · 80,058 tokens · 9 tool uses · 170 s) |
 | 2026-10-31 19:28 | 7 Code check | Orchestrator | Format check, analyzer-check, scope-check --tier security, decision-check PASS; no C# change; main not moved. Pending: Product Manager dry run D1-D4 before the review round |
 | 2026-10-31 19:44 | 7 Code check | Product Manager | Dry run D1-D4 skipped for now: continue without it; protection stays marked not yet tried in CONTRIBUTING, dry run to be done later |
+| 2026-10-31 19:44 | 8 Review round 1 | squad-reviewer | launched, code SHA bcbec90 (opus/medium · usage pending) |
+| 2026-10-31 19:44 | 8 Review round 1 | squad-security | launched (diff mode), code SHA bcbec90 (opus/medium · usage pending) |
