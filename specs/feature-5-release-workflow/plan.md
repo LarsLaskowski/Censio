@@ -282,3 +282,9 @@ the Companion is kept. The image is feature 4's, unchanged.
 - N3: accepted, only this branch's dry-run artifact is started; CONTRIBUTING says so.
 - N4: follow-up issue described under *Out of scope / follow-ups*.
 - N5: no change.
+
+### Security notes (round 2, non-blocking, verbatim)
+
+- N6 (`actions/download-artifact` version): B2's guarantee that the download "cannot write" the checked-out script depends on the action extracting safely. Versions 4.0.0–4.1.6 had a path-traversal (zip-slip) flaw (CVE-2024-42471) that let an artifact write outside its target directory. The Dev should pin a commit of the current major (at least v4.1.7), in line with the existing `upload-artifact` v7.0.2 pin. The diff review will check this pin.
+- N7 (`runner.temp` in `run:` steps): inside `run:` steps the path should be written `$RUNNER_TEMP`, not `${{ runner.temp }}`. The plan's "no `${{ }}` inside `run:`" rule already requires this; the diff review will check it.
+- N8 (open facts are not part of the security case): facts 13, 14a and 15 are still unverified. All three fail safe: an access error, a failed digest or ID comparison, or the empty-digest refusal. No security property depends on them being true, so no measurement is needed before approval.
