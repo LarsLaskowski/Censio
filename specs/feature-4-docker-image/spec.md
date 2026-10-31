@@ -26,11 +26,16 @@ sources are copied can lose the Blazor script (record 0007, Vandox#24).
 - S4: Given the running container with a new named volume on `/config`, when a process of the runtime user
   creates a file in `/config`, then it succeeds; `/config` is the one place the server will keep its database
   and the uploaded catalog (#29, #42).
-- S5: Given the running container, when the operator runs `docker ps`, then within the start period the
-  container's status reads `(healthy)`, because the image probes `/health` itself.
+- S5: Given the running container, when the operator runs `docker ps`, then within 60 seconds of the start
+  the container's status reads `(healthy)`, because the image probes `/health` itself on `127.0.0.1` (interval
+  10 s, timeout 3 s, start period 30 s, 3 retries); a server that stops answering turns `(unhealthy)` after
+  three failed probes.
 - S6: Given the image, when the operator starts it with `-e ASPNETCORE_HTTP_PORTS=9090 -p 9090:9090`, then
-  the server listens on 9090 instead; without that variable it listens on 8080 because the image sets the port
-  itself, not because the base image happens to.
+  the server listens on 9090 instead and the container still turns `(healthy)`, because the probe uses the
+  first port of `ASPNETCORE_HTTP_PORTS` (so `8080;8081` probes 8080); without that variable it listens on 8080
+  because the image sets the port itself, not because the base image happens to. `ASPNETCORE_HTTP_PORTS` is
+  the one documented way to change the port; `ASPNETCORE_URLS` is not supported for the image, and the
+  documentation says so.
 - S7: Given a build with `--build-arg VERSION=1.2.3`, when the operator opens `/`, then it shows `Version 1.2.3`
   (record 0005; the release #5 and edge #6 builds pass their version this way).
 - S8: Given the Dockerfile, when `hadolint` checks it, then it reports no finding.
@@ -46,8 +51,11 @@ sources are copied can lose the Blazor script (record 0007, Vandox#24).
   as `1026:100`), when the operator runs
   `docker run -d --name censio --user 99:100 -p 8080:8080 -v /mnt/user/appdata/censio:/config censio`, then
   the server starts as UID 99 (`docker exec censio id -u` prints `99`), `/health` answers `200`, and that
-  user can create a file in `/config`: the image needs no root and no write access outside `/config` for
-  any UID it is started with.
+  user can create a file in `/config`: the image needs no root for any UID it is started with. The one
+  write outside `/config` is ASP.NET Core's data-protection key ring (antiforgery, `app.UseAntiforgery()`):
+  as UID 1654 it lands in `/home/app/.aspnet` in the container layer, under another UID (`HOME=/`) it stays in
+  memory and the server logs ASP.NET Core's warning about it at start; in both cases the keys are lost when
+  the container is recreated, and an open page needs a reload after a restart.
 
 ## Errors and edge cases
 
@@ -74,9 +82,18 @@ sources are copied can lose the Blazor script (record 0007, Vandox#24).
 
 ## Non-functional requirements
 
-- Platform: linux/amd64 only. Build stage `mcr.microsoft.com/dotnet/sdk:10.0-alpine`, runtime stage
-  `mcr.microsoft.com/dotnet/aspnet:10.0-alpine` pinned by digest; the existing Dependabot `docker` entry for
-  `/src/Censio.Server` keeps the digest current. Multi-stage, no docker-compose file.
+- Platform: linux/amd64 only, guaranteed by the single-architecture tags, not by `FROM --platform` (hadolint
+  DL3029): build stage `mcr.microsoft.com/dotnet/sdk:10.0-alpine-amd64`, runtime stage
+  `mcr.microsoft.com/dotnet/aspnet:10.0-alpine-amd64`, both pinned by their linux/amd64 manifest digest (the
+  `-amd64` tags are the issue's `10.0-alpine` images for one architecture). `base.name` is that runtime tag and
+  `base.digest` that manifest digest. The existing Dependabot `docker` entry for `/src/Censio.Server` updates
+  both `FROM` lines; it does not touch the `base.digest` label, so the image check of AC9 fails a Dependabot
+  pull request until the label is set to the new digest by hand. The image declares no `VOLUME`: `/config`
+  exists in the image, owned by 1654, and every documented command passes `-v`. Multi-stage, no
+  docker-compose file.
+- Runtime base: the plain `aspnet` Alpine image runs with invariant globalization (no ICU) and has no tzdata,
+  so `TZ` (which Unraid passes by default) has no effect and log times are UTC; recorded in
+  `docs/areas/server.md`.
 - Security: the runtime user is not root, and the image runs under any non-root UID given with `--user`; the image contains only the published server, no SDK, sources or
   test assemblies. Inside the container the listener binds all interfaces on 8080, plain HTTP (record 0006);
   this is a security area (*Network exposure*, `.squad/project.md`) and changes the statements about the
@@ -88,7 +105,11 @@ sources are copied can lose the Blazor script (record 0007, Vandox#24).
 - Verification: the session has a Docker client but no daemon, so the restore-order reproduction (*Image build
   check*, `.squad/stack.md`) runs before the review, extended by the check of E1; the criteria about a running
   container (S2–S7, S9, S11) are checked by a CI job that builds the image without pushing it and probes the
-  container on every pull request.
+  container on every pull request. That job builds the solution on the runner first, so `bin/` and `obj/` with
+  the runner's paths are in the build context for AC1. The documented steps get a dry run by the Product
+  Manager before the documentation review (*Operator environments*, `.squad/routing.md`): Docker Desktop on
+  Windows in PowerShell, and Unraid or Synology; where no NAS is at hand, the stand-in is Linux Docker Engine
+  with a bind mount owned by `99:100`, which the CI job runs as AC13.
 - Target host (Q1): Linux Docker Engine and Docker Desktop on Windows (Linux containers), Docker 23 or later
   with BuildKit, for building and running; Unraid and Synology NAS hosts for running, their shares owned by
   other UIDs (S11, E4). The build needs access to `mcr.microsoft.com`. The container starts as non-root in
@@ -97,24 +118,29 @@ sources are copied can lose the Blazor script (record 0007, Vandox#24).
 ## Acceptance criteria
 
 - [ ] AC1: `docker build -f src/Censio.Server/Dockerfile .` from the repository root succeeds and produces a
-  linux/amd64 image, from a clean checkout and from a working tree with local build output (S1, E2).
+  linux/amd64 image, from a clean checkout and from a working tree after `dotnet build` and `dotnet publish`
+  on the host; the plan names the ignore file and where BuildKit reads it with `-f` (S1, E2).
 - [ ] AC2: A container started as in S2 answers `GET /health` on port 8080 with `200` and body `Healthy`, and `GET /`
   answers `200` with `Version 0.0.0` and a `_framework/blazor.web` script reference that itself answers `200`
   (S2).
 - [ ] AC3: In the container, `id -u` prints `1654` and the server process runs as UID 1654 (S3).
 - [ ] AC4: The runtime user can create a file in `/config` of a new named volume (S4).
-- [ ] AC5: The image declares a health check on `/health`; `docker inspect` reports the container `healthy`
-  within the start period (S5).
+- [ ] AC5: The image declares a health check on `/health` with the timings of S5; `docker inspect` reports the
+  container `healthy` within 60 seconds of the start (S5).
 - [ ] AC6: The image sets `ASPNETCORE_HTTP_PORTS=8080` and exposes 8080 itself; started with
-  `ASPNETCORE_HTTP_PORTS=9090` the server answers `/health` on 9090 (S6).
+  `ASPNETCORE_HTTP_PORTS=9090` the server answers `/health` on 9090 and `docker inspect` reports it `healthy`
+  within 60 seconds; started with `ASPNETCORE_HTTP_PORTS=8080;8081` it reports `healthy` too (S6).
 - [ ] AC7: Built with `--build-arg VERSION=1.2.3` the start page shows `Version 1.2.3`; built with
   `VERSION=1.0;touch /pwned` the build fails or the value stays literal, and no `/pwned` exists in either stage
   (S7, E5).
 - [ ] AC8: `hadolint` reports no finding on the Dockerfile (S8).
-- [ ] AC9: `docker inspect` shows the four labels of S9 with `licenses` `MIT` and `base.digest` equal to the
-  digest the runtime `FROM` line pins (S9).
-- [ ] AC10: With `wwwroot/_framework/blazor.web*.js` removed from the publish output the image build fails with a
-  message naming that path; the *Image build check* reproduction in `.squad/stack.md` fails the same way (E1).
+- [ ] AC9: `docker inspect` shows the four labels of S9 with `licenses` `MIT`, `base.name` equal to the runtime
+  tag and `base.digest` equal to the digest the runtime `FROM` line pins; a check in CI fails when the label
+  and the `FROM` digest differ (S9, NFR *Platform*).
+- [ ] AC10: Built from a temporary copy whose `Censio.Server.csproj` lacks `RequiresAspNetWebAssets` (record
+  0007), so that no file matches `wwwroot/_framework/blazor.web*.js`, the image build fails with a message naming
+  that glob; the check matches the glob, not one file name, and the *Image build check* reproduction in
+  `.squad/stack.md` fails the same way (E1).
 - [ ] AC11: `docker stop` ends the container with exit code 0 within the default timeout (E6).
 - [ ] AC12: `README.md` and `docs/USER_GUIDE.md` each hold a Docker section, English first and then German with
   the same content, with the build and run commands of S1/S2 as single lines valid in bash and PowerShell, the
@@ -129,7 +155,7 @@ sources are copied can lose the Blazor script (record 0007, Vandox#24).
 
 - Pushing the image, Docker Hub credentials, tags and the version from the release tag: #5 and #6.
 - The configuration reference, the database and catalog files in `/config` and data surviving container
-  recreation: #29, #33, #42.
+  recreation: #29, #33, #42; persisting the data-protection key ring in `/config` goes with them (S11).
 - Other platforms than linux/amd64 (arm64 hosts, including ARM-based Synology models; Windows containers),
   docker-compose, and NAS-specific templates (an Unraid Community Applications template, a Synology project).
 - The rest of `README.md` and the user guide (what Censio is, status, the Windows ZIP): #7.
@@ -171,5 +197,35 @@ sources are copied can lose the Blazor script (record 0007, Vandox#24).
   remedies, the health check,
   the version build argument, linux/amd64; *Listen address* says the loopback default holds outside the image
   only; *Not here* and its index row in `docs/areas/README.md` drop "Docker image".
+  The section also states the probe and its timings, that only `ASPNETCORE_HTTP_PORTS` changes the port,
+  where the data-protection keys go (S11), invariant globalization, no tzdata (UTC log times, `TZ` without
+  effect), no `VOLUME`, and the by-hand `base.digest` fix of a Dependabot pull request.
 - `SECURITY.md` (*Deployment Security Considerations*): the loopback sentence qualified for the image.
 - `docs/ARCHITECTURE.md` (*Deployment*): the image name, platform and the two base images, linked to the area.
+
+## Challenge
+
+- M1 (probe port vs S6): accepted — S6 and AC6 require `(healthy)` with `9090` and with `8080;8081`; the probe
+  takes the first port of `ASPNETCORE_HTTP_PORTS` on `127.0.0.1`; `ASPNETCORE_URLS` is documented as not
+  supported. The probe tool (BusyBox `wget`, as the image has no `curl`) is the plan's choice to verify.
+- M2 (`base.digest` vs Dependabot): accepted, option (i) — the issue puts the labels in the Dockerfile, which
+  rules out (ii); the label stays a literal, a CI check fails on a mismatch (AC9), and the by-hand fix of a
+  Dependabot pull request is documented (NFR *Platform*). The plan records the choice in a decision record.
+- m1 (which digest): accepted — the `-amd64` tags pinned by their manifest digest, both stages, no
+  `FROM --platform` (NFR *Platform*).
+- m2 (data-protection keys): accepted — S11 says where the keys go, that they are lost on recreation and that
+  the warning under `--user` is expected; persisting them is out of scope with #29/#33/#42.
+- m3 (health-check timings): accepted — interval 10 s, timeout 3 s, start period 30 s, 3 retries, healthy
+  within 60 s (S5, AC5).
+- m4 (dirty tree in CI): accepted — the CI job builds and publishes on the runner first (NFR *Verification*,
+  AC1); the ignore file and its location are named by the plan, since the spec states the effect only.
+- m5 (AC10 negative state): accepted — produced from a temporary copy without `RequiresAspNetWebAssets`;
+  the check matches the glob.
+- m6 (docs verified only on bash): accepted — dry run by the Product Manager on Docker Desktop for Windows in
+  PowerShell and on Unraid or Synology, stand-in Linux Docker Engine with a `99:100` bind mount (NFR
+  *Verification*); the plan schedules it.
+- m7 (`VOLUME`): decided — no `VOLUME`, `/config` exists owned by 1654 and every documented command passes
+  `-v` (NFR *Platform*); this avoids an anonymous volume on every run without `-v`.
+- m8 (globalization, tzdata): accepted — the plain image stays (smaller, no ICU need today); both limits are
+  stated in the NFR *Runtime base* and the area document. The plan verifies them against the image
+  configuration.
