@@ -42,7 +42,9 @@ reference them, so anyone who can push a branch can read them with a workflow of
    jobs `image-publish`, `promote` and `dispatch` alone** — a job on a branch ref is refused before its first step;
    the repository's tag ruleset lets only administrators create, move or delete `v*` tags. The rule is of type Tag:
    a branch rule `v*` would admit any branch named `v…`, which every writer can push. Needs settings the workflow
-   cannot make, in an order (`docs/CONTRIBUTING.md`, *Versioning and releases*).
+   cannot make, in an order (`docs/CONTRIBUTING.md`, *Versioning and releases*). The refusal on a branch ref and the
+   creation of an unknown environment without a rule (below) are GitHub's documented behavior, not yet measured here
+   (see `docs/CONTRIBUTING.md`, *Versioning and releases*, *Not yet tried*).
 7. **As 6, with required reviewers on the environment** — a second person approves every push; rejected: the
    project has one administrator, who also publishes the release. The tag ruleset decides only who creates, moves or
    deletes `v*` tags; anyone with write access can still publish a release on an existing tag or re-run a release
