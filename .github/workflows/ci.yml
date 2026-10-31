@@ -14,57 +14,56 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      # Secrets are not exposed to Dependabot or fork-triggered runs, so the
-      # token is empty there. The SonarQube steps below are skipped in that
-      # case so the build and tests still run.
-      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      # A boolean, never the token's value: secrets are not exposed to Dependabot or
+      # fork-triggered runs, so it is false there and the SonarQube steps below are
+      # skipped so the build and tests still run. The token itself is in the `env` of
+      # the two SonarQube steps only.
+      SONAR_ENABLED: ${{ secrets.SONAR_TOKEN != '' }}
     steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
+          persist-credentials: false
+
       - name: Set up JDK 17
         uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           java-version: 17
           distribution: 'zulu'
 
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
-
       - name: Setup .NET
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: '10.0.x'
 
-      - name: Cache SonarQube Cloud packages
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.sonar/cache
-          key: ${{ runner.os }}-sonar
-          restore-keys: ${{ runner.os }}-sonar
-
-      - name: Cache SonarQube Cloud scanner
-        id: cache-sonar-scanner
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ${{ runner.temp }}/scanner
-          key: ${{ runner.os }}-sonar-scanner
-          restore-keys: ${{ runner.os }}-sonar-scanner
-
-      - name: Install SonarQube Cloud scanner
-        if: ${{ env.SONAR_TOKEN != '' && steps.cache-sonar-scanner.outputs.cache-hit != 'true' }}
-        run: |
-          mkdir -p ${{ runner.temp }}/scanner
-          dotnet tool update dotnet-sonarscanner --tool-path ${{ runner.temp }}/scanner
+      - name: Restore tools
+        run: dotnet tool restore
 
       - name: Restore
         run: dotnet restore Censio.slnx
 
-      - name: Begin SonarQube analysis
-        if: ${{ env.SONAR_TOKEN != '' }}
+      - name: Check tool versions
         run: |
-          ${{ runner.temp }}/scanner/dotnet-sonarscanner begin \
+          cli=$(jq -r '.tools["reihitsu.cli"].version // empty' .config/dotnet-tools.json)
+          analyzer=$(sed -n 's/.*<PackageVersion Include="Reihitsu.Analyzer" Version="\([^"]*\)".*/\1/p' Directory.Packages.props | head -n 1)
+          if [ -z "$cli" ] || [ -z "$analyzer" ] || [ "${cli%.*}" != "${analyzer%.*}" ]; then
+            echo "::error::Reihitsu.Cli ${cli:-<missing>} (.config/dotnet-tools.json) and Reihitsu.Analyzer ${analyzer:-<missing>} (Directory.Packages.props) are on different release lines; raise Reihitsu.Cli in the tool manifest"
+            exit 1
+          fi
+
+      - name: Format check
+        run: dotnet tool run reihitsu-format --check ./
+
+      - name: Begin SonarQube analysis
+        id: sonar-begin
+        if: env.SONAR_ENABLED == 'true'
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          dotnet tool run dotnet-sonarscanner begin \
             /k:"LarsLaskowski_Censio" \
-            /o:"larslaskowski" \
+            /o:"networlddev" \
             /d:sonar.token="$SONAR_TOKEN" \
             /d:sonar.cs.opencover.reportsPaths="${{ runner.temp }}/TestResults/**/coverage.opencover.xml" \
             /d:sonar.coverage.exclusions=".squad/**,.claude/**,src/Censio.Companion/**"
@@ -73,6 +72,7 @@ jobs:
         run: dotnet build Censio.slnx -c Release --no-restore
 
       - name: Test
+        id: test
         run: >
           dotnet test Censio.slnx
           -c Release --no-build
@@ -83,16 +83,18 @@ jobs:
           DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=opencover
 
       - name: End SonarQube analysis
-        if: ${{ !cancelled() && env.SONAR_TOKEN != '' }}
+        if: ${{ !cancelled() && steps.sonar-begin.outcome == 'success' }}
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
-          ${{ runner.temp }}/scanner/dotnet-sonarscanner end /d:sonar.token="$SONAR_TOKEN"
+          dotnet tool run dotnet-sonarscanner end /d:sonar.token="$SONAR_TOKEN"
 
       - name: Publish test report
         uses: dorny/test-reporter@a43b3a5f7366b97d083190328d2c652e1a8b6aa2 # v3.0.0
         # Creating check runs needs a writable token, which Dependabot and
         # fork-triggered runs do not get. Skip there; the test step itself
         # still fails the job on a failing test.
-        if: ${{ !cancelled() && github.actor != 'dependabot[bot]' && github.event.pull_request.head.repo.fork != true }}
+        if: ${{ !cancelled() && github.actor != 'dependabot[bot]' && github.event.pull_request.head.repo.fork != true && (steps.test.outcome == 'success' || steps.test.outcome == 'failure') }}
         with:
           name: dotnet tests
           path: ${{ runner.temp }}/TestResults/**/*.trx
@@ -100,7 +102,7 @@ jobs:
 
       - name: Upload test & coverage artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && (steps.test.outcome == 'success' || steps.test.outcome == 'failure') }}
         with:
           name: test-results
           path: |

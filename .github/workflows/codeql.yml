@@ -26,23 +26,16 @@ jobs:
             build-mode: none
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      # CodeQL fails on a C# analysis without a source file; skip it until the first one exists, then remove
-      # this step and the conditions.
-      - name: Detect C# sources
-        id: sources
-        run: |
-          if [ -n "$(git ls-files '*.cs' | head -n 1)" ]; then echo "exists=true" >> "$GITHUB_OUTPUT"; else echo "exists=false" >> "$GITHUB_OUTPUT"; fi
+        with:
+          persist-credentials: false
 
       - name: Initialize CodeQL
-        if: ${{ matrix.language != 'csharp' || steps.sources.outputs.exists == 'true' }}
         uses: github/codeql-action/init@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
 
       - name: Perform CodeQL Analysis
-        if: ${{ matrix.language != 'csharp' || steps.sources.outputs.exists == 'true' }}
         uses: github/codeql-action/analyze@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
         with:
           category: /language:${{ matrix.language }}
