@@ -95,6 +95,10 @@ the Docker health probe rely on it.
   CI job `image` fails when they differ, so a base-image pull request from Dependabot needs the `base.digest`
   label (and `base.name`) set by hand to the new `FROM` line.
 - The server logs to the console (`docker logs`).
+- Published on Docker Hub as `networlddev/censio:<version>` for every release and as `latest`, which points to the
+  last promoted release; both tags resolve to the same single linux/amd64 image manifest (no attestation index), the
+  image that passed the release checks (the start page shows `Version <version>`, `/health` answers `Healthy`). A
+  release creates no other tag, and an earlier release's tag stays unchanged unless its run is re-run.
 
 ## Limits and errors
 
@@ -113,8 +117,9 @@ the Docker health probe rely on it.
 - [`decisions/0009-server-image-runs-as-a-fixed-non-root-user.md`](../decisions/0009-server-image-runs-as-a-fixed-non-root-user.md) — user 1654, other UIDs through `--user`, no `VOLUME`.
 - [`decisions/0010-server-image-base-pinned-by-amd64-manifest-digest.md`](../decisions/0010-server-image-base-pinned-by-amd64-manifest-digest.md) — full-version amd64 base tags pinned by digest, the `base.digest` label checked in CI.
 - [`decisions/0011-data-protection-key-ring-in-the-data-directory.md`](../decisions/0011-data-protection-key-ring-in-the-data-directory.md) — the key ring lies in `<data directory>/data-protection-keys`; the server stops when it cannot write it.
+- [`decisions/0012-release-pre-release-first-and-secret-free-builds.md`](../decisions/0012-release-pre-release-first-and-secret-free-builds.md) — releases run as pre-release first, artifacts are built without secrets and `latest` is set by digest at the promotion.
 
 ## Not here
 
-- Data ingest from the Companion (later issue) and the release workflows (#5, #6).
+- Data ingest from the Companion (later issue) and the edge builds (#6).
 - Web layout and theming (#31).

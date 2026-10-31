@@ -132,3 +132,32 @@ jobs:
 
       - name: Build and check the server image
         run: bash .github/scripts/image-check.sh
+
+  release-check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Show the GitHub CLI version
+        run: gh --version
+
+      - name: Test the release checks
+        run: bash .github/scripts/release-check-test.sh
+
+      - name: Upload the Companion ZIP of the dry run
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: companion-dry-run
+          path: ${{ runner.temp }}/companion-dry-run/Censio-1.2.3-win-x64.zip
+          if-no-files-found: error
+          retention-days: 14
