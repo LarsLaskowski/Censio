@@ -107,15 +107,17 @@ review:
 
 ```bash
 scratch="$(mktemp -d)"
-git ls-files -z -- '*.slnx' '*.sln' '*.csproj' '*.props' '*.targets' 'nuget.config' 'global.json' \
-  | xargs -0 -I{} cp --parents {} "$scratch"
-(cd "$scratch" && dotnet restore Censio.slnx)
-git ls-files -z | xargs -0 -I{} cp --parents {} "$scratch"
+git ls-files -z -- 'global.json' 'Directory.Build.props' 'Directory.Packages.props' \
+  'src/Censio.Server/Censio.Server.csproj' 'src/Censio.Contracts/Censio.Contracts.csproj' \
+  'src/Censio.Server.Data/Censio.Server.Data.csproj' | xargs -0 -I{} cp --parents {} "$scratch"
+(cd "$scratch" && dotnet restore src/Censio.Server/Censio.Server.csproj)
+git ls-files -z -- '.editorconfig' 'src' | xargs -0 -I{} cp --parents {} "$scratch"
 (cd "$scratch" && dotnet publish src/Censio.Server/Censio.Server.csproj -c Release --no-restore -o ./publish)
-ls "$scratch"/publish/wwwroot/_framework
+ls "$scratch"/publish/wwwroot/_framework/blazor.web*.js \
+  || { echo "publish output lacks wwwroot/_framework/blazor.web*.js (see docs/decisions/0007)" >&2; false; }
 ```
 
-Keep the first copy equal to the `COPY` lines before `RUN dotnet restore` in the Dockerfile. A `--no-restore`
+Keep the first copy equal to the `COPY` lines before `RUN dotnet restore` in the Dockerfile and the second to the `COPY .editorconfig` and `COPY src/` lines after it. A `--no-restore`
 publish that fails, or an output that is missing, is the defect the CI release build would report after the
 PR is open.
 
