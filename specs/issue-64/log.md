@@ -7,3 +7,4 @@ are quoted in full.
 | ---- | ---- | ------ | ------ |
 | 2026-10-31 16:07 | 1 Intake | Orchestrator | Issue #64 read (no comments, no labels); bug: no feature label (user asked for squad to implement; no feature call); branch claude/keen-johnson-vsy5gm |
 | 2026-10-31 16:15 | 2 Plan | squad-lead | RESULT: DONE, tier security; plan.md + decision record 0011 (key ring in data directory, fail closed at start) (opus/medium · 122,813 tokens · 23 tool uses · 501 s) |
+| 2026-10-31 16:19 | 3 Plan security review | squad-security | CHANGES_REQUIRED: B1 Protect wraps IO errors in CryptographicException (fact 9 false); B2 registration vs start check read config at different times under WebApplicationFactory; non-blocking N1-N4 (opus/medium · 45,530 tokens · 17 tool uses · 215 s) |
