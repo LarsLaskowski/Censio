@@ -6,3 +6,4 @@ are quoted in full.
 | Date | Step | Member | Result |
 | ---- | ---- | ------ | ------ |
 | 2026-10-31 19:14 | 1 Intake | Orchestrator | Issue 74 read (open, no labels): CI hardening, release secrets into environment release; branch claude/serene-tesla-aq98ib merged with main (no diff to main) |
+| 2026-10-31 19:18 | 2 Plan | squad-lead | RESULT: DONE: tier security, plan.md, record 0012 extended in place (options 5-9); maintainer settings steps 1-6; follow-up issue for main ruleset bypass (opus/medium · usage pending) |

@@ -3,7 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-10-31
 - **Area:** —
-- **Source:** Issue #5
+- **Source:** Issue #5, issue #74
 - **Supersedes:** —
 
 ## Context
@@ -33,6 +33,22 @@ for real only after it is merged, and its refusals must be tested before that.
 4. **The metadata action for tags and labels** — adds a third-party action to a job that pushes; the run creates two
    fixed tags only. Rejected for the plain `docker` CLI.
 
+Where the Docker Hub secrets live (issue #74): as repository secrets, every job of every workflow on every branch
+of the repository can reference them, so anyone who can push a branch can read them with a workflow of their own.
+
+5. **Repository secrets** (the first version) — no setup; readable from any branch workflow.
+6. **Secrets of a GitHub environment `release` whose deployment rule admits only tags `v*`, referenced by the
+   jobs `image-publish` and `promote` alone** — a job on a branch ref is refused before its first step; the tag
+   ruleset of the repository already lets only administrators create, move or delete `v*` tags. Needs settings the
+   workflow cannot make, in an order (`docs/CONTRIBUTING.md`, *Versioning and releases*).
+7. **As 6, with required reviewers on the environment** — a second person approves every push; rejected: the
+   project has one administrator, who also publishes the release, and the tag ruleset already decides who starts it.
+8. **A branch rule `main` instead of the tag rule** — rejected: a run of a `release` event runs on the tag's ref,
+   so a branch rule refuses every release.
+9. **New secret names that exist only in the environment** — would fail closed when the environment was never set
+   up, but repository secrets of the old names would still be readable; deleting them is needed either way, and
+   with them deleted, a missing environment fails closed at the credentials check as well. Rejected.
+
 The checks themselves live in `.github/scripts/release-check.sh`, which the workflow and a CI test job
 (`release-check-test.sh`, every pull request) both run, so a refusal is tested before a release needs it.
 
@@ -41,7 +57,8 @@ The checks themselves live in `.github/scripts/release-check.sh`, which the work
 Option 2: build jobs hold no secret and a read-only token, publish and promote jobs run no build code, and
 `latest` is set at the promotion, registry-side, to the digest that passed the checks. Values passed between jobs
 and artifacts are treated as untrusted in the credentialed jobs, and the image is one `linux/amd64` manifest
-without a provenance attestation. What a release produces and shows is in
+without a provenance attestation. The Docker Hub secrets are secrets of the environment `release` only (option 6).
+What a release produces and shows is in
 [`areas/server.md`](../areas/server.md) (*Docker image*) and [`areas/companion.md`](../areas/companion.md)
 (*Platform*); how a maintainer runs a release is in `docs/CONTRIBUTING.md` (*Versioning and releases*).
 
@@ -63,3 +80,10 @@ without a provenance attestation. What a release produces and shows is in
 - A failed run can be completed with "Re-run failed jobs" only while its artifacts are kept (7 days).
 - The promotion moves Docker Hub `latest` before GitHub's *Latest* mark; a failure between the two leaves them
   apart until the promote job is re-run.
+- The workflow cannot see the environment's settings. A run that references an environment that does not exist
+  creates it without any rule, and a repository secret of the same name stays readable from every branch; the
+  protection holds only once the maintainer has set up the environment and deleted the repository secrets. Without
+  any Docker Hub secret, the credentials check fails and the release stays a pre-release.
+- The tag rule admits a `v*` tag on any commit, so an administrator's tag on a branch could hand the secrets to that
+  branch's workflow; this needs the administrator role, which can change the environment anyway. The `contents:
+  write` token is no environment secret and is not affected.
