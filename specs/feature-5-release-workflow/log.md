@@ -22,4 +22,5 @@ are quoted in full.
 | 2026-10-31 17:49 | 2b Plan (revise round 2) | squad-lead | RESULT: DONE: plan shortened to 3,869 words, N6-N8 folded in, status Approved by Security (opus/medium · 4,083 tokens · 5 tool uses · 28 s · continued) |
 | 2026-10-31 17:49 | 4-5 Skeleton and tests first | Orchestrator | Skipped: no production or test code (plan Verification without tests) |
 | 2026-10-31 17:49 | 6 Implement G1 | squad-dev | launched: check script, test script, CI job (sonnet/medium · 131,392 tokens · 21 tool uses · 409 s) |
-| 2026-10-31 17:56 | 6 Implement G2 | squad-dev | launched (continued): release.yml (sonnet/medium · usage pending) |
+| 2026-10-31 17:56 | 6 Implement G2 | squad-dev | launched (continued): release.yml (sonnet/medium · 13,132 tokens · 27 tool uses · 498 s · continued) |
+| 2026-10-31 17:58 | 6 Implement G3 | squad-dev | launched (continued): documentation tasks 6-10 (sonnet/medium · usage pending) |
