@@ -76,3 +76,4 @@ dotnet_diagnostic.RH4124.severity = none
 dotnet_diagnostic.RH7004.severity = none
 dotnet_diagnostic.RH8027.severity = none
 dotnet_diagnostic.RH8306.severity = none
+dotnet_diagnostic.S1125.severity = none

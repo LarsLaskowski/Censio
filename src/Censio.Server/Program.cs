@@ -9,17 +9,17 @@ builder.Services.AddCensioDataProtection();
 
 await using var app = builder.Build();
 
-if (DataProtectionSetup.TryCreateKeyRing(app.Services, app.Configuration, app.Logger))
+if (DataProtectionSetup.TryCreateKeyRing(app.Services, app.Configuration, app.Logger) == false)
 {
-    app.UseAntiforgery();
-    app.MapStaticAssets();
-    app.MapHealthChecks("/health");
-    app.MapRazorComponents<Censio.Server.Components.App>()
-       .AddInteractiveServerRenderMode();
-
-    await app.RunAsync();
-
-    return 0;
+    return 1;
 }
 
-return 1;
+app.UseAntiforgery();
+app.MapStaticAssets();
+app.MapHealthChecks("/health");
+app.MapRazorComponents<Censio.Server.Components.App>()
+   .AddInteractiveServerRenderMode();
+
+await app.RunAsync();
+
+return 0;
