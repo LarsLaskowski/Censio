@@ -36,5 +36,4 @@ Dockerfile keep copying only project and build files before `dotnet restore`.
 ## Consequences
 
 The image's publish output equals the working tree's for the Blazor scripts without a Dockerfile rule about
-source files. An SDK that drops the property is caught by the *Image build check* and the image build in CI;
-the fallback is option 2. A future Razor class library needs the same property.
+source files. An SDK that drops the property is caught by the *Image build check* and, once #4 adds it, by the image build in CI; the fallback is option 2. A future Razor class library needs the same property.

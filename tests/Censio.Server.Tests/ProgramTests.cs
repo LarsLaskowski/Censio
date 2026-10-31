@@ -238,7 +238,7 @@ public sealed class ProgramTests
 
         foreach (var key in forbidden)
         {
-            Assert.DoesNotContain(keys.Select(item => item.ToLowerInvariant()).ToList(), key.ToLowerInvariant(), $"The committed settings should not set {key}");
+            Assert.DoesNotContain(key, keys, StringComparer.OrdinalIgnoreCase, $"The committed settings should not set {key}");
         }
 
         Assert.IsEmpty(endpoints, "The committed settings should not set Kestrel:Endpoints");
