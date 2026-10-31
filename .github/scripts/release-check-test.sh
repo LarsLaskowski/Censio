@@ -209,7 +209,7 @@ step "AC7: dockerhub-secrets"
 expect_ok "AC7 both set" "" dockerhub-secrets true true
 for pair in "false true" "true false" "false false"; do
     # shellcheck disable=SC2086 # the two words are the two arguments
-    expect_error "AC7 ${pair}" "Docker Hub credentials are missing: set the repository secrets DOCKERHUB_USERNAME and DOCKERHUB_TOKEN." dockerhub-secrets $pair
+    expect_error "AC7 ${pair}" "Docker Hub credentials are missing: set DOCKERHUB_USERNAME and DOCKERHUB_TOKEN as secrets of the environment release." dockerhub-secrets $pair
 done
 
 step "AC2, AC8: Companion"

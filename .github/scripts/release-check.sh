@@ -129,7 +129,7 @@ check_dockerhub_secrets()
     local token_set="${2-}"
 
     if [[ "$user_set" != "true" || "$token_set" != "true" ]]; then
-        error "Docker Hub credentials are missing: set the repository secrets DOCKERHUB_USERNAME and DOCKERHUB_TOKEN."
+        error "Docker Hub credentials are missing: set DOCKERHUB_USERNAME and DOCKERHUB_TOKEN as secrets of the environment release."
     fi
 }
 
