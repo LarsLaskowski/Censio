@@ -54,6 +54,11 @@ request.
   `dotnet tool run reihitsu-format --check ./`, fix with *Format*), a build error, a failing test, a failing
   SonarQube step, or a *Check tool versions* error (`Reihitsu.Cli` in `.config/dotnet-tools.json` and
   `Reihitsu.Analyzer` in `Directory.Packages.props` must be on the same major.minor release line).
+- **Image check** (`.github/workflows/ci.yml`, job `image`): builds the server image from
+  `src/Censio.Server/Dockerfile` on the runner and checks it by running it (`.github/scripts/image-check.sh`:
+  labels, user, health check, ports, `VERSION`, the missing-Blazor-script failure, a clean and a dirty working
+  tree). It pushes nothing and uses no secret. The log names the failed case (`image-check: <case>: <expected> /
+  <actual>`). Locally, `hadolint src/Censio.Server/Dockerfile` and the *Image build check* of `.squad/stack.md`.
 - **Test report** (check *dotnet tests*): lists the results of the test step, also when a test failed. It is
   skipped on fork and Dependabot pull requests, whose token cannot create check runs.
 - **SonarQube Cloud** (organisation `networlddev`, project `networlddev_censio`; check *SonarCloud Code
@@ -67,7 +72,10 @@ request.
   reproduces it.
 - **Dependabot** (`.github/dependabot.yml`): weekly version updates for NuGet (the .NET tools of the manifest
   included), GitHub Actions and Docker (`src/Censio.Server/`), each ecosystem in one grouped pull request;
-  security updates arrive separately.
+  security updates arrive separately. A base-image pull request fails the job `image` until the labels
+  `org.opencontainers.image.base.name` and `…base.digest` in the Dockerfile are set by hand to the tag and digest of
+  the new runtime `FROM` line. Major base-image updates are ignored until the target framework moves. A new
+  Alpine minor (a new tag suffix such as `alpine3.25`) is a manual bump of both `FROM` lines and the labels.
 - **Fork scope** (`.github/workflows/fork-scope.yml`): runs on pull requests from forks, with the check as it
   is on `main`, and turns red when one changes a squad or agent instruction file (`.squad/` except `stack.md`
   and `project.md`, `.claude/`, `CLAUDE.md`, `AGENTS.md`, `.github/copilot-instructions.md`), text outside the
