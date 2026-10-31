@@ -16,3 +16,5 @@ are quoted in full.
 | 2026-10-31 19:23 | 3 Plan security review (round 2) | squad-security | launched, verdict pending (opus/medium · 31,474 tokens · 6 tool uses · 57 s) |
 | 2026-10-31 19:24 | 3 Plan security review | Orchestrator | Plan approved by Security in round 2 (APPROVED); needs D1-D4 logged before the diff review |
 | 2026-10-31 19:24 | 4 Skeleton | Orchestrator | Skipped: no API change |
+| 2026-10-31 19:25 | 5 Tests first | squad-tester | DONE: AC7 expected text updated (1 line in release-check-test.sh); 3 cases fail on current script as required; shellcheck clean (sonnet/medium · usage pending) |
+| 2026-10-31 19:25 | 6 Implement | squad-dev | launched: release.yml, notify-website.yml, release-check.sh, docs (sonnet/medium · usage pending) |
