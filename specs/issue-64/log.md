@@ -17,3 +17,4 @@ are quoted in full.
 | 2026-10-31 16:36 | 7 Code check | Orchestrator | Format check, Build (0 warnings), Test (all green), Coverage gate PASS (83.7% new / 90.8% overall), Analyzer gate PASS; Sonar scan uploaded, branch result not readable (checked in step 11); code SHA ea67e98 |
 | 2026-10-31 16:38 | 8 Review (security diff) | squad-security | APPROVED; no blocking findings; wrapped-exception branch to be confirmed by CI I64-AC7d in step 11 (opus/medium · 45,158 tokens · 12 tool uses · 135 s) |
 | 2026-10-31 16:40 | 8 Review | squad-reviewer | Round 1: BLOCKING 0, NON-BLOCKING 1 (verbatim doc fix: relative-path log line in README/USER_GUIDE) (opus/medium · 81,502 tokens · 17 tool uses · 198 s) |
+| 2026-10-31 16:40 | 8 Review | Orchestrator | verbatim doc fix applied (README.md, docs/USER_GUIDE.md EN+DE, relative-path log line), commit bcba1d4; format check, scope-check, decision-check pass |
