@@ -56,7 +56,7 @@ request.
   `Reihitsu.Analyzer` in `Directory.Packages.props` must be on the same major.minor release line).
 - **Test report** (check *dotnet tests*): lists the results of the test step, also when a test failed. It is
   skipped on fork and Dependabot pull requests, whose token cannot create check runs.
-- **SonarQube Cloud** (organisation `networlddev`, project `LarsLaskowski_Censio`; check *SonarCloud Code
+- **SonarQube Cloud** (organisation `networlddev`, project `networlddev_censio`; check *SonarCloud Code
   Analysis*): analyses build and tests inside the CI job and shows the quality gate as its own check, which does
   not decide the result of *CI*. It is skipped when the repository secret `SONAR_TOKEN` is not available (fork
   and Dependabot pull requests); a rejected token or an unreachable server fails the CI job. Locally the *Sonar

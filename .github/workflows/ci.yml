@@ -62,7 +62,7 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
           dotnet tool run dotnet-sonarscanner begin \
-            /k:"LarsLaskowski_Censio" \
+            /k:"networlddev_censio" \
             /o:"networlddev" \
             /d:sonar.token="$SONAR_TOKEN" \
             /d:sonar.cs.opencover.reportsPaths="${{ runner.temp }}/TestResults/**/coverage.opencover.xml" \
