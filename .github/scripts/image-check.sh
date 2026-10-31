@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Builds the server image and checks it the way the acceptance criteria of feature 4 describe.
+# It also checks the cases of issue 64 (named "I64-AC7a" to "I64-AC7d"): the data-protection key ring in /config.
 # Run from the repository root; needs docker, curl, git, dotnet and sudo (for the NAS case).
 # Pushes nothing and logs in nowhere. Every failure prints "image-check: <case>: <expected> / <actual>".
 set -euo pipefail
@@ -215,6 +216,15 @@ expect_equal "AC3 Config.User" "1654:1654" "$(inspect_image "$clean_image" '{{.C
 step "AC4: /config writable"
 docker exec "$main" touch /config/check || fail "AC4" "touch /config/check succeeds" "failed"
 
+step "I64-AC7a: key ring in /config/data-protection-keys"
+key_directory="/config/data-protection-keys"
+expect_equal "I64-AC7a env" "true" "$(inspect_image "$clean_image" '{{range .Config.Env}}{{if eq . "CENSIO__DATADIRECTORY=/config"}}true{{end}}{{end}}')"
+expect_equal "I64-AC7a mode and owner" "700:1654" "$(docker exec "$main" stat -c %a:%u "$key_directory")"
+key_files="$(docker exec "$main" find "$key_directory" -maxdepth 1 -name 'key-*.xml' -printf '%f\n' | sort)"
+if [[ -z "$key_files" ]]; then
+    fail "I64-AC7a" "at least one key-*.xml in ${key_directory}" "none"
+fi
+
 step "AC5: container turns healthy"
 wait_healthy "AC5" "$main"
 
@@ -227,6 +237,36 @@ if ((stop_seconds > 10)); then
 fi
 expect_equal "AC11 exit code" "0" "$(inspect_container "$main" '{{.State.ExitCode}}')"
 docker rm -f "$main" > /dev/null
+
+step "I64-AC7b: a new container on the same volume keeps the key files"
+reuse_container="censio-check-reuse"
+start_container "$reuse_container" -p 127.0.0.1:18084:8080 -v "${volume}:/config" "$clean_image"
+wait_http "I64-AC7b" "http://127.0.0.1:18084/health"
+reused_files="$(docker exec "$reuse_container" find "$key_directory" -maxdepth 1 -name 'key-*.xml' -printf '%f\n' | sort)"
+expect_equal "I64-AC7b key files" "$key_files" "$reused_files"
+docker rm -f "$reuse_container" > /dev/null
+
+step "I64-AC7d: a user without write access to the key directory stops the start"
+denied_container="censio-check-denied"
+start_container "$denied_container" --user 4242:4242 -v "${volume}:/config" "$clean_image"
+denied_status="none"
+denied_deadline=$((SECONDS + 60))
+while ((SECONDS < denied_deadline)); do
+    denied_status="$(inspect_container "$denied_container" '{{.State.Status}}')"
+    if [[ "$denied_status" == "exited" ]]; then
+        break
+    fi
+    sleep 2
+done
+expect_equal "I64-AC7d status" "exited" "$denied_status"
+expect_equal "I64-AC7d exit code" "1" "$(inspect_container "$denied_container" '{{.State.ExitCode}}')"
+denied_log="$(docker logs "$denied_container" 2>&1 || true)"
+denied_text="The data-protection key ring cannot be stored in '${key_directory}'; the server stops. Make the data directory writable for the user the server runs as."
+if ! grep -Fq -- "$denied_text" <<< "$denied_log"; then
+    echo "$denied_log" >&2
+    fail "I64-AC7d log" "log line '${denied_text}'" "line missing"
+fi
+docker rm -f "$denied_container" > /dev/null
 
 step "AC6: other port"
 port_container="censio-check-port"
@@ -252,6 +292,7 @@ if [[ "$nas_ready" != "true" ]]; then
     fail "AC13" "200 from /health as 99:100" "no answer"
 fi
 expect_equal "AC13 id" "99" "$(docker exec "$nas_container" id -u)"
+expect_equal "I64-AC7c owner of the key directory" "99" "$(docker exec "$nas_container" stat -c %u "$key_directory")"
 docker exec "$nas_container" touch /config/check || fail "AC13" "touch /config/check as 99:100 succeeds" "failed"
 expect_equal "AC13 entrypoint" '["dotnet","Censio.Server.dll"]' "$(inspect_image "$clean_image" '{{json .Config.Entrypoint}}')"
 scripts="$(docker run --rm --entrypoint find "$clean_image" /app -name '*.sh')"

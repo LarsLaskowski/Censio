@@ -53,4 +53,4 @@ change with it.
 The hand-written fakes and stubs the tests reuse (no mocking library unless `docs/UNIT_TESTS.md` says
 otherwise):
 
-- None yet; the first fake (for example of the statistics pipe) is listed here when it is written.
+- `RecordingLogger` (`tests/Censio.Server.Tests/RecordingLogger.cs`): an `ILogger` that keeps each entry's level, formatted message and exception in `Entries`, for tests that assert what a component logs.

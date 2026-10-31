@@ -12,3 +12,4 @@ are quoted in full.
 | 2026-10-31 16:22 | 2 Plan revise | squad-lead | RESULT: DONE; revised for B1/M2 (CryptographicException filter), B2/M1 (lazy KeyManagementOptions binding), M3 (await using app), minors (opus/medium · 47,200 tokens · 12 tool uses · 147 s) |
 | 2026-10-31 16:25 | 3 Plan security review (round 2) | squad-security | APPROVED; B1 and B2 resolved, fact 15 re-measured (opus/medium · 39,191 tokens · 14 tool uses · 160 s) |
 | 2026-10-31 16:26 | 4 Skeleton | squad-dev | DataProtectionSetup.cs stubs + Program.cs rewritten; build ok; RH2003 on stubs expected, S1125 on Program.cs == false noted for step 7 (sonnet/medium · 67,587 tokens · 9 tool uses · 49 s) |
+| 2026-10-31 16:30 | 5 Tests first | squad-tester | 14 DataProtectionSetupTests + 2 ProgramTests + RecordingLogger + image cases I64-AC7a-d; confirmed: compile, 28/28 fail with NotImplementedException; image cases deferred to CI (Docker) (sonnet/medium · 118,763 tokens · 16 tool uses · 220 s) |
