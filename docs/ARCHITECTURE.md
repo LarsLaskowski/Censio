@@ -64,7 +64,10 @@ on Alpine bases of the .NET SDK and ASP.NET runtime pinned by digest, and runs a
 is in [`areas/server.md`](areas/server.md), the choices in
 [`decisions/0009`](decisions/0009-server-image-runs-as-a-fixed-non-root-user.md) and
 [`decisions/0010`](decisions/0010-server-image-base-pinned-by-amd64-manifest-digest.md). The image keeps the data-protection key ring in `/config` (`Censio:DataDirectory`, [`decisions/0011`](decisions/0011-data-protection-key-ring-in-the-data-directory.md)). The Companion is
-published as a Windows ZIP. A release is cut from a `v*` tag.
+published as a Windows ZIP. A release is cut from a `vMAJOR.MINOR.PATCH` tag on `main` and published as a
+pre-release: the workflow builds and checks the ZIP and the image without secrets, publishes them, and only then
+promotes the release, moving `latest` and *Latest* to it ([`decisions/0012`](decisions/0012-release-pre-release-first-and-secret-free-builds.md);
+steps in [`CONTRIBUTING.md`](CONTRIBUTING.md), *Versioning and releases*).
 <!-- project:end architecture -->
 
 ## Development process

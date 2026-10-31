@@ -69,6 +69,17 @@ request.
   line is not a full-version `mcr.microsoft.com/dotnet` Alpine tag, the pinned tag is not in the registry's
   list, or the registry cannot be read. It uses no secret and its token is read-only (`contents: read`). A failed scheduled run notifies the user who last changed the workflow's `cron` line, and GitHub disables the schedule of a public repository after 60 days without activity (it is re-enabled on the workflow's page under *Actions*). Locally:
   `bash .github/scripts/base-check.sh [dockerfile]` from the repository root (needs `curl` and `jq`).
+- **Release check** (`.github/workflows/ci.yml`, job `release-check`): runs the cases of
+  `.github/scripts/release-check-test.sh` on every pull request: the tag forms, a commit on and one off `main`, the
+  full-release warning, missing Docker Hub secrets, a Companion publish output with an extra file, and an exe and an
+  image built with another version than expected; each case asserts the exact annotation. It builds the Companion
+  and the server image with version `1.2.3` and pushes the image only to a throwaway registry on the runner (no
+  secret, no Docker Hub). It uploads the Companion ZIP as artifact `companion-dry-run` (14 days). Locally:
+  `bash .github/scripts/release-check-test.sh` from the repository root, with the Docker daemon running (needs
+  `docker` with buildx, `curl`, `git`, `dotnet`, `python3`, `zip`). Start `Censio.Companion.exe` from the artifact
+  of a pull request's own run on Windows only after reading the change; never start one from a fork's run.
+- **Release** (`.github/workflows/release.yml`): runs when a release is published; see *Versioning and releases*.
+  It can run for real only after it is merged to `main`, because GitHub runs the workflow of the tagged commit.
 - **Test report** (check *dotnet tests*): lists the results of the test step, also when a test failed. It is
   skipped on fork and Dependabot pull requests, whose token cannot create check runs.
 - **SonarQube Cloud** (organisation `networlddev`, project `networlddev_censio`; check *SonarCloud Code
@@ -170,8 +181,35 @@ expected to arrive clean (see the decision record on quality gates in [`decision
 <!-- project:begin releases -->
 ## Versioning and releases
 
-A release is a `v<major>.<minor>.<patch>` tag created manually on `main`; it publishes the Docker image and
-the Windows ZIP of the Companion. Merging a PR by itself never publishes a release.
+A release is a `vMAJOR.MINOR.PATCH` tag created on `main` (no leading zeros, no pre-release suffix); it publishes
+the Docker image `networlddev/censio` and the Windows ZIP of the Companion. Merging a PR by itself never publishes a
+release.
+
+To release, a maintainer (write access to the repository):
+
+1. On GitHub, *Releases*, *Draft a new release*; create the new tag `vX.Y.Z` on the target `main`.
+2. Tick *Set as a pre-release*, and publish.
+
+The workflow `Release` ([`decisions/0012`](decisions/0012-release-pre-release-first-and-secret-free-builds.md)) then
+runs. It refuses a tag of another form and a tag whose commit is not reachable from the head of `main`; builds and
+checks the ZIP and the image without any secret; attaches the ZIP `Censio-<version>-win-x64.zip` to the release;
+pushes the checked image as `networlddev/censio:<version>`; and only then moves `networlddev/censio:latest` to
+that digest and turns the release into a full release marked *Latest*. While it runs, or when a job fails, the
+release stays a pre-release and `latest` stays where it was. A release published as a full release only gets a
+warning; it is marked *Latest* by GitHub at once and stays so if a job fails. The repository secrets
+`DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` must be set; only the jobs that push and promote read them.
+
+Limits and rules:
+
+- The check that the tag is on `main` guards against a maintainer's mistake; it is not a security control. GitHub
+  runs the workflow of the tagged commit, so a tag on a commit of `main` from before the workflow was merged starts
+  no run, and a tag on a branch whose workflow differs is not refused.
+- After a failed job, use *Re-run failed jobs* of the newest release's run, and only within the 7 days the run's
+  artifacts are kept. Later, or when the failure needs a rebuild, use *Re-run all jobs*: it rebuilds, replaces the ZIP
+  asset and overwrites the image tag `<version>`. Never re-run the run of an older release after a newer one was
+  promoted: that moves `latest` and *Latest* back. Publishing a release of a lower version does the same.
+- The run uses the commit's `Release` workflow, so it can run for real only after it is merged; the first release is
+  `v0.1.0`.
 
 Every assembly of the solution gets its version from the build property `Version` (`-p:Version=<v>`, default
 `0.0.0`), shown unchanged by the server's start page and the Companion's tray menu

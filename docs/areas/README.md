@@ -29,5 +29,5 @@ operator or another component can rely on — formats, limits, error behavior, g
 | Area | Scope | Not here |
 | ---- | ----- | -------- |
 | [server](server.md) | The server's HTTP surface: listen address, start page, `/health`, plain HTTP, unknown paths, the version shown, the data directory and its data-protection key ring, the Docker image | Data ingest, release workflows, web theming |
-| [companion](companion.md) | The Companion process on Windows: tray icon, tooltip, menu, `Exit`, single instance per user session, platform | Pipe and game-file reading, server connection, release ZIP |
+| [companion](companion.md) | The Companion process on Windows: tray icon, tooltip, menu, `Exit`, single instance per user session, platform, release ZIP | Pipe and game-file reading, server connection |
 <!-- project:end area-index -->
