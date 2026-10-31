@@ -246,7 +246,7 @@ these statements stay unverified until they have):
   `refs/tags/v*` match the same tags, and the labels of the settings pages named above (including *Allow
   administrators to bypass configured protection rules*).
 - That a `release` event runs on `refs/tags/<tag>` and passes the rule, and that the jobs need no `deployments`
-  permission (the first release).
+  permission (the first release), and that a release published or re-run by a writer on an existing `v*` tag passes it as well.
 
 Limits and rules:
 

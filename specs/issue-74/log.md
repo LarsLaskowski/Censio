@@ -20,5 +20,7 @@ are quoted in full.
 | 2026-10-31 19:25 | 6 Implement | squad-dev | launched: release.yml, notify-website.yml, release-check.sh, docs (sonnet/medium · 80,058 tokens · 9 tool uses · 170 s) |
 | 2026-10-31 19:28 | 7 Code check | Orchestrator | Format check, analyzer-check, scope-check --tier security, decision-check PASS; no C# change; main not moved. Pending: Product Manager dry run D1-D4 before the review round |
 | 2026-10-31 19:44 | 7 Code check | Product Manager | Dry run D1-D4 skipped for now: continue without it; protection stays marked not yet tried in CONTRIBUTING, dry run to be done later |
-| 2026-10-31 19:44 | 8 Review round 1 | squad-reviewer | launched, code SHA bcbec90 (opus/medium · usage pending) |
-| 2026-10-31 19:44 | 8 Review round 1 | squad-security | launched (diff mode), code SHA bcbec90 (opus/medium · usage pending) |
+| 2026-10-31 19:44 | 8 Review round 1 | squad-reviewer | launched, code SHA bcbec90 (opus/medium · 41,347 tokens · 6 tool uses · 52 s) |
+| 2026-10-31 19:44 | 8 Review round 1 | squad-security | launched (diff mode), code SHA bcbec90 (opus/medium · 46,045 tokens · 7 tool uses · 119 s) |
+| 2026-10-31 19:46 | 8 Review round 1 | Orchestrator | Reviewer: no blocking, 2 non-blocking (both marked verbatim, applied by orchestrator: CONTRIBUTING fact 15 line, ARCHITECTURE wording). Security diff: APPROVED, N1 record 0012 states unmeasured behavior as fact (to Lead), N2 fact 15 (covered by the CONTRIBUTING fix), N3 pre-existing notify-website empty token check (outside diff) |
+| 2026-10-31 19:46 | 8 Review | Orchestrator | Verbatim fixes of round 1 applied (docs only) |
