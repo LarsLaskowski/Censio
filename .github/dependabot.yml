@@ -7,6 +7,7 @@ updates:
     open-pull-requests-limit: 10
     groups:
       actions:
+        applies-to: version-updates
         patterns:
           - "*"
 
@@ -18,6 +19,7 @@ updates:
     # opening a separate PR per package.
     groups:
       nuget-dependencies:
+        applies-to: version-updates
         patterns:
           - "*"
 
@@ -28,5 +30,6 @@ updates:
     open-pull-requests-limit: 10
     groups:
       docker-images:
+        applies-to: version-updates
         patterns:
           - "*"

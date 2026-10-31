@@ -7,12 +7,15 @@ profile and owned by this repository: keep it true when the build changes.
 ## Toolchain
 
 - .NET SDK `10.0.x` (target framework `net10.0`), solution `Censio.slnx`.
-- Formatter: `reihitsu-format` (`dotnet tool install -g Reihitsu.Cli`), on the same release line as the
-  **Reihitsu.Analyzer** version pinned in `Directory.Packages.props`; otherwise the formatter can revert
-  code the analyzer considers correct.
+- .NET tools: `reihitsu-format` (`Reihitsu.Cli`) and `dotnet-sonarscanner` are pinned in
+  `.config/dotnet-tools.json` and restored with `dotnet tool restore`; CI and the commands below run them
+  through the manifest (`dotnet tool run`), so every machine uses the pinned version. The formatter stays on
+  the same release line (major.minor) as the **Reihitsu.Analyzer** version pinned in `Directory.Packages.props`,
+  which CI enforces (*Check tool versions*); otherwise the formatter can revert code the analyzer considers
+  correct. Dependabot raises both in one grouped NuGet pull request.
 - Analyzers in every project via `Directory.Build.props`: **Reihitsu.Analyzer**, **SonarAnalyzer.CSharp**
   (the Sonar C# rules locally, so SonarQube issues surface before the push) and the MSTest analyzers.
-- The SessionStart hook `.claude/hooks/session-start.sh` installs the formatter, sets `DOTNET_ROOT` and
+- The SessionStart hook `.claude/hooks/session-start.sh` restores the tool manifest, sets `DOTNET_ROOT` and
   restores the solution in remote sessions.
 
 ## Layout
@@ -28,8 +31,8 @@ profile and owned by this repository: keep it true when the build changes.
 | Name | Command |
 | ---- | ------- |
 | *Restore* | `dotnet restore Censio.slnx` |
-| *Format* (in the squad: by the member that changed the files, `.squad/team.md`) | `reihitsu-format --force ./` |
-| *Format check* | `reihitsu-format --check ./` |
+| *Format* (in the squad: by the member that changed the files, `.squad/team.md`) | `dotnet tool run reihitsu-format --force ./` |
+| *Format check* | `dotnet tool run reihitsu-format --check ./` (CI runs it too, after *Restore*) |
 | *Build* | `dotnet build Censio.slnx -c Release --no-restore` |
 | *Test* | `dotnet test Censio.slnx -c Release --no-build` |
 | *Single test* | `dotnet test tests/<Project>.Tests/<Project>.Tests.csproj --filter "FullyQualifiedName~ClassName.MethodName"` |
@@ -37,7 +40,7 @@ profile and owned by this repository: keep it true when the build changes.
 | *Test with coverage* | `rm -rf TestResults && dotnet test Censio.slnx -c Release --no-build --collect:"XPlat Code Coverage" --results-directory ./TestResults` (clears earlier runs: the coverage gate merges every report it finds) |
 | *Coverage gate* | `python3 .squad/tools/coverage-check.py` |
 | *Analyzer gate* | `python3 .squad/tools/analyzer-check.py` |
-| *Sonar gate* | `python3 .squad/tools/sonar-check.py branch -- bash -c 'dotnet sonarscanner begin /k:"LarsLaskowski_Censio" /o:"larslaskowski" ${SONAR_TOKEN:+/d:sonar.token="$SONAR_TOKEN"} /d:sonar.branch.name="$(git branch --show-current)" /d:sonar.projectBaseDir="$PWD" && dotnet build Censio.slnx -c Release --no-incremental && dotnet sonarscanner end ${SONAR_TOKEN:+/d:sonar.token="$SONAR_TOKEN"}'` (after *Test with coverage*; needs a SonarQube credential and the `dotnet-sonarscanner` tool, see *Sonar gate* below; the token is passed only when `SONAR_TOKEN` is set) |
+| *Sonar gate* | `python3 .squad/tools/sonar-check.py branch -- bash -c 'dotnet tool run dotnet-sonarscanner begin /k:"LarsLaskowski_Censio" /o:"networlddev" ${SONAR_TOKEN:+/d:sonar.token="$SONAR_TOKEN"} /d:sonar.branch.name="$(git branch --show-current)" /d:sonar.projectBaseDir="$PWD" && dotnet build Censio.slnx -c Release --no-incremental && dotnet tool run dotnet-sonarscanner end ${SONAR_TOKEN:+/d:sonar.token="$SONAR_TOKEN"}'` (after *Test with coverage*; needs a SonarQube credential and the tool restored from the manifest, see *Sonar gate* below; the token is passed only when `SONAR_TOKEN` is set) |
 | *Image build check* | `docker build -f src/Censio.Server/Dockerfile .` where Docker runs; otherwise the restore-order reproduction under *Image build check* below (`.squad/routing.md`, *Criteria verified only in CI*) |
 
 ## Analyzer gate
@@ -81,9 +84,9 @@ network access to its download hosts (`api.sonarcloud.io` and `scanner.sonarclou
 hosts cover, and the package registry); without them it reports NOT CHECKED, and step 11 reads the draft pull request with `python3 .squad/tools/sonar-check.py pr <number>`
 instead. A finding of a rule no local analyzer reports is noted in this section, in the same change, instead of a
 squad lesson.
-The .NET scanner is the `dotnet-sonarscanner` tool (`dotnet tool install dotnet-sonarscanner`, or the repository's
-tool manifest, which `dotnet tool restore` must have restored before the gate in a fresh cloud session: the
-SessionStart hook does it, run it by hand where the hook did not); its `begin` arguments mirror the CI step, plus the branch name and the repository root as base
+The .NET scanner is the `dotnet-sonarscanner` tool of the repository's tool manifest, which `dotnet tool restore`
+must have restored before the gate in a fresh cloud session (the SessionStart hook does it, run it by hand where
+the hook did not); its `begin` arguments mirror the CI step, plus the branch name and the repository root as base
 directory, and it needs the full, non-incremental build between `begin` and `end`. The local coverage report is
 Cobertura, which the scanner does not read, so the branch analysis carries no coverage figure: the *Coverage
 gate* covers that.
@@ -188,9 +191,6 @@ itself with a lock (`obj/analyzer-check.lock`), plain builds do not.
 
 ## Known pitfalls
 
-- `reihitsu-format` fails with ".NET location: Not found" when `DOTNET_ROOT` is unset — the SessionStart
-  hook sets it; otherwise prefix the command with
-  `DOTNET_ROOT="$(dirname "$(readlink -f "$(command -v dotnet)")")"`.
 - `reihitsu-format` asks for confirmation for more than 25 files; `--force` skips the prompt, which a
   non-interactive session cannot answer.
 - `reihitsu-format` rewrites a `\u` escape in a C# string literal into the character it names, so a literal

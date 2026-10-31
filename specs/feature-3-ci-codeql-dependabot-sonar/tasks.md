@@ -12,7 +12,7 @@ tests* in the plan). Every group: no new API.
 | 3 | G1 | `codeql.yml` as plan *Approach* 3 | `.github/workflows/codeql.yml` | AC6, AC7 | — | Dev | [x] |
 | 4 | G1 | `dependabot.yml` Docker entry to `/src/Censio.Server` (plan *Approach* 4) | `.github/dependabot.yml` | AC8 | — | Dev | [x] |
 | 5 | G1 | `python3 .squad/tools/analyzer-check.py --lint-only` on the changed workflows | — | AC1, AC6, AC7 | 2, 3, 4 | Dev | [x] |
-| 6 | G2 | `.squad/stack.md`: *Toolchain*, *Format*, *Format check*, *Sonar gate* command and section, `DOTNET_ROOT` pitfall (plan *Documentation updates*) | `.squad/stack.md` | AC9, AC11 | 2 | Dev | [ ] |
-| 7 | G2 | `docs/CONTRIBUTING.md` `getting-started` block: tool manifest, *Automated checks* subsection (plan *Documentation updates*) | `docs/CONTRIBUTING.md` | AC11 | 2, 3, 4 | Dev | [ ] |
-| 8 | G2 | `docs/CONTRIBUTING.md` `releases` block: release-note labels, `feature` included | `docs/CONTRIBUTING.md` | AC10 | — | Dev | [ ] |
+| 6 | G2 | `.squad/stack.md`: *Toolchain*, *Format*, *Format check*, *Sonar gate* command and section, `DOTNET_ROOT` pitfall (plan *Documentation updates*) | `.squad/stack.md` | AC9, AC11 | 2 | Dev | [x] |
+| 7 | G2 | `docs/CONTRIBUTING.md` `getting-started` block: tool manifest, *Automated checks* subsection (plan *Documentation updates*) | `docs/CONTRIBUTING.md` | AC11 | 2, 3, 4 | Dev | [x] |
+| 8 | G2 | `docs/CONTRIBUTING.md` `releases` block: release-note labels, `feature` included | `docs/CONTRIBUTING.md` | AC10 | — | Dev | [x] |
 | 9 | G3 | Draft PR: owner prerequisites asked of the Product Manager, CI/CodeQL/SonarQube green, throwaway broken-format and failing-test commits turn CI red and are reverted | — | AC12 | 1–8 | Orchestrator | [ ] |
