@@ -41,7 +41,7 @@ profile and owned by this repository: keep it true when the build changes.
 | *Test with coverage* | `rm -rf TestResults && dotnet test Censio.slnx -c Release --no-build --collect:"XPlat Code Coverage" --results-directory ./TestResults` (clears earlier runs: the coverage gate merges every report it finds) |
 | *Coverage gate* | `python3 .squad/tools/coverage-check.py` |
 | *Analyzer gate* | `python3 .squad/tools/analyzer-check.py` |
-| *Sonar gate* | `python3 .squad/tools/sonar-check.py branch -- bash -c 'dotnet tool run dotnet-sonarscanner begin /k:"networlddev_censio" /o:"networlddev" ${SONAR_TOKEN:+/d:sonar.token="$SONAR_TOKEN"} /d:sonar.branch.name="$(git branch --show-current)" /d:sonar.projectBaseDir="$PWD" && dotnet build Censio.slnx -c Release --no-incremental && dotnet tool run dotnet-sonarscanner end ${SONAR_TOKEN:+/d:sonar.token="$SONAR_TOKEN"}'` (after *Test with coverage*; needs a SonarQube credential and the tool restored from the manifest, see *Sonar gate* below; the token is passed only when `SONAR_TOKEN` is set) |
+| *Sonar gate* | `python3 .squad/tools/sonar-check.py branch -- bash -c 'dotnet tool run dotnet-sonarscanner begin /k:"networlddev_censio" /o:"networlddev" ${SONAR_TOKEN:+/d:sonar.token="$SONAR_TOKEN"} /d:sonar.branch.name="$(git branch --show-current)" /d:sonar.projectBaseDir="$PWD" /d:sonar.issue.ignore.multicriteria=e1 /d:sonar.issue.ignore.multicriteria.e1.ruleKey=docker:S8431 /d:sonar.issue.ignore.multicriteria.e1.resourceKey=src/Censio.Server/Dockerfile && dotnet build Censio.slnx -c Release --no-incremental && dotnet tool run dotnet-sonarscanner end ${SONAR_TOKEN:+/d:sonar.token="$SONAR_TOKEN"}'` (after *Test with coverage*; needs a SonarQube credential and the tool restored from the manifest, see *Sonar gate* below; the token is passed only when `SONAR_TOKEN` is set) |
 | *Image build check* | `docker build -f src/Censio.Server/Dockerfile .` where Docker runs; otherwise the restore-order reproduction under *Image build check* below (`.squad/routing.md`, *Criteria verified only in CI*) |
 
 ## Analyzer gate
@@ -55,6 +55,8 @@ anywhere. Do not grep console build output instead: an incremental build prints 
 
 Easy to get wrong by hand: `#region` blocks on every type, XML documentation on every member, no
 underscores in member names, a region for an interface implementation named after the interface.
+
+`docker:S8431` (tag and digest in one `FROM`) is excluded for `src/Censio.Server/Dockerfile` only, through `sonar.issue.ignore.multicriteria` in the *Begin SonarQube analysis* step of `.github/workflows/ci.yml` and in the *Sonar gate* command, which stay equal (record 0010): the digest pins the base and the tag is what Dependabot updates.
 
 SonarQube Cloud's own quality profile can still report `S####` rules the local default profile does not,
 and its non-Roslyn checks (hotspots, taint analysis, duplication) have no local equivalent: the *Sonar gate*
@@ -107,15 +109,17 @@ review:
 
 ```bash
 scratch="$(mktemp -d)"
-git ls-files -z -- '*.slnx' '*.sln' '*.csproj' '*.props' '*.targets' 'nuget.config' 'global.json' \
-  | xargs -0 -I{} cp --parents {} "$scratch"
-(cd "$scratch" && dotnet restore Censio.slnx)
-git ls-files -z | xargs -0 -I{} cp --parents {} "$scratch"
+git ls-files -z -- 'global.json' 'Directory.Build.props' 'Directory.Packages.props' \
+  'src/Censio.Server/Censio.Server.csproj' 'src/Censio.Contracts/Censio.Contracts.csproj' \
+  'src/Censio.Server.Data/Censio.Server.Data.csproj' | xargs -0 -I{} cp --parents {} "$scratch"
+(cd "$scratch" && dotnet restore src/Censio.Server/Censio.Server.csproj)
+git ls-files -z -- '.editorconfig' 'src' | xargs -0 -I{} cp --parents {} "$scratch"
 (cd "$scratch" && dotnet publish src/Censio.Server/Censio.Server.csproj -c Release --no-restore -o ./publish)
-ls "$scratch"/publish/wwwroot/_framework
+ls "$scratch"/publish/wwwroot/_framework/blazor.web*.js \
+  || { echo "publish output lacks wwwroot/_framework/blazor.web*.js (see docs/decisions/0007)" >&2; false; }
 ```
 
-Keep the first copy equal to the `COPY` lines before `RUN dotnet restore` in the Dockerfile. A `--no-restore`
+Keep the first copy equal to the `COPY` lines before `RUN dotnet restore` in the Dockerfile and the second to the `COPY .editorconfig` and `COPY src/` lines after it. A `--no-restore`
 publish that fails, or an output that is missing, is the defect the CI release build would report after the
 PR is open.
 

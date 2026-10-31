@@ -1,0 +1,12 @@
+**/bin/
+**/obj/
+**/publish/
+**/TestResults/
+.git/
+.github/
+.claude/
+.squad/
+specs/
+tests/
+docs/
+*.md

@@ -8,11 +8,13 @@ on:
 
 permissions:
   contents: read
-  checks: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write  # the test report (dorny/test-reporter) creates a check run
     env:
       # A boolean, never the token's value: secrets are not exposed to Dependabot or
       # fork-triggered runs, so it is false there and the SonarQube steps below are
@@ -66,7 +68,10 @@ jobs:
             /o:"networlddev" \
             /d:sonar.token="$SONAR_TOKEN" \
             /d:sonar.cs.opencover.reportsPaths="${{ runner.temp }}/TestResults/**/coverage.opencover.xml" \
-            /d:sonar.coverage.exclusions=".squad/**,.claude/**,src/Censio.Companion/**"
+            /d:sonar.coverage.exclusions=".squad/**,.claude/**,src/Censio.Companion/**" \
+            /d:sonar.issue.ignore.multicriteria=e1 \
+            /d:sonar.issue.ignore.multicriteria.e1.ruleKey=docker:S8431 \
+            /d:sonar.issue.ignore.multicriteria.e1.resourceKey=src/Censio.Server/Dockerfile
 
       - name: Build
         run: dotnet build Censio.slnx -c Release --no-restore
@@ -109,3 +114,21 @@ jobs:
             ${{ runner.temp }}/TestResults/**/*.trx
             ${{ runner.temp }}/TestResults/**/coverage.opencover.xml
           if-no-files-found: warn
+
+  image:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Build and check the server image
+        run: bash .github/scripts/image-check.sh

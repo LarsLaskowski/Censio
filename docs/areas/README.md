@@ -28,6 +28,6 @@ operator or another component can rely on — formats, limits, error behavior, g
 <!-- project:begin area-index -->
 | Area | Scope | Not here |
 | ---- | ----- | -------- |
-| [server](server.md) | The server's HTTP surface: listen address, start page, `/health`, plain HTTP, unknown paths, the version shown | Data ingest, Docker image, release workflows, web theming |
+| [server](server.md) | The server's HTTP surface: listen address, start page, `/health`, plain HTTP, unknown paths, the version shown, the Docker image | Data ingest, release workflows, web theming |
 | [companion](companion.md) | The Companion process on Windows: tray icon, tooltip, menu, `Exit`, single instance per user session, platform | Pipe and game-file reading, server connection, release ZIP |
 <!-- project:end area-index -->

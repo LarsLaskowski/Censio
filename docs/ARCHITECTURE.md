@@ -54,12 +54,17 @@ Companion; cache and recording paths are never derived from external input unche
 
 The server speaks plain HTTP only; TLS is the reverse proxy's job. Its start page and `/health` need no login, and
 `/health` reveals only its status ([`decisions/0006`](decisions/0006-server-plain-http-and-open-health.md),
-[`areas/server.md`](areas/server.md)).
+[`areas/server.md`](areas/server.md)). Outside the Docker image it listens on loopback only; the image listens on
+all interfaces of the container, and the published port decides who can reach it (record 0006).
 
 ## Deployment
 
-The server is built into a Docker image; the Companion is published as a Windows ZIP. A release is cut from a
-`v*` tag.
+The server is built into the Docker image `networlddev/censio` (linux/amd64) from `src/Censio.Server/Dockerfile`,
+on Alpine bases of the .NET SDK and ASP.NET runtime pinned by digest, and runs as a non-root user; its behavior
+is in [`areas/server.md`](areas/server.md), the choices in
+[`decisions/0009`](decisions/0009-server-image-runs-as-a-fixed-non-root-user.md) and
+[`decisions/0010`](decisions/0010-server-image-base-pinned-by-amd64-manifest-digest.md). The Companion is
+published as a Windows ZIP. A release is cut from a `v*` tag.
 <!-- project:end architecture -->
 
 ## Development process

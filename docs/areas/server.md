@@ -3,15 +3,17 @@
 ## Scope
 
 The server's HTTP surface: the address it listens on, the start page, the health check, how unknown paths and
-plain HTTP are treated, and the version it shows. Operators who run the server and the Docker health probe rely
-on it.
+plain HTTP are treated, the version it shows, and the Docker image it ships in. Operators who run the server and
+the Docker health probe rely on it.
 
 ## Behavior
 
 ### Listen address
 
-- Without address configuration the server listens on `http://localhost:5000` (loopback only) and logs the line
-  `Now listening on: http://localhost:5000`. No launch profile is committed, so `dotnet run` and `dotnet
+- Outside the Docker image, without address configuration the server listens on `http://localhost:5000` (loopback
+  only) and logs the line
+  `Now listening on: http://localhost:5000`. The image listens on all interfaces of the container on port 8080
+  (*Docker image*). No launch profile is committed, so `dotnet run` and `dotnet
   Censio.Server.dll` both start in the `Production` environment on that address.
 - Another address is set with the standard ASP.NET Core settings (`--urls`, `ASPNETCORE_URLS`,
   `ASPNETCORE_HTTP_PORTS`); the server has no setting of its own for it.
@@ -38,6 +40,42 @@ on it.
 - `/`, `/health` and the Blazor hub need no login. Antiforgery protection is on.
 - Host filtering is off (`AllowedHosts` is `*`), a deliberate choice (record 0006).
 
+### Docker image
+
+- The image `networlddev/censio` is built from `src/Censio.Server/Dockerfile`, for linux/amd64 only. Build stage:
+  `mcr.microsoft.com/dotnet/sdk:10.0.403-alpine3.24-amd64`; runtime stage:
+  `mcr.microsoft.com/dotnet/aspnet:10.0.14-alpine3.24-amd64`; both are pinned by their amd64 manifest digest. It
+  contains only the published server.
+- The image sets `ASPNETCORE_HTTP_PORTS=8080` and exposes 8080: the server listens on all interfaces of the
+  container, on plain HTTP. Which host addresses can reach it is decided by the `-p` mapping
+  (`-p 127.0.0.1:8080:8080` for the host alone). The port is changed only through `ASPNETCORE_HTTP_PORTS`;
+  `ASPNETCORE_URLS` is not supported for the image.
+- The container runs as user `1654:1654` and never starts as root. `--user <uid>:<gid>` runs it as another
+  non-root user; the application files are readable by every UID.
+- `/config` exists in the image, owned by 1654, and is the data directory. The image declares no `VOLUME`. The
+  server writes nothing to `/config` yet. A directory the runtime user cannot write (a bind mount owned by
+  another UID, a named volume combined with another `--user`) does not stop the server from starting; it is made
+  writable by starting with `--user <uid>:<gid>` of the directory's owner or by `chown -R 1654:1654 <dir>` on
+  the host.
+- ASP.NET Core's data-protection key ring is not kept: as UID 1654 it lies in the container layer, under another
+  UID (`HOME=/`) it stays in memory and the server logs ASP.NET Core's warning about it at start. In both cases
+  the keys are lost when the container is recreated, and an open page needs a reload after a restart.
+- Health check: the image probes `http://127.0.0.1:<port>/health` with BusyBox `wget`, where `<port>` is the first
+  entry of `ASPNETCORE_HTTP_PORTS` (`8080;8081` probes 8080). Interval 10 s, timeout 3 s, start period 30 s,
+  3 retries; the container reads `healthy` within 60 s of the start.
+- The build argument `VERSION` (default `0.0.0`) sets the product version shown on the start page. A value that
+  is not a semantic version (`MAJOR.MINOR.PATCH`, optional pre-release and build parts) fails the build with
+  `VERSION is not a semantic version: <value>`; no image is produced.
+- The build fails, with a message naming `wwwroot/_framework/blazor.web*.js`, when the published output lacks the
+  Blazor script.
+- The runtime base runs with invariant globalization (no ICU) and has no time zone data: `TZ` has no effect and
+  log times are UTC.
+- Labels: `org.opencontainers.image.base.name` (the runtime tag), `…base.digest` (its manifest digest),
+  `…description` and `…licenses` (`MIT`). The two base labels are literal copies of the runtime `FROM` line; the
+  CI job `image` fails when they differ, so a base-image pull request from Dependabot needs the `base.digest`
+  label (and `base.name`) set by hand to the new `FROM` line.
+- The server logs to the console (`docker logs`).
+
 ## Limits and errors
 
 - The server reads no request body and takes no input on `/` or `/health`.
@@ -50,8 +88,10 @@ on it.
 - [`decisions/0005-product-version-from-one-build-property.md`](../decisions/0005-product-version-from-one-build-property.md) — the version comes from the build property `Version`.
 - [`decisions/0006-server-plain-http-and-open-health.md`](../decisions/0006-server-plain-http-and-open-health.md) — plain HTTP, open `/` and `/health`, host filtering off.
 - [`decisions/0007-server-web-assets-independent-of-restore-inputs.md`](../decisions/0007-server-web-assets-independent-of-restore-inputs.md) — the project requests the Blazor scripts itself, so the image contains them.
+- [`decisions/0009-server-image-runs-as-a-fixed-non-root-user.md`](../decisions/0009-server-image-runs-as-a-fixed-non-root-user.md) — user 1654, other UIDs through `--user`, no `VOLUME`.
+- [`decisions/0010-server-image-base-pinned-by-amd64-manifest-digest.md`](../decisions/0010-server-image-base-pinned-by-amd64-manifest-digest.md) — full-version amd64 base tags pinned by digest, the `base.digest` label checked in CI.
 
 ## Not here
 
-- Data ingest from the Companion (later issue), the Docker image (#4) and the release workflows (#5, #6).
+- Data ingest from the Companion (later issue) and the release workflows (#5, #6).
 - Web layout and theming (#31).
