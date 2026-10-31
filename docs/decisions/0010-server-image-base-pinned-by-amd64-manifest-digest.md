@@ -1,6 +1,6 @@
 # 0010: The image bases are full-version amd64 tags pinned by digest; the `base.digest` label is checked in CI
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-10-31
 - **Area:** server
 - **Source:** Issue #4

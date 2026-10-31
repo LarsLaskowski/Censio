@@ -1,6 +1,6 @@
 # 0009: The server image runs as a fixed non-root user; other UIDs come from `--user`
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-10-31
 - **Area:** server
 - **Source:** Issue #4
