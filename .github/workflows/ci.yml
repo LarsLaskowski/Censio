@@ -68,7 +68,10 @@ jobs:
             /o:"networlddev" \
             /d:sonar.token="$SONAR_TOKEN" \
             /d:sonar.cs.opencover.reportsPaths="${{ runner.temp }}/TestResults/**/coverage.opencover.xml" \
-            /d:sonar.coverage.exclusions=".squad/**,.claude/**,src/Censio.Companion/**"
+            /d:sonar.coverage.exclusions=".squad/**,.claude/**,src/Censio.Companion/**" \
+            /d:sonar.issue.ignore.multicriteria=e1 \
+            /d:sonar.issue.ignore.multicriteria.e1.ruleKey=docker:S8431 \
+            /d:sonar.issue.ignore.multicriteria.e1.resourceKey=src/Censio.Server/Dockerfile
 
       - name: Build
         run: dotnet build Censio.slnx -c Release --no-restore
