@@ -260,6 +260,19 @@ from external input.
 - N1, N2, N3: facts 7, 8, 10 updated; documentation entries added under *Documentation updates*.
 - N4: the area document does not call the AC6 line the only error line (*Documentation updates*).
 
+## PR approval decisions
+
+- D1 (deviation in `Program.cs` and `DataProtectionSetup.cs`): accepted. The *Approach* wrote the start check as
+  `if (TryCreateKeyRing(...) == false) { return 1; }`; the Dev inverted it (mapping, `RunAsync` and `return 0` inside
+  the positive branch, `return 1` after it) and moved the directory and key step into a private `CreateKeyRing`,
+  because SonarAnalyzer reports S1125 on `== false` while `AGENTS.md` prescribes `== false` over `!`. Behavior is
+  unchanged: nothing is mapped or listened to when the check fails, the app is disposed before exit code 1 (AC5, AC6),
+  and the three catch clauses are exactly those of *Approach*. The conflict between the style rule and S1125 is a
+  squad/instruction matter, outside this product PR (follow-up issue).
+- D2 (`services.AddLogging()` in `AddCensioDataProtection`): accepted. `AddLogging` registers through `TryAdd`, so
+  in `Program` (where the host already added logging) it changes nothing; it makes the extension self-contained for
+  the `ILoggerFactory` its options callback needs, which the bare-`ServiceCollection` tests rely on.
+
 ## Out of scope / follow-ups
 
 - The database path (#29) and the full `CENSIO__…` reference (#33) — they build on `Censio:DataDirectory`.

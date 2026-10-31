@@ -1,6 +1,6 @@
 # 0011: The data-protection key ring lies in the configured data directory; the server stops when it cannot write it
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-10-31
 - **Area:** server
 - **Source:** Issue #64
