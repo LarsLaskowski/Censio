@@ -27,8 +27,8 @@ version it shows, and the release ZIP it ships in. The user who starts the Compa
 
 ### Platform
 
-- The Companion runs on Windows x64 and needs the .NET 10 Desktop Runtime. Every build writes
-  `Censio.Companion.exe`, on Linux too; it runs only on Windows.
+- The Companion runs on Windows x64. Every build writes `Censio.Companion.exe`, on Linux too; it runs only on
+  Windows, and a local build needs the .NET 10 Desktop Runtime (the release ZIP below does not).
 - Every release attaches the ZIP `Censio-<version>-win-x64.zip`. It holds exactly one file at its root, the
   self-contained single-file `Censio.Companion.exe` with the native libraries embedded, and needs no installed .NET,
   installer or administrator rights, on Windows 10 22H2 and Windows 11, x64. The exe is not signed, so SmartScreen

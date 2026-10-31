@@ -237,7 +237,8 @@ check_image()
 
     container="censio-release-check-$$-${RANDOM}"
     docker run -d --name "$container" -p 127.0.0.1::8080 "$image" > /dev/null
-    port="$(docker port "$container" 8080/tcp | sed -n '1p')"
+    # An image that exits at once publishes no port; the wait loop below then ends and reports E6.
+    port="$(docker port "$container" 8080/tcp 2> /dev/null | sed -n '1p' || true)"
     port="${port##*:}"
     while ((SECONDS < deadline)); do
         running="$(docker inspect --format '{{.State.Running}}' "$container")"

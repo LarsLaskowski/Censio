@@ -264,6 +264,13 @@ if ((SECONDS - started > 70)); then
 fi
 expect_equal "AC3 containers left" "" "$(docker ps -a --filter name=censio-release-check- --format '{{.Names}}')"
 
+step "AC3: image that exits at once (E6)"
+exits_name="censio-release-test:exits"
+images+=("$exits_name")
+printf 'FROM %s\nENTRYPOINT ["false"]\n' "$image_name" | docker build -q -t "$exits_name" - > /dev/null
+expect_error "AC3 exits at once" "The server image did not answer Healthy on /health within 60 s." check-image "$exits_name" "$version"
+expect_equal "AC3 containers left after exit" "" "$(docker ps -a --filter name=censio-release-check- --format '{{.Names}}')"
+
 step "AC3: push and promote-image against a local registry"
 docker run -d --name "$registry_name" -p 127.0.0.1::5000 "$registry_image" > /dev/null
 registry_port="$(docker port "$registry_name" 5000/tcp | sed -n '1p')"
@@ -285,7 +292,11 @@ fi
 expect_equal "AC3 push exit code" "0" "$rc"
 pushed_digest="$(last_line)"
 expect_equal "AC3 pushed digest" "$(registry_digest "${registry_repo}:${version}")" "$pushed_digest"
-expect_equal "AC3 pushed manifest" "application/vnd.oci.image.manifest.v1+json linux/amd64" "$(docker buildx imagetools inspect "${registry_repo}:${version}" --format '{{.Manifest.MediaType}} {{.Image.OS}}/{{.Image.Architecture}}')"
+pushed_kind="$(docker buildx imagetools inspect "${registry_repo}:${version}" --format '{{.Manifest.MediaType}} {{.Image.OS}}/{{.Image.Architecture}}')"
+case "$pushed_kind" in
+    "application/vnd.oci.image.manifest.v1+json linux/amd64" | "application/vnd.docker.distribution.manifest.v2+json linux/amd64") ;;
+    *) fail "AC3 pushed manifest" "one image manifest for linux/amd64" "$pushed_kind" ;;
+esac
 echo "info: image ID ${image_id}, pushed digest ${pushed_digest}"
 
 provenance_name="censio-release-test:provenance"
