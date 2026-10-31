@@ -37,4 +37,4 @@ are quoted in full.
 | 2026-10-30 20:27 | 7 Manual Windows run requested | Product Manager | Asked for the manual tray run (AC10-AC12); user chose: test first, then review |
 | 2026-10-31 09:21 | 7 Manual Windows run | Product Manager | All points passed on Windows incl. icon return after taskkill of explorer (AC10-AC12, fact 19) |
 | 2026-10-31 09:22 | 8 Review round 1 (diff) | squad-security | APPROVED; no blocking findings, 3 non-blocking notes (mutex name squatting, /_blazor open, SONAR_TOKEN scoping tracked in #3/#4) (opus/medium · 39,134 tokens · 8 tool uses · 58 s) |
-| 2026-10-31 09:24 | 8 Review round 1 | squad-reviewer | BLOCKING 1 (AC9 test assertion binds to wrong DoesNotContain overload, always passes), NON-BLOCKING 1 (record 0007 claims a CI image build) (opus/medium · usage pending) |
+| 2026-10-31 09:24 | 8 Review round 1 | squad-reviewer | BLOCKING 1 (AC9 test assertion binds to wrong DoesNotContain overload, always passes), NON-BLOCKING 1 (record 0007 claims a CI image build) (opus/medium · 112,283 tokens · 22 tool uses · 168 s) |
