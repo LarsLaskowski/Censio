@@ -3,7 +3,7 @@
 Source: Issue #4 | [spec.md](spec.md)
 Status: Revised (1)
 Tier: security — the image changes the server's network exposure (inside the container the listener binds all interfaces on 8080 instead of loopback) and adds a CI job that builds pull request code.
-Security areas touched: Network exposure (`src/Censio.Server/Dockerfile`: `ASPNETCORE_HTTP_PORTS=8080`, `EXPOSE 8080`, health probe); Docker and build configuration (`src/Censio.Server/Dockerfile`, `.dockerignore`, two new base images as dependencies); CI workflow (`.github/workflows/ci.yml`, new job `image`, and its script `.github/scripts/image-check.sh`); Dependabot configuration (`.github/dependabot.yml`, `ignore` of major base-image updates); the *Image build check* command in `.squad/stack.md`
+Security areas touched: Network exposure (`src/Censio.Server/Dockerfile`: `ASPNETCORE_HTTP_PORTS=8080`, `EXPOSE 8080`, health probe); Docker and build configuration (`src/Censio.Server/Dockerfile`, `.dockerignore`, two new base images as dependencies); CI workflow (`.github/workflows/ci.yml`, new job `image`, its script `.github/scripts/image-check.sh`, and the SonarQube rule exclusion of `docker:S8431`); Dependabot configuration (`.github/dependabot.yml`, `ignore` of major base-image updates); the *Image build check* command in `.squad/stack.md`
 
 ## Problem / root cause
 
@@ -30,6 +30,7 @@ ignore file, a CI job with its script, a Dependabot setting, and documentation.
 | 17 | The root `.editorconfig` turns seven `RH` rules off (lines 72–78); without it the image build warns `RH8306` in `src/Censio.Server.Data/ServerDataAssembly.cs` | Devil's Advocate, build of the planned context; `.editorconfig` | confirmed |
 | 14 | Under `--user 99:100` Docker sets `HOME=/`; ASP.NET Core then keeps the key ring in memory and logs a warning; the server still answers | to verify: Dev, CI job case AC13 (the log is printed in the job) | unverified |
 | 15 | `ubuntu-latest` has Docker with BuildKit as default builder and passwordless `sudo` (for `chown 99:100`) | to verify: Dev, first CI run of the job | unverified |
+| 18 | `sonar.issue.ignore.multicriteria` passed as `/d:` arguments to `dotnet-sonarscanner begin` keeps `docker:S8431` off `src/Censio.Server/Dockerfile` in SonarQube Cloud's analysis | to verify: orchestrator, step 11, `sonar-check.py pr 66` after the CI run lists no `docker:S8431` (if it still does: `resourceKey` `**/Censio.Server/Dockerfile`, then back to the Lead) | unverified |
 | 16 | The session has a Docker client (29.9.2) without a daemon, and `hadolint`, `shellcheck`, `actionlint` | `docker version`, `which` | confirmed |
 
 ## Acceptance criteria
@@ -155,7 +156,10 @@ in step 9.
    B1); a scheduled staleness job in this change (deferred to a follow-up issue, N3: tag updates cover the
    pinned Alpine minor until MCR stops publishing it); an
    `ARG` (lost: Dependabot stops); labels from #5/#6 (lost: the issue wants them in the Dockerfile); the index
-   digest (lost: platform follows the host); the `-extra` variant (lost: size without need). Record 0010.
+   digest (lost: platform follows the host); the `-extra` variant (lost: size without need). For SonarQube's
+   `docker:S8431` (tag and digest together): an in-repository rule exclusion for this Dockerfile (chosen,
+   Lead decision); digest only (lost: Dependabot and `base.name`); tag only (lost: no pinning); *Accepted* in the
+   UI (lost: invisible, raised again after a base bump). Record 0010.
 3. **Restore scope** — the server project (chosen: the image needs only it, and the Companion's `win-x64`
    restore stays out); the solution, as the reproduction did (lost: copies every test and Companion project
    into the image build for nothing).
@@ -225,7 +229,12 @@ All owned by the Dev, written once the job is green, against the Dockerfile as b
   pushes nothing); the Dependabot bullet: a base-image pull request needs the `base.digest` label set by hand,
   major base-image updates are ignored until the target framework moves, and a new Alpine minor (new tag
   suffix) is a manual bump of both `FROM` lines.
-- `.squad/stack.md`: *Image build check* as in *Approach*; the *Commands* row unchanged.
+- `.squad/stack.md`: *Image build check* as in *Approach*; the *Commands* row unchanged. The *Sonar gate* row's
+  `begin` gets the three arguments of the `docker:S8431` exclusion below, and *Analyzer gate* one paragraph: the
+  rule is excluded for `src/Censio.Server/Dockerfile` only (record 0010), and both copies stay equal.
+- `.github/workflows/ci.yml` (*Begin SonarQube analysis*), Dev: after the `sonar.coverage.exclusions` line,
+  `/d:sonar.issue.ignore.multicriteria=e1`, `/d:sonar.issue.ignore.multicriteria.e1.ruleKey=docker:S8431`,
+  `/d:sonar.issue.ignore.multicriteria.e1.resourceKey=src/Censio.Server/Dockerfile` (fact 18).
 
 Sweep: `docs/`, `SECURITY.md`, `.squad/project.md` for "loopback", "localhost", "5000", "Docker", "only";
 hits above. `CONTRIBUTING.md` line 35 (`dotnet run` on `localhost:5000`) stays true. `.squad/project.md`
