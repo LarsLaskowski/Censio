@@ -14,9 +14,14 @@ COPY src/ src/
 
 ARG VERSION=0.0.0
 SHELL ["/bin/ash", "-o", "pipefail", "-c"]
-RUN case "$VERSION" in ''|*[!0-9A-Za-z.+-]*) echo "VERSION is not a semantic version: $VERSION" >&2; exit 1;; esac \
-    && if ! printf '%s\n' "$VERSION" | grep -Eqx '(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?'; then echo "VERSION is not a semantic version: $VERSION" >&2; exit 1; fi
-RUN dotnet publish src/Censio.Server/Censio.Server.csproj -c Release --no-restore -o /app/publish "-p:Version=${VERSION}"
+RUN case "$VERSION" in \
+        ''|*[!0-9A-Za-z.+-]*) echo "VERSION is not a semantic version: $VERSION" >&2; exit 1;; \
+    esac \
+    && if ! printf '%s\n' "$VERSION" | grep -Eqx \
+        '(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?'; \
+    then echo "VERSION is not a semantic version: $VERSION" >&2; exit 1; fi
+RUN dotnet publish src/Censio.Server/Censio.Server.csproj -c Release --no-restore \
+    -o /app/publish "-p:Version=${VERSION}"
 RUN ls /app/publish/wwwroot/_framework/blazor.web*.js > /dev/null 2>&1 \
     || { echo "publish output lacks wwwroot/_framework/blazor.web*.js (see docs/decisions/0007)" >&2; exit 1; }
 

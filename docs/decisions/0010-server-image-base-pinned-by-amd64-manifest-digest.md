@@ -23,6 +23,11 @@ cooldown holds back — invisible from the repository. With a full-version tag a
 plain `aspnet` Alpine image runs with invariant globalization and contains no tzdata; the `-extra` variant adds
 ICU and tzdata.
 
+SonarQube Cloud's rule `docker:S8431` flags every `FROM` that names both a tag and a digest, because the digest
+alone selects the image and a tag that no longer matches it misleads the reader; it rates the finding as a
+vulnerability and fails the quality gate (pull request #66). A Dockerfile treats `#` as a comment only at the
+start of a line, so a same-line `NOSONAR` on a `FROM` line is impossible.
+
 ## Options considered
 
 1. **Full-version single-architecture tags (`-alpineX.Y-amd64`) pinned by their manifest digest, the label a
@@ -42,10 +47,22 @@ ICU and tzdata.
 7. **The `-extra` runtime variant** — ICU and time zones. Con: a larger image for a need the server does not have
    yet (it formats no culture-specific text and logs in UTC).
 
+For `docker:S8431` on option 1's `FROM` lines:
+
+8. **Exclude `docker:S8431` for `src/Censio.Server/Dockerfile` with `sonar.issue.ignore.multicriteria`, passed
+   by the CI scanner and the *Sonar gate* alike** (chosen) — reviewable in the repository, survives each base
+   bump. Con: a second scanner argument kept equal in two places.
+9. **Digest only** — satisfies the rule. Con: Dependabot cannot propose a tag update without a tag, and
+   `base.name` could no longer name the image.
+10. **Tag only** — satisfies the rule. Con: the pull follows a mutable tag; the base image is no longer pinned.
+11. **Mark the issue *Accepted* in the SonarQube Cloud UI** — no repository change. Con: invisible in the
+    repository, and the issue is matched to its line, so a base bump can raise it again on new code.
+
 ## Decision
 
 Option 1 with the plain runtime variant; Dependabot ignores major base-image updates, which a `net10.0` app
-cannot take. The exact tags, the labels and the limits that follow (invariant globalization, no time zones) are
+cannot take. `docker:S8431` is excluded for this Dockerfile (option 8): the digest keeps the integrity the rule
+protects, and the tag is what Dependabot updates. The exact tags, the labels and the limits that follow (invariant globalization, no time zones) are
 in [`areas/server.md`](../areas/server.md) (*Docker image*).
 
 ## Consequences
@@ -56,6 +73,9 @@ in [`areas/server.md`](../areas/server.md) (*Docker image*).
   next .NET patch (MCR rebuilds its tags monthly), and a new Alpine minor, or the end of new tags on the pinned
   one, needs a manual bump of both `FROM` lines (`docs/CONTRIBUTING.md`). Nothing in this change notices the end
   of new tags; a scheduled check for it is a follow-up issue, decided after the plan's security review.
+- A hand edit that changes a tag without its digest builds the old image under the new `base.name`; nothing
+  checks that a tag still resolves to its pinned digest, because MCR rebuilds its tags. The exclusion covers only
+  `docker:S8431` in this one file (`.squad/stack.md`, *Analyzer gate*).
 - arm64 hosts are out; adding them needs a multi-platform build and changes this record.
 - A feature that needs cultures or local time zones moves the runtime stage to the `-extra` variant; the move to
   .NET 11 changes both tags and the Dependabot `ignore` by hand.
