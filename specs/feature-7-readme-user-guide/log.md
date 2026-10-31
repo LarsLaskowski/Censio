@@ -9,3 +9,4 @@ are quoted in full.
 | 2026-10-31 20:17 | 2a Spec | Lead | ESCALATE Q1: how does the README reach the current state (#6 closed not planned, no release yet)? (opus/medium · usage pending) |
 | 2026-10-31 20:17 | 2a Spec | Product Manager | Q1 answered: option B, releases plus building both parts from source |
 | 2026-10-31 20:18 | 2a Spec (continued after answer) | Lead | DONE: spec.md, plan-check --spec clean (1851 words) (opus/medium · usage pending) |
+| 2026-10-31 20:19 | 2a Spec challenge | Devil's Advocate | 0 major, 4 minor; appended verbatim as Challenge notes (opus/medium · usage pending) |
