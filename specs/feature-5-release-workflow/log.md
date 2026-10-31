@@ -15,4 +15,6 @@ are quoted in full.
 | 2026-10-31 17:41 | 2b Plan challenge | squad-devils-advocate | launched, verdict pending (opus/medium · 62,727 tokens · 13 tool uses · 136 s) |
 | 2026-10-31 17:41 | 3 Plan security review | squad-security | launched, verdict pending (opus/medium · 51,034 tokens · 10 tool uses · 118 s) |
 | 2026-10-31 17:44 | 2b/3 Verdicts | Orchestrator | Plan challenge: 1 major (retag digest, registry test), 4 minor. Security: CHANGES_REQUIRED (B1 outputs into credentialed jobs, B2 artifact poisoning), 5 non-blocking. Lead revise round launched |
-| 2026-10-31 17:47 | 2b Plan (revise round) | squad-lead | RESULT: DONE: all findings accepted; retag uses --prefer-index=false (imagetools default changes digest); N4 follow-up (opus/medium · usage pending) |
+| 2026-10-31 17:47 | 2b Plan (revise round) | squad-lead | RESULT: DONE: all findings accepted; retag uses --prefer-index=false (imagetools default changes digest); N4 follow-up (opus/medium · 37,825 tokens · 24 tool uses · 231 s · continued) |
+| 2026-10-31 17:48 | 3 Plan security review (round 2) | squad-security | launched, verdict pending (opus/medium · usage pending) |
+| 2026-10-31 17:48 | 2b Plan | Orchestrator | Follow-up issue 74 opened (release secrets in environment) |
