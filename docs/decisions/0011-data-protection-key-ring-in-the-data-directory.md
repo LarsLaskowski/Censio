@@ -50,7 +50,15 @@ are in [`areas/server.md`](../areas/server.md) (*Data directory and key ring*).
 - The README's earlier statement that an unwritable `/config` does not stop the server no longer holds: the operator
   fixes the ownership (`--user` or `chown`, record 0009) before the server runs.
 - The keys lie unencrypted in the data directory (ASP.NET Core logs its warning about it); the directory's
-  permissions and the operator's backups protect them.
+  permissions and the operator's backups protect them. ASP.NET Core creates the key files owner-only itself.
+- The repository is bound when the options are first resolved, from the application's final configuration, not
+  while services are registered: a configuration source added late (tests, hosting) is honored, and registration and
+  start check cannot disagree. Registering it eagerly from `builder.Configuration` was rejected for that reason.
+- ASP.NET Core reports a refused write of the ring as a `CryptographicException` wrapping the I/O exception, and logs
+  its own error entry first; the start check recognizes exactly that wrapped form besides the plain I/O exceptions
+  and lets every other exception through.
+- In the image the setting can be pointed to another absolute path but not disabled (`docker run -e` cannot unset
+  an image `ENV`, and an empty value stops the start); acceptable while the image is unreleased.
 - #29 and #33 build on `Censio:DataDirectory`; a separate database path stays possible.
 - Revisit when the server runs as more than one instance on one key ring, or when a certificate becomes available
   in the deployment.
