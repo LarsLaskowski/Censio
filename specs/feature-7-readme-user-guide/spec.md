@@ -46,8 +46,10 @@ Facts the issue rests on, checked:
   *Assets*, extracts it and starts `Censio.Companion.exe`, then the README's SmartScreen note tells them how to get
   past "Windows protected your PC" and the tray menu shows `Version <version>`.
 - S5: Given no release exists or the person wants the state of `main`, when they look for an edge build, then the
-  README says that no edge builds are offered and — as the Product Manager decides (open question Q1) — how to get
-  the current state.
+  README says that no edge builds are offered and that the current state is built from source: the server image
+  with `docker build` (as today) and the Companion on Windows with `dotnet publish` of `src/Censio.Companion` for
+  `win-x64`, self-contained and single-file, after which they start the published `Censio.Companion.exe` and its
+  tray menu shows `Version 0.0.0` (Q1).
 - S6: Given a person reads `docs/USER_GUIDE.md`, then it covers installation, the first start, where data and
   logs are stored (server: `/config` with `data-protection-keys`, log on the console via `docker logs censio`;
   Companion: stores no data and writes no log yet), and how to report problems.
@@ -83,7 +85,12 @@ Facts the issue rests on, checked:
   dry run of the documented steps by the Product Manager.
 - Target hosts, as documented today and confirmed by #4 and #5: Docker 23 or later (Linux Docker Engine, or Docker
   Desktop for Windows with WSL 2 and Linux containers), linux/amd64; the Companion on Windows 10 22H2 or 11, x64,
-  without .NET, installer or administrator rights. A host for building from source depends on Q1.
+  without .NET, installer or administrator rights.
+- Building from source (Q1, stated as requirements; no host details were given): the server image needs what
+  the README names today (BuildKit, access to `mcr.microsoft.com`); the Companion needs Windows 10 22H2 or 11 x64
+  with the .NET 10 SDK (`global.json`: `10.0.100`, later feature bands allowed), access to `nuget.org`, and the
+  source from `git clone` or the source ZIP of GitHub. The commands are written so they run in PowerShell 7 and
+  Windows PowerShell 5.1; that they do in 5.1 is an untested assumption, marked "Not yet tried" until a run shows it.
 - No new configuration, no code change; external addresses only `github.com/LarsLaskowski/Censio` and
   `hub.docker.com/r/networlddev/censio`.
 - No secret, private path or real user data in examples.
@@ -95,10 +102,15 @@ Facts the issue rests on, checked:
   link, licence (MIT, link to `LICENSE`) (S1, S3, S4, S9, E2).
 - [ ] AC2: *Status* names the milestone and version it describes, lists what works and what does not yet as in S2,
   and states that no release exists while none does (S2, S10, E1).
-- [ ] AC3: The README states that no edge builds are offered and gives the way to the current state that the
-  Product Manager chose in Q1 (S5, E1).
-- [ ] AC4: In the Product Manager's dry run an external person installs and starts the current state using only
-  the README; every step the run did not show is marked "Not yet tried" in both languages (S3, S4, S5, E1, E3).
+- [ ] AC3: The README states that no edge builds are offered and documents building the current state from source
+  for both parts: the server image (`docker build`) and the Companion (`dotnet publish` of `src/Censio.Companion`,
+  `-r win-x64 --self-contained true -p:PublishSingleFile=true`, with the output folder and the exe to start),
+  each with its prerequisites as listed under *Non-functional requirements* (S5, E1).
+- [ ] AC4: In the Product Manager's dry run an external person, using only the README, builds and starts the
+  current state from source — the server image answers `Healthy` on `/health` and its start page shows
+  `Version 0.0.0`, the Companion's tray menu shows `Version 0.0.0` — and the release steps (S3, S4) are marked
+  "Not yet tried" while no release exists; every step the run did not show (Windows PowerShell 5.1 included) is
+  marked "Not yet tried" in both languages (S3, S4, S5, E1, E3).
 - [ ] AC5: `docs/USER_GUIDE.md` covers installation, first start, where data and logs are stored for the server and
   the Companion, and how to report problems with the *Bug report* template and the facts to include, and sends
   vulnerabilities to private reporting per `SECURITY.md` (S6, S7, E3, E5).
@@ -120,7 +132,10 @@ Facts the issue rests on, checked:
 ## Open questions
 
 - Q1: With #6 closed as not planned and no release yet, how does an external person get the current state from
-  the README? Pending — escalated to the Product Manager (options in the Lead's result).
+  the README? Answered: by the Product Manager (option B) — releases once they exist, and until then (and for
+  `main`) building both parts from source, including the Companion's `dotnet publish` on Windows. No host details
+  were given; the prerequisites are stated requirements (*Non-functional requirements*), Windows PowerShell 5.1 an
+  untested assumption.
 - Q2: Does the user guide repeat the README's install steps? Answered: the issue lists installation under the user
   guide and AC "only the README" under the README, so both carry them; how the two files share the text is the
   plan's choice.
