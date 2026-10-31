@@ -30,7 +30,8 @@ LABEL org.opencontainers.image.base.name="mcr.microsoft.com/dotnet/aspnet:10.0.1
       org.opencontainers.image.base.digest="sha256:7e3205ef1189ab2b63a02040e02638a62bd70c67ac3a3a70a5a908be8e5da96c" \
       org.opencontainers.image.description="Censio server: live state and history of Anno 117 statistics" \
       org.opencontainers.image.licenses="MIT"
-ENV ASPNETCORE_HTTP_PORTS=8080
+ENV ASPNETCORE_HTTP_PORTS=8080 \
+    CENSIO__DATADIRECTORY=/config
 WORKDIR /app
 COPY --from=build /app/publish .
 RUN install -d -o 1654 -g 1654 -m 0755 /config

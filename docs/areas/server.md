@@ -3,7 +3,7 @@
 ## Scope
 
 The server's HTTP surface: the address it listens on, the start page, the health check, how unknown paths and
-plain HTTP are treated, the version it shows, and the Docker image it ships in. Operators who run the server and
+plain HTTP are treated, the version it shows, the data directory with its data-protection key ring, and the Docker image it ships in. Operators who run the server and
 the Docker health probe rely on it.
 
 ## Behavior
@@ -40,6 +40,26 @@ the Docker health probe rely on it.
 - `/`, `/health` and the Blazor hub need no login. Antiforgery protection is on.
 - Host filtering is off (`AllowedHosts` is `*`), a deliberate choice (record 0006).
 
+### Data directory and key ring
+
+- The setting `Censio:DataDirectory` (environment variable `CENSIO__DATADIRECTORY`) names the data directory. It must
+  be an absolute path. Unset, the server sets no key repository of its own: ASP.NET Core's default applies
+  (outside the image, the user's home directory) and the server creates nothing and logs nothing about it.
+- With the setting, ASP.NET Core's data-protection key ring lies in `<data directory>/data-protection-keys`. The
+  server creates the key directory and the first key at start, before it serves a request. A second start on the
+  same directory reads the existing ring and creates no further key.
+- When the server creates the key directory on Linux, its mode is `0700`; an existing directory keeps its mode.
+  ASP.NET Core creates the key files owner-only itself. The keys lie unencrypted; ASP.NET Core logs its warning
+  `No XML encryptor configured` when it creates the first key.
+- A value that is not an absolute path (including the empty string) stops the start: the server logs one `Critical`
+  entry `The data directory (Censio:DataDirectory) must be an absolute path, not '<value>'; the server stops.`,
+  creates no directory and exits with code 1 before it listens.
+- A data directory where the key directory cannot be created or written stops the start: the server logs one
+  `Critical` entry `The data-protection key ring cannot be stored in '<key directory>'; the server stops. Make the data directory writable for the user the server runs as.`
+  with the exception and exits with code 1 before it listens. A refused write is reported by ASP.NET Core as a
+  `CryptographicException` wrapping the I/O exception, and ASP.NET Core logs its own `Error` entry before the
+  `Critical` one. Any other exception is not caught.
+
 ### Docker image
 
 - The image `networlddev/censio` is built from `src/Censio.Server/Dockerfile`, for linux/amd64 only. Build stage:
@@ -52,14 +72,14 @@ the Docker health probe rely on it.
   `ASPNETCORE_URLS` is not supported for the image.
 - The container runs as user `1654:1654` and never starts as root. `--user <uid>:<gid>` runs it as another
   non-root user; the application files are readable by every UID.
-- `/config` exists in the image, owned by 1654, and is the data directory. The image declares no `VOLUME`. The
-  server writes nothing to `/config` yet. A directory the runtime user cannot write (a bind mount owned by
-  another UID, a named volume combined with another `--user`) does not stop the server from starting; it is made
-  writable by starting with `--user <uid>:<gid>` of the directory's owner or by `chown -R 1654:1654 <dir>` on
-  the host.
-- ASP.NET Core's data-protection key ring is not kept: as UID 1654 it lies in the container layer, under another
-  UID (`HOME=/`) it stays in memory and the server logs ASP.NET Core's warning about it at start. In both cases
-  the keys are lost when the container is recreated, and an open page needs a reload after a restart.
+- `/config` exists in the image, owned by 1654, and is the data directory: the image sets
+  `CENSIO__DATADIRECTORY=/config`, so the key ring lies in `/config/data-protection-keys` (*Data directory and key
+  ring*). The image declares no `VOLUME`. The setting can be pointed to another absolute path but not disabled
+  (`docker run -e` cannot unset an image `ENV`, and an empty value stops the start). A directory the runtime user
+  cannot write (a bind mount owned by another UID, a named volume combined with another `--user`) stops the
+  container at start with exit code 1; it is made writable by starting with `--user <uid>:<gid>` of the
+  directory's owner or by `chown -R 1654:1654 <dir>` on the host.
+- The key ring survives a recreation of a container that keeps `/config`.
 - Health check: the image probes `http://127.0.0.1:<port>/health` with BusyBox `wget`, where `<port>` is the first
   entry of `ASPNETCORE_HTTP_PORTS` (`8080;8081` probes 8080). Interval 10 s, timeout 3 s, start period 30 s,
   3 retries; the container reads `healthy` within 60 s of the start.
@@ -81,6 +101,8 @@ the Docker health probe rely on it.
 - The server reads no request body and takes no input on `/` or `/health`.
 - If the port is taken, the server ends with the ASP.NET Core startup error in the console; it has no handling of
   its own.
+- A data directory that is not an absolute path, or a key directory the server cannot create or write, stops the
+  start with exit code 1 and a `Critical` log line (*Data directory and key ring*).
 - Request paths and hosts are not logged at the default levels (`Microsoft.AspNetCore` logs warnings only).
 
 ## Related decisions
@@ -90,6 +112,7 @@ the Docker health probe rely on it.
 - [`decisions/0007-server-web-assets-independent-of-restore-inputs.md`](../decisions/0007-server-web-assets-independent-of-restore-inputs.md) — the project requests the Blazor scripts itself, so the image contains them.
 - [`decisions/0009-server-image-runs-as-a-fixed-non-root-user.md`](../decisions/0009-server-image-runs-as-a-fixed-non-root-user.md) — user 1654, other UIDs through `--user`, no `VOLUME`.
 - [`decisions/0010-server-image-base-pinned-by-amd64-manifest-digest.md`](../decisions/0010-server-image-base-pinned-by-amd64-manifest-digest.md) — full-version amd64 base tags pinned by digest, the `base.digest` label checked in CI.
+- [`decisions/0011-data-protection-key-ring-in-the-data-directory.md`](../decisions/0011-data-protection-key-ring-in-the-data-directory.md) — the key ring lies in `<data directory>/data-protection-keys`; the server stops when it cannot write it.
 
 ## Not here
 

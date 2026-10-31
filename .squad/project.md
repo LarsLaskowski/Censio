@@ -15,6 +15,7 @@ files or endpoints.
 - Authentication: the WebSocket ingest accepts a Companion only with a valid token; the web UI follows the deployment note in `SECURITY.md`.
 - File paths for the cache and for recordings: derived from configuration, never from data read from the pipe or a game file; reject traversal.
 - Parsing of external input: the Anno 117 statistics pipe stream and game files (Companion), and every WebSocket message (server) — bounded sizes, malformed input is rejected, never trusted.
+- Data-protection key ring: `<Censio:DataDirectory>/data-protection-keys` (`DataProtectionSetup`), created owner-only, unencrypted at rest; the server stops when it cannot write it.
 - Network exposure: the server's listener and its routes reachable without login (`/`, `/health`, the Blazor hub and static assets); plain HTTP, TLS at the reverse proxy (record 0006).
 - Outbound calls: none planned; a new one is a security area.
 - Logging of external data: pipe, game-file and WebSocket content is logged only truncated and sanitized, never the token.

@@ -43,7 +43,7 @@ The server accepts data only from a client that presents the ingest token. Guara
 
 ## Configuration
 
-Configuration (server address, ingest token, cache and recording paths) comes from files and environment
+Configuration (server address, data directory, ingest token, cache and recording paths) comes from files and environment
 variables and is validated at startup. The rules per area are in [`areas/`](areas/README.md).
 
 ## Security model
@@ -63,7 +63,7 @@ The server is built into the Docker image `networlddev/censio` (linux/amd64) fro
 on Alpine bases of the .NET SDK and ASP.NET runtime pinned by digest, and runs as a non-root user; its behavior
 is in [`areas/server.md`](areas/server.md), the choices in
 [`decisions/0009`](decisions/0009-server-image-runs-as-a-fixed-non-root-user.md) and
-[`decisions/0010`](decisions/0010-server-image-base-pinned-by-amd64-manifest-digest.md). The Companion is
+[`decisions/0010`](decisions/0010-server-image-base-pinned-by-amd64-manifest-digest.md). The image keeps the data-protection key ring in `/config` (`Censio:DataDirectory`, [`decisions/0011`](decisions/0011-data-protection-key-ring-in-the-data-directory.md)). The Companion is
 published as a Windows ZIP. A release is cut from a `v*` tag.
 <!-- project:end architecture -->
 
