@@ -103,22 +103,30 @@ expect_ok()
 
 tag_error()
 {
-    printf "Release tag '%s' is not of the form vMAJOR.MINOR.PATCH." "$1"
+    local tag="$1"
+
+    printf "Release tag '%s' is not of the form vMAJOR.MINOR.PATCH." "$tag"
 }
 
 form_error()
 {
-    printf 'The value %s passed from an earlier job is not of the expected form.' "$1"
+    local value="$1"
+
+    printf 'The value %s passed from an earlier job is not of the expected form.' "$value"
 }
 
 image_id_of()
 {
-    docker image inspect --format '{{.Id}}' "$1"
+    local image="$1"
+
+    docker image inspect --format '{{.Id}}' "$image"
 }
 
 registry_digest()
 {
-    docker buildx imagetools inspect "$1" --format '{{.Manifest.Digest}}'
+    local reference="$1"
+
+    docker buildx imagetools inspect "$reference" --format '{{.Manifest.Digest}}'
 }
 
 # Builds an image of one file without network access; further arguments are extra build options.
