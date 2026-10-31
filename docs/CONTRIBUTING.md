@@ -5,8 +5,9 @@
 
 ### Machine setup
 
-Git, the .NET SDK from `.squad/stack.md` (*Toolchain*), the formatter `reihitsu-format` and Python 3 for the
-gates under `.squad/tools/`. The Companion builds on any platform but runs on Windows only; the server runs anywhere .NET and Docker do.
+Git, the .NET SDK from `.squad/stack.md` (*Toolchain*) and Python 3 for the gates under `.squad/tools/`. The
+formatter `reihitsu-format` and the SonarQube scanner are pinned in `.config/dotnet-tools.json`; run
+`dotnet tool restore` once after cloning (and again when a pull request changes the manifest). The Companion builds on any platform but runs on Windows only; the server runs anywhere .NET and Docker do.
 
 ### Cloning the repository
 
@@ -43,6 +44,48 @@ dotnet test Censio.slnx -c Release --no-build
 For detailed rules on how unit tests are structured and named, see [`UNIT_TESTS.md`](UNIT_TESTS.md).
 **Unit tests are mandatory for newly written code** — see the checklist there before opening a pull
 request.
+
+### Automated checks
+
+- **CI** (`.github/workflows/ci.yml`, job `build`): runs on every push to `main` and every pull request against
+  `main`. It restores the tools and the solution, checks the tool versions, checks the formatting, builds
+  `Censio.slnx` (the Companion included, on Linux), runs the tests with coverage and uploads the results. It
+  turns red on an unformatted file (the log names it: `Not formatted: <path>`; reproduce with
+  `dotnet tool run reihitsu-format --check ./`, fix with *Format*), a build error, a failing test, a failing
+  SonarQube step, or a *Check tool versions* error (`Reihitsu.Cli` in `.config/dotnet-tools.json` and
+  `Reihitsu.Analyzer` in `Directory.Packages.props` must be on the same major.minor release line).
+- **Test report** (check *dotnet tests*): lists the results of the test step, also when a test failed. It is
+  skipped on fork and Dependabot pull requests, whose token cannot create check runs.
+- **SonarQube Cloud** (organisation `networlddev`, project `networlddev_censio`; check *SonarCloud Code
+  Analysis*): analyses build and tests inside the CI job and shows the quality gate as its own check, which does
+  not decide the result of *CI*. It is skipped when the repository secret `SONAR_TOKEN` is not available (fork
+  and Dependabot pull requests); a rejected token or an unreachable server fails the CI job. Locally the *Sonar
+  gate* of `.squad/stack.md` runs it.
+- **CodeQL** (`.github/workflows/codeql.yml`): analyses C# and the workflows on pushes to `main`, on pull
+  requests and weekly (Sunday 01:30 UTC); its checks *Analyze (csharp)* and *Analyze (actions)* turn red when
+  the analysis itself fails, and the alerts it finds appear under *Security > Code scanning*. No local command
+  reproduces it.
+- **Dependabot** (`.github/dependabot.yml`): weekly version updates for NuGet (the .NET tools of the manifest
+  included), GitHub Actions and Docker (`src/Censio.Server/`), each ecosystem in one grouped pull request;
+  security updates arrive separately.
+- **Fork scope** (`.github/workflows/fork-scope.yml`): runs on pull requests from forks, with the check as it
+  is on `main`, and turns red when one changes a squad or agent instruction file (`.squad/` except `stack.md`
+  and `project.md`, `.claude/`, `CLAUDE.md`, `AGENTS.md`, `.github/copilot-instructions.md`), text outside the
+  `<!-- project:… -->` blocks of a marked file or a working record under `specs/`, or adds a control character
+  to a Markdown file; it does not check `.github/workflows/`. `python3 .squad/tools/scope-check.py --no-specs`
+  reproduces it locally, except that the local run allows changes inside the project blocks of `AGENTS.md` and
+  its mirror.
+
+Pull requests from forks and Dependabot's get no repository secrets, so SonarQube and the test report are
+skipped there while restore, format check, build and tests run. A first-time contributor's run waits until a
+maintainer approves it.
+
+When a Dependabot pull request raises `Reihitsu.Analyzer` and `Reihitsu.Cli` together and the new formatter
+formats the code differently, the format check turns it red. A maintainer first reviews the Dependabot diff,
+because a push to its branch gives that run the repository secrets while the raised packages build; then checks
+out the branch, runs *Format* and pushes the result. A raised `dotnet-sonarscanner` gets no SonarQube run on a
+Dependabot pull request, so before merging a maintainer pushes a commit to its branch or runs the *Sonar gate*
+locally. If *Check tool versions* is red, raise the package that is behind.
 <!-- project:end getting-started -->
 
 ## Submitting a pull request
@@ -113,6 +156,10 @@ the Windows ZIP of the Companion. Merging a PR by itself never publishes a relea
 Every assembly of the solution gets its version from the build property `Version` (`-p:Version=<v>`, default
 `0.0.0`), shown unchanged by the server's start page and the Companion's tray menu
 ([`decisions/0005`](decisions/0005-product-version-from-one-build-property.md)).
+
+The release notes GitHub generates sort merged pull requests by label (`.github/release.yml`): `breaking-change`
+under *Breaking changes*, `enhancement` or `feature` under *Features*, `security` under *Security fixes*, `bug`
+under *Bug fixes*, any other under *Other changes*; `ignore-for-release` leaves a pull request out.
 <!-- project:end releases -->
 
 <!-- project:begin stability -->
