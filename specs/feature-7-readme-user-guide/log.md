@@ -12,3 +12,4 @@ are quoted in full.
 | 2026-10-31 20:19 | 2a Spec challenge | Devil's Advocate | 0 major, 4 minor; appended verbatim as Challenge notes (opus/medium · usage pending) |
 | 2026-10-31 20:23 | 2b Plan | Lead | DONE: tier trivial, security none, plan challenge skipped (no options); plan-check clean (opus/medium · usage pending) |
 | 2026-10-31 20:23 | 2b Plan challenge / 3 Security | Orchestrator | skipped: plan weighs no options; no security area touched |
+| 2026-10-31 20:25 | 6 Implement (docs, G1 tasks 1-4) | Dev | README, USER_GUIDE, server.md written; parity and link checks pass; anchors unchecked; task 5 waits for dry run (sonnet/medium · usage pending) |

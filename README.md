@@ -2,27 +2,54 @@
 
 Censio reads the statistics of a running Anno 117 game on Windows and shows them live and over time in a web application: a Windows Companion extracts the data, a Blazor Server application stores and displays it.
 
-## Docker
+Deutsche Version: [Censio (Deutsch)](#censio-deutsch)
 
-The Censio server runs as the Docker image `networlddev/censio` (linux/amd64) on Docker Hub. Every release publishes the tag `<version>` (for example `0.1.0`) and moves the tag `latest` to the newest release. The versions are listed on the release page `https://github.com/LarsLaskowski/Censio/releases` and the tags on `https://hub.docker.com/r/networlddev/censio/tags`. You need Docker 23 or later (Linux Docker Engine, or Docker Desktop for Windows with the WSL 2 backend and Linux containers). The commands below use the version `0.1.0`; replace it with the version you want, or with `latest`. Run the commands one at a time: a command that fails makes the next one fail too. Not yet tried: pulling and running the published image, until the release `v0.1.0` exists.
+## Status
 
-### Pull
+Censio is in milestone M0 (Foundation). No release exists yet; the first one is planned as `v0.1.0` (milestone M1). The state of `main` carries the version `0.0.0`.
+
+Works today:
+
+- The server runs as a Docker image. Its start page shows `Version <version>`, and `GET /health` answers `Healthy`.
+- The Companion starts on Windows as a tray icon. Its menu shows `Version <version>` and `Exit`.
+
+Not yet:
+
+- No game data is read.
+- Nothing is sent from the Companion to the server.
+- There is no history.
+
+## Getting Censio
+
+- Releases: once a release exists, the Docker image and the Companion ZIP are published with it on `https://github.com/LarsLaskowski/Censio/releases`.
+- Edge builds: none are offered.
+- The current state of `main`, or any state without a release, is built from source. Get the source with `git clone`, then change into the folder:
+
+```text
+git clone https://github.com/LarsLaskowski/Censio.git
+```
+
+```text
+cd Censio
+```
+
+Alternatively use *Code*, *Download ZIP* on the GitHub page of the repository and extract it. Run the commands of the source builds below in that folder, one at a time.
+
+Not supported: arm64 hosts, Windows containers, and Windows other than Windows 10 22H2 or Windows 11 (x64).
+
+## Server (Docker)
+
+The Censio server runs as the Docker image `networlddev/censio` (linux/amd64) on Docker Hub. Every release publishes the tag `<version>` (for example `0.1.0`) and moves the tag `latest` to the newest release. You need Docker 23 or later (Linux Docker Engine, or Docker Desktop for Windows with the WSL 2 backend and Linux containers). The commands below use the version `0.1.0`; replace it with the version you want, or with `latest`. Run the commands one at a time: a command that fails makes the next one fail too. Not yet tried: pulling and running the published image, until the release `v0.1.0` exists.
 
 ```text
 docker pull networlddev/censio:0.1.0
 ```
 
-`docker run` pulls a missing image itself, so this step only fetches it in advance. A failed pull leaves nothing half-installed.
-
-### Run
-
-Start the container with a named volume for the data directory `/config`:
-
 ```text
 docker run -d --name censio -p 8080:8080 -v censio-config:/config networlddev/censio:0.1.0
 ```
 
-Check that it answers (the response is `Healthy`; not yet tried: in Windows PowerShell 5.1 `curl` is an alias of `Invoke-WebRequest`, which should show `StatusCode` `200` and `Content` `Healthy` and may ask for a confirmation first) and read its log:
+Check that it answers (the response is `Healthy`) and read its log:
 
 ```text
 curl http://localhost:8080/health
@@ -32,116 +59,124 @@ curl http://localhost:8080/health
 docker logs censio
 ```
 
-Open `http://localhost:8080/` for the start page. After a few seconds `docker ps` shows the container as `(healthy)`: the image probes `/health` itself every 10 seconds. If a run failed, remove the container before starting it again, because its name is taken:
+Open `http://localhost:8080/` for the start page; it shows `Version 0.1.0`. If a run failed, remove the container before starting it again, because its name is taken:
 
 ```text
 docker rm -f censio
 ```
 
-### Port
-
-Inside the container the server listens on port 8080. If port 8080 is taken on the host, Docker reports "port is already allocated"; map another host port:
-
-```text
-docker run -d --name censio -p 9000:8080 -v censio-config:/config networlddev/censio:0.1.0
-```
-
-To change the port the server itself listens on, set `ASPNETCORE_HTTP_PORTS` (the health probe follows the first port of the list; `ASPNETCORE_URLS` is not supported by the image):
-
-```text
-docker run -d --name censio -e ASPNETCORE_HTTP_PORTS=9090 -p 9090:9090 -v censio-config:/config networlddev/censio:0.1.0
-```
-
-### Data directory and NAS hosts
-
-`/config` is the directory for the server's data; it holds the data-protection key ring in `/config/data-protection-keys`. The image sets `CENSIO__DATADIRECTORY=/config`; point it to another absolute path with `-e CENSIO__DATADIRECTORY=<path>`. It cannot be switched off in the image: `docker run -e` cannot unset it and an empty value stops the start. The image declares no `VOLUME`, so every command above passes `-v`. A named volume (`censio-config`) is the default and the only form on Docker Desktop for Windows. The container never starts as root: it runs as user `1654`.
-
-On a NAS whose shares belong to another user (Unraid `nobody:users` is `99:100`, a Synology user such as `1026:100`), start the container with that user and group; replace the path with your share:
-
-```text
-docker run -d --name censio --user 99:100 -p 8080:8080 -v /mnt/user/appdata/censio:/config networlddev/censio:0.1.0
-```
-
-Or hand the directory to the image's user and start without `--user`:
-
-```text
-chown -R 1654:1654 /mnt/user/appdata/censio
-```
-
-```text
-docker run -d --name censio -p 8080:8080 -v /mnt/user/appdata/censio:/config networlddev/censio:0.1.0
-```
-
-A directory the container user cannot write stops the container at start with exit code 1; `docker logs censio` then shows `The data-protection key ring cannot be stored in '/config/data-protection-keys'; the server stops. Make the data directory writable for the user the server runs as.` A value of `CENSIO__DATADIRECTORY` that is not an absolute path also stops it with exit code 1; `docker logs censio` then shows `The data directory (Censio:DataDirectory) must be an absolute path, not '<value>'; the server stops.` Pull the image on the NAS itself; `docker run` does it when the image is missing:
-
-```text
-docker pull networlddev/censio:0.1.0
-```
-
-Building the image from source and starting it with the commands of this guide was tried on Docker Desktop for Windows in PowerShell 7. An automated check on Linux Docker Engine runs the `--user 99:100` command with a bind mount owned by `99:100`; Windows PowerShell 5.1, the other commands of this section (the `chown` remedy, the pull on the NAS), the stop at start for an unwritable directory on NAS hardware, and Unraid or Synology hardware have not been tried yet.
-
-### Network and TLS
-
-Inside the image the server listens on all interfaces of the container, on plain HTTP, with no login on the start page and `/health`. The `-p` mapping decides who can reach it: `-p 8080:8080` publishes it on every interface of the host. To reach it from the host alone, bind the mapping to the loopback address:
+If port 8080 is taken on the host, Docker reports "port is already allocated"; map another host port, for example `-p 9000:8080`. The server speaks plain HTTP without a login; to reach it from the host alone, publish it on the loopback address (a published port bypasses host firewalls such as ufw and firewalld on Linux):
 
 ```text
 docker run -d --name censio -p 127.0.0.1:8080:8080 -v censio-config:/config networlddev/censio:0.1.0
 ```
 
-On Linux a published port bypasses host firewalls such as ufw and firewalld, so restrict access with the mapping, not with the firewall. TLS is the job of a reverse proxy in front of the server; see `SECURITY.md`.
+The [user guide](docs/USER_GUIDE.md) describes the data directory, NAS hosts, TLS and the limits.
 
-### Limits
+### Build the server from source
 
-- Only linux/amd64; arm64 hosts (including ARM-based Synology models) and Windows containers are not supported.
-- The image runs with invariant globalization and has no time zone data: `TZ` has no effect and log times are UTC.
-- ASP.NET Core's data-protection keys lie unencrypted in `/config/data-protection-keys`; keep the directory and its backups private. ASP.NET Core logs the warning `No XML encryptor configured` when the server creates the first key.
-- The server logs to the console; read it with `docker logs censio`.
-
-### Build from source
-
-To run a state of the repository that has not been released, build the image from a checkout of this repository, with the commands run in its root directory. This needs access to `mcr.microsoft.com` and BuildKit. In the `docker run` commands of this guide, use the local name `censio` instead of `networlddev/censio:0.1.0`.
-
+This builds the current state of the repository into a local image. It needs Docker 23 or later with BuildKit and access to `mcr.microsoft.com`. Run it in the root folder of the checkout (*Getting Censio*):
 
 ```text
 docker build -f src/Censio.Server/Dockerfile -t censio .
 ```
 
-The build stamps the version `0.0.0`; pass another one as a semantic version (`MAJOR.MINOR.PATCH`, optionally with pre-release and build parts), anything else fails the build with `VERSION is not a semantic version`:
+Start the local image. `--pull never` makes Docker refuse to start when the build failed and no local image `censio` exists, instead of pulling a foreign image of that name:
 
 ```text
-docker build -f src/Censio.Server/Dockerfile --build-arg VERSION=1.2.3 -t censio .
+docker run -d --name censio --pull never -p 8080:8080 -v censio-config:/config censio
 ```
+
+Then check `http://localhost:8080/health` (`Healthy`) and `http://localhost:8080/` as above; the start page shows `Version 0.0.0`. Not yet tried: the refusal of `--pull never` after a failed build.
 
 ## Companion
 
-The Companion is the Windows program that reads the statistics of the running game. Download `Censio-<version>-win-x64.zip` from the release page `https://github.com/LarsLaskowski/Censio/releases` (under *Assets* of the release). It needs Windows 10 22H2 or Windows 11, 64-bit; it needs no installed .NET, no installer and no administrator rights. Not yet tried: the ZIP on a machine without .NET, until it has been tried on a Windows machine.
+The Companion is the Windows program that reads the statistics of the running game. Download `Censio-<version>-win-x64.zip` from the release page `https://github.com/LarsLaskowski/Censio/releases` (under *Assets* of the release). It needs Windows 10 22H2 or Windows 11, 64-bit; it needs no installed .NET, no installer and no administrator rights. Not yet tried: the ZIP on a machine without .NET, until a release exists and it has been tried on a Windows machine.
 
 1. Extract the ZIP to a folder of your choice. It holds one file, `Censio.Companion.exe`.
 2. Start `Censio.Companion.exe`. A tray icon appears; its menu shows `Version <version>`.
 
-The program is not signed, so Windows SmartScreen may show "Windows protected your PC" the first time. Choose "More info", then "Run anyway".
+The program is not signed, so Windows SmartScreen may show "Windows protected your PC" the first time. Choose "More info", then "Run anyway" (on a German Windows: "Weitere Informationen", then "Trotzdem ausführen").
 
-## Docker (Deutsch)
+### Build the Companion from source
 
-Der Censio-Server läuft als Docker-Image `networlddev/censio` (linux/amd64) auf Docker Hub. Jedes Release veröffentlicht den Tag `<version>` (zum Beispiel `0.1.0`) und setzt den Tag `latest` auf das neueste Release. Die Versionen stehen auf der Release-Seite `https://github.com/LarsLaskowski/Censio/releases`, die Tags auf `https://hub.docker.com/r/networlddev/censio/tags`. Voraussetzung ist Docker 23 oder neuer (Docker Engine unter Linux oder Docker Desktop für Windows mit WSL-2-Backend und Linux-Containern). Die Befehle unten verwenden die Version `0.1.0`; sie durch die gewünschte Version oder durch `latest` ersetzen. Die Befehle werden einzeln ausgeführt: Schlägt ein Befehl fehl, schlägt auch der nächste fehl. Noch nicht ausprobiert: das Laden und Starten des veröffentlichten Images, bis das Release `v0.1.0` existiert.
+Building needs the .NET 10 SDK (version 10.0.100 or a later feature band), access to `nuget.org` and the source (*Getting Censio*), on any operating system the SDK supports; only running the program needs Windows 10 22H2 or Windows 11, x64. Run the command in the root folder of the checkout. It uses the flags of the release build, except the version, and writes to the folder `publish`:
 
-### Pull
+```text
+dotnet publish src/Censio.Companion/Censio.Companion.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=embedded -p:PublishDocumentationFile=false -p:PublishReferencesDocumentationFiles=false -o publish
+```
+
+The folder `publish` then holds only `Censio.Companion.exe`. Start it on Windows (`publish\Censio.Companion.exe`); the tray menu shows `Version 0.0.0`. The command is written to run in PowerShell 7 and Windows PowerShell 5.1. Not yet tried: Windows PowerShell 5.1.
+
+## Configuration
+
+| Setting | Environment variable | Default | Meaning |
+| ------- | -------------------- | ------- | ------- |
+| `Censio:DataDirectory` | `CENSIO__DATADIRECTORY` | unset outside the Docker image, `/config` in the image | Absolute path of the server's data directory; it holds the data-protection keys in `data-protection-keys`. |
+| `ASPNETCORE_HTTP_PORTS` | `ASPNETCORE_HTTP_PORTS` | `8080` in the Docker image; outside it the server listens on `http://localhost:5000` | Port the server listens on inside the Docker image. |
+
+The Companion has no settings yet.
+
+## User guide
+
+The [user guide](docs/USER_GUIDE.md) covers installation, the first start, data and logs, and how to report a problem. Report a security vulnerability privately as [SECURITY.md](SECURITY.md) describes, never in a public issue.
+
+## Licence
+
+Censio is released under the MIT licence; see [LICENSE](LICENSE).
+
+# Censio (Deutsch)
+
+Censio liest die Statistik eines laufenden Anno-117-Spiels unter Windows und zeigt sie live und im Verlauf in einer Webanwendung: Ein Windows-Companion extrahiert die Daten, eine Blazor-Server-Anwendung speichert und zeigt sie an.
+
+English version: [Censio](#censio)
+
+## Status
+
+Censio befindet sich im Meilenstein M0 (Foundation). Es gibt noch kein Release; das erste ist als `v0.1.0` geplant (Meilenstein M1). Der Stand von `main` trägt die Version `0.0.0`.
+
+Funktioniert heute:
+
+- Der Server läuft als Docker-Image. Seine Startseite zeigt `Version <version>`, und `GET /health` antwortet mit `Healthy`.
+- Der Companion startet unter Windows als Tray-Symbol. Sein Menü zeigt `Version <version>` und `Exit`.
+
+Noch nicht:
+
+- Es werden keine Spieldaten gelesen.
+- Der Companion sendet nichts an den Server.
+- Es gibt keinen Verlauf.
+
+## Censio beziehen
+
+- Releases: Sobald ein Release existiert, werden das Docker-Image und das Companion-ZIP damit auf `https://github.com/LarsLaskowski/Censio/releases` veröffentlicht.
+- Edge-Builds: Es werden keine angeboten.
+- Der aktuelle Stand von `main` oder jeder Stand ohne Release wird aus dem Quellcode gebaut. Den Quellcode mit `git clone` holen und dann in den Ordner wechseln:
+
+```text
+git clone https://github.com/LarsLaskowski/Censio.git
+```
+
+```text
+cd Censio
+```
+
+Alternativ auf der GitHub-Seite des Repositorys *Code*, *Download ZIP* wählen und das ZIP entpacken. Die Befehle der Quellcode-Builds unten in diesem Ordner ausführen, einzeln nacheinander.
+
+Nicht unterstützt: arm64-Hosts, Windows-Container und Windows außer Windows 10 22H2 oder Windows 11 (x64).
+
+## Server (Docker)
+
+Der Censio-Server läuft als Docker-Image `networlddev/censio` (linux/amd64) auf Docker Hub. Jedes Release veröffentlicht den Tag `<version>` (zum Beispiel `0.1.0`) und setzt den Tag `latest` auf das neueste Release. Voraussetzung ist Docker 23 oder neuer (Docker Engine unter Linux oder Docker Desktop für Windows mit WSL-2-Backend und Linux-Containern). Die Befehle unten verwenden die Version `0.1.0`; sie durch die gewünschte Version oder durch `latest` ersetzen. Die Befehle werden einzeln ausgeführt: Schlägt ein Befehl fehl, schlägt auch der nächste fehl. Noch nicht ausprobiert: das Laden und Starten des veröffentlichten Images, bis das Release `v0.1.0` existiert.
 
 ```text
 docker pull networlddev/censio:0.1.0
 ```
 
-`docker run` lädt ein fehlendes Image selbst, dieser Schritt holt es nur vorab. Ein fehlgeschlagener Pull hinterlässt nichts Halbfertiges.
-
-### Run
-
-Den Container mit einem benannten Volume für das Datenverzeichnis `/config` starten:
-
 ```text
 docker run -d --name censio -p 8080:8080 -v censio-config:/config networlddev/censio:0.1.0
 ```
 
-Prüfen, ob er antwortet (die Antwort lautet `Healthy`; noch nicht ausprobiert: in Windows PowerShell 5.1 ist `curl` ein Alias für `Invoke-WebRequest`, das `StatusCode` `200` und `Content` `Healthy` anzeigen sollte und vorher eine Bestätigung verlangen kann), und sein Log lesen:
+Prüfen, ob er antwortet (die Antwort lautet `Healthy`), und sein Log lesen:
 
 ```text
 curl http://localhost:8080/health
@@ -151,91 +186,68 @@ curl http://localhost:8080/health
 docker logs censio
 ```
 
-Die Startseite liegt unter `http://localhost:8080/`. Nach wenigen Sekunden zeigt `docker ps` den Container als `(healthy)`: Das Image fragt `/health` selbst alle 10 Sekunden ab. Ist ein Start fehlgeschlagen, den Container vor einem neuen Start entfernen, weil sein Name belegt ist:
+Die Startseite liegt unter `http://localhost:8080/`; sie zeigt `Version 0.1.0`. Ist ein Start fehlgeschlagen, den Container vor einem neuen Start entfernen, weil sein Name belegt ist:
 
 ```text
 docker rm -f censio
 ```
 
-### Port
-
-Im Container lauscht der Server auf Port 8080. Ist Port 8080 auf dem Host belegt, meldet Docker „port is already allocated“; dann einen anderen Host-Port abbilden:
-
-```text
-docker run -d --name censio -p 9000:8080 -v censio-config:/config networlddev/censio:0.1.0
-```
-
-Den Port, auf dem der Server selbst lauscht, ändert `ASPNETCORE_HTTP_PORTS` (der Health-Check folgt dem ersten Eintrag der Liste; `ASPNETCORE_URLS` unterstützt das Image nicht):
-
-```text
-docker run -d --name censio -e ASPNETCORE_HTTP_PORTS=9090 -p 9090:9090 -v censio-config:/config networlddev/censio:0.1.0
-```
-
-### Datenverzeichnis und NAS-Hosts
-
-`/config` ist das Verzeichnis für die Daten des Servers; es enthält den Data-Protection-Schlüsselring in `/config/data-protection-keys`. Das Image setzt `CENSIO__DATADIRECTORY=/config`; mit `-e CENSIO__DATADIRECTORY=<Pfad>` lässt es sich auf einen anderen absoluten Pfad setzen. Im Image abschalten lässt es sich nicht: `docker run -e` kann es nicht entfernen, und ein leerer Wert stoppt den Start. Das Image deklariert kein `VOLUME`, deshalb geben alle Befehle oben `-v` an. Ein benanntes Volume (`censio-config`) ist der Standard und unter Docker Desktop für Windows die einzige Form. Der Container startet nie als root: Er läuft als Benutzer `1654`.
-
-Auf einem NAS, dessen Freigaben einem anderen Benutzer gehören (Unraid `nobody:users` ist `99:100`, ein Synology-Benutzer etwa `1026:100`), den Container mit diesem Benutzer und dieser Gruppe starten; den Pfad durch die eigene Freigabe ersetzen:
-
-```text
-docker run -d --name censio --user 99:100 -p 8080:8080 -v /mnt/user/appdata/censio:/config networlddev/censio:0.1.0
-```
-
-Oder das Verzeichnis dem Benutzer des Images übergeben und ohne `--user` starten:
-
-```text
-chown -R 1654:1654 /mnt/user/appdata/censio
-```
-
-```text
-docker run -d --name censio -p 8080:8080 -v /mnt/user/appdata/censio:/config networlddev/censio:0.1.0
-```
-
-Ein Verzeichnis, das der Container-Benutzer nicht beschreiben kann, stoppt den Container beim Start mit Exit-Code 1; `docker logs censio` zeigt dann `The data-protection key ring cannot be stored in '/config/data-protection-keys'; the server stops. Make the data directory writable for the user the server runs as.` Ein Wert von `CENSIO__DATADIRECTORY`, der kein absoluter Pfad ist, stoppt ihn ebenfalls mit Exit-Code 1; `docker logs censio` zeigt dann `The data directory (Censio:DataDirectory) must be an absolute path, not '<value>'; the server stops.` Das Image auf dem NAS selbst laden; `docker run` tut das, wenn das Image fehlt:
-
-```text
-docker pull networlddev/censio:0.1.0
-```
-
-Das Bauen des Images aus dem Quellcode und sein Start mit den Befehlen dieser Anleitung wurde unter Docker Desktop für Windows in PowerShell 7 ausprobiert. Eine automatische Prüfung unter Docker Engine für Linux führt den Befehl mit `--user 99:100` und einem Bind-Mount aus, der `99:100` gehört; Windows PowerShell 5.1, die übrigen Befehle dieses Abschnitts (die `chown`-Abhilfe, das Laden auf dem NAS), der Stopp beim Start für ein nicht beschreibbares Verzeichnis auf NAS-Hardware sowie Unraid- oder Synology-Hardware wurden noch nicht ausprobiert.
-
-### Netzwerk und TLS
-
-Im Image lauscht der Server auf allen Schnittstellen des Containers, über reines HTTP und ohne Login für Startseite und `/health`. Die `-p`-Abbildung entscheidet, wer ihn erreicht: `-p 8080:8080` veröffentlicht ihn auf jeder Schnittstelle des Hosts. Um ihn nur vom Host aus erreichbar zu machen, die Abbildung an die Loopback-Adresse binden:
+Ist Port 8080 auf dem Host belegt, meldet Docker „port is already allocated“; dann einen anderen Host-Port abbilden, zum Beispiel `-p 9000:8080`. Der Server spricht reines HTTP ohne Login; um ihn nur vom Host aus erreichbar zu machen, ihn auf der Loopback-Adresse veröffentlichen (unter Linux umgeht ein veröffentlichter Port Host-Firewalls wie ufw und firewalld):
 
 ```text
 docker run -d --name censio -p 127.0.0.1:8080:8080 -v censio-config:/config networlddev/censio:0.1.0
 ```
 
-Unter Linux umgeht ein veröffentlichter Port Host-Firewalls wie ufw und firewalld; den Zugriff deshalb über die Abbildung beschränken, nicht über die Firewall. TLS ist Aufgabe eines Reverse Proxys vor dem Server; siehe `SECURITY.md`.
+Das [Benutzerhandbuch](docs/USER_GUIDE.md#censio-benutzerhandbuch) beschreibt das Datenverzeichnis, NAS-Hosts, TLS und die Einschränkungen.
 
-### Einschränkungen
+### Server aus dem Quellcode bauen
 
-- Nur linux/amd64; arm64-Hosts (auch ARM-basierte Synology-Modelle) und Windows-Container werden nicht unterstützt.
-- Das Image läuft mit invarianter Globalisierung und ohne Zeitzonendaten: `TZ` hat keine Wirkung, Logzeiten sind UTC.
-- Die Data-Protection-Schlüssel von ASP.NET Core liegen unverschlüsselt in `/config/data-protection-keys`; das Verzeichnis und seine Sicherungen privat halten. ASP.NET Core meldet die Warnung `No XML encryptor configured`, wenn der Server den ersten Schlüssel anlegt.
-- Der Server schreibt sein Log auf die Konsole; Lesen mit `docker logs censio`.
-
-### Aus dem Quellcode bauen
-
-Um einen Stand des Repositorys auszuführen, der nicht veröffentlicht ist, das Image aus einem Checkout dieses Repositorys bauen; die Befehle laufen in dessen Hauptverzeichnis. Das braucht Zugriff auf `mcr.microsoft.com` und BuildKit. In den `docker run`-Befehlen dieser Anleitung dann den lokalen Namen `censio` statt `networlddev/censio:0.1.0` verwenden.
-
+Das baut den aktuellen Stand des Repositorys zu einem lokalen Image. Es braucht Docker 23 oder neuer mit BuildKit und Zugriff auf `mcr.microsoft.com`. Im Hauptordner des Checkouts ausführen (*Censio beziehen*):
 
 ```text
 docker build -f src/Censio.Server/Dockerfile -t censio .
 ```
 
-Der Build setzt die Version `0.0.0`; eine andere wird als Semantic Version übergeben (`MAJOR.MINOR.PATCH`, optional mit Pre-Release- und Build-Teil), alles andere lässt den Build mit `VERSION is not a semantic version` scheitern:
+Das lokale Image starten. `--pull never` lässt Docker den Start verweigern, wenn der Build fehlgeschlagen ist und kein lokales Image `censio` existiert, statt ein fremdes Image dieses Namens zu laden:
 
 ```text
-docker build -f src/Censio.Server/Dockerfile --build-arg VERSION=1.2.3 -t censio .
+docker run -d --name censio --pull never -p 8080:8080 -v censio-config:/config censio
 ```
 
-## Companion (Deutsch)
+Dann `http://localhost:8080/health` (`Healthy`) und `http://localhost:8080/` wie oben prüfen; die Startseite zeigt `Version 0.0.0`. Noch nicht ausprobiert: die Ablehnung durch `--pull never` nach einem fehlgeschlagenen Build.
 
-Der Companion ist das Windows-Programm, das die Statistik des laufenden Spiels liest. `Censio-<version>-win-x64.zip` von der Release-Seite `https://github.com/LarsLaskowski/Censio/releases` herunterladen (beim Release unter *Assets*). Er braucht Windows 10 22H2 oder Windows 11, 64 Bit; er braucht kein installiertes .NET, keinen Installer und keine Administratorrechte. Noch nicht ausprobiert: das ZIP auf einem Rechner ohne .NET, bis es auf einem Windows-Rechner ausprobiert wurde.
+## Companion
+
+Der Companion ist das Windows-Programm, das die Statistik des laufenden Spiels liest. `Censio-<version>-win-x64.zip` von der Release-Seite `https://github.com/LarsLaskowski/Censio/releases` herunterladen (beim Release unter *Assets*). Er braucht Windows 10 22H2 oder Windows 11, 64 Bit; er braucht kein installiertes .NET, keinen Installer und keine Administratorrechte. Noch nicht ausprobiert: das ZIP auf einem Rechner ohne .NET, bis ein Release existiert und es auf einem Windows-Rechner ausprobiert wurde.
 
 1. Das ZIP in einen beliebigen Ordner entpacken. Es enthält eine Datei, `Censio.Companion.exe`.
 2. `Censio.Companion.exe` starten. Ein Tray-Symbol erscheint; sein Menü zeigt `Version <version>`.
 
-Das Programm ist nicht signiert, deshalb zeigt Windows SmartScreen beim ersten Start unter Umständen „Der Computer wurde durch Windows geschützt“. „Weitere Informationen“ wählen, dann „Trotzdem ausführen“.
+Das Programm ist nicht signiert, deshalb zeigt Windows SmartScreen beim ersten Start unter Umständen „Der Computer wurde durch Windows geschützt“. „Weitere Informationen“ wählen, dann „Trotzdem ausführen“ (unter englischem Windows: "More info", "Run anyway").
+
+### Companion aus dem Quellcode bauen
+
+Das Bauen braucht das .NET-10-SDK (Version 10.0.100 oder ein späteres Feature Band), Zugriff auf `nuget.org` und den Quellcode (*Censio beziehen*), auf jedem Betriebssystem, das das SDK unterstützt; nur das Ausführen des Programms braucht Windows 10 22H2 oder Windows 11, x64. Den Befehl im Hauptordner des Checkouts ausführen. Er verwendet die Flags des Release-Builds, außer der Version, und schreibt in den Ordner `publish`:
+
+```text
+dotnet publish src/Censio.Companion/Censio.Companion.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=embedded -p:PublishDocumentationFile=false -p:PublishReferencesDocumentationFiles=false -o publish
+```
+
+Der Ordner `publish` enthält danach nur `Censio.Companion.exe`. Unter Windows starten (`publish\Censio.Companion.exe`); das Tray-Menü zeigt `Version 0.0.0`. Der Befehl ist so geschrieben, dass er in PowerShell 7 und Windows PowerShell 5.1 läuft. Noch nicht ausprobiert: Windows PowerShell 5.1.
+
+## Konfiguration
+
+| Einstellung | Umgebungsvariable | Standard | Bedeutung |
+| ----------- | ----------------- | -------- | --------- |
+| `Censio:DataDirectory` | `CENSIO__DATADIRECTORY` | außerhalb des Docker-Images nicht gesetzt, im Image `/config` | Absoluter Pfad des Datenverzeichnisses des Servers; es enthält die Data-Protection-Schlüssel in `data-protection-keys`. |
+| `ASPNETCORE_HTTP_PORTS` | `ASPNETCORE_HTTP_PORTS` | `8080` im Docker-Image; außerhalb lauscht der Server auf `http://localhost:5000` | Port, auf dem der Server im Docker-Image lauscht. |
+
+Der Companion hat noch keine Einstellungen.
+
+## Benutzerhandbuch
+
+Das [Benutzerhandbuch](docs/USER_GUIDE.md#censio-benutzerhandbuch) behandelt Installation, den ersten Start, Daten und Logs sowie das Melden eines Problems. Eine Sicherheitslücke privat melden, wie [SECURITY.md](SECURITY.md) es beschreibt, nie in einem öffentlichen Issue.
+
+## Lizenz
+
+Censio steht unter der MIT-Lizenz; siehe [LICENSE](LICENSE).
