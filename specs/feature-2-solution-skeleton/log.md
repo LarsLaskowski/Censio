@@ -35,3 +35,4 @@ are quoted in full.
 | 2026-10-30 20:25 | 7 Code check (analyzer) | squad-code-officer | RESULT: PASS; MSTEST0037 fixed in ProgramTests.cs, Analyzer gate clean (haiku/medium · 62,341 tokens · 8 tool uses · 44 s) |
 | 2026-10-30 20:26 | 7 Sonar gate | Orchestrator | NOT CHECKED: dotnet-sonarscanner not installed in the session; code analysis is read from the draft PR in step 11 |
 | 2026-10-30 20:27 | 7 Manual Windows run requested | Product Manager | Asked for the manual tray run (AC10-AC12); user chose: test first, then review |
+| 2026-10-31 09:21 | 7 Manual Windows run | Product Manager | All points passed on Windows incl. icon return after taskkill of explorer (AC10-AC12, fact 19) |
