@@ -147,7 +147,7 @@ expect_build_failure()
     if output="$(docker build --progress=plain "$@" 2>&1)"; then
         fail "$case_name" "docker build fails" "docker build succeeded"
     fi
-    if ! sed -E 's/^#[0-9]+ [0-9.]+ //' <<< "$output" | grep -Fxq -- "$line"; then
+    if ! grep -Fxq -- "$line" < <(sed -E 's/^#[0-9]+ [0-9.]+ //' <<< "$output"); then
         echo "$output" >&2
         fail "$case_name" "build output line '${line}'" "line missing"
     fi

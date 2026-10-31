@@ -24,7 +24,7 @@ Start the container with a named volume for the data directory `/config`:
 docker run -d --name censio -p 8080:8080 -v censio-config:/config censio
 ```
 
-Check that it answers (the response is `Healthy`; in Windows PowerShell 5.1 `curl` is an alias of `Invoke-WebRequest`, which shows `StatusCode` `200` and `Content` `Healthy` and may ask for a confirmation first) and read its log:
+Check that it answers (the response is `Healthy`; not yet tried: in Windows PowerShell 5.1 `curl` is an alias of `Invoke-WebRequest`, which should show `StatusCode` `200` and `Content` `Healthy` and may ask for a confirmation first) and read its log:
 
 ```text
 curl http://localhost:8080/health
@@ -86,7 +86,7 @@ Copy `censio.tar` to the NAS, then run on the NAS:
 docker load -i censio.tar
 ```
 
-The commands in this section were tried on Docker Desktop for Windows. An automated check on Linux Docker Engine runs the `--user 99:100` command with a bind mount owned by `99:100`; the `chown` remedy, the `docker save` and `docker load` transfer and Unraid or Synology hardware have not been tried yet.
+Building and starting the image with the commands of this guide was tried on Docker Desktop for Windows in PowerShell 7. An automated check on Linux Docker Engine runs the `--user 99:100` command with a bind mount owned by `99:100`; Windows PowerShell 5.1, the other commands of this section (the `chown` remedy, the `docker save` and `docker load` transfer) and Unraid or Synology hardware have not been tried yet.
 
 ### Network and TLS
 
@@ -129,7 +129,7 @@ Den Container mit einem benannten Volume für das Datenverzeichnis `/config` sta
 docker run -d --name censio -p 8080:8080 -v censio-config:/config censio
 ```
 
-Prüfen, ob er antwortet (die Antwort lautet `Healthy`; in Windows PowerShell 5.1 ist `curl` ein Alias für `Invoke-WebRequest`, das `StatusCode` `200` und `Content` `Healthy` anzeigt und vorher eine Bestätigung verlangen kann), und sein Log lesen:
+Prüfen, ob er antwortet (die Antwort lautet `Healthy`; noch nicht ausprobiert: in Windows PowerShell 5.1 ist `curl` ein Alias für `Invoke-WebRequest`, das `StatusCode` `200` und `Content` `Healthy` anzeigen sollte und vorher eine Bestätigung verlangen kann), und sein Log lesen:
 
 ```text
 curl http://localhost:8080/health
@@ -191,7 +191,7 @@ docker save -o censio.tar censio
 docker load -i censio.tar
 ```
 
-Die Befehle dieses Abschnitts wurden unter Docker Desktop für Windows ausprobiert. Eine automatische Prüfung unter Docker Engine für Linux führt den Befehl mit `--user 99:100` und einem Bind-Mount aus, der `99:100` gehört; die `chown`-Abhilfe, die Übertragung mit `docker save` und `docker load` sowie Unraid- oder Synology-Hardware wurden noch nicht ausprobiert.
+Das Bauen und Starten des Images mit den Befehlen dieser Anleitung wurde unter Docker Desktop für Windows in PowerShell 7 ausprobiert. Eine automatische Prüfung unter Docker Engine für Linux führt den Befehl mit `--user 99:100` und einem Bind-Mount aus, der `99:100` gehört; Windows PowerShell 5.1, die übrigen Befehle dieses Abschnitts (die `chown`-Abhilfe, die Übertragung mit `docker save` und `docker load`) sowie Unraid- oder Synology-Hardware wurden noch nicht ausprobiert.
 
 ### Netzwerk und TLS
 
