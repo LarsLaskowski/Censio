@@ -7,7 +7,7 @@ Security areas touched: CI workflow (new `.github/workflows/base-check.yml`: tri
 
 ## Problem / root cause
 
-Not a code defect but a missing check. `src/Censio.Server/Dockerfile` lines 1 and 31 pin
+Not a code defect but a missing check. `src/Censio.Server/Dockerfile` lines 1 and 28 pin
 `sdk:10.0.403-alpine3.24-amd64` and `aspnet:10.0.14-alpine3.24-amd64` by digest (record 0010, option 1).
 Dependabot (`.github/dependabot.yml`, `docker` entry for `/src/Censio.Server`) proposes a tag update only within
 the same tag suffix, so once MCR stops publishing `-alpine3.24-amd64` tags it proposes nothing, and record 0010
@@ -18,7 +18,7 @@ receiving .NET and Alpine patches without any signal in the repository.
 
 | # | Claim | Evidence | Status |
 | - | ----- | -------- | ------ |
-| 1 | The Dockerfile has exactly two `FROM` lines, both `mcr.microsoft.com/dotnet/<image>:<M.m.p>-alpine<X.Y>-amd64@sha256:…` | `src/Censio.Server/Dockerfile` lines 1 (`sdk:10.0.403-alpine3.24-amd64 … AS build`) and 31 (`aspnet:10.0.14-alpine3.24-amd64`) | confirmed |
+| 1 | The Dockerfile has exactly two `FROM` lines, both `mcr.microsoft.com/dotnet/<image>:<M.m.p>-alpine<X.Y>-amd64@sha256:…` | `src/Censio.Server/Dockerfile` lines 1 (`sdk:10.0.403-alpine3.24-amd64 … AS build`) and 28 (`aspnet:10.0.14-alpine3.24-amd64`) | confirmed |
 | 2 | Issue: `alpine3.22` ended at `10.0.3`, `alpine3.23` at `10.0.12` | `curl https://mcr.microsoft.com/v2/dotnet/aspnet/tags/list` (2026-10-31), tags `^10\.0\.[0-9]+-alpine[0-9.]+-amd64$`: 3.22 = 10.0.0–10.0.3, 3.23 = 10.0.1–10.0.12, 3.24 = 10.0.9–10.0.14; SDK: 3.22 = 10.0.100–103, 3.23 = 10.0.101–401, 3.24 = 10.0.301–403 | confirmed |
 | 3 | A new Alpine minor overlaps the old one for several patches (3.23 and 3.24 both got 10.0.9–10.0.12), so "a newer minor exists" alone is no failure; "a newer patch only on a newer minor" is the signal | same tag lists as row 2 | confirmed |
 | 4 | Today nothing is frozen: no `alpine3.25` tag exists, the pinned tags are the newest on every minor | same tag lists (no tag containing `alpine3.25`; aspnet max 10.0.14, SDK max 10.0.403) | confirmed |
@@ -27,7 +27,7 @@ receiving .NET and Alpine patches without any signal in the repository.
 | 7 | Dependabot proposes no update across a tag-suffix change (`alpine3.24` → `alpine3.25`) | record 0010 *Context* (`dependabot-core` `docker/…/tag.rb`, `update_checker.rb`, read in #4's Security plan review) and `docs/CONTRIBUTING.md` line 77–78 ("A new Alpine minor … is a manual bump") | confirmed |
 | 8 | `curl` and `jq` exist on `ubuntu-latest`; `jq` is already used by CI | `.github/workflows/ci.yml` step *Check tool versions* uses `jq`; `image-check.sh` uses `curl` on the runner | confirmed |
 | 9 | `mcr.microsoft.com` is reachable from GitHub-hosted runners without credentials | to verify: the PR's own run of the new workflow (path trigger) passes; owner orchestrator, step 11 | unverified |
-| 10 | A failed scheduled run notifies a maintainer (GitHub notifies the user who last changed the `cron` line), and a public repository's schedules are disabled after 60 days without activity | to verify: GitHub documentation (*Events that trigger workflows*, `schedule`), not reachable from the session (`docs.github.com` 403); owner Reviewer in step 8, by reading the page, else the documentation updates leave both statements out | unverified |
+| 10 | A failed scheduled run notifies a maintainer (GitHub notifies the user who last changed the `cron` line), and a public repository's schedules are disabled after 60 days without activity | GitHub documentation *Events that trigger workflows*, `schedule` (notifications go to the user who last modified the `cron` syntax; public-repository schedules are disabled after 60 days without activity), read from the docs source by the Reviewer in step 8 | confirmed |
 | 11 | No release tag exists, so record 0010 is unreleased and is edited in place | `git ls-remote --tags origin` prints nothing | confirmed |
 | 12 | Workflows under `.github/workflows/` are product files: not template-managed and not reported by `scope-check.py` | `.squad/orchestration.md` *Template-managed files* lists none; `.squad/tools/scope-check.py` lines 58–67; precedent #63 added `notify-website.yml` in a product PR | confirmed |
 
@@ -203,6 +203,21 @@ checkout keeps no credentials.
   place as `docs/decisions/README.md` prescribes): *Context* gains the MCR overlap evidence, *Options considered*
   options 12–16 for the check, *Decision* one sentence, and the *Consequences* bullet that said nothing notices the
   end of new tags now names the check. Index row unchanged (title still fits).
+
+## PR approval decisions
+
+- Deviation accepted: the script's registry-tag pattern (*Approach* step 4) limits each captured component to
+  `[0-9]{1,6}` instead of `[0-9]+`; the pin pattern (step 2) keeps `[0-9]+`. Reason: bash `$((10#…))` wraps
+  silently past 64 bits, so an unbounded registry component could compare wrongly; six digits are far above any
+  .NET patch or Alpine minor. A registry tag with a longer component is ignored (it is outside the pattern, as
+  step 4 already ignores every non-matching tag); a pin with a longer component matches no kept tag and ends in
+  `tag not in the registry's list`, so the check stays fail closed. No criterion changes (AC2/AC3 name no width).
+- Fact 10 confirmed (Reviewer, GitHub docs source); the notification and 60-day statements in
+  `docs/CONTRIBUTING.md` and record 0010 stand. Fact 1 corrected to line 28 (Security note 5). Fact 9 stays
+  open until the PR's own run of *Base image check* is green (orchestrator, step 11).
+- `docs/ARCHITECTURE.md` (*Deployment*: bases pinned by digest) and `.squad/project.md` (*Outbound calls* lists
+  the product's calls, not CI's) need no change; no area document changes (server behavior unchanged).
+  Record 0010 (Accepted) matches the script and workflow as built.
 
 ## Out of scope / follow-ups
 
