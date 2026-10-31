@@ -74,7 +74,7 @@ chown -R 1654:1654 /mnt/user/appdata/censio
 docker run -d --name censio -p 8080:8080 -v /mnt/user/appdata/censio:/config censio
 ```
 
-A directory the container user cannot write stops the container at start with exit code 1; `docker logs censio` then shows `The data-protection key ring cannot be stored in '/config/data-protection-keys'; the server stops. Make the data directory writable for the user the server runs as.` A value of `CENSIO__DATADIRECTORY` that is not an absolute path stops it the same way. Build the image on the NAS, or build it elsewhere and move it:
+A directory the container user cannot write stops the container at start with exit code 1; `docker logs censio` then shows `The data-protection key ring cannot be stored in '/config/data-protection-keys'; the server stops. Make the data directory writable for the user the server runs as.` A value of `CENSIO__DATADIRECTORY` that is not an absolute path also stops it with exit code 1; `docker logs censio` then shows `The data directory (Censio:DataDirectory) must be an absolute path, not '<value>'; the server stops.` Build the image on the NAS, or build it elsewhere and move it:
 
 ```text
 docker save -o censio.tar censio
@@ -179,7 +179,7 @@ chown -R 1654:1654 /mnt/user/appdata/censio
 docker run -d --name censio -p 8080:8080 -v /mnt/user/appdata/censio:/config censio
 ```
 
-Ein Verzeichnis, das der Container-Benutzer nicht beschreiben kann, stoppt den Container beim Start mit Exit-Code 1; `docker logs censio` zeigt dann `The data-protection key ring cannot be stored in '/config/data-protection-keys'; the server stops. Make the data directory writable for the user the server runs as.` Ein Wert von `CENSIO__DATADIRECTORY`, der kein absoluter Pfad ist, stoppt ihn ebenso. Das Image auf dem NAS bauen, oder woanders bauen und übertragen:
+Ein Verzeichnis, das der Container-Benutzer nicht beschreiben kann, stoppt den Container beim Start mit Exit-Code 1; `docker logs censio` zeigt dann `The data-protection key ring cannot be stored in '/config/data-protection-keys'; the server stops. Make the data directory writable for the user the server runs as.` Ein Wert von `CENSIO__DATADIRECTORY`, der kein absoluter Pfad ist, stoppt ihn ebenfalls mit Exit-Code 1; `docker logs censio` zeigt dann `The data directory (Censio:DataDirectory) must be an absolute path, not '<value>'; the server stops.` Das Image auf dem NAS bauen, oder woanders bauen und übertragen:
 
 ```text
 docker save -o censio.tar censio
