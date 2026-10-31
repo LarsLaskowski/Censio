@@ -40,7 +40,14 @@ sources are copied can lose the Blazor script (record 0007, Vandox#24).
 - S10: Given a reader of `README.md` or `docs/USER_GUIDE.md`, when they follow its Docker section (English
   first, then German), then they can build and start the image and reach `/health`; the section says that
   inside the image the server listens on all interfaces of the container, that the `-p` mapping decides who
-  can reach it, and that TLS belongs in a reverse proxy (`SECURITY.md`).
+  can reach it, and that TLS belongs in a reverse proxy (`SECURITY.md`). Every command is one line that runs
+  unchanged in bash and in PowerShell (no `\` continuation, no `$(…)`).
+- S11: Given a NAS share owned by another UID and GID (Unraid `nobody:users`, `99:100`; a Synology user such
+  as `1026:100`), when the operator runs
+  `docker run -d --name censio --user 99:100 -p 8080:8080 -v /mnt/user/appdata/censio:/config censio`, then
+  the server starts as UID 99 (`docker exec censio id -u` prints `99`), `/health` answers `200`, and that
+  user can create a file in `/config`: the image needs no root and no write access outside `/config` for
+  any UID it is started with.
 
 ## Errors and edge cases
 
@@ -52,8 +59,13 @@ sources are copied can lose the Blazor script (record 0007, Vandox#24).
   publish.
 - E3: The host port 8080 is taken: `docker run` fails with Docker's own "port is already allocated" message;
   the documentation shows mapping another host port (`-p 9000:8080`).
-- E4: `/config` is a bind mount of a host directory the runtime user (UID 1654) cannot write: what the
-  operator sees and must do depends on the target host (open question Q1).
+- E4: `/config` is a bind mount of a host directory the runtime user cannot write (a NAS share of another
+  UID, a directory created by root), or a named volume combined with `--user` of another UID (the volume
+  takes the image's `1654` ownership): the server still starts and answers `/health`, because it writes
+  nothing to `/config` yet (#29 and #42 report a failed write); the documentation names the two remedies —
+  start with `--user <uid>:<gid>` of the directory's owner (S11), or hand the directory to the image's user
+  (`chown -R 1654:1654 <dir>`) — and says that `/config` on Docker Desktop for Windows is a named volume.
+  The image ships no root entrypoint that changes ownership or drops privileges (Q1).
 - E5: `VERSION` holds shell metacharacters (`--build-arg "VERSION=1.0;touch /pwned"`): the value reaches the
   build as one literal argument and is never run as a command; a value that is no valid version fails the build
   with the SDK's error, and no image is produced.
@@ -65,7 +77,7 @@ sources are copied can lose the Blazor script (record 0007, Vandox#24).
 - Platform: linux/amd64 only. Build stage `mcr.microsoft.com/dotnet/sdk:10.0-alpine`, runtime stage
   `mcr.microsoft.com/dotnet/aspnet:10.0-alpine` pinned by digest; the existing Dependabot `docker` entry for
   `/src/Censio.Server` keeps the digest current. Multi-stage, no docker-compose file.
-- Security: the runtime user is not root; the image contains only the published server, no SDK, sources or
+- Security: the runtime user is not root, and the image runs under any non-root UID given with `--user`; the image contains only the published server, no SDK, sources or
   test assemblies. Inside the container the listener binds all interfaces on 8080, plain HTTP (record 0006);
   this is a security area (*Network exposure*, `.squad/project.md`) and changes the statements about the
   loopback default in `docs/areas/server.md` and `SECURITY.md` for the image.
@@ -75,9 +87,12 @@ sources are copied can lose the Blazor script (record 0007, Vandox#24).
 - Logs: the server logs to the console as today, read with `docker logs`.
 - Verification: the session has a Docker client but no daemon, so the restore-order reproduction (*Image build
   check*, `.squad/stack.md`) runs before the review, extended by the check of E1; the criteria about a running
-  container (S2–S7, S9) are checked by a CI job that builds the image without pushing it and probes the
+  container (S2–S7, S9, S11) are checked by a CI job that builds the image without pushing it and probes the
   container on every pull request.
-- Target host: pending the Product Manager's answer to Q1.
+- Target host (Q1): Linux Docker Engine and Docker Desktop on Windows (Linux containers), Docker 23 or later
+  with BuildKit, for building and running; Unraid and Synology NAS hosts for running, their shares owned by
+  other UIDs (S11, E4). The build needs access to `mcr.microsoft.com`. The container starts as non-root in
+  every documented command; root (`--user 0`) is never documented.
 
 ## Acceptance criteria
 
@@ -102,16 +117,21 @@ sources are copied can lose the Blazor script (record 0007, Vandox#24).
   message naming that path; the *Image build check* reproduction in `.squad/stack.md` fails the same way (E1).
 - [ ] AC11: `docker stop` ends the container with exit code 0 within the default timeout (E6).
 - [ ] AC12: `README.md` and `docs/USER_GUIDE.md` each hold a Docker section, English first and then German with
-  the same content, with the build and run commands of S1/S2, the port mapping (E3), the volume and its ownership
-  rule (E4), the all-interfaces note and TLS at the reverse proxy (S10); `docs/areas/server.md` and `SECURITY.md`
-  state that inside the image the server listens on all interfaces on 8080 (S6, S10).
+  the same content, with the build and run commands of S1/S2 as single lines valid in bash and PowerShell, the
+  port mapping (E3), the named volume as the default, the NAS run command with `--user` of S11 and the two
+  ownership remedies of E4, the all-interfaces note and TLS at the reverse proxy (S10); `docs/areas/server.md`
+  and `SECURITY.md` state that inside the image the server listens on all interfaces on 8080 (S6, S10).
+- [ ] AC13: A container started with `--user 99:100` and a bind mount on `/config` owned by `99:100` reports
+  `id -u` `99`, answers `GET /health` with `200`, and its process can create a file in `/config`; the image
+  has no `ENTRYPOINT` or script that runs as root (S11, E4).
 
 ## Out of scope
 
 - Pushing the image, Docker Hub credentials, tags and the version from the release tag: #5 and #6.
 - The configuration reference, the database and catalog files in `/config` and data surviving container
   recreation: #29, #33, #42.
-- Other platforms than linux/amd64 (arm64 hosts, Windows containers) and docker-compose.
+- Other platforms than linux/amd64 (arm64 hosts, including ARM-based Synology models; Windows containers),
+  docker-compose, and NAS-specific templates (an Unraid Community Applications template, a Synology project).
 - The rest of `README.md` and the user guide (what Censio is, status, the Windows ZIP): #7.
 - E3 needs no criterion of its own beyond its documentation in AC12: the message is Docker's.
 
@@ -121,7 +141,13 @@ sources are copied can lose the Blazor script (record 0007, Vandox#24).
   Windows, a NAS such as Unraid or Synology whose shares belong to other UIDs), Docker version and BuildKit,
   access to `mcr.microsoft.com`, the console the operator pastes into (bash or PowerShell), and whether
   `/config` is a named volume or a bind mount the operator must hand to UID 1654?
-  (escalated to the Product Manager; decides E4, the documented commands and the NFR *Target host*)
+  Answered: Product Manager, option (b) — Linux Docker Engine and Docker Desktop on Windows, Docker 23+ with
+  BuildKit, and NAS hosts (Unraid, Synology) whose shares belong to other UIDs. Reconciled with the issue's
+  non-root requirement by keeping the image non-root (`USER 1654`) and serving the NAS case with Docker's own
+  `--user <uid>:<gid>` (S11) or a `chown` of the directory (E4). A PUID/PGID entrypoint was rejected: it
+  starts the container as root and drops privileges, which breaks the issue's criterion "the container starts
+  as non-root". Docker Desktop on Windows implies PowerShell, so the documented commands are single lines
+  valid in both consoles (S10); `mcr.microsoft.com` access is a build prerequisite (NFR *Target host*).
 - Q2: `README.md` and `docs/USER_GUIDE.md` do not exist yet; does this feature create them?
   Answered: yes, with the Docker section only — issue #4 (*Documentation*) asks for it, and #7 completes both files.
 - Q3: Which `CENSIO__…` variables exist? Answered: none — `Program.cs` binds no option and `appsettings.json`
@@ -141,7 +167,8 @@ sources are copied can lose the Blazor script (record 0007, Vandox#24).
 ## Area documents
 
 - `docs/areas/server.md`: a section *Docker image* — port 8080 on all interfaces of the container and how to
-  change it, the non-root user 1654, `/config` as the data directory and its ownership rule, the health check,
+  change it, the non-root user 1654 and `--user` for other UIDs, `/config` as the data directory and its two ownership
+  remedies, the health check,
   the version build argument, linux/amd64; *Listen address* says the loopback default holds outside the image
   only; *Not here* and its index row in `docs/areas/README.md` drop "Docker image".
 - `SECURITY.md` (*Deployment Security Considerations*): the loopback sentence qualified for the image.
