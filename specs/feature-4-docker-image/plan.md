@@ -1,20 +1,20 @@
 # Plan: Docker image for the server
 
 Source: Issue #4 | [spec.md](spec.md)
-Status: Draft
+Status: Revised (1)
 Tier: security — the image changes the server's network exposure (inside the container the listener binds all interfaces on 8080 instead of loopback) and adds a CI job that builds pull request code.
-Security areas touched: Network exposure (`src/Censio.Server/Dockerfile`: `ASPNETCORE_HTTP_PORTS=8080`, `EXPOSE 8080`, health probe); Docker and build configuration (`src/Censio.Server/Dockerfile`, `.dockerignore`, two new base images as dependencies); CI workflow (`.github/workflows/ci.yml`, new job `image`, and its script `.github/scripts/image-check.sh`); the *Image build check* command in `.squad/stack.md`
+Security areas touched: Network exposure (`src/Censio.Server/Dockerfile`: `ASPNETCORE_HTTP_PORTS=8080`, `EXPOSE 8080`, health probe); Docker and build configuration (`src/Censio.Server/Dockerfile`, `.dockerignore`, two new base images as dependencies); CI workflow (`.github/workflows/ci.yml`, new job `image`, and its script `.github/scripts/image-check.sh`); Dependabot configuration (`.github/dependabot.yml`, `ignore` of major base-image updates); the *Image build check* command in `.squad/stack.md`
 
 ## Problem / root cause
 
 Feature: see [spec.md](spec.md) (*Problem*). The change holds no production or test code: a Dockerfile, an
-ignore file, a CI job with its script, and documentation.
+ignore file, a CI job with its script, a Dependabot setting, and documentation.
 
 ## Verified facts
 
 | # | Claim | Evidence | Status |
 | - | ----- | -------- | ------ |
-| 1 | `mcr.microsoft.com/dotnet/aspnet:10.0-alpine-amd64` is a single manifest `sha256:7e3205ef1189ab2b63a02040e02638a62bd70c67ac3a3a70a5a908be8e5da96c`; `sdk:10.0-alpine-amd64` is `sha256:60a079c9d3ffc98b2968c3153b995ede679f7d6504e3ae7d2b68225a7fd84f5a`; the index digests of `10.0-alpine` differ (`254fe017…`, `cc02b814…`) | `HEAD /v2/dotnet/{aspnet,sdk}/manifests/<tag>` on `mcr.microsoft.com`, 2026-10-31; the Dev takes the digests current at step 6 | confirmed |
+| 1 | `mcr.microsoft.com/dotnet/aspnet:10.0.14-alpine3.24-amd64` is the single manifest `sha256:7e3205ef1189ab2b63a02040e02638a62bd70c67ac3a3a70a5a908be8e5da96c` (the same as `10.0-alpine-amd64` today); `sdk:10.0.403-alpine3.24-amd64` is `sha256:60a079c9d3ffc98b2968c3153b995ede679f7d6504e3ae7d2b68225a7fd84f5a` (the newest 10.0 SDK tag on Alpine 3.24); the index digests of `10.0-alpine` differ (`254fe017…`, `cc02b814…`) | `HEAD /v2/dotnet/{aspnet,sdk}/manifests/<tag>` and `/v2/dotnet/{aspnet,sdk}/tags/list` on `mcr.microsoft.com`, 2026-10-31; the Dev takes the newest full-version tags and their digests at step 6 | confirmed |
 | 2 | The runtime base sets `APP_UID=1654`, `ASPNETCORE_HTTP_PORTS=8080`, `DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=true`, no `User`, `Cmd ["/bin/sh"]`, architecture amd64 | config blob `sha256:5308c8ca…` of fact 1 | confirmed |
 | 3 | User `app` is `1654:1654` with home `/home/app` (owned 1654); `nobody` is 65534 | `etc/passwd` and `home/app` in layer `sha256:83301d18…` | confirmed |
 | 4 | The runtime base has BusyBox `wget` (`/usr/bin/wget`), no `curl`, no `/usr/share/zoneinfo` | file list of the rootfs layer `sha256:7b229517…`; the `apk add` in the history installs no curl or tzdata | confirmed |
@@ -22,11 +22,12 @@ ignore file, a CI job with its script, and documentation.
 | 6 | `Censio.Server.csproj` sets `RequiresAspNetWebAssets` (line 5) and references `Censio.Contracts` and `Censio.Server.Data`; `Directory.Build.props`, `Directory.Packages.props` and `global.json` (SDK `10.0.100`, `latestFeature`) are the build files at the root | the files | confirmed |
 | 7 | `ci.yml` has one job `build`; workflow permissions `contents: read`, `checks: write`; triggers push/pull_request on `main` | `.github/workflows/ci.yml` lines 3–11 | confirmed |
 | 8 | Dependabot has a `docker` entry for `/src/Censio.Server` | `.github/dependabot.yml` lines 26–36 | confirmed |
-| 9 | Dependabot updates a `FROM <image>:10.0-alpine-amd64@sha256:…` line (tag with that suffix plus digest) and leaves a `LABEL` alone | to verify: Dev reads the Dockerfile parser and updater of `dependabot-core` (`docker/lib/dependabot/docker/`) in step 6 and reports it; the CI label check of AC9 fails closed either way | unverified |
+| 9 | Dependabot parses `FROM <image>:<tag>@sha256:…` and never touches a `LABEL`; with a floating tag (`10.0-alpine-amd64`) every .NET or Alpine patch arrives only as a digest-only refresh, which the server-side experiment `docker_digest_only_update_suppression` can suppress and a digest cooldown holds back; with a full-version tag (`10.0.14-alpine3.24-amd64`) a .NET patch arrives as a tag update; the tag's suffix (`alpine3.24-amd64`) stays fixed, so a move to a new Alpine minor is manual | Security's plan review, reading `dependabot-core` main: `docker/lib/dependabot/docker/file_parser.rb`, `tag.rb` (`Tag#comparable?`), `update_checker.rb` (`digest_only_update_suppressed?`); record 0010 | confirmed |
 | 10 | No record is released (no tag) | `git ls-remote --tags origin` prints nothing | confirmed |
 | 11 | No `.dockerignore` exists; with `-f src/Censio.Server/Dockerfile` BuildKit reads `src/Censio.Server/Dockerfile.dockerignore` first, else `.dockerignore` at the context root | to verify: Dev, CI job case AC1-dirty (the file lists of the clean and the dirty build are equal, and no `bin/`/`obj/` lies in the build stage) | unverified |
 | 12 | `dotnet` as PID 1 (exec-form `ENTRYPOINT`) stops on SIGTERM with exit code 0 within Docker's 10 s | to verify: Dev, CI job case AC11 | unverified |
-| 13 | `-p:Version="1.0;touch /pwned"` fails the publish (MSBuild splits at `;`, `touch /pwned` is no property) | to verify: Dev, CI job case AC7-injection | unverified |
+| 13 | `-p:Version=1.0;touch /pwned` fails MSBuild ("Switch: touch /pwned"), but `-p:Version=1.0;Foo=bar` succeeds and sets a second global property; the shell quoting passes the value as one argument and runs nothing | Security's plan review (`dotnet msbuild` and `sh -c` runs); the Dockerfile therefore rejects a non-SemVer `VERSION` before the publish (N1) | confirmed |
+| 17 | The root `.editorconfig` turns seven `RH` rules off (lines 72–78); without it the image build warns `RH8306` in `src/Censio.Server.Data/ServerDataAssembly.cs` | Devil's Advocate, build of the planned context; `.editorconfig` | confirmed |
 | 14 | Under `--user 99:100` Docker sets `HOME=/`; ASP.NET Core then keeps the key ring in memory and logs a warning; the server still answers | to verify: Dev, CI job case AC13 (the log is printed in the job) | unverified |
 | 15 | `ubuntu-latest` has Docker with BuildKit as default builder and passwordless `sudo` (for `chown 99:100`) | to verify: Dev, first CI run of the job | unverified |
 | 16 | The session has a Docker client (29.9.2) without a daemon, and `hadolint`, `shellcheck`, `actionlint` | `docker version`, `which` | confirmed |
@@ -51,11 +52,11 @@ The Dev runs the *Image build check* reproduction and the *Analyzer gate* (`hado
 | -- | ------------ | ------------- |
 | AC1 | clean: `docker build` right after checkout; dirty: after `dotnet build Censio.slnx -c Release` and `dotnet publish src/Censio.Server/Censio.Server.csproj -c Release -o publish` on the runner, `docker build --no-cache`; both succeed, `docker image inspect` gives `amd64`/`linux`, and `find /app -type f` lists equal file sets | CI case AC1 / Dev |
 | AC2 | container as in S2 (named volume): `curl` `/health` → `200`, body `Healthy`; `/` → `200`, contains `Version 0.0.0` and a `_framework/blazor.web` script path, that path → `200`; log has `Now listening on:` with `8080` | CI case AC2 |
-| AC3 | `docker exec id -u` → `1654`; `stat -c %u /proc/1` → `1654`; `Config.User` is `1654` | CI case AC3 |
+| AC3 | `docker exec id -u` → `1654`; `stat -c %u /proc/1` → `1654`; `Config.User` is `1654:1654` | CI case AC3 |
 | AC4 | `docker exec censio touch /config/check` succeeds on a new named volume | CI case AC4 |
 | AC5 | `Config.Healthcheck` has interval 10 s, timeout 3 s, start period 30 s, retries 3; `State.Health.Status` turns `healthy` within 60 s (poll every 2 s) | CI case AC5 |
 | AC6 | `Config.Env` holds `ASPNETCORE_HTTP_PORTS=8080`, `Config.ExposedPorts` holds `8080/tcp`; with `-e ASPNETCORE_HTTP_PORTS=9090 -p 9090:9090` `/health` → `200` on 9090 and `healthy` within 60 s; with `8080;8081` `healthy` within 60 s | CI case AC6 |
-| AC7 | build `--build-arg VERSION=1.2.3` → `/` contains `Version 1.2.3`; build `--build-arg "VERSION=1.0;touch /pwned"`: the build fails, or (if it succeeds) `test -e /pwned` is false in the runtime image and in the stage `build` (`--target build`) | CI case AC7 |
+| AC7 | build `--build-arg VERSION=1.2.3` → `/` contains `Version 1.2.3`; builds with `VERSION=1.0;touch /pwned`, `VERSION=1.0;Foo=bar` and `VERSION=1.0` each fail, and the output contains `VERSION is not a semantic version`; `test -e /pwned` is false in the stage `build` (`--target build` up to the check) | CI case AC7 |
 | AC8 | `hadolint src/Censio.Server/Dockerfile` reports nothing | *Analyzer gate* / Dev, step 7 |
 | AC9 | `Config.Labels` holds the four labels, `licenses` = `MIT`, `base.name` and `base.digest` equal to the tag and digest parsed from the runtime `FROM` line of the Dockerfile; a mismatch fails the job with both values | CI case AC9 |
 | AC10 | a copy of the checkout in `$RUNNER_TEMP` with the `RequiresAspNetWebAssets` line deleted from `Censio.Server.csproj`: `docker build` fails and its output contains `wwwroot/_framework/blazor.web*.js`; the same copy run through the *Image build check* reproduction fails with the same message | CI case AC10; reproduction locally / Dev before the review |
@@ -85,16 +86,20 @@ script's.
 
 **Dockerfile** `src/Censio.Server/Dockerfile`, two stages:
 
-- `build`: `FROM mcr.microsoft.com/dotnet/sdk:10.0-alpine-amd64@sha256:<digest> AS build`, `WORKDIR /src`;
+- `build`: `FROM mcr.microsoft.com/dotnet/sdk:10.0.403-alpine3.24-amd64@sha256:<digest> AS build` (fact 1:
+  full-version tags in both stages, record 0010), `WORKDIR /src`;
   `COPY` one line each: `global.json`, `Directory.Build.props`, `Directory.Packages.props`, and the three
   `.csproj` files of `Censio.Server`, `Censio.Contracts`, `Censio.Server.Data` to their own paths;
-  `RUN dotnet restore src/Censio.Server/Censio.Server.csproj`; `COPY src/ src/`; `ARG VERSION=0.0.0`;
+  `RUN dotnet restore src/Censio.Server/Censio.Server.csproj`; `COPY .editorconfig ./` and `COPY src/ src/`;
+  `ARG VERSION=0.0.0`; a `RUN` that fails with `VERSION is not a semantic version: <value>` unless `VERSION`
+  matches `^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$`
+  (`grep -Eqx` on the quoted value; no `;`, space or `=` passes);
   `RUN dotnet publish src/Censio.Server/Censio.Server.csproj -c Release --no-restore -o /app/publish
   "-p:Version=${VERSION}"` (the value is quoted and expanded once, never evaluated); then a `RUN` that fails
   unless a file matches `/app/publish/wwwroot/_framework/blazor.web*.js`, with the message
   `publish output lacks wwwroot/_framework/blazor.web*.js (see docs/decisions/0007)`.
-- runtime: `FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine-amd64@sha256:<digest>`; `LABEL` with
-  `org.opencontainers.image.base.name="mcr.microsoft.com/dotnet/aspnet:10.0-alpine-amd64"`,
+- runtime: `FROM mcr.microsoft.com/dotnet/aspnet:10.0.14-alpine3.24-amd64@sha256:<digest>`; `LABEL` with
+  `org.opencontainers.image.base.name="mcr.microsoft.com/dotnet/aspnet:10.0.14-alpine3.24-amd64"`,
   `org.opencontainers.image.base.digest="sha256:<the same digest>"`, `org.opencontainers.image.description`
   ("Censio server: live state and history of Anno 117 statistics"), `org.opencontainers.image.licenses="MIT"`;
   `ENV ASPNETCORE_HTTP_PORTS=8080`; `WORKDIR /app`; `COPY --from=build /app/publish .` (root-owned, readable by
@@ -117,8 +122,9 @@ AC7, AC10, AC1-dirty (the dirty build last, after `dotnet build`/`publish`). Pol
 failure prints `image-check: <case>: <expected> / <actual>` and exits 1. It reads the digest and tag from the
 Dockerfile's runtime `FROM` line, so the label check needs no second copy.
 
-**Image build check** in `.squad/stack.md`: the first copy and the restore follow the Dockerfile (the three
-projects and the root build files, `dotnet restore src/Censio.Server/Censio.Server.csproj`), and the last line
+**Image build check** in `.squad/stack.md`: both copies and the restore follow the Dockerfile (first the three
+projects and the root build files, `dotnet restore src/Censio.Server/Censio.Server.csproj`; then `.editorconfig`
+and `src/` only, not the whole tree), and the last line
 becomes the same glob check with the same message as the Dockerfile.
 
 Layout of the README and user-guide section: `## Docker` (English), then `## Docker (Deutsch)` with the same
@@ -131,7 +137,9 @@ in step 9.
 1. **User model** — fixed non-root `USER 1654` with `--user`/`chown` for NAS (chosen); a PUID/PGID entrypoint
    that drops root (lost: starts as root, against the issue); `VOLUME /config` (lost: anonymous volumes). Record
    0009.
-2. **Base pinning and `base.digest`** — `-amd64` tags by manifest digest, literal label, CI check (chosen); an
+2. **Base pinning and `base.digest`** — full-version `-alpineX.Y-amd64` tags by manifest digest, literal label,
+   CI check (chosen); floating `10.0-alpine-amd64` tags (lost: patches only as suppressible digest refreshes,
+   B1); a scheduled staleness job (lost: a second workflow for what a tag update gives); an
    `ARG` (lost: Dependabot stops); labels from #5/#6 (lost: the issue wants them in the Dockerfile); the index
    digest (lost: platform follows the host); the `-extra` variant (lost: size without need). Record 0010.
 3. **Restore scope** — the server project (chosen: the image needs only it, and the Companion's `win-x64`
@@ -152,6 +160,7 @@ in step 9.
 | — | `.dockerignore` | new |
 | — | `.github/workflows/ci.yml` | new job `image` |
 | — | `.github/scripts/image-check.sh` | new |
+| — | `.github/dependabot.yml` | `docker` entry: `ignore` with `dependency-name: "*"`, `update-types: ["version-update:semver-major"]` |
 | — | `.squad/stack.md` | *Image build check* |
 
 ## Signatures (for the Dev's skeleton)
@@ -187,17 +196,21 @@ All owned by the Dev, written once the job is green, against the Dockerfile as b
 - `docs/areas/README.md`: the server row's scope adds the Docker image, *Not here* drops it.
 - `SECURITY.md` (*Deployment Security Considerations*): "without address configuration it listens on loopback
   only" gains "outside the Docker image; the image listens on all interfaces of the container on 8080, and the
-  `-p` mapping decides who can reach it (`-p 127.0.0.1:8080:8080` for the host alone)".
+  `-p` mapping decides who can reach it (`-p 127.0.0.1:8080:8080` for the host alone)", followed by one
+  sentence: on Linux a published port bypasses host firewalls such as ufw and firewalld, so restrict it with the
+  mapping, not with the firewall.
 - `docs/ARCHITECTURE.md` (*Deployment*): image `networlddev/censio`, linux/amd64, built from
   `src/Censio.Server/Dockerfile` on the two Alpine bases, non-root; links `areas/server.md`, records 0009 and
   0010; *Security model* paragraph links 0006 for the image's listener.
 - `README.md` and `docs/USER_GUIDE.md` (new, Docker section only, *Approach* layout): build, run with named
-  volume, `/health`, port mapping and E3, `-p 127.0.0.1:…`, `docker rm -f censio` before a re-run, NAS:
+  volume, `/health`, port mapping and E3, `-p 127.0.0.1:…` with the ufw/firewalld sentence of `SECURITY.md`, `docker rm -f censio` before a re-run, NAS:
   build there or `docker save -o censio.tar censio` / `docker load -i censio.tar`, the `--user` command of
   S11 and `chown -R 1654:1654 <dir>`, Docker Desktop: named volume, all interfaces and TLS at a reverse proxy,
   `ASPNETCORE_URLS` not supported, the limits (amd64 only, UTC, data-protection keys).
 - `docs/CONTRIBUTING.md` (*Automated checks*): a bullet for the job `image` (what it builds and checks, that it
-  pushes nothing); the Dependabot bullet: a base-image pull request needs the `base.digest` label set by hand.
+  pushes nothing); the Dependabot bullet: a base-image pull request needs the `base.digest` label set by hand,
+  major base-image updates are ignored until the target framework moves, and a new Alpine minor (new tag
+  suffix) is a manual bump of both `FROM` lines.
 - `.squad/stack.md`: *Image build check* as in *Approach*; the *Commands* row unchanged.
 
 Sweep: `docs/`, `SECURITY.md`, `.squad/project.md` for "loopback", "localhost", "5000", "Docker", "only";
@@ -215,7 +228,8 @@ gate 0007 names. Record 0005: the version enters only through `-p:Version`.
 
 - [x] No limits: the change parses no input.
 - [x] No exception reaches a user: the build's own messages and the Blazor-check message above.
-- The `VERSION` argument reaches the shell only as a quoted, once-expanded word (AC7).
+- The `VERSION` argument reaches the shell only as a quoted, once-expanded word, and a value that is not
+  strict SemVer fails before `dotnet publish`, so no `;` sets another MSBuild property (AC7).
 - The job has `contents: read`, no secret and no push; it runs pull request code as `build` already does.
 - The container never starts as root in any documented command; `--user 0` is not documented.
 - Published files are root-owned and read-only for the runtime user; only `/config` is writable.
@@ -232,17 +246,24 @@ gate 0007 names. Record 0005: the version enters only through `-p:Version`.
 As in the spec. A follow-up issue for the orchestrator: "[Server] Persist the data-protection key ring in
 /config" — body: inside the image the key ring is lost on recreation (record 0009); move it with #29/#33.
 
-## Challenge notes
+## Challenge
 
-Devil's Advocate, mode `plan`: no major objection, 3 minor (verbatim).
+Devil's Advocate, mode `plan`, three minor objections:
 
-1. **minor** — AC3's check and the Dockerfile disagree on `Config.User`, so the CI case fails on a correct image. *Approach* sets `USER 1654:1654`, which `docker inspect` reports as `"1654:1654"`, but the AC3 row expects `Config.User` to be `1654`. Instruction for Dev/Tester: in `image-check.sh`, expect `Config.User` = `1654:1654` (or compare only the part before the `:`), and keep `id -u` → `1654` and `stat -c %u /proc/1` → `1654`.
-2. **minor** — The image build runs without the repository's `.editorconfig`, and the *Image build check* reproduction hides this. The Dockerfile copies only the three root build files and `src/`. The root `.editorconfig`, which sets `RH0396`, `RH0428`, `RH2102`, `RH4124`, `RH7004`, `RH8027` and `RH8306` to `none` (lines 72–78), never reaches the build stage. When building the planned context, this warning appeared: `src/Censio.Server.Data/ServerDataAssembly.cs(12,9): warning RH8306: Property summary must use a noun phrase…`. That goes against "zero `RH####` warnings" in AGENTS.md. The reproduction in `.squad/stack.md` (line 113) copies every `git ls-files` file for its second copy, so it gets `.editorconfig` and never shows the difference. Instruction for Dev: add `COPY .editorconfig ./` to the Dockerfile with the root build files. Make the reproduction's second copy match the Dockerfile's (`.editorconfig` and `src/` only, not the whole tree), so it fails or warns exactly where the image build does.
-3. **minor** — Dependabot is about to open a failing base-image pull request every week. The `docker` entry in `.github/dependabot.yml` (lines 26–36) has no `ignore`. With `10.0-alpine-amd64` tags, Dependabot will propose the `11.0-alpine-amd64` pair once .NET 11 is released (expected November 2026). The 11.0 SDK image cannot satisfy `global.json` (`10.0.100`, `rollForward: latestFeature`), and the 11.0 runtime does not run a `net10.0` app. The `image` job blocks such a pull request, so nothing broken ships, but every weekly run opens it again. Instruction for Lead/Dev: add an `ignore` with `update-types: ["version-update:semver-major"]` to the `docker` entry, so only digest and minor updates of the 10.0 tags arrive. List `.github/dependabot.yml` under *Affected projects* and *Security areas touched*, and mention it in the Dependabot bullet in `docs/CONTRIBUTING.md`. Alternatively, write in that bullet that a major base-image pull request is closed by hand until the target framework moves.
+1. `Config.User` is `1654:1654`: accepted — AC3's row expects `1654:1654`; `id -u` and `/proc/1` stay `1654`.
+2. `.editorconfig` missing in the image build: accepted — `COPY .editorconfig ./` before `COPY src/ src/`, and
+   the reproduction's second copy matches the Dockerfile's (fact 17, *Approach*, task 2).
+3. Weekly failing major base-image pull requests: accepted — `ignore` of `version-update:semver-major` in the
+   `docker` entry (*Affected projects*, *Security areas touched*, `CONTRIBUTING.md` bullet, task 3).
 
-## Security notes
+## Security review
 
-Security, mode `plan`: `CHANGES_REQUIRED`, one blocking finding (B1, goes to the Lead's revision) and two non-blocking (verbatim).
-
-- **N1: E5 says a value that is no valid version fails the build. That isn't true for a `;Key=Value` value.** `VERSION='1.0;touch ./pwned' sh -c '… "-p:Version=${VERSION}"'` gives one literal argument and creates no file, so the shell quoting in *Approach* is right. `dotnet msbuild … "-p:Version=1.0;touch /pwned"` fails with "Switch: touch /pwned", which confirms fact 13. But `"-p:Version=1.0;Foo=bar"` succeeds and prints `Version=[1.0] Foo=[bar]`. A `;` in `VERSION` sets any MSBuild global property (for example `RequiresAspNetWebAssets=false`). No attack boundary today, since whoever passes `--build-arg` controls the build; #5 and #6 take the value from a tag name, and git allows `;` in tag names. Suggestion: correct E5's wording, and either have the Dockerfile's publish `RUN` reject a `VERSION` that doesn't match a strict SemVer pattern before calling `dotnet publish`, or note for #5/#6 that they validate the tag first. AC7 should then also cover `1.0;Foo=bar`.
-- **N2: The new `SECURITY.md` and README wording ("the `-p` mapping decides who can reach it") is accurate but incomplete.** On Linux, Docker-published ports bypass host firewalls such as ufw and firewalld. One sentence next to the `-p 127.0.0.1:8080:8080` advice would keep operators from relying on ufw to limit an all-interfaces listener.
+- B1 (base-image patches unverified): resolved with option (a) — full-version single-architecture tags
+  (`sdk:10.0.403-alpine3.24-amd64`, `aspnet:10.0.14-alpine3.24-amd64`), so a .NET patch arrives as a Dependabot
+  tag update and does not depend on the digest-only refresh; fact 9 is confirmed from Security's reading and the
+  remaining limit (a new Alpine minor and Alpine fixes between .NET patches arrive only by a manual bump or a
+  digest refresh) is stated in record 0010 and in `CONTRIBUTING.md`. `base.name` names the exact tag (S9).
+- N1 (`;Key=Value` in `VERSION`): taken — the build stage rejects a non-SemVer `VERSION` before the publish;
+  E5 and AC7 are corrected and AC7 covers `1.0;Foo=bar`. #5 and #6 pass a SemVer value and get this check.
+- N2 (Docker bypasses ufw/firewalld): taken — one sentence next to the `-p 127.0.0.1:8080:8080` advice in
+  `SECURITY.md`, `README.md` and `docs/USER_GUIDE.md` (*Documentation updates*; spec S10).

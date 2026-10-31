@@ -45,7 +45,8 @@ sources are copied can lose the Blazor script (record 0007, Vandox#24).
 - S10: Given a reader of `README.md` or `docs/USER_GUIDE.md`, when they follow its Docker section (English
   first, then German), then they can build and start the image and reach `/health`; the section says that
   inside the image the server listens on all interfaces of the container, that the `-p` mapping decides who
-  can reach it, and that TLS belongs in a reverse proxy (`SECURITY.md`). Every command is one line that runs
+  can reach it (on Linux a published port bypasses ufw and firewalld), and that TLS belongs in a reverse proxy
+  (`SECURITY.md`). Every command is one line that runs
   unchanged in bash and in PowerShell (no `\` continuation, no `$(…)`).
 - S11: Given a NAS share owned by another UID and GID (Unraid `nobody:users`, `99:100`; a Synology user such
   as `1026:100`), when the operator runs
@@ -74,20 +75,21 @@ sources are copied can lose the Blazor script (record 0007, Vandox#24).
   start with `--user <uid>:<gid>` of the directory's owner (S11), or hand the directory to the image's user
   (`chown -R 1654:1654 <dir>`) — and says that `/config` on Docker Desktop for Windows is a named volume.
   The image ships no root entrypoint that changes ownership or drops privileges (Q1).
-- E5: `VERSION` holds shell metacharacters (`--build-arg "VERSION=1.0;touch /pwned"`): the value reaches the
-  build as one literal argument and is never run as a command; a value that is no valid version fails the build
-  with the SDK's error, and no image is produced.
+- E5: `VERSION` holds shell or MSBuild metacharacters (`--build-arg "VERSION=1.0;touch /pwned"`,
+  `VERSION=1.0;Foo=bar`): the value is never run as a command, and a value that is not a semantic version
+  (`MAJOR.MINOR.PATCH`, optional pre-release and build parts) fails the build before the publish with
+  `VERSION is not a semantic version: <value>`; no image is produced.
 - E6: The container is stopped (`docker stop`): the server shuts down within Docker's default stop timeout,
   without being killed.
 
 ## Non-functional requirements
 
 - Platform: linux/amd64 only, guaranteed by the single-architecture tags, not by `FROM --platform` (hadolint
-  DL3029): build stage `mcr.microsoft.com/dotnet/sdk:10.0-alpine-amd64`, runtime stage
-  `mcr.microsoft.com/dotnet/aspnet:10.0-alpine-amd64`, both pinned by their linux/amd64 manifest digest (the
-  `-amd64` tags are the issue's `10.0-alpine` images for one architecture). `base.name` is that runtime tag and
+  DL3029): build stage `mcr.microsoft.com/dotnet/sdk:10.0.<patch>-alpine<X.Y>-amd64`, runtime stage
+  `mcr.microsoft.com/dotnet/aspnet:10.0.<patch>-alpine<X.Y>-amd64`, both pinned by their linux/amd64 manifest
+  digest (full-version tags of the issue's `10.0-alpine` images for one architecture, record 0010). `base.name` is that runtime tag and
   `base.digest` that manifest digest. The existing Dependabot `docker` entry for `/src/Censio.Server` updates
-  both `FROM` lines; it does not touch the `base.digest` label, so the image check of AC9 fails a Dependabot
+  both `FROM` lines (major updates ignored); it does not touch the `base.digest` label, so the image check of AC9 fails a Dependabot
   pull request until the label is set to the new digest by hand. The image declares no `VOLUME`: `/config`
   exists in the image, owned by 1654, and every documented command passes `-v`. Multi-stage, no
   docker-compose file.
@@ -132,8 +134,8 @@ sources are copied can lose the Blazor script (record 0007, Vandox#24).
   `ASPNETCORE_HTTP_PORTS=9090` the server answers `/health` on 9090 and `docker inspect` reports it `healthy`
   within 60 seconds; started with `ASPNETCORE_HTTP_PORTS=8080;8081` it reports `healthy` too (S6).
 - [ ] AC7: Built with `--build-arg VERSION=1.2.3` the start page shows `Version 1.2.3`; built with
-  `VERSION=1.0;touch /pwned` the build fails or the value stays literal, and no `/pwned` exists in either stage
-  (S7, E5).
+  `VERSION=1.0;touch /pwned` or `VERSION=1.0;Foo=bar` the build fails with `VERSION is not a semantic version`,
+  and no `/pwned` exists (S7, E5).
 - [ ] AC8: `hadolint` reports no finding on the Dockerfile (S8).
 - [ ] AC9: `docker inspect` shows the four labels of S9 with `licenses` `MIT`, `base.name` equal to the runtime
   tag and `base.digest` equal to the digest the runtime `FROM` line pins; a check in CI fails when the label
@@ -213,8 +215,9 @@ sources are copied can lose the Blazor script (record 0007, Vandox#24).
 - M2 (`base.digest` vs Dependabot): accepted, option (i) — the issue puts the labels in the Dockerfile, which
   rules out (ii); the label stays a literal, a CI check fails on a mismatch (AC9), and the by-hand fix of a
   Dependabot pull request is documented (NFR *Platform*). The plan records the choice in a decision record.
-- m1 (which digest): accepted — the `-amd64` tags pinned by their manifest digest, both stages, no
-  `FROM --platform` (NFR *Platform*).
+- m1 (which digest): accepted — single-architecture `-amd64` tags pinned by their manifest digest, both
+  stages, no `FROM --platform`; after Security's plan review (B1) full-version tags (`10.0.<patch>-alpine<X.Y>-amd64`)
+  so patches arrive as tag updates (NFR *Platform*, record 0010).
 - m2 (data-protection keys): accepted — S11 says where the keys go, that they are lost on recreation and that
   the warning under `--user` is expected; persisting them is out of scope with #29/#33/#42.
 - m3 (health-check timings): accepted — interval 10 s, timeout 3 s, start period 30 s, 3 retries, healthy
