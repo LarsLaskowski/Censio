@@ -30,4 +30,5 @@ are quoted in full.
 | 2026-10-31 18:03 | 8 Review round 1 | squad-reviewer | launched, code SHA 899dcab (opus/medium · 99,165 tokens · 21 tool uses · 163 s) |
 | 2026-10-31 18:03 | 8 Review round 1 | squad-security | launched (diff mode), code SHA 899dcab (opus/medium · 58,542 tokens · 12 tool uses · 114 s) |
 | 2026-10-31 18:06 | 8 Review round 1 | Orchestrator | Security diff: APPROVED (2 non-blocking: on-main vs GITHUB_SHA, concurrency group). Reviewer: BLOCKING 2 (check-image docker port race/E6, companion.md Desktop Runtime), NON-BLOCKING 1 (classic-store manifest type in test) -> Dev fix round |
-| 2026-10-31 18:06 | 6 Fix round 1 | squad-dev | launched (continued): reviewer blocking findings (sonnet/medium · usage pending) |
+| 2026-10-31 18:06 | 6 Fix round 1 | squad-dev | launched (continued): reviewer blocking findings (sonnet/medium · 5,572 tokens · 6 tool uses · 78 s · continued) |
+| 2026-10-31 18:07 | 8 Review delta (round 2) | squad-reviewer | launched (continued): delta on 87e1b5c (opus/medium · usage pending) |
