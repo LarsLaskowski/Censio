@@ -12,3 +12,5 @@ are quoted in full.
 | 2026-10-31 17:02 | 4/5 Skeleton and tests first | Orchestrator | skipped: plan declares no production or test code (bash script + workflow); Verification without tests V1-V6 instead |
 | 2026-10-31 17:04 | 6 Implement | squad-dev | base-check.sh + base-check.yml + CONTRIBUTING; V1-V5 pass against real registry (orchestrator re-ran V1: exit 0); security notes 1-4 applied; fact 10 left out of docs (sonnet/medium · 90,084 tokens · 10 tool uses · 110 s) |
 | 2026-10-31 17:04 | 7 Code check | Orchestrator | no C# change: Format/Build/Coverage n/a; Analyzer gate --lint-only PASS, scope-check PASS, decision-check PASS; V1 re-run exit 0 |
+| 2026-10-31 17:07 | 8 Review | squad-reviewer | Round 1: BLOCKING 2 (jq error echoes registry text into log; leading-zero pin passes by numeric compare), NON-BLOCKING 1 (verbatim: fact 10 confirmed, add 60-day/notification statements) (opus/medium · 51,789 tokens · 13 tool uses · 139 s) |
+| 2026-10-31 17:07 | 8 Review | Orchestrator | verbatim doc fix applied (docs/CONTRIBUTING.md; record 0010 Consequences, sentence re-wrapped to the file's line width); decision-check, scope-check pass |

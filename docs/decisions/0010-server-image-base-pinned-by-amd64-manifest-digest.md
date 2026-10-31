@@ -92,9 +92,9 @@ check* (option 12), described in [`CONTRIBUTING.md`](../CONTRIBUTING.md) (*Autom
 - Accepted limit: an Alpine fix between two .NET patches reaches the image only through a digest refresh or the
   next .NET patch (MCR rebuilds its tags monthly), and a new Alpine minor, or the end of new tags on the pinned
   one, needs a manual bump of both `FROM` lines (`docs/CONTRIBUTING.md`). The *Base image check* turns red within
-  a week of the first .NET patch the pinned minor misses; until then a newer minor is not adopted. It reads only
-  the public tag list, with a read-only token and no secret, and fails closed when it cannot read the pins or the
-  list.
+  a week of the first .NET patch the pinned minor misses, as long as GitHub has not disabled its schedule after 60
+  days without repository activity; until then a newer minor is not adopted. It reads only the public tag list,
+  with a read-only token and no secret, and fails closed when it cannot read the pins or the list.
 - A hand edit that changes a tag without its digest builds the old image under the new `base.name`; nothing
   checks that a tag still resolves to its pinned digest, because MCR rebuilds its tags. The exclusion covers only
   `docker:S8431` in this one file (`.squad/stack.md`, *Analyzer gate*).

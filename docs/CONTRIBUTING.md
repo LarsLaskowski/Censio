@@ -67,7 +67,7 @@ request.
   because Dependabot proposes no such update; the log names the minor to move to (move both `FROM` lines and the
   base labels there, as in the *Dependabot* bullet). It also turns red, saying `cannot check`, when a `FROM`
   line is not a full-version `mcr.microsoft.com/dotnet` Alpine tag, the pinned tag is not in the registry's
-  list, or the registry cannot be read. It uses no secret and its token is read-only (`contents: read`). Locally:
+  list, or the registry cannot be read. It uses no secret and its token is read-only (`contents: read`). A failed scheduled run notifies the user who last changed the workflow's `cron` line, and GitHub disables the schedule of a public repository after 60 days without activity (it is re-enabled on the workflow's page under *Actions*). Locally:
   `bash .github/scripts/base-check.sh [dockerfile]` from the repository root (needs `curl` and `jq`).
 - **Test report** (check *dotnet tests*): lists the results of the test step, also when a test failed. It is
   skipped on fork and Dependabot pull requests, whose token cannot create check runs.

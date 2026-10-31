@@ -55,7 +55,7 @@ fetch_tags()
     fi
 
     if ! tags=$(printf '%s' "$response" | jq -r \
-        '.tags | if type == "array" then .[] | strings | select(test("\n") | not) else error end') \
+        '.tags | if type == "array" then .[] | strings | select(test("\n") | not) else error("no tag list") end' 2>/dev/null) \
         || [[ -z "$tags" ]]; then
         tags=""
         fetch_failed[$repository]="registry answer holds no tag list"
@@ -106,7 +106,6 @@ check_from()
 
     local major="${BASH_REMATCH[1]}"
     local minor="${BASH_REMATCH[2]}"
-    local patch="${BASH_REMATCH[3]}"
     local alpine_major="${BASH_REMATCH[4]}"
     local alpine_minor="${BASH_REMATCH[5]}"
     local suffix="${BASH_REMATCH[6]}"
@@ -139,7 +138,7 @@ check_from()
         candidate_minor=$((10#${BASH_REMATCH[3]}))
 
         if ((candidate_major == 10#$alpine_major && candidate_minor == 10#$alpine_minor)); then
-            if ((candidate_patch == 10#$patch)); then
+            if [[ "$candidate" == "$tag" ]]; then
                 found=1
             fi
 
