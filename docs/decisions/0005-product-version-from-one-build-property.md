@@ -1,6 +1,6 @@
 # 0005: The product version comes from one build property
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-10-30
 - **Area:** —
 - **Source:** Issue #2

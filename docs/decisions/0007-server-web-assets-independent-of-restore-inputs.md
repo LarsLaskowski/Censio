@@ -1,6 +1,6 @@
 # 0007: The server project requests the Blazor web assets itself
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-10-30
 - **Area:** server
 - **Source:** Issue #2

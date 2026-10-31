@@ -1,6 +1,6 @@
 # 0004: Companion logic in a platform-neutral project; the Windows shell builds on Linux
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-10-30
 - **Area:** companion
 - **Source:** Issue #2

@@ -1,6 +1,6 @@
 # 0006: The server serves plain HTTP; start page and health check need no login
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-10-30
 - **Area:** server
 - **Source:** Issue #2
