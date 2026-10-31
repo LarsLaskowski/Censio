@@ -13,4 +13,6 @@ are quoted in full.
 | 2026-10-31 19:21 | 2/3 Verdicts | Orchestrator | Plan challenge: 1 major (WEBSITE_DISPATCH_TOKEN same defect, fact 13 wrong), 2 minor. Security: CHANGES_REQUIRED (B1 negative case unmeasured, B2 main-Protection write-role bypass in record), 3 non-blocking. Lead revise round launched |
 | 2026-10-31 19:21 | 2b Plan (revise round) | squad-lead | launched (continued): challenge and security findings (opus/medium · 23,690 tokens · 7 tool uses · 119 s · continued) |
 | 2026-10-31 19:23 | 2b Plan | Orchestrator | Lead revised: WEBSITE_DISPATCH_TOKEN joins the change, B1 dry run D1-D4, B2 recorded (issue 77); follow-up issue 78 opened (writers republish old release) |
-| 2026-10-31 19:23 | 3 Plan security review (round 2) | squad-security | launched, verdict pending (opus/medium · usage pending) |
+| 2026-10-31 19:23 | 3 Plan security review (round 2) | squad-security | launched, verdict pending (opus/medium · 31,474 tokens · 6 tool uses · 57 s) |
+| 2026-10-31 19:24 | 3 Plan security review | Orchestrator | Plan approved by Security in round 2 (APPROVED); needs D1-D4 logged before the diff review |
+| 2026-10-31 19:24 | 4 Skeleton | Orchestrator | Skipped: no API change |
