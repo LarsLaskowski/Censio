@@ -19,3 +19,5 @@ are quoted in full.
 | 2026-10-31 17:48 | 3 Plan security review (round 2) | squad-security | launched, verdict pending (opus/medium · 37,189 tokens · 5 tool uses · 54 s) |
 | 2026-10-31 17:48 | 2b Plan | Orchestrator | Follow-up issue 74 opened (release secrets in environment) |
 | 2026-10-31 17:48 | 3 Plan security review | Orchestrator | Plan approved by Security in round 2 (verdict APPROVED); N6-N8 appended verbatim to plan.md |
+| 2026-10-31 17:49 | 2b Plan (revise round 2) | squad-lead | RESULT: DONE: plan shortened to 3,869 words, N6-N8 folded in, status Approved by Security (opus/medium · usage pending) |
+| 2026-10-31 17:49 | 4-5 Skeleton and tests first | Orchestrator | Skipped: no production or test code (plan Verification without tests) |

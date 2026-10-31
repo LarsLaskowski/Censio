@@ -1,7 +1,7 @@
 # Plan: Release workflow: pre-release, Windows ZIP, Docker image, promote
 
 Source: Issue #5 | [spec.md](spec.md)
-Status: Revised (1)
+Status: Approved by Security
 Tier: security — the change adds a workflow that holds the Docker Hub credentials and a `contents: write` token and decides what is published (trust of the build and release).
 Security areas touched: CI workflows (new `.github/workflows/release.yml` with secrets and write permissions, new job in `.github/workflows/ci.yml`), the published Docker image (`networlddev/censio` on Docker Hub), the Companion release build (publish options), new CI scripts under `.github/scripts/`, one new pinned action (`actions/download-artifact`)
 
@@ -84,7 +84,8 @@ annotation are encoded (`%25`, `%0D`, `%0A`). Patterns are matched with `[[ $val
 (never `grep`, which matches line by line).
 
 **Values between jobs and from the event** (Security B1): every `github.event.*` and `needs.*.outputs.*` value reaches
-a `run:` only through `env` and is passed as an argument; no `${{ }}` inside `run:`. Each publish and promote job
+a `run:` only through `env` and is passed as an argument; no `${{ }}` inside `run:` (paths there are written
+`$RUNNER_TEMP`, not `${{ runner.temp }}`). Each publish and promote job
 first checks the form of every output it uses with `form`: a version against the tag pattern without `v`, an image
 ID or digest against `^sha256:[0-9a-f]{64}$`.
 
@@ -103,7 +104,8 @@ ID or digest against `^sha256:[0-9a-f]{64}$`.
 | `promote-image <repo> <digest>` | `docker buildx imagetools create --prefer-index=false -t <repo>:latest <repo>@<digest>` (registry-side, no pull, fact 14), then the registry digest of `<repo>:latest` must be `<digest>` | `<repo>:latest has digest <actual>, expected <digest>.` |
 
 **`.github/workflows/release.yml`** (`name: Release`), `on: release: types: [published]`, `permissions: {}`, every
-action pinned by commit, every checkout `persist-credentials: false` and at the tagged commit. No cache of any kind:
+action pinned by commit (`actions/download-artifact` on a commit of its current major, at least v4.1.7, which fixed
+the extraction path traversal CVE-2024-42471), every checkout `persist-credentials: false` and at the tagged commit. No cache of any kind:
 no `actions/cache`, no `cache:` of `setup-dotnet`, no Buildx `type=gha` cache (record 0008). Artifacts are uploaded
 with `retention-days: 7`. Jobs:
 
@@ -262,29 +264,16 @@ the Companion is kept. The image is feature 4's, unchanged.
   `--provenance=false`, `push` asserts one `linux/amd64` manifest, and `promote-image` retags registry-side with
   `--prefer-index=false` (the proposed default wraps the manifest and changes the digest), keeping the digest
   comparison; both are tested against `registry:2` in CI (fact 14a). Alternatives under *Options considered*.
-- m1 (no daemon): accepted. Fact 21 corrected; the Dev starts `dockerd` before the test script and reports any case
-  that could not run.
-- m2 (no checkout for `gh`): accepted. `GH_REPO` next to `GH_TOKEN` in both steps (the jobs now check out the script
-  anyway).
-- m3 (retention): accepted. Both artifacts `retention-days: 7`; CONTRIBUTING states the window and *Re-run all jobs*
-  after it; spec E7 names the window.
-- m4 (E6 on an exited container): accepted. `check-image` ends the wait when the container exited, prints E6's text
-  as the last line with exit 1, keeps `docker`/`curl` errors above it, removes the container by `trap`; the test
-  asserts all three.
+- m1–m4: accepted — m1 fact 21 and *Tests per criterion*; m2 `GH_REPO` (*Approach* jobs 4, 6); m3 retention 7 days
+  (*Approach*, CONTRIBUTING, spec E7); m4 `check-image` (*Approach*) and its test.
 
 ## Security review
 
 - B1 (job outputs into credentialed jobs): accepted — *Approach* (values between jobs, `form`), with one test case per
   form, an injected `;id` and an LF included.
 - B2 (artifact poisoning): accepted — *Approach* jobs 4–6 and *Security considerations*.
-- N1: accepted, `[[ =~ ]]` under `LC_ALL=C`, with a tag + LF test case.
-- N2: accepted, no cache of any kind (*Approach*, *Security considerations*).
-- N3: accepted, only this branch's dry-run artifact is started; CONTRIBUTING says so.
-- N4: follow-up issue described under *Out of scope / follow-ups*.
-- N5: no change.
+- N1–N3: accepted (*Approach*, *Security considerations*, CONTRIBUTING); N4: follow-up issue; N5: no change.
 
-### Security notes (round 2, non-blocking, verbatim)
-
-- N6 (`actions/download-artifact` version): B2's guarantee that the download "cannot write" the checked-out script depends on the action extracting safely. Versions 4.0.0–4.1.6 had a path-traversal (zip-slip) flaw (CVE-2024-42471) that let an artifact write outside its target directory. The Dev should pin a commit of the current major (at least v4.1.7), in line with the existing `upload-artifact` v7.0.2 pin. The diff review will check this pin.
-- N7 (`runner.temp` in `run:` steps): inside `run:` steps the path should be written `$RUNNER_TEMP`, not `${{ runner.temp }}`. The plan's "no `${{ }}` inside `run:`" rule already requires this; the diff review will check it.
-- N8 (open facts are not part of the security case): facts 13, 14a and 15 are still unverified. All three fail safe: an access error, a failed digest or ID comparison, or the empty-digest refusal. No security property depends on them being true, so no measurement is needed before approval.
+Round 2: `APPROVED`. Its notes are folded in: N6 into *Approach* (pin of `actions/download-artifact`), N7 into the
+values rule (`$RUNNER_TEMP` in `run:`), N8 (facts 13, 14a, 15 fail safe; no security property rests on them)
+needs no change.
