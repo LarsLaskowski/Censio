@@ -1,7 +1,7 @@
 # Spec: README and user guide from the start (English, then German)
 
 Source: Issue #7
-Status: Draft
+Status: Approved by Product Manager
 
 ## Problem
 
@@ -9,8 +9,8 @@ People outside the project (testers, Anno 117 players) need to find out from `RE
 it is, and how to install and start the current state; the user guide (`docs/USER_GUIDE.md`) is where they look up
 details and how to report a problem. Today (main at `07b0bb1`):
 
-- `README.md` and `docs/USER_GUIDE.md` hold the same text (only the title differs): a one-sentence description,
-  then the sections *Docker* and *Companion*, each in English and then in German (`Docker (Deutsch)`,
+- `README.md` and `docs/USER_GUIDE.md` hold the same sections; the README opens with a one-sentence description
+  the guide lacks, and the titles differ. Both then hold the sections *Docker* and *Companion*, each in English and then in German (`Docker (Deutsch)`,
   `Companion (Deutsch)`). The SmartScreen note and the `docker run` example (no compose) exist.
 - Missing: a *Status* section (what works, what does not), the licence (`LICENSE` is MIT, the README does not say
   so), how to get the software when no release exists, what the Companion stores and logs, and how to report
@@ -47,10 +47,11 @@ Facts the issue rests on, checked:
   past "Windows protected your PC" and the tray menu shows `Version <version>`.
 - S5: Given no release exists or the person wants the state of `main`, when they look for an edge build, then the
   README says that no edge builds are offered and that the current state is built from source: the server image
-  with `docker build` (as today) and the Companion on Windows with `dotnet publish` of `src/Censio.Companion` for
-  `win-x64`, self-contained and single-file, after which they start the published `Censio.Companion.exe` and its
-  tray menu shows `Version 0.0.0` (Q1).
-- S6: Given a person reads `docs/USER_GUIDE.md`, then it covers installation, the first start, where data and
+  with `docker build` (as today) and the Companion with `dotnet publish` of `src/Censio.Companion` for `win-x64`
+  with the flags of the release build, into a named output folder that holds the single `Censio.Companion.exe`;
+  started on Windows, its tray menu shows `Version 0.0.0` (Q1).
+- S6: Given a person reads `docs/USER_GUIDE.md`, then it opens with what Censio is (or a link to the README for
+  it) and covers installation, the first start, where data and
   logs are stored (server: `/config` with `data-protection-keys`, log on the console via `docker logs censio`;
   Companion: stores no data and writes no log yet), and how to report problems.
 - S7: Given a person has a problem, when they follow the user guide, then they open a GitHub issue with the
@@ -62,7 +63,9 @@ Facts the issue rests on, checked:
 - S9: Given an operator who wants to change a setting, when they read the README, then a configuration table
   lists each setting (key, environment variable, default) in English and in German.
 - S10: Given a later milestone changes what works, when its pull request updates the documentation, then it
-  changes the *Status* section in both languages and nothing else has to move.
+  changes the README's *Status* section in both languages; the first release also removes the "Not yet tried"
+  notes about the published image and ZIP, which stand only in the opening paragraph of the Docker and of the
+  Companion installation section of each file and language.
 
 ## Errors and edge cases
 
@@ -75,7 +78,8 @@ Facts the issue rests on, checked:
   not an absolute path (exit code 1 and the exact log lines from `docs/areas/server.md`).
 - E4: An unsupported host (arm64, Windows containers, Windows other than 10 22H2 / 11 x64) is named as unsupported.
 - E5: A reader who finds a vulnerability is sent to private reporting, not to the bug template.
-- E6: A link in either file (`LICENSE`, `SECURITY.md`, the user guide, the issue template) resolves on GitHub.
+- E6: A link in either file (`LICENSE`, `SECURITY.md`, the user guide, the issue template) resolves on GitHub,
+  relative to the folder of the file that holds it (`docs/USER_GUIDE.md` links `../LICENSE`).
 
 ## Non-functional requirements
 
@@ -87,9 +91,10 @@ Facts the issue rests on, checked:
   Desktop for Windows with WSL 2 and Linux containers), linux/amd64; the Companion on Windows 10 22H2 or 11, x64,
   without .NET, installer or administrator rights.
 - Building from source (Q1, stated as requirements; no host details were given): the server image needs what
-  the README names today (BuildKit, access to `mcr.microsoft.com`); the Companion needs Windows 10 22H2 or 11 x64
-  with the .NET 10 SDK (`global.json`: `10.0.100`, later feature bands allowed), access to `nuget.org`, and the
-  source from `git clone` or the source ZIP of GitHub. The commands are written so they run in PowerShell 7 and
+  the README names today (BuildKit, access to `mcr.microsoft.com`); the Companion build needs the .NET 10 SDK
+  (`global.json`: `10.0.100`, later feature bands allowed) on any operating system it supports, access to
+  `nuget.org`, and the source from `git clone` or the source ZIP of GitHub; only running the exe needs Windows
+  10 22H2 or 11 x64. The commands are written so they run in PowerShell 7 and
   Windows PowerShell 5.1; that they do in 5.1 is an untested assumption, marked "Not yet tried" until a run shows it.
 - No new configuration, no code change; external addresses only `github.com/LarsLaskowski/Censio` and
   `hub.docker.com/r/networlddev/censio`.
@@ -103,24 +108,25 @@ Facts the issue rests on, checked:
 - [ ] AC2: *Status* names the milestone and version it describes, lists what works and what does not yet as in S2,
   and states that no release exists while none does (S2, S10, E1).
 - [ ] AC3: The README states that no edge builds are offered and documents building the current state from source
-  for both parts: the server image (`docker build`) and the Companion (`dotnet publish` of `src/Censio.Companion`,
-  `-r win-x64 --self-contained true -p:PublishSingleFile=true`, with the output folder and the exe to start),
-  each with its prerequisites as listed under *Non-functional requirements* (S5, E1).
+  for both parts: the server image (`docker build`) and the Companion (`dotnet publish` of `src/Censio.Companion`
+  with the flags of the release build in `.github/scripts/release-check.sh` except `-p:Version`, and an explicit
+  `-o` folder that then holds the single `Censio.Companion.exe` to start), each with its prerequisites as listed
+  under *Non-functional requirements* (S5, E1).
 - [ ] AC4: In the Product Manager's dry run an external person, using only the README, builds and starts the
   current state from source — the server image answers `Healthy` on `/health` and its start page shows
   `Version 0.0.0`, the Companion's tray menu shows `Version 0.0.0` — and the release steps (S3, S4) are marked
   "Not yet tried" while no release exists; every step the run did not show (Windows PowerShell 5.1 included) is
   marked "Not yet tried" in both languages (S3, S4, S5, E1, E3).
-- [ ] AC5: `docs/USER_GUIDE.md` covers installation, first start, where data and logs are stored for the server and
+- [ ] AC5: `docs/USER_GUIDE.md` opens with what Censio is or a link to the README for it, and covers installation, first start, where data and logs are stored for the server and
   the Companion, and how to report problems with the *Bug report* template and the facts to include, and sends
   vulnerabilities to private reporting per `SECURITY.md` (S6, S7, E3, E5).
-- [ ] AC6: In both files every English section has a German section in the same position with German headings,
-  the same facts, byte-identical code blocks and the same link targets (S8, E2).
+- [ ] AC6: In each file every English section has a German section in the same position with German headings,
+  the same facts, code blocks byte-identical to the English ones and links to the same targets (S8, E2, S10).
 - [ ] AC7: The configuration table lists `Censio:DataDirectory` / `CENSIO__DATADIRECTORY` (unset outside the image,
   `/config` in the image) and `ASPNETCORE_HTTP_PORTS` (`8080` in the image), with values as in
   `docs/areas/server.md` (S9).
 - [ ] AC8: Unsupported hosts are named (E4), and every relative link of both files resolves to a file of the
-  repository (E6).
+  repository, checked from the folder of the file that holds it; `SECURITY.md` is a link, not only a name (E6).
 
 ## Out of scope
 
@@ -150,11 +156,16 @@ Facts the issue rests on, checked:
 - None describes new behavior: the change documents existing behavior for users. `docs/areas/server.md`, *Not
   here*, names "the edge builds (#6)" as a later topic; since #6 is not planned, that line drops the reference.
 
-## Challenge notes
+## Challenge
 
-1. **minor**: AC3's Companion publish command does not match the release build, so the dry run would not test what users later download. `.github/scripts/release-check.sh` lines 213-216 publish with `-c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=embedded -p:PublishDocumentationFile=false -p:PublishReferencesDocumentationFiles=false`. AC3 names only the first four flags. Without `IncludeNativeLibrariesForSelfExtract`, the WPF native DLLs (`*_cor3.dll`) land next to the exe. The exe still runs from that folder, but not if it is copied somewhere else on its own.
-   - Instruction: document the release script's flags, minus `-p:Version`, with an explicit `-o` folder. Say that the output folder holds the single `Censio.Companion.exe` to start.
-   - Also: `docs/areas/companion.md` (*Platform*) says the Companion builds on Linux too. The prerequisites should say that the build needs only the .NET 10 SDK, and only running it needs Windows 10 22H2 or 11 x64. Don't state Windows as a build requirement.
-2. **minor**: S10 ("nothing else has to move") contradicts E1. The "Not yet tried" notes about the release sit in the Docker and Companion sections of both files (in `README.md`: the Docker intro paragraph and the first Companion paragraph), so the first release changes more than *Status*. Instruction: either gather every release-dependent note into *Status*, or reword S10 to list the places a release changes.
-3. **minor**: AC8 and E6 relative links cannot be copied verbatim between the two files. `docs/USER_GUIDE.md` sits one level down, so its links need `../LICENSE`, `../SECURITY.md` and `../.github/ISSUE_TEMPLATE/bug_report.md`. Today both files carry the same text (`diff` shows only the header differs). Instruction: check the links of each file from that file's own folder, and keep any shared text free of relative links, or adjust them per file. Note that `SECURITY.md` is currently named only in backticks, not linked.
-4. **minor**: the *Problem* section says the two files differ only in the title. `diff README.md docs/USER_GUIDE.md` shows the guide also lacks the one-sentence description (README lines 1-3 against guide line 1). Instruction: correct that sentence, and have AC5 require the guide to open with what Censio is, or with a link to the README for it.
+All four notes of the spec challenge were minor; each is accepted.
+
+1. Publish command differs from the release build — accepted: S5 and AC3 now require the release script's flags
+   except `-p:Version`, with an explicit `-o` folder holding the single exe; the build prerequisite is the .NET 10 SDK
+   on any supported OS, Windows only for running it (*Non-functional requirements*).
+2. S10 contradicts E1 — accepted by rewording S10: it names the second place a release changes (the opening
+   paragraph of each installation section), and AC6 covers it.
+3. Relative links differ per file — accepted: E6 and AC8 check each link from its own file's folder and require
+   `SECURITY.md` as a link.
+4. The guide lacks the description — accepted: *Problem* corrected; S6 and AC5 require the guide to open with what
+   Censio is or a link to the README.
