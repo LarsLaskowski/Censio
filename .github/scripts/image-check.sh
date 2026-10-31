@@ -220,7 +220,7 @@ step "I64-AC7a: key ring in /config/data-protection-keys"
 key_directory="/config/data-protection-keys"
 expect_equal "I64-AC7a env" "true" "$(inspect_image "$clean_image" '{{range .Config.Env}}{{if eq . "CENSIO__DATADIRECTORY=/config"}}true{{end}}{{end}}')"
 expect_equal "I64-AC7a mode and owner" "700:1654" "$(docker exec "$main" stat -c %a:%u "$key_directory")"
-key_files="$(docker exec "$main" find "$key_directory" -maxdepth 1 -name 'key-*.xml' -printf '%f\n' | sort)"
+key_files="$(docker exec "$main" find "$key_directory" -maxdepth 1 -name 'key-*.xml' | sed 's|.*/||' | sort)"
 if [[ -z "$key_files" ]]; then
     fail "I64-AC7a" "at least one key-*.xml in ${key_directory}" "none"
 fi
@@ -242,7 +242,7 @@ step "I64-AC7b: a new container on the same volume keeps the key files"
 reuse_container="censio-check-reuse"
 start_container "$reuse_container" -p 127.0.0.1:18084:8080 -v "${volume}:/config" "$clean_image"
 wait_http "I64-AC7b" "http://127.0.0.1:18084/health"
-reused_files="$(docker exec "$reuse_container" find "$key_directory" -maxdepth 1 -name 'key-*.xml' -printf '%f\n' | sort)"
+reused_files="$(docker exec "$reuse_container" find "$key_directory" -maxdepth 1 -name 'key-*.xml' | sed 's|.*/||' | sort)"
 expect_equal "I64-AC7b key files" "$key_files" "$reused_files"
 docker rm -f "$reuse_container" > /dev/null
 
