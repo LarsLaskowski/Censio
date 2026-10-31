@@ -12,5 +12,5 @@ are quoted in full.
 | 2026-10-31 17:32 | 2a Spec challenge (revise round) | squad-lead | RESULT: DONE: all 7 objections answered, no escalation (opus/medium · 26,615 tokens · 10 tool uses · 121 s · continued) |
 | 2026-10-31 17:41 | 2b Plan | squad-lead | RESULT: DONE: tier security, plan weighs options, record 0012, follow-up issue for notify-website payload (opus/medium · 70,280 tokens · 38 tool uses · 624 s · continued) |
 | 2026-10-31 17:41 | 2b Plan | Orchestrator | Follow-up issue 73 opened (notify-website tag payload) |
-| 2026-10-31 17:41 | 2b Plan challenge | squad-devils-advocate | launched, verdict pending (opus/medium · usage pending) |
+| 2026-10-31 17:41 | 2b Plan challenge | squad-devils-advocate | launched, verdict pending (opus/medium · 62,727 tokens · 13 tool uses · 136 s) |
 | 2026-10-31 17:41 | 3 Plan security review | squad-security | launched, verdict pending (opus/medium · 51,034 tokens · 10 tool uses · 118 s) |
