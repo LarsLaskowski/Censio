@@ -1,7 +1,7 @@
 # Spec: Release workflow: pre-release, Windows ZIP, Docker image, promote
 
 Source: Issue #5
-Status: Draft
+Status: Approved by Product Manager
 
 ## Problem
 
@@ -54,7 +54,8 @@ and every build shows `0.0.0` unless a workflow passes a version (record 0005).
   it pushes anything.
 - E7: Any job of a release published as a pre-release fails (build, check, upload, push, promote): the release
   stays a pre-release; `latest` and *Latest* stay where they were. The other artifact may already exist. The
-  maintainer re-runs the failed jobs; that run finishes as S1.
+  maintainer re-runs the failed jobs; that run finishes as S1. Only a failure inside the promotion, after `latest`
+  moved and before *Latest* is set, leaves the two apart until that re-run.
 - E8: A re-run meets an existing artifact: the ZIP asset is replaced and the tag `<version>` overwritten by the
   re-built image, checked again as in E5 and E6; the re-run does not fail on "already exists".
 - E9: The tester's Windows shows the SmartScreen warning for the unsigned `Censio.Companion.exe` ("Windows protected
@@ -101,7 +102,8 @@ and every build shows `0.0.0` unless a workflow passes a version (record 0005).
 - [ ] AC2: The ZIP holds exactly `Censio.Companion.exe` at its root, which on Windows x64 without .NET starts from
   any extracted folder and shows `Version <version>` in its tray menu; a publish output with another file list fails
   the Windows job with E10's error before anything is attached (S2, E10). Verified: `CI` for the file list and
-  E10; `v0.1.0` on a Windows machine without .NET for the start and the tray menu.
+  E10; a dry run of the ZIP the CI job builds, on Windows without .NET, before the review, and `v0.1.0`, for the
+  start and the tray menu.
 - [ ] AC3: The pushed image, started with the README's command, answers `Healthy` on `/health` and shows
   `Version <version>` on its start page; the Docker job checks both on the built image before it pushes, and the
   pushed digest is the checked one (S3, E6). Verified: `CI` for the checks on a built image and for E6's failure;
@@ -119,7 +121,7 @@ and every build shows `0.0.0` unless a workflow passes a version (record 0005).
 - [ ] AC8: An artifact whose version differs from the tag's fails its job with E5's error before it is attached or
   pushed (E5). Verified: `CI` with an exe and an image built with another version than expected.
 - [ ] AC9: After any failed job of a release published as a pre-release, the release stays a pre-release and
-  neither `latest` nor *Latest* moves; re-running the failed jobs replaces existing artifacts without error and ends
+  neither `latest` nor *Latest* moves (except E7's failure inside the promotion); re-running the failed jobs replaces existing artifacts without error and ends
   as AC1 (E7, E8). Verified: `review` (the promotion waits for both artifact jobs; the upload replaces an asset of
   the same name; the push overwrites the tag); on a real release only if a job fails.
 - [ ] AC10: README and user guide (English first, then German, one file each) are rewritten for the published
@@ -146,13 +148,11 @@ and every build shows `0.0.0` unless a workflow passes a version (record 0005).
 
 ## Open questions
 
-- Which file is `release.yml`? Answered: `.github/workflows/release.yml`; `.github/release.yml` (release-note
-  configuration) stays as it is.
+- Which file is `release.yml`? Answered: `.github/workflows/release.yml`; `.github/release.yml` stays.
 - What does "warns" do, and what is "a tag on main"? Answered: a warning annotation, the run continues (E3); the
   tagged commit is reachable from the head of `main` (E2, CONTRIBUTING *Versioning and releases*).
 - Can the workflow run before the merge? Answered: no — GitHub runs the tagged commit's workflow (NFR, last bullets).
-- Does the promotion start `notify-website.yml` again? Answered: no — it listens to `published`, which a promotion
-  does not raise, and events of the workflow's own token start no workflow.
+- Does the promotion start `notify-website.yml` again? Answered: no — it listens to `published` only.
 - When does `latest` move? Answered: (Product Manager) with the promotion, after both artifacts exist.
 - Target hosts and the first release. Answered: (Product Manager) Windows 10 22H2 and 11 x64 without .NET or
   administrator rights; unsigned exe with the documented SmartScreen step; the secrets `DOCKERHUB_USERNAME` and
@@ -177,13 +177,13 @@ and every build shows `0.0.0` unless a workflow passes a version (record 0005).
   (AC3), AC7's logs; AC9's failure path is shown by review only.
 - m1 (E3 vs. E7/AC9): accepted. E7 and AC9 apply to pre-releases only; E3 states what a failed full release keeps.
   Reverting it to a pre-release is not added.
-- m2 (E2's limits): accepted. E2 names both limits and that it is no security control; CONTRIBUTING states them
-  (AC5, AC10).
-- m3 ("product version"): accepted. E5 checks the informational version of the `Censio.Companion` assembly, which the
-  tray reads (`src/Censio.Contracts/ProductVersion.cs`); the file-properties version is out of scope.
+- Plan step (Lead): E7 names the promotion's window; AC2 gained a dry run. m4 holds: a one-file publish was measured.
+- m2 (E2's limits): accepted (E2, AC5, AC10).
+- m3 ("product version"): accepted. E5 checks the informational version the tray reads; file properties are out of
+  scope.
 - m4 (ZIP contents): accepted. Exactly `Censio.Companion.exe`, checked by the job (E10, AC2); the plan verifies that
   a WPF single-file publish yields one file, else the spec returns with the named extra files.
 - m5 (tested = pushed image; old re-run): accepted. NFR *Image tags* and AC3 require the checked digest to be pushed
   and promoted without a second build; re-running an older run is out of scope, CONTRIBUTING warns.
-- m6 (documentation): accepted. AC10 lists the rewrite of the Docker sections and the new Companion section.
+- m6 (documentation): accepted (AC10).
 
