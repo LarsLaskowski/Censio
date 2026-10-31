@@ -66,7 +66,7 @@ is in [`areas/server.md`](areas/server.md), the choices in
 [`decisions/0010`](decisions/0010-server-image-base-pinned-by-amd64-manifest-digest.md). The image keeps the data-protection key ring in `/config` (`Censio:DataDirectory`, [`decisions/0011`](decisions/0011-data-protection-key-ring-in-the-data-directory.md)). The Companion is
 published as a Windows ZIP. A release is cut from a `vMAJOR.MINOR.PATCH` tag on `main` and published as a
 pre-release: the workflow builds and checks the ZIP and the image without secrets, publishes them, and only then
-promotes the release, moving `latest` and *Latest* to it ([`decisions/0012`](decisions/0012-release-pre-release-first-and-secret-free-builds.md);
+promotes the release, moving `latest` and *Latest* to it; the release's write credentials are secrets of the environment `release`, which only runs on `v*` tags reach ([`decisions/0012`](decisions/0012-release-pre-release-first-and-secret-free-builds.md);
 steps in [`CONTRIBUTING.md`](CONTRIBUTING.md), *Versioning and releases*).
 <!-- project:end architecture -->
 

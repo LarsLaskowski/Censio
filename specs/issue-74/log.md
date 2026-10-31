@@ -17,4 +17,5 @@ are quoted in full.
 | 2026-10-31 19:24 | 3 Plan security review | Orchestrator | Plan approved by Security in round 2 (APPROVED); needs D1-D4 logged before the diff review |
 | 2026-10-31 19:24 | 4 Skeleton | Orchestrator | Skipped: no API change |
 | 2026-10-31 19:25 | 5 Tests first | squad-tester | DONE: AC7 expected text updated (1 line in release-check-test.sh); 3 cases fail on current script as required; shellcheck clean (sonnet/medium · 64,521 tokens · 11 tool uses · 44 s) |
-| 2026-10-31 19:25 | 6 Implement | squad-dev | launched: release.yml, notify-website.yml, release-check.sh, docs (sonnet/medium · usage pending) |
+| 2026-10-31 19:25 | 6 Implement | squad-dev | launched: release.yml, notify-website.yml, release-check.sh, docs (sonnet/medium · 80,058 tokens · 9 tool uses · 170 s) |
+| 2026-10-31 19:28 | 7 Code check | Orchestrator | Format check, analyzer-check, scope-check --tier security, decision-check PASS; no C# change; main not moved. Pending: Product Manager dry run D1-D4 before the review round |

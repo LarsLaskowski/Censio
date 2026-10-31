@@ -185,7 +185,7 @@ A release is a `vMAJOR.MINOR.PATCH` tag created on `main` (no leading zeros, no 
 the Docker image `networlddev/censio` and the Windows ZIP of the Companion. Merging a PR by itself never publishes a
 release.
 
-To release, a maintainer (write access to the repository):
+To release, an administrator of the repository (only administrators can create `v*` tags, see below):
 
 1. On GitHub, *Releases*, *Draft a new release*; create the new tag `vX.Y.Z` on the target `main`.
 2. Tick *Set as a pre-release*, and publish.
@@ -196,8 +196,57 @@ checks the ZIP and the image without any secret; attaches the ZIP `Censio-<versi
 pushes the checked image as `networlddev/censio:<version>`; and only then moves `networlddev/censio:latest` to
 that digest and turns the release into a full release marked *Latest*. While it runs, or when a job fails, the
 release stays a pre-release and `latest` stays where it was. A release published as a full release only gets a
-warning; it is marked *Latest* by GitHub at once and stays so if a job fails. The repository secrets
-`DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` must be set; only the jobs that push and promote read them.
+warning; it is marked *Latest* by GitHub at once and stays so if a job fails. The secrets `DOCKERHUB_USERNAME` and
+`DOCKERHUB_TOKEN` (jobs `image-publish` and `promote`) and `WEBSITE_DISPATCH_TOKEN` (job `dispatch` of
+`notify-website.yml`) are secrets of the GitHub environment `release` and must not exist as repository secrets: a
+repository secret is readable by a workflow on any branch, an environment secret only by a job that names the
+environment and runs on a ref its deployment rule admits. The rule admits only tags `v*`.
+
+One-time setup by the administrator, in this order (GitHub, *Settings*):
+
+1. *Environments*, *New environment* `release`, before the pull request that adds `environment: release` is merged,
+   so no run creates it without a rule. If one already did, edit that one.
+2. *Deployment branches and tags*: *Selected branches and tags*, one rule of type **Tag** with the pattern `v*`; no
+   branch rule, no required reviewers. The type is Tag because a branch rule `v*` would admit any branch named
+   `v...`, which everyone with write access can push. Clear *Allow administrators to bypass configured protection
+   rules* if the page shows it.
+3. *Environment secrets*: add `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN` and `WEBSITE_DISPATCH_TOKEN`. A stored secret
+   cannot be read back; a token not at hand is created anew (Docker Hub access token with read and write access;
+   the fine-grained GitHub token described in `notify-website.yml`) and the old one revoked after step 5.
+4. Merge the pull request.
+5. *Secrets and variables*, *Actions*, *Repository secrets*: delete the three secrets (and any *Dependabot*
+   secrets of those names).
+6. Publish `v0.1.0` as above and check that the jobs `image-publish`, `promote` and `dispatch` show the
+   environment `release`.
+
+The workflow cannot read the environment's settings, so no step can check that the rule exists; a missing Docker
+Hub secret fails the credentials check and the release stays a pre-release. The protection holds only after steps
+1 to 3 and 5.
+
+Who can do what:
+
+- Only administrators create, move or delete `v*` tags (ruleset `tag-Protection`).
+- Anyone with write access can publish a release on an existing `v*` tag or re-run a release run; that runs the
+  reviewed workflow of that tag with the environment secrets. It discloses no secret but may move `latest` back
+  ([issue #78](https://github.com/LarsLaskowski/Censio/issues/78)).
+- The environment admits the workflow of whatever commit a `v*` tag points to and closes branch workflows, not
+  `main`: while the ruleset `main-Protection` lets the write and maintain roles bypass its pull request rule, a
+  writer can push a changed workflow to `main` without a pull request, and the administrator's next release runs it
+  with the secrets ([issue #77](https://github.com/LarsLaskowski/Censio/issues/77)).
+
+Not yet tried (a settings dry run, D1 to D4 of the plan of issue #74, and the first release `v0.1.0` have not run;
+these statements stay unverified until they have):
+
+- D1: that the bypass actors of `tag-Protection` (administrator only) and `main-Protection` (administrator,
+  maintain and write roles) are as stated above.
+- D2: that a job naming the environment on a branch ref is refused before its first step.
+- D3: that a repository secret is still readable by a job without an environment, and that all three are gone after
+  step 5.
+- D4: that an unknown environment is created without a rule, that `*` of the tag rule and of the ruleset's
+  `refs/tags/v*` match the same tags, and the labels of the settings pages named above (including *Allow
+  administrators to bypass configured protection rules*).
+- That a `release` event runs on `refs/tags/<tag>` and passes the rule, and that the jobs need no `deployments`
+  permission (the first release).
 
 Limits and rules:
 

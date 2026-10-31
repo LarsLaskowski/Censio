@@ -3,6 +3,7 @@ name: Release
 # A release is published as a pre-release; the run builds and checks the artifacts without any secret, publishes them
 # and only then promotes the release (record 0012). Event and job-output values reach a script only through `env` and
 # are checked with `release-check.sh form` before the credentialed jobs use them. No cache of any kind (record 0008).
+# The Docker Hub secrets are secrets of the environment `release`, which admits only `v*` tags (record 0012).
 on:
   release:
     types: [ published ]
@@ -146,6 +147,7 @@ jobs:
   image-publish:
     needs: [ check, image-build ]
     runs-on: ubuntu-latest
+    environment: release
     permissions:
       contents: read
     env:
@@ -197,6 +199,7 @@ jobs:
   promote:
     needs: [ check, companion-publish, image-publish ]
     runs-on: ubuntu-latest
+    environment: release
     permissions:
       contents: write
     env:
