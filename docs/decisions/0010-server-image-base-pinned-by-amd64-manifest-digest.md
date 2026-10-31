@@ -54,7 +54,8 @@ in [`areas/server.md`](../areas/server.md) (*Docker image*).
   `FROM` line (`docs/CONTRIBUTING.md`, *Automated checks*); the CI check makes a forgotten label fail closed.
 - Accepted limit: an Alpine fix between two .NET patches reaches the image only through a digest refresh or the
   next .NET patch (MCR rebuilds its tags monthly), and a new Alpine minor, or the end of new tags on the pinned
-  one, needs a manual bump of both `FROM` lines (`docs/CONTRIBUTING.md`).
+  one, needs a manual bump of both `FROM` lines (`docs/CONTRIBUTING.md`). Nothing in this change notices the end
+  of new tags; a scheduled check for it is a follow-up issue, decided after the plan's security review.
 - arm64 hosts are out; adding them needs a multi-platform build and changes this record.
 - A feature that needs cultures or local time zones moves the runtime stage to the `-extra` variant; the move to
   .NET 11 changes both tags and the Dependabot `ignore` by hand.

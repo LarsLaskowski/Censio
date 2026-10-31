@@ -56,7 +56,7 @@ The Dev runs the *Image build check* reproduction and the *Analyzer gate* (`hado
 | AC4 | `docker exec censio touch /config/check` succeeds on a new named volume | CI case AC4 |
 | AC5 | `Config.Healthcheck` has interval 10 s, timeout 3 s, start period 30 s, retries 3; `State.Health.Status` turns `healthy` within 60 s (poll every 2 s) | CI case AC5 |
 | AC6 | `Config.Env` holds `ASPNETCORE_HTTP_PORTS=8080`, `Config.ExposedPorts` holds `8080/tcp`; with `-e ASPNETCORE_HTTP_PORTS=9090 -p 9090:9090` `/health` → `200` on 9090 and `healthy` within 60 s; with `8080;8081` `healthy` within 60 s | CI case AC6 |
-| AC7 | build `--build-arg VERSION=1.2.3` → `/` contains `Version 1.2.3`; builds with `VERSION=1.0;touch /pwned`, `VERSION=1.0;Foo=bar` and `VERSION=1.0` each fail, and the output contains `VERSION is not a semantic version`; `test -e /pwned` is false in the stage `build` (`--target build` up to the check) | CI case AC7 |
+| AC7 | build `--build-arg VERSION=1.2.3` → `/` contains `Version 1.2.3`; builds with `VERSION=1.0;touch /pwned`, `VERSION=1.0;Foo=bar`, `VERSION=1.0` and `VERSION=1.0.0\n;Foo=bar` (a line break after `1.0.0`, passed as `$'1.0.0\n;Foo=bar'`) each fail, and the output contains `VERSION is not a semantic version`; `test -e /pwned` is false in the stage `build` (`--target build` up to the check) | CI case AC7 |
 | AC8 | `hadolint src/Censio.Server/Dockerfile` reports nothing | *Analyzer gate* / Dev, step 7 |
 | AC9 | `Config.Labels` holds the four labels, `licenses` = `MIT`, `base.name` and `base.digest` equal to the tag and digest parsed from the runtime `FROM` line of the Dockerfile; a mismatch fails the job with both values | CI case AC9 |
 | AC10 | a copy of the checkout in `$RUNNER_TEMP` with the `RequiresAspNetWebAssets` line deleted from `Censio.Server.csproj`: `docker build` fails and its output contains `wwwroot/_framework/blazor.web*.js`; the same copy run through the *Image build check* reproduction fails with the same message | CI case AC10; reproduction locally / Dev before the review |
@@ -92,8 +92,11 @@ script's.
   `.csproj` files of `Censio.Server`, `Censio.Contracts`, `Censio.Server.Data` to their own paths;
   `RUN dotnet restore src/Censio.Server/Censio.Server.csproj`; `COPY .editorconfig ./` and `COPY src/ src/`;
   `ARG VERSION=0.0.0`; a `RUN` that fails with `VERSION is not a semantic version: <value>` unless `VERSION`
-  matches `^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$`
-  (`grep -Eqx` on the quoted value; no `;`, space or `=` passes);
+  passes two checks in this order: first the whole value as one string,
+  `case "$VERSION" in ''|*[!0-9A-Za-z.+-]*) echo "VERSION is not a semantic version: $VERSION" >&2; exit 1;; esac`
+  (rejects an empty value and any `;`, space, `=` or line break, B2: `grep` alone is line-wise), then
+  `grep -Eqx` on the quoted value against
+  `^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$`;
   `RUN dotnet publish src/Censio.Server/Censio.Server.csproj -c Release --no-restore -o /app/publish
   "-p:Version=${VERSION}"` (the value is quoted and expanded once, never evaluated); then a `RUN` that fails
   unless a file matches `/app/publish/wwwroot/_framework/blazor.web*.js`, with the message
@@ -139,7 +142,8 @@ in step 9.
    0009.
 2. **Base pinning and `base.digest`** — full-version `-alpineX.Y-amd64` tags by manifest digest, literal label,
    CI check (chosen); floating `10.0-alpine-amd64` tags (lost: patches only as suppressible digest refreshes,
-   B1); a scheduled staleness job (lost: a second workflow for what a tag update gives); an
+   B1); a scheduled staleness job in this change (deferred to a follow-up issue, N3: tag updates cover the
+   pinned Alpine minor until MCR stops publishing it); an
    `ARG` (lost: Dependabot stops); labels from #5/#6 (lost: the issue wants them in the Dockerfile); the index
    digest (lost: platform follows the host); the `-extra` variant (lost: size without need). Record 0010.
 3. **Restore scope** — the server project (chosen: the image needs only it, and the Companion's `win-x64`
@@ -229,7 +233,8 @@ gate 0007 names. Record 0005: the version enters only through `-p:Version`.
 - [x] No limits: the change parses no input.
 - [x] No exception reaches a user: the build's own messages and the Blazor-check message above.
 - The `VERSION` argument reaches the shell only as a quoted, once-expanded word, and a value that is not
-  strict SemVer fails before `dotnet publish`, so no `;` sets another MSBuild property (AC7).
+  strict SemVer — checked as one whole string, so a line break cannot hide a `;` — fails before
+  `dotnet publish`, so no `;` sets another MSBuild property (AC7).
 - The job has `contents: read`, no secret and no push; it runs pull request code as `build` already does.
 - The container never starts as root in any documented command; `--user 0` is not documented.
 - Published files are root-owned and read-only for the runtime user; only `/config` is writable.
@@ -245,6 +250,11 @@ gate 0007 names. Record 0005: the version enters only through `-p:Version`.
 
 As in the spec. A follow-up issue for the orchestrator: "[Server] Persist the data-protection key ring in
 /config" — body: inside the image the key ring is lost on recreation (record 0009); move it with #29/#33.
+A second one: "[CI] Detect a frozen pinned Alpine base of the server image" — body: the Dockerfile pins
+full-version `-alpineX.Y-amd64` tags (record 0010); once MCR stops publishing tags for that Alpine minor
+(alpine3.22 ended at 10.0.3, alpine3.23 at 10.0.12), Dependabot proposes nothing and the base silently stops
+receiving .NET and Alpine patches; add a scheduled check that fails when a newer .NET 10 patch exists only on a
+newer Alpine minor.
 
 ## Challenge
 
@@ -267,3 +277,10 @@ Devil's Advocate, mode `plan`, three minor objections:
   E5 and AC7 are corrected and AC7 covers `1.0;Foo=bar`. #5 and #6 pass a SemVer value and get this check.
 - N2 (Docker bypasses ufw/firewalld): taken — one sentence next to the `-p 127.0.0.1:8080:8080` advice in
   `SECURITY.md`, `README.md` and `docs/USER_GUIDE.md` (*Documentation updates*; spec S10).
+- B2 (round 2: the line-wise `grep -Eqx` lets `1.0.0\n;Foo=bar` through): taken as Security required (Lead
+  decision after the Plan ↔ Security loop limit) — the `case` check on the whole value runs before the `grep`
+  (*Approach*), and AC7 in plan and spec covers the line-break value with the same message. Its whole list of
+  accepted forms, re-checked: only `[0-9A-Za-z.+-]` characters in one non-empty line, then the strict SemVer
+  pattern; `;`, `=`, space, tab, line break, quote, `$` and backtick all fail the `case`.
+- N3 (pinned Alpine minor can freeze): taken as a follow-up issue (*Out of scope / follow-ups*); the limit stays
+  stated in record 0010.

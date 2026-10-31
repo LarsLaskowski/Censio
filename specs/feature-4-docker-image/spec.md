@@ -76,7 +76,7 @@ sources are copied can lose the Blazor script (record 0007, Vandox#24).
   (`chown -R 1654:1654 <dir>`) — and says that `/config` on Docker Desktop for Windows is a named volume.
   The image ships no root entrypoint that changes ownership or drops privileges (Q1).
 - E5: `VERSION` holds shell or MSBuild metacharacters (`--build-arg "VERSION=1.0;touch /pwned"`,
-  `VERSION=1.0;Foo=bar`): the value is never run as a command, and a value that is not a semantic version
+  `VERSION=1.0;Foo=bar`, or `1.0.0\n;Foo=bar` with a line break): the value is never run as a command, and a value that is not a semantic version
   (`MAJOR.MINOR.PATCH`, optional pre-release and build parts) fails the build before the publish with
   `VERSION is not a semantic version: <value>`; no image is produced.
 - E6: The container is stopped (`docker stop`): the server shuts down within Docker's default stop timeout,
@@ -134,7 +134,8 @@ sources are copied can lose the Blazor script (record 0007, Vandox#24).
   `ASPNETCORE_HTTP_PORTS=9090` the server answers `/health` on 9090 and `docker inspect` reports it `healthy`
   within 60 seconds; started with `ASPNETCORE_HTTP_PORTS=8080;8081` it reports `healthy` too (S6).
 - [ ] AC7: Built with `--build-arg VERSION=1.2.3` the start page shows `Version 1.2.3`; built with
-  `VERSION=1.0;touch /pwned` or `VERSION=1.0;Foo=bar` the build fails with `VERSION is not a semantic version`,
+  `VERSION=1.0;touch /pwned`, `VERSION=1.0;Foo=bar` or `VERSION=1.0.0\n;Foo=bar` (a line break after
+  `1.0.0`) the build fails with `VERSION is not a semantic version`,
   and no `/pwned` exists (S7, E5).
 - [ ] AC8: `hadolint` reports no finding on the Dockerfile (S8).
 - [ ] AC9: `docker inspect` shows the four labels of S9 with `licenses` `MIT`, `base.name` equal to the runtime
@@ -163,6 +164,8 @@ sources are copied can lose the Blazor script (record 0007, Vandox#24).
 - Other platforms than linux/amd64 (arm64 hosts, including ARM-based Synology models; Windows containers),
   docker-compose, and NAS-specific templates (an Unraid Community Applications template, a Synology project).
 - The rest of `README.md` and the user guide (what Censio is, status, the Windows ZIP): #7.
+- A scheduled check that notices when MCR stops publishing tags for the pinned Alpine minor: a follow-up issue
+  (record 0010).
 - E3 needs no criterion of its own beyond its documentation in AC12: the message is Docker's.
 
 ## Open questions
