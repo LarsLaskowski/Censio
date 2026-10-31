@@ -15,8 +15,9 @@ profile and owned by this repository: keep it true when the build changes.
   correct. Dependabot raises both in one grouped NuGet pull request.
 - Analyzers in every project via `Directory.Build.props`: **Reihitsu.Analyzer**, **SonarAnalyzer.CSharp**
   (the Sonar C# rules locally, so SonarQube issues surface before the push) and the MSTest analyzers.
-- The SessionStart hook `.claude/hooks/session-start.sh` restores the tool manifest, sets `DOTNET_ROOT` and
-  restores the solution in remote sessions.
+- The SessionStart hook `.claude/hooks/session-start.sh` restores the tool manifest, installs an unpinned global
+  `reihitsu-format` when none is on `PATH` (the commands below use the pinned one through `dotnet tool run`),
+  sets `DOTNET_ROOT` and restores the solution in remote sessions.
 
 ## Layout
 

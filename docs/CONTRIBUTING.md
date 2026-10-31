@@ -62,12 +62,19 @@ request.
   and Dependabot pull requests); a rejected token or an unreachable server fails the CI job. Locally the *Sonar
   gate* of `.squad/stack.md` runs it.
 - **CodeQL** (`.github/workflows/codeql.yml`): analyses C# and the workflows on pushes to `main`, on pull
-  requests and weekly (Sunday 01:30 UTC); alerts appear under *Security > Code scanning*.
+  requests and weekly (Sunday 01:30 UTC); its checks *Analyze (csharp)* and *Analyze (actions)* turn red when
+  the analysis itself fails, and the alerts it finds appear under *Security > Code scanning*. No local command
+  reproduces it.
 - **Dependabot** (`.github/dependabot.yml`): weekly version updates for NuGet (the .NET tools of the manifest
   included), GitHub Actions and Docker (`src/Censio.Server/`), each ecosystem in one grouped pull request;
   security updates arrive separately.
-- **Fork scope** (`.github/workflows/fork-scope.yml`): runs on pull requests from forks and checks that they
-  stay inside the files a contribution may change.
+- **Fork scope** (`.github/workflows/fork-scope.yml`): runs on pull requests from forks, with the check as it
+  is on `main`, and turns red when one changes a squad or agent instruction file (`.squad/` except `stack.md`
+  and `project.md`, `.claude/`, `CLAUDE.md`, `AGENTS.md`, `.github/copilot-instructions.md`), text outside the
+  `<!-- project:… -->` blocks of a marked file or a working record under `specs/`, or adds a control character
+  to a Markdown file; it does not check `.github/workflows/`. `python3 .squad/tools/scope-check.py --no-specs`
+  reproduces it locally, except that the local run allows changes inside the project blocks of `AGENTS.md` and
+  its mirror.
 
 Pull requests from forks and Dependabot's get no repository secrets, so SonarQube and the test report are
 skipped there while restore, format check, build and tests run. A first-time contributor's run waits until a
