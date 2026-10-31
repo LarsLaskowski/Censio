@@ -26,7 +26,7 @@ Start the container with a named volume for the data directory `/config`:
 docker run -d --name censio -p 8080:8080 -v censio-config:/config censio
 ```
 
-Check that it answers (the response is `Healthy`; in Windows PowerShell 5.1 `curl` is an alias of `Invoke-WebRequest` and works the same) and read its log:
+Check that it answers (the response is `Healthy`; in Windows PowerShell 5.1 `curl` is an alias of `Invoke-WebRequest`, which shows `StatusCode` `200` and `Content` `Healthy` and may ask for a confirmation first) and read its log:
 
 ```text
 curl http://localhost:8080/health
@@ -88,7 +88,7 @@ Copy `censio.tar` to the NAS, then run on the NAS:
 docker load -i censio.tar
 ```
 
-These NAS steps and the Docker Desktop steps are covered by an automated Linux check with user `99:100`; they have not been tried on Unraid or Synology hardware yet.
+An automated check on Linux Docker Engine runs the `--user 99:100` command with a bind mount owned by `99:100`; the `chown` remedy, the `docker save` and `docker load` transfer, Docker Desktop for Windows and Unraid or Synology hardware have not been tried yet.
 
 ### Network and TLS
 
@@ -131,7 +131,7 @@ Den Container mit einem benannten Volume für das Datenverzeichnis `/config` sta
 docker run -d --name censio -p 8080:8080 -v censio-config:/config censio
 ```
 
-Prüfen, ob er antwortet (die Antwort lautet `Healthy`; in Windows PowerShell 5.1 ist `curl` ein Alias für `Invoke-WebRequest` und funktioniert genauso), und sein Log lesen:
+Prüfen, ob er antwortet (die Antwort lautet `Healthy`; in Windows PowerShell 5.1 ist `curl` ein Alias für `Invoke-WebRequest`, das `StatusCode` `200` und `Content` `Healthy` anzeigt und vorher eine Bestätigung verlangen kann), und sein Log lesen:
 
 ```text
 curl http://localhost:8080/health
@@ -193,7 +193,7 @@ docker save -o censio.tar censio
 docker load -i censio.tar
 ```
 
-Diese NAS-Schritte und die Schritte für Docker Desktop deckt eine automatische Linux-Prüfung mit dem Benutzer `99:100` ab; auf Unraid- oder Synology-Hardware wurden sie noch nicht ausprobiert.
+Eine automatische Prüfung unter Docker Engine für Linux führt den Befehl mit `--user 99:100` und einem Bind-Mount aus, der `99:100` gehört; die `chown`-Abhilfe, die Übertragung mit `docker save` und `docker load`, Docker Desktop für Windows und Unraid- oder Synology-Hardware wurden noch nicht ausprobiert.
 
 ### Netzwerk und TLS
 

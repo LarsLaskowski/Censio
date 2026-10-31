@@ -61,16 +61,26 @@ The Dev runs the *Image build check* reproduction and the *Analyzer gate* (`hado
 | AC9 | `Config.Labels` holds the four labels, `licenses` = `MIT`, `base.name` and `base.digest` equal to the tag and digest parsed from the runtime `FROM` line of the Dockerfile; a mismatch fails the job with both values | CI case AC9 |
 | AC10 | a copy of the checkout in `$RUNNER_TEMP` with the `RequiresAspNetWebAssets` line deleted from `Censio.Server.csproj`: `docker build` fails and its output contains `wwwroot/_framework/blazor.web*.js`; the same copy run through the *Image build check* reproduction fails with the same message | CI case AC10; reproduction locally / Dev before the review |
 | AC11 | `docker stop` of the AC2 container returns within 10 s, `State.ExitCode` is `0` | CI case AC11 |
-| AC12 | read against the documentation updates and the spec; the dry run below | Reviewer, step 8; Product Manager, dry run |
+| AC12 | read against the documentation updates and the spec; the dry run below | Product Manager, dry run; Reviewer, step 8 delta round after it |
 | AC13 | `sudo install -d -o 99 -g 100 "$RUNNER_TEMP/nas"`, `docker run --user 99:100 -v "$RUNNER_TEMP/nas:/config"`: `id -u` → `99`, `/health` → `200`, `touch /config/check` succeeds; `Config.Entrypoint` is `["dotnet","Censio.Server.dll"]` and the image has no `*.sh` under `/app`; the container log is printed | CI case AC13 |
 
-**Dry run** (*Operator environments*, `.squad/routing.md`), scheduled by the orchestrator after the CI job is
-green and before the Reviewer's round in step 8: the Product Manager pastes the README's commands
+**Order** (Lead decision in step 8, deviation from the step order logged): `ci.yml` runs only on
+`pull_request` and on `push` to `main`, so the job `image` cannot run before a pull request exists. After the
+round-1 fixes pass step 7, the orchestrator opens the **draft** pull request early (final title and body,
+`specs/` still on the branch); the job `image` must be green on that head, its run linked in `log.md` as the
+measurement of facts 11, 12, 14 and 15; then the dry run below; then the Reviewer's delta round (with
+Security's diff delta when `image-check.sh`, `ci.yml` or the Dockerfile changed) on the fixes, the dry-run
+edits and the green run. Step 9 approves only with all three on the reviewed head; step 10 then posts the
+working record, removes `specs/` and keeps the existing pull request a draft (*Draft until green*).
+
+**Dry run** (*Operator environments*, `.squad/routing.md`), on the head whose job `image` is green and before
+the documentation delta review: the Product Manager pastes the README's commands
 (a) on Docker Desktop for Windows (Docker Engine 23 or later, WSL 2 backend, Linux containers) in Windows
 PowerShell 5.1 and in PowerShell 7, and (b) on an Unraid (6.12 or later) or Synology (DSM 7.2, Container
 Manager) host with a share of its own UID, including the `docker save`/`docker load` transfer; without a NAS,
 the stand-in is the CI case AC13. The result goes into `log.md`; a statement no run has shown is marked so in
-the documentation.
+the documentation. A failed step goes to the Dev (steps 6–7), the job `image` must be green again, and the
+Product Manager repeats the failed part before the delta round.
 
 **Documented commands** (*Shell procedures*): every command is one line without variables, and each depends
 only on the previous one having succeeded. (a) All lines pasted at once: a failed `docker build` is followed

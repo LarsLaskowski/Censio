@@ -7,6 +7,7 @@ set -euo pipefail
 dockerfile="src/Censio.Server/Dockerfile"
 work="${RUNNER_TEMP:-$(mktemp -d)}"
 containers=()
+declare -A started
 volumes=()
 images=()
 dirs=()
@@ -80,6 +81,7 @@ start_container()
     local name="$1"
     shift
     containers+=("$name")
+    started["$name"]=$SECONDS
     docker run -d --name "$name" "$@" > /dev/null
 }
 
@@ -112,8 +114,8 @@ wait_healthy()
 {
     local case_name="$1"
     local name="$2"
-    local deadline=$((SECONDS + 60))
     local status="none"
+    local deadline=$((started["$name"] + 60))
 
     while ((SECONDS < deadline)); do
         status="$(inspect_container "$name" '{{.State.Health.Status}}')"
@@ -132,20 +134,22 @@ image_files()
     docker run --rm --entrypoint find "$image" /app -type f | sort
 }
 
-# Builds an image that must fail; the output has to contain the given text.
+# Builds an image that must fail. The build output has to hold the given line as the executed RUN command printed it
+# (BuildKit prefixes it with "#<step> <seconds> "): the same text also appears in the Dockerfile's own RUN lines,
+# which BuildKit echoes as step headers and in its error excerpt, so only a prefixed whole line proves the check fired.
 expect_build_failure()
 {
     local case_name="$1"
-    local needle="$2"
+    local line="$2"
     shift 2
     local output
 
     if output="$(docker build --progress=plain "$@" 2>&1)"; then
         fail "$case_name" "docker build fails" "docker build succeeded"
     fi
-    if [[ "$output" != *"$needle"* ]]; then
+    if ! sed -E 's/^#[0-9]+ [0-9.]+ //' <<< "$output" | grep -Fxq -- "$line"; then
         echo "$output" >&2
-        fail "$case_name" "output contains '${needle}'" "message missing"
+        fail "$case_name" "build output line '${line}'" "line missing"
     fi
 }
 
@@ -268,16 +272,11 @@ if [[ "$version_page" != *"Version 1.2.3"* ]]; then
     fail "AC7 start page" "contains 'Version 1.2.3'" "missing"
 fi
 docker rm -f "$version_container" > /dev/null
-semver_message="VERSION is not a semantic version"
-expect_build_failure "AC7 metacharacters" "$semver_message" -f "$dockerfile" --build-arg 'VERSION=1.0;touch /pwned' --target build .
-expect_build_failure "AC7 second property" "$semver_message" -f "$dockerfile" --build-arg 'VERSION=1.0;Foo=bar' --target build .
-expect_build_failure "AC7 two components" "$semver_message" -f "$dockerfile" --build-arg 'VERSION=1.0' --target build .
-expect_build_failure "AC7 line break" "$semver_message" -f "$dockerfile" --build-arg $'VERSION=1.0.0\n;Foo=bar' --target build .
-# The rejected builds leave no stage behind; a build of the stage with a valid value shows nothing was written to /.
-build_image="censio-check:build"
-images+=("$build_image")
-docker build -f "$dockerfile" --target build -t "$build_image" .
-docker run --rm --entrypoint sh "$build_image" -c 'test ! -e /pwned' || fail "AC7" "no /pwned in stage build" "/pwned exists"
+semver_message="VERSION is not a semantic version: "
+expect_build_failure "AC7 metacharacters" "${semver_message}1.0;touch /pwned" -f "$dockerfile" --build-arg 'VERSION=1.0;touch /pwned' --target build .
+expect_build_failure "AC7 second property" "${semver_message}1.0;Foo=bar" -f "$dockerfile" --build-arg 'VERSION=1.0;Foo=bar' --target build .
+expect_build_failure "AC7 two components" "${semver_message}1.0" -f "$dockerfile" --build-arg 'VERSION=1.0' --target build .
+expect_build_failure "AC7 line break" "${semver_message}1.0.0" -f "$dockerfile" --build-arg $'VERSION=1.0.0\n;Foo=bar' --target build .
 
 step "AC10: build without RequiresAspNetWebAssets fails"
 copy="${work}/image-check-copy"
@@ -289,7 +288,7 @@ sed -i '/RequiresAspNetWebAssets/d' "${copy}/src/Censio.Server/Censio.Server.csp
 if grep -q 'RequiresAspNetWebAssets' "${copy}/src/Censio.Server/Censio.Server.csproj"; then
     fail "AC10" "RequiresAspNetWebAssets removed from the copy" "still present"
 fi
-expect_build_failure "AC10" 'wwwroot/_framework/blazor.web*.js' -f "${copy}/${dockerfile}" "$copy"
+expect_build_failure "AC10" 'publish output lacks wwwroot/_framework/blazor.web*.js (see docs/decisions/0007)' -f "${copy}/${dockerfile}" "$copy"
 
 step "AC1 dirty: build after a local build and publish"
 dotnet build Censio.slnx -c Release
