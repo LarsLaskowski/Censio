@@ -28,6 +28,11 @@ alone selects the image and a tag that no longer matches it misleads the reader;
 vulnerability and fails the quality gate (pull request #66). A Dockerfile treats `#` as a comment only at the
 start of a line, so a same-line `NOSONAR` on a `FROM` line is impossible.
 
+MCR stops publishing the full-version tags of an Alpine minor some patches after the next minor starts
+(`aspnet` on 2026-10-31: `alpine3.22` 10.0.0–10.0.3, `alpine3.23` 10.0.1–10.0.12, `alpine3.24` 10.0.9–10.0.14;
+the SDK alike), so a newer minor alone is no reason to move, while a patch on the newer minor that the pinned one
+lacks is. The tag list (`/v2/dotnet/<image>/tags/list`) is anonymous and unpaginated (issue #65).
+
 ## Options considered
 
 1. **Full-version single-architecture tags (`-alpineX.Y-amd64`) pinned by their manifest digest, the label a
@@ -58,12 +63,27 @@ For `docker:S8431` on option 1's `FROM` lines:
 11. **Mark the issue *Accepted* in the SonarQube Cloud UI** — no repository change. Con: invisible in the
     repository, and the issue is matched to its line, so a base bump can raise it again on new code.
 
+For noticing that the pinned Alpine minor gets no new tags (issue #65):
+
+12. **A separate workflow, weekly, on manual dispatch and on pull requests that change the Dockerfile or the
+    check, failing when a newer patch of a pinned base exists only on a newer Alpine minor** (chosen) — no
+    unrelated pull request turns red because MCR moved; a bump is checked in its own pull request. Con: a red
+    scheduled run is the only signal.
+13. **A step in the CI job `image`** — no new workflow. Con: every pull request turns red for a reason outside
+    it, and nothing runs while no one pushes.
+14. **Open an issue on failure** — more visible. Con: `issues: write` for a check that otherwise only reads.
+15. **Compare the pin with the floating `10.0-alpine-amd64` tag's digest** — follows MCR's choice of minor. Con:
+    more registry requests, and MCR's monthly rebuilds make digest matches unreliable.
+16. **Renovate with a versioning that crosses Alpine minors** — would propose the bump. Con: a second update tool
+    with write access; the label edit stays manual.
+
 ## Decision
 
 Option 1 with the plain runtime variant; Dependabot ignores major base-image updates, which a `net10.0` app
 cannot take. `docker:S8431` is excluded for this Dockerfile (option 8): the digest keeps the integrity the rule
 protects, and the tag is what Dependabot updates. The exact tags, the labels and the limits that follow (invariant globalization, no time zones) are
-in [`areas/server.md`](../areas/server.md) (*Docker image*).
+in [`areas/server.md`](../areas/server.md) (*Docker image*). A frozen Alpine minor is reported by the *Base image
+check* (option 12), described in [`CONTRIBUTING.md`](../CONTRIBUTING.md) (*Automated checks*).
 
 ## Consequences
 
@@ -71,8 +91,10 @@ in [`areas/server.md`](../areas/server.md) (*Docker image*).
   `FROM` line (`docs/CONTRIBUTING.md`, *Automated checks*); the CI check makes a forgotten label fail closed.
 - Accepted limit: an Alpine fix between two .NET patches reaches the image only through a digest refresh or the
   next .NET patch (MCR rebuilds its tags monthly), and a new Alpine minor, or the end of new tags on the pinned
-  one, needs a manual bump of both `FROM` lines (`docs/CONTRIBUTING.md`). Nothing in this change notices the end
-  of new tags; a scheduled check for it is a follow-up issue, decided after the plan's security review.
+  one, needs a manual bump of both `FROM` lines (`docs/CONTRIBUTING.md`). The *Base image check* turns red within
+  a week of the first .NET patch the pinned minor misses, as long as GitHub has not disabled its schedule after 60
+  days without repository activity; until then a newer minor is not adopted. It reads only the public tag list,
+  with a read-only token and no secret, and fails closed when it cannot read the pins or the list.
 - A hand edit that changes a tag without its digest builds the old image under the new `base.name`; nothing
   checks that a tag still resolves to its pinned digest, because MCR rebuilds its tags. The exclusion covers only
   `docker:S8431` in this one file (`.squad/stack.md`, *Analyzer gate*).

@@ -59,6 +59,16 @@ request.
   labels, user, health check, ports, `VERSION`, the missing-Blazor-script failure, a clean and a dirty working
   tree). It pushes nothing and uses no secret. The log names the failed case (`image-check: <case>: <expected> /
   <actual>`). Locally, `hadolint src/Censio.Server/Dockerfile` and the *Image build check* of `.squad/stack.md`.
+- **Base image check** (`.github/workflows/base-check.yml`): runs weekly (Wednesday 05:30 UTC), on demand
+  (`workflow_dispatch`) and on pull requests that change the Dockerfile, `.github/scripts/base-check.sh` or the
+  workflow. It reads the public tag list of `mcr.microsoft.com` anonymously and compares every `FROM` line of
+  `src/Censio.Server/Dockerfile` with it. It turns red when a newer .NET patch of a pinned base exists only on a
+  newer Alpine minor (for example `10.0.14-alpine3.24-amd64` while the pin is `10.0.12-alpine3.23-amd64`),
+  because Dependabot proposes no such update; the log names the minor to move to (move both `FROM` lines and the
+  base labels there, as in the *Dependabot* bullet). It also turns red, saying `cannot check`, when a `FROM`
+  line is not a full-version `mcr.microsoft.com/dotnet` Alpine tag, the pinned tag is not in the registry's
+  list, or the registry cannot be read. It uses no secret and its token is read-only (`contents: read`). A failed scheduled run notifies the user who last changed the workflow's `cron` line, and GitHub disables the schedule of a public repository after 60 days without activity (it is re-enabled on the workflow's page under *Actions*). Locally:
+  `bash .github/scripts/base-check.sh [dockerfile]` from the repository root (needs `curl` and `jq`).
 - **Test report** (check *dotnet tests*): lists the results of the test step, also when a test failed. It is
   skipped on fork and Dependabot pull requests, whose token cannot create check runs.
 - **SonarQube Cloud** (organisation `networlddev`, project `networlddev_censio`; check *SonarCloud Code
@@ -75,7 +85,8 @@ request.
   security updates arrive separately. A base-image pull request fails the job `image` until the labels
   `org.opencontainers.image.base.name` and `…base.digest` in the Dockerfile are set by hand to the tag and digest of
   the new runtime `FROM` line. Major base-image updates are ignored until the target framework moves. A new
-  Alpine minor (a new tag suffix such as `alpine3.25`) is a manual bump of both `FROM` lines and the labels.
+  Alpine minor (a new tag suffix such as `alpine3.25`) is a manual bump of both `FROM` lines and the labels;
+  the *Base image check* reports when that bump is due.
 - **Fork scope** (`.github/workflows/fork-scope.yml`): runs on pull requests from forks, with the check as it
   is on `main`, and turns red when one changes a squad or agent instruction file (`.squad/` except `stack.md`
   and `project.md`, `.claude/`, `CLAUDE.md`, `AGENTS.md`, `.github/copilot-instructions.md`), text outside the
