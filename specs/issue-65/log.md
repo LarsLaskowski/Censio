@@ -16,5 +16,5 @@ are quoted in full.
 | 2026-10-31 17:07 | 8 Review | Orchestrator | verbatim doc fix applied (docs/CONTRIBUTING.md; record 0010 Consequences, sentence re-wrapped to the file's line width); decision-check, scope-check pass |
 | 2026-10-31 17:07 | 8 Fix | squad-dev | fixed jq error echo + leading-zero pin (string compare); stub-curl and real-registry checks pass; lint PASS (sonnet/medium · 5,187 tokens · 4 tool uses · 28 s · continued from 6 Implement) |
 | 2026-10-31 17:08 | 8 Review (delta) | squad-reviewer | APPROVE; both blocking findings fixed, re-verified by stub curl and real registry (opus/medium · 7,176 tokens · 4 tool uses · 45 s · continued from 8 Review) |
-| 2026-10-31 17:09 | 9 PR approval | squad-lead | APPROVED: [0-9]{1,6} limit accepted, fact 10 confirmed, no further doc changes (opus/medium · usage pending) |
+| 2026-10-31 17:09 | 9 PR approval | squad-lead | APPROVED: [0-9]{1,6} limit accepted, fact 10 confirmed, no further doc changes (opus/medium · 40,334 tokens · 7 tool uses · 59 s) |
 | 2026-10-31 17:09 | 10 Pull request | Orchestrator | Working record posted on the issue; work folder removed; draft PR opened |
