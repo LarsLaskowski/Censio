@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 
 using Censio.Contracts;
 
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Configuration.Json;
@@ -21,6 +22,11 @@ public sealed class ProgramTests
     /// The pattern of the Blazor script element on the start page.
     /// </summary>
     private static readonly Regex _blazorScript = new("<script[^>]*\\ssrc=\"([^\"]*_framework/blazor\\.web(\\.[A-Za-z0-9]+)?\\.js)\"", RegexOptions.None, TimeSpan.FromSeconds(5));
+
+    /// <summary>
+    /// The temporary directories of the running test, deleted afterwards.
+    /// </summary>
+    private readonly List<string> _temporaryDirectories = [];
 
     #endregion // Fields
 
@@ -213,6 +219,61 @@ public sealed class ProgramTests
     }
 
     /// <summary>
+    /// Deletes the temporary directories of the test.
+    /// </summary>
+    [TestCleanup]
+    public void Cleanup()
+    {
+        foreach (var directory in _temporaryDirectories.Where(Directory.Exists))
+        {
+            Directory.Delete(directory, true);
+        }
+    }
+
+    /// <summary>
+    /// A configured data directory holds a key file once the server answers.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    public async Task ProgramStartWithDataDirectoryWritesKeyRing()
+    {
+        // Arrange
+        var dataDirectory = CreateTemporaryDirectory();
+        using var factory = new CensioServerFactory("Production", CreateDataDirectorySettings(dataDirectory));
+        using var client = factory.CreateClient();
+
+        // Act
+        using var response = await client.GetAsync("/health", TestContext.CancellationToken);
+
+        // Assert
+        var keyFiles = Directory.GetFiles(Path.Combine(dataDirectory, DataProtectionSetup.KeyDirectoryName), "key-*.xml");
+
+        Assert.AreEqual(System.Net.HttpStatusCode.OK, response.StatusCode, "The health endpoint should answer 200");
+        Assert.HasCount(1, keyFiles, "The start should have created exactly one key file");
+    }
+
+    /// <summary>
+    /// A second start on the same data directory reads the ring of the first one.
+    /// </summary>
+    [TestMethod]
+    public void ProgramRestartWithSameDataDirectoryUnprotectsEarlierPayload()
+    {
+        // Arrange
+        var dataDirectory = CreateTemporaryDirectory();
+        var settings = CreateDataDirectorySettings(dataDirectory);
+        var protectedPayload = ProtectWithNewServer(settings, "payload");
+
+        // Act
+        var restored = UnprotectWithNewServer(settings, protectedPayload);
+
+        // Assert
+        var keyFiles = Directory.GetFiles(Path.Combine(dataDirectory, DataProtectionSetup.KeyDirectoryName), "key-*.xml");
+
+        Assert.AreEqual("payload", restored, "The second instance should unprotect the payload of the first one");
+        Assert.HasCount(1, keyFiles, "The second start should create no further key file");
+    }
+
+    /// <summary>
     /// The committed settings files set no listen address.
     /// </summary>
     /// <param name="environment">The hosting environment</param>
@@ -242,6 +303,59 @@ public sealed class ProgramTests
         }
 
         Assert.IsEmpty(endpoints, "The committed settings should not set Kestrel:Endpoints");
+    }
+
+    /// <summary>
+    /// Creates the settings that point the server to a data directory.
+    /// </summary>
+    /// <param name="dataDirectory">The data directory</param>
+    /// <returns>The settings</returns>
+    private static Dictionary<string, string?> CreateDataDirectorySettings(string dataDirectory)
+    {
+        return new Dictionary<string, string?>
+               {
+                   [DataProtectionSetup.DataDirectoryKey] = dataDirectory
+               };
+    }
+
+    /// <summary>
+    /// Starts a server, protects a payload with it and stops it.
+    /// </summary>
+    /// <param name="settings">The settings of the server</param>
+    /// <param name="payload">The payload</param>
+    /// <returns>The protected payload</returns>
+    private static string ProtectWithNewServer(Dictionary<string, string?> settings, string payload)
+    {
+        using var factory = new CensioServerFactory("Production", settings);
+
+        return factory.Services.GetRequiredService<IDataProtectionProvider>().CreateProtector("Censio.Tests.Restart").Protect(payload);
+    }
+
+    /// <summary>
+    /// Starts a server, unprotects a payload with it and stops it.
+    /// </summary>
+    /// <param name="settings">The settings of the server</param>
+    /// <param name="protectedPayload">The protected payload</param>
+    /// <returns>The payload</returns>
+    private static string UnprotectWithNewServer(Dictionary<string, string?> settings, string protectedPayload)
+    {
+        using var factory = new CensioServerFactory("Production", settings);
+
+        return factory.Services.GetRequiredService<IDataProtectionProvider>().CreateProtector("Censio.Tests.Restart").Unprotect(protectedPayload);
+    }
+
+    /// <summary>
+    /// Creates an empty temporary directory that is deleted after the test.
+    /// </summary>
+    /// <returns>The full path of the directory</returns>
+    private string CreateTemporaryDirectory()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "censio-test-" + Guid.NewGuid().ToString("N"));
+
+        Directory.CreateDirectory(path);
+        _temporaryDirectories.Add(path);
+
+        return path;
     }
 
     #endregion // Methods

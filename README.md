@@ -58,7 +58,7 @@ docker run -d --name censio -e ASPNETCORE_HTTP_PORTS=9090 -p 9090:9090 -v censio
 
 ### Data directory and NAS hosts
 
-`/config` is the directory for the server's data. The image declares no `VOLUME`, so every command above passes `-v`. A named volume (`censio-config`) is the default and the only form on Docker Desktop for Windows. The container never starts as root: it runs as user `1654`.
+`/config` is the directory for the server's data; it holds the data-protection key ring in `/config/data-protection-keys`. The image sets `CENSIO__DATADIRECTORY=/config`; point it to another absolute path with `-e CENSIO__DATADIRECTORY=<path>`. It cannot be switched off in the image: `docker run -e` cannot unset it and an empty value stops the start. The image declares no `VOLUME`, so every command above passes `-v`. A named volume (`censio-config`) is the default and the only form on Docker Desktop for Windows. The container never starts as root: it runs as user `1654`.
 
 On a NAS whose shares belong to another user (Unraid `nobody:users` is `99:100`, a Synology user such as `1026:100`), start the container with that user and group; replace the path with your share:
 
@@ -76,7 +76,7 @@ chown -R 1654:1654 /mnt/user/appdata/censio
 docker run -d --name censio -p 8080:8080 -v /mnt/user/appdata/censio:/config censio
 ```
 
-A directory the container user cannot write does not stop the server from starting; writes to `/config` fail later, once the server stores data there. Build the image on the NAS, or build it elsewhere and move it:
+A directory the container user cannot write stops the container at start with exit code 1; `docker logs censio` then shows `The data-protection key ring cannot be stored in '/config/data-protection-keys'; the server stops. Make the data directory writable for the user the server runs as.` A value of `CENSIO__DATADIRECTORY` that is not an absolute path also stops it with exit code 1; `docker logs censio` then shows `The data directory (Censio:DataDirectory) must be an absolute path, not '<value>'; the server stops.` Build the image on the NAS, or build it elsewhere and move it:
 
 ```text
 docker save -o censio.tar censio
@@ -88,7 +88,7 @@ Copy `censio.tar` to the NAS, then run on the NAS:
 docker load -i censio.tar
 ```
 
-Building and starting the image with the commands of this guide was tried on Docker Desktop for Windows in PowerShell 7. An automated check on Linux Docker Engine runs the `--user 99:100` command with a bind mount owned by `99:100`; Windows PowerShell 5.1, the other commands of this section (the `chown` remedy, the `docker save` and `docker load` transfer) and Unraid or Synology hardware have not been tried yet.
+Building and starting the image with the commands of this guide was tried on Docker Desktop for Windows in PowerShell 7. An automated check on Linux Docker Engine runs the `--user 99:100` command with a bind mount owned by `99:100`; Windows PowerShell 5.1, the other commands of this section (the `chown` remedy, the `docker save` and `docker load` transfer), the stop at start for an unwritable directory on NAS hardware, and Unraid or Synology hardware have not been tried yet.
 
 ### Network and TLS
 
@@ -104,7 +104,7 @@ On Linux a published port bypasses host firewalls such as ufw and firewalld, so 
 
 - Only linux/amd64; arm64 hosts (including ARM-based Synology models) and Windows containers are not supported.
 - The image runs with invariant globalization and has no time zone data: `TZ` has no effect and log times are UTC.
-- ASP.NET Core's data-protection keys (antiforgery) are not kept: they are lost when the container is recreated, an open page needs a reload after a restart, and under `--user` with another UID the server logs a warning about it at start.
+- ASP.NET Core's data-protection keys lie unencrypted in `/config/data-protection-keys`; keep the directory and its backups private. ASP.NET Core logs the warning `No XML encryptor configured` when the server creates the first key.
 - The server logs to the console; read it with `docker logs censio`.
 
 ## Docker (Deutsch)
@@ -163,7 +163,7 @@ docker run -d --name censio -e ASPNETCORE_HTTP_PORTS=9090 -p 9090:9090 -v censio
 
 ### Datenverzeichnis und NAS-Hosts
 
-`/config` ist das Verzeichnis für die Daten des Servers. Das Image deklariert kein `VOLUME`, deshalb geben alle Befehle oben `-v` an. Ein benanntes Volume (`censio-config`) ist der Standard und unter Docker Desktop für Windows die einzige Form. Der Container startet nie als root: Er läuft als Benutzer `1654`.
+`/config` ist das Verzeichnis für die Daten des Servers; es enthält den Data-Protection-Schlüsselring in `/config/data-protection-keys`. Das Image setzt `CENSIO__DATADIRECTORY=/config`; mit `-e CENSIO__DATADIRECTORY=<Pfad>` lässt es sich auf einen anderen absoluten Pfad setzen. Im Image abschalten lässt es sich nicht: `docker run -e` kann es nicht entfernen, und ein leerer Wert stoppt den Start. Das Image deklariert kein `VOLUME`, deshalb geben alle Befehle oben `-v` an. Ein benanntes Volume (`censio-config`) ist der Standard und unter Docker Desktop für Windows die einzige Form. Der Container startet nie als root: Er läuft als Benutzer `1654`.
 
 Auf einem NAS, dessen Freigaben einem anderen Benutzer gehören (Unraid `nobody:users` ist `99:100`, ein Synology-Benutzer etwa `1026:100`), den Container mit diesem Benutzer und dieser Gruppe starten; den Pfad durch die eigene Freigabe ersetzen:
 
@@ -181,7 +181,7 @@ chown -R 1654:1654 /mnt/user/appdata/censio
 docker run -d --name censio -p 8080:8080 -v /mnt/user/appdata/censio:/config censio
 ```
 
-Ein Verzeichnis, das der Container-Benutzer nicht beschreiben kann, hindert den Server nicht am Start; Schreibzugriffe auf `/config` schlagen erst fehl, sobald der Server dort Daten ablegt. Das Image auf dem NAS bauen, oder woanders bauen und übertragen:
+Ein Verzeichnis, das der Container-Benutzer nicht beschreiben kann, stoppt den Container beim Start mit Exit-Code 1; `docker logs censio` zeigt dann `The data-protection key ring cannot be stored in '/config/data-protection-keys'; the server stops. Make the data directory writable for the user the server runs as.` Ein Wert von `CENSIO__DATADIRECTORY`, der kein absoluter Pfad ist, stoppt ihn ebenfalls mit Exit-Code 1; `docker logs censio` zeigt dann `The data directory (Censio:DataDirectory) must be an absolute path, not '<value>'; the server stops.` Das Image auf dem NAS bauen, oder woanders bauen und übertragen:
 
 ```text
 docker save -o censio.tar censio
@@ -193,7 +193,7 @@ docker save -o censio.tar censio
 docker load -i censio.tar
 ```
 
-Das Bauen und Starten des Images mit den Befehlen dieser Anleitung wurde unter Docker Desktop für Windows in PowerShell 7 ausprobiert. Eine automatische Prüfung unter Docker Engine für Linux führt den Befehl mit `--user 99:100` und einem Bind-Mount aus, der `99:100` gehört; Windows PowerShell 5.1, die übrigen Befehle dieses Abschnitts (die `chown`-Abhilfe, die Übertragung mit `docker save` und `docker load`) sowie Unraid- oder Synology-Hardware wurden noch nicht ausprobiert.
+Das Bauen und Starten des Images mit den Befehlen dieser Anleitung wurde unter Docker Desktop für Windows in PowerShell 7 ausprobiert. Eine automatische Prüfung unter Docker Engine für Linux führt den Befehl mit `--user 99:100` und einem Bind-Mount aus, der `99:100` gehört; Windows PowerShell 5.1, die übrigen Befehle dieses Abschnitts (die `chown`-Abhilfe, die Übertragung mit `docker save` und `docker load`), der Stopp beim Start für ein nicht beschreibbares Verzeichnis auf NAS-Hardware sowie Unraid- oder Synology-Hardware wurden noch nicht ausprobiert.
 
 ### Netzwerk und TLS
 
@@ -209,5 +209,5 @@ Unter Linux umgeht ein veröffentlichter Port Host-Firewalls wie ufw und firewal
 
 - Nur linux/amd64; arm64-Hosts (auch ARM-basierte Synology-Modelle) und Windows-Container werden nicht unterstützt.
 - Das Image läuft mit invarianter Globalisierung und ohne Zeitzonendaten: `TZ` hat keine Wirkung, Logzeiten sind UTC.
-- Die Data-Protection-Schlüssel von ASP.NET Core (Antiforgery) bleiben nicht erhalten: Sie gehen verloren, wenn der Container neu erstellt wird, eine offene Seite muss nach einem Neustart neu geladen werden, und unter `--user` mit einer anderen UID meldet der Server beim Start eine Warnung dazu.
+- Die Data-Protection-Schlüssel von ASP.NET Core liegen unverschlüsselt in `/config/data-protection-keys`; das Verzeichnis und seine Sicherungen privat halten. ASP.NET Core meldet die Warnung `No XML encryptor configured`, wenn der Server den ersten Schlüssel anlegt.
 - Der Server schreibt sein Log auf die Konsole; Lesen mit `docker logs censio`.
