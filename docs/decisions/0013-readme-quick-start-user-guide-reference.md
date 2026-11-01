@@ -1,6 +1,6 @@
 # 0013: The README is the quick start, the user guide the reference; unreleased states are built from source
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-10-31
 - **Area:** —
 - **Source:** Issue #7

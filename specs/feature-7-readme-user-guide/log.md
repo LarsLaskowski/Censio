@@ -18,3 +18,5 @@ are quoted in full.
 | 2026-11-01 08:08 | 8 Review round 1 | Reviewer | BLOCKING 4, NON-BLOCKING 1 (curl marker dropped in README, VERSION build arg dropped, image-on-releases claim wrong, tray version unconfirmed; guide lacks local-name hint) (opus/medium · usage pending) |
 | 2026-11-01 08:08 | 8 Dry run follow-up | Product Manager | Companion tray menu showed Version 0.0.0; PowerShell version still not stated |
 | 2026-11-01 08:09 | 8 Fix round 1 | Dev | All 5 findings fixed; parity and link checks pass (sonnet/medium · usage pending) |
+| 2026-11-01 08:09 | 8 Review delta (round 2) | Reviewer | APPROVE: all findings resolved (opus/medium · usage pending) |
+| 2026-11-01 08:09 | 9 PR approval | Orchestrator | approved by checklist: delta review clean, main not moved, area docs in diff, record 0013 Accepted |

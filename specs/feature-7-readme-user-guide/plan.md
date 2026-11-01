@@ -1,7 +1,7 @@
 # Plan: README and user guide from the start (English, then German)
 
 Source: Issue #7 | [spec.md](spec.md)
-Status: Draft
+Status: Approved
 Tier: trivial — documentation that needs a decision record (0013) and touches an area document, with no change to behavior, production or test code.
 Security areas touched: none
 
