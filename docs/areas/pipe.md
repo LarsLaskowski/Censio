@@ -35,11 +35,12 @@ named pipe.
 | 0 | Version | int32 protocol version |
 | 1 | SessionStart | string (headline) |
 | 2 | SessionEnd | empty |
-| 3 | AreaProductionStatistics | session ID, island ID, area index (one unsigned byte each, 0 to 255); session GUID (int32); area name (string); timestamp (int64); entry count (int32); that many entries; workforce map; building map |
+| 3 | AreaProductionStatistics | session ID, island ID, area index (one unsigned byte each, 0 to 255); session GUID (int32); area name (string); timestamp (int64); entry count (int32); that many entries |
 
 - An entry is: product GUID (int32); generation, consumption, delta, perfect generation, perfect consumption
   (float32); building count, maintenance (int32); income (float32); profit (int32); summed and average
-  productivity (float32). An entry takes at least 56 bytes. Entries are delivered in frame order.
+  productivity (float32); workforce map; building map. An entry takes at least 56 bytes, its two map counts
+  included. Entries are delivered in frame order.
 - A map is an int32 pair count and that many (int32 GUID, int32 amount) pairs. It is a set of GUID to amount: its
   order carries no meaning, and a GUID that occurs twice is delivered once with the sum of its amounts.
 
@@ -47,9 +48,9 @@ named pipe.
 
 - A reader starts with the version unknown and tracks it per stream. Only a `Version` frame is decoded while the
   version is unknown or not `2`.
-- A frame of any other type before the first `Version` gives a protocol-mismatch error without a received version.
-  An empty frame or an unknown type byte before any `Version` gives the empty-frame or unknown-type error, not a
-  protocol-mismatch error, because the frame has no type to gate.
+- A frame of any other type before the first `Version`, an unknown type byte included, gives a protocol-mismatch
+  error without a received version. An empty frame before any `Version` gives the empty-frame error, not a
+  protocol-mismatch error, because it has no type byte to gate.
 - After a `Version` other than `2`, the version frame gives a protocol-mismatch error with the received and the
   expected version, and every following frame of another type is skipped undecoded and gives that error again, until
   a `Version 2` arrives.
