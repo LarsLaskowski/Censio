@@ -48,4 +48,5 @@ version it shows, and the release ZIP it ships in. The user who starts the Compa
 
 ## Not here
 
-- Reading the statistics pipe and the game files, the connection to the server, settings and autostart (later issues).
+- Reading the statistics pipe: see [`pipe.md`](pipe.md).
+- Reading the game files, the connection to the server, settings and autostart (later issues).
