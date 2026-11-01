@@ -214,7 +214,8 @@ To release, an administrator of the repository (only administrators can create `
 2. Tick *Set as a pre-release*, and publish.
 
 The workflow `Release` ([`decisions/0012`](decisions/0012-release-pre-release-first-and-secret-free-builds.md)) then
-runs. It refuses a tag of another form and a tag whose commit is not reachable from the head of `main`; builds and
+runs. It refuses a tag of another form and a tag whose commit is not reachable from the head of `main`, and a tag lower than the highest `vMAJOR.MINOR.PATCH` tag (checked at
+the start and again right before the promotion); builds and
 checks the ZIP and the image without any secret; attaches the ZIP `Censio-<version>-win-x64.zip` to the release;
 pushes the checked image as `networlddev/censio:<version>`; and only then moves `networlddev/censio:latest` to
 that digest and turns the release into a full release marked *Latest*. While it runs, or when a job fails, the
@@ -250,8 +251,14 @@ Who can do what:
 
 - Only administrators create, move or delete `v*` tags (ruleset `tag-Protection`).
 - Anyone with write access can publish a release on an existing `v*` tag or re-run a release run; that runs the
-  reviewed workflow of that tag with the environment secrets. It discloses no secret but may move `latest` back
-  ([issue #78](https://github.com/LarsLaskowski/Censio/issues/78)).
+  reviewed workflow of that tag with the environment secrets. It discloses no secret, and it never moves Docker Hub
+  `latest` for a tag but the highest (refused in `check` and in `promote`, [issue #78](https://github.com/LarsLaskowski/Censio/issues/78)).
+  A re-run of only `image-publish` or `companion-publish` re-pushes that run's `<version>` or re-attaches its ZIP
+  from the run's own checked artifacts within the 7 days; of the highest tag it rebuilds and re-promotes the same
+  version.
+- Residual: GitHub's *Latest* mark can be set by anyone with write access (by hand, by publishing an old tag's
+  release as a full release, or by deleting the highest release), and the workflow does not protect it. The
+  administrator restores it on the highest release with *Set as latest release*.
 - The environment admits the workflow of whatever commit a `v*` tag points to and closes branch workflows, not
   `main`: while the ruleset `main-Protection` lets the write and maintain roles bypass its pull request rule, a
   writer can push a changed workflow to `main` without a pull request, and the administrator's next release runs it
@@ -278,8 +285,8 @@ Limits and rules:
   no run, and a tag on a branch whose workflow differs is not refused.
 - After a failed job, use *Re-run failed jobs* of the newest release's run, and only within the 7 days the run's
   artifacts are kept. Later, or when the failure needs a rebuild, use *Re-run all jobs*: it rebuilds, replaces the ZIP
-  asset and overwrites the image tag `<version>`. Never re-run the run of an older release after a newer one was
-  promoted: that moves `latest` and *Latest* back. Publishing a release of a lower version does the same.
+  asset and overwrites the image tag `<version>`. Releasing a lower version is not supported while a higher
+  `v*` tag exists: its run is refused. A failed release cannot be completed after a higher tag was created.
 - The run uses the commit's `Release` workflow, so it can run for real only after it is merged; the first release is
   `v0.1.0`.
 

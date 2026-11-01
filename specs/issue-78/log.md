@@ -12,3 +12,4 @@ are quoted in full.
 | 2026-11-01 09:42 | 2 Plan revise | Lead | Revised for DA major (guarantee limited to Docker Hub latest, GitHub Latest residual) + 3 minor + 2 Security notes; plan-check PASS (opus/medium · 43,588 tokens · 9 tool uses · 87 s) |
 | 2026-11-01 09:43 | 3 Plan security review (round 2) | Security | APPROVED, no findings; skeleton skipped: no C# API (bash script change) (opus/medium · 30,059 tokens · 4 tool uses · 36 s) |
 | 2026-11-01 09:44 | 5 Tests first | Tester | Step 'Issue 78: newest' added to release-check-test.sh (19 cases); fails on current code (unknown command 'newest'); none deferred (sonnet/medium · 81,476 tokens · 10 tool uses · 60 s) |
+| 2026-11-01 09:46 | 6 Implement | Dev | release-check.sh newest + release.yml steps + docs; real Issue 78 test step passes (verified by Orchestrator); actionlint, shellcheck, lint-only PASS; no C#, so no coverage gate (sonnet/medium · 83,797 tokens · 10 tool uses · 44 s) |

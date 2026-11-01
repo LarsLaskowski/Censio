@@ -5,6 +5,7 @@
 #   tag <tag>                                        prints the version: the tag without its "v"
 #   form version|digest <name> <value>               checks a value passed from an earlier job
 #   on-main <tag> <main-ref>                         the tagged commit must be reachable from <main-ref>
+#   newest <tag>                                     the tag must be the highest vMAJOR.MINOR.PATCH tag of the repository
 #   prerelease <tag> <true|false>                    warns when the release was published as a full release
 #   dockerhub-secrets <user-set> <token-set>         both Docker Hub secrets must be set (true)
 #   companion <version> <out-dir>                    publishes, checks and zips the Companion
@@ -72,6 +73,58 @@ check_tag()
         error "Release tag '${tag}' is not of the form vMAJOR.MINOR.PATCH."
     fi
     printf '%s\n' "${tag#v}"
+}
+
+# Fails unless the tag is the highest vMAJOR.MINOR.PATCH tag of the repository. The fields are compared as
+# strings, never as numbers (a longer field is higher, equal lengths compare in C order), so long fields cannot
+# overflow; the pattern rules out leading zeros.
+check_newest()
+{
+    local tag="${1-}"
+    local tags
+    local name
+    local highest="$tag"
+    local highest_fields=()
+    local fields=()
+    local index
+    local higher
+    local LC_ALL=C
+
+    check_tag "$tag" > /dev/null
+    if ! git rev-parse -q --verify "refs/tags/${tag}" > /dev/null; then
+        error "Release tag '${tag}' is not among the fetched tags."
+    fi
+    [[ "${tag#v}" =~ $version_pattern ]]
+    highest_fields=("${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" "${BASH_REMATCH[3]}")
+    tags="$(git tag --list)"
+    while IFS= read -r name; do
+        if [[ "$name" != v* ]] || [[ ! "${name#v}" =~ $version_pattern ]]; then
+            continue
+        fi
+        fields=("${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" "${BASH_REMATCH[3]}")
+        higher=false
+        for index in 0 1 2; do
+            if ((${#fields[index]} != ${#highest_fields[index]})); then
+                if ((${#fields[index]} > ${#highest_fields[index]})); then
+                    higher=true
+                fi
+                break
+            fi
+            if [[ "${fields[index]}" != "${highest_fields[index]}" ]]; then
+                if [[ "${fields[index]}" > "${highest_fields[index]}" ]]; then
+                    higher=true
+                fi
+                break
+            fi
+        done
+        if [[ "$higher" == "true" ]]; then
+            highest="$name"
+            highest_fields=("${fields[@]}")
+        fi
+    done <<< "$tags"
+    if [[ "$highest" != "$tag" ]]; then
+        error "Release tag '${tag}' is older than tag '${highest}'; only the highest version tag can be released."
+    fi
 }
 
 check_form()
@@ -332,6 +385,7 @@ case "$command_name" in
     tag) check_tag "$@" ;;
     form) check_form "$@" ;;
     on-main) check_on_main "$@" ;;
+    newest) check_newest "$@" ;;
     prerelease) check_prerelease "$@" ;;
     dockerhub-secrets) check_dockerhub_secrets "$@" ;;
     companion) companion "$@" ;;
