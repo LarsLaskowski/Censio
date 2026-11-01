@@ -68,7 +68,7 @@ events, errors and version messages, as typed items.
 
 - An island frame is identified by its session GUID, island ID and area index. The session ID byte and the area name
   are data of the frame, not part of the key: an island that is renamed keeps its key.
-- Within a tick every key occurs once. Two frames that differ in any part of the key belong to the same tick.
+- Within a tick every key occurs once. Two frames with the same game time that differ in any part of the key belong to the same tick; a different key closes nothing.
 
 #### Closing a tick
 
