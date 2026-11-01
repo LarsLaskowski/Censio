@@ -27,10 +27,12 @@ an injected clock (record 0034). The tooltip is the Companion's only output
   digits and `Z` (`2026-11-01T17:09:00.1234567Z`); each line, the last included, ends with one line feed. The
   receive time of a frame is the one the pipeline gives it: one clock reading per frame, shared by the recording and
   the ticks.
-- S2: Given a recording runs, when the tester chooses `Exit`, or Windows signs out or shuts down, then the file ends
+- S2: Given a recording runs, when the tester chooses `Exit`, then the file ends
   with the last frame received whole before the stop, every line in it is complete, and the Companion ends as
   without `--record` (within 2 seconds, exit code 0). Frames still waiting to be written are written first, for at
-  most 1 second; E10 says what happens to those left after it.
+  most 1 second; E10 says what happens to those left after it. At Windows sign-out or shutdown the Companion runs
+  the same stop; whether Windows waits for that second is not promised (checked by the maintainer's manual test on
+  Windows, not by a criterion).
 - S3: Given the Companion runs with `--record`, when the game quits and is started again, then the file of the ended
   connection is closed and the next connection writes a new file; no file is created while no connection delivers
   a frame.
@@ -90,7 +92,7 @@ an injected clock (record 0034). The tooltip is the Companion's only output
 - E10: The disk is slower than the pipe: frames wait to be written in a queue of at most 16 MiB, each frame counted as its line's base64 length plus 128
   bytes; the
   pipe is read on without waiting for the disk. When a frame does not fit, or frames are still queued 1 second after
-  `Exit`, sign-out or shutdown began, the recording stops as E3 describes: the file ends with the last complete line
+  `Exit` began, the recording stops as E3 describes: the file ends with the last complete line
   written, the frames after it are not recorded, and the live run is unchanged. A line a stalled disk is still
   writing when the second ends may be cut off, as in E2.
 - E11: Line format when replaying: a line feed or a carriage return plus line feed ends a line; a missing line feed
@@ -123,7 +125,7 @@ an injected clock (record 0034). The tooltip is the Companion's only output
   moves the fake clock while a frame arrives in chunks, so a second clock reading for the same frame would show as a
   different receive time (S1, S6, S7, S8, E1).
 - [ ] AC2: Every frame a connection received whole while recording is in its file exactly once, in order, each as
-  one complete line, also when the stop (`Exit`, sign-out, shutdown) or the end of the connection falls between the
+  one complete line, also when the stop (`Exit`) or the end of the connection falls between the
   parts of a frame that arrives in chunks; the partial frame is not in the file. This holds unless the recording
   failed as E3 or E10 describe (S2, E1, E2).
 - [ ] AC3: A recording file starts with the header line, then one line per frame in the form of S1; its name follows
@@ -205,3 +207,6 @@ Devil's Advocate, spec challenge (Q1 option b unchanged):
   name an empty or refused `--replay` path.
 - m6 (wording): accepted. S5 names the same message reader and tick assembler a test uses, and the live
   connection's state rules, not a copy.
+
+PR approval (Lead, review round 1 note on S2): accepted. S2, E10 and AC2 promise the 1-second flush for `Exit`
+only; sign-out and shutdown run the same stop without that promise (record 0036, option 14).

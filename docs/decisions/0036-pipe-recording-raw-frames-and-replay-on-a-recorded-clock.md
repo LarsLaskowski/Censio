@@ -51,6 +51,11 @@ Companion must still end within 2 seconds.
     measured). The cap changes no item: a replay's timers never fire, a live clock reaches the same deadline.
 13. **Refusing recorded times far before the previous one as an invalid line** — keeps the assembler as it was;
     changes E7's promise that backward times replay unchanged, and leaves a system clock set back unguarded.
+14. **Stopping the recording from `Application.SessionEnding` as well as from `OnExit`** — a sign-out or shutdown
+    would get the 1-second flush before Windows asks the next application; but `SessionEnding` comes with the
+    query, which another application can still refuse, so a refused sign-out would leave the Companion running
+    without its recording. Rejected: sign-out and shutdown run the `Exit` stop through `OnExit`, which WPF raises
+    when the session ends; whether Windows waits for its second is not promised.
 
 ## Decision
 
