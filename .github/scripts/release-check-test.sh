@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests release-check.sh the way the acceptance criteria AC2 to AC8 of feature 5 describe: every case asserts the
+# Tests release-check.sh the way the acceptance criteria AC2 to AC8 of feature 5 and AC1 to AC4 of issue #78 describe: every case asserts the
 # exit code and the exact annotation line (the last line of the output). Run from the repository root; needs docker
 # with buildx and a running daemon, curl, git, dotnet, python3, zip and unzip. It builds the Companion and the
 # server image once with version 1.2.3, starts a local registry (registry:2 pinned by digest) on 127.0.0.1 and
@@ -211,6 +211,68 @@ for pair in "false true" "true false" "false false"; do
     # shellcheck disable=SC2086 # the two words are the two arguments
     expect_error "AC7 ${pair}" "Docker Hub credentials are missing: set DOCKERHUB_USERNAME and DOCKERHUB_TOKEN as secrets of the environment release." dockerhub-secrets $pair
 done
+
+step "Issue 78: newest"
+newest_repo="${work}/newest"
+git init -q -b main "$newest_repo"
+git -C "$newest_repo" config user.name test
+git -C "$newest_repo" config user.email test@example.com
+git -C "$newest_repo" config commit.gpgsign false
+git -C "$newest_repo" config tag.gpgsign false
+git -C "$newest_repo" commit -q --allow-empty -m first
+git -C "$newest_repo" tag v1.0.0
+(
+    cd "$newest_repo"
+    expect_ok "I78-AC1 only tag" "" newest v1.0.0
+
+    for name in v0.9.0 v0.10.0 v1.0.9 v1.0.10; do
+        git tag "$name"
+    done
+    expect_ok "I78-AC1 numeric" "" newest v1.0.10
+
+    for name in v2.0.0-rc.1 v3.0 V9.0.0 v09.0.0 x9.0.0 v1.0.10.1; do
+        git tag "$name"
+    done
+    git branch v99.0.0
+    expect_ok "I78-AC1 ignored" "" newest v1.0.10
+
+    expect_error "I78-AC4 absent" "Release tag 'v1.0.11' is not among the fetched tags." newest v1.0.11
+
+    expect_error "I78-AC2 lower patch" "Release tag 'v1.0.9' is older than tag 'v1.0.10'; only the highest version tag can be released." newest v1.0.9
+    expect_error "I78-AC2 names the highest" "Release tag 'v0.9.0' is older than tag 'v1.0.10'; only the highest version tag can be released." newest v0.9.0
+
+    git tag v9.9.9
+    git switch -q -c side
+    git commit -q --allow-empty -m side
+    git tag -a v10.0.0 -m "annotated tag on a side branch"
+    git switch -q main
+    expect_error "I78-AC2 not on main, annotated v1.0.10" "Release tag 'v1.0.10' is older than tag 'v10.0.0'; only the highest version tag can be released." newest v1.0.10
+    expect_error "I78-AC2 not on main, annotated v9.9.9" "Release tag 'v9.9.9' is older than tag 'v10.0.0'; only the highest version tag can be released." newest v9.9.9
+    expect_ok "I78-AC1 annotated highest" "" newest v10.0.0
+
+    git tag v99999999999999999999.0.0
+    expect_error "I78-AC2 long field" "Release tag 'v1.0.0' is older than tag 'v99999999999999999999.0.0'; only the highest version tag can be released." newest v1.0.0
+    expect_error "I78-AC2 long field below" "Release tag 'v10.0.0' is older than tag 'v99999999999999999999.0.0'; only the highest version tag can be released." newest v10.0.0
+    expect_ok "I78-AC2 ignored passes" "" newest v99999999999999999999.0.0
+
+    for bad in v1.2 'v1.2.3;id' ""; do
+        expect_error "I78-AC3 '${bad}'" "$(tag_error "$bad")" newest "$bad"
+    done
+    expect_error "I78-AC3 line break" "Release tag 'v1.2.3%0A' is not of the form vMAJOR.MINOR.PATCH." newest $'v1.2.3\n'
+    expect_error "I78-AC3 no argument" "$(tag_error "")" newest
+)
+
+no_tags_repo="${work}/newest-no-tags"
+git init -q -b main "$no_tags_repo"
+git -C "$no_tags_repo" config user.name test
+git -C "$no_tags_repo" config user.email test@example.com
+git -C "$no_tags_repo" config commit.gpgsign false
+git -C "$no_tags_repo" config tag.gpgsign false
+git -C "$no_tags_repo" commit -q --allow-empty -m first
+(
+    cd "$no_tags_repo"
+    expect_error "I78-AC4 no tags" "Release tag 'v1.0.0' is not among the fetched tags." newest v1.0.0
+)
 
 step "AC2, AC8: Companion"
 companion_out="${work}/companion"

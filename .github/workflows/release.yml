@@ -4,6 +4,7 @@ name: Release
 # and only then promotes the release (record 0012). Event and job-output values reach a script only through `env` and
 # are checked with `release-check.sh form` before the credentialed jobs use them. No cache of any kind (record 0008).
 # The Docker Hub secrets are secrets of the environment `release`, which admits only `v*` tags (record 0012).
+# A tag that is not the highest `v*` version is refused in `check` and again in `promote` (record 0012).
 on:
   release:
     types: [ published ]
@@ -37,6 +38,11 @@ jobs:
         env:
           TAG: ${{ github.event.release.tag_name }}
         run: bash .github/scripts/release-check.sh on-main "$TAG" origin/main
+
+      - name: Check that the tag is the highest version
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: bash .github/scripts/release-check.sh newest "$TAG"
 
       - name: Check that the release is a pre-release
         env:
@@ -210,12 +216,18 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
+          fetch-depth: 0  # compare the tag with every v* tag right before latest moves
           persist-credentials: false
 
       - name: Check the passed values
         run: |
           bash .github/scripts/release-check.sh form version version "$VERSION"
           bash .github/scripts/release-check.sh form digest digest "$DIGEST"
+
+      - name: Check that the tag is still the highest version
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: bash .github/scripts/release-check.sh newest "$TAG"
 
       - name: Check the Docker Hub credentials
         env:
