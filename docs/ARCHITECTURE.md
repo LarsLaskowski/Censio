@@ -17,7 +17,7 @@ except the Windows shell:
 | Project | Responsibility | References |
 | ------- | -------------- | ---------- |
 | `Censio.Contracts` | The types shared by Companion and server, and the product version | — |
-| `Censio.Pipe` | Framing and parsing the statistics pipe into typed messages ([`areas/pipe.md`](areas/pipe.md)) | — |
+| `Censio.Pipe` | Framing and parsing the statistics pipe into typed messages and assembling them into ticks ([`areas/pipe.md`](areas/pipe.md)) | — |
 | `Censio.GameData` | Reading the game files and the catalog | — |
 | `Censio.Server.Data` | Persistence of the server | — |
 | `Censio.Server` | Web host, UI, later the ingest | Contracts, Server.Data |
@@ -40,6 +40,8 @@ flowchart LR
 The Companion parses the pipe stream and the game files, extracts the game data and pushes it to the server.
 The pipe stream is parsed strictly: a frame the parser cannot read is reported as an error, never guessed
 ([`decisions/0033`](decisions/0033-pipe-reader-strict-from-the-reference-source.md)).
+The Companion groups the messages into ticks with an island identity and session events
+([`decisions/0034`](decisions/0034-ticks-assembled-by-close-rules-on-an-injected-clock.md)).
 The server accepts data only from a client that presents the ingest token. Guarantees are listed in
 `.squad/project.md` (*Guarantees*) and linked to their decision record as they are made.
 

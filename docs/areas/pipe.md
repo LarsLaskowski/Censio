@@ -3,11 +3,12 @@
 ## Scope
 
 The statistics pipe as the Companion reads it: the frame layout, the message types of protocol version 2, the
-1 MiB limit, the error kinds, which errors skip a frame and which end the stream, and the version gate. The pipe is
+1 MiB limit, the error kinds, which errors skip a frame and which end the stream, the version gate, and the
+grouping of the messages into ticks and session events with the tick limits. The pipe is
 untrusted input: the format is known only from Ubisoft's example reader (`UbisoftMainzAnno/anno117_pipe_example`,
 read on 2026-11-01, "for documentation purposes only"), and a game update may change it without notice. The
 implementation is in `Censio.Pipe`; it works on any readable byte stream and does not depend on Windows or on the
-named pipe.
+named pipe. Ticks are assembled on an injected clock, so the same rules serve a live stream and a replay.
 
 ## Behavior
 
@@ -18,6 +19,8 @@ named pipe.
 - Frames may arrive in any chunking (one byte per read, split between prefix and payload, or all at once); the
   results are the same.
 - A read holds at most one frame plus its decoded message in memory, whatever the counts in the payload say.
+- A map keeps memory for its distinct GUIDs only: a map whose pairs repeat a GUID is stored at the size of its
+  decoded content, not of the pair count on the wire. Results do not change.
 
 ### Frame layout
 
@@ -55,11 +58,72 @@ named pipe.
   expected version, and every following frame of another type is skipped undecoded and gives that error again, until
   a `Version 2` arrives.
 
+### Ticks and sessions
+
+The game sends one island per frame and no end-of-tick marker. A tick is the set of island frames that share one
+game time (the frame's timestamp); the assembler groups the frames into ticks and delivers them, with session
+events, errors and version messages, as typed items.
+
+#### Island key
+
+- An island frame is identified by its session GUID, island ID and area index. The session ID byte and the area name
+  are data of the frame, not part of the key: an island that is renamed keeps its key.
+- Within a tick every key occurs once. Two frames with the same game time that differ in any part of the key belong to the same tick; a different key closes nothing.
+
+#### Closing a tick
+
+A tick is delivered when it closes, once, and is never reopened. It closes when:
+
+1. an island frame carries another game time, higher or lower (*game time changed*);
+2. an island frame repeats a key already in the tick (*island repeated*); the frame opens the next tick;
+3. no island frame arrived for 30 seconds (*quiet period*); the period is measured on the injected clock from the
+   receive time of the last island frame, and a frame received exactly at the deadline or later belongs to the next
+   tick, which may carry the same game time;
+4. a session start or a session end arrives (*session event*); the tick is delivered before the event;
+5. the stream ends, also with a truncated-frame, oversized-frame or read-failed error (*stream ended*); the tick is
+   delivered before the error and the end.
+
+- A version message or a skipped-frame error does not close the tick and does not restart the quiet period: only an
+  island frame does.
+- The receive time of a tick is the time its last island frame was received; the receive time of a frame is the
+  moment its read completed.
+- A frame that is dropped for a tick limit does not restart the quiet period and its key does not count as present.
+
+#### No data yet
+
+- An island with no entries is marked as such. This can also mean an island without production, not only a game that
+  has not produced data yet.
+- A tick whose islands all have no entries is marked *no data yet* (the game sends such a tick after a load).
+
+#### Session events
+
+- A session start is delivered with its headline unchanged (not trimmed, `_` kept).
+- A session end is delivered as a session end when an island frame or a session start came since the last session
+  end; otherwise, at the start of the stream or after another session end, it is delivered as a *repeated session
+  end*. The game sends a second session end; the repeated one carries no new information.
+- Ticks carry no session gate: islands are delivered whatever session events came before.
+
+#### Order and end
+
+- Items come in stream order. A tick comes at its close, before the item that closed it.
+- After the end of the stream, or after a cancellation, every further request returns the end of the stream.
+- A cancelled request throws the platform's cancellation, discards the open tick and ends the stream; the source
+  read is cancelled with it. A request after the assembler was disposed throws an object-disposed error, and the
+  dispose cancels a pending read. No other exception leaves the assembler.
+- The caller must keep requesting: the receive time of a frame is stamped when its read completes, but the next read
+  starts only on a request. A slow consumer belongs behind the tick buffer (#41) or the decoupling of #11.
+
 ## Limits and errors
 
 - A frame's length (type byte and payload) is at most 1 MiB (1,048,576), inclusive: exactly 1 MiB is read.
 - A workforce or building map holds at most 1,024 pairs; more is a malformed message. The real maps hold a few
   dozen pairs.
+- A tick holds at most 256 islands and at most 524,288 entries and map pairs together, counted after decoding (the
+  pairs of a map after the sum of repeated GUIDs). An island frame that would exceed either limit is dropped and
+  delivered as a *tick limit* item with its key only; the open tick is unchanged. A frame that alone exceeds the item
+  limit opens no tick. The limits bound the memory of an open tick: at both limits, with every island full of
+  entries and no pairs (the worst shape), it held 124.1 MiB (measured with frames decoded by the parser; distinct
+  pairs: 10.9 MiB; 1,024-pair maps of one repeated GUID: 7.3 MiB).
 - Every error is a typed result with its kind and, where they apply, the type value, length, offset and versions.
   An error carries no payload text, so a caller that logs it logs no pipe content.
 
@@ -108,14 +172,22 @@ Until fixtures from real recordings (#20) test the reader:
 - Whether the game ever sends duplicate map keys is unknown.
 - A game update that changes the format without a new protocol version is misread as long as every field still
   fits; one that bumps the version is refused with a protocol-mismatch error.
+- The timing (frames about one second apart, ticks about two minutes), the shared timestamp, the zero-entry tick after
+  a load, the double session end and the number of islands per tick (estimated well under 256, with fewer than
+  524,288 entries and pairs) are third-party observations until the recordings of #17 confirm them.
+- A stall of more than 30 seconds in the stream splits a tick into two ticks with one game time.
+- A game that sends one island twice in a tick splits it as *island repeated*.
+- A replay that ends at its last frame closes the last tick as *stream ended*.
+- A caller that pauses for more than 30 seconds between requests stamps frames late and may split ticks.
 
 ## Related decisions
 
 - [`decisions/0033-pipe-reader-strict-from-the-reference-source.md`](../decisions/0033-pipe-reader-strict-from-the-reference-source.md) — the reader is strict, fails closed and is built from the reference source with synthetic frames.
+- [`decisions/0034-ticks-assembled-by-close-rules-on-an-injected-clock.md`](../decisions/0034-ticks-assembled-by-close-rules-on-an-injected-clock.md) — ticks close by five rules and a quiet period on an injected clock; a pure core with an async driver.
 - [`decisions/0018-pipe-parsed-in-companion-versioned-json-contract.md`](../decisions/0018-pipe-parsed-in-companion-versioned-json-contract.md) — the Companion parses the pipe; the format is confined to `Censio.Pipe`.
 
 ## Not here
 
 - Opening the pipe, waiting for the game, reconnecting and connection states (#11).
-- Assembling ticks from the messages (#10).
+- Telling a resent or paused tick from a new one (#19, #35).
 - Recording the stream (#12).

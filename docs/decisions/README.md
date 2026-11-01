@@ -86,4 +86,5 @@ once in the [area document](../areas/README.md) of the record's area, and the re
 | [0031](0031-bounded-local-tick-buffer-gaps-accepted.md) | The Companion buffers unsent ticks within a bound; beyond it gaps are accepted | Accepted | 2026-11-01 |
 | [0032](0032-telegram-alerts-and-mobile-layout-later.md) | Telegram alerts and a mobile layout come later | Accepted | 2026-11-01 |
 | [0033](0033-pipe-reader-strict-from-the-reference-source.md) | The pipe reader is strict, fails closed and is built from the reference source with synthetic frames | Accepted | 2026-11-01 |
+| [0034](0034-ticks-assembled-by-close-rules-on-an-injected-clock.md) | Ticks are assembled by close rules and a quiet period on an injected clock, in a pure core with an async driver | Accepted | 2026-11-01 |
 <!-- project:end index -->
