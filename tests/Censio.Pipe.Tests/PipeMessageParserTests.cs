@@ -155,9 +155,9 @@ public sealed class PipeMessageParserTests
         var message = ParseMessage<AreaProductionStatisticsMessage>(frame);
 
         // Assert
-        CollectionAssert.AreEquivalent(new[] { new KeyValuePair<int, int>(9, 7), new KeyValuePair<int, int>(8, 1) },
-                                       message.Entries[0].WorkforceAmounts.ToList(),
-                                       "The duplicate GUID should be held once with the sum");
+        Assert.AreSequenceEqual(new[] { new KeyValuePair<int, int>(9, 7), new KeyValuePair<int, int>(8, 1) }.OrderBy(pair => pair.Key).ThenBy(pair => pair.Value).ToList(),
+                                message.Entries[0].WorkforceAmounts.OrderBy(pair => pair.Key).ThenBy(pair => pair.Value).ToList(),
+                                "The duplicate GUID should be held once with the sum");
         Assert.IsEmpty(message.Entries[0].BuildingAmounts, "The building map should stay empty");
     }
 
@@ -174,9 +174,9 @@ public sealed class PipeMessageParserTests
         var message = ParseMessage<AreaProductionStatisticsMessage>(frame);
 
         // Assert
-        CollectionAssert.AreEquivalent(new[] { new KeyValuePair<int, int>(9, 7) },
-                                       message.Entries[0].BuildingAmounts.ToList(),
-                                       "The duplicate GUID should be held once with the sum");
+        Assert.AreSequenceEqual(new[] { new KeyValuePair<int, int>(9, 7) }.OrderBy(pair => pair.Key).ThenBy(pair => pair.Value).ToList(),
+                                message.Entries[0].BuildingAmounts.OrderBy(pair => pair.Key).ThenBy(pair => pair.Value).ToList(),
+                                "The duplicate GUID should be held once with the sum");
         Assert.IsEmpty(message.Entries[0].WorkforceAmounts, "The workforce map should stay empty");
     }
 
@@ -558,8 +558,12 @@ public sealed class PipeMessageParserTests
         Assert.AreEqual(guid + 9, entry.Profit, "The profit should be read");
         Assert.AreEqual(guid + 10.25f, entry.SummedProductivity, 0f, "The summed productivity should be read");
         Assert.AreEqual(guid + 11.75f, entry.AverageProductivity, 0f, "The average productivity should be read");
-        CollectionAssert.AreEquivalent(workforce, entry.WorkforceAmounts.ToList(), "The workforce map should hold the written pairs");
-        CollectionAssert.AreEquivalent(buildings, entry.BuildingAmounts.ToList(), "The building map should hold the written pairs");
+        Assert.AreSequenceEqual(workforce.OrderBy(pair => pair.Key).ThenBy(pair => pair.Value).ToList(),
+                                entry.WorkforceAmounts.OrderBy(pair => pair.Key).ThenBy(pair => pair.Value).ToList(),
+                                "The workforce map should hold the written pairs");
+        Assert.AreSequenceEqual(buildings.OrderBy(pair => pair.Key).ThenBy(pair => pair.Value).ToList(),
+                                entry.BuildingAmounts.OrderBy(pair => pair.Key).ThenBy(pair => pair.Value).ToList(),
+                                "The building map should hold the written pairs");
     }
 
     #endregion // Methods
