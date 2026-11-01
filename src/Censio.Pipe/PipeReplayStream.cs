@@ -186,7 +186,7 @@ public sealed class PipeReplayStream : Stream
 
             return true;
         }
-        catch (IOException)
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
             return Fail(PipeReplayProblemKind.ReadFailed, null);
         }

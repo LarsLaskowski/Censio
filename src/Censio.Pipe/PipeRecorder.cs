@@ -125,14 +125,12 @@ public class PipeRecorder : IAsyncDisposable
             return;
         }
 
+        StartWriter();
+
         if (_queue.Writer.TryWrite((frame, receiveTime, cost)) == false)
         {
             Interlocked.Add(ref _queuedBytes, -cost);
-
-            return;
         }
-
-        StartWriter();
     }
 
     /// <summary>
