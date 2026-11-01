@@ -47,7 +47,7 @@ public static class PipeEndpoint
     /// <summary>
     /// Gets the timeout of one connect attempt.
     /// </summary>
-    public static TimeSpan AttemptTimeout => throw new NotImplementedException();
+    public static TimeSpan AttemptTimeout => TimeSpan.FromSeconds(2);
 
     #endregion // Properties
 
@@ -61,7 +61,9 @@ public static class PipeEndpoint
     /// <exception cref="ArgumentNullException"><paramref name="entries" /> is <c>null</c></exception>
     public static bool IsListed(IEnumerable<string> entries)
     {
-        throw new NotImplementedException();
+        ArgumentNullException.ThrowIfNull(entries);
+
+        return entries.Any(entry => string.Equals(entry, PipePath, StringComparison.OrdinalIgnoreCase));
     }
 
     #endregion // Methods

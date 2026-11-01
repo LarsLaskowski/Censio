@@ -5,6 +5,25 @@ namespace Censio.Companion.Core;
 /// </summary>
 public sealed class PipeConnectResult
 {
+    #region Constants
+
+    /// <summary>
+    /// The mask of the facility bits of an HRESULT.
+    /// </summary>
+    private const uint Win32HResultMask = 0xFFFF0000;
+
+    /// <summary>
+    /// The facility bits of an HRESULT that wraps a Win32 error code.
+    /// </summary>
+    private const uint Win32HResultPrefix = 0x80070000;
+
+    /// <summary>
+    /// The mask of the Win32 error code in an HRESULT.
+    /// </summary>
+    private const uint Win32CodeMask = 0xFFFF;
+
+    #endregion // Constants
+
     #region Constructor
 
     /// <summary>
@@ -25,6 +44,16 @@ public sealed class PipeConnectResult
     #region Properties
 
     /// <summary>
+    /// Gets the result for a pipe that does not exist.
+    /// </summary>
+    public static PipeConnectResult NotFound { get; } = new(PipeConnectResultKind.NotFound, null, null);
+
+    /// <summary>
+    /// Gets the result for a pipe held by another reader.
+    /// </summary>
+    public static PipeConnectResult Busy { get; } = new(PipeConnectResultKind.Busy, null, null);
+
+    /// <summary>
     /// Gets the outcome kind.
     /// </summary>
     public PipeConnectResultKind Kind { get; }
@@ -39,16 +68,6 @@ public sealed class PipeConnectResult
     /// </summary>
     public int? ErrorCode { get; }
 
-    /// <summary>
-    /// Gets the result for a pipe that does not exist.
-    /// </summary>
-    public static PipeConnectResult NotFound => throw new NotImplementedException();
-
-    /// <summary>
-    /// Gets the result for a pipe held by another reader.
-    /// </summary>
-    public static PipeConnectResult Busy => throw new NotImplementedException();
-
     #endregion // Properties
 
     #region Methods
@@ -61,7 +80,9 @@ public sealed class PipeConnectResult
     /// <exception cref="ArgumentNullException"><paramref name="stream" /> is <c>null</c></exception>
     public static PipeConnectResult FromStream(Stream stream)
     {
-        throw new NotImplementedException();
+        ArgumentNullException.ThrowIfNull(stream);
+
+        return new PipeConnectResult(PipeConnectResultKind.Connected, stream, null);
     }
 
     /// <summary>
@@ -73,7 +94,22 @@ public sealed class PipeConnectResult
     /// <exception cref="ArgumentNullException"><paramref name="exception" /> is <c>null</c></exception>
     public static PipeConnectResult FromFailure(Exception exception, bool pipeExists)
     {
-        throw new NotImplementedException();
+        ArgumentNullException.ThrowIfNull(exception);
+
+        if (exception is FileNotFoundException)
+        {
+            return NotFound;
+        }
+
+        if (exception is TimeoutException)
+        {
+            return pipeExists ? Busy : NotFound;
+        }
+
+        var hresult = unchecked((uint)exception.HResult);
+        int? errorCode = (hresult & Win32HResultMask) == Win32HResultPrefix ? (int)(hresult & Win32CodeMask) : null;
+
+        return new PipeConnectResult(PipeConnectResultKind.Failed, null, errorCode);
     }
 
     #endregion // Methods

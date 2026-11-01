@@ -10,12 +10,12 @@ public static class PipeRetryDelay
     /// <summary>
     /// Gets the maximum delay.
     /// </summary>
-    public static TimeSpan Max => throw new NotImplementedException();
+    public static TimeSpan Max => TimeSpan.FromSeconds(10);
 
     /// <summary>
     /// Gets the time a connection must last to count as successful.
     /// </summary>
-    public static TimeSpan SuccessfulConnectionTime => throw new NotImplementedException();
+    public static TimeSpan SuccessfulConnectionTime => TimeSpan.FromSeconds(30);
 
     #endregion // Properties
 
@@ -29,7 +29,15 @@ public static class PipeRetryDelay
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="consecutiveFailures" /> is below 1</exception>
     public static TimeSpan For(int consecutiveFailures)
     {
-        throw new NotImplementedException();
+        ArgumentOutOfRangeException.ThrowIfLessThan(consecutiveFailures, 1);
+
+        // 2^4 = 16 s already exceeds the maximum, so larger exponents need no computation
+        if (consecutiveFailures > 4)
+        {
+            return Max;
+        }
+
+        return TimeSpan.FromSeconds(1 << (consecutiveFailures - 1));
     }
 
     #endregion // Methods

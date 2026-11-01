@@ -39,7 +39,18 @@ public static class TrayMenu
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="state" /> is not a defined value</exception>
     public static string FormatToolTip(PipeConnectionState state)
     {
-        throw new NotImplementedException();
+        var text = state switch
+                   {
+                       PipeConnectionState.WaitingForGame => "Waiting for game",
+                       PipeConnectionState.Connected => "Connected",
+                       PipeConnectionState.Receiving => "Receiving",
+                       PipeConnectionState.PipeBusy => "Pipe busy",
+                       PipeConnectionState.ProtocolMismatch => "Protocol mismatch",
+                       PipeConnectionState.Error => "Error",
+                       _ => throw new ArgumentOutOfRangeException(nameof(state), state, "The connection state is not defined")
+                   };
+
+        return $"{ToolTip}: {text}";
     }
 
     /// <summary>
