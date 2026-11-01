@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace Censio.Pipe;
 
 /// <summary>
@@ -5,6 +7,20 @@ namespace Censio.Pipe;
 /// </summary>
 public readonly record struct PipeReplaySpeed
 {
+    #region Constants
+
+    /// <summary>
+    /// The slowest factor.
+    /// </summary>
+    private const double MinFactor = 0.1;
+
+    /// <summary>
+    /// The fastest factor.
+    /// </summary>
+    private const double MaxFactor = 1000;
+
+    #endregion // Constants
+
     #region Constructors
 
     /// <summary>
@@ -23,12 +39,12 @@ public readonly record struct PipeReplaySpeed
     /// <summary>
     /// Gets the replay at the recorded speed.
     /// </summary>
-    public static PipeReplaySpeed RealTime => throw new NotImplementedException();
+    public static PipeReplaySpeed RealTime => new(1d);
 
     /// <summary>
     /// Gets the replay without waiting.
     /// </summary>
-    public static PipeReplaySpeed Maximum => throw new NotImplementedException();
+    public static PipeReplaySpeed Maximum => new(null);
 
     /// <summary>
     /// Gets the speed factor, or <c>null</c> at maximum speed.
@@ -47,7 +63,23 @@ public readonly record struct PipeReplaySpeed
     /// <returns><c>true</c> if the text is a valid speed</returns>
     public static bool TryParse(string? text, out PipeReplaySpeed speed)
     {
-        throw new NotImplementedException();
+        speed = default;
+
+        if (string.Equals(text, "max", StringComparison.OrdinalIgnoreCase))
+        {
+            speed = Maximum;
+
+            return true;
+        }
+
+        if (double.TryParse(text, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var factor) == false || (factor >= MinFactor && factor <= MaxFactor) == false)
+        {
+            return false;
+        }
+
+        speed = new PipeReplaySpeed(factor);
+
+        return true;
     }
 
     /// <summary>
@@ -57,7 +89,14 @@ public readonly record struct PipeReplaySpeed
     /// <returns>The time to wait</returns>
     public TimeSpan Scale(TimeSpan recordedPause)
     {
-        throw new NotImplementedException();
+        if (Factor is not { } factor || recordedPause <= TimeSpan.Zero)
+        {
+            return TimeSpan.Zero;
+        }
+
+        var scaled = Math.Round(recordedPause.Ticks / (decimal)factor);
+
+        return scaled >= long.MaxValue ? TimeSpan.MaxValue : TimeSpan.FromTicks((long)scaled);
     }
 
     #endregion // Methods

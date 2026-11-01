@@ -8,9 +8,9 @@ public sealed class PipeReplayClock : TimeProvider
     #region Fields
 
     /// <summary>
-    /// The current time of the clock.
+    /// The current time of the clock in UTC ticks.
     /// </summary>
-    private DateTimeOffset _now;
+    private long _utcTicks;
 
     #endregion // Fields
 
@@ -22,7 +22,7 @@ public sealed class PipeReplayClock : TimeProvider
     /// <param name="start">The time the clock starts at</param>
     public PipeReplayClock(DateTimeOffset start)
     {
-        _now = start;
+        _utcTicks = start.UtcTicks;
     }
 
     #endregion // Constructors
@@ -35,7 +35,7 @@ public sealed class PipeReplayClock : TimeProvider
     /// <param name="now">The new time</param>
     public void SetUtcNow(DateTimeOffset now)
     {
-        throw new NotImplementedException();
+        Volatile.Write(ref _utcTicks, now.UtcTicks);
     }
 
     #endregion // Methods
@@ -45,13 +45,13 @@ public sealed class PipeReplayClock : TimeProvider
     /// <inheritdoc />
     public override DateTimeOffset GetUtcNow()
     {
-        throw new NotImplementedException();
+        return new DateTimeOffset(Volatile.Read(ref _utcTicks), TimeSpan.Zero);
     }
 
     /// <inheritdoc />
     public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
     {
-        throw new NotImplementedException();
+        return new PipeReplayTimer();
     }
 
     #endregion // TimeProvider
