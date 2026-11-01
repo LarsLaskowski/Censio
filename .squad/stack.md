@@ -209,3 +209,6 @@ itself with a lock (`obj/analyzer-check.lock`), plain builds do not.
 - `Censio.Companion` sets `RuntimeIdentifier` `win-x64`, so every build, Linux included, writes the Windows
   `Censio.Companion.exe`; check it with `file` (`PE32+ executable`). Without the identifier the apphost follows
   the build machine (record 0004).
+- The server image (`src/Censio.Server/Dockerfile`) is Alpine-based, so its tools are BusyBox: a command run
+  inside it (`docker exec`, `docker run --entrypoint`) may not use GNU-only options such as `find -printf`; run
+  the plain command and process its output on the host.
