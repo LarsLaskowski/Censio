@@ -96,6 +96,47 @@ public sealed class TrayMenuTests
     }
 
     /// <summary>
+    /// The tooltip shows the application name and the text of the state.
+    /// </summary>
+    /// <param name="state">The connection state</param>
+    /// <param name="expected">The expected tooltip</param>
+    [TestMethod]
+    [DataRow(PipeConnectionState.WaitingForGame, "Censio Companion: Waiting for game")]
+    [DataRow(PipeConnectionState.Connected, "Censio Companion: Connected")]
+    [DataRow(PipeConnectionState.Receiving, "Censio Companion: Receiving")]
+    [DataRow(PipeConnectionState.PipeBusy, "Censio Companion: Pipe busy")]
+    [DataRow(PipeConnectionState.ProtocolMismatch, "Censio Companion: Protocol mismatch")]
+    [DataRow(PipeConnectionState.Error, "Censio Companion: Error")]
+    public void TrayMenuFormatToolTipReturnsTextPerState(PipeConnectionState state, string expected)
+    {
+        // Arrange
+        // (state and expected come from the data row)
+
+        // Act
+        var toolTip = TrayMenu.FormatToolTip(state);
+
+        // Assert
+        Assert.AreEqual(expected, toolTip, "The tooltip should be the application name, a colon and the state text");
+    }
+
+    /// <summary>
+    /// An undefined state is rejected.
+    /// </summary>
+    [TestMethod]
+    public void TrayMenuFormatToolTipUndefinedStateThrows()
+    {
+        // Arrange
+        var state = (PipeConnectionState)99;
+        var call = () => TrayMenu.FormatToolTip(state);
+
+        // Act
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(call, "An undefined state should be rejected");
+
+        // Assert
+        Assert.AreEqual("state", exception.ParamName, "The exception should name the parameter");
+    }
+
+    /// <summary>
     /// The Core assembly carries the build version of the solution.
     /// </summary>
     [TestMethod]
