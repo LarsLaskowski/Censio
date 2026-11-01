@@ -14,9 +14,9 @@ Plan: [plan.md](plan.md) — Status: Draft
 | 8 | G3 | Tests first: status rule, connection with recording, files, session, replay runner, command line, tooltips; adapt `TrayStatusUpdaterTests` to the generic type; link `ControlledWriteStream` | `tests/Censio.Companion.Core.Tests/PipeStatusRuleTests.cs`, `tests/Censio.Companion.Core.Tests/PipeConnectionTests.cs`, `tests/Censio.Companion.Core.Tests/PipeRecordingFilesTests.cs`, `tests/Censio.Companion.Core.Tests/PipeRecordingSessionTests.cs`, `tests/Censio.Companion.Core.Tests/PipeReplayRunnerTests.cs`, `tests/Censio.Companion.Core.Tests/CompanionCommandLineTests.cs`, `tests/Censio.Companion.Core.Tests/TrayMenuTests.cs`, `tests/Censio.Companion.Core.Tests/TrayStatusUpdaterTests.cs`, `tests/Censio.Companion.Core.Tests/Censio.Companion.Core.Tests.csproj` | AC2, AC3, AC4, AC5, AC7, AC9 | 7 | Tester | [x] |
 | 9 | G3 | Implement the Companion core types | the files of row 7 | AC2, AC3, AC4, AC5, AC7, AC9 | 8 | Dev | [x] |
 | 10 | G4 | Shell, no new API: parse `e.Args`, recording session, replay runner, invalid command line tooltip, 1-second flush in `OnExit` | `src/Censio.Companion/App.xaml.cs` | AC9 | 9 | Dev | [x] |
-| 11 | G5 | Area documents `pipe.md` (capped quiet wait in *Order and end*), `companion.md`, area index | `docs/areas/pipe.md`, `docs/areas/companion.md`, `docs/areas/README.md` | AC10 | 10 | Dev | [ ] |
-| 12 | G5 | `ARCHITECTURE.md` component rows and flow sentence | `docs/ARCHITECTURE.md` | AC10 | 10 | Dev | [ ] |
-| 13 | G5 | README: *What works* and *Recording and replay*, English then German | `README.md` | AC10 | 10 | Dev | [ ] |
-| 14 | G5 | User guide: *Recording and replay*, *Data and logs*, *Reporting problems*, English then German | `docs/USER_GUIDE.md` | AC10 | 10 | Dev | [ ] |
-| 15 | G5 | `.squad/project.md` *Security areas* (recordings path, recording files as parsed input) | `.squad/project.md` | AC10 | 10 | Dev | [ ] |
+| 11 | G5 | Area documents `pipe.md` (capped quiet wait in *Order and end*), `companion.md`, area index | `docs/areas/pipe.md`, `docs/areas/companion.md`, `docs/areas/README.md` | AC10 | 10 | Dev | [x] |
+| 12 | G5 | `ARCHITECTURE.md` component rows and flow sentence | `docs/ARCHITECTURE.md` | AC10 | 10 | Dev | [x] |
+| 13 | G5 | README: *What works* and *Recording and replay*, English then German | `README.md` | AC10 | 10 | Dev | [x] |
+| 14 | G5 | User guide: *Recording and replay*, *Data and logs*, *Reporting problems*, English then German | `docs/USER_GUIDE.md` | AC10 | 10 | Dev | [x] |
+| 15 | G5 | `.squad/project.md` *Security areas* (recordings path, recording files as parsed input) | `.squad/project.md` | AC10 | 10 | Dev | [x] |
 | 16 | G5 | `.squad/project.md` *Test doubles*: `ControlledWriteStream` | `.squad/project.md` | AC10 | 2 | Tester | [x] |

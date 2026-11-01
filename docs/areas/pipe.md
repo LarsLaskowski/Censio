@@ -5,11 +5,11 @@
 The statistics pipe as the Companion reads it: the frame layout, the message types of protocol version 2, the
 1 MiB limit, the error kinds, which errors skip a frame and which end the stream, the version gate, and the
 grouping of the messages into ticks and session events with the tick limits, and the connection: discovery,
-states, reconnect and stop. The pipe is
+states, reconnect and stop, and recording the frames to a file and replaying such a file. The pipe is
 untrusted input: the format is known only from Ubisoft's example reader (`UbisoftMainzAnno/anno117_pipe_example`,
 read on 2026-11-01, "for documentation purposes only"), and a game update may change it without notice. The
 reader is in `Censio.Pipe`; it works on any readable byte stream and does not depend on Windows or on the
-named pipe. The connection logic is in `Censio.Companion.Core`, the Windows pipe access in the Companion shell. Ticks are assembled on an injected clock, so the same rules serve a live stream and a replay.
+named pipe. The connection logic is in `Censio.Companion.Core`, the Windows pipe access in the Companion shell. Ticks are assembled on an injected clock, so the same rules serve a live stream and a replay. A recording file is untrusted input as well.
 
 ## Behavior
 
@@ -111,8 +111,113 @@ A tick is delivered when it closes, once, and is never reopened. It closes when:
 - A cancelled request throws the platform's cancellation, discards the open tick and ends the stream; the source
   read is cancelled with it. A request after the assembler was disposed throws an object-disposed error, and the
   dispose cancels a pending read. No other exception leaves the assembler.
+- The quiet period is waited in steps of at most one day and the clock is read again after each step, so a clock that
+  was set back (by a replay's recorded times or by the system) makes the assembler wait on and throws nothing. The
+  steps change no item: a deadline that the clock reaches closes the tick as before.
 - The caller must keep requesting: the receive time of a frame is stamped when its read completes, but the next read
   starts only on a request. A slow consumer belongs behind the tick buffer (#41) or the hand-off built with the first consumers (#12, #13).
+
+## Recording and replay
+
+The Companion can keep the frames of a connection in a file and feed such a file back through the same message
+reader and tick assembler as a live pipe, so the ticks of a run can be reproduced (record 0036, issue #12). The
+Companion's switches, folder and tooltips are in [`companion.md`](companion.md).
+
+### What is recorded
+
+- Every frame the frame reader read whole is recorded, in order and exactly once, with the receive time the pipeline
+  gave it (one clock reading per frame, shared by the recording and the ticks). That includes the frames the reader
+  skips (empty, unknown type, malformed, protocol mismatch): they are recorded and replayed as skipped.
+- A frame that is only partly received (the stream ended inside it, or its length is over 1 MiB or negative) is not
+  recorded. The error that ended the stream is not recorded either.
+- One connection is one file. The file is created when the connection delivers its first frame and closed when the
+  connection ends; a connection that delivers no frame creates no file. A game session is not a file: the game sends
+  `Version` once after the connect, and a replay of a part of a connection without it would be skipped.
+- Recording never changes the live run: frames, states and receive times are the same with and without it.
+
+### File format (version 1)
+
+- Name: `recording-<yyyyMMdd-HHmmss>Z.jsonl`, the receive time of the first frame in UTC, cut to the second. If the
+  name is taken, `-2`, `-3`, ... is appended before `.jsonl`; no file is overwritten (up to 1,000 names per second,
+  then the recording fails).
+- Text in UTF-8 without a byte order mark, one JSON object per line, every line (the last included) ended by one
+  line feed.
+- Line 1 is the header `{"format":"censio-pipe-recording","version":1,"started":"<time>"}`; `started` is the
+  receive time of the first frame.
+- Every further line is one frame: `{"time":"<time>","frame":"<base64>"}`. `frame` is the base64 of the frame's type
+  byte and payload, without the 4-byte length prefix.
+- A time is ISO 8601 in UTC with seven fractional digits and `Z` (`2026-11-01T17:09:00.1234567Z`), so a replay
+  reproduces every receive time to the 100 ns.
+- A file is about a third larger than the frames it holds (base64). There is no size cap and no rotation.
+- A change of the format raises `version`; the anonymiser (#20) writes version 1.
+
+### Writing
+
+- Frames wait in a queue of at most 16 MiB (16,777,216) and a writer drains it to the file; the pipe is read on
+  without waiting for the disk. A queued frame is counted as the length of its base64 text plus 128 bytes. The limit
+  adds at most 16 MiB of queued lines to the frame the reader holds.
+- Each line is flushed to the operating system after it is written. A killed or crashed Companion therefore loses
+  at most the line it was writing; a power loss can also lose the lines the operating system had not yet written to
+  the disk (there is no sync per line).
+- The recording stops for the rest of the run, with the lines already written complete, when the folder or file cannot
+  be created, a write or a flush fails, or a frame does not fit into the queue; frames already queued are still
+  written, the frames after the failure are not recorded. A connection that starts afterwards records nothing.
+  The live connection and its states are not affected. The Companion reports this in its tooltip.
+- When the Companion exits, the queue is written for at most 1 second; frames still queued then count as a failed
+  recording, and a line the disk is still writing at that moment may be cut off, as after a crash.
+
+### Replay
+
+- A replay turns the file back into the pipe's byte stream and reads it through the same message reader (with its
+  version gate, limits and skip rules) and tick assembler as a live connection; nothing is a copy of those rules.
+- The assembler's clock is set to the recorded time of each frame, so the replayed ticks carry the recorded receive
+  times at every speed. With the same frames, the ticks, session events and version messages equal those of the
+  live run, in the same order. The one accepted difference: the stream ends at the last frame, so the last tick
+  closes as *stream ended*, where the live run may have closed it by the quiet period.
+- Speed: before a frame the replay waits the recorded pause to the previous frame divided by the speed. The speed is
+  a factor from `0.1` to `1000` (default `1`, real speed) or `max` (no waiting). A time that goes backwards or
+  repeats gets no wait and is stamped as recorded, without clamping. A long pause is waited in steps of at most one
+  day.
+- The file is opened read-only and never changed. A replay holds one line in memory at a time, whatever the file
+  size, and works on any platform.
+
+### Line rules
+
+- A line ends with a line feed or a carriage return plus line feed. A missing line feed after the last line and one
+  empty line at the end are accepted; an empty line anywhere else is an invalid line.
+- A UTF-8 byte order mark before the header is accepted. The header needs `format` (the string
+  `censio-pipe-recording`) and `version` (an integer); `started` is not checked.
+- JSON fields may come in any order. Fields other than the ones above are ignored, in the header and in a frame line.
+  A field given twice, or of the wrong JSON type, is refused.
+- Limits, checked before the content is decoded: a line is at most 1,402,200 bytes; `frame` is at most 1,398,104
+  characters and decodes to at most 1,048,576 bytes (1 MiB); JSON nested deeper than 64 levels is refused. The decoded frame then passes the reader's own limits.
+  A time must be convertible to UTC and at least 30 seconds before the latest representable time.
+
+### Replay problems
+
+A problem ends the replay after the frames before it were replayed; the reason is part of the status.
+
+| Reason | Cause |
+| ------ | ----- |
+| file not found | The file cannot be opened: it does not exist, access is refused, the path is refused by the platform |
+| not a recording | The first line is not the header (also an empty file, a header line over the line limit, or a header field of the wrong JSON type) |
+| unsupported version | The header's `version` is not `1` |
+| invalid line `<n>` | Line `n` (the header is line 1) is not valid JSON of the frame form, has invalid base64, a frame over 1 MiB, a line over the limit, a missing or unusable `time`, a field given twice or of the wrong type, or is an empty line that is not the last |
+| read failed | The file cannot be read on after it was opened |
+
+A recording that holds only the header replays as finished at once. No exception message reaches the status.
+
+### Privacy
+
+A recording holds the savegame headline, island names and the economic data as the game sent them. It stays on the
+machine, is never sent anywhere and is never deleted automatically. Only anonymised fixtures (#20, record 0029) may be
+shared publicly.
+
+### Recorder started in the middle of a connection
+
+Recording from the start of a connection is what exists. A recorder that starts in the middle of a connection (a
+tray toggle, #13) has to write the connection's last `Version` frame first, or the replay shows `Protocol mismatch`:
+the version gate skips every frame of a file without it.
 
 ## Connection
 
@@ -260,6 +365,11 @@ Until fixtures from real recordings (#20) test the reader:
 - A game that sends one island twice in a tick splits it as *island repeated*.
 - A replay that ends at its last frame closes the last tick as *stream ended*.
 - A caller that pauses for more than 30 seconds between requests stamps frames late and may split ticks.
+- A recorder that starts in the middle of a connection needs the connection's last `Version` frame first (#13).
+- A recording ends at the last line the operating system had written: a stalled disk at `Exit` or a power loss can
+  cost the last lines.
+- Whether Windows sign-out or shutdown gives the Companion the same 1 second to write the queue as `Exit` is not
+  verified.
 
 ## Related decisions
 
@@ -267,8 +377,9 @@ Until fixtures from real recordings (#20) test the reader:
 - [`decisions/0034-ticks-assembled-by-close-rules-on-an-injected-clock.md`](../decisions/0034-ticks-assembled-by-close-rules-on-an-injected-clock.md) — ticks close by five rules and a quiet period on an injected clock; a pure core with an async driver.
 - [`decisions/0035-pipe-connection-states-retry-and-identification-level.md`](../decisions/0035-pipe-connection-states-retry-and-identification-level.md) — the connection checks that the pipe exists, connects read-only at identification level, and resets its retry delay only after 30 seconds in `Receiving`.
 - [`decisions/0018-pipe-parsed-in-companion-versioned-json-contract.md`](../decisions/0018-pipe-parsed-in-companion-versioned-json-contract.md) — the Companion parses the pipe; the format is confined to `Censio.Pipe`.
+- [`decisions/0036-pipe-recording-raw-frames-and-replay-on-a-recorded-clock.md`](../decisions/0036-pipe-recording-raw-frames-and-replay-on-a-recorded-clock.md) — recordings hold the raw frames as JSON lines, written off the read path; replay feeds them back on a recorded clock.
 
 ## Not here
 
 - Telling a resent or paused tick from a new one (#19, #35).
-- Recording the stream (#12).
+- Anonymising recordings (#20).

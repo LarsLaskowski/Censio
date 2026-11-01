@@ -13,8 +13,8 @@ files or endpoints.
 
 - Ingest token: read from configuration or an environment variable, compared in constant time, never logged.
 - Authentication: the WebSocket ingest accepts a Companion only with a valid token; the web UI follows the deployment note in `SECURITY.md`.
-- File paths for the cache and for recordings: derived from configuration, never from data read from the pipe or a game file; reject traversal.
-- Parsing of external input: the Anno 117 statistics pipe stream and game files (Companion), and every WebSocket message (server) — bounded sizes, malformed input is rejected, never trusted.
+- File paths for the cache and for recordings: derived from configuration, never from data read from the pipe or a game file; reject traversal. The recordings folder is `%LOCALAPPDATA%\Censio\Recordings` from `PipeRecordingFiles.DefaultFolder`, fixed, the file name built from the receive time and a counter only (record 0036); the replay path is the user's own command-line argument, opened read-only.
+- Parsing of external input: the Anno 117 statistics pipe stream and game files (Companion), recording files (`PipeReplayStream` with `PipeRecordingFormat`, bounded line, frame and queue sizes), and every WebSocket message (server) — bounded sizes, malformed input is rejected, never trusted.
 - Local pipe connection (Companion): `NamedPipeConnector` opens `\\.\pipe\anno117` read-only, asynchronously and at impersonation level `Identification` (`PipeEndpoint`), so the pipe's server cannot act with the user's Windows identity; nothing is written to it (record 0035).
 - Data-protection key ring: `<Censio:DataDirectory>/data-protection-keys` (`DataProtectionSetup`), created owner-only, unencrypted at rest; the server stops when it cannot write it.
 - Network exposure: the server's listener and its routes reachable without login (`/`, `/health`, the Blazor hub and static assets); plain HTTP, TLS at the reverse proxy (record 0006).
