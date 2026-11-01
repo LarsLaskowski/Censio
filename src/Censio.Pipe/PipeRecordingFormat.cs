@@ -161,39 +161,57 @@ public static class PipeRecordingFormat
         var hasFormat = false;
         var hasVersion = false;
 
-        if (reader.Read() == false || reader.TokenType != JsonTokenType.StartObject)
+        if (TryStartObject(ref reader) == false)
         {
             return false;
         }
 
         while (reader.Read() && reader.TokenType == JsonTokenType.PropertyName)
         {
-            if (reader.ValueTextEquals("format"u8))
+            if (TryReadHeaderField(ref reader, ref hasFormat, ref hasVersion, ref version) == false)
             {
-                if (hasFormat || reader.Read() == false || reader.TokenType != JsonTokenType.String || reader.ValueTextEquals("censio-pipe-recording"u8) == false)
-                {
-                    return false;
-                }
-
-                hasFormat = true;
-            }
-            else if (reader.ValueTextEquals("version"u8))
-            {
-                if (hasVersion || reader.Read() == false || reader.TokenType != JsonTokenType.Number || reader.TryGetInt32(out version) == false)
-                {
-                    return false;
-                }
-
-                hasVersion = true;
-            }
-            else
-            {
-                reader.Read();
-                reader.Skip();
+                return false;
             }
         }
 
-        return hasFormat && hasVersion && reader.TokenType == JsonTokenType.EndObject && reader.Read() == false;
+        return hasFormat && hasVersion && IsEndOfObject(ref reader);
+    }
+
+    /// <summary>
+    /// Reads the header field the reader is on; an unknown field is skipped.
+    /// </summary>
+    /// <param name="reader">The reader on the property name</param>
+    /// <param name="hasFormat">Whether the format field was read before</param>
+    /// <param name="hasVersion">Whether the version field was read before</param>
+    /// <param name="version">The format version</param>
+    /// <returns><see langword="true" /> when the field is valid</returns>
+    private static bool TryReadHeaderField(ref Utf8JsonReader reader, ref bool hasFormat, ref bool hasVersion, ref int version)
+    {
+        if (reader.ValueTextEquals("format"u8))
+        {
+            if (hasFormat || reader.Read() == false || reader.TokenType != JsonTokenType.String || reader.ValueTextEquals("censio-pipe-recording"u8) == false)
+            {
+                return false;
+            }
+
+            hasFormat = true;
+
+            return true;
+        }
+
+        if (reader.ValueTextEquals("version"u8))
+        {
+            if (hasVersion || reader.Read() == false || reader.TokenType != JsonTokenType.Number || reader.TryGetInt32(out version) == false)
+            {
+                return false;
+            }
+
+            hasVersion = true;
+
+            return true;
+        }
+
+        return SkipValue(ref reader);
     }
 
     /// <summary>
@@ -212,39 +230,91 @@ public static class PipeRecordingFormat
         var hasTime = false;
         var hasFrame = false;
 
-        if (reader.Read() == false || reader.TokenType != JsonTokenType.StartObject)
+        if (TryStartObject(ref reader) == false)
         {
             return false;
         }
 
         while (reader.Read() && reader.TokenType == JsonTokenType.PropertyName)
         {
-            if (reader.ValueTextEquals("time"u8))
+            if (TryReadFrameField(ref reader, ref hasTime, ref hasFrame, ref receiveTime, ref frame) == false)
             {
-                if (hasTime || reader.Read() == false || reader.TokenType != JsonTokenType.String || TryReadTime(ref reader, out receiveTime) == false)
-                {
-                    return false;
-                }
-
-                hasTime = true;
-            }
-            else if (reader.ValueTextEquals("frame"u8))
-            {
-                if (hasFrame || reader.Read() == false || reader.TokenType != JsonTokenType.String || TryReadFrame(ref reader, out frame) == false)
-                {
-                    return false;
-                }
-
-                hasFrame = true;
-            }
-            else
-            {
-                reader.Read();
-                reader.Skip();
+                return false;
             }
         }
 
-        return hasTime && hasFrame && reader.TokenType == JsonTokenType.EndObject && reader.Read() == false;
+        return hasTime && hasFrame && IsEndOfObject(ref reader);
+    }
+
+    /// <summary>
+    /// Reads the frame line field the reader is on; an unknown field is skipped.
+    /// </summary>
+    /// <param name="reader">The reader on the property name</param>
+    /// <param name="hasTime">Whether the time field was read before</param>
+    /// <param name="hasFrame">Whether the frame field was read before</param>
+    /// <param name="receiveTime">The receive time in UTC</param>
+    /// <param name="frame">The decoded frame</param>
+    /// <returns><see langword="true" /> when the field is valid</returns>
+    private static bool TryReadFrameField(ref Utf8JsonReader reader, ref bool hasTime, ref bool hasFrame, ref DateTimeOffset receiveTime, ref byte[] frame)
+    {
+        if (reader.ValueTextEquals("time"u8))
+        {
+            if (hasTime || reader.Read() == false || reader.TokenType != JsonTokenType.String || TryReadTime(ref reader, out receiveTime) == false)
+            {
+                return false;
+            }
+
+            hasTime = true;
+
+            return true;
+        }
+
+        if (reader.ValueTextEquals("frame"u8))
+        {
+            if (hasFrame || reader.Read() == false || reader.TokenType != JsonTokenType.String || TryReadFrame(ref reader, out frame) == false)
+            {
+                return false;
+            }
+
+            hasFrame = true;
+
+            return true;
+        }
+
+        return SkipValue(ref reader);
+    }
+
+    /// <summary>
+    /// Reads the start of the object a line must consist of.
+    /// </summary>
+    /// <param name="reader">The reader</param>
+    /// <returns><see langword="true" /> when the first token starts an object</returns>
+    private static bool TryStartObject(ref Utf8JsonReader reader)
+    {
+        return reader.Read() && reader.TokenType == JsonTokenType.StartObject;
+    }
+
+    /// <summary>
+    /// Checks that the reader is on the end of the object and that no token follows.
+    /// </summary>
+    /// <param name="reader">The reader</param>
+    /// <returns><see langword="true" /> when the object ends the line</returns>
+    private static bool IsEndOfObject(ref Utf8JsonReader reader)
+    {
+        return reader.TokenType == JsonTokenType.EndObject && reader.Read() == false;
+    }
+
+    /// <summary>
+    /// Skips the value of the property the reader is on.
+    /// </summary>
+    /// <param name="reader">The reader on the property name</param>
+    /// <returns><see langword="true" />, as an unknown field is accepted</returns>
+    private static bool SkipValue(ref Utf8JsonReader reader)
+    {
+        reader.Read();
+        reader.Skip();
+
+        return true;
     }
 
     /// <summary>

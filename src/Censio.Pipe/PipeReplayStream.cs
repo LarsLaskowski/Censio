@@ -257,51 +257,80 @@ public sealed class PipeReplayStream : Stream
 
         while (true)
         {
-            var available = _buffer.AsSpan(_start, _end - _start);
-            var index = available[scanned..].IndexOf((byte)'\n');
+            var availableLength = _end - _start;
+            var index = _buffer.AsSpan(_start, availableLength)[scanned..].IndexOf((byte)'\n');
 
             if (index >= 0)
             {
-                var length = scanned + index;
-
-                _lineStart = _start;
-                _lineLength = length > 0 && available[length - 1] == (byte)'\r' ? length - 1 : length;
-                _start += length + 1;
-
-                return _lineLength > PipeRecordingFormat.MaxLineLength ? PipeReplayLineStatus.TooLong : PipeReplayLineStatus.Line;
+                return CompleteLine(scanned + index);
             }
 
-            scanned = available.Length;
+            scanned = availableLength;
 
-            if (available.Length >= LineBufferLength)
+            if (availableLength >= LineBufferLength)
             {
                 return PipeReplayLineStatus.TooLong;
             }
 
-            if (_start > 0)
-            {
-                available.CopyTo(_buffer);
-                _start = 0;
-                _end = available.Length;
-            }
+            CompactBuffer();
 
             var read = await _recording.ReadAsync(_buffer.AsMemory(_end), cancellationToken).ConfigureAwait(false);
 
             if (read == 0)
             {
-                _lineStart = _start;
-                _lineLength = _end - _start;
-                _start = _end;
-
-                if (_lineLength == 0)
-                {
-                    return PipeReplayLineStatus.End;
-                }
-
-                return _lineLength > PipeRecordingFormat.MaxLineLength ? PipeReplayLineStatus.TooLong : PipeReplayLineStatus.Line;
+                return CompleteFinalLine();
             }
 
             _end += read;
+        }
+    }
+
+    /// <summary>
+    /// Completes the line that ends with a line feed at the given offset behind <see cref="_start" />.
+    /// </summary>
+    /// <param name="length">The number of bytes before the line feed</param>
+    /// <returns>The status of the line</returns>
+    private PipeReplayLineStatus CompleteLine(int length)
+    {
+        var hasCarriageReturn = length > 0 && _buffer![_start + length - 1] == (byte)'\r';
+
+        _lineStart = _start;
+        _lineLength = hasCarriageReturn ? length - 1 : length;
+        _start += length + 1;
+
+        return _lineLength > PipeRecordingFormat.MaxLineLength ? PipeReplayLineStatus.TooLong : PipeReplayLineStatus.Line;
+    }
+
+    /// <summary>
+    /// Completes the last line of a recording that ends without a line feed.
+    /// </summary>
+    /// <returns>The status of the line</returns>
+    private PipeReplayLineStatus CompleteFinalLine()
+    {
+        _lineStart = _start;
+        _lineLength = _end - _start;
+        _start = _end;
+
+        if (_lineLength == 0)
+        {
+            return PipeReplayLineStatus.End;
+        }
+
+        return _lineLength > PipeRecordingFormat.MaxLineLength ? PipeReplayLineStatus.TooLong : PipeReplayLineStatus.Line;
+    }
+
+    /// <summary>
+    /// Moves the unconsumed bytes to the start of the buffer.
+    /// </summary>
+    private void CompactBuffer()
+    {
+        if (_start > 0)
+        {
+            var length = _end - _start;
+
+            _buffer.AsSpan(_start, length).CopyTo(_buffer);
+            _start = 0;
+            _end = length;
         }
     }
 
