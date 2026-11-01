@@ -723,18 +723,23 @@ public sealed class PipeReplayStreamTests
     /// </summary>
     /// <param name="wholeLines">The number of whole lines before the failing read</param>
     /// <param name="expectedFrames">The number of frames replayed</param>
+    /// <param name="accessDenied">Whether the failing read throws an access error instead of an I/O error</param>
     /// <returns>The task</returns>
     [TestMethod]
-    [DataRow(0, 0)]
-    [DataRow(1, 0)]
-    [DataRow(2, 1)]
-    [DataRow(3, 2)]
-    public async Task PipeReplayStreamReadFailureIsReadFailed(int wholeLines, int expectedFrames)
+    [DataRow(0, 0, false)]
+    [DataRow(1, 0, false)]
+    [DataRow(2, 1, false)]
+    [DataRow(3, 2, false)]
+    [DataRow(0, 0, true)]
+    [DataRow(1, 0, true)]
+    [DataRow(2, 1, true)]
+    [DataRow(3, 2, true)]
+    public async Task PipeReplayStreamReadFailureIsReadFailed(int wholeLines, int expectedFrames, bool accessDenied)
     {
         // Arrange
         string[] lines = [Header(), Line(1, _firstFrame), Line(2, _secondFrame), Line(3, _firstFrame)];
         var failAt = lines.Take(wholeLines).Sum(line => Utf8(line).Length) + 5;
-        using var recording = new ChunkedStream(Utf8(string.Concat(lines)), 7, failAt);
+        using var recording = new ChunkedStream(Utf8(string.Concat(lines)), 7, failAt, accessDenied: accessDenied);
 
         // Act
         var (frames, problem) = await ReplayFramesAsync(recording);
