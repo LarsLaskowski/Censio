@@ -1,6 +1,6 @@
 # 0034: Ticks are assembled by close rules and a quiet period on an injected clock, in a pure core with an async driver
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-01
 - **Area:** pipe
 - **Source:** Issue #10
