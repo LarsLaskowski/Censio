@@ -254,8 +254,8 @@ Who can do what:
   reviewed workflow of that tag with the environment secrets. It discloses no secret, and it never moves Docker Hub
   `latest` for a tag but the highest (refused in `check` and in `promote`, [issue #78](https://github.com/LarsLaskowski/Censio/issues/78)).
   A re-run of only `image-publish` or `companion-publish` re-pushes that run's `<version>` or re-attaches its ZIP
-  from the run's own checked artifacts within the 7 days; of the highest tag it rebuilds and re-promotes the same
-  version.
+  from the run's own checked artifacts within the 7 days, and stops at `promote` unless the tag is the highest; a republish or a re-run of all jobs of
+  the highest tag rebuilds and re-promotes the same version.
 - Residual: GitHub's *Latest* mark can be set by anyone with write access (by hand, by publishing an old tag's
   release as a full release, or by deleting the highest release), and the workflow does not protect it. The
   administrator restores it on the highest release with *Set as latest release*.

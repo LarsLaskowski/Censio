@@ -65,8 +65,8 @@ is in [`areas/server.md`](areas/server.md), the choices in
 [`decisions/0009`](decisions/0009-server-image-runs-as-a-fixed-non-root-user.md) and
 [`decisions/0010`](decisions/0010-server-image-base-pinned-by-amd64-manifest-digest.md). The image keeps the data-protection key ring in `/config` (`Censio:DataDirectory`, [`decisions/0011`](decisions/0011-data-protection-key-ring-in-the-data-directory.md)). The Companion is
 published as a Windows ZIP. A release is cut from a `vMAJOR.MINOR.PATCH` tag on `main` and published as a
-pre-release: the workflow builds and checks the ZIP and the image without secrets, publishes them, and only then
-promotes the release, moving `latest` to it when its tag is the highest version and *Latest* (GitHub's mark, which a writer can also set) to it; the release's write credentials are secrets of the environment `release`, which admits only runs on `v*` tags ([`decisions/0012`](decisions/0012-release-pre-release-first-and-secret-free-builds.md);
+pre-release: the workflow refuses a tag that is not the highest such tag (before the build and again before the promotion), builds and checks the ZIP and the image without secrets, publishes them, and only then
+promotes the release, moving `latest` and *Latest* to it (*Latest* is GitHub's mark, which a writer can also set by hand); the release's write credentials are secrets of the environment `release`, which admits only runs on `v*` tags ([`decisions/0012`](decisions/0012-release-pre-release-first-and-secret-free-builds.md);
 steps in [`CONTRIBUTING.md`](CONTRIBUTING.md), *Versioning and releases*).
 <!-- project:end architecture -->
 
