@@ -2,7 +2,7 @@
 
 Source: Issue #78
 Status: Draft
-Tier: security — the change adds a guard to the trust of the release (what a writer can make a credentialed release run do with Docker Hub `latest` and GitHub's *Latest*), a security control in `.github/workflows/release.yml`.
+Tier: security — the change adds a guard to the trust of the release (what a writer can make a credentialed release run do with Docker Hub `latest`), a security control in `.github/workflows/release.yml`.
 Security areas touched: Release publishing (`.github/workflows/release.yml`, jobs `check` and `promote`); CI scripts `.github/scripts/release-check.sh` and `.github/scripts/release-check-test.sh` (run by CI job `release-check`); `.squad/project.md` (*Security areas*, Release publishing entry, wording extended, not narrowed)
 
 ## Problem / root cause
@@ -12,7 +12,9 @@ lines 14-45) checks only the tag's form (`release-check.sh tag`), that its commi
 pre-release flag; `promote` (lines 199-244) moves `latest` to the run's digest (`promote-image`, line 233, script
 lines 312-325) and marks the release *Latest* (`gh release edit "$TAG" --prerelease=false --latest`, line 244)
 unconditionally. A writer who republishes the release of an older `v*` tag, re-runs an older run, or re-runs only
-the older run's `promote` job (whose `check` job does not run again) therefore moves both back.
+the older run's `promote` job (whose `check` job does not run again) therefore moves both back. The guard covers
+Docker Hub `latest` only, which needs the environment secrets: GitHub's *Latest* mark is a release setting any writer
+changes directly (fact 12), which no workflow can protect.
 
 ## Verified facts
 
@@ -29,6 +31,8 @@ the older run's `promote` job (whose `check` job does not run again) therefore m
 | 9 | "Re-run failed jobs" or a re-run of one job does not re-run a succeeded `check` job, and a re-run checkout fetches the repository anew | to verify: observed at the first re-run of a release run, administrator (not measurable before a release); GitHub's documented re-run behavior re-runs the selected or failed jobs and their dependents; the design does not rest on it, since `promote` checks itself | unverified |
 | 10 | The tag itself reaches the script only through `env` | `release.yml` lines 30-31, 37-38 | confirmed |
 | 11 | `notify-website.yml` dispatches on every published release, also a republished old one | `.github/workflows/notify-website.yml` lines 6-8, 22; left out of scope, see last section | confirmed |
+| 12 | A writer can set GitHub's *Latest* without a run: publish an old tag's release as a full release, tick *Set as latest release*, or delete the highest release | `docs/CONTRIBUTING.md` *Versioning and releases* (a full release is marked *Latest* at once, before any job); record 0012 option 11; release editing is the write role's permission | confirmed |
+| 13 | `version_pattern` allows any number of digits and no leading zero; bash arithmetic wraps at 64 bits | `release-check.sh` line 23; Security's plan review (`b=9223372036854775808; echo $((b > 1))` prints `0`) | confirmed |
 
 ## Acceptance criteria
 
@@ -41,7 +45,7 @@ exit code 1 with the given text as the `::error::` annotation on the last line, 
   branches (a branch `v99.0.0`) are ignored.
 - [ ] AC2: refused with `Release tag '<tag>' is older than tag '<highest>'; only the highest version tag can be
   released.` when a matching tag of a higher version exists; `<highest>` is the highest matching tag, whether it is
-  annotated or lightweight, on `main` or not.
+  annotated or lightweight, on `main` or not, however many digits a field has.
 - [ ] AC3: a `<tag>` not of the form `vMAJOR.MINOR.PATCH` is refused with the existing text of `tag`:
   `Release tag '<tag>' is not of the form vMAJOR.MINOR.PATCH.` (line breaks and `%` encoded as there).
 - [ ] AC4: a well-formed `<tag>` that is not a tag of the repository (also in a repository without any tag) is
@@ -56,7 +60,7 @@ exit code 1 with the given text as the `::error::` annotation on the last line, 
 | AC | Test(s) | Test file |
 | -- | ------- | --------- |
 | AC1 | step "Issue 78: newest": cases `I78-AC1 only tag` (repo with `v1.0.0` only), `I78-AC1 numeric` (`v0.9.0`, `v0.10.0`, `v1.0.9`, `v1.0.10`: `v1.0.10` passes), `I78-AC1 ignored` (the non-matching tags of AC1 and a branch `v99.0.0` added: `v1.0.10` still passes) | `.github/scripts/release-check-test.sh` |
-| AC2 | `I78-AC2 lower patch` (`v1.0.9` names `v1.0.10`), `I78-AC2 names the highest` (`v0.9.0` names `v1.0.10`, not `v0.10.0`), `I78-AC2 not on main, annotated` (annotated `v10.0.0` on a side branch beside `v9.9.9`: `v1.0.10` and `v9.9.9` name `v10.0.0`), `I78-AC2 ignored passes` (after the AC2 cases the highest tag still passes) | `.github/scripts/release-check-test.sh` |
+| AC2 | `I78-AC2 lower patch` (`v1.0.9` names `v1.0.10`), `I78-AC2 names the highest` (`v0.9.0` names `v1.0.10`, not `v0.10.0`), `I78-AC2 not on main, annotated` (annotated `v10.0.0` on a side branch beside `v9.9.9`: `v1.0.10` and `v9.9.9` name `v10.0.0`), `I78-AC2 long field` (`v1.0.0` names `v99999999999999999999.0.0`, a 20-digit major beyond 64 bits), `I78-AC2 ignored passes` (after the AC2 cases, `v99999999999999999999.0.0` passes) | `.github/scripts/release-check-test.sh` |
 | AC3 | `I78-AC3 '<bad>'` for `v1.2`, `v1.2.3;id`, empty, `v1.2.3` plus LF (expected `v1.2.3%0A`) — the expected text built with the existing `tag_error` helper | `.github/scripts/release-check-test.sh` |
 | AC4 | `I78-AC4 absent` (`v1.0.11` in the repo above), `I78-AC4 no tags` (fresh repo with one commit, `v1.0.0`) | `.github/scripts/release-check-test.sh` |
 | AC5 | no test: workflow wiring, which runs only at a real release. Verified by *Analyzer gate* `--lint-only` (actionlint), the Reviewer and Security's diff review reading the two steps and the checkout | — |
@@ -70,11 +74,14 @@ the same `git config` lines. The script header gains "and the criteria AC1 to AC
 New command `newest <tag>` in `release-check.sh`, function `check_newest`, dispatched in the final `case`, listed in
 the usage header (`newest <tag>  the tag must be the highest vMAJOR.MINOR.PATCH tag of the repository`). Order:
 
-1. Validate the form exactly as `check_tag` does (reuse it; its error and exit stand).
+1. Validate the form with `check_tag "$tag" > /dev/null` (its error and exit stand; its stdout is discarded, since AC1
+   requires no output — not a `$(…)` call, whose `exit 1` would stop only the subshell).
 2. `git rev-parse -q --verify "refs/tags/${tag}"` fails → AC4 error.
 3. List `git tag --list`, keep the names matching `^v` + `version_pattern`, find the highest by numeric comparison of
-   the three fields (bash arithmetic on `BASH_REMATCH`, no `sort -V`, no locale dependence); if it is higher than the
-   tag's version → AC2 error naming it. Equal is only the tag itself.
+   the three fields from `BASH_REMATCH`, compared as strings, never as numbers: the longer field is higher, fields of
+   equal length compare with `[[ > ]]` under a function-local `LC_ALL=C` — exact because the pattern rules out
+   leading zeros, and free of 64-bit overflow (fact 13); no `sort -V`. If the highest is higher than the tag's
+   version → AC2 error naming it. Equal is only the tag itself.
 
 Messages pass through `error` (annotation encoding). No output on success, so the workflow step needs no capture.
 
@@ -89,8 +96,10 @@ Messages pass through `error` (annotation encoding). No output on success, so th
 
 In `promote`, the checkout gains `fetch-depth: 0  # compare the tag with every v* tag right before latest moves`, and
 after *Check the passed values* a step *Check that the tag is still the highest version* with the same `env` and
-`run`. `image-publish` gets no check: a re-run of it alone re-pushes `<version>` from the run's own checked archive
-and leaves `latest` to `promote`. The workflow header comment gains one sentence: a tag that is not the highest
+`run`. `image-publish` and `companion-publish` get no check: a re-run of either alone, within the 7-day artifact
+retention, re-pushes `<version>` or re-attaches the ZIP from the run's own checked artifacts (the same version of the
+same commit) and then stops at `promote`; a check there would need a full-history checkout in a credentialed job for
+no change to `latest`. The workflow header comment gains one sentence: a tag that is not the highest
 `v*` version is refused in `check` and again in `promote` (record 0012).
 
 No new user-visible output beyond the two annotation texts fixed in AC2 and AC4.
@@ -101,7 +110,8 @@ Recorded in record 0012, options 10 to 15: the tag comparison in `check` and `pr
 GitHub's *Latest* release (writer-controlled reference); skipping only the promotion (still re-pushes an old
 release's artifacts); required reviewers on the environment with administrator self-approval (an untestable
 setting and an approval on every release; stays available); a `triggering_actor` permission check (unmeasured token
-reach); accepting it as documented. Checking only in `check` lost to checking in both: a re-run of `promote` alone
+reach); accepting it as documented; protecting GitHub's *Latest* mark (option 16, not possible from a workflow:
+recorded as residual). Checking only in `check` lost to checking in both: a re-run of `promote` alone
 skips `check`.
 
 ## Affected projects and types
@@ -138,7 +148,9 @@ PR as a draft after step 7 (*Draft until green*).
 
 - `docs/areas/server.md` (*Docker image*, lines 98-101): `latest` points to the promoted release of the highest
   version, not "the last promoted release"; a release whose tag is not the highest `vMAJOR.MINOR.PATCH` tag is
-  refused and leaves `latest` where it was.
+  refused and leaves `latest` where it was; a re-run of only the publish jobs of such a run re-pushes its own
+  `<version>`. GitHub's *Latest* mark is not protected: anyone with write access can set it by hand or by publishing
+  an old tag's release as a full release.
 - `docs/areas/companion.md`: none — "Every release attaches the ZIP" stays true of every release that completes.
 
 ## Documentation updates
@@ -150,17 +162,22 @@ Sweep: `docs/ARCHITECTURE.md`, `docs/areas/*.md`, `docs/CONTRIBUTING.md`, `READM
 - `docs/CONTRIBUTING.md`, *Versioning and releases* (Dev):
   - lines 216-218: the list of refusals gains "a tag lower than the highest `vMAJOR.MINOR.PATCH` tag (checked at the
     start and again right before the promotion)";
-  - *Who can do what*, lines 252-254: a writer's republish or re-run of any tag but the highest stops before it
-    pushes or promotes anything; of the highest it rebuilds and re-promotes the same version; still no secret
-    disclosed; drop the "may move `latest` back" link wording, keep the issue link as the source;
-  - *Limits and rules*, lines 279-282: replace "Never re-run the run of an older release … does the same" by: the
-    run of a lower version is refused once a higher tag exists; to release a lower version, an administrator deletes
-    the higher tags first; a failed release cannot be completed after a higher tag was created.
+  - *Who can do what*, lines 252-254: a writer's republish or re-run of any tag but the highest never moves Docker
+    Hub `latest` (refused in `check` and in `promote`); a re-run of only `image-publish` or `companion-publish`
+    re-pushes that run's `<version>` or re-attaches its ZIP from its own checked artifacts within the 7 days; of the
+    highest it rebuilds and re-promotes the same version; still no secret disclosed. New residual bullet: GitHub's
+    *Latest* mark can be set by anyone with write access (by hand, by publishing an old tag's release as a full
+    release, or by deleting the highest release), and the workflow does not protect it; the administrator restores
+    it on the highest release with *Set as latest release*. Keep the issue #78 link as the source;
+  - *Limits and rules*, lines 279-282: replace "Never re-run the run of an older release … does the same" by:
+    releasing a lower version is not supported while a higher `v*` tag exists — its run is refused; a failed release
+    cannot be completed after a higher tag was created.
 - `docs/areas/server.md`: as in *Areas* (Dev).
 - `docs/ARCHITECTURE.md` lines 67-70: "promotes the release, moving `latest` and *Latest* to it" gains "when its tag
-  is the highest version" (Dev; record 0012 is already linked there).
-- `.squad/project.md`, *Security areas*, Release publishing: append "; a run promotes only a tag that is the highest
-  `v*` version, checked in `check` and `promote` (record 0012)" (Dev).
+  is the highest version" for `latest`; *Latest* is GitHub's mark, which a writer can also set (Dev; record 0012 is already linked there).
+- `.squad/project.md`, *Security areas*, Release publishing: append "; a run moves Docker Hub `latest` only for a tag
+  that is the highest `v*` version, checked in `check` and `promote` (record 0012); GitHub's *Latest* mark is not
+  protected" (Dev).
 - Test documentation: none beyond the test script's header (Tester).
 
 ## Architecture check
@@ -177,18 +194,40 @@ already runs. `.squad/project.md` lists no guarantee. The change narrows what a 
   failing `git` (no repository) exits non-zero with Git's own stderr, as `on-main` does today.
 - [ ] The comparison reference is the tag set, which only administrators change (fact 1, unverified as D1); a writer
   cannot add a higher tag to block a release, nor remove one to unblock an old release.
+- [ ] Overflow: fields are compared by length, then as strings, never by arithmetic (fact 13, `I78-AC2 long field`).
 - [ ] Fails closed: no tags fetched → AC4; a malformed tag → AC3; any refusal leaves the release a pre-release and
   `latest` unchanged, as every other refusal of the run does.
 - [ ] Residual: a writer can still republish or re-run the highest release (same version, same reviewed commit,
-  rebuilt); a tag created between the check in `promote` and the move of `latest` is not noticed; issue #77 is
+  rebuilt), re-run only the publish jobs of a lower run (its own `<version>` and ZIP again), and set GitHub's
+  *Latest* mark on any release directly (fact 12); a tag created between the check in `promote` and the move of `latest` is not noticed; issue #77 is
   unaffected. All recorded in record 0012, *Consequences*.
 
 ## Decision records
 
 - `docs/decisions/0012-release-pre-release-first-and-secret-free-builds.md` (Accepted, unreleased: no `v*` tag on
   origin) — extended in place: source issue #78, options 10-15, one decision sentence, the concurrency consequence
-  rewritten (the older release's `promote` now stops), a new consequence (no lower-version release while a higher
-  tag exists), the writer re-run consequence rewritten. Index row unchanged.
+  rewritten (the older release's `promote` now stops; only `latest` is guaranteed), a new consequence (releasing a
+  lower version is not supported while a higher tag exists), the writer re-run consequence rewritten with the
+  publish-job re-run and the unprotected *Latest* mark, option 16 (protecting *Latest*: not possible). Index row
+  unchanged.
+
+## Challenge
+
+- MAJOR 1 (*Latest* cannot be protected) — accepted. The guarantee is limited to Docker Hub `latest`; *Latest* is a
+  residual in Problem, fact 12, *Areas*, CONTRIBUTING *Who can do what*, `.squad/project.md` and record 0012
+  (Consequences, option 16). No mitigation: any check runs only when a run does, and editing a release needs none.
+- MINOR 2 (publish-job re-runs) — accepted. Wording in *Approach*, *Areas*, CONTRIBUTING and record 0012 now says a
+  re-run of `image-publish` or `companion-publish` alone re-pushes or re-attaches from its own checked artifacts and
+  stops at `promote`; no check is added there (reason in *Approach*).
+- MINOR 3 (overflow) — accepted: comparison by length then string (*Approach* step 3), case `I78-AC2 long field`.
+- MINOR 4 (lower-version releases) — accepted: the docs now say plainly that releasing a lower version is not
+  supported while a higher tag exists; the deletion procedure is dropped.
+
+## Security review
+
+APPROVED; the two non-blocking notes are resolved: (1) overflow — same fix as MINOR 3, fact 13 and the
+*Security considerations* entry; (2) stdout of `check_tag` — discarded with `check_tag "$tag" > /dev/null` in the
+current shell (*Approach* step 1).
 
 ## Out of scope / follow-ups
 
