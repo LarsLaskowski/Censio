@@ -1,7 +1,8 @@
 # Plan: Recorder and replay of the statistics pipe
 
 Source: Issue #12 | [spec.md](spec.md)
-Status: Revised (1)
+Plan size: a feature over two projects with eleven new types, a file format, its parser's bounds and the recorder's queue needs the length, as each rule is a test the Tester writes from it.
+Status: Revised (2), final (Lead decision after the Plan ↔ Security loop limit)
 Tier: standard — new behavior (recording files, replay from a file) that creates, changes or removes no security control: the recording path is fixed and built from no input, and the replay file's line bounds are input handling.
 Security areas touched: File paths for recordings (`PipeRecordingFiles`, `%LOCALAPPDATA%\Censio\Recordings`); Parsing of external input (a recording file read by `PipeReplayStream`); Logging of external data (unchanged: nothing is logged, tooltips carry no file content)
 
@@ -29,6 +30,8 @@ per the status rule).
 | 16 | `FileStream.FlushAsync` and `Flush()` hand the bytes to the operating system only; `Flush(true)` or `FileOptions.WriteThrough` reach the disk. Bytes handed to the system survive the end of the process, not a power loss | Devil's Advocate M1; .NET API documentation of `FileStream.Flush(Boolean)` | confirmed |
 | 17 | `Task.Delay` refuses a delay over `UInt32.MaxValue − 1` milliseconds (about 49.7 days); `DateTimeOffset` + 30 s throws near `MaxValue`; `Utf8JsonReader.GetDateTimeOffset` throws `FormatException` where `TryGetDateTimeOffset` returns false; `Skip` past the depth limit (64) throws `JsonException` | Security plan review B1 | confirmed |
 | 18 | `Environment.GetFolderPath(LocalApplicationData)` returns an empty string when the folder cannot be determined | Security plan review B3; .NET API documentation of `GetFolderPath` | confirmed |
+| 19 | `PipeTickAssembler.Step` passes `deadline − now` to `Task.Delay` uncapped (line 143); `_lastReceiveTime` moves only on islands, so a clock set back 59 days or more after an island makes `Task.Delay` throw `ArgumentOutOfRangeException` before `CreateTimer`. A live system clock set back that far does the same (latent: no live assembler yet, fact 4) | `src/Censio.Pipe/PipeTickAssembler.cs` lines 122–143; Security plan review F1, measured on .NET 10.0.403 | confirmed |
+| 20 | `Utf8JsonReader`'s `TryGetDateTimeOffset`, `TryGetBytesFromBase64`, `TryGetInt32` and `ValueTextEquals` throw `InvalidOperationException` on a token of another type; `GetString` throws it on invalid UTF-8 | Security plan review F2 | confirmed |
 | 11 | WPF raises `Application.Exit` (`OnExit`) after an uncancelled `SessionEnding` at sign-out and shutdown, so the recording flush in `OnExit` also runs then | to verify: Dev reads the WPF `Application` source (`release/10.0`); maintainer's manual test on Windows (sign-out with `--record`, file ends with a complete line) in step 9 | unverified |
 | 12 | `NotifyIcon.Text` accepts up to 127 characters on .NET 10; the longest new tooltip (`Censio Companion: Replay error: invalid line 9223372036854775807`) has 64 | to verify: Dev reads `System.Windows.Forms` `NotifyIcon.Text` (`release/10.0`) | unverified |
 | 13 | A full disk and a deleted folder surface from `FileStream` writes and flushes as `IOException` (access denied as `UnauthorizedAccessException`), the cases `ControlledWriteStream` models | to verify: Dev reads `dotnet/runtime` `release/10.0` `Win32Marshal.GetExceptionForWin32Error` (`ERROR_DISK_FULL`, `ERROR_ACCESS_DENIED`) before the Tester writes the double | unverified |
@@ -55,13 +58,14 @@ per the status rule).
 | AC5 | `PipeConnectionRecordingFailureKeepsStatesAndReads` | `tests/Censio.Companion.Core.Tests/PipeConnectionTests.cs` |
 | AC5 | `TrayMenuFormatToolTipWithRecordingStateAppendsSuffix` (off, recording, failed per state) | `tests/Censio.Companion.Core.Tests/TrayMenuTests.cs` |
 | AC6 | `PipeReplayStreamSkippedFramesReplayAsSkipped`, `PipeReplayStreamFrameBeforeVersionGivesProtocolMismatch`, `PipeReplayStreamTickLimitAppliesToReplayedFrames` | `tests/Censio.Pipe.Tests/PipeReplayStreamTests.cs` |
-| AC7 | `PipeReplayStreamEmptyFileIsNotARecording`, `PipeReplayStreamOtherFormatIsNotARecording`, `PipeReplayStreamHeaderWithoutVersionIsNotARecording`, `PipeReplayStreamOtherVersionIsUnsupported`, `PipeReplayStreamInvalidLineEndsAfterEarlierFrames` (invalid JSON, invalid base64, missing time, missing frame, field twice, frame over 1 MiB, a frame string of 1,398,104 characters without padding, cut last line, time `9999-12-31T23:59:59.9999999Z`, time `0001-01-01T00:00:00+01:00`, an unknown field nested 65 deep), `PipeReplayStreamLineOverMaxLengthIsInvalidWithoutReadingItWhole`, `PipeReplayStreamAcceptedLineForms` (CRLF, no final line feed, one empty last line, byte order mark, unknown fields, any field order), `PipeReplayStreamEmptyLineInsideIsInvalid`, `PipeReplayStreamReadFailureIsReadFailed`, `PipeReplayStreamHeaderOnlyEndsAtOnce` | `tests/Censio.Pipe.Tests/PipeReplayStreamTests.cs` |
-| AC7 | `PipeReplayRunnerMissingFileIsFileNotFound`, `PipeReplayRunnerDeniedFileIsFileNotFound` | `tests/Censio.Companion.Core.Tests/PipeReplayRunnerTests.cs` |
+| AC7 | `PipeReplayStreamEmptyFileIsNotARecording`, `PipeReplayStreamOtherFormatIsNotARecording`, `PipeReplayStreamHeaderWithoutVersionIsNotARecording`, `PipeReplayStreamHeaderFieldOfWrongTypeIsNotARecording` (`format` as number, null, object, with a raw 0xFF byte; `version` as `"1"`, null, `1.5`), `PipeReplayStreamOtherVersionIsUnsupported`, `PipeReplayStreamInvalidLineEndsAfterEarlierFrames` (invalid JSON, invalid base64, missing time, missing frame, field twice, frame over 1 MiB, a frame string of 1,398,104 characters without padding, cut last line, time `9999-12-31T23:59:59.9999999Z`, time `0001-01-01T00:00:00+01:00`, an unknown field nested 65 deep, `time` and `frame` each as number, null, object and array, `time` with a raw 0xFF byte), `PipeReplayStreamLineOverMaxLengthIsInvalidWithoutReadingItWhole`, `PipeReplayStreamAcceptedLineForms` (CRLF, no final line feed, one empty last line, byte order mark, unknown fields, any field order), `PipeReplayStreamEmptyLineInsideIsInvalid`, `PipeReplayStreamReadFailureIsReadFailed`, `PipeReplayStreamHeaderOnlyEndsAtOnce` | `tests/Censio.Pipe.Tests/PipeReplayStreamTests.cs` |
+| AC7 | `PipeReplayRunnerMissingFileIsFileNotFound`, `PipeReplayRunnerDeniedFileIsFileNotFound`, `PipeReplayRunnerRefusedPathIsFileNotFound` (open throws `ArgumentException`) | `tests/Censio.Companion.Core.Tests/PipeReplayRunnerTests.cs` |
 | AC8 | `PipeReplayStreamRealSpeedWaitsRecordedPause`, `PipeReplayStreamFactorDividesPause`, `PipeReplayStreamMaximumSpeedDoesNotWait`, `PipeReplayStreamBackwardOrRepeatedTimeDoesNotWaitAndKeepsTime`, `PipeReplayStreamCancelledWaitThrowsCancellation` | `tests/Censio.Pipe.Tests/PipeReplayStreamTests.cs` |
 | AC8 | `PipeReplaySpeedTryParseAcceptsValidValues` (`max`, `1`, `0.1`, `1000`, `10`), `PipeReplaySpeedTryParseRejectsInvalidValues` (`0.09`, `1000.1`, `0`, `-1`, `1,5`, `NaN`, `Infinity`, empty, null), `PipeReplaySpeedScaleDividesPause` | `tests/Censio.Pipe.Tests/PipeReplaySpeedTests.cs` |
 | AC8 | `PipeReplayClockGetUtcNowReturnsLastSetTimeAlsoBackwards`, `PipeReplayClockTimerNeverFiresAndAcceptsChangeAndDispose` | `tests/Censio.Pipe.Tests/PipeReplayClockTests.cs` |
-| AC8 | `PipeReplayStreamGapOverDelayLimitIsWaitedInSteps` (60-day gap at speed 1), `PipeReplaySpeedScaleSaturatesAtMaximum` (full-range gap at speed 0.1) | `tests/Censio.Pipe.Tests/PipeReplayStreamTests.cs`, `tests/Censio.Pipe.Tests/PipeReplaySpeedTests.cs` |
-| AC9 | `CompanionCommandLineParseReturnsMode` (none, `--record`, `--replay f`, `--replay f --speed 10`, `--speed max --replay f`, option names in any case), `CompanionCommandLineParseInvalidReturnsInvalid` (unknown argument, `--speed` alone, bad speed, `--replay` without file, `--record --replay f`, an option twice) | `tests/Censio.Companion.Core.Tests/CompanionCommandLineTests.cs` |
+| AC8 | `PipeReplayStreamGapOverDelayLimitIsWaitedInSteps` (60-day gap at speed 1), `PipeReplayStreamBackwardTimeOverDelayLimitAfterIslandDoesNotThrow` (island at T1, a skipped frame at T1 − 60 days, a frame one second later, speed 1: the items of the recorded times, no exception), `PipeReplaySpeedScaleSaturatesAtMaximum` (full-range gap at speed 0.1) | `tests/Censio.Pipe.Tests/PipeReplayStreamTests.cs`, `tests/Censio.Pipe.Tests/PipeReplaySpeedTests.cs` |
+| AC8 | `PipeTickAssemblerClockBackOverDelayLimitWaitsInSteps` (`FakeTimeProvider`: island at T, clock set to T − 60 days with a read pending; two 1-day advances throw nothing and close nothing; advancing to T + 30 s closes the tick as quiet period) | `tests/Censio.Pipe.Tests/PipeTickAssemblerTests.cs` |
+| AC9 | `CompanionCommandLineParseReturnsMode` (none, `--record`, `--replay f`, `--replay f --speed 10`, `--speed max --replay f`, option names in any case), `CompanionCommandLineParseInvalidReturnsInvalid` (unknown argument, `--speed` alone, bad speed, `--replay` without file, `--replay ""`, `--record --replay f`, an option twice) | `tests/Censio.Companion.Core.Tests/CompanionCommandLineTests.cs` |
 | AC9 | `PipeReplayRunnerConnectedUntilFirstStatus` (skipped frames keep `Connected`), `PipeReplayRunnerFrameBeforeVersionShowsProtocolMismatch`, `PipeReplayRunnerReceivingAfterVersion2`, `PipeReplayRunnerProtocolMismatchAfterOtherVersion`, `PipeReplayRunnerFinishedAfterLastFrame`, `PipeReplayRunnerProblemShownAfterEarlierFrames`, `PipeReplayRunnerCancelledEndsWithoutEvent` | `tests/Censio.Companion.Core.Tests/PipeReplayRunnerTests.cs` |
 | AC9 | `PipeStatusRuleForReadReturnsStatusPerResult` (message, skip, protocol mismatch with and without version, each stream-ending error, end) | `tests/Censio.Companion.Core.Tests/PipeStatusRuleTests.cs` |
 | AC9 | `TrayMenuFormatReplayToolTipReturnsTextPerStatus` (connected, receiving, protocol mismatch, finished, each problem), `TrayMenuInvalidCommandLineToolTipHasExactText` | `tests/Censio.Companion.Core.Tests/TrayMenuTests.cs` |
@@ -82,16 +86,25 @@ result and the stamp it just read; an observer that throws is caught and ignored
 assembler, *Order and end*). `PipeConnection` reads `_timeProvider.GetUtcNow()` once after each read and hands that
 value to the recorder (it uses the same value for `_receivingSince`).
 
+**Quiet wait** (`PipeTickAssembler.Step`, Security F1, fact 19). The delay is `min(deadline − now, 1 day)`
+(private constant `MaxQuietWait`); when it elapses, `Step` returns and the next pass reads the clock again and waits
+on until the deadline, so a clock set back after an island waits in steps instead of throwing. Close rules and
+items are unchanged: a replay's timers never fire (fact 10), and a live clock reaches the same deadline.
+
 **Format** (`PipeRecordingFormat`). Header `{"format":"censio-pipe-recording","version":1,"started":"<time>"}`, frame
 line `{"time":"<time>","frame":"<base64>"}`, fields in this order when written, each line ending with `\n`. Time:
 UTC, `yyyy-MM-ddTHH:mm:ss.fffffffZ`, invariant culture (Gregorian). File name `recording-yyyyMMdd-HHmmssZ.jsonl`,
 invariant culture, sequence 2 and up adds `-<n>` before `.jsonl`. Written with `System.Text.Json`'s `Utf8JsonWriter`; read with `Utf8JsonReader`:
-header needs `format` (exact string) and `version` (integer; other integer → unsupported version; missing or not an
-integer → not a recording), skips other fields and their values; frame line needs `time` (`TryGetDateTimeOffset`, converted to UTC, and at
-most `DateTimeOffset.MaxValue` − 30 seconds so the quiet deadline cannot overflow) and `frame` (base64 string at
-most 1,398,104 characters, checked before decoding, and at most 1,048,576 bytes after decoding — 1,398,104
-characters without padding decode to 1,048,578); a field twice, another JSON value than an object, trailing
-content, a `FormatException` or `JsonException` of the reader (depth over 64 included) → invalid line. `MaxLineLength` = 1,398,104 + 4,096 bytes, counted before decoding, line terminator excluded.
+each known field's `TokenType` is checked before its getter (fact 20): `String` for `format`, `time` and `frame`,
+`Number` for `version`; `GetString` is never called. Header needs `format` (`ValueTextEquals` on the UTF-8 name) and
+`version` (`TryGetInt32`; other integer → unsupported version; missing, of another type or not an `Int32` → not a
+recording), skips other fields and their values; frame line needs `time` (`TryGetDateTimeOffset`, converted to UTC,
+and at most `DateTimeOffset.MaxValue` − 30 seconds so the quiet deadline cannot overflow) and `frame` (base64 string
+at most 1,398,104 characters, checked before decoding, and at most 1,048,576 bytes after decoding — 1,398,104
+characters without padding decode to 1,048,578); a field of another type, a field twice, another JSON value than an
+object, trailing content, or a `FormatException`, `JsonException` (depth over 64 included) or
+`InvalidOperationException` of the reader (a fall-back only; the type checks come first) → invalid line, in the
+header → not a recording. `MaxLineLength` = 1,398,104 + 4,096 bytes, counted before decoding, line terminator excluded.
 
 **Recorder** (`PipeRecorder`, `Censio.Pipe`). `Record` is synchronous and never waits: it ignores a result without
 frame and every call after a failure or `CompleteAsync`; otherwise it adds the entry's cost `EntryCost(frame length)` = 4 × ceil(length / 3) +
@@ -133,7 +146,8 @@ and `Dispose` (fact 10); the real waits run on the wait provider. A test replays
 `new PipeTickAssembler(new PipeMessageReader(new PipeReplayStream(file, PipeReplaySpeed.Maximum, clock, TimeProvider.System)), clock)`.
 
 **Replay in the Companion.** `PipeReplayRunner` opens the file (`FileNotFoundException`,
-`DirectoryNotFoundException`, `UnauthorizedAccessException`, `IOException` on open → problem `FileNotFound`),
+`DirectoryNotFoundException`, `UnauthorizedAccessException`, `IOException`, `ArgumentException` (a path .NET
+refuses, N6) on open → problem `FileNotFound`),
 builds that pipeline with a read observer that applies `PipeStatusRule.ForRead` (end results ignored; the status
 stays `Connected` until the first result the rule maps to a status, so a recording whose first frame is not a
 `Version` shows `Protocol mismatch`), reads items
@@ -143,7 +157,7 @@ stream-ending error → `Error` with kind, end → `Waiting for game`, skipped �
 behavior unchanged.
 
 **Command line** (`CompanionCommandLine.Parse`). Options are matched case-insensitively, in any order, each once:
-`--record`; `--replay <path>` (the next argument, which must not start with `--`); `--speed <value>` (needs
+`--record`; `--replay <path>` (the next argument, which must not be empty or start with `--`); `--speed <value>` (needs
 `--replay`; `PipeReplaySpeed.TryParse`: `max` case-insensitive, or a number in invariant culture, `NumberStyles.AllowDecimalPoint`, from 0.1 to 1000).
 Anything else is `Invalid`.
 
@@ -175,7 +189,7 @@ the Tester adapts its tests.
 | ------- | ----------- | ------ |
 | Censio.Pipe | `PipeReadResult.cs` | `Frame`, `WithFrame` |
 | Censio.Pipe | `PipeMessageReader.cs` | attaches the frame to each result from a whole frame |
-| Censio.Pipe | `PipeTickAssembler.cs` | constructor with read observer |
+| Censio.Pipe | `PipeTickAssembler.cs` | constructor with read observer; quiet wait in steps of at most one day |
 | Censio.Pipe | `PipeRecordingFormat.cs`, `PipeRecorder.cs`, `PipeReplayStream.cs`, `PipeReplayClock.cs`, `PipeReplaySpeed.cs`, `PipeReplayProblem.cs`, `PipeReplayProblemKind.cs` | new |
 | Censio.Companion.Core | `PipeConnection.cs` | constructor with recording session; one stamp per read; uses `PipeStatusRule` |
 | Censio.Companion.Core | `PipeStatusRule.cs`, `PipeRecordingFiles.cs`, `PipeRecordingSession.cs`, `PipeRecordingState.cs`, `PipeReplayRunner.cs`, `PipeReplayStatus.cs`, `CompanionCommandLine.cs`, `CompanionMode.cs` | new |
@@ -247,7 +261,9 @@ has no test project (record 0004) and is outside both coverage measures already 
 
 All owned by the Dev, written once the code is green; *Test doubles* by the Tester.
 
-- `docs/areas/pipe.md`: *Scope* names recording and replay; new section *Recording and replay* after *Ticks and
+- `docs/areas/pipe.md`: *Order and end*: the quiet period is waited in steps of at most one day, so a clock set
+  back, by a replay or the system, waits on and throws nothing — "No other exception leaves the assembler" stays;
+  *Scope* names recording and replay; new section *Recording and replay* after *Ticks and
   sessions*, stating the rules of *Approach* (what is recorded, file per connection, format, queue and its cost,
   flush, replay pipeline, clock, speeds, waits, line rules, problems, limits); *Residual risks*: mid-connection
   start needs the last `Version` (#13), a stalled disk or power loss can lose the last lines; *Related decisions*
@@ -267,8 +283,8 @@ All owned by the Dev, written once the code is green; *Test doubles* by the Test
 
 ## Architecture check
 
-No guarantee exists yet. Record 0018 holds (format and replay in `Censio.Pipe`), 0034 (assembler unchanged plus an
-observer), 0035 (connection behavior unchanged; the rule extraction keeps its tests), 0004 (new logic tested).
+No guarantee exists yet. Record 0018 holds (format and replay in `Censio.Pipe`), 0034 (close rules unchanged; an
+observer and a capped quiet wait), 0035 (connection behavior unchanged; the rule extraction keeps its tests), 0004 (new logic tested).
 
 ## Security considerations
 
@@ -300,14 +316,18 @@ Devil's Advocate plan challenge, all accepted (reasons in record 0036 where they
 
 ## Security review
 
-Plan review `CHANGES_REQUIRED`, all resolved:
+Round 1 (B1–B3, N1–N5) resolved; the answers are in *Approach*, the tests and record 0036. Round 2
+`CHANGES_REQUIRED`, the second rejection: the Lead decided (mode `decide`, *Loop limits*) to accept and fix, since
+Security measured F1 and supplied F2's statements, and neither fix changes the scope or a criterion
+(`PipeTickAssembler.cs` is already in the plan). One Security delta confirmation follows; a further rejection goes to
+the Product Manager.
 
-- B1: `TryGetDateTimeOffset`; late times, `FormatException`, `JsonException` → `invalid line <n>`; `Scale`
-  saturates; waits in steps of a day; tests in AC7 and AC8; spec E6 updated.
-- B2: per-entry cost (`EntryCost`); `PipeRecorderEmptyFramesOnHeldStreamFailAtEntryLimit`; spec E10 and NFR.
-- B3: a folder not fully qualified is refused; `PipeRecordingFilesFolderNotFullyQualifiedIsRefused`; spec E3.
-- N1, N2, N3, N5: taken (cost freed after flush; invariant Gregorian names; 1,398,104-character case; local-file
-  note in the docs). N4: moot, timers never fire.
+- F1: the quiet wait is capped at one day and re-checked (*Quiet wait*, record 0036 option 12); refusing backward
+  times in the replay lost (option 13: changes E7 and leaves the live clock's case open). Tests in AC8.
+- F2: token types checked before each getter, no `GetString`, `InvalidOperationException` caught as a fall-back;
+  spec E6 and E11 updated; tests in AC7.
+- N6: taken both ways: `Parse` refuses an empty `--replay` (spec E8), the runner maps `ArgumentException` on open to
+  `file not found` (spec E6); tests in AC7 and AC9.
 
 ## Out of scope / follow-ups
 

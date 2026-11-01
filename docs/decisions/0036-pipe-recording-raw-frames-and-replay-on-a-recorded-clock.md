@@ -45,10 +45,16 @@ Companion must still end within 2 seconds.
 11. **A disk sync per line (`WriteThrough` or `Flush(true)`)** — survives a power loss too; a disk write per frame
     and less of the 1-second budget at `Exit` for the queue (plan challenge M1). Rejected: a power loss may cost
     the last lines.
+12. **The assembler waits the quiet period in steps of at most one day and re-checks the clock** (chosen) — a
+    clock set back after an island, by a recorded time (E7) or the system, puts the quiet deadline beyond what
+    `Task.Delay` accepts (about 49.7 days) and made it throw out of the assembler (Security plan review F1,
+    measured). The cap changes no item: a replay's timers never fire, a live clock reaches the same deadline.
+13. **Refusing recorded times far before the previous one as an invalid line** — keeps the assembler as it was;
+    changes E7's promise that backward times replay unchanged, and leaves a system clock set back unguarded.
 
 ## Decision
 
-Options 1, 5, 6 and the header of 9: each whole frame travels with its read result and is recorded with the
+Options 1, 5, 6, 12 and the header of 9: each whole frame travels with its read result and is recorded with the
 receive time the pipeline read once, through a queue bounded to 16 MiB of line cost that a writer drains to a
 file flushed per line to the operating system; a replay turns a recording back into the pipe's byte stream for the same message reader and
 tick assembler, on a clock that reads the recorded times. The format, the limits and the replay errors are in
@@ -65,5 +71,6 @@ tick assembler, on a clock that reads the recorded times. The format, the limits
   [0029](0029-anonymised-test-fixtures-only.md)).
 - At `Exit` the queue is written for at most 1 second; a stalled disk can leave the last line cut, as a crash does.
   A power loss can lose the lines the operating system had not yet written.
-- Recorded times are untrusted: a time whose quiet deadline would overflow, and gaps longer than a single delay
-  allows, are handled by the replay (invalid line, waits in steps), not by the assembler.
+- Recorded times are untrusted: a time whose quiet deadline would overflow is an invalid line, a gap longer than a
+  single delay allows is waited in steps by the replay, and a quiet deadline far ahead of a clock set back is waited
+  in steps by the assembler (option 12, a change to `PipeTickAssembler` within this feature).

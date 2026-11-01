@@ -73,16 +73,16 @@ an injected clock (record 0034). The tooltip is the Companion's only output
   replayed as skipped.
 - E6: Replay file problems, each ending the replay with the tooltip
   `Censio Companion: Replay error: <reason>` after the frames before it were replayed: `file not found` (also no
-  access), `not a recording` (first line is not the header; also an empty file), `unsupported version` (header
+  access or a path .NET refuses), `not a recording` (first line is not the header, also with a header field of the wrong JSON type; also an empty file), `unsupported version` (header
   version other than 1), `invalid line <n>` (not valid JSON of the frame form, invalid base64, a frame over 1 MiB, a
   line over the size such a frame needs, a missing time, a time too late to add 30 seconds to or not convertible to UTC, nesting deeper than 64, a field
-  given twice), `read failed` (the file cannot be read
+  given twice or of the wrong JSON type), `read failed` (the file cannot be read
   on after it was opened). A header-only recording replays as finished at once.
 - E7: Recorded times that go backwards or repeat: the replay does not wait before such a frame, and the frame is
   stamped with its recorded time unchanged, so the ticks are the ones the recorded times give; a large gap is waited
   for at the chosen speed (`Exit` ends the wait).
 - E8: Invalid command line — an unknown argument, `--speed` without `--replay`, a speed that is not `max` or a number
-  from `0.1` to `1000` written with `.` (also on a German Windows), `--replay` without a file, or `--record` together
+  from `0.1` to `1000` written with `.` (also on a German Windows), `--replay` without a file or with an empty one, or `--record` together
   with `--replay`: the Companion shows `Censio Companion: Invalid command line`, neither records, replays nor opens
   the pipe, and `Exit` works as usual.
 - E9: A Companion already runs: a start with `--record` or `--replay` ends at once like any second start (single
@@ -97,7 +97,7 @@ an injected clock (record 0034). The tooltip is the Companion's only output
   after the last line and one empty line at the end are accepted; an empty line elsewhere is `invalid line <n>`. JSON
   fields may come in any order; fields other than those of S1 are ignored, in the header and in a frame line. A
   UTF-8 byte order mark before the header is accepted (a file saved by a Windows editor). The header needs `format`
-  and `version`; `started` is not checked.
+  (a string) and `version` (an integer); `started` is not checked.
 
 ## Non-functional requirements
 
@@ -200,5 +200,8 @@ Devil's Advocate, spec challenge (Q1 option b unchanged):
 - m5 (format details): accepted. S1 fixes `started` (first frame's receive time, the file name's instant cut to
   the second), the time form with seven digits and `Z`, and the final line feed; E11 fixes CRLF, final newline,
   empty lines and extra fields; *Out of scope* binds #20 to format version 1.
+- Security plan review round 2 (F1, F2, N6), settled by the Lead's decision: E7 unchanged (backward times stay
+  allowed; the assembler waits a far deadline in steps); E6 and E11 name fields of the wrong JSON type; E8 and E6
+  name an empty or refused `--replay` path.
 - m6 (wording): accepted. S5 names the same message reader and tick assembler a test uses, and the live
   connection's state rules, not a copy.
