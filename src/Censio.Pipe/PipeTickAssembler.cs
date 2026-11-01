@@ -8,6 +8,11 @@ public sealed class PipeTickAssembler : IDisposable
     #region Fields
 
     /// <summary>
+    /// The longest single wait for the quiet period; a longer wait is made in steps that re-read the clock.
+    /// </summary>
+    private static readonly TimeSpan _maxQuietWait = TimeSpan.FromDays(1);
+
+    /// <summary>
     /// The source of the messages.
     /// </summary>
     private readonly IPipeMessageSource _source;
@@ -157,7 +162,7 @@ public sealed class PipeTickAssembler : IDisposable
 
         using var delaySource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
-        var delay = Task.Delay(deadline.Value - now, _timeProvider, delaySource.Token);
+        var delay = Task.Delay(TimeSpan.FromTicks(Math.Min((deadline.Value - now).Ticks, _maxQuietWait.Ticks)), _timeProvider, delaySource.Token);
 
         await Task.WhenAny(_pending, delay).ConfigureAwait(false);
         await delaySource.CancelAsync().ConfigureAwait(false);
@@ -204,8 +209,33 @@ public sealed class PipeTickAssembler : IDisposable
     private async Task<(PipeReadResult Result, DateTimeOffset Stamp)> ReadStampedAsync(CancellationToken cancellationToken)
     {
         var result = await _source.ReadAsync(cancellationToken).ConfigureAwait(false);
+        var stamp = _timeProvider.GetUtcNow();
 
-        return (result, _timeProvider.GetUtcNow());
+        Observe(result, stamp);
+
+        return (result, stamp);
+    }
+
+    /// <summary>
+    /// Hands a read to the observer; an exception of the observer is ignored.
+    /// </summary>
+    /// <param name="result">The read result</param>
+    /// <param name="stamp">The receive time</param>
+    private void Observe(PipeReadResult result, DateTimeOffset stamp)
+    {
+        if (_readObserver is null)
+        {
+            return;
+        }
+
+        try
+        {
+            _readObserver(result, stamp);
+        }
+        catch (Exception)
+        {
+            // An observer must never stop the reading
+        }
     }
 
     /// <summary>

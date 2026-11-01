@@ -13,11 +13,13 @@ public sealed class PipeReadResult
     /// <param name="kind">The outcome</param>
     /// <param name="message">The message</param>
     /// <param name="error">The error</param>
-    private PipeReadResult(PipeReadResultKind kind, PipeMessage? message, PipeError? error)
+    /// <param name="frame">The whole frame the result came from, or <see langword="null" /></param>
+    private PipeReadResult(PipeReadResultKind kind, PipeMessage? message, PipeError? error, ReadOnlyMemory<byte>? frame = null)
     {
         Kind = kind;
         Message = message;
         Error = error;
+        Frame = frame;
     }
 
     #endregion // Constructors
@@ -84,7 +86,7 @@ public sealed class PipeReadResult
     /// <returns>The result with the frame</returns>
     public PipeReadResult WithFrame(ReadOnlyMemory<byte> frame)
     {
-        throw new NotImplementedException();
+        return new PipeReadResult(Kind, Message, Error, frame);
     }
 
     #endregion // Methods

@@ -72,26 +72,13 @@ public sealed class PipeMessageReader : IPipeMessageSource
                                         });
     }
 
-    #endregion // Methods
-
-    #region IPipeMessageSource
-
-    /// <inheritdoc />
-    public async ValueTask<PipeReadResult> ReadAsync(CancellationToken cancellationToken)
+    /// <summary>
+    /// Parses a whole frame and applies the version gate.
+    /// </summary>
+    /// <param name="frame">The whole frame</param>
+    /// <returns>The message or the error of the frame</returns>
+    private PipeReadResult ReadFrame(ReadOnlyMemory<byte> frame)
     {
-        var frameResult = await _frameReader.ReadFrameAsync(cancellationToken).ConfigureAwait(false);
-
-        switch (frameResult.Kind)
-        {
-            case PipeFrameResultKind.EndOfStream:
-                return PipeReadResult.End;
-
-            case PipeFrameResultKind.Error:
-                return PipeReadResult.FromError(frameResult.Error!);
-        }
-
-        var frame = frameResult.Frame;
-
         if (frame.IsEmpty)
         {
             return PipeMessageParser.Parse(frame.Span);
@@ -116,6 +103,29 @@ public sealed class PipeMessageReader : IPipeMessageSource
         }
 
         return PipeMessageParser.Parse(frame.Span);
+    }
+
+    #endregion // Methods
+
+    #region IPipeMessageSource
+
+    /// <inheritdoc />
+    public async ValueTask<PipeReadResult> ReadAsync(CancellationToken cancellationToken)
+    {
+        var frameResult = await _frameReader.ReadFrameAsync(cancellationToken).ConfigureAwait(false);
+
+        switch (frameResult.Kind)
+        {
+            case PipeFrameResultKind.EndOfStream:
+                return PipeReadResult.End;
+
+            case PipeFrameResultKind.Error:
+                return PipeReadResult.FromError(frameResult.Error!);
+        }
+
+        var frame = frameResult.Frame;
+
+        return ReadFrame(frame).WithFrame(frame);
     }
 
     #endregion // IPipeMessageSource
