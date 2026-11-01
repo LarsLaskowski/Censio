@@ -15,7 +15,7 @@ Works today:
 
 Not yet:
 
-- No game data is read.
+- Game data is read from the pipe but not yet shown or stored.
 - Nothing is sent from the Companion to the server.
 - There is no history.
 
@@ -165,7 +165,7 @@ Funktioniert heute:
 
 Noch nicht:
 
-- Es werden keine Spieldaten gelesen.
+- Spieldaten werden aus der Pipe gelesen, aber noch nicht angezeigt oder gespeichert.
 - Der Companion sendet nichts an den Server.
 - Es gibt keinen Verlauf.
 
