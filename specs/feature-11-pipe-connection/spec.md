@@ -1,7 +1,7 @@
 # Spec: Pipe connection: discovery, reconnect and single-reader handling
 
 Source: Issue #11
-Status: Draft
+Status: Approved by Lead
 
 ## Problem
 
@@ -86,8 +86,8 @@ kinds, `docs/areas/pipe.md`); the tick assembler is attached with its first cons
 - Security: read access only, nothing written; the pipe's server cannot impersonate the Companion's Windows
   identity; content read within the limits of `docs/areas/pipe.md`; events carry no pipe content.
 - Memory: one frame and its message (the reader's limit); nothing is kept once the state is updated.
-- Platform: the logic is platform-neutral and tested on Linux with a fake pipe; only opening the named pipe and
-  classifying its Windows result are Windows code.
+- Platform: the logic, classification included, is tested on Linux with a fake pipe; only opening the pipe and
+  checking that it exists are Windows code.
 - Configuration: none new; the pipe name, delays and timeout are fixed.
 - Logs: none until #13; the events carry the state and its cause (error kind, Windows error code, received version).
 
