@@ -237,15 +237,18 @@ public sealed class PipeTickBuilderTests
         var deadline = builder.QuietDeadline;
 
         // Act
-        var early = new[] { builder.CloseIfQuiet(At(0)), builder.CloseIfQuiet(At(10)), builder.CloseIfQuiet(At(29.999)) };
+        var joinTime = _start.AddTicks(299_995_000);
+        var early = new[] { builder.CloseIfQuiet(At(0)), builder.CloseIfQuiet(At(10)), builder.CloseIfQuiet(_start.AddTicks(299_990_000)) };
 
-        var joined = builder.Add(Frame(new PipeIslandKey(1, 2, 0), "Neapolis", 100), At(29.9995));
-        var closed = builder.CloseIfQuiet(At(59.9995));
+        var joined = builder.Add(Frame(new PipeIslandKey(1, 2, 0), "Neapolis", 100), joinTime);
+        var beforeClose = builder.CloseIfQuiet(joinTime + PipeTickLimits.QuietPeriod - TimeSpan.FromTicks(1));
+        var closed = builder.CloseIfQuiet(joinTime + PipeTickLimits.QuietPeriod);
 
         // Assert
         Assert.AreEqual(At(30), deadline, "The deadline should be the last island receive time plus the quiet period");
         Assert.IsTrue(early.All(item => item is null), "No check before the deadline should deliver anything");
         Assert.IsEmpty(joined, "The frame should join the open tick without delivering anything");
+        Assert.IsNull(beforeClose, "One tick before the deadline of the last frame should deliver nothing");
         Assert.IsNotNull(closed, "The deadline of the last frame should close the tick");
         Assert.HasCount(2, AssertTick(closed, PipeTickCloseReason.QuietPeriod).Islands, "The early checks should not have changed the open tick");
     }
@@ -650,6 +653,25 @@ public sealed class PipeTickBuilderTests
         // Assert
         Assert.HasCount(1, results, "The end should deliver one item");
         Assert.AreEqual(PipeTickResultKind.EndOfStream, results[0].Kind, "The item should be the end");
+    }
+
+    /// <summary>
+    /// Anything added after the end of the stream delivers nothing.
+    /// </summary>
+    [TestMethod]
+    public void PipeTickBuilderAddAfterEndDeliversNothing()
+    {
+        // Arrange
+        var builder = new PipeTickBuilder();
+
+        builder.Add(PipeReadResult.End, At(0));
+
+        // Act
+        var results = builder.Add(Frame(_ostia, "Ostia", 100), At(1));
+
+        // Assert
+        Assert.IsEmpty(results, "A frame after the end of the stream should deliver nothing");
+        Assert.IsNull(builder.QuietDeadline, "A frame after the end of the stream should not open a tick");
     }
 
     /// <summary>
