@@ -17,8 +17,8 @@ notes of `Dealwatch/Tabularium117` (`docs/protocol.md`):
   Confirmed.
 - The reference opens it read-only with share mode `0` and never writes. Confirmed. That a second client gets "pipe
   busy" is unconfirmed: whether the game admits more than one client is unknown.
-- A read fails with `ERROR_BROKEN_PIPE` when the game exits; the reference then waits for the pipe again, with
-  `WaitNamedPipe(NMPWAIT_WAIT_FOREVER)`, which can block without end. Confirmed.
+- A read fails with `ERROR_BROKEN_PIPE` when the game exits; the reference then waits for the pipe without a time
+  limit. Confirmed.
 - Loading a save and the main menu keep the connection (`SessionEnd`, `SessionStart`, a tick; in the main menu
   `SessionEnd`, then nothing); the game sends `Version` first on every connection (capture, `[live]`).
 
@@ -84,8 +84,10 @@ kinds, `docs/areas/pipe.md`); the tick assembler is attached with its first cons
   in every state; the tray's UI thread never waits on a pending pipe call. Events may come on any thread; the tray
   moves the tooltip update to its UI thread.
 - Security: read access only, nothing written; the pipe's server cannot impersonate the Companion's Windows
-  identity; content read within the limits of `docs/areas/pipe.md`; events carry no pipe content.
-- Memory: one frame and its message (the reader's limit); nothing is kept once the state is updated.
+  identity; content read within the limits of `docs/areas/pipe.md`; events carry no pipe content beyond the received
+  version number.
+- Memory: one frame and its message (the reader's limit); nothing is kept once the state is updated; at most one
+  tooltip update waits for the tray, and it shows the latest state.
 - Platform: the logic, classification included, is tested on Linux with a fake pipe; only opening the pipe and
   checking that it exists are Windows code.
 - Configuration: none new; the pipe name, delays and timeout are fixed.
@@ -120,7 +122,8 @@ kinds, `docs/areas/pipe.md`); the tick assembler is attached with its first cons
   completes without the clock being advanced —, closes the pipe, and no event follows it; on Windows, `Exit`
   removes the icon at once and ends the process within 2 seconds in every state (S5, E8).
 - [ ] AC12: An event is raised exactly once per change of state or cause, in order; a handler that throws stops
-  neither the connection nor the other handlers (E3, E9, E10).
+  neither the connection nor the other handlers; however fast the state changes, at most one tooltip update is
+  pending and it shows the latest state (E3, E9, E10).
 - [ ] AC13: The pipe is opened by name `\\.\pipe\anno117`, with read access only, and with an impersonation level
   that does not let the pipe's server act as the user; the connection never writes to it (E11).
 - [ ] AC14: While connected, the connection requests the next message as soon as the previous one is handled, with
@@ -152,16 +155,13 @@ kinds, `docs/areas/pipe.md`); the tick assembler is attached with its first cons
 
 ## Open questions
 
-- Does this feature show the state, or only raise events for #13? Answered: the tooltip shows it. The issue's manual
-  test and its documentation for external testers need a visible state; the tooltip is the smallest, and #13's
-  status and icon build on it. Lead decision within both issues' scope.
+- Does this feature show the state, or only raise events for #13? Answered: the tooltip shows it; the issue's manual
+  test and its documentation for testers need a visible state, and #13 builds on it. Lead decision.
 - What counts as `Receiving`? Answered: the first `Version 2` message; the main menu may send nothing for long, so
   waiting for an island frame would leave a working connection in `Connected`.
-- Does loading a save break the pipe? Answered: no (capture, `[live]`); if a future game recreates it, S3 applies.
 - Can busy be told from missing? Answered: yes; Windows reports `ERROR_FILE_NOT_FOUND` and `ERROR_PIPE_BUSY`
   (`CreateFile`, `WaitNamedPipe`). How the Companion obtains them is the plan's.
-- Does the game admit a new client after the Companion exits? Answered: the reference reconnects after a broken pipe;
-  confirmed only by AC17, and a residual risk in `docs/areas/pipe.md`.
+- Does the game admit a new client after the Companion exits? Answered: the reference reconnects; AC17 confirms it.
 
 ## Area documents
 

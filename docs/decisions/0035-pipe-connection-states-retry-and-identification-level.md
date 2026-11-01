@@ -15,13 +15,15 @@ player must tell "game not running" from "pipe busy", but .NET's `NamedPipeClien
 retries a missing pipe until its timeout and then throws the same `TimeoutException` as for a busy one
 (`dotnet/runtime` `release/10.0`, `NamedPipeClientStream.cs`, `ConnectInternal`; `NamedPipeClientStream.Windows.cs`,
 `TryConnect`). With its default impersonation level `None` it sets no `SECURITY_SQOS_PRESENT`, so the pipe's server
-— the game, or any program that created the name first — may impersonate the Companion's user at Windows' default
-level. The logic must be tested on Linux (record [0004](0004-companion-shell-and-linux-build.md)).
+— the game, or any program that created the name first — may impersonate the Companion's user at
+`SecurityImpersonation`, Windows' default for a named pipe server (Microsoft documentation,
+`impersonating-a-named-pipe-client.md` and `impersonation-levels.md`). The logic must be tested on Linux (record [0004](0004-companion-shell-and-linux-build.md)).
 
 ## Options considered
 
 1. **`NamedPipeClientStream`, preceded by a check that the pipe exists in the `\\.\pipe\` listing** (chosen) — a
-   missing pipe is decided at once without opening anything; a timed-out connect is busy when the pipe still
+   missing pipe is decided at once without opening anything; the whole entry is compared, since a pipe name may hold
+   a backslash and `x\anno117` would otherwise match; a timed-out connect is busy when the pipe still
    exists. Managed code only. Con: a small race between the check and the connect, and the listing's behavior is
    confirmed only on Windows.
 2. **P/Invoke `CreateFileW` and `WaitNamedPipeW`, as the reference** — exact Windows error codes, no race. Con:
@@ -37,7 +39,11 @@ level. The logic must be tested on Linux (record [0004](0004-companion-shell-and
 6. **`PipeOptions.CurrentUserOnly`** — refuses a pipe whose owner is another user. Rejected: it would also refuse
    a game run as administrator, and a foreign pipe is already read within the reader's limits.
 7. **Reset the retry delay on every connection that reached `Receiving`** — simpler. Rejected (spec challenge m5):
-   a pipe that sends `Version 2` and then breaks would be retried every second forever.
+   a pipe that sends `Version 2` and then breaks would be retried every second forever. The reset needs an
+   uninterrupted 30 seconds in `Receiving` up to the end of the connection.
+8. **One tooltip update per status change** — simplest. Rejected (Security plan review): a pipe alternating
+   `Version 2` and `Version 3` on one connection would queue updates without bound; at most one update is pending
+   and it shows the latest status.
 
 ## Decision
 
@@ -48,6 +54,10 @@ delays and their reset after 30 seconds in `Receiving`. The rules are in [`areas
 
 ## Consequences
 
+- The impersonation level holds only for the local server name `.`: Windows ignores the flags on a remote
+  connection, so the server name stays a constant.
+- An unexpected exception of an attempt or a read ends it as an error and the connection retries; only the stop's
+  own cancellation ends the loop.
 - The states and delays are tested on Linux with a fake connector and stream; the connector itself is verified only
   by the manual test on Windows.
 - A pipe that appears between the check and the connect is found by the next attempt; one that vanishes during the
