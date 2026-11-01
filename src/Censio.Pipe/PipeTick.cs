@@ -30,7 +30,7 @@ public sealed class PipeTick
     /// <summary>
     /// Gets a value indicating whether every island has no entries.
     /// </summary>
-    public bool IsNoDataYet => throw new NotImplementedException();
+    public bool IsNoDataYet => Islands.All(island => island.HasNoEntries);
 
     #endregion // Properties
 }

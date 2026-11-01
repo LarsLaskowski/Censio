@@ -30,7 +30,7 @@ public sealed class PipeTickIsland
     /// <summary>
     /// Gets a value indicating whether the island has no entries.
     /// </summary>
-    public bool HasNoEntries => throw new NotImplementedException();
+    public bool HasNoEntries => Entries.Count == 0;
 
     #endregion // Properties
 }

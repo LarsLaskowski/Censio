@@ -86,7 +86,9 @@ public sealed class PipeTickResult
     /// <returns>The result</returns>
     public static PipeTickResult FromTick(PipeTick tick)
     {
-        throw new NotImplementedException();
+        ArgumentNullException.ThrowIfNull(tick);
+
+        return new PipeTickResult(PipeTickResultKind.Tick, tick, null, null, null, null);
     }
 
     /// <summary>
@@ -96,7 +98,9 @@ public sealed class PipeTickResult
     /// <returns>The result</returns>
     public static PipeTickResult FromSessionStart(string headline)
     {
-        throw new NotImplementedException();
+        ArgumentNullException.ThrowIfNull(headline);
+
+        return new PipeTickResult(PipeTickResultKind.SessionStart, null, headline, null, null, null);
     }
 
     /// <summary>
@@ -106,7 +110,7 @@ public sealed class PipeTickResult
     /// <returns>The result</returns>
     public static PipeTickResult FromVersion(int version)
     {
-        throw new NotImplementedException();
+        return new PipeTickResult(PipeTickResultKind.Version, null, null, version, null, null);
     }
 
     /// <summary>
@@ -116,7 +120,9 @@ public sealed class PipeTickResult
     /// <returns>The result</returns>
     public static PipeTickResult FromError(PipeError error)
     {
-        throw new NotImplementedException();
+        ArgumentNullException.ThrowIfNull(error);
+
+        return new PipeTickResult(PipeTickResultKind.Error, null, null, null, error, null);
     }
 
     /// <summary>
@@ -126,7 +132,7 @@ public sealed class PipeTickResult
     /// <returns>The result</returns>
     public static PipeTickResult FromTickLimit(PipeIslandKey key)
     {
-        throw new NotImplementedException();
+        return new PipeTickResult(PipeTickResultKind.TickLimit, null, null, null, null, key);
     }
 
     #endregion // Methods

@@ -244,6 +244,11 @@ public static class PipeMessageParser
             map[guid] = (int)sum;
         }
 
+        if (map.Count < pairCount)
+        {
+            map.TrimExcess();
+        }
+
         return true;
     }
 
