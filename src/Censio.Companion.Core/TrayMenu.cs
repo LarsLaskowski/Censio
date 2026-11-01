@@ -1,3 +1,7 @@
+using System.Globalization;
+
+using Censio.Pipe;
+
 namespace Censio.Companion.Core;
 
 /// <summary>
@@ -64,9 +68,18 @@ public static class TrayMenu
     /// <param name="state">The connection state</param>
     /// <param name="recording">The recording state</param>
     /// <returns>The tooltip text</returns>
+    /// <exception cref="ArgumentOutOfRangeException">A state is not a defined value</exception>
     public static string FormatToolTip(PipeConnectionState state, PipeRecordingState recording)
     {
-        throw new NotImplementedException();
+        var suffix = recording switch
+                     {
+                         PipeRecordingState.Off => string.Empty,
+                         PipeRecordingState.Recording => " (recording)",
+                         PipeRecordingState.Failed => " (recording failed)",
+                         _ => throw new ArgumentOutOfRangeException(nameof(recording), recording, "The recording state is not defined")
+                     };
+
+        return FormatToolTip(state) + suffix;
     }
 
     /// <summary>
@@ -74,9 +87,38 @@ public static class TrayMenu
     /// </summary>
     /// <param name="status">The replay status</param>
     /// <returns>The tooltip text</returns>
+    /// <exception cref="ArgumentOutOfRangeException">The state or the problem kind is not a defined value</exception>
     public static string FormatReplayToolTip(PipeReplayStatus status)
     {
-        throw new NotImplementedException();
+        if (status.Problem is { } problem)
+        {
+            var reason = problem.Kind switch
+                         {
+                             PipeReplayProblemKind.FileNotFound => "file not found",
+                             PipeReplayProblemKind.NotARecording => "not a recording",
+                             PipeReplayProblemKind.UnsupportedVersion => "unsupported version",
+                             PipeReplayProblemKind.InvalidLine => string.Create(CultureInfo.InvariantCulture, $"invalid line {problem.LineNumber}").TrimEnd(),
+                             PipeReplayProblemKind.ReadFailed => "read failed",
+                             _ => throw new ArgumentOutOfRangeException(nameof(status), problem.Kind, "The problem kind is not defined")
+                         };
+
+            return $"{ToolTip}: Replay error: {reason}";
+        }
+
+        if (status.IsFinished)
+        {
+            return $"{ToolTip}: Replay finished";
+        }
+
+        var text = status.State switch
+                   {
+                       PipeConnectionState.Connected => "Connected",
+                       PipeConnectionState.Receiving => "Receiving",
+                       PipeConnectionState.ProtocolMismatch => "Protocol mismatch",
+                       _ => throw new ArgumentOutOfRangeException(nameof(status), status.State, "The replay state is not defined")
+                   };
+
+        return $"{ToolTip}: Replay: {text}";
     }
 
     /// <summary>

@@ -1,3 +1,5 @@
+using Censio.Pipe;
+
 namespace Censio.Companion.Core;
 
 /// <summary>
@@ -5,6 +7,15 @@ namespace Censio.Companion.Core;
 /// </summary>
 public sealed class PipeRecordingFiles
 {
+    #region Constants
+
+    /// <summary>
+    /// The highest sequence number tried for the file name of one second.
+    /// </summary>
+    private const int MaxSequence = 1000;
+
+    #endregion // Constants
+
     #region Fields
 
     /// <summary>
@@ -36,7 +47,7 @@ public sealed class PipeRecordingFiles
     /// <returns>The recordings folder</returns>
     public static string DefaultFolder(string localApplicationData)
     {
-        throw new NotImplementedException();
+        return Path.Combine(localApplicationData, "Censio", "Recordings");
     }
 
     /// <summary>
@@ -44,9 +55,32 @@ public sealed class PipeRecordingFiles
     /// </summary>
     /// <param name="started">The time the recording started</param>
     /// <returns>The stream of the new file</returns>
+    /// <exception cref="InvalidOperationException">The recordings folder is not a full path</exception>
+    /// <exception cref="IOException">The file cannot be created</exception>
     public Stream Create(DateTimeOffset started)
     {
-        throw new NotImplementedException();
+        if (Path.IsPathFullyQualified(_folder) == false)
+        {
+            throw new InvalidOperationException("The recordings folder is not a full path.");
+        }
+
+        Directory.CreateDirectory(_folder);
+
+        for (var sequence = 1; sequence <= MaxSequence; sequence++)
+        {
+            var path = Path.Combine(_folder, PipeRecordingFormat.FormatFileName(started, sequence));
+
+            try
+            {
+                return new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.Read);
+            }
+            catch (IOException) when (File.Exists(path))
+            {
+                // The name is taken: try the next one
+            }
+        }
+
+        throw new IOException("No free recording file name is left for this second.");
     }
 
     #endregion // Methods

@@ -20,6 +20,11 @@ public sealed class PipeConnection
     private readonly TimeProvider _timeProvider;
 
     /// <summary>
+    /// The recording session, or <c>null</c> if nothing is recorded.
+    /// </summary>
+    private readonly PipeRecordingSession? _recording;
+
+    /// <summary>
     /// Guards <see cref="_status" />.
     /// </summary>
     private readonly Lock _statusLock = new();
@@ -41,11 +46,6 @@ public sealed class PipeConnection
     /// The time the connection entered the receiving state, if it is in it.
     /// </summary>
     private DateTimeOffset? _receivingSince;
-
-    /// <summary>
-    /// The recording session, or <c>null</c> if nothing is recorded.
-    /// </summary>
-    private readonly PipeRecordingSession? _recording;
 
     #endregion // Fields
 
@@ -122,13 +122,14 @@ public sealed class PipeConnection
     }
 
     /// <summary>
-    /// Checks whether an error of the pipe ends the session.
+    /// Checks whether a read result ends the session.
     /// </summary>
-    /// <param name="kind">The kind of the error</param>
+    /// <param name="read">The read result</param>
     /// <returns><c>true</c> if the stream cannot be read on</returns>
-    private static bool IsStreamEnding(PipeErrorKind kind)
+    private static bool IsSessionEnding(PipeReadResult read)
     {
-        return kind is PipeErrorKind.TruncatedFrame or PipeErrorKind.OversizedFrame or PipeErrorKind.ReadFailed;
+        return read.Kind == PipeReadResultKind.EndOfStream
+               || read.Error?.Kind is PipeErrorKind.TruncatedFrame or PipeErrorKind.OversizedFrame or PipeErrorKind.ReadFailed;
     }
 
     /// <summary>
@@ -240,82 +241,93 @@ public sealed class PipeConnection
     /// <returns>The status the session ended with, and whether a receiving connection lasted long enough to reset the failures</returns>
     private async Task<(PipeConnectionStatus Status, bool WasLong)> RunSessionAsync(Stream stream, CancellationToken cancellationToken)
     {
-        await using (stream.ConfigureAwait(false))
+        var recorder = _recording?.BeginConnection();
+
+        try
         {
-            SetStatus(new PipeConnectionStatus
-                      {
-                          State = PipeConnectionState.Connected
-                      },
-                      cancellationToken);
-
-            var reader = new PipeMessageReader(stream);
-            PipeConnectionStatus endStatus;
-
-            while (true)
+            await using (stream.ConfigureAwait(false))
             {
-                PipeReadResult read;
+                SetStatus(new PipeConnectionStatus
+                          {
+                              State = PipeConnectionState.Connected
+                          },
+                          cancellationToken);
 
-                try
-                {
-                    read = await reader.ReadAsync(cancellationToken).ConfigureAwait(false);
-                }
-                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-                {
-                    return (default, false);
-                }
-                catch (Exception)
-                {
-                    endStatus = ErrorStatus(PipeErrorKind.ReadFailed);
+                var reader = new PipeMessageReader(stream);
+                PipeConnectionStatus endStatus;
 
-                    break;
+                while (true)
+                {
+                    PipeReadResult read;
+                    DateTimeOffset stamp;
+
+                    try
+                    {
+                        read = await reader.ReadAsync(cancellationToken).ConfigureAwait(false);
+                        stamp = _timeProvider.GetUtcNow();
+                    }
+                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                    {
+                        return (default, false);
+                    }
+                    catch (Exception)
+                    {
+                        endStatus = ErrorStatus(PipeErrorKind.ReadFailed);
+
+                        break;
+                    }
+
+                    recorder?.Record(read, stamp);
+
+                    var status = PipeStatusRule.ForRead(read);
+
+                    if (IsSessionEnding(read))
+                    {
+                        endStatus = status!.Value;
+
+                        break;
+                    }
+
+                    if (status is not { } next)
+                    {
+                        continue;
+                    }
+
+                    if (next.State == PipeConnectionState.Receiving)
+                    {
+                        EnterReceiving(stamp, cancellationToken);
+                    }
+                    else
+                    {
+                        LeaveReceiving();
+                        SetStatus(next, cancellationToken);
+                    }
                 }
 
-                if (read.Kind == PipeReadResultKind.Message)
-                {
-                    EnterReceiving(cancellationToken);
-                }
-                else if (read.Kind == PipeReadResultKind.EndOfStream)
-                {
-                    endStatus = new PipeConnectionStatus
-                                {
-                                    State = PipeConnectionState.WaitingForGame
-                                };
+                var wasLong = _receivingSince is { } since && _timeProvider.GetUtcNow() - since >= PipeRetryDelay.SuccessfulConnectionTime;
 
-                    break;
-                }
-                else if (read.Error!.Kind == PipeErrorKind.ProtocolMismatch)
-                {
-                    LeaveReceiving();
-                    SetStatus(new PipeConnectionStatus
-                              {
-                                  State = PipeConnectionState.ProtocolMismatch,
-                                  ReceivedVersion = read.Error.ReceivedVersion
-                              },
-                              cancellationToken);
-                }
-                else if (IsStreamEnding(read.Error.Kind))
-                {
-                    endStatus = ErrorStatus(read.Error.Kind);
+                _receivingSince = null;
 
-                    break;
-                }
+                return (endStatus, wasLong);
             }
-
-            var wasLong = _receivingSince is { } since && _timeProvider.GetUtcNow() - since >= PipeRetryDelay.SuccessfulConnectionTime;
-
-            _receivingSince = null;
-
-            return (endStatus, wasLong);
+        }
+        finally
+        {
+            if (recorder is not null)
+            {
+                _recording!.EndConnection(recorder);
+            }
         }
     }
 
     /// <summary>
     /// Enters the receiving state and stamps the time if the connection was not in it.
     /// </summary>
+    /// <param name="stamp">The time of the read that entered the receiving state</param>
     /// <param name="cancellationToken">The token that stops the run</param>
-    private void EnterReceiving(CancellationToken cancellationToken)
+    private void EnterReceiving(DateTimeOffset stamp, CancellationToken cancellationToken)
     {
-        _receivingSince ??= _timeProvider.GetUtcNow();
+        _receivingSince ??= stamp;
 
         SetStatus(new PipeConnectionStatus
                   {
