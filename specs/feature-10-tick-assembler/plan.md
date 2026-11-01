@@ -270,3 +270,28 @@ platform-neutral.
 
 - As in the spec. #12 implements `IPipeMessageSource` for replay and drives the clock from recorded times; #11 wraps
   `PipeMessageReader` over the named pipe and hands it to `PipeTickAssembler`.
+
+## Challenge notes
+
+Devil's Advocate, mode `plan`: no major objections, five minor ones (verbatim).
+
+1. **minor: the receive time can be wrong when the quiet-period timer and a finishing read race.** This can split a tick in a way the stamps would not.
+   - **Evidence:** plan, *Approach*, assembler step 3, "The delay wins → `CloseIfQuiet(timeProvider.GetUtcNow())`". `ReadStampedAsync` takes its stamp inside its own continuation. So on the live clock a read can stamp at 29.9999 s and complete its task just after the delay fires at 30 s. The tick is then closed as *quiet period*, and the frame with the same timestamp opens a second tick, although by its stamp it belonged to the first.
+   - **Instruction:** when the delay wins, check `_pending.IsCompletedSuccessfully` first. If it has completed, feed `Add(result, stamp)` and let the builder's step 2 decide by the stamp. Call `CloseIfQuiet` only when the read is still pending.
+
+2. **minor: a request whose token is already cancelled can return a queued item instead of throwing.**
+   - **Evidence:** plan, assembler step 1, "Queue not empty → dequeue", and step 4, "token cancelled (at any await)". The dequeue path has no await, so it never sees the token. The reader checks the token first (`PipeFrameReader.cs:76`, `ThrowIfCancellationRequested`), and spec E9/AC11 say a cancelled request ends in cancellation.
+   - **Instruction:** call `cancellationToken.ThrowIfCancellationRequested()` at the start of `ReadAsync`, before the queue, and run it through the same cancel/discard/end path as step 4. Add a DataRow or a test for a pre-cancelled token while items are queued.
+
+3. **minor: in live use, receive times depend on how often the caller asks.**
+   - **Evidence:** plan, assembler step 2, "Start the read if none is pending". The next read only starts when the caller asks again, and the receive time is stamped when that read completes. A live consumer that pauses for more than 30 s (for example, a WebSocket send in #11/#13) stamps the buffered frames late. That splits ticks and moves receive times, despite the spec's NFR "never on how fast they are processed". AC12 only covers this with fixed injected times.
+   - **Instruction:** no code change. In `docs/areas/pipe.md`, *Order and end* and *Residual risks*, state that the caller must keep requesting and that a slow consumer belongs behind the tick buffer (#41) or #11's decoupling.
+
+4. **minor: the memory measurement (plan fact 9) must use objects built the way the parser builds them.**
+   - **Evidence:** `PipeMessageParser.cs:222` allocates a new `Dictionary<int,int>(pairCount)` per map. That is two dictionaries per entry, even when they are empty. The "all entries, no pairs" case is therefore the heaviest per counted item, at roughly 200+ bytes per entry.
+   - **Instruction:** build the scratch tick's frames through `PipeMessageParser` (or with two new empty dictionaries per entry), not with shared empty dictionaries, and record the larger of the two shapes.
+   - **Also fix:** fact 9 says "Dev, step 6", but tasks.md puts the measurement in task 3. Align them on task 3.
+
+5. **minor: the `ObjectDisposedException` in *Security considerations* has no test.**
+   - **Evidence:** plan, *Security considerations* says the assembler surfaces `ObjectDisposedException` after `Dispose`. No test in *Tests per criterion* covers `Dispose`.
+   - **Instruction:** the Tester adds `PipeTickAssemblerReadAfterDisposeThrowsObjectDisposed` and `PipeTickAssemblerDisposeCancelsPendingRead` (the source saw its token cancelled). Alternatively, the Lead drops the claim if `Dispose` should not throw.
