@@ -23,7 +23,8 @@ and host names, paths — and data from the game's files belongs to the publishe
 ## Decision
 
 Option 3. A fixture under `tests/` that comes from a recording or a game file is anonymised with the anonymiser of
-#20 before it is committed: every private value is replaced whole, and no extracted game asset is included.
+#20 before it is committed: every private value is replaced whole, economic values are perturbed and timestamps
+shifted while structure and GUIDs are kept, and no extracted game asset is included.
 
 ## Consequences
 

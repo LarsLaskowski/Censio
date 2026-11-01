@@ -21,9 +21,9 @@ redirect health probes and pin browsers to HTTPS on hosts that have none.
    matches `SECURITY.md`; the server itself never encrypts.
 
 For the web UI as a whole (issue #8): **a login of the server's own** (a password or user accounts) — protects a
-server that is exposed by mistake; a credential store and a login flow for a tool one player runs at home, and a
-reverse proxy can add authentication where it is needed — against **no web login, access decided by the deployment**
-— chosen.
+server that is exposed by mistake, but needs a credential store and a login flow for a tool one player runs at home —
+against **no web login, access decided by the deployment**, where a reverse proxy can add authentication where it is
+needed; the second is chosen.
 
 ## Decision
 
@@ -40,7 +40,7 @@ is decided by the network and an optional reverse proxy (`SECURITY.md`). The rul
 - In the image the loopback default does not protect the server: a `-p 8080:8080` mapping publishes it on every
   interface of the host. Kept, because a container listening on loopback alone is unreachable, and Docker's
   `-p 127.0.0.1:8080:8080` restricts it where needed (documented in the README).
-- Anyone who reaches the server can read every page and use every action the UI offers; a later login would supersede this record and must exempt
+- Anyone who reaches the server can read every page and use every action the UI offers; a later login changes this decision and must exempt
   `/health`.
 - The start page shows the version to anyone who can reach it, accepted in a trusted network.
 - Host filtering is off (`AllowedHosts` `*`) and the Blazor hub checks no `Origin`, so a DNS-rebinding page can

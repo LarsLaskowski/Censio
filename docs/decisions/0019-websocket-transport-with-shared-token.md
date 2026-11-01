@@ -25,9 +25,9 @@ speaks plain HTTP and leaves TLS to a reverse proxy ([0006](0006-server-plain-ht
 4. **Per-client credentials or certificates** — stronger identity; key management that one Companion per server does
    not need.
 
-For the token: **always required**, against **enabled by default, switchable off by configuration** — chosen: an
-operator in a closed network or in local mode can do without it, while a fresh server never accepts an
-unauthenticated Companion unless the operator turns the token off on purpose.
+For the token: **always required**, against **enabled by default, switchable off by configuration**; the second is
+chosen, because an operator in a closed network or in local mode can do without it, while a fresh server never accepts
+an unauthenticated Companion unless the operator turns the token off on purpose.
 
 ## Decision
 

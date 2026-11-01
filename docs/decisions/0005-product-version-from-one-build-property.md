@@ -21,10 +21,11 @@ chose.
 2. **One MSBuild property for all assemblies** — `Version` in `Directory.Build.props`, default `0.0.0`,
    overridden by the workflows with `-p:Version=…`; no dependency, the workflows decide the text.
 
-For the version line (issue #8): **start at `1.0.0`**, against **`0.x` releases from `0.1.0`, `1.0.0` at milestone M7**
-— chosen: the contract and the storage may still change incompatibly before 1.0. For builds between releases:
-**edge builds on every merge to `main`** (#6), against **none, an unreleased state is built from source**
-([0013](0013-readme-quick-start-user-guide-reference.md)) — chosen: #6 was closed as not planned.
+For the version line (issue #8): **start at `1.0.0`**, against **`0.x` releases from `0.1.0`, `1.0.0` at milestone M7**;
+the second is chosen, because the contract and the storage may still change incompatibly before 1.0. For builds
+between releases: **edge builds on every merge to `main`** (#6), against **none, an unreleased state is built from
+source** ([0013](0013-readme-quick-start-user-guide-reference.md)); the second is chosen, because #6 was closed as
+not planned.
 
 ## Decision
 
