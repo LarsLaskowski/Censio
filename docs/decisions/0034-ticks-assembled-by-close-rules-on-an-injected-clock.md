@@ -46,4 +46,7 @@ values and limits are in [`areas/pipe.md`](../areas/pipe.md).
 - A replay that ends at its last frame closes that tick as *stream ended*, where the live run may have closed it by
   the quiet period; #12's same-ticks check allows for it.
 - Telling a resent or paused tick from a new one is left to the consumers that store ticks (#19, #35).
+- The tick limits count decoded entries and map pairs, so the reader trims a map whose duplicate GUIDs were summed
+  to its distinct GUIDs (Security plan review); otherwise a map pre-sized to its wire count would keep up to 1,024
+  slots while counting as one. Results are unchanged.
 - Tests use `FakeTimeProvider` (`Microsoft.Extensions.TimeProvider.Testing`, test project only).
