@@ -162,11 +162,10 @@ Every error is a typed result the caller can tell apart by kind; the reader neve
   frame marker to resynchronise on, and skipping means reading up to 2 GiB that the reader cannot check; #11
   reconnects.
 - Q5: Is there a real sample of the format to build and test from (`.squad/routing.md`, *Escalation to the Product
-  Manager*)? Answered: not yet — none is in the repository or on the issue, and Censio cannot record one before
-  #12, which depends on this feature. Escalated to the Product Manager in step 2; the answer is recorded here before
-  the plan. Variants a sample should cover: `Version 2`; `SessionEnd`; `SessionStart` with a headline; a statistics
-  frame with entries and both maps; a statistics frame with entry count `0`; an area name with `_` in place of an
-  umlaut; a map with a duplicate GUID, if the game sends one.
+  Manager*)? Answered: (Product Manager, step 2) no — the reader is built from the reference source and tested with
+  synthetic frames only, no real recording. None is in the repository or on the issue, and Censio cannot record
+  one before #12, which depends on this feature. The residual risk (the format is known only from the reference
+  source) goes into a decision record; tests on anonymised real recordings come with #20.
 
 ## Area documents
 
