@@ -983,6 +983,75 @@ public sealed class PipeReplayStreamTests
     }
 
     /// <summary>
+    /// A header line over the longest line makes the file no recording, whatever ends it.
+    /// </summary>
+    /// <param name="terminated">Whether a line feed ends the line</param>
+    /// <returns>The task</returns>
+    [TestMethod]
+    [DataRow(true)]
+    [DataRow(false)]
+    public async Task PipeReplayStreamHeaderOverMaxLengthIsNotARecording(bool terminated)
+    {
+        // Arrange
+        var text = PaddedLine(string.Empty, PipeRecordingFormat.MaxLineLength + 1) + (terminated ? "\n" : string.Empty);
+        using var recording = new ChunkedStream(Utf8(text), 4096);
+
+        // Act
+        var (frames, problem) = await ReplayFramesAsync(recording);
+
+        // Assert
+        Assert.IsEmpty(frames, "No frame follows a header that is too long");
+        Assert.IsNotNull(problem, "A header over the maximum line length should end the replay with a problem");
+        Assert.AreEqual(PipeReplayProblemKind.NotARecording, problem.Kind, "A header that is too long makes the file no recording");
+        Assert.IsNull(problem.LineNumber, "The problem of the header names no line");
+    }
+
+    /// <summary>
+    /// The replay stream is a forward-only, read-only stream: everything else is not supported.
+    /// </summary>
+    [TestMethod]
+    public void PipeReplayStreamUnsupportedMembersThrowNotSupported()
+    {
+        // Arrange
+        using var stream = NewReplay(Utf8(Header()));
+        var buffer = new byte[4];
+
+        // Act
+        // Assert
+        Assert.IsTrue(stream.CanRead, "The stream should be readable");
+        Assert.IsFalse(stream.CanSeek, "The stream should not seek");
+        Assert.IsFalse(stream.CanWrite, "The stream should not be writable");
+        Assert.Throws<NotSupportedException>(() => _ = stream.Length, "Length should not be supported");
+        Assert.Throws<NotSupportedException>(() => _ = stream.Position, "Reading the position should not be supported");
+        Assert.Throws<NotSupportedException>(() => stream.Position = 0, "Setting the position should not be supported");
+        Assert.Throws<NotSupportedException>(() => stream.Read(buffer, 0, buffer.Length), "A synchronous read should not be supported");
+        Assert.Throws<NotSupportedException>(() => stream.Seek(0, SeekOrigin.Begin), "Seek should not be supported");
+        Assert.Throws<NotSupportedException>(() => stream.SetLength(0), "SetLength should not be supported");
+        Assert.Throws<NotSupportedException>(() => stream.Write(buffer, 0, buffer.Length), "Write should not be supported");
+        stream.Flush();
+    }
+
+    /// <summary>
+    /// A read into an empty buffer returns zero and consumes nothing of the replay.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    public async Task PipeReplayStreamReadIntoEmptyBufferReturnsZeroAndKeepsTheFrames()
+    {
+        // Arrange
+        using var stream = NewReplay(Utf8(string.Concat(Header(), Line(1, _firstFrame))));
+
+        // Act
+        var empty = await stream.ReadAsync(Memory<byte>.Empty, TestContext.CancellationToken);
+        var buffer = new byte[16];
+        var read = await stream.ReadAsync(buffer, TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(0, empty, "A read into an empty buffer should return zero");
+        Assert.AreEqual(4 + _firstFrame.Length, read, "The frame should still be served after the empty read");
+    }
+
+    /// <summary>
     /// Creates the UTF-8 bytes of a text.
     /// </summary>
     /// <param name="text">The text</param>
