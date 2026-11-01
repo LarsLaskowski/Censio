@@ -146,9 +146,10 @@ and `Dispose` (fact 10); the real waits run on the wait provider. A test replays
 `new PipeTickAssembler(new PipeMessageReader(new PipeReplayStream(file, PipeReplaySpeed.Maximum, clock, TimeProvider.System)), clock)`.
 
 **Replay in the Companion.** `PipeReplayRunner` opens the file (`FileNotFoundException`,
-`DirectoryNotFoundException`, `UnauthorizedAccessException`, `IOException`, `ArgumentException` (a path .NET
-refuses, N6) on open → problem `FileNotFound`),
-builds that pipeline with a read observer that applies `PipeStatusRule.ForRead` (end results ignored; the status
+`DirectoryNotFoundException`, `UnauthorizedAccessException`, `IOException`, `ArgumentException`, `NotSupportedException`
+(a path .NET refuses, N6; the catch covers only the open) on open → problem `FileNotFound`),
+builds that pipeline with a read observer that applies `PipeStatusRule.ForRead` (end results and stream-ending errors ignored — `PipeReplayStream` ends only at a frame boundary and reports its
+problems itself, S5; the status
 stays `Connected` until the first result the rule maps to a status, so a recording whose first frame is not a
 `Version` shows `Protocol mismatch`), reads items
 until the end, then sets `IsFinished` (and the stream's problem). `PipeStatusRule.ForRead` is the rule moved out of
