@@ -22,3 +22,4 @@ are quoted in full.
 | 2026-11-01 17:53 | 5 Tests first G1 | squad-tester | DONE: 122 new cases fail on stubs (confirmed: 607 pass/122 fail); deferred PipeMessageReaderEndAndStreamEndingErrorCarryNoFrame; BackwardsFakeTimeProvider added (FakeTimeProvider cannot go back) (sonnet/medium · 221,962 tokens · 41 tool uses · 666 s) |
 | 2026-11-01 17:57 | 6 Implement G1 | squad-dev | DONE: 729/729 Pipe tests pass, coverage gate 96.5% new lines, analyzer 0; 6 uncovered lines in PipeRecorder (sonnet/medium · 132,738 tokens · 22 tool uses · 222 s) |
 | 2026-11-01 17:59 | 6 Coverage G1 | squad-tester | DONE: deferred AC2 test and 3 recorder tests added; new lines 171/171; Pipe tests 733 pass; analyzer 0 (sonnet/medium · 89,117 tokens · 10 tool uses · 90 s) |
+| 2026-11-01 18:00 | 4 Skeleton G2 | squad-dev | DONE: PipeReplayClock, PipeReplaySpeed, PipeReplayProblem, PipeReplayStream stubs; build OK (sonnet/medium · usage pending) |
