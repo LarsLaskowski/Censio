@@ -9,13 +9,16 @@ version it shows, and the release ZIP it ships in. The user who starts the Compa
 
 ### Tray icon and menu
 
-- Started, the Companion shows one icon in the notification area with the tooltip `Censio Companion`. It opens
+- Started, the Companion shows one icon in the notification area with the tooltip `Censio Companion: <state>`, where `<state>` is the state of the pipe connection ([`pipe.md`](pipe.md)): `Waiting for game`, `Connected`, `Receiving`, `Pipe busy`, `Protocol mismatch` or `Error`. Before the first attempt it reads `Censio Companion: Waiting for game`. It opens
   no window and shows no taskbar button.
+- The tooltip follows the state without any action by the player. At most one tooltip update waits for the
+  tray at a time and it shows the latest state. The tooltip shows no cause.
 - The context menu of the icon holds exactly three entries: `Version <version>` (greyed out, nothing happens on
   click), a separator and `Exit`.
 - `<version>` is the informational version the Companion was built with: `0.0.0` without a version, otherwise
   the build property `Version` exactly as passed.
-- `Exit` removes the icon and ends the process with exit code 0.
+- `Exit` removes the icon at once and ends the process with exit code 0 within 2 seconds in every connection state;
+  the tray never waits for a pending pipe call.
 - When Windows Explorer restarts, the icon appears again once the notification area is back. Sign-out and
   shutdown end the Companion without a dialog.
 
@@ -37,7 +40,8 @@ version it shows, and the release ZIP it ships in. The user who starts the Compa
 
 ## Limits and errors
 
-- The Companion shows no error message and logs nothing yet.
+- The Companion shows no error message or dialog and logs nothing yet; a connection problem shows only as a tooltip
+  state.
 
 ## Related decisions
 
@@ -48,5 +52,5 @@ version it shows, and the release ZIP it ships in. The user who starts the Compa
 
 ## Not here
 
-- Reading the statistics pipe: see [`pipe.md`](pipe.md).
+- Opening and reading the statistics pipe, the connection states and the retry rules: see [`pipe.md`](pipe.md).
 - Reading the game files, the connection to the server, settings and autostart (later issues).

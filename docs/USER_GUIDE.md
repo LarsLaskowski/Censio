@@ -110,6 +110,23 @@ The Companion is the Windows program that reads the statistics of the running ga
 
 The program is not signed, so Windows SmartScreen may show "Windows protected your PC" the first time. Choose "More info", then "Run anyway" (on a German Windows: "Weitere Informationen", then "Trotzdem ausführen").
 
+#### Connecting to the game
+
+The game creates its statistics pipe only when it is started with the launch argument `/pipe` (add `/pipe` to the launch options of your game launcher). Without it the Companion cannot connect, and it looks the same as a game that is not running. Start the Companion before or after the game; it needs no restart when the game is quit and started again. It only reads from the pipe and never writes to it.
+
+Hover over the tray icon: the tooltip reads `Censio Companion: <state>`.
+
+| Tooltip | Meaning |
+| ------- | ------- |
+| `Waiting for game` | The pipe does not exist: the game is not running or was not started with `/pipe`. The Companion keeps looking (pauses grow from 1 to 10 seconds) |
+| `Connected` | The pipe is open; the game has not yet sent its first message. The game sends it at once, so you will hardly ever see this state |
+| `Receiving` | The game is sending data |
+| `Pipe busy` | The pipe exists but another program holds it (for example another pipe tool); the game serves one client at a time, so close other pipe readers. The Companion keeps retrying (pauses grow from 1 to 10 seconds) and shows `Receiving` at the next attempt after the pipe is free. It can also stay at `Pipe busy` after you restart the Companion while the game is in the main menu, until you load a game |
+| `Protocol mismatch` | The pipe speaks another protocol version than 2 (for example after a game update); the Companion stays connected and continues when version 2 arrives |
+| `Error` | Connecting failed or the connection broke off. When you quit the game, `Error` can show briefly before `Waiting for game`; that is normal |
+
+When the game quits, the Companion returns to `Waiting for game` and connects again by itself when the game is back; loading another save and a return to the main menu keep the connection. `Exit` in the tray menu works in every state and ends the program within 2 seconds.
+
 ### Build from source
 
 To run a state of the repository that has not been released, build it from a checkout of this repository, with the commands run in its root directory. No edge builds are offered. In the other `docker run` commands of this guide, add `--pull never` and use the local name `censio` instead of `networlddev/censio:0.1.0`.
@@ -150,7 +167,7 @@ The folder `publish` then holds only `Censio.Companion.exe`. Start it on Windows
 
 Server: open `http://localhost:8080/`; the start page shows the heading `Censio` and the line `Version <version>`. `curl http://localhost:8080/health` answers `Healthy`, and after a few seconds `docker ps` shows the container as `(healthy)`. The first start creates the first data-protection key, and ASP.NET Core logs the warning `No XML encryptor configured` once (see *Limits*).
 
-Companion: the program opens no window and shows no taskbar button. One icon appears in the notification area with the tooltip `Censio Companion`; its menu holds `Version <version>` (greyed out), a separator and `Exit`, which removes the icon and ends the program. A second start in the same Windows session does nothing: it ends at once without a message and the first keeps running. Windows SmartScreen asks once at the first start (see *Companion* above).
+Companion: the program opens no window and shows no taskbar button. One icon appears in the notification area with the tooltip `Censio Companion: <state>` (the states are listed under *Connecting to the game* above); its menu holds `Version <version>` (greyed out), a separator and `Exit`, which removes the icon and ends the program within 2 seconds. A second start in the same Windows session does nothing: it ends at once without a message and the first keeps running. Windows SmartScreen asks once at the first start (see *Companion* above).
 
 ## Data and logs
 
@@ -280,6 +297,23 @@ Der Companion ist das Windows-Programm, das die Statistik des laufenden Spiels l
 
 Das Programm ist nicht signiert, deshalb zeigt Windows SmartScreen beim ersten Start unter Umständen „Der Computer wurde durch Windows geschützt“. „Weitere Informationen“ wählen, dann „Trotzdem ausführen“ (unter englischem Windows: "More info", "Run anyway").
 
+#### Verbindung zum Spiel
+
+Das Spiel legt seine Statistik-Pipe nur an, wenn es mit dem Startargument `/pipe` gestartet wird (`/pipe` zu den Startoptionen des Spiele-Launchers hinzufügen). Ohne dieses Argument kann der Companion sich nicht verbinden; das sieht genauso aus wie ein Spiel, das nicht läuft. Den Companion vor oder nach dem Spiel starten; er braucht keinen Neustart, wenn das Spiel beendet und erneut gestartet wird. Er liest nur aus der Pipe und schreibt nie hinein.
+
+Mit der Maus über das Tray-Symbol fahren: Der Tooltip lautet `Censio Companion: <Zustand>`.
+
+| Tooltip | Bedeutung |
+| ------- | --------- |
+| `Waiting for game` | Die Pipe existiert nicht: Das Spiel läuft nicht oder wurde nicht mit `/pipe` gestartet. Der Companion sucht weiter (die Pausen wachsen von 1 auf 10 Sekunden) |
+| `Connected` | Die Pipe ist geöffnet; das Spiel hat noch keine erste Nachricht gesendet. Das Spiel sendet sie sofort, dieser Zustand ist daher kaum zu sehen |
+| `Receiving` | Das Spiel sendet Daten |
+| `Pipe busy` | Die Pipe existiert, wird aber von einem anderen Programm gehalten (zum Beispiel einem anderen Pipe-Werkzeug); das Spiel bedient nur einen Client gleichzeitig, andere Pipe-Leser also schließen. Der Companion versucht es weiter (die Pausen wachsen von 1 auf 10 Sekunden) und zeigt beim nächsten Versuch nach dem Freiwerden der Pipe `Receiving`. Er kann auch nach einem Neustart des Companions bei `Pipe busy` bleiben, solange das Spiel im Hauptmenü ist, bis ein Spiel geladen wird |
+| `Protocol mismatch` | Die Pipe spricht eine andere Protokollversion als 2 (zum Beispiel nach einem Spiel-Update); der Companion bleibt verbunden und macht weiter, sobald Version 2 eintrifft |
+| `Error` | Das Verbinden ist fehlgeschlagen oder die Verbindung ist abgebrochen. Beim Beenden des Spiels kann `Error` kurz vor `Waiting for game` erscheinen; das ist normal |
+
+Beendet man das Spiel, kehrt der Companion zu `Waiting for game` zurück und verbindet sich von selbst wieder, sobald das Spiel zurück ist; das Laden eines anderen Spielstands und der Wechsel ins Hauptmenü behalten die Verbindung. `Exit` im Tray-Menü funktioniert in jedem Zustand und beendet das Programm innerhalb von 2 Sekunden.
+
 ### Aus dem Quellcode bauen
 
 Um einen Stand des Repositorys auszuführen, der nicht veröffentlicht ist, ihn aus einem Checkout dieses Repositorys bauen; die Befehle laufen in dessen Hauptverzeichnis. Edge-Builds werden nicht angeboten. In den übrigen `docker run`-Befehlen dieser Anleitung `--pull never` ergänzen und den lokalen Namen `censio` statt `networlddev/censio:0.1.0` verwenden.
@@ -320,7 +354,7 @@ Der Ordner `publish` enthält danach nur `Censio.Companion.exe`. Unter Windows s
 
 Server: `http://localhost:8080/` öffnen; die Startseite zeigt die Überschrift `Censio` und die Zeile `Version <version>`. `curl http://localhost:8080/health` antwortet mit `Healthy`, und nach wenigen Sekunden zeigt `docker ps` den Container als `(healthy)`. Beim ersten Start wird der erste Data-Protection-Schlüssel angelegt, und ASP.NET Core meldet einmal die Warnung `No XML encryptor configured` (siehe *Einschränkungen*).
 
-Companion: Das Programm öffnet kein Fenster und zeigt keine Schaltfläche in der Taskleiste. Im Infobereich erscheint ein Symbol mit dem Tooltip `Censio Companion`; sein Menü enthält `Version <version>` (ausgegraut), einen Trenner und `Exit`, das das Symbol entfernt und das Programm beendet. Ein zweiter Start in derselben Windows-Sitzung tut nichts: Er endet sofort ohne Meldung, und der erste läuft weiter. Windows SmartScreen fragt beim ersten Start einmal nach (siehe *Companion* oben).
+Companion: Das Programm öffnet kein Fenster und zeigt keine Schaltfläche in der Taskleiste. Im Infobereich erscheint ein Symbol mit dem Tooltip `Censio Companion: <Zustand>` (die Zustände stehen oben unter *Verbindung zum Spiel*); sein Menü enthält `Version <version>` (ausgegraut), einen Trenner und `Exit`, das das Symbol entfernt und das Programm innerhalb von 2 Sekunden beendet. Ein zweiter Start in derselben Windows-Sitzung tut nichts: Er endet sofort ohne Meldung, und der erste läuft weiter. Windows SmartScreen fragt beim ersten Start einmal nach (siehe *Companion* oben).
 
 ## Daten und Logs
 
