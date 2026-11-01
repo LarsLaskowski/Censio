@@ -1,6 +1,6 @@
 # 0036: Recordings hold the raw frames as JSON lines, written off the read path; replay feeds them back as a byte stream on a recorded clock
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-01
 - **Area:** pipe
 - **Source:** Issue #12
