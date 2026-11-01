@@ -27,7 +27,7 @@ public sealed class PipeReadResult
     /// <summary>
     /// Gets the end-of-stream result.
     /// </summary>
-    public static PipeReadResult End => throw new NotImplementedException();
+    public static PipeReadResult End { get; } = new(PipeReadResultKind.EndOfStream, null, null);
 
     /// <summary>
     /// Gets the outcome.
@@ -55,7 +55,9 @@ public sealed class PipeReadResult
     /// <returns>The result</returns>
     public static PipeReadResult FromMessage(PipeMessage message)
     {
-        throw new NotImplementedException();
+        ArgumentNullException.ThrowIfNull(message);
+
+        return new PipeReadResult(PipeReadResultKind.Message, message, null);
     }
 
     /// <summary>
@@ -65,7 +67,9 @@ public sealed class PipeReadResult
     /// <returns>The result</returns>
     public static PipeReadResult FromError(PipeError error)
     {
-        throw new NotImplementedException();
+        ArgumentNullException.ThrowIfNull(error);
+
+        return new PipeReadResult(PipeReadResultKind.Error, null, error);
     }
 
     #endregion // Methods

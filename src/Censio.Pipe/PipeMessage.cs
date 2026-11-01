@@ -5,6 +5,17 @@ namespace Censio.Pipe;
 /// </summary>
 public abstract class PipeMessage
 {
+    #region Constructors
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="PipeMessage"/> class.
+    /// </summary>
+    protected PipeMessage()
+    {
+    }
+
+    #endregion // Constructors
+
     #region Properties
 
     /// <summary>
