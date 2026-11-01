@@ -16,3 +16,4 @@ are quoted in full.
 | 2026-11-01 09:48 | 7 Code check | Orchestrator | Format check, Analyzer gate (incl. shellcheck/actionlint), Build, Test, scope-check PASS; no C# changed, Coverage gate n/a; Sonar gate NOT CHECKED (branch data not readable via API), to be read on draft PR; main not moved |
 | 2026-11-01 09:49 | 8 Review (diff) | Security | APPROVED on a9c58f3; 1 non-blocking: git tag --list failure exits via set -e without annotation (opus/medium · 34,351 tokens · 6 tool uses · 67 s) |
 | 2026-11-01 09:50 | 8 Review (round 1) | Reviewer | BLOCKING 1 (CONTRIBUTING wording: publish-job re-run does not rebuild), NON-BLOCKING 1 (ARCHITECTURE sentence wording) (opus/medium · 57,814 tokens · 12 tool uses · 115 s) |
+| 2026-11-01 09:50 | 8 Fix round 1 | Dev | CONTRIBUTING and ARCHITECTURE wording fixed; lint-only and scope-check PASS (sonnet/medium · 2,767 tokens · 3 tool uses · 10 s · continued) |
