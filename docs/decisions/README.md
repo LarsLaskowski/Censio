@@ -65,4 +65,5 @@ once in the [area document](../areas/README.md) of the record's area, and the re
 | [0010](0010-server-image-base-pinned-by-amd64-manifest-digest.md) | The image bases are full-version amd64 tags pinned by digest; the `base.digest` label is checked in CI | Accepted | 2026-10-31 |
 | [0011](0011-data-protection-key-ring-in-the-data-directory.md) | The data-protection key ring lies in the configured data directory; the server stops when it cannot write it | Accepted | 2026-10-31 |
 | [0012](0012-release-pre-release-first-and-secret-free-builds.md) | Releases run as pre-release first; artifacts are built without secrets and promoted by digest | Accepted | 2026-10-31 |
+| [0013](0013-readme-quick-start-user-guide-reference.md) | The README is the quick start, the user guide the reference; unreleased states are built from source | Accepted | 2026-10-31 |
 <!-- project:end index -->

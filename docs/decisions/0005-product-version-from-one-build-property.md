@@ -31,5 +31,6 @@ releases*); what each component shows is in [`areas/server.md`](../areas/server.
 
 ## Consequences
 
-- A local build always shows `0.0.0`; only the workflows of #5 and #6 produce other versions.
+- A local build always shows `0.0.0`; only the release workflow of #5 produces other versions (the edge builds of
+  #6 were closed as not planned).
 - A workflow that forgets `-p:Version` ships `0.0.0`; #5 checks the version of its artifacts.

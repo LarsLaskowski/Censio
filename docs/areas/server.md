@@ -121,5 +121,5 @@ the Docker health probe rely on it.
 
 ## Not here
 
-- Data ingest from the Companion (later issue) and the edge builds (#6).
+- Data ingest from the Companion (later issue).
 - Web layout and theming (#31).
