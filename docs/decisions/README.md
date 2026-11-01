@@ -85,4 +85,5 @@ once in the [area document](../areas/README.md) of the record's area, and the re
 | [0030](0030-documentation-language-rules.md) | Code and project records are in English; README and user guides hold English, then German, in one file | Accepted | 2026-11-01 |
 | [0031](0031-bounded-local-tick-buffer-gaps-accepted.md) | The Companion buffers unsent ticks within a bound; beyond it gaps are accepted | Accepted | 2026-11-01 |
 | [0032](0032-telegram-alerts-and-mobile-layout-later.md) | Telegram alerts and a mobile layout come later | Accepted | 2026-11-01 |
+| [0033](0033-pipe-reader-strict-from-the-reference-source.md) | The pipe reader is strict, fails closed and is built from the reference source with synthetic frames | Accepted | 2026-11-01 |
 <!-- project:end index -->
