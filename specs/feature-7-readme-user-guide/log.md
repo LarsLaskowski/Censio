@@ -14,3 +14,4 @@ are quoted in full.
 | 2026-10-31 20:23 | 2b Plan challenge / 3 Security | Orchestrator | skipped: plan weighs no options; no security area touched |
 | 2026-10-31 20:25 | 6 Implement (docs, G1 tasks 1-4) | Dev | README, USER_GUIDE, server.md written; parity and link checks pass; anchors unchecked; task 5 waits for dry run (sonnet/medium · usage pending) |
 | 2026-11-01 08:05 | 6 Dry run (AC4) | Product Manager | Server image built from README: /health Healthy, Version shown correctly; Companion built and started. Not shown: PowerShell version (5.1 vs 7), curl alias, --pull never refusal, release steps |
+| 2026-11-01 08:05 | 6 Implement (task 5) | Dev | Maintainer-tried notes added; markers kept (sonnet/medium · usage pending) |
