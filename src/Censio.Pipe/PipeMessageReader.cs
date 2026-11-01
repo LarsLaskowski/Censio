@@ -3,7 +3,7 @@ namespace Censio.Pipe;
 /// <summary>
 /// Reads typed messages from one pipe stream and applies the protocol version gate.
 /// </summary>
-public sealed class PipeMessageReader
+public sealed class PipeMessageReader : IPipeMessageSource
 {
     #region Fields
 
@@ -42,11 +42,41 @@ public sealed class PipeMessageReader
     #region Methods
 
     /// <summary>
-    /// Reads the next message.
+    /// Applies the version gate to a parsed version frame.
     /// </summary>
-    /// <param name="cancellationToken">The token that cancels the read</param>
-    /// <returns>The message, the error of the frame, or the end of the stream</returns>
-    /// <exception cref="OperationCanceledException">The read was cancelled.</exception>
+    /// <param name="parsed">The parse result of the version frame</param>
+    /// <returns>The version message, a mismatch error, or the parse error</returns>
+    private PipeReadResult ApplyVersion(PipeReadResult parsed)
+    {
+        if (parsed.Message is not VersionMessage version)
+        {
+            return parsed;
+        }
+
+        if (version.Version == PipeProtocol.SupportedVersion)
+        {
+            _supported = true;
+            _mismatchVersion = null;
+
+            return parsed;
+        }
+
+        _supported = false;
+        _mismatchVersion = version.Version;
+
+        return PipeReadResult.FromError(new PipeError
+                                        {
+                                            Kind = PipeErrorKind.ProtocolMismatch,
+                                            ReceivedVersion = version.Version,
+                                            ExpectedVersion = PipeProtocol.SupportedVersion
+                                        });
+    }
+
+    #endregion // Methods
+
+    #region IPipeMessageSource
+
+    /// <inheritdoc />
     public async ValueTask<PipeReadResult> ReadAsync(CancellationToken cancellationToken)
     {
         var frameResult = await _frameReader.ReadFrameAsync(cancellationToken).ConfigureAwait(false);
@@ -88,36 +118,5 @@ public sealed class PipeMessageReader
         return PipeMessageParser.Parse(frame.Span);
     }
 
-    /// <summary>
-    /// Applies the version gate to a parsed version frame.
-    /// </summary>
-    /// <param name="parsed">The parse result of the version frame</param>
-    /// <returns>The version message, a mismatch error, or the parse error</returns>
-    private PipeReadResult ApplyVersion(PipeReadResult parsed)
-    {
-        if (parsed.Message is not VersionMessage version)
-        {
-            return parsed;
-        }
-
-        if (version.Version == PipeProtocol.SupportedVersion)
-        {
-            _supported = true;
-            _mismatchVersion = null;
-
-            return parsed;
-        }
-
-        _supported = false;
-        _mismatchVersion = version.Version;
-
-        return PipeReadResult.FromError(new PipeError
-                                        {
-                                            Kind = PipeErrorKind.ProtocolMismatch,
-                                            ReceivedVersion = version.Version,
-                                            ExpectedVersion = PipeProtocol.SupportedVersion
-                                        });
-    }
-
-    #endregion // Methods
+    #endregion // IPipeMessageSource
 }
