@@ -1,4 +1,6 @@
 using System.Collections.Concurrent;
+using System.Globalization;
+using System.Text;
 
 using Censio.Pipe;
 using Censio.Pipe.Tests;
@@ -44,6 +46,11 @@ public sealed class PipeConnectionTests
     /// The statuses the connection raised, in order.
     /// </summary>
     private readonly ConcurrentQueue<PipeConnectionStatus> _events = [];
+
+    /// <summary>
+    /// The files the recording session opened, with the start of their recordings.
+    /// </summary>
+    private readonly ConcurrentQueue<(DateTimeOffset Started, ControlledWriteStream Sink)> _sinks = [];
 
     /// <summary>
     /// The runs started by the test.
@@ -1063,6 +1070,258 @@ public sealed class PipeConnectionTests
     }
 
     /// <summary>
+    /// Each connection that delivers a frame writes a file of its own and closes it when it ends.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    public async Task PipeConnectionRecordingWritesOneFilePerConnection()
+    {
+        // Arrange
+        var secondTime = _start + TimeSpan.FromSeconds(1);
+        var first = EnqueueWire(PipeTestFrames.Version(2), PipeTestFrames.SessionStart("Capital"));
+        var second = EnqueueWire(PipeTestFrames.Version(2), PipeTestFrames.Island(1, 100));
+        var session = new PipeRecordingSession(OpenSink);
+
+        StartRun(CreateConnection(session));
+
+        await WaitForPendingReadsAsync(first, 1);
+
+        // Act
+        first.End();
+        AdvanceInSteps(TimeSpan.FromSeconds(1));
+
+        await WaitForPendingReadsAsync(second, 1);
+
+        second.End();
+
+        await session.StopAsync(_guard).WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        var sinks = Sinks();
+
+        Assert.HasCount(2, sinks, "Each connection should open a file of its own");
+        Assert.AreEqual(RecordingText(_start, (_start, PipeTestFrames.Version(2)), (_start, PipeTestFrames.SessionStart("Capital"))), sinks[0].Text, "The first file should hold the frames of the first connection");
+        Assert.AreEqual(RecordingText(secondTime, (secondTime, PipeTestFrames.Version(2)), (secondTime, PipeTestFrames.Island(1, 100))), sinks[1].Text, "The second file should hold the frames of the second connection");
+        Assert.IsTrue(sinks[0].IsDisposed, "The file of the ended connection should be closed");
+        Assert.IsTrue(sinks[1].IsDisposed, "The file of the second connection should be closed");
+    }
+
+    /// <summary>
+    /// A connection that delivers no frame creates no file.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    public async Task PipeConnectionRecordingCreatesNoFileWithoutFrame()
+    {
+        // Arrange
+        var stream = EnqueueStream();
+        var session = new PipeRecordingSession(OpenSink);
+
+        StartRun(CreateConnection(session));
+
+        await WaitForPendingReadsAsync(stream, 1);
+
+        // Act
+        stream.End();
+
+        await session.StopAsync(_guard).WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        Assert.IsEmpty(Sinks(), "No file should be created while no frame arrives");
+        Assert.AreEqual(PipeRecordingState.Recording, session.State, "The recording should not have failed");
+    }
+
+    /// <summary>
+    /// A connection that ends inside a frame records the frames received whole and not the partial one.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    public async Task PipeConnectionRecordingEndInsideChunkedFrameRecordsOnlyWholeFrames()
+    {
+        // Arrange
+        var stream = EnqueueStream(PipeTestFrames.Wire(PipeTestFrames.Version(2)), PipeTestFrames.Wire(PipeTestFrames.Island(1, 100))[..10]);
+        var session = new PipeRecordingSession(OpenSink);
+
+        StartRun(CreateConnection(session));
+
+        await WaitForPendingReadsAsync(stream, 1);
+
+        // Act
+        stream.End();
+
+        await session.StopAsync(_guard).WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(ErrorStatus(PipeErrorKind.TruncatedFrame), _events.Last(), "The connection should end with the truncated frame");
+        Assert.AreEqual(RecordingText(_start, (_start, PipeTestFrames.Version(2))), Sinks().Single().Text, "Only the frame received whole should be in the file");
+    }
+
+    /// <summary>
+    /// A stop inside a frame records the frames received whole and not the partial one.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    public async Task PipeConnectionRecordingStopInsideChunkedFrameRecordsOnlyWholeFrames()
+    {
+        // Arrange
+        var stream = EnqueueStream(PipeTestFrames.Wire(PipeTestFrames.Version(2)), PipeTestFrames.Wire(PipeTestFrames.Island(1, 100))[..10]);
+        var session = new PipeRecordingSession(OpenSink);
+
+        StartRun(CreateConnection(session));
+
+        await WaitForPendingReadsAsync(stream, 1);
+
+        // Act
+        await _stop.CancelAsync();
+        await _runs[0].WaitAsync(_guard, TestContext.CancellationToken);
+        await session.StopAsync(_guard).WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(RecordingText(_start, (_start, PipeTestFrames.Version(2))), Sinks().Single().Text, "Only the frame received whole should be in the file");
+        Assert.IsTrue(Sinks().Single().IsDisposed, "The file should be closed when the run stops");
+    }
+
+    /// <summary>
+    /// A frame that arrives in chunks while the clock moves is stamped once, with the time it was whole.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    public async Task PipeConnectionRecordingStampsEachFrameOnce()
+    {
+        // Arrange
+        var island = PipeTestFrames.Wire(PipeTestFrames.Island(1, 100));
+        var stream = EnqueueStream();
+        var session = new PipeRecordingSession(OpenSink);
+
+        StartRun(CreateConnection(session));
+
+        await WaitForPendingReadsAsync(stream, 1);
+
+        // Act
+        stream.Feed(PipeTestFrames.Wire(PipeTestFrames.Version(2)));
+
+        await WaitForPendingReadsAsync(stream, 2);
+
+        _clock.Advance(TimeSpan.FromSeconds(1));
+        stream.Feed(island[..8]);
+
+        await WaitForPendingReadsAsync(stream, 3);
+
+        _clock.Advance(TimeSpan.FromSeconds(1));
+        stream.Feed(island[8..16]);
+
+        await WaitForPendingReadsAsync(stream, 4);
+
+        _clock.Advance(TimeSpan.FromSeconds(1));
+        stream.Feed(island[16..]);
+
+        await WaitForPendingReadsAsync(stream, 5);
+
+        stream.End();
+
+        await session.StopAsync(_guard).WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(RecordingText(_start, (_start, PipeTestFrames.Version(2)), (_start.AddSeconds(3), PipeTestFrames.Island(1, 100))),
+                        Sinks().Single().Text,
+                        "The frame in chunks should carry the time its last chunk arrived");
+    }
+
+    /// <summary>
+    /// A write failure of the recording leaves the states and the reads of the connection as they are.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    public async Task PipeConnectionRecordingFailureKeepsStatesAndReads()
+    {
+        // Arrange
+        var stream = EnqueueStream();
+        var session = new PipeRecordingSession(_ => throw new IOException("Disk full"));
+        var failed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        var ended = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var connection = CreateConnection(session);
+
+        session.StateChanged += (_, _) => failed.TrySetResult();
+        connection.StatusChanged += (_, status) => EndWhenWaiting(ended, status);
+
+        StartRun(connection);
+
+        await WaitForPendingReadsAsync(stream, 1);
+
+        stream.Feed(PipeTestFrames.Wire(PipeTestFrames.Version(2)));
+
+        await failed.Task.WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Act
+        stream.Feed(PipeTestFrames.Wire(PipeTestFrames.Version(3)));
+        stream.End();
+
+        await ended.Task.WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(PipeRecordingState.Failed, session.State, "The write failure should be on the session");
+        Assert.AreSequenceEqual(new[]
+                                {
+                                    Status(PipeConnectionState.Connected),
+                                    Status(PipeConnectionState.Receiving),
+                                    MismatchStatus(3),
+                                    Status(PipeConnectionState.WaitingForGame)
+                                },
+                                _events.ToArray(),
+                                "The connection should raise the states it raises without a recording");
+    }
+
+    /// <summary>
+    /// The frames of a connection, recorded and replayed at maximum speed, give the ticks the live assembler gives.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    public async Task PipeConnectionRecordingReplaysSameTicksAsLiveAssembler()
+    {
+        // Arrange
+        var wire = PipeTestFrames.Wire(PipeTestFrames.Version(2),
+                                       PipeTestFrames.SessionStart("Capital"),
+                                       PipeTestFrames.Island(1, 100),
+                                       PipeTestFrames.Island(2, 100),
+                                       PipeTestFrames.Island(3, 200),
+                                       PipeTestFrames.SessionEnd());
+        var liveClock = new FakeTimeProvider(_start);
+        var liveStream = new ControlledPipeStream();
+        using var assembler = new PipeTickAssembler(new PipeMessageReader(liveStream), liveClock);
+        var liveItems = DrainAsync(assembler);
+
+        await WaitForPendingReadsAsync(liveStream, 1);
+        await FeedInChunksAsync(liveStream, liveClock, wire);
+
+        var expected = await liveItems.WaitAsync(_guard, TestContext.CancellationToken);
+
+        var stream = EnqueueStream();
+        var session = new PipeRecordingSession(OpenSink);
+
+        StartRun(CreateConnection(session));
+
+        await WaitForPendingReadsAsync(stream, 1);
+        await FeedInChunksAsync(stream, _clock, wire);
+        await session.StopAsync(_guard).WaitAsync(_guard, TestContext.CancellationToken);
+
+        var replayClock = new PipeReplayClock(_start);
+
+        using var replay = new PipeReplayStream(new MemoryStream(Sinks().Single().ToArray()), PipeReplaySpeed.Maximum, replayClock, TimeProvider.System);
+        using var replayAssembler = new PipeTickAssembler(new PipeMessageReader(replay), replayClock);
+
+        // Act
+        var replayed = await DrainAsync(replayAssembler).WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        var ticks = expected.Where(item => item.Tick is not null).Select(item => item.Tick!).ToList();
+
+        Assert.HasCount(2, ticks, "The live run should give two ticks");
+        Assert.IsGreaterThan(_start, ticks[0].ReceiveTime, "The clock should have moved while the frames arrived");
+        Assert.AreSequenceEqual(expected.Select(Describe).ToList(), replayed.Select(Describe).ToList(), "The replay of the recording should give the items of the live assembler");
+    }
+
+    /// <summary>
     /// Creates the given number of seconds as offsets.
     /// </summary>
     /// <param name="seconds">The seconds</param>
@@ -1230,6 +1489,143 @@ public sealed class PipeConnectionTests
     private static byte[] PartialFrame()
     {
         return [.. PipeFrameBuilder.RawLength(8), (byte)PipeMessageType.SessionEnd, 0];
+    }
+
+    /// <summary>
+    /// Completes a source when the status is waiting for the game.
+    /// </summary>
+    /// <param name="source">The source</param>
+    /// <param name="status">The status</param>
+    private static void EndWhenWaiting(TaskCompletionSource source, PipeConnectionStatus status)
+    {
+        if (status.State == PipeConnectionState.WaitingForGame)
+        {
+            source.TrySetResult();
+        }
+    }
+
+    /// <summary>
+    /// Creates the text of a recording file.
+    /// </summary>
+    /// <param name="started">The time of the header</param>
+    /// <param name="frames">The receive times and the frames without their length prefix</param>
+    /// <returns>The text</returns>
+    private static string RecordingText(DateTimeOffset started, params (DateTimeOffset Time, byte[] Frame)[] frames)
+    {
+        return Encoding.UTF8.GetString(PipeTestFrames.Recording(started, frames));
+    }
+
+    /// <summary>
+    /// Describes an item of the tick assembler with all its values.
+    /// </summary>
+    /// <param name="item">The item</param>
+    /// <returns>The description</returns>
+    private static string Describe(PipeTickResult item)
+    {
+        if (item.Tick is null)
+        {
+            return string.Create(CultureInfo.InvariantCulture, $"{item.Kind} headline={item.Headline} version={item.Version} error={item.Error} key={item.IslandKey}");
+        }
+
+        var islands = string.Join(";", item.Tick.Islands.Select(island => string.Create(CultureInfo.InvariantCulture, $"{island.Key.SessionGuid}/{island.Key.IslandId}/{island.Key.AreaIndex} {island.SessionId} {island.Name} [{string.Join(",", island.Entries.Select(entry => $"{entry.ProductGuid}:{entry.Generation:R}:{entry.Consumption:R}:{entry.BuildingCount}"))}]")));
+
+        return string.Create(CultureInfo.InvariantCulture, $"Tick {item.Tick.CloseReason} game={item.Tick.GameTime} received={item.Tick.ReceiveTime:O} [{islands}]");
+    }
+
+    /// <summary>
+    /// Opens a file of the recording session: a stream the test can read back.
+    /// </summary>
+    /// <param name="started">The start of the recording</param>
+    /// <returns>The stream</returns>
+    private ControlledWriteStream OpenSink(DateTimeOffset started)
+    {
+        var sink = new ControlledWriteStream();
+
+        _sinks.Enqueue((started, sink));
+
+        return sink;
+    }
+
+    /// <summary>
+    /// Gets the files the recording session opened, ordered by the start of their recordings.
+    /// </summary>
+    /// <returns>The files</returns>
+    private ControlledWriteStream[] Sinks()
+    {
+        return [.. _sinks.OrderBy(entry => entry.Started).Select(entry => entry.Sink)];
+    }
+
+    /// <summary>
+    /// Reads the items of a tick assembler until the end of the stream.
+    /// </summary>
+    /// <param name="assembler">The assembler</param>
+    /// <returns>The items, the end included</returns>
+    private async Task<List<PipeTickResult>> DrainAsync(PipeTickAssembler assembler)
+    {
+        var items = new List<PipeTickResult>();
+
+        while (true)
+        {
+            var item = await assembler.ReadAsync(TestContext.CancellationToken);
+
+            items.Add(item);
+
+            if (item.Kind == PipeTickResultKind.EndOfStream)
+            {
+                return items;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Feeds bytes in small chunks, moves the clock before each chunk, waits until the reader waits for more and ends
+    /// the stream.
+    /// </summary>
+    /// <param name="stream">The stream, with one read pending</param>
+    /// <param name="clock">The clock to move</param>
+    /// <param name="wire">The bytes</param>
+    /// <returns>The task</returns>
+    private async Task FeedInChunksAsync(ControlledPipeStream stream, FakeTimeProvider clock, byte[] wire)
+    {
+        const int chunkSize = 5;
+
+        var pending = 1;
+
+        for (var offset = 0; offset < wire.Length; offset += chunkSize)
+        {
+            clock.Advance(_step);
+            stream.Feed(wire[offset..Math.Min(offset + chunkSize, wire.Length)]);
+
+            pending++;
+
+            await WaitForPendingReadsAsync(stream, pending);
+        }
+
+        stream.End();
+    }
+
+    /// <summary>
+    /// Queues an attempt that opens a stream already fed with the given frames.
+    /// </summary>
+    /// <param name="frames">The frames without their length prefix</param>
+    /// <returns>The stream</returns>
+    private ControlledPipeStream EnqueueWire(params byte[][] frames)
+    {
+        return EnqueueStream(PipeTestFrames.Wire(frames));
+    }
+
+    /// <summary>
+    /// Creates the connection under test with a recording session and a handler that records its events.
+    /// </summary>
+    /// <param name="session">The recording session</param>
+    /// <returns>The connection</returns>
+    private PipeConnection CreateConnection(PipeRecordingSession session)
+    {
+        var connection = new PipeConnection(_connector, _clock, session);
+
+        connection.StatusChanged += (_, status) => _events.Enqueue(status);
+
+        return connection;
     }
 
     /// <summary>

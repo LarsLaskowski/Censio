@@ -36,6 +36,11 @@ public sealed class ControlledWriteStream : Stream
     private readonly List<(long Length, TaskCompletionSource Source)> _flushWaiters = [];
 
     /// <summary>
+    /// Completes when the stream is disposed.
+    /// </summary>
+    private readonly TaskCompletionSource _disposedSource = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    /// <summary>
     /// The lock of the state.
     /// </summary>
     private readonly Lock _lock = new();
@@ -241,6 +246,16 @@ public sealed class ControlledWriteStream : Stream
         {
             return _content.ToArray();
         }
+    }
+
+    /// <summary>
+    /// Waits until the stream is disposed.
+    /// </summary>
+    /// <param name="cancellationToken">The token that ends the wait</param>
+    /// <returns>The task that completes when the stream was disposed</returns>
+    public Task WaitForDisposeAsync(CancellationToken cancellationToken)
+    {
+        return _disposedSource.Task.WaitAsync(cancellationToken);
     }
 
     /// <summary>
@@ -458,6 +473,8 @@ public sealed class ControlledWriteStream : Stream
             _disposed = true;
             failure = _disposeFailure;
         }
+
+        _disposedSource.TrySetResult();
 
         base.Dispose(disposing);
 
