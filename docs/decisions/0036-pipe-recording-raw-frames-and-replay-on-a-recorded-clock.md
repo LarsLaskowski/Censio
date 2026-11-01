@@ -54,8 +54,9 @@ Companion must still end within 2 seconds.
 14. **Stopping the recording from `Application.SessionEnding` as well as from `OnExit`** — a sign-out or shutdown
     would get the 1-second flush before Windows asks the next application; but `SessionEnding` comes with the
     query, which another application can still refuse, so a refused sign-out would leave the Companion running
-    without its recording. Rejected: sign-out and shutdown run the `Exit` stop through `OnExit`, which WPF raises
-    when the session ends; whether Windows waits for its second is not promised.
+    without its recording. Rejected: sign-out and shutdown are left to the `Exit` stop in `OnExit`, which WPF is expected
+    to raise when the session ends (not verified; checked by the maintainer's manual test on Windows); whether
+    Windows waits for its second is not promised.
 
 ## Decision
 
