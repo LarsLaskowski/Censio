@@ -181,6 +181,32 @@ public sealed class PipeMessageParserTests
     }
 
     /// <summary>
+    /// A 1,024-pair map of one GUID holds one pair and keeps no space for the wire count.
+    /// </summary>
+    [TestMethod]
+    public void PipeMessageParserDuplicateMapKeysKeepNoSpareCapacity()
+    {
+        // Arrange
+        var duplicates = Enumerable.Repeat(new KeyValuePair<int, int>(9, 1), PipeProtocol.MaxMapPairs).ToArray();
+        var frame = CreateStatistics(1).Entry(5, duplicates, duplicates).Build();
+
+        // Act
+        var message = ParseMessage<AreaProductionStatisticsMessage>(frame);
+
+        // Assert
+        var workforce = message.Entries[0].WorkforceAmounts as Dictionary<int, int>;
+        var buildings = message.Entries[0].BuildingAmounts as Dictionary<int, int>;
+
+        Assert.IsNotNull(workforce, "The workforce map should be a dictionary");
+        Assert.IsNotNull(buildings, "The building map should be a dictionary");
+        Assert.HasCount(1, workforce, "The workforce map should count the GUID once");
+        Assert.AreEqual(PipeProtocol.MaxMapPairs, workforce[9], "The workforce amounts should be summed");
+        Assert.IsLessThan(8, workforce.Capacity, "The workforce map should keep space for its distinct GUIDs only");
+        Assert.HasCount(1, buildings, "The building map should count the GUID once");
+        Assert.IsLessThan(8, buildings.Capacity, "The building map should keep space for its distinct GUIDs only");
+    }
+
+    /// <summary>
     /// A duplicate sum outside the int32 range rejects the frame.
     /// </summary>
     /// <param name="first">The first amount</param>
