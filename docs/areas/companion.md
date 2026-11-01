@@ -44,6 +44,7 @@ version it shows, and the release ZIP it ships in. The user who starts the Compa
 - [`decisions/0004-companion-shell-and-linux-build.md`](../decisions/0004-companion-shell-and-linux-build.md) — logic in a platform-neutral project, the Windows shell builds on Linux.
 - [`decisions/0005-product-version-from-one-build-property.md`](../decisions/0005-product-version-from-one-build-property.md) — the version comes from the build property `Version`.
 - [`decisions/0012-release-pre-release-first-and-secret-free-builds.md`](../decisions/0012-release-pre-release-first-and-secret-free-builds.md) — the release ZIP is built on Linux without secrets and checked before it is attached.
+- [`decisions/0027-companion-zip-self-contained-single-file-unsigned.md`](../decisions/0027-companion-zip-self-contained-single-file-unsigned.md) — self-contained single-file exe in a ZIP, not signed.
 
 ## Not here
 

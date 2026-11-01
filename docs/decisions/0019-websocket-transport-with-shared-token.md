@@ -33,7 +33,7 @@ unauthenticated Companion unless the operator turns the token off on purpose.
 
 Option 3. The Companion sends the contract messages ([0018](0018-pipe-parsed-in-companion-versioned-json-contract.md))
 over a WebSocket; the server accepts a connection only with the shared token, which is enabled by default and can be
-switched off by configuration (#28). The token is compared in constant time and never logged.
+switched off by configuration (#28); only an explicit setting switches it off, a missing or empty token never does. The token is compared in constant time and never logged.
 
 ## Consequences
 

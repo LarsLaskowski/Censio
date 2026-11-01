@@ -115,8 +115,9 @@ the Docker health probe rely on it.
 ## Related decisions
 
 - [`decisions/0005-product-version-from-one-build-property.md`](../decisions/0005-product-version-from-one-build-property.md) — the version comes from the build property `Version`.
-- [`decisions/0006-server-plain-http-and-open-health.md`](../decisions/0006-server-plain-http-and-open-health.md) — plain HTTP, open `/` and `/health`, host filtering off.
+- [`decisions/0006-server-plain-http-and-open-health.md`](../decisions/0006-server-plain-http-and-open-health.md) — plain HTTP, no web login, open `/health`, host filtering off.
 - [`decisions/0007-server-web-assets-independent-of-restore-inputs.md`](../decisions/0007-server-web-assets-independent-of-restore-inputs.md) — the project requests the Blazor scripts itself, so the image contains them.
+- [`decisions/0026-server-image-linux-amd64-on-docker-hub-no-compose.md`](../decisions/0026-server-image-linux-amd64-on-docker-hub-no-compose.md) — linux/amd64 only, on Docker Hub, no compose file.
 - [`decisions/0009-server-image-runs-as-a-fixed-non-root-user.md`](../decisions/0009-server-image-runs-as-a-fixed-non-root-user.md) — user 1654, other UIDs through `--user`, no `VOLUME`.
 - [`decisions/0010-server-image-base-pinned-by-amd64-manifest-digest.md`](../decisions/0010-server-image-base-pinned-by-amd64-manifest-digest.md) — full-version amd64 base tags pinned by digest, the `base.digest` label checked in CI.
 - [`decisions/0011-data-protection-key-ring-in-the-data-directory.md`](../decisions/0011-data-protection-key-ring-in-the-data-directory.md) — the key ring lies in `<data directory>/data-protection-keys`; the server stops when it cannot write it.
