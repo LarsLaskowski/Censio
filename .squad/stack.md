@@ -8,15 +8,13 @@ profile and owned by this repository: keep it true when the build changes.
 
 - .NET SDK `10.0.x` (target framework `net10.0`), solution `Censio.slnx`.
 - .NET tools: `reihitsu-format` (`Reihitsu.Cli`) and `dotnet-sonarscanner` are pinned in
-  `.config/dotnet-tools.json` and restored with `dotnet tool restore`; CI and the commands below run them
-  through the manifest (`dotnet tool run`), so every machine uses the pinned version. The formatter stays on
+  `.config/dotnet-tools.json` and restored with `dotnet tool restore`; CI runs both and the *Format* commands below run the formatter through the manifest (`dotnet tool run`), so every machine uses the pinned version. The formatter stays on
   the same release line (major.minor) as the **Reihitsu.Analyzer** version pinned in `Directory.Packages.props`,
   which CI enforces (*Check tool versions*); otherwise the formatter can revert code the analyzer considers
   correct. Dependabot raises both in one grouped NuGet pull request.
 - Analyzers in every project via `Directory.Build.props`: **Reihitsu.Analyzer**, **SonarAnalyzer.CSharp**
   (the Sonar C# rules locally, so SonarQube issues surface before the push) and the MSTest analyzers.
-- The SessionStart hook `.claude/hooks/session-start.sh` restores the tool manifest (the pinned formatter and
-  scanner the commands below run through `dotnet tool run`), sets `DOTNET_ROOT` and restores the solution in
+- The SessionStart hook `.claude/hooks/session-start.sh` restores the tool manifest (the pinned formatter the commands below run through `dotnet tool run`, and the scanner CI uses), sets `DOTNET_ROOT` and restores the solution in
   remote sessions.
 
 ## Layout
@@ -56,7 +54,7 @@ anywhere. Do not grep console build output instead: an incremental build prints 
 Easy to get wrong by hand: `#region` blocks on every type, XML documentation on every member, no
 underscores in member names, a region for an interface implementation named after the interface.
 
-`docker:S8431` (tag and digest in one `FROM`) is excluded for `src/Censio.Server/Dockerfile` only, through `sonar.issue.ignore.multicriteria` in the *Begin SonarQube analysis* step of `.github/workflows/ci.yml` and in the *Sonar gate* command, which stay equal (record 0010): the digest pins the base and the tag is what Dependabot updates.
+`docker:S8431` (tag and digest in one `FROM`) is excluded for `src/Censio.Server/Dockerfile` only, through `sonar.issue.ignore.multicriteria` in the *Begin SonarQube analysis* step of `.github/workflows/ci.yml`, whose analysis the *Sonar gate* reads (record 0010): the digest pins the base and the tag is what Dependabot updates.
 
 SonarQube Cloud's own quality profile can still report `S####` rules the local default profile does not,
 and its non-Roslyn checks (hotspots, taint analysis, duplication) have no local equivalent: the *Sonar gate*
