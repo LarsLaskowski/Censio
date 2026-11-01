@@ -42,6 +42,11 @@ public sealed class PipeConnection
     /// </summary>
     private DateTimeOffset? _receivingSince;
 
+    /// <summary>
+    /// The recording session, or <c>null</c> if nothing is recorded.
+    /// </summary>
+    private readonly PipeRecordingSession? _recording;
+
     #endregion // Fields
 
     #region Constructor
@@ -52,9 +57,21 @@ public sealed class PipeConnection
     /// <param name="connector">The connector that makes the attempts</param>
     /// <param name="timeProvider">The clock</param>
     public PipeConnection(IPipeConnector connector, TimeProvider timeProvider)
+        : this(connector, timeProvider, null)
+    {
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="PipeConnection" /> class.
+    /// </summary>
+    /// <param name="connector">The connector that makes the attempts</param>
+    /// <param name="timeProvider">The clock</param>
+    /// <param name="recording">The recording session, or <c>null</c> if nothing is recorded</param>
+    public PipeConnection(IPipeConnector connector, TimeProvider timeProvider, PipeRecordingSession? recording)
     {
         _connector = connector;
         _timeProvider = timeProvider;
+        _recording = recording;
     }
 
     #endregion // Constructor

@@ -39,9 +39,9 @@ public partial class App : Application
     private void StartConnection(TrayIcon trayIcon)
     {
         var connection = new PipeConnection(new NamedPipeConnector(), TimeProvider.System);
-        var updater = new TrayStatusUpdater(() => connection.Status,
-                                            action => Dispatcher.BeginInvoke(DispatcherPriority.Background, action),
-                                            status => trayIcon.SetToolTip(TrayMenu.FormatToolTip(status.State)));
+        var updater = new TrayStatusUpdater<PipeConnectionStatus>(() => connection.Status,
+                                                                  action => Dispatcher.BeginInvoke(DispatcherPriority.Background, action),
+                                                                  status => trayIcon.SetToolTip(TrayMenu.FormatToolTip(status.State)));
 
         connection.StatusChanged += (_, _) => updater.Notify();
 

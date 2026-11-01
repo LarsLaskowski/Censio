@@ -17,6 +17,11 @@ public static class TrayMenu
     /// </summary>
     public const string ExitText = "Exit";
 
+    /// <summary>
+    /// The tooltip of the tray icon when the command line is invalid.
+    /// </summary>
+    public const string InvalidCommandLineToolTip = "Censio Companion: Invalid command line";
+
     #endregion // Constants
 
     #region Methods
@@ -51,6 +56,27 @@ public static class TrayMenu
                    };
 
         return $"{ToolTip}: {text}";
+    }
+
+    /// <summary>
+    /// Formats the tooltip of the tray icon for a connection state and a recording state.
+    /// </summary>
+    /// <param name="state">The connection state</param>
+    /// <param name="recording">The recording state</param>
+    /// <returns>The tooltip text</returns>
+    public static string FormatToolTip(PipeConnectionState state, PipeRecordingState recording)
+    {
+        throw new NotImplementedException();
+    }
+
+    /// <summary>
+    /// Formats the tooltip of the tray icon for a replay status.
+    /// </summary>
+    /// <param name="status">The replay status</param>
+    /// <returns>The tooltip text</returns>
+    public static string FormatReplayToolTip(PipeReplayStatus status)
+    {
+        throw new NotImplementedException();
     }
 
     /// <summary>
