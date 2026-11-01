@@ -17,3 +17,4 @@ are quoted in full.
 | 2026-11-01 08:05 | 6 Implement (task 5) | Dev | Maintainer-tried notes added; markers kept (sonnet/medium · usage pending) |
 | 2026-11-01 08:08 | 8 Review round 1 | Reviewer | BLOCKING 4, NON-BLOCKING 1 (curl marker dropped in README, VERSION build arg dropped, image-on-releases claim wrong, tray version unconfirmed; guide lacks local-name hint) (opus/medium · usage pending) |
 | 2026-11-01 08:08 | 8 Dry run follow-up | Product Manager | Companion tray menu showed Version 0.0.0; PowerShell version still not stated |
+| 2026-11-01 08:09 | 8 Fix round 1 | Dev | All 5 findings fixed; parity and link checks pass (sonnet/medium · usage pending) |
