@@ -364,6 +364,128 @@ public sealed class PipeTickAssemblerTests
     }
 
     /// <summary>
+    /// The read observer gets each read result with the stamp the assembler read for it, the end included.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    public async Task PipeTickAssemblerReadObserverGetsEachResultWithItsStamp()
+    {
+        // Arrange
+        var clock = new FakeTimeProvider(_start);
+        var source = new ScriptedPipeMessageSource();
+        var frame = Frame(1, "Ostia", 100);
+        var version = PipeReadResult.FromMessage(new VersionMessage(2));
+        var observed = new List<(PipeReadResult Result, DateTimeOffset Stamp)>();
+
+        source.Enqueue(frame, () => clock.SetUtcNow(_start.AddSeconds(1)));
+        source.Enqueue(version, () => clock.SetUtcNow(_start.AddSeconds(2)));
+        source.Enqueue(PipeReadResult.End, () => clock.SetUtcNow(_start.AddSeconds(3)));
+
+        using var assembler = new PipeTickAssembler(source, clock, (result, stamp) => observed.Add((result, stamp)));
+
+        // Act
+        var results = await DrainAsync(assembler);
+
+        // Assert
+        Assert.AreEqual(PipeTickResultKind.EndOfStream, results[^1].Kind, "The stream should end");
+        Assert.HasCount(3, observed, "The observer should see every read result once");
+        Assert.AreSame(frame, observed[0].Result, "The observer should see the first result itself");
+        Assert.AreSame(version, observed[1].Result, "The observer should see the second result itself");
+        Assert.AreSame(PipeReadResult.End, observed[2].Result, "The observer should see the end");
+        Assert.AreEqual(_start.AddSeconds(1), observed[0].Stamp, "The first stamp should be the clock after the first read");
+        Assert.AreEqual(_start.AddSeconds(2), observed[1].Stamp, "The second stamp should be the clock after the second read");
+        Assert.AreEqual(_start.AddSeconds(3), observed[2].Stamp, "The third stamp should be the clock after the third read");
+    }
+
+    /// <summary>
+    /// A read observer that throws is ignored and the assembler delivers the same items.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    public async Task PipeTickAssemblerThrowingReadObserverKeepsReading()
+    {
+        // Arrange
+        var clock = new FakeTimeProvider(_start);
+        var source = new ScriptedPipeMessageSource();
+        var calls = 0;
+
+        source.Enqueue(Frame(1, "Ostia", 100));
+        source.Enqueue(PipeReadResult.End);
+
+        void Observe(PipeReadResult result, DateTimeOffset stamp)
+        {
+            calls++;
+
+            throw new InvalidOperationException("The observer failed");
+        }
+
+        using var assembler = new PipeTickAssembler(source, clock, Observe);
+
+        // Act
+        var results = await DrainAsync(assembler);
+
+        // Assert
+        Assert.AreEqual(2, calls, "The observer should have been called for each read result");
+        Assert.HasCount(2, results, "The tick and the end should be delivered");
+
+        var tick = AssertTick(results[0], PipeTickCloseReason.StreamEnded);
+
+        Assert.HasCount(1, tick.Islands, "The tick should hold the island");
+        Assert.AreEqual(PipeTickResultKind.EndOfStream, results[1].Kind, "The end should follow");
+    }
+
+    /// <summary>
+    /// A clock set back far over the delay limit after an island makes the assembler wait in steps instead of throwing.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    public async Task PipeTickAssemblerClockBackOverDelayLimitWaitsInSteps()
+    {
+        // Arrange
+        var clock = new BackwardsFakeTimeProvider(_start);
+        var source = new ScriptedPipeMessageSource();
+
+        source.Enqueue(Frame(1, "Ostia", 100));
+
+        var held = source.EnqueueHeld();
+
+        using var assembler = new PipeTickAssembler(source, clock);
+
+        var skippedRequest = StartRead(assembler, TestContext.CancellationToken);
+
+        clock.MoveBack(TimeSpan.FromDays(60));
+        held.Release(PipeReadResult.FromError(new PipeError
+                                              {
+                                                  Kind = PipeErrorKind.EmptyFrame
+                                              }));
+
+        await skippedRequest.WaitAsync(_guard, TestContext.CancellationToken);
+
+        var request = StartRead(assembler, TestContext.CancellationToken);
+        var faultedAfterSkippedFrame = request.IsFaulted;
+
+        clock.Advance(TimeSpan.FromDays(1));
+        clock.Advance(TimeSpan.FromDays(1));
+
+        var endedEarly = request.IsCompleted;
+
+        // Act
+        clock.Advance(TimeSpan.FromDays(58) + PipeTickLimits.QuietPeriod);
+
+        await Task.WhenAny(request.WaitAsync(_guard, TestContext.CancellationToken));
+
+        // Assert
+        Assert.IsFalse(faultedAfterSkippedFrame, "A deadline 60 days ahead of the clock should not make the read throw");
+        Assert.IsFalse(endedEarly, "Two days of waiting should not close the tick or end the read");
+        Assert.IsFalse(request.IsFaulted, "The wait should end without an exception");
+
+        var tick = AssertTick(request.Result, PipeTickCloseReason.QuietPeriod);
+
+        Assert.HasCount(1, tick.Islands, "The tick should hold the island");
+        Assert.AreEqual(_start, tick.ReceiveTime, "The tick should carry the receive time of its frame");
+    }
+
+    /// <summary>
     /// Summarizes a result by its kind, close reason, game time, receive time and island keys.
     /// </summary>
     /// <param name="result">The result</param>
@@ -425,6 +547,30 @@ public sealed class PipeTickAssemblerTests
     private static Task<PipeTickResult> StartRead(PipeTickAssembler assembler, CancellationToken cancellationToken)
     {
         return assembler.ReadAsync(cancellationToken).AsTask();
+    }
+
+    /// <summary>
+    /// Reads the assembler until the end of the stream.
+    /// </summary>
+    /// <param name="assembler">The assembler</param>
+    /// <returns>All results, the end last</returns>
+    private async Task<List<PipeTickResult>> DrainAsync(PipeTickAssembler assembler)
+    {
+        var results = new List<PipeTickResult>();
+
+        for (var count = 0; count < 100; count++)
+        {
+            var result = await assembler.ReadAsync(TestContext.CancellationToken);
+
+            results.Add(result);
+
+            if (result.Kind == PipeTickResultKind.EndOfStream)
+            {
+                break;
+            }
+        }
+
+        return results;
     }
 
     /// <summary>

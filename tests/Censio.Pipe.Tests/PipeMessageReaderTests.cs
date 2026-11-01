@@ -37,9 +37,54 @@ public sealed class PipeMessageReaderTests
     private static IEnumerable<object[]> CorruptedOffsets => Enumerable.Range(0, CreateSequence().Length)
                                                                        .SelectMany(offset => new[] { (byte)0x00, (byte)0xFF }, (offset, value) => new object[] { offset, value });
 
+    /// <summary>
+    /// Gets the cases of a result built from a whole frame: the bytes before the frame, how many results they give, the
+    /// frame, and the kind of the result.
+    /// </summary>
+    private static IEnumerable<object[]> FrameCases
+    {
+        get
+        {
+            yield return [VersionFrame(2), 1, new byte[] { 2 }, PipeReadResultKind.Message];
+            yield return [Array.Empty<byte>(), 0, new byte[] { 0, 2, 0, 0, 0 }, PipeReadResultKind.Message];
+            yield return [Array.Empty<byte>(), 0, Array.Empty<byte>(), PipeReadResultKind.Error];
+            yield return [VersionFrame(2), 1, new byte[] { 99, 1, 2 }, PipeReadResultKind.Error];
+            yield return [VersionFrame(2), 1, new byte[] { 3, 1 }, PipeReadResultKind.Error];
+            yield return [Array.Empty<byte>(), 0, new byte[] { 0, 3, 0, 0, 0 }, PipeReadResultKind.Error];
+            yield return [Array.Empty<byte>(), 0, new byte[] { 2 }, PipeReadResultKind.Error];
+        }
+    }
+
     #endregion // Properties
 
     #region Methods
+
+    /// <summary>
+    /// A result built from a whole frame (message, empty, unknown type, malformed, protocol mismatch) carries that frame.
+    /// </summary>
+    /// <param name="before">The bytes before the frame, with their length prefixes</param>
+    /// <param name="beforeResults">The number of results the bytes before the frame give</param>
+    /// <param name="frame">The frame bytes</param>
+    /// <param name="kind">The expected kind of the result</param>
+    /// <returns>The task of the test</returns>
+    [TestMethod]
+    [DynamicData(nameof(FrameCases))]
+    public async Task PipeMessageReaderResultCarriesWholeFrame(byte[] before, int beforeResults, byte[] frame, PipeReadResultKind kind)
+    {
+        // Arrange
+        using var stream = new ChunkedStream([.. before, .. PipeFrameBuilder.WithPrefix(frame)], 3);
+        var reader = new PipeMessageReader(stream);
+
+        await SkipResultsAsync(reader, beforeResults);
+
+        // Act
+        var result = await reader.ReadAsync(TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(kind, result.Kind, "The result should have the expected kind");
+        Assert.IsNotNull(result.Frame, "The result should carry the frame it came from");
+        Assert.AreSequenceEqual(frame, result.Frame.Value.ToArray(), "The result should carry the whole frame, type byte and payload");
+    }
 
     /// <summary>
     /// Two session-end frames after the version give two messages.
@@ -509,6 +554,20 @@ public sealed class PipeMessageReaderTests
         }
 
         return results;
+    }
+
+    /// <summary>
+    /// Reads and discards a number of results.
+    /// </summary>
+    /// <param name="reader">The reader</param>
+    /// <param name="count">The number of results</param>
+    /// <returns>The task</returns>
+    private async Task SkipResultsAsync(PipeMessageReader reader, int count)
+    {
+        for (var index = 0; index < count; index++)
+        {
+            await reader.ReadAsync(TestContext.CancellationToken);
+        }
     }
 
     #endregion // Methods
