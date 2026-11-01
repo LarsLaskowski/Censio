@@ -38,35 +38,41 @@ text on 2026-11-01 (line numbers of that read).
 | -- | ------- | --------- |
 | AC1 | `PipeMessageParserVersionFrameReturnsVersionMessage`, `PipeMessageParserSessionStartFrameReturnsHeadline` (200-byte headline), `PipeMessageParserSessionEndFrameReturnsSessionEndMessage`, `PipeMessageParserStatisticsFrameReturnsAllFields` (IDs 200, 255, 128; two entries; maps with `CollectionAssert.AreEquivalent` on the pairs), `PipeMessageParserStatisticsFrameWithoutEntriesReturnsNoEntries`; `PipeMessageReaderTwoSessionEndFramesReturnTwoMessages` | `PipeMessageParserTests.cs`; `PipeMessageReaderTests.cs` |
 | AC2 | `PipeMessageReaderChunkedStreamReturnsSameResults` (`[DataRow]` chunk sizes 1, 3, 4, 5 and `int.MaxValue`) | `PipeMessageReaderTests.cs` |
-| AC3 | `PipeMessageParserDuplicateWorkforceGuidSumsAmounts`, `PipeMessageParserDuplicateBuildingGuidSumsAmounts`, `PipeMessageParserDuplicateGuidSumOverflowReturnsMalformed` (`[DataRow]` `int.MaxValue`+1, `int.MinValue`−1) | `PipeMessageParserTests.cs` |
+| AC3 | `PipeMessageParserDuplicateWorkforceGuidSumsAmounts`, `PipeMessageParserDuplicateBuildingGuidSumsAmounts`, `PipeMessageParserDuplicateGuidSumOverflowReturnsMalformed` (`[DataRow]` amount pairs (`int.MaxValue`, `1`) and (`int.MinValue`, `-1`)) | `PipeMessageParserTests.cs` |
 | AC4 | `PipeFrameReaderEndAtFrameBoundaryReturnsEndOfStream`, `PipeFrameReaderReadAfterEndReturnsEndOfStream` (`[DataRow]` after end, truncated, oversized) | `PipeFrameReaderTests.cs` |
 | AC5 | `PipeFrameReaderStreamEndsInPrefixReturnsTruncated` (`[DataRow]` 1, 2, 3 bytes), `PipeFrameReaderStreamEndsInPayloadReturnsTruncated` | `PipeFrameReaderTests.cs` |
-| AC6 | `PipeFrameReaderOversizedLengthReturnsOversized` (`[DataRow]` 1048577, −1, `int.MinValue`; asserts `Length` and stream `Position == 4`), `PipeFrameReaderMaximumLengthReturnsFrame` | `PipeFrameReaderTests.cs` |
+| AC6 | `PipeFrameReaderOversizedLengthReturnsOversized` (`[DataRow]` 1048577, −1, `int.MinValue`; asserts `Length` and stream `Position == 4`), `PipeFrameReaderMaximumLengthReturnsFrame`; `PipeMessageReaderOversizedLengthReturnsOversized` | `PipeFrameReaderTests.cs`; `PipeMessageReaderTests.cs` |
 | AC7 | `PipeMessageParserEmptyFrameReturnsEmptyFrame`, `PipeMessageParserUnknownTypeReturnsUnknownType` (`[DataRow]` 4, 255); `PipeMessageReaderEmptyFrameThenFrameReturnsNextMessage`, `PipeMessageReaderUnknownTypeThenFrameReturnsNextMessage` | `PipeMessageParserTests.cs`; `PipeMessageReaderTests.cs` |
 | AC8 | `PipeMessageParserTruncatedPayloadReturnsMalformed` (`[DynamicData]`: `Version` of 3 bytes, statistics cut in the header, in an entry, in each map), `PipeMessageParserStringBeyondFrameReturnsMalformed`, `PipeMessageParserNegativeCountReturnsMalformed` (entries, workforce, buildings), `PipeMessageParserCountBeyondFrameReturnsMalformed`; `PipeMessageReaderMalformedFrameThenFrameReturnsNextMessage` | `PipeMessageParserTests.cs`; `PipeMessageReaderTests.cs` |
 | AC9 | `PipeMessageParserHugeCountAllocatesNoMemoryForCount` (`GC.GetAllocatedBytesForCurrentThread()` around `Parse`, under 64 KiB, `[DataRow]` entry count and pair count) | `PipeMessageParserTests.cs` |
-| AC10 | `PipeMessageReaderUnsupportedVersionReturnsMismatch`, `PipeMessageReaderFrameAfterUnsupportedVersionReturnsMismatch`, `PipeMessageReaderSupportedVersionAfterMismatchDecodesFrames`, `PipeMessageReaderFrameBeforeVersionReturnsMismatchWithoutVersion` | `PipeMessageReaderTests.cs` |
+| AC10 | `PipeMessageReaderUnsupportedVersionReturnsMismatch`, `PipeMessageReaderFrameAfterUnsupportedVersionReturnsMismatch`, `PipeMessageReaderSupportedVersionAfterMismatchDecodesFrames`, `PipeMessageReaderFrameBeforeVersionReturnsMismatchWithoutVersion`, `PipeMessageReaderEmptyFrameBeforeVersionReturnsEmptyFrame`, `PipeMessageReaderUnknownTypeBeforeVersionReturnsMismatch` | `PipeMessageReaderTests.cs` |
 | AC11 | `PipeMessageParserTrailingBytesReturnsMessage`, `PipeMessageParserInvalidUtf8ReturnsReplacementCharacter`, `PipeMessageParserStringKeptAsDelivered` (`[DataRow]` `Zycada `, `R_mische K_ste`) | `PipeMessageParserTests.cs` |
-| AC12 | `PipeFrameReaderStreamIoErrorReturnsReadFailed`, `PipeFrameReaderReadAfterReadFailedReturnsEndOfStream`, `PipeFrameReaderCancelledReadThrowsOperationCanceled`, `PipeFrameReaderReadAfterCancelledReadReturnsEndOfStream` | `PipeFrameReaderTests.cs` |
+| AC12 | `PipeFrameReaderStreamIoErrorReturnsReadFailed`, `PipeFrameReaderDisposedStreamReturnsReadFailed`, `PipeFrameReaderReadAfterReadFailedReturnsEndOfStream`, `PipeFrameReaderCancelledReadThrowsOperationCanceled` (`[DataRow]` cancelled before the prefix, cancelled after the prefix), `PipeFrameReaderReadAfterCancelledReadReturnsEndOfStream` (same rows), `PipeFrameReaderUnreadableStreamThrowsArgumentException`; `PipeMessageReaderReadFailedThenReturnsEndOfStream`, `PipeMessageReaderCancelledReadThrowsOperationCanceled` | `PipeFrameReaderTests.cs`; `PipeMessageReaderTests.cs` |
 | AC13 | `PipeMessageReaderTruncatedSequenceNeverThrows` (`[DynamicData]` every cut offset), `PipeMessageReaderCorruptedSequenceNeverThrows` (`[DynamicData]` every offset × `0x00`, `0xFF`); both read to the end through a helper and assert the last result is the end of the stream | `PipeMessageReaderTests.cs` |
+| AC15 | `PipeMessageParserMapAtPairLimitReturnsMessage` (`[DataRow]` workforce, buildings; 1,024 pairs), `PipeMessageParserMapOverPairLimitReturnsMalformed` (same rows; 1,025 pairs) | `PipeMessageParserTests.cs` |
 | AC14 | `PipeMessageParserMalformedErrorCarriesNoPayloadText` (headline `secret`, length byte beyond the frame); `PipeErrorStringFormListsPresentFields` | `PipeMessageParserTests.cs`; `PipeErrorTests.cs` |
 
 Notes for the Tester: U+FFFD in an expected value is built at run time (`((char)0xFFFD).ToString()`), not
 written as a `\u` escape that *Format* rewrites (`.squad/stack.md`, *Known pitfalls*). Frames are built with the
-helper `PipeFrameBuilder`, never as hand-typed byte arrays beyond the corrupt cases.
+helper `PipeFrameBuilder`, never as hand-typed byte arrays beyond the corrupt cases. The disposed case uses a
+`MemoryStream` disposed before the read.
 
 ## Approach
 
 **Frame reader** (`PipeFrameReader`, one per stream). `ReadFrameAsync`:
-1. If ended, return `PipeFrameResult.End`. Call `cancellationToken.ThrowIfCancellationRequested()`.
+1. If ended, return `PipeFrameResult.End`. Then, inside the handling of step 5, call
+   `cancellationToken.ThrowIfCancellationRequested()`.
 2. Read the 4-byte prefix with `ReadAtLeastAsync(…, 4, throwOnEndOfStream: false, …)`: 0 bytes → ended, `End`;
    1–3 → ended, `TruncatedFrame`.
 3. `length < 0 || length > PipeProtocol.MaxFrameLength` → ended, `OversizedFrame` with `Length`; nothing more is
    read (the stream stays at offset 4 of that frame).
 4. Allocate `length` bytes and read them the same way; fewer → ended, `TruncatedFrame` with `Length`; else
    `PipeFrameResult.FromFrame` (length 0 gives an empty frame).
-5. `IOException`, `ObjectDisposedException`, `NotSupportedException` from the stream → ended, `ReadFailed`
-   (no exception text kept). `OperationCanceledException` → ended, rethrown.
+5. `IOException` or `ObjectDisposedException` from the stream → ended, `ReadFailed` (no exception text kept).
+   Every `OperationCanceledException`, step 1's included → ended, rethrown.
+
+The constructor throws `ArgumentNullException` for a null stream and `ArgumentException` when
+`stream.CanRead == false` (a programming error, not a stream failure).
 
 The reader never reads past the current frame, so it holds one frame at most.
 
@@ -76,15 +82,15 @@ The reader never reads past the current frame, so it holds one frame at most.
   position of the field that did not fit). No field ever defaults to `0`.
 - Strings: length byte, bounds check, `Encoding.UTF8.GetString` (U+FFFD replacement, no trim).
 - Counts: negative → malformed; entry count greater than `remaining / 56`, pair count greater than
-  `remaining / 8` → malformed before any list or dictionary is created; collections are created with at most that
-  capacity.
-- Map amounts are summed with `checked` arithmetic; `OverflowException` caught inside the map loop → malformed.
+  `PipeProtocol.MaxMapPairs` (1,024) or `remaining / 8` → malformed before any list or dictionary is created;
+  collections are created with at most that capacity.
+- Map amounts are summed in `long` and range-checked against `int`; out of range → malformed (no exception path).
 - Bytes after the last field are ignored. The parser does not apply the version gate.
 
 **Message reader** (`PipeMessageReader`, one per stream, owns a `PipeFrameReader`; gate state: unknown at start,
 then supported, or mismatch with the received version). `ReadAsync`:
 - Frame result `End` or an error → passed through.
-- Empty frame → `EmptyFrame` (no type, gate not consulted).
+- Empty frame → `EmptyFrame` (no type, gate not consulted, also before any `Version`).
 - Type byte `0` → parsed; `Version 2` → gate supported, the message returned; any other version → gate mismatch
   with that version, `ProtocolMismatch` returned; a malformed `Version` → its malformed error, gate unchanged.
 - Any other type byte (known or unknown) while the gate is not supported → `ProtocolMismatch` with
@@ -125,6 +131,7 @@ are get-only unless marked init (required init where stated).
 - `class PipeProtocol` (static)
 - `PipeProtocol.SupportedVersion: const int = 2`
 - `PipeProtocol.MaxFrameLength: const int = 1048576`
+- `PipeProtocol.MaxMapPairs: const int = 1024`
 - `enum PipeMessageType : byte` with `Version = 0`, `SessionStart = 1`, `SessionEnd = 2`, `AreaProductionStatistics = 3`
 - `class PipeMessage` (abstract) with `PipeMessage.MessageType: PipeMessageType` (abstract property)
 - `VersionMessage.VersionMessage(int version)`, `VersionMessage.Version: int` (sealed class, derives `PipeMessage`)
@@ -138,7 +145,7 @@ are get-only unless marked init (required init where stated).
 - `class PipeFrameResult` (sealed, private constructor): `PipeFrameResult.Kind: PipeFrameResultKind`, `PipeFrameResult.Frame: ReadOnlyMemory<byte>`, `PipeFrameResult.Error: PipeError?`, `PipeFrameResult.End: PipeFrameResult` (static), `PipeFrameResult.FromFrame(ReadOnlyMemory<byte> frame): PipeFrameResult` (static), `PipeFrameResult.FromError(PipeError error): PipeFrameResult` (static)
 - `enum PipeReadResultKind` with `Message`, `Error`, `EndOfStream`
 - `class PipeReadResult` (sealed, private constructor): `PipeReadResult.Kind: PipeReadResultKind`, `PipeReadResult.Message: PipeMessage?`, `PipeReadResult.Error: PipeError?`, `PipeReadResult.End: PipeReadResult` (static), `PipeReadResult.FromMessage(PipeMessage message): PipeReadResult` (static), `PipeReadResult.FromError(PipeError error): PipeReadResult` (static)
-- `PipeFrameReader.PipeFrameReader(Stream stream)` (sealed class; throws ArgumentNullException for a null stream), `PipeFrameReader.ReadFrameAsync(CancellationToken cancellationToken): ValueTask<PipeFrameResult>`
+- `PipeFrameReader.PipeFrameReader(Stream stream)` (sealed class; throws ArgumentNullException for a null stream, ArgumentException for an unreadable one), `PipeFrameReader.ReadFrameAsync(CancellationToken cancellationToken): ValueTask<PipeFrameResult>`
 - `PipeMessageParser.Parse(ReadOnlySpan<byte> frame): PipeReadResult` (static class)
 - `PipeMessageReader.PipeMessageReader(Stream stream)` (sealed class), `PipeMessageReader.ReadAsync(CancellationToken cancellationToken): ValueTask<PipeReadResult>`
 
@@ -151,7 +158,8 @@ are get-only unless marked init (required init where stated).
 - Test helpers (not test classes), written by the Tester in group G1: `tests/Censio.Pipe.Tests/PipeFrameBuilder.cs`
   (builds synthetic frames: prefix, type byte, int32, int64, float32, unsigned byte, string, entries, maps, and a
   raw length for the corrupt cases) and `tests/Censio.Pipe.Tests/ChunkedStream.cs` (a read-only `Stream` over bytes
-  that returns at most N bytes per read, or throws `IOException` after a given offset).
+  that returns at most N bytes per read, throws `IOException` at a given offset, or cancels a given
+  `CancellationTokenSource` at a given offset and then honours its token).
 
 Existing test code that calls a changed signature: none (no existing signature changes).
 
@@ -175,7 +183,9 @@ scope*).
   outline; *Behavior*: message types and fields, maps as GUID→amount sets with duplicates summed, strings as UTF-8
   with U+FFFD, untrimmed, extra bytes ignored, the version gate per stream; *Limits and errors*: the seven error
   kinds, which skip the frame (empty, unknown type, malformed, mismatch) and which end the stream (truncated,
-  oversized, read failed, cancellation), the 1 MiB limit inclusive, errors carry no payload text. It states as
+  oversized, read failed, cancellation), the 1 MiB limit inclusive, at most 1,024 pairs per map, errors carry no
+  payload text; before any `Version` an empty frame gives the empty-frame error and an unknown type byte the
+  protocol-mismatch error (challenge 5). It states as
   deliberate differences from the reference: an oversized length ends the stream where the reference reads on out
   of step, so the caller (#11) reconnects (challenge 7); an overflowing duplicate sum rejects the frame where the
   reference wraps (challenge 5); a short field rejects the frame where the reference reads `0`; a wrong version
@@ -214,28 +224,29 @@ row of `docs/ARCHITECTURE.md` changes in wording only (Dev, above).
 
 See spec, *Out of scope*. No follow-up issue: real-recording tests are #20's scope already.
 
-## Challenge notes
+## Challenge
 
-Plan challenge, Devil's Advocate, mode `plan`: 0 major, 5 minor. Minor objections appended verbatim; the Lead answers them while implementing or in a revision.
+Plan challenge (Devil's Advocate): 0 major, 5 minor, all accepted.
 
-1. **Cancellation order is ambiguous** (plan *Approach*, frame reader steps 1 and 5; E18). Step 1 calls `ThrowIfCancellationRequested` before any read, while step 5 is the step that marks the reader ended. If step 1 sits outside that handling, a read with an already cancelled token throws without ending the reader, and the next read decodes normally, which breaks E18. Instruction: the Dev marks the reader ended on every `OperationCanceledException`, step 1's included. The Tester covers cancellation both before the prefix and after the prefix (part of the frame consumed), for example with a cancel-at-offset option in `ChunkedStream`. Verified fact 14 (pre-cancelled `MemoryStream`) only exercises the first case.
-2. **The message reader's pass-through of frame errors is not tested for AC6 and AC12** (tasks rows 7–9 list neither; plan AC6 and AC12 tests are all in `PipeFrameReaderTests.cs`). #11 will call `PipeMessageReader`, and that class converts each frame result into a `PipeReadResult`. Instruction: the Tester adds `PipeMessageReaderReadFailedThenReturnsEndOfStream`, `PipeMessageReaderOversizedLengthReturnsOversized` and `PipeMessageReaderCancelledReadThrowsOperationCanceled`, and AC6 and AC12 are added to row 8's criteria.
-3. **`NotSupportedException` and `ObjectDisposedException` mapped to `ReadFailed`** (plan *Approach*, step 5). `ChunkedStream` throws only `IOException`, so these branches have no test. A non-readable stream is also a programming error, not a stream failure. Instruction: the constructor throws `ArgumentException` when `stream.CanRead == false`, and step 5 catches only `IOException` and `ObjectDisposedException`. Each of those gets a test, which needs a disposed-stream case in `ChunkedStream` or a `MemoryStream` disposed before the read.
-4. **The overflow test rows cannot be written as stated** (plan AC3, `[DataRow]` `int.MaxValue`+1, `int.MinValue`−1). Neither value fits in an `int`. Instruction: use rows of amount pairs, (`int.MaxValue`, `1`) and (`int.MinValue`, `-1`). The Dev may sum in `long` and range-check instead of catching `OverflowException`; the outcome is the same and there is no exception path.
-5. **What the version gate does with empty and unknown-type frames is not documented or tested before `Version`** (plan *Approach*, message reader; spec E5, E6, E14). The plan returns `EmptyFrame` for a length-0 frame before any `Version` (gate not checked), but `ProtocolMismatch` for an unknown type byte. E14 ("a frame other than `Version`") and E6 could each be read the other way. Instruction: `docs/areas/pipe.md` states both cases, and the Tester adds `PipeMessageReaderEmptyFrameBeforeVersionReturnsEmptyFrame` and `PipeMessageReaderUnknownTypeBeforeVersionReturnsMismatch` under AC10.
+1. Cancellation order. Accepted: *Approach*, frame reader steps 1 and 5 — every `OperationCanceledException`
+   ends the reader; AC12 tests cancel before and after the prefix (`ChunkedStream` cancel-at-offset).
+2. Pass-through in the message reader untested for AC6 and AC12. Accepted: three `PipeMessageReader` tests added
+   under AC6 and AC12; tasks row 8 names both criteria.
+3. `NotSupportedException` and `ObjectDisposedException`. Accepted: the constructor rejects an unreadable stream
+   with `ArgumentException`; step 5 catches `IOException` and `ObjectDisposedException` only, each with a test.
+4. Overflow rows. Accepted: rows of amount pairs; the sum is taken in `long` and range-checked.
+5. Gate with empty and unknown-type frames before `Version`. Accepted: two AC10 tests added, and `pipe.md` states
+   both cases (*Documentation updates*).
 
-## Security notes
+## Security review
 
-Security plan review, `squad-security`, mode `plan`: APPROVED (spec and plan reviewed together). Non-blocking findings appended verbatim; finding 1 leaves the plan a choice, so the Lead decides it in a revision.
+Security plan review: APPROVED, two non-blocking findings.
 
-1. **Non-blocking: per-frame CPU cost under hostile map keys.** Workforce and building maps are `Dictionary<int,int>`. Integer hashing is the identity and the bucket count is a predictable prime. The plan even pre-sizes the map from the attacker's count (*Approach*, "collections are created with at most that capacity"). Measured with a map pre-sized for 131,064 pairs (prime 156,437):
-   - 27,455 keys that all fall in one bucket: 873 ms to insert.
-   - The same number of ordinary keys: 3 ms.
-   - Extrapolation, not measured: a map of about 65k pairs whose keys all collide (512 KB) would cost several seconds, so one 1 MiB frame with two such maps costs on the order of 10 s of CPU, and it can repeat on every frame.
-
-   Memory stays bounded and the result stays correct, so the spec's limits hold. Only the time per frame is unbounded in practice. Only a process that can serve the pipe name can send such keys, and that is already a same-user attacker, so this does not block. Pick one:
-   - (a) A per-map pair cap in the spec. The real maps hold workforce types and building GUIDs, a few dozen each. Above the cap the frame is a malformed message.
-   - (b) Open a linked hardening issue now.
-
-   If (a), add an AC with a test that pins it.
-2. **Non-blocking: the resource claim covers only the extreme count.** The NFR says a read holds at most one frame plus its decoded message. Only AC9's huge-count case is pinned. There is no test for a legitimate maximum-size frame. Acceptable as written.
+1. Per-frame CPU cost under colliding map keys. Decided: option (a) — a cap of 1,024 pairs per map (spec E19,
+   AC15, `PipeProtocol.MaxMapPairs`); a map over the cap is a malformed message. The real maps hold workforce
+   types and building GUIDs, a few dozen each, so the cap rejects no plausible frame, and it bounds colliding
+   inserts to about 0.5 million comparisons per map. Option (b), a follow-up issue, lost: the fix is one constant
+   and one check, cheaper now than a second change. The cap and its residual risk are in record 0033. The cap is a
+   size bound on input (input handling), so the tier stays `standard`.
+2. Only the extreme count is pinned. Accepted as written: AC9 pins the huge count, `PipeFrameReaderMaximumLengthReturnsFrame`
+   reads a 1 MiB frame; no further test.

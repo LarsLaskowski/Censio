@@ -75,11 +75,13 @@ Every error is a typed result the caller tells apart by kind; the reader never t
 - E17: An I/O error of the stream: a read-failed error, then the end of the stream.
 - E18: The caller cancels a read: that read ends with the platform's cancellation, not with a result, and every
   later read returns the end of the stream (part of a frame may already be consumed).
+- E19: A workforce or building map with more than 1,024 pairs: the error of E7 (the real maps hold a few dozen;
+  the cap bounds the time a frame of colliding keys costs).
 
 ## Non-functional requirements
 
 - Limits: a frame's length (type byte and payload) is at most 1 MiB; a read holds at most one frame plus its
-  decoded message in memory, whatever the counts in the payload say (E10).
+  decoded message in memory, whatever the counts in the payload say (E10); a map holds at most 1,024 pairs (E19).
 - Security: an error carries only its kind, type value, length, offset and versions, never payload text, so a
   caller that logs it logs no pipe content.
 - Platform: any readable byte stream, no dependency on Windows or the named pipe; tested on Linux. Opening
@@ -123,6 +125,8 @@ Every error is a typed result the caller tells apart by kind; the reader never t
   with cancellation and returns no result, and the next read gives the end of the stream (E17, E18).
 - [ ] AC13: A valid sequence of all four message types cut at every byte offset, and with each single byte replaced
   by `0x00` and by `0xFF` in turn, read to the end never throws and ends with the end of the stream (E1–E10).
+- [ ] AC15: A map of 1,024 pairs is decoded, and a workforce or building map of 1,025 pairs gives a
+  malformed-message error (E19).
 - [ ] AC14: No error carries payload text: the error for a malformed `SessionStart` with the headline `secret`
   contains `secret` in none of its values and not in its string form (E8).
 
@@ -151,7 +155,7 @@ Every error is a typed result the caller tells apart by kind; the reader never t
 
 ## Area documents
 
-- `docs/areas/pipe.md` (new area): frame layout, message types and fields, the 1 MiB limit, the error kinds and
+- `docs/areas/pipe.md` (new area): frame layout, message types and fields, the 1 MiB limit, the 1,024-pair map cap, the error kinds and
   when the reader skips or stops, the version gate, duplicate map keys, string decoding, extra bytes — and where
   it deliberately differs from the reference (E3, E11, E12); not here: #10, #11, #12.
 - `docs/areas/companion.md`, *Not here*: points to the pipe area.

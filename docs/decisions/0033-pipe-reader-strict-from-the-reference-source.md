@@ -43,5 +43,8 @@ synthetic frames only; what it accepts, skips and stops on is in [`areas/pipe.md
   (Windows-1252 would garble non-ASCII bytes); that the game writes `_` for umlauts rests on a third-party capture
   (`Dealwatch/Tabularium117`, `docs/protocol.md`), not on our own; whether the game ever sends duplicate map keys is
   unknown.
+- A map holds at most 1,024 pairs (Security plan review): integer keys hash to themselves, so colliding keys
+  would cost seconds of CPU per frame; real maps hold a few dozen pairs. A future game with larger maps would see its
+  frames rejected until the cap is raised.
 - A game update that changes the format without a new protocol version is misread as long as every field still fits;
   one that bumps the version is refused with a protocol-mismatch error.
