@@ -149,11 +149,11 @@ changes most.
 - `UI` — the web interface: layout, views and charts.
 - `Alerts` — notifications the server sends out.
 - `Tests` — test projects and test data without a product change.
-- `Tooling` — developer tools beside the product, such as the recording anonymiser.
+- `Tooling` — developer tools beside the product, such as tools for recordings and test fixtures.
 - `Repo` — the solution, the repository layout and the shared build configuration.
 - `Docker` — the server image and its build.
 - `CI` — the checks on pushes and pull requests: build, analysis, CodeQL, Dependabot, SonarQube Cloud.
-- `Release` — publishing: the release and edge-build workflows, release notes, the Windows ZIP and image tags.
+- `Release` — publishing: the release workflow, release notes, the Windows ZIP and image tags.
 - `Security` — security reviews and hardening that belong to no single area.
 - `Docs` — `README.md`, the user guide and the documents under `docs/`.
 - `Squad` — the squad's project knowledge (`.squad/stack.md`, `.squad/project.md`, the project blocks of the
