@@ -56,3 +56,5 @@ The hand-written fakes and stubs the tests reuse (no mocking library unless `doc
 otherwise):
 
 - `RecordingLogger` (`tests/Censio.Server.Tests/RecordingLogger.cs`): an `ILogger` that keeps each entry's level, formatted message and exception in `Entries`, for tests that assert what a component logs.
+- `ChunkedStream` (`tests/Censio.Pipe.Tests/ChunkedStream.cs`): a read-only `Stream` that returns its bytes in chunks of a given size, can throw an `IOException` at an offset or cancel a `CancellationTokenSource` at an offset, can report `CanRead` as false, and throws `ObjectDisposedException` once disposed, for tests of the frame reader's partial reads, I/O errors and cancellation. It models no real component.
+- `PipeFrameBuilder` (`tests/Censio.Pipe.Tests/PipeFrameBuilder.cs`): a fluent builder that writes the pipe's frame fields in little-endian order (type byte, payload, optional length prefix), for tests that need synthetic and corrupt frames.
