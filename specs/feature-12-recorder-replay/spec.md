@@ -72,7 +72,8 @@ an injected clock (record 0034). The tooltip is the Companion's only output
   `Censio Companion: Replay error: <reason>` after the frames before it were replayed: `file not found` (also no
   access), `not a recording` (first line is not the header; also an empty file), `unsupported version` (header
   version other than 1), `invalid line <n>` (not valid JSON of the frame form, invalid base64, a frame over 1 MiB, a
-  line over the size such a frame needs, or a missing time). A header-only recording replays as finished at once.
+  line over the size such a frame needs, a missing time, a field given twice), `read failed` (the file cannot be read
+  on after it was opened). A header-only recording replays as finished at once.
 - E7: Recorded times that go backwards or repeat: the replay does not wait before such a frame, and the frame is
   stamped with its recorded time unchanged, so the ticks are the ones the recorded times give; a large gap is waited
   for at the chosen speed (`Exit` ends the wait).
@@ -85,10 +86,13 @@ an injected clock (record 0034). The tooltip is the Companion's only output
 - E10: The disk is slower than the pipe: frames wait to be written in a queue of at most 16 MiB of frame bytes; the
   pipe is read on without waiting for the disk. When a frame does not fit, or frames are still queued 1 second after
   `Exit`, sign-out or shutdown began, the recording stops as E3 describes: the file ends with the last complete line
-  written, the frames after it are not recorded, and the live run is unchanged.
+  written, the frames after it are not recorded, and the live run is unchanged. A line a stalled disk is still
+  writing when the second ends may be cut off, as in E2.
 - E11: Line format when replaying: a line feed or a carriage return plus line feed ends a line; a missing line feed
   after the last line and one empty line at the end are accepted; an empty line elsewhere is `invalid line <n>`. JSON
-  fields may come in any order; fields other than those of S1 are ignored, in the header and in a frame line.
+  fields may come in any order; fields other than those of S1 are ignored, in the header and in a frame line. A
+  UTF-8 byte order mark before the header is accepted (a file saved by a Windows editor). The header needs `format`
+  and `version`; `started` is not checked.
 
 ## Non-functional requirements
 
