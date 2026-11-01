@@ -169,3 +169,10 @@ builds the control (Options 2).
 - #28 updates `.squad/project.md` (*Security areas*: Authentication), `docs/ARCHITECTURE.md` (*Data flow*,
   *Security model*) and `SECURITY.md` for the token switch (named in 0019).
 - #21 records its result in 0024; #19 records profile detection (extending 0020 or its own record).
+
+## Security notes
+
+Security plan review: APPROVED, no blocking findings. Non-blocking, to be applied in step 6:
+
+1. 0006 understates what an unauthenticated visitor can do. Suggested wording: "Anyone who reaches the server can read every page and use every action the UI offers." and extend the rebinding bullet so that "the first change that puts game data or a state-changing action on a page revisits this choice."
+2. 0019's *Decision* does not say the token stays on when none is configured. Suggested addition: "only an explicit setting switches it off; a missing or empty token never does."
