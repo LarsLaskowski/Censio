@@ -176,3 +176,15 @@ Every error is a typed result the caller can tell apart by kind; the reader neve
 - `docs/areas/companion.md`, *Not here*: points to the pipe area for reading the statistics pipe.
 - `docs/ARCHITECTURE.md`: the `Censio.Pipe` row and *Data flow* say that the pipe layer frames and parses the
   stream into typed messages, and link the pipe area.
+
+## Challenge notes
+
+Spec challenge, Devil's Advocate, mode `spec`: 0 major, 7 minor. Minor objections appended verbatim; the Lead answers them while planning.
+
+1. **Signedness of the one-byte fields (S4, AC1).** The reference reads session ID, island ID and area index as `unsigned char` (pipe.cpp, `const int sessionID = (*buffer)[pos++]`), and the string length byte the same way (`ReadString`). A build that reads them as signed bytes would still pass AC1 with values under 128. State that all four are unsigned 0–255. Make AC1 use an ID of at least 128 and a `SessionStart` string of 200 or more bytes.
+2. **Map order (S4, AC1).** The reference keeps both maps in `std::unordered_map` (pipe.h, `WorkforceGUIDtoAmount`), so pair order carries no meaning. State in the spec and in AC1 that maps are compared as GUID→amount sets. Otherwise a test might pin an insertion order that the plan never promised.
+3. **State after a cancelled read (E18, AC12).** The spec says the cancelled call stops reading. It does not say what the next read returns when part of a frame was already consumed. Resuming at an unknown offset would desynchronise the stream, the risk Q4 rules out for oversized frames. Specify that every read after a cancellation returns the end of the stream, the same as E13, and add it to AC12.
+4. **The version gate is per stream (E11, E14, Q3).** The fail-closed gate depends on `Version` arriving first on every connection (pipe.cpp, "Read preamble"). If #11 reuses one reader across reconnects, a stale gate state carries over. State that a reader serves exactly one stream (one connection) and starts with the version unknown.
+5. **E12 differs from the reference.** The reference wraps a signed int32 overflow silently (in C++ that is undefined behaviour). The spec instead drops the whole statistics frame, every entry of the area, as malformed. That is a sound fail-closed choice, but S6 says "as the reference does". Record the difference in `docs/areas/pipe.md` as deliberate.
+6. **The string encoding is an assumption (E16).** The reference treats strings as raw bytes (`std::string_view`) and states no encoding. The spec gives no source for the claim that the game writes `_` in place of umlauts. Without a sample, UTF-8 is unverified; the game might send Windows-1252, and decoding that as UTF-8 would garble text. Name the encoding and the `_` claim explicitly as residual risks in the Q5 decision record, to be checked by the #20 fixtures.
+7. **Stopping after an oversized length differs from the reference (Q4, E3).** The reference does `continue` after "Message too long.", which leaves the stream desynchronised. Stopping is the better choice. The area document should say it deliberately differs from the reference, so that #11 knows it must reconnect after an oversized-frame error.
