@@ -167,7 +167,7 @@ public sealed class PipeFrameReaderTests
 
         // Assert
         Assert.AreEqual(PipeFrameResultKind.Frame, result.Kind, "A frame of the maximum length should be read");
-        CollectionAssert.AreEqual(frame, result.Frame.ToArray(), "The frame should hold the delivered bytes");
+        Assert.AreSequenceEqual(frame, result.Frame.ToArray(), "The frame should hold the delivered bytes");
     }
 
     /// <summary>
