@@ -114,6 +114,9 @@ What a release produces and shows is in
 - Releasing a lower version (a fix for an older line) is not supported while a higher `v*` tag exists, and a failed
   release can no longer be completed once a higher tag was created.
 - GitHub's *Latest* mark is not protected: anyone with write access can set it on any release (option 16).
+- When `git tag --list` itself fails in `release-check.sh newest`, the run stops through `set -e` with git's own exit
+  code and message and no `::error::` annotation. It still fails closed and only follows a successful lookup of the
+  same tag, so a dedicated annotation was not added.
 - The Companion exe built on Linux carries no Windows version resource of its own; the file properties show no
   product version. Revisit with a Windows build if testers need it, or with code signing.
 - Build code can write job outputs and upload artifacts; the publish and promote jobs therefore check the form of

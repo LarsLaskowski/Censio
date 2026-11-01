@@ -18,3 +18,4 @@ are quoted in full.
 | 2026-11-01 09:50 | 8 Review (round 1) | Reviewer | BLOCKING 1 (CONTRIBUTING wording: publish-job re-run does not rebuild), NON-BLOCKING 1 (ARCHITECTURE sentence wording) (opus/medium · 57,814 tokens · 12 tool uses · 115 s) |
 | 2026-11-01 09:50 | 8 Fix round 1 | Dev | CONTRIBUTING and ARCHITECTURE wording fixed; lint-only and scope-check PASS (sonnet/medium · 2,767 tokens · 3 tool uses · 10 s · continued) |
 | 2026-11-01 09:51 | 8 Review (delta) | Reviewer | APPROVE on c1a3e22; both round-1 findings resolved (opus/medium · 2,615 tokens · 2 tool uses · 11 s · continued) |
+| 2026-11-01 09:52 | 9 PR approval | Lead | APPROVED; git tag --list failure path accepted unfixed (recorded in 0012) (opus/medium · usage pending) |
