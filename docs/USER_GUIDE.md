@@ -119,13 +119,13 @@ Hover over the tray icon: the tooltip reads `Censio Companion: <state>`.
 | Tooltip | Meaning |
 | ------- | ------- |
 | `Waiting for game` | The pipe does not exist: the game is not running or was not started with `/pipe`. The Companion keeps looking (pauses grow from 1 to 10 seconds) |
-| `Connected` | The pipe is open; the game has not yet sent its first message |
+| `Connected` | The pipe is open; the game has not yet sent its first message. The game sends it at once, so you will hardly ever see this state |
 | `Receiving` | The game is sending data |
-| `Pipe busy` | The pipe exists but another program holds it (for example another pipe tool); the Companion retries until it is free |
+| `Pipe busy` | The pipe exists but another program holds it (for example another pipe tool); the game serves one client at a time, so close other pipe readers. The Companion retries every 10 seconds and shows `Receiving` once the pipe is free. It can also stay at `Pipe busy` after you restart the Companion while the game is in the main menu, until you load or start a game |
 | `Protocol mismatch` | The pipe speaks another protocol version than 2 (for example after a game update); the Companion stays connected and continues when version 2 arrives |
 | `Error` | Connecting failed or the connection broke off. When you quit the game, `Error` can show briefly before `Waiting for game`; that is normal |
 
-When the game quits, the Companion returns to `Waiting for game` and connects again by itself when the game is back; loading another save or visiting the main menu keeps the connection. `Exit` in the tray menu works in every state and ends the program within 2 seconds.
+When the game quits, the Companion returns to `Waiting for game` and connects again by itself when the game is back; a return to the main menu keeps the connection. `Exit` in the tray menu works in every state and ends the program within 2 seconds.
 
 ### Build from source
 
@@ -306,13 +306,13 @@ Mit der Maus über das Tray-Symbol fahren: Der Tooltip lautet `Censio Companion:
 | Tooltip | Bedeutung |
 | ------- | --------- |
 | `Waiting for game` | Die Pipe existiert nicht: Das Spiel läuft nicht oder wurde nicht mit `/pipe` gestartet. Der Companion sucht weiter (die Pausen wachsen von 1 auf 10 Sekunden) |
-| `Connected` | Die Pipe ist geöffnet; das Spiel hat noch keine erste Nachricht gesendet |
+| `Connected` | Die Pipe ist geöffnet; das Spiel hat noch keine erste Nachricht gesendet. Das Spiel sendet sie sofort, dieser Zustand ist daher kaum zu sehen |
 | `Receiving` | Das Spiel sendet Daten |
-| `Pipe busy` | Die Pipe existiert, wird aber von einem anderen Programm gehalten (zum Beispiel einem anderen Pipe-Werkzeug); der Companion versucht es erneut, bis sie frei ist |
+| `Pipe busy` | Die Pipe existiert, wird aber von einem anderen Programm gehalten (zum Beispiel einem anderen Pipe-Werkzeug); das Spiel bedient nur einen Client gleichzeitig, andere Pipe-Leser also schließen. Der Companion versucht es alle 10 Sekunden erneut und zeigt `Receiving`, sobald die Pipe frei ist. Er kann auch nach einem Neustart des Companions bei `Pipe busy` bleiben, solange das Spiel im Hauptmenü ist, bis ein Spiel geladen oder gestartet wird |
 | `Protocol mismatch` | Die Pipe spricht eine andere Protokollversion als 2 (zum Beispiel nach einem Spiel-Update); der Companion bleibt verbunden und macht weiter, sobald Version 2 eintrifft |
 | `Error` | Das Verbinden ist fehlgeschlagen oder die Verbindung ist abgebrochen. Beim Beenden des Spiels kann `Error` kurz vor `Waiting for game` erscheinen; das ist normal |
 
-Beendet man das Spiel, kehrt der Companion zu `Waiting for game` zurück und verbindet sich von selbst wieder, sobald das Spiel zurück ist; ein anderer Spielstand oder das Hauptmenü behalten die Verbindung. `Exit` im Tray-Menü funktioniert in jedem Zustand und beendet das Programm innerhalb von 2 Sekunden.
+Beendet man das Spiel, kehrt der Companion zu `Waiting for game` zurück und verbindet sich von selbst wieder, sobald das Spiel zurück ist; der Wechsel ins Hauptmenü behält die Verbindung. `Exit` im Tray-Menü funktioniert in jedem Zustand und beendet das Programm innerhalb von 2 Sekunden.
 
 ### Aus dem Quellcode bauen
 
