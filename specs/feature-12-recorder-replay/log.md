@@ -10,3 +10,4 @@ are quoted in full.
 | 2026-11-01 17:13 | 2a Spec | Product Manager | Decision: (b) command-line switch --record, no tray menu entry |
 | 2026-11-01 17:14 | 2a Spec (revise after escalation) | squad-lead | DONE: spec revised to --record only; plan-check --spec passes (opus/medium · 6,920 tokens · 5 tool uses · 58 s · continued from 2a Spec) |
 | 2026-11-01 17:17 | 2a Spec challenge | squad-devils-advocate | OBJECTIONS 1 major (M1 slow disk vs live run, unbounded memory), 6 minor (m1-m6) (opus/medium · 60,549 tokens · 11 tool uses · 157 s) |
+| 2026-11-01 17:18 | 2a Spec (revise after challenge) | squad-lead | DONE: all 7 objections accepted and answered in Challenge section; bounded 16 MiB queue; size warning kept (2,648 words) because E10/E11 change what the user sees (opus/medium · 13,338 tokens · 5 tool uses · 80 s · continued from 2a Spec) |
