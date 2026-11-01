@@ -244,8 +244,10 @@ One-time setup by the administrator, in this order (GitHub, *Settings*):
    environment `release`.
 
 The workflow cannot read the environment's settings, so no step can check that the rule exists; a missing Docker
-Hub secret fails the credentials check and the release stays a pre-release. The protection holds only after steps
-1 to 3 and 5.
+Hub secret fails the credentials check and the release stays a pre-release, and a missing `WEBSITE_DISPATCH_TOKEN`
+fails the job `dispatch` of `notify-website.yml` at its step `Check the website token`, with a message naming the
+secret. At `v0.1.0`, check that this step passes (it also shows that the secret is set). The protection holds only
+after steps 1 to 3 and 5.
 
 Who can do what:
 

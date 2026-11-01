@@ -1,6 +1,7 @@
 # Triggers a rebuild of www.e-networld.de after every published release.
 # Needs the environment secret WEBSITE_DISPATCH_TOKEN of the environment `release` (fine-grained token, repository
 # access limited to LarsLaskowski/e-networld, permission "Contents: Read and write").
+# Its first step fails the job with a clear message when that secret is missing.
 name: Notify website
 
 on:
@@ -14,6 +15,15 @@ jobs:
     runs-on: ubuntu-latest
     environment: release
     steps:
+      - name: Check the website token
+        env:
+          TOKEN_SET: ${{ secrets.WEBSITE_DISPATCH_TOKEN != '' }}
+        run: |
+          if [[ "$TOKEN_SET" != "true" ]]; then
+            echo "::error::WEBSITE_DISPATCH_TOKEN is missing: set WEBSITE_DISPATCH_TOKEN as a secret of the environment release."
+            exit 1
+          fi
+
       - uses: peter-evans/repository-dispatch@28959ce8df70de7be546dd1250a005dd32156697 # v4.0.1
         with:
           token: ${{ secrets.WEBSITE_DISPATCH_TOKEN }}
