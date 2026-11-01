@@ -21,6 +21,11 @@ internal sealed class TrayIcon : IDisposable
     /// </summary>
     private readonly ContextMenuStrip _menu;
 
+    /// <summary>
+    /// Whether the icon is disposed
+    /// </summary>
+    private bool _disposed;
+
     #endregion // Fields
 
     #region Constructors
@@ -87,7 +92,12 @@ internal sealed class TrayIcon : IDisposable
     /// <param name="text">The tooltip text</param>
     public void SetToolTip(string text)
     {
-        throw new NotImplementedException();
+        if (_disposed)
+        {
+            return;
+        }
+
+        _notifyIcon.Text = text;
     }
 
     #endregion // Methods
@@ -97,6 +107,7 @@ internal sealed class TrayIcon : IDisposable
     /// <inheritdoc />
     public void Dispose()
     {
+        _disposed = true;
         _notifyIcon.Visible = false;
         _notifyIcon.Dispose();
         _menu.Dispose();
