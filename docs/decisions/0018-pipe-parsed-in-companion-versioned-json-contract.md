@@ -1,6 +1,6 @@
 # 0018: The Companion parses the pipe; the server receives only a versioned JSON contract
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-01
 - **Area:** —
 - **Source:** Issue #8; Issue #9 (pipe parser), Issue #27 (contract v1)

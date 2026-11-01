@@ -1,6 +1,6 @@
 # 0019: Companion and server talk over a WebSocket with a shared token, enabled by default
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-01
 - **Area:** —
 - **Source:** Issue #8; Issue #28 (ingest endpoint), Issue #40 (forward mode)

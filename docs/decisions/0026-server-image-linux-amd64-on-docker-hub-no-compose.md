@@ -1,6 +1,6 @@
 # 0026: The server image is published for linux/amd64 on Docker Hub; no compose file is shipped
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-01
 - **Area:** server
 - **Source:** Issue #8; Issue #4 (Docker image)

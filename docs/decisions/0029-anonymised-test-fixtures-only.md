@@ -1,6 +1,6 @@
 # 0029: Test fixtures from recordings and game files are anonymised
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-01
 - **Area:** —
 - **Source:** Issue #8; Issue #12 (recorder), Issue #17 (reference sessions), Issue #20 (anonymiser)

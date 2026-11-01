@@ -1,6 +1,6 @@
 # 0014: The product is named Censio
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-01
 - **Area:** —
 - **Source:** Issue #8

@@ -1,6 +1,6 @@
 # 0022: The chart time axis switches between real time and game time
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-01
 - **Area:** —
 - **Source:** Issue #8; Issue #35 (time series), Issue #37 (range picker and switch)

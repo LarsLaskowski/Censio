@@ -1,6 +1,6 @@
 # 0024: RDA archives are read with an existing NuGet library where one fits
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-01
 - **Area:** —
 - **Source:** Issue #8; Issue #21 (RDA spike)

@@ -1,6 +1,6 @@
 # 0030: Code and project records are in English; README and user guides hold English, then German, in one file
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-01
 - **Area:** —
 - **Source:** Issue #8

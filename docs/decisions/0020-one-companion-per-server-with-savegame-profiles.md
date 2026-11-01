@@ -1,6 +1,6 @@
 # 0020: One Companion per server; savegames are kept apart as profiles
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-01
 - **Area:** —
 - **Source:** Issue #8; Issue #19 (profile detection), Issue #28 (ingest), Issue #30 (state per profile)

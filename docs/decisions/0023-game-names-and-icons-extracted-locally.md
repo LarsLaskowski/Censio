@@ -1,6 +1,6 @@
 # 0023: Names and icons are extracted from the local installation, cached, re-extracted after updates and never distributed; German and English
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-01
 - **Area:** —
 - **Source:** Issue #8; Issues #22–#26 (game data), Issue #42 (catalog upload)

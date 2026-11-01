@@ -1,6 +1,6 @@
 # 0015: Two deliverables, the Companion ZIP and the server image; the Companion hosts the server for local use
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-01
 - **Area:** —
 - **Source:** Issue #8; Issue #39 (local mode), Issue #40 (forward mode)

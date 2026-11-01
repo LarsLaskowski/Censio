@@ -1,6 +1,6 @@
 # 0025: The web UI uses MudBlazor and Blazor-ApexCharts; the light theme is the default
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-01
 - **Area:** —
 - **Source:** Issue #8; Issue #31 (layout and theming), Issue #36 (trend charts)

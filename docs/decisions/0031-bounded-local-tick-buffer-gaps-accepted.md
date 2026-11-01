@@ -1,6 +1,6 @@
 # 0031: The Companion buffers unsent ticks within a bound; beyond it gaps are accepted
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-01
 - **Area:** —
 - **Source:** Issue #8; Issue #41 (tick buffer)

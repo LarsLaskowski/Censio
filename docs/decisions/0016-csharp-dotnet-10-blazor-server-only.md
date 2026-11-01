@@ -1,6 +1,6 @@
 # 0016: C#, .NET 10 and Blazor Server only
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-01
 - **Area:** —
 - **Source:** Issue #8

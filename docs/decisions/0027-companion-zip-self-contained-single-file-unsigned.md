@@ -1,6 +1,6 @@
 # 0027: The Companion ships as a self-contained single-file exe in a ZIP, without code signing
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-01
 - **Area:** companion
 - **Source:** Issue #8; Issue #5 (release)

@@ -1,6 +1,6 @@
 # 0017: The Companion is a WPF tray application with optional autostart and an automatic connection
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-01
 - **Area:** —
 - **Source:** Issue #8; Issue #13 (tray app), Issue #15 (autostart), Issue #40 (connection)

@@ -1,6 +1,6 @@
 # 0028: Censio is released under the MIT licence
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-01
 - **Area:** —
 - **Source:** Issue #8

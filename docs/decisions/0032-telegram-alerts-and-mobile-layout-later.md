@@ -1,6 +1,6 @@
 # 0032: Telegram alerts and a mobile layout come later
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-01
 - **Area:** —
 - **Source:** Issue #8; Issue #52 (Telegram alerts), Issue #53 (mobile and tablet layout)

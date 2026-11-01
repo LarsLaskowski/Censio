@@ -1,6 +1,6 @@
 # 0021: SQLite from the start; full resolution for 7 days, then hourly averages without limit; deletion per profile
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-01
 - **Area:** —
 - **Source:** Issue #8; Issue #29 (SQLite), Issue #35 (time series and retention)
