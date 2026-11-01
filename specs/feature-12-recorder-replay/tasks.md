@@ -19,4 +19,4 @@ Plan: [plan.md](plan.md) — Status: Draft
 | 13 | G5 | README: *What works* and *Recording and replay*, English then German | `README.md` | AC10 | 10 | Dev | [ ] |
 | 14 | G5 | User guide: *Recording and replay*, *Data and logs*, *Reporting problems*, English then German | `docs/USER_GUIDE.md` | AC10 | 10 | Dev | [ ] |
 | 15 | G5 | `.squad/project.md` *Security areas* (recordings path, recording files as parsed input) | `.squad/project.md` | AC10 | 10 | Dev | [ ] |
-| 16 | G5 | `.squad/project.md` *Test doubles*: `ControlledWriteStream` | `.squad/project.md` | AC10 | 2 | Tester | [ ] |
+| 16 | G5 | `.squad/project.md` *Test doubles*: `ControlledWriteStream` | `.squad/project.md` | AC10 | 2 | Tester | [x] |
