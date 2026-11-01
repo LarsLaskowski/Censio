@@ -11,7 +11,7 @@ Censio is in milestone M0 (Foundation). No release exists yet; the first one is 
 Works today:
 
 - The server runs as a Docker image. Its start page shows `Version <version>`, and `GET /health` answers `Healthy`.
-- The Companion starts on Windows as a tray icon. Its menu shows `Version <version>` and `Exit`.
+- The Companion starts on Windows as a tray icon. Its menu shows `Version <version>` and `Exit`, and its tooltip shows the state of the connection to the game's statistics pipe (the game needs the launch argument `/pipe`).
 
 Not yet:
 
@@ -104,6 +104,23 @@ The Companion is the Windows program that reads the statistics of the running ga
 
 The program is not signed, so Windows SmartScreen may show "Windows protected your PC" the first time. Choose "More info", then "Run anyway" (on a German Windows: "Weitere Informationen", then "Trotzdem ausführen").
 
+#### Connecting to the game
+
+The game creates its statistics pipe only when it is started with the launch argument `/pipe` (add `/pipe` to the launch options of your game launcher). Without it the Companion cannot connect, and it looks the same as a game that is not running. Start the Companion before or after the game; it needs no restart when the game is quit and started again. It only reads from the pipe and never writes to it.
+
+Hover over the tray icon: the tooltip reads `Censio Companion: <state>`.
+
+| Tooltip | Meaning |
+| ------- | ------- |
+| `Waiting for game` | The pipe does not exist: the game is not running or was not started with `/pipe`. The Companion keeps looking (pauses grow from 1 to 10 seconds) |
+| `Connected` | The pipe is open; the game has not yet sent its first message |
+| `Receiving` | The game is sending data |
+| `Pipe busy` | The pipe exists but another program holds it (for example another pipe tool); the Companion retries until it is free |
+| `Protocol mismatch` | The pipe speaks another protocol version than 2 (for example after a game update); the Companion stays connected and continues when version 2 arrives |
+| `Error` | Connecting failed or the connection broke off. When you quit the game, `Error` can show briefly before `Waiting for game`; that is normal |
+
+When the game quits, the Companion returns to `Waiting for game` and connects again by itself when the game is back; loading another save or visiting the main menu keeps the connection. `Exit` in the tray menu works in every state and ends the program within 2 seconds.
+
 ### Build the Companion from source
 
 Building needs the .NET 10 SDK (version 10.0.100 or a later feature band), access to `nuget.org` and the source (*Getting Censio*), on any operating system the SDK supports; only running the program needs Windows 10 22H2 or Windows 11, x64. Run the command in the root folder of the checkout. It uses the flags of the release build, except the version, and writes to the folder `publish`:
@@ -144,7 +161,7 @@ Censio befindet sich im Meilenstein M0 (Foundation). Es gibt noch kein Release; 
 Funktioniert heute:
 
 - Der Server läuft als Docker-Image. Seine Startseite zeigt `Version <version>`, und `GET /health` antwortet mit `Healthy`.
-- Der Companion startet unter Windows als Tray-Symbol. Sein Menü zeigt `Version <version>` und `Exit`.
+- Der Companion startet unter Windows als Tray-Symbol. Sein Menü zeigt `Version <version>` und `Exit`, und sein Tooltip zeigt den Zustand der Verbindung zur Statistik-Pipe des Spiels (das Spiel braucht das Startargument `/pipe`).
 
 Noch nicht:
 
@@ -236,6 +253,23 @@ Der Companion ist das Windows-Programm, das die Statistik des laufenden Spiels l
 2. `Censio.Companion.exe` starten. Ein Tray-Symbol erscheint; sein Menü zeigt `Version <version>`.
 
 Das Programm ist nicht signiert, deshalb zeigt Windows SmartScreen beim ersten Start unter Umständen „Der Computer wurde durch Windows geschützt“. „Weitere Informationen“ wählen, dann „Trotzdem ausführen“ (unter englischem Windows: "More info", "Run anyway").
+
+#### Verbindung zum Spiel
+
+Das Spiel legt seine Statistik-Pipe nur an, wenn es mit dem Startargument `/pipe` gestartet wird (`/pipe` zu den Startoptionen des Spiele-Launchers hinzufügen). Ohne dieses Argument kann der Companion sich nicht verbinden; das sieht genauso aus wie ein Spiel, das nicht läuft. Den Companion vor oder nach dem Spiel starten; er braucht keinen Neustart, wenn das Spiel beendet und erneut gestartet wird. Er liest nur aus der Pipe und schreibt nie hinein.
+
+Mit der Maus über das Tray-Symbol fahren: Der Tooltip lautet `Censio Companion: <Zustand>`.
+
+| Tooltip | Bedeutung |
+| ------- | --------- |
+| `Waiting for game` | Die Pipe existiert nicht: Das Spiel läuft nicht oder wurde nicht mit `/pipe` gestartet. Der Companion sucht weiter (die Pausen wachsen von 1 auf 10 Sekunden) |
+| `Connected` | Die Pipe ist geöffnet; das Spiel hat noch keine erste Nachricht gesendet |
+| `Receiving` | Das Spiel sendet Daten |
+| `Pipe busy` | Die Pipe existiert, wird aber von einem anderen Programm gehalten (zum Beispiel einem anderen Pipe-Werkzeug); der Companion versucht es erneut, bis sie frei ist |
+| `Protocol mismatch` | Die Pipe spricht eine andere Protokollversion als 2 (zum Beispiel nach einem Spiel-Update); der Companion bleibt verbunden und macht weiter, sobald Version 2 eintrifft |
+| `Error` | Das Verbinden ist fehlgeschlagen oder die Verbindung ist abgebrochen. Beim Beenden des Spiels kann `Error` kurz vor `Waiting for game` erscheinen; das ist normal |
+
+Beendet man das Spiel, kehrt der Companion zu `Waiting for game` zurück und verbindet sich von selbst wieder, sobald das Spiel zurück ist; ein anderer Spielstand oder das Hauptmenü behalten die Verbindung. `Exit` im Tray-Menü funktioniert in jedem Zustand und beendet das Programm innerhalb von 2 Sekunden.
 
 ### Companion aus dem Quellcode bauen
 

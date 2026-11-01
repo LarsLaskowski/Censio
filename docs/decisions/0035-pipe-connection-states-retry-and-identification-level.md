@@ -1,6 +1,6 @@
 # 0035: The pipe connection is a platform-neutral state machine over a Windows connector that checks the pipe exists first and connects at identification level
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-01
 - **Area:** pipe
 - **Source:** Issue #11

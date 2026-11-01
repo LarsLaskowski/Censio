@@ -29,6 +29,6 @@ operator or another component can rely on — formats, limits, error behavior, g
 | Area | Scope | Not here |
 | ---- | ----- | -------- |
 | [server](server.md) | The server's HTTP surface: listen address, start page, `/health`, plain HTTP, unknown paths, the version shown, the data directory and its data-protection key ring, the Docker image | Data ingest, release workflows, web theming |
-| [companion](companion.md) | The Companion process on Windows: tray icon, tooltip, menu, `Exit`, single instance per user session, platform, release ZIP | Pipe and game-file reading, server connection |
-| [pipe](pipe.md) | The statistics pipe as the Companion reads it: frame layout, the message types of protocol version 2, the 1 MiB limit, error kinds, skip and stop rules, the version gate, ticks and session events, the tick limits | Opening the pipe and reconnecting, recording |
+| [companion](companion.md) | The Companion process on Windows: tray icon, tooltip, menu, `Exit`, single instance per user session, connection state in the tooltip, platform, release ZIP | Pipe and game-file reading, server connection |
+| [pipe](pipe.md) | The statistics pipe as the Companion reads it: frame layout, the message types of protocol version 2, the 1 MiB limit, error kinds, skip and stop rules, the version gate, ticks and session events, the tick limits, the connection: discovery, states, reconnect | Recording |
 <!-- project:end area-index -->

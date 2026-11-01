@@ -21,7 +21,7 @@ except the Windows shell:
 | `Censio.GameData` | Reading the game files and the catalog | — |
 | `Censio.Server.Data` | Persistence of the server | — |
 | `Censio.Server` | Web host, UI, later the ingest | Contracts, Server.Data |
-| `Censio.Companion.Core` | The Companion's platform-neutral logic (tray menu, single-instance rule) | Contracts, Pipe, GameData |
+| `Censio.Companion.Core` | The Companion's platform-neutral logic (tray menu, single-instance rule, pipe connection state machine and tooltip texts) | Contracts, Pipe, GameData |
 | `Censio.Companion` | The Windows tray shell (WPF application, Windows Forms tray icon); no test project | Companion.Core |
 
 All assemblies carry the version of the build property `Version` (default `0.0.0`) as informational version
@@ -40,7 +40,9 @@ flowchart LR
 The Companion parses the pipe stream and the game files, extracts the game data and pushes it to the server.
 The pipe stream is parsed strictly: a frame the parser cannot read is reported as an error, never guessed
 ([`decisions/0033`](decisions/0033-pipe-reader-strict-from-the-reference-source.md)).
-The Companion groups the messages into ticks with an island identity and session events
+The Companion opens the pipe itself, reconnects when the game restarts and shows the connection state in its tray
+tooltip ([`decisions/0035`](decisions/0035-pipe-connection-states-retry-and-identification-level.md),
+[`areas/pipe.md`](areas/pipe.md)). The Companion groups the messages into ticks with an island identity and session events
 ([`decisions/0034`](decisions/0034-ticks-assembled-by-close-rules-on-an-injected-clock.md)).
 The server accepts data only from a client that presents the ingest token. Guarantees are listed in
 `.squad/project.md` (*Guarantees*) and linked to their decision record as they are made.
@@ -55,6 +57,10 @@ variables and is validated at startup. The rules per area are in [`areas/`](area
 Untrusted input: the statistics pipe, the game files and the WebSocket ingest. The ingest token authenticates the
 Companion; cache and recording paths are never derived from external input unchecked. Kept in sync with
 `SECURITY.md` and the *Security areas* in `.squad/project.md`.
+
+The Companion opens the pipe `\\.\pipe\anno117` read-only and at impersonation level identification, so the pipe's
+server cannot act with the player's Windows identity; a pipe created by another program is read within the reader's
+limits ([`areas/pipe.md`](areas/pipe.md), record 0035).
 
 The server speaks plain HTTP only; TLS is the reverse proxy's job. Its start page and `/health` need no login, and
 `/health` reveals only its status ([`decisions/0006`](decisions/0006-server-plain-http-and-open-health.md),

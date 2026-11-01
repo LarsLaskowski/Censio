@@ -4,11 +4,12 @@
 
 The statistics pipe as the Companion reads it: the frame layout, the message types of protocol version 2, the
 1 MiB limit, the error kinds, which errors skip a frame and which end the stream, the version gate, and the
-grouping of the messages into ticks and session events with the tick limits. The pipe is
+grouping of the messages into ticks and session events with the tick limits, and the connection: discovery,
+states, reconnect and stop. The pipe is
 untrusted input: the format is known only from Ubisoft's example reader (`UbisoftMainzAnno/anno117_pipe_example`,
 read on 2026-11-01, "for documentation purposes only"), and a game update may change it without notice. The
-implementation is in `Censio.Pipe`; it works on any readable byte stream and does not depend on Windows or on the
-named pipe. Ticks are assembled on an injected clock, so the same rules serve a live stream and a replay.
+reader is in `Censio.Pipe`; it works on any readable byte stream and does not depend on Windows or on the
+named pipe. The connection logic is in `Censio.Companion.Core`, the Windows pipe access in the Companion shell. Ticks are assembled on an injected clock, so the same rules serve a live stream and a replay.
 
 ## Behavior
 
@@ -111,7 +112,72 @@ A tick is delivered when it closes, once, and is never reopened. It closes when:
   read is cancelled with it. A request after the assembler was disposed throws an object-disposed error, and the
   dispose cancels a pending read. No other exception leaves the assembler.
 - The caller must keep requesting: the receive time of a frame is stamped when its read completes, but the next read
-  starts only on a request. A slow consumer belongs behind the tick buffer (#41) or the decoupling of #11.
+  starts only on a request. A slow consumer belongs behind the tick buffer (#41) or the hand-off built with the first consumers (#12, #13).
+
+## Connection
+
+The Companion opens the game's pipe itself, keeps the connection and reconnects. The logic (states, delays) is
+platform-neutral and runs on an injected clock; only opening the pipe and listing the existing pipes are Windows
+code (record 0035).
+
+### Opening
+
+- The pipe is `\\.\pipe\anno117` on the local machine. The game creates it only when it is started with the launch
+  argument `/pipe`; without it, or with the game not running, the pipe does not exist, and the two cases look the
+  same.
+- The Companion opens it read-only and asynchronously and never writes. It connects at impersonation level
+  identification, so the pipe's server (the game, or any program that created the name first) cannot act with the
+  player's Windows identity through the connection.
+- Before each attempt the Companion lists the existing pipes of the machine. If `anno117` is not among them (the
+  whole name is compared, case-insensitive; `x\anno117` does not count), the attempt ends at once as *not found*
+  without opening anything. If the listing itself fails, the pipe counts as existing.
+- An attempt waits at most 2 seconds for a free pipe instance. A timeout while the pipe is still listed is *busy*
+  (another client holds it); a timeout when it is no longer listed is *not found*. Any other failure of the
+  attempt is *failed*, carrying the Windows error code where it has one (access denied is code 5).
+- There is no read timeout: a connection that sends nothing stays open and is read without pause.
+
+### States
+
+The state is shown in the tray tooltip ([`companion.md`](companion.md)).
+
+| State | Meaning |
+| ----- | ------- |
+| Waiting for game | No connection: the pipe does not exist, or the connection ended at a frame boundary. The state before the first attempt |
+| Connected | The pipe is open; the game's `Version 2` has not arrived yet |
+| Receiving | A message of protocol version 2 has arrived on this connection |
+| Pipe busy | The pipe exists but no instance became free within 2 seconds |
+| Protocol mismatch | A version other than 2, or a frame before the first `Version`; the connection stays open and keeps being read |
+| Error | An attempt failed, or the stream ended with a truncated frame, an oversized frame or a read failure (the kind is part of the status) |
+
+- A message result moves to `Receiving`; a skipped frame (empty, unknown type, malformed) changes nothing. Session
+  start, session end and island messages keep `Receiving` and cause no new attempt.
+- A protocol mismatch gives `Protocol mismatch` with the received version (none for a frame before any `Version`);
+  the mismatch errors of frames skipped meanwhile raise no new event. A `Version 2` on that connection gives
+  `Receiving`.
+- A stream that ends at a frame boundary gives `Waiting for game`; one that ends inside a frame (a game that quits
+  while sending) shows `Error` until the next attempt's result replaces it. An unexpected exception of a read ends
+  the connection as read failed. The stream is closed when the connection ends.
+- Every change of the state or of its cause is raised as an event on whatever thread the connection runs on; a
+  handler that throws affects neither the connection nor the other handlers. An unchanged state raises no event.
+  Events carry the state, the error kind, the Windows error code or the received version, and no pipe content.
+
+### Retry
+
+- The first attempt runs at once after the start. After each attempt that did not lead to a connection and after
+  each connection that ended, the next attempt follows after a delay of 1, 2, 4 and 8 seconds and then 10 seconds
+  each. One counter spans all failure kinds.
+- The counter resets when the connection ended after it had been in `Receiving` without interruption for at least
+  30 seconds up to its end; a protocol mismatch in between restarts that measurement. A connection that reaches
+  `Receiving` only briefly does not reset the counter, so a pipe that sends `Version 2` and breaks is not retried
+  faster than the delays above.
+- A pipe that appears again is connected by the next attempt; one that appears between the check and the open is
+  found by the next attempt.
+
+### Stop
+
+- Stopping ends the connection within about 50 ms, also while an attempt, a delay or a read is pending, closes the
+  pipe and raises no further event. The tray's thread never waits for it: `Exit` removes the icon and ends the
+  process within 2 seconds in every state.
 
 ## Limits and errors
 
@@ -149,8 +215,8 @@ A tick is delivered when it closes, once, and is never reopened. It closes when:
 The reference reads leniently; this reader is strict and fails closed (record 0033).
 
 - **Oversized length.** The reference reports the frame and reads on, out of step with the stream. Nothing in the
-  stream marks where the next frame starts, so this reader ends the stream. The caller that opens the pipe (#11)
-  must reconnect after an oversized-frame, truncated-frame or read-failed error.
+  stream marks where the next frame starts, so this reader ends the stream. The connection
+  reconnects after an oversized-frame, truncated-frame or read-failed error (*Retry*).
 - **Overflowing duplicate sum.** The reference sums duplicate amounts in an int32 and wraps silently. Here the whole
   frame is rejected as malformed.
 - **Short field.** The reference reads `0` for a field past the end of the frame. Here the frame is rejected as
@@ -175,6 +241,12 @@ Until fixtures from real recordings (#20) test the reader:
 - The timing (frames about one second apart, ticks about two minutes), the shared timestamp, the zero-entry tick after
   a load, the double session end and the number of islands per tick (estimated well under 256, with fewer than
   524,288 entries and pairs) are third-party observations until the recordings of #17 confirm them.
+- Until the manual test on Windows confirms them: that listing `\\.\pipe\` opens no pipe instance and shows the
+  game's pipe under its full name; that the game accepts a new client after the previous one closed, and whether
+  it admits a second client at the same time; that the game starts every connection with `Version`, and that a
+  save load and the main menu keep the connection.
+- A program that created `\\.\pipe\anno117` before the game is read as the game, within the limits above, and
+  cannot act with the player's Windows rights through the connection; it can still show `Receiving` with false data.
 - A stall of more than 30 seconds in the stream splits a tick into two ticks with one game time.
 - A game that sends one island twice in a tick splits it as *island repeated*.
 - A replay that ends at its last frame closes the last tick as *stream ended*.
@@ -184,10 +256,10 @@ Until fixtures from real recordings (#20) test the reader:
 
 - [`decisions/0033-pipe-reader-strict-from-the-reference-source.md`](../decisions/0033-pipe-reader-strict-from-the-reference-source.md) — the reader is strict, fails closed and is built from the reference source with synthetic frames.
 - [`decisions/0034-ticks-assembled-by-close-rules-on-an-injected-clock.md`](../decisions/0034-ticks-assembled-by-close-rules-on-an-injected-clock.md) — ticks close by five rules and a quiet period on an injected clock; a pure core with an async driver.
+- [`decisions/0035-pipe-connection-states-retry-and-identification-level.md`](../decisions/0035-pipe-connection-states-retry-and-identification-level.md) — the connection checks that the pipe exists, connects read-only at identification level, and resets its retry delay only after 30 seconds in `Receiving`.
 - [`decisions/0018-pipe-parsed-in-companion-versioned-json-contract.md`](../decisions/0018-pipe-parsed-in-companion-versioned-json-contract.md) — the Companion parses the pipe; the format is confined to `Censio.Pipe`.
 
 ## Not here
 
-- Opening the pipe, waiting for the game, reconnecting and connection states (#11).
 - Telling a resent or paused tick from a new one (#19, #35).
 - Recording the stream (#12).
