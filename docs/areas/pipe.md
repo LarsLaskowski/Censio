@@ -250,8 +250,8 @@ Until fixtures from real recordings (#20) test the reader:
   - The game sends `Version` at once after the connect, without a loaded save, so `Connected` is not visible in
     practice. A return to the main menu and loading another save while connected kept `Receiving`.
   - A Companion restarted while the game runs shows `Receiving` at once with a loaded save. With the game in the
-    main menu it stays at `Pipe busy` until a game is loaded or started; the game apparently releases the old
-    connection only when it next sends something. The Companion keeps retrying every 10 seconds meanwhile.
+    main menu it stays at `Pipe busy` until a game is loaded; the game apparently releases the old
+    connection only when it next sends something. The Companion keeps retrying meanwhile, with the delays of *Retry* (at most 10 seconds apart).
   - `Exit` in `Pipe busy` ended the process in under 2 seconds.
   - Not tested: the exact name `x\anno117` with the game on.
 - A program that created `\\.\pipe\anno117` before the game is read as the game, within the limits above, and
