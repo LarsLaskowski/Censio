@@ -280,6 +280,86 @@ public sealed class TrayMenuTests
     }
 
     /// <summary>
+    /// The tooltip of an invalid command line has the exact text.
+    /// </summary>
+    [TestMethod]
+    public void TrayMenuInvalidCommandLineToolTipHasExactText()
+    {
+        // Arrange
+        const string expected = "Censio Companion: Invalid command line";
+
+        // Act
+        var toolTip = TrayMenu.InvalidCommandLineToolTip;
+
+        // Assert
+        Assert.AreEqual(expected, toolTip, "The tooltip should name the application and the invalid command line");
+    }
+
+    /// <summary>
+    /// An undefined recording state is rejected.
+    /// </summary>
+    [TestMethod]
+    public void TrayMenuFormatToolTipUndefinedRecordingStateThrows()
+    {
+        // Arrange
+        var call = () => TrayMenu.FormatToolTip(PipeConnectionState.Connected, (PipeRecordingState)99);
+
+        // Act
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(call, "An undefined recording state should be rejected");
+
+        // Assert
+        Assert.AreEqual("recording", exception.ParamName, "The exception should name the parameter");
+    }
+
+    /// <summary>
+    /// An undefined problem kind is rejected.
+    /// </summary>
+    [TestMethod]
+    public void TrayMenuFormatReplayToolTipUndefinedProblemKindThrows()
+    {
+        // Arrange
+        var status = new PipeReplayStatus
+                     {
+                         State = PipeConnectionState.Connected,
+                         Problem = new PipeReplayProblem
+                                   {
+                                       Kind = (PipeReplayProblemKind)99
+                                   }
+                     };
+        var call = () => TrayMenu.FormatReplayToolTip(status);
+
+        // Act
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(call, "An undefined problem kind should be rejected");
+
+        // Assert
+        Assert.AreEqual("status", exception.ParamName, "The exception should name the parameter");
+    }
+
+    /// <summary>
+    /// A state a replay cannot be in is rejected.
+    /// </summary>
+    /// <param name="state">The state</param>
+    [TestMethod]
+    [DataRow(PipeConnectionState.WaitingForGame)]
+    [DataRow(PipeConnectionState.Error)]
+    [DataRow((PipeConnectionState)99)]
+    public void TrayMenuFormatReplayToolTipUnreachableStateThrows(PipeConnectionState state)
+    {
+        // Arrange
+        var status = new PipeReplayStatus
+                     {
+                         State = state
+                     };
+        var call = () => TrayMenu.FormatReplayToolTip(status);
+
+        // Act
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(call, "A state a replay cannot reach should be rejected");
+
+        // Assert
+        Assert.AreEqual("status", exception.ParamName, "The exception should name the parameter");
+    }
+
+    /// <summary>
     /// The Core assembly carries the build version of the solution.
     /// </summary>
     [TestMethod]

@@ -1,6 +1,8 @@
 using System.Globalization;
 using System.Text;
 
+using Censio.Pipe;
+
 namespace Censio.Companion.Core.Tests;
 
 /// <summary>
@@ -130,14 +132,42 @@ public sealed class PipeRecordingFilesTests
 
         // Act
         files.Create(_started).Dispose();
-        files.Create(_started.AddMilliseconds(500)).Dispose();
-        files.Create(_started.AddMilliseconds(900)).Dispose();
+        files.Create(_started.AddMilliseconds(100)).Dispose();
+        files.Create(_started.AddMilliseconds(200)).Dispose();
 
         // Assert
         string[] expected = ["recording-20261101-170900Z-2.jsonl", "recording-20261101-170900Z-3.jsonl", "recording-20261101-170900Z.jsonl"];
         var names = Directory.GetFiles(folder).Select(path => Path.GetFileName(path)).Order().ToArray();
 
         Assert.AreSequenceEqual(expected, names, "The files of one second should get the suffixes 2 and 3");
+    }
+
+    /// <summary>
+    /// When the first 1,000 names of a second are taken, the creation fails and creates nothing more.
+    /// </summary>
+    [TestMethod]
+    public void PipeRecordingFilesAllNamesTakenThrowsIoException()
+    {
+        // Arrange
+        var folder = Path.Combine(_root, "Recordings");
+
+        Directory.CreateDirectory(folder);
+
+        for (var sequence = 1; sequence <= 1000; sequence++)
+        {
+            File.WriteAllText(Path.Combine(folder, PipeRecordingFormat.FormatFileName(_started, sequence)), "taken");
+        }
+
+        var files = new PipeRecordingFiles(folder);
+
+        // Act
+        var action = () => files.Create(_started);
+
+        // Assert
+        var exception = Assert.ThrowsExactly<IOException>(action, "A second with no free name should be refused with an I/O error");
+
+        Assert.AreEqual("No free recording file name is left for this second.", exception.Message, "The error should name the reason");
+        Assert.HasCount(1000, Directory.GetFiles(folder), "No file beyond the 1,000th name should be created");
     }
 
     /// <summary>

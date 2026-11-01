@@ -176,6 +176,29 @@ public sealed class PipeRecordingSessionTests
     }
 
     /// <summary>
+    /// A subscriber that throws neither stops the other subscribers nor the failed state.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    public async Task PipeRecordingSessionThrowingStateChangedHandlerIsIgnored()
+    {
+        // Arrange
+        var session = new PipeRecordingSession(_ => throw new IOException("Disk full"));
+
+        session.StateChanged += (_, _) => throw new InvalidOperationException("The subscriber failed");
+
+        var changed = ChangeOf(session);
+
+        // Act
+        session.BeginConnection()!.Record(Result(PipeTestFrames.Version(2)), _start);
+
+        await changed.WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(PipeRecordingState.Failed, session.State, "The failed state should be set although a subscriber threw");
+    }
+
+    /// <summary>
     /// Each connection gets a recorder of its own.
     /// </summary>
     [TestMethod]

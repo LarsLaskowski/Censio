@@ -323,6 +323,87 @@ public sealed class PipeReplayRunnerTests
     }
 
     /// <summary>
+    /// A recording that cannot be opened because the stream type is not supported is a problem of the file.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    public async Task PipeReplayRunnerNotSupportedOpenIsFileNotFound()
+    {
+        // Arrange
+        var runner = CreateRunner(() => throw new NotSupportedException("The path format is not supported"));
+
+        // Act
+        await runner.RunAsync(TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        AssertFileNotFound(runner);
+    }
+
+    /// <summary>
+    /// A stream that cannot be read is not reported as a missing file.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    public async Task PipeReplayRunnerNotSupportedReadIsNotFileNotFound()
+    {
+        // Arrange
+        var stream = new ControlledPipeStream();
+
+        stream.Fail(new NotSupportedException("The stream cannot be read"));
+
+        var runner = CreateRunner(() => stream);
+
+        // Act
+        var action = () => runner.RunAsync(TestContext.CancellationToken);
+
+        // Assert
+        await Assert.ThrowsExactlyAsync<NotSupportedException>(action, "A read failure of the stream should not be turned into file not found");
+
+        Assert.IsFalse(runner.Status.IsFinished, "The replay should not report a problem of the file");
+        Assert.IsNull(runner.Status.Problem, "No problem should be set");
+    }
+
+    /// <summary>
+    /// A subscriber that throws does not stop the replay or the other subscribers.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    public async Task PipeReplayRunnerThrowingStatusChangedHandlerIsIgnored()
+    {
+        // Arrange
+        var recording = PipeTestFrames.Recording(_start, (_start, PipeTestFrames.Version(2)));
+        var runner = new PipeReplayRunner(() => new MemoryStream(recording), PipeReplaySpeed.Maximum, TimeProvider.System);
+
+        runner.StatusChanged += (_, _) => throw new InvalidOperationException("The subscriber failed");
+        runner.StatusChanged += (_, status) => _events.Enqueue(status);
+
+        // Act
+        await runner.RunAsync(TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(Status(PipeConnectionState.Receiving, true), runner.Status, "The replay should finish although a subscriber threw");
+        Assert.HasCount(2, _events, "The other subscriber should get the receiving and the finished status");
+    }
+
+    /// <summary>
+    /// A replay without a subscriber runs to its end.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    public async Task PipeReplayRunnerWithoutSubscriberFinishes()
+    {
+        // Arrange
+        var recording = PipeTestFrames.Recording(_start, (_start, PipeTestFrames.Version(2)));
+        var runner = new PipeReplayRunner(() => new MemoryStream(recording), PipeReplaySpeed.Maximum, TimeProvider.System);
+
+        // Act
+        await runner.RunAsync(TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(Status(PipeConnectionState.Receiving, true), runner.Status, "The replay should finish without a subscriber");
+    }
+
+    /// <summary>
     /// Creates a status without a problem.
     /// </summary>
     /// <param name="state">The state</param>

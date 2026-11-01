@@ -1107,6 +1107,30 @@ public sealed class PipeConnectionTests
     }
 
     /// <summary>
+    /// A connection without a recording session reads and ends as usual and opens no file.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    public async Task PipeConnectionWithoutRecordingCreatesNoRecorder()
+    {
+        // Arrange
+        var stream = EnqueueWire(PipeTestFrames.Version(2));
+
+        StartRun(CreateConnection(null));
+
+        await WaitForPendingReadsAsync(stream, 1);
+
+        // Act
+        stream.End();
+
+        // Assert
+        Assert.AreSequenceEqual(new[] { Status(PipeConnectionState.Connected), Status(PipeConnectionState.Receiving), Status(PipeConnectionState.WaitingForGame) },
+                                _events.ToArray(),
+                                "A connection without recording should go through its states as usual");
+        Assert.IsEmpty(Sinks(), "No file should be opened without a recording session");
+    }
+
+    /// <summary>
     /// A connection that delivers no frame creates no file.
     /// </summary>
     /// <returns>The task</returns>
@@ -1619,7 +1643,7 @@ public sealed class PipeConnectionTests
     /// </summary>
     /// <param name="session">The recording session</param>
     /// <returns>The connection</returns>
-    private PipeConnection CreateConnection(PipeRecordingSession session)
+    private PipeConnection CreateConnection(PipeRecordingSession? session)
     {
         var connection = new PipeConnection(_connector, _clock, session);
 
