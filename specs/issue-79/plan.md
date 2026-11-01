@@ -175,3 +175,11 @@ boolean) is applied, not changed.
 
 - Whether the runner applies an input's default to an explicitly empty value (fact 3) — irrelevant once the check
   runs first.
+
+## Challenge notes
+
+Devil's Advocate, minor objection (verbatim): The administrator is never told to perform fact 4's check. Fact 4 (and *Verification without tests*) says the administrator confirms the expression at `v0.1.0` by seeing the new step pass in job `dispatch`. But setup step 6 in `docs/CONTRIBUTING.md` (around line 241) only says to check that `image-publish`, `promote` and `dispatch` show the environment `release`; it does not mention the new step. Instruction for the Dev: in setup step 6, append "and that the step `Check the website token` of job `dispatch` passes". If touching line ~241 is considered too close to PR #84's hunks, add the sentence to the paragraph at lines 245-247 instead (the plan already edits it).
+
+## Security notes
+
+Security (APPROVED), non-blocking, verbatim: (1) In the diff review I will check the AC3 grep: only the header comment, the check step's env line, the error text and the `token:` input mention the secret. I will also check that the dispatch step's lines in `git diff origin/main` are unchanged. (2) Option 3's rejection is right for security reasons too: a job-level `if:` skip would fail open, silently dropping the notification.
