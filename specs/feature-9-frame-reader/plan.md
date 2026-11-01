@@ -223,3 +223,19 @@ Plan challenge, Devil's Advocate, mode `plan`: 0 major, 5 minor. Minor objection
 3. **`NotSupportedException` and `ObjectDisposedException` mapped to `ReadFailed`** (plan *Approach*, step 5). `ChunkedStream` throws only `IOException`, so these branches have no test. A non-readable stream is also a programming error, not a stream failure. Instruction: the constructor throws `ArgumentException` when `stream.CanRead == false`, and step 5 catches only `IOException` and `ObjectDisposedException`. Each of those gets a test, which needs a disposed-stream case in `ChunkedStream` or a `MemoryStream` disposed before the read.
 4. **The overflow test rows cannot be written as stated** (plan AC3, `[DataRow]` `int.MaxValue`+1, `int.MinValue`−1). Neither value fits in an `int`. Instruction: use rows of amount pairs, (`int.MaxValue`, `1`) and (`int.MinValue`, `-1`). The Dev may sum in `long` and range-check instead of catching `OverflowException`; the outcome is the same and there is no exception path.
 5. **What the version gate does with empty and unknown-type frames is not documented or tested before `Version`** (plan *Approach*, message reader; spec E5, E6, E14). The plan returns `EmptyFrame` for a length-0 frame before any `Version` (gate not checked), but `ProtocolMismatch` for an unknown type byte. E14 ("a frame other than `Version`") and E6 could each be read the other way. Instruction: `docs/areas/pipe.md` states both cases, and the Tester adds `PipeMessageReaderEmptyFrameBeforeVersionReturnsEmptyFrame` and `PipeMessageReaderUnknownTypeBeforeVersionReturnsMismatch` under AC10.
+
+## Security notes
+
+Security plan review, `squad-security`, mode `plan`: APPROVED (spec and plan reviewed together). Non-blocking findings appended verbatim; finding 1 leaves the plan a choice, so the Lead decides it in a revision.
+
+1. **Non-blocking: per-frame CPU cost under hostile map keys.** Workforce and building maps are `Dictionary<int,int>`. Integer hashing is the identity and the bucket count is a predictable prime. The plan even pre-sizes the map from the attacker's count (*Approach*, "collections are created with at most that capacity"). Measured with a map pre-sized for 131,064 pairs (prime 156,437):
+   - 27,455 keys that all fall in one bucket: 873 ms to insert.
+   - The same number of ordinary keys: 3 ms.
+   - Extrapolation, not measured: a map of about 65k pairs whose keys all collide (512 KB) would cost several seconds, so one 1 MiB frame with two such maps costs on the order of 10 s of CPU, and it can repeat on every frame.
+
+   Memory stays bounded and the result stays correct, so the spec's limits hold. Only the time per frame is unbounded in practice. Only a process that can serve the pipe name can send such keys, and that is already a same-user attacker, so this does not block. Pick one:
+   - (a) A per-map pair cap in the spec. The real maps hold workforce types and building GUIDs, a few dozen each. Above the cap the frame is a malformed message.
+   - (b) Open a linked hardening issue now.
+
+   If (a), add an AC with a test that pins it.
+2. **Non-blocking: the resource claim covers only the extreme count.** The NFR says a read holds at most one frame plus its decoded message. Only AC9's huge-count case is pinned. There is no test for a legitimate maximum-size frame. Acceptable as written.
