@@ -44,6 +44,11 @@ public sealed class PipeReadResult
     /// </summary>
     public PipeError? Error { get; }
 
+    /// <summary>
+    /// Gets the whole frame (type byte and payload) the result came from, or <see langword="null" /> when there is none.
+    /// </summary>
+    public ReadOnlyMemory<byte>? Frame { get; }
+
     #endregion // Properties
 
     #region Methods
@@ -70,6 +75,16 @@ public sealed class PipeReadResult
         ArgumentNullException.ThrowIfNull(error);
 
         return new PipeReadResult(PipeReadResultKind.Error, null, error);
+    }
+
+    /// <summary>
+    /// Creates a copy of the result that carries the frame it came from.
+    /// </summary>
+    /// <param name="frame">The whole frame</param>
+    /// <returns>The result with the frame</returns>
+    public PipeReadResult WithFrame(ReadOnlyMemory<byte> frame)
+    {
+        throw new NotImplementedException();
     }
 
     #endregion // Methods

@@ -18,6 +18,11 @@ public sealed class PipeTickAssembler : IDisposable
     private readonly TimeProvider _timeProvider;
 
     /// <summary>
+    /// The observer that sees each read with its stamp, or <see langword="null" />.
+    /// </summary>
+    private readonly Action<PipeReadResult, DateTimeOffset>? _readObserver;
+
+    /// <summary>
     /// The items produced but not yet delivered.
     /// </summary>
     private readonly Queue<PipeTickResult> _queue = new();
@@ -57,9 +62,21 @@ public sealed class PipeTickAssembler : IDisposable
     /// <param name="source">The source of the messages</param>
     /// <param name="timeProvider">The clock</param>
     public PipeTickAssembler(IPipeMessageSource source, TimeProvider timeProvider)
+        : this(source, timeProvider, null)
+    {
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="PipeTickAssembler" /> class.
+    /// </summary>
+    /// <param name="source">The source of the messages</param>
+    /// <param name="timeProvider">The clock</param>
+    /// <param name="readObserver">The observer called with each read result and its stamp, or <see langword="null" /></param>
+    public PipeTickAssembler(IPipeMessageSource source, TimeProvider timeProvider, Action<PipeReadResult, DateTimeOffset>? readObserver)
     {
         _source = source;
         _timeProvider = timeProvider;
+        _readObserver = readObserver;
     }
 
     #endregion // Constructors
