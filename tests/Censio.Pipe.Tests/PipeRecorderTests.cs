@@ -402,6 +402,84 @@ public sealed class PipeRecorderTests
     }
 
     /// <summary>
+    /// A frame recorded after Complete is dropped, not written, and does not fail the recorder.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    public async Task PipeRecorderRecordAfterCompleteIsDropped()
+    {
+        // Arrange
+        var stream = new ControlledWriteStream();
+        var recorder = new PipeRecorder(_ => stream);
+
+        recorder.Record(Result(2), _start);
+
+        await recorder.CompleteAsync(TestContext.CancellationToken);
+
+        var expected = stream.Text;
+
+        // Act
+        recorder.Record(Result(3), _start.AddSeconds(1));
+
+        await recorder.CompleteAsync(TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(expected, stream.Text, "The late frame should not be written");
+        Assert.IsFalse(recorder.HasFailed, "A late frame should not fail the recorder");
+    }
+
+    /// <summary>
+    /// A file that cannot be closed fails the recorder once.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    public async Task PipeRecorderDisposeFailureFailsOnce()
+    {
+        // Arrange
+        var stream = new ControlledWriteStream();
+        var recorder = new PipeRecorder(_ => stream);
+        var failures = 0;
+
+        recorder.Failed += (_, _) => Interlocked.Increment(ref failures);
+        stream.FailDispose(new IOException("The file cannot be closed"));
+        recorder.Record(Result(2), _start);
+
+        // Act
+        await recorder.CompleteAsync(TestContext.CancellationToken);
+
+        // Assert
+        Assert.IsTrue(recorder.HasFailed, "The recorder should have failed");
+        Assert.AreEqual(1, failures, "The failure should be raised once");
+    }
+
+    /// <summary>
+    /// A write failure followed by a failing close raises the failure only once.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    public async Task PipeRecorderWriteAndDisposeFailureRaiseFailedOnce()
+    {
+        // Arrange
+        var stream = new ControlledWriteStream();
+        var recorder = new PipeRecorder(_ => stream);
+        var failures = 0;
+        var header = PipeRecordingFormat.FormatHeader(_start);
+
+        recorder.Failed += (_, _) => Interlocked.Increment(ref failures);
+        stream.FailWritesAfter(Encoding.UTF8.GetByteCount(header), new IOException("The disk is full"));
+        stream.FailDispose(new IOException("The file cannot be closed"));
+        recorder.Record(Result(2), _start);
+
+        // Act
+        await recorder.CompleteAsync(TestContext.CancellationToken);
+
+        // Assert
+        Assert.IsTrue(recorder.HasFailed, "The recorder should have failed");
+        Assert.AreEqual(1, failures, "The failure should be raised once although two things failed");
+        Assert.AreEqual(header, stream.Text, "Only the header should be in the file");
+    }
+
+    /// <summary>
     /// A factory that fails fails the recorder once and is not called again.
     /// </summary>
     /// <param name="exception">The exception of the factory</param>

@@ -5,7 +5,7 @@ namespace Censio.Pipe.Tests;
 /// <summary>
 /// A write-only <see cref="Stream" /> that keeps the bytes written, holds writes until the test releases them, fails a
 /// write or a flush after a given length with a given exception, counts writes and flushes, remembers how many bytes
-/// each flush covered and records its disposal. It models the failures of a <see cref="FileStream" /> (a full disk as
+/// each flush covered, records its disposal and can fail it. It models the failures of a <see cref="FileStream" /> (a full disk as
 /// <see cref="IOException" />, a deleted folder as <see cref="DirectoryNotFoundException" />, a refused access as
 /// <see cref="UnauthorizedAccessException" />, checked by reading <c>dotnet/runtime</c> <c>release/10.0</c>
 /// <c>Win32Marshal.GetExceptionForWin32Error</c>); a failed write keeps none of its bytes. Only the asynchronous
@@ -74,6 +74,11 @@ public sealed class ControlledWriteStream : Stream
     /// The exception of the failing flush.
     /// </summary>
     private Exception? _flushFailure;
+
+    /// <summary>
+    /// The exception of the disposal, or <see langword="null" />.
+    /// </summary>
+    private Exception? _disposeFailure;
 
     /// <summary>
     /// A value indicating whether the stream was disposed.
@@ -211,6 +216,18 @@ public sealed class ControlledWriteStream : Stream
         {
             _flushFailureLength = length;
             _flushFailure = exception;
+        }
+    }
+
+    /// <summary>
+    /// Makes the disposal of the stream throw the exception.
+    /// </summary>
+    /// <param name="exception">The exception</param>
+    public void FailDispose(Exception exception)
+    {
+        lock (_lock)
+        {
+            _disposeFailure = exception;
         }
     }
 
@@ -434,12 +451,20 @@ public sealed class ControlledWriteStream : Stream
     /// <inheritdoc />
     protected override void Dispose(bool disposing)
     {
+        Exception? failure;
+
         lock (_lock)
         {
             _disposed = true;
+            failure = _disposeFailure;
         }
 
         base.Dispose(disposing);
+
+        if (failure is not null)
+        {
+            throw failure;
+        }
     }
 
     #endregion // Stream

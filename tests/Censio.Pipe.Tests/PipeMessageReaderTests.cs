@@ -168,6 +168,36 @@ public sealed class PipeMessageReaderTests
     }
 
     /// <summary>
+    /// The end of the stream and the errors that end it carry no frame.
+    /// </summary>
+    /// <returns>The task of the test</returns>
+    [TestMethod]
+    public async Task PipeMessageReaderEndAndStreamEndingErrorCarryNoFrame()
+    {
+        // Arrange
+        using var endStream = new ChunkedStream([]);
+        using var truncatedStream = new ChunkedStream([.. PipeFrameBuilder.RawLength(5), 1, 2]);
+        using var oversizedStream = new ChunkedStream(PipeFrameBuilder.RawLength(PipeProtocol.MaxFrameLength + 1));
+        using var failedStream = new ChunkedStream([], ioErrorOffset: 0);
+
+        // Act
+        var end = await new PipeMessageReader(endStream).ReadAsync(TestContext.CancellationToken);
+        var truncated = await new PipeMessageReader(truncatedStream).ReadAsync(TestContext.CancellationToken);
+        var oversized = await new PipeMessageReader(oversizedStream).ReadAsync(TestContext.CancellationToken);
+        var failed = await new PipeMessageReader(failedStream).ReadAsync(TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(PipeReadResultKind.EndOfStream, end.Kind, "An empty stream should end");
+        Assert.AreEqual(PipeErrorKind.TruncatedFrame, truncated.Error?.Kind, "A cut frame should be truncated");
+        Assert.AreEqual(PipeErrorKind.OversizedFrame, oversized.Error?.Kind, "A too long frame should be oversized");
+        Assert.AreEqual(PipeErrorKind.ReadFailed, failed.Error?.Kind, "A failing read should be a read failure");
+        Assert.IsNull(end.Frame, "The end should carry no frame");
+        Assert.IsNull(truncated.Frame, "A truncated frame should carry no frame");
+        Assert.IsNull(oversized.Frame, "An oversized frame should carry no frame");
+        Assert.IsNull(failed.Frame, "A failed read should carry no frame");
+    }
+
+    /// <summary>
     /// An oversized length before any version is passed through, not turned into a mismatch.
     /// </summary>
     /// <returns>The task of the test</returns>
