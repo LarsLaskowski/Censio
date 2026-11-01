@@ -81,7 +81,8 @@ branches through its API. A private project needs a SonarQube credential: a netw
 environment for `sonarcloud.io` and `*.sonarcloud.io` (the agent proxy attaches the token to those requests, so no
 session or member sees it), or else `SONAR_TOKEN` in the environment, which every process of the session can
 read. A finding of a rule no local analyzer reports is noted in this section, in the same change, instead of a
-squad lesson.
+squad lesson. `csharpsquid:S3776` (cognitive complexity above 15 in one method) is such a rule: no local analyzer
+reports it, so split a long method with nested branches into private methods while writing it.
 
 ## Image build check
 

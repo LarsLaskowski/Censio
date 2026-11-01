@@ -13,11 +13,13 @@ public sealed class PipeReadResult
     /// <param name="kind">The outcome</param>
     /// <param name="message">The message</param>
     /// <param name="error">The error</param>
-    private PipeReadResult(PipeReadResultKind kind, PipeMessage? message, PipeError? error)
+    /// <param name="frame">The whole frame the result came from, or <see langword="null" /></param>
+    private PipeReadResult(PipeReadResultKind kind, PipeMessage? message, PipeError? error, ReadOnlyMemory<byte>? frame = null)
     {
         Kind = kind;
         Message = message;
         Error = error;
+        Frame = frame;
     }
 
     #endregion // Constructors
@@ -43,6 +45,11 @@ public sealed class PipeReadResult
     /// Gets the error of a <see cref="PipeReadResultKind.Error" /> result.
     /// </summary>
     public PipeError? Error { get; }
+
+    /// <summary>
+    /// Gets the whole frame (type byte and payload) the result came from, or <see langword="null" /> when there is none.
+    /// </summary>
+    public ReadOnlyMemory<byte>? Frame { get; }
 
     #endregion // Properties
 
@@ -70,6 +77,16 @@ public sealed class PipeReadResult
         ArgumentNullException.ThrowIfNull(error);
 
         return new PipeReadResult(PipeReadResultKind.Error, null, error);
+    }
+
+    /// <summary>
+    /// Creates a copy of the result that carries the frame it came from.
+    /// </summary>
+    /// <param name="frame">The whole frame</param>
+    /// <returns>The result with the frame</returns>
+    public PipeReadResult WithFrame(ReadOnlyMemory<byte> frame)
+    {
+        return new PipeReadResult(Kind, Message, Error, frame);
     }
 
     #endregion // Methods

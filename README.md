@@ -11,7 +11,7 @@ Censio is in milestone M0 (Foundation). No release exists yet; the first one is 
 Works today:
 
 - The server runs as a Docker image. Its start page shows `Version <version>`, and `GET /health` answers `Healthy`.
-- The Companion starts on Windows as a tray icon. Its menu shows `Version <version>` and `Exit`, and its tooltip shows the state of the connection to the game's statistics pipe (the game needs the launch argument `/pipe`).
+- The Companion starts on Windows as a tray icon. Its menu shows `Version <version>` and `Exit`, and its tooltip shows the state of the connection to the game's statistics pipe (the game needs the launch argument `/pipe`). With the switch `--record` it records what the game sends to a local file, and with `--replay <file>` it plays such a file back (*Recording and replay*).
 
 Not yet:
 
@@ -121,6 +121,16 @@ Hover over the tray icon: the tooltip reads `Censio Companion: <state>`.
 
 When the game quits, the Companion returns to `Waiting for game` and connects again by itself when the game is back; loading another save and a return to the main menu keep the connection. `Exit` in the tray menu works in every state and ends the program within 2 seconds.
 
+### Recording and replay
+
+For testing and bug reports the Companion can keep what the game sends and play it back later. Both are started with a switch on the command line (for example `Censio.Companion.exe --record` in a terminal or in a shortcut's target); the tray menu has no entry for them. Close a running Companion first: a second start ends at once.
+
+- **Record:** `Censio.Companion.exe --record` connects to the game as usual and writes every connection to its own file in `%LOCALAPPDATA%\Censio\Recordings` (paste the path into the Explorer address bar). A file `recording-<yyyyMMdd-HHmmss>Z.jsonl` (UTC time of the first data) is created when the game's first data arrives; when the game is quit and started again, the next connection writes a new file. The tooltip then ends with `(recording)`. If writing fails (for example the disk is full or too slow), recording stops for the rest of the run, the tooltip ends with `(recording failed)` and the Companion keeps working. `Exit` in the tray menu writes what is still waiting, for at most 1 second, and ends the program. If the Companion is killed or the computer loses power, the last lines of a file can be missing; whether Windows sign-out or shutdown writes them is not tried.
+- **Replay:** `Censio.Companion.exe --replay <file> [--speed <factor>|max]` reads a recording from a local file instead of the game's pipe and plays it back as the game sent it. `--speed` is `max` (no pauses) or a number from `0.1` to `1000`, written with a decimal point also on a German Windows (`--speed 10` pauses a tenth as long); without it the replay runs at real speed. The Companion does not open the pipe while it replays, and the file is only read. Nothing consumes the replayed data yet, so only the tooltip shows the progress: `Replay: Connected`, then `Replay: Receiving` (or `Replay: Protocol mismatch`), and after the last frame `Replay finished` until `Exit`. A problem with the file shows as `Replay error: <reason>` with `file not found`, `not a recording`, `unsupported version`, `invalid line <n>` or `read failed`.
+- **Invalid command line:** an unknown argument, `--speed` without `--replay`, a speed outside the range, `--replay` without a file, or `--record` together with `--replay` show `Censio Companion: Invalid command line`; the Companion then neither records nor replays, and `Exit` works.
+
+**A recording is private.** It holds the savegame headline, island names and economic data exactly as the game sent them. It stays in the folder on your computer, the Companion never sends it anywhere and never deletes it. Do not attach or post a raw recording publicly (not in an issue either); only anonymised fixtures are meant to be shared. Delete the files yourself when you no longer need them.
+
 ### Build the Companion from source
 
 Building needs the .NET 10 SDK (version 10.0.100 or a later feature band), access to `nuget.org` and the source (*Getting Censio*), on any operating system the SDK supports; only running the program needs Windows 10 22H2 or Windows 11, x64. Run the command in the root folder of the checkout. It uses the flags of the release build, except the version, and writes to the folder `publish`:
@@ -161,7 +171,7 @@ Censio befindet sich im Meilenstein M0 (Foundation). Es gibt noch kein Release; 
 Funktioniert heute:
 
 - Der Server läuft als Docker-Image. Seine Startseite zeigt `Version <version>`, und `GET /health` antwortet mit `Healthy`.
-- Der Companion startet unter Windows als Tray-Symbol. Sein Menü zeigt `Version <version>` und `Exit`, und sein Tooltip zeigt den Zustand der Verbindung zur Statistik-Pipe des Spiels (das Spiel braucht das Startargument `/pipe`).
+- Der Companion startet unter Windows als Tray-Symbol. Sein Menü zeigt `Version <version>` und `Exit`, und sein Tooltip zeigt den Zustand der Verbindung zur Statistik-Pipe des Spiels (das Spiel braucht das Startargument `/pipe`). Mit dem Schalter `--record` zeichnet er auf, was das Spiel sendet, in eine lokale Datei, und mit `--replay <Datei>` spielt er eine solche Datei ab (*Aufzeichnen und Abspielen*).
 
 Noch nicht:
 
@@ -270,6 +280,16 @@ Mit der Maus über das Tray-Symbol fahren: Der Tooltip lautet `Censio Companion:
 | `Error` | Das Verbinden ist fehlgeschlagen oder die Verbindung ist abgebrochen. Beim Beenden des Spiels kann `Error` kurz vor `Waiting for game` erscheinen; das ist normal |
 
 Beendet man das Spiel, kehrt der Companion zu `Waiting for game` zurück und verbindet sich von selbst wieder, sobald das Spiel zurück ist; das Laden eines anderen Spielstands und der Wechsel ins Hauptmenü behalten die Verbindung. `Exit` im Tray-Menü funktioniert in jedem Zustand und beendet das Programm innerhalb von 2 Sekunden.
+
+### Aufzeichnen und Abspielen
+
+Für Tests und Fehlermeldungen kann der Companion aufzeichnen, was das Spiel sendet, und es später wieder abspielen. Beides wird mit einem Schalter in der Kommandozeile gestartet (zum Beispiel `Censio.Companion.exe --record` in einem Terminal oder im Ziel einer Verknüpfung); das Tray-Menü hat dafür keinen Eintrag. Einen laufenden Companion vorher schließen: Ein zweiter Start endet sofort.
+
+- **Aufzeichnen:** `Censio.Companion.exe --record` verbindet sich wie gewohnt mit dem Spiel und schreibt jede Verbindung in eine eigene Datei in `%LOCALAPPDATA%\Censio\Recordings` (den Pfad in die Adressleiste des Explorers einfügen). Eine Datei `recording-<yyyyMMdd-HHmmss>Z.jsonl` (UTC-Zeit der ersten Daten) entsteht, sobald die ersten Daten des Spiels eintreffen; wird das Spiel beendet und neu gestartet, schreibt die nächste Verbindung eine neue Datei. Der Tooltip endet dann mit `(recording)`. Schlägt das Schreiben fehl (zum Beispiel weil die Platte voll oder zu langsam ist), endet die Aufzeichnung für den Rest des Laufs, der Tooltip endet mit `(recording failed)`, und der Companion arbeitet weiter. `Exit` im Tray-Menü schreibt noch Wartendes, höchstens 1 Sekunde lang, und beendet das Programm. Wird der Companion beendet („abgeschossen“) oder fällt der Strom aus, können die letzten Zeilen einer Datei fehlen; ob Windows beim Abmelden oder Herunterfahren sie schreibt, ist nicht ausprobiert.
+- **Abspielen:** `Censio.Companion.exe --replay <Datei> [--speed <Faktor>|max]` liest eine Aufzeichnung aus einer lokalen Datei statt aus der Pipe des Spiels und spielt sie so ab, wie das Spiel sie gesendet hat. `--speed` ist `max` (keine Pausen) oder eine Zahl von `0.1` bis `1000`, auch unter deutschem Windows mit Dezimalpunkt geschrieben (`--speed 10` macht die Pausen auf ein Zehntel kürzer); ohne Angabe läuft das Abspielen in Echtzeit. Der Companion öffnet beim Abspielen die Pipe nicht, und die Datei wird nur gelesen. Die abgespielten Daten verwendet noch nichts, daher zeigt nur der Tooltip den Fortschritt: `Replay: Connected`, dann `Replay: Receiving` (oder `Replay: Protocol mismatch`) und nach dem letzten Frame `Replay finished` bis `Exit`. Ein Problem mit der Datei erscheint als `Replay error: <Grund>` mit `file not found`, `not a recording`, `unsupported version`, `invalid line <n>` oder `read failed`.
+- **Ungültige Kommandozeile:** ein unbekanntes Argument, `--speed` ohne `--replay`, eine Geschwindigkeit außerhalb des Bereichs, `--replay` ohne Datei oder `--record` zusammen mit `--replay` zeigen `Censio Companion: Invalid command line`; der Companion zeichnet dann weder auf noch spielt er ab, und `Exit` funktioniert.
+
+**Eine Aufzeichnung ist privat.** Sie enthält die Überschrift des Spielstands, Inselnamen und Wirtschaftsdaten genau so, wie das Spiel sie gesendet hat. Sie bleibt im Ordner auf dem eigenen Rechner, der Companion sendet sie nirgendwohin und löscht sie nie. Eine unbearbeitete Aufzeichnung nie öffentlich anhängen oder posten (auch nicht in einem Issue); geteilt werden sollen nur anonymisierte Testdaten. Die Dateien selbst löschen, wenn sie nicht mehr gebraucht werden.
 
 ### Companion aus dem Quellcode bauen
 

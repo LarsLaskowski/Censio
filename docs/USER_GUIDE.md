@@ -127,6 +127,16 @@ Hover over the tray icon: the tooltip reads `Censio Companion: <state>`.
 
 When the game quits, the Companion returns to `Waiting for game` and connects again by itself when the game is back; loading another save and a return to the main menu keep the connection. `Exit` in the tray menu works in every state and ends the program within 2 seconds.
 
+#### Recording and replay
+
+For testing and bug reports the Companion can keep what the game sends and play it back later. Both are started with a switch on the command line (for example `Censio.Companion.exe --record` in a terminal or in a shortcut's target); the tray menu has no entry for them. Close a running Companion first: a second start ends at once.
+
+- **Record:** `Censio.Companion.exe --record` connects to the game as usual and writes every connection to its own file in `%LOCALAPPDATA%\Censio\Recordings` (paste the path into the Explorer address bar). A file `recording-<yyyyMMdd-HHmmss>Z.jsonl` (UTC time of the first data) is created when the game's first data arrives; when the game is quit and started again, the next connection writes a new file. The tooltip then ends with `(recording)`. If writing fails (for example the disk is full or too slow), recording stops for the rest of the run, the tooltip ends with `(recording failed)` and the Companion keeps working. `Exit` in the tray menu writes what is still waiting, for at most 1 second, and ends the program. If the Companion is killed or the computer loses power, the last lines of a file can be missing; whether Windows sign-out or shutdown writes them is not tried.
+- **Replay:** `Censio.Companion.exe --replay <file> [--speed <factor>|max]` reads a recording from a local file instead of the game's pipe and plays it back as the game sent it. `--speed` is `max` (no pauses) or a number from `0.1` to `1000`, written with a decimal point also on a German Windows (`--speed 10` pauses a tenth as long); without it the replay runs at real speed. The Companion does not open the pipe while it replays, and the file is only read. Nothing consumes the replayed data yet, so only the tooltip shows the progress: `Replay: Connected`, then `Replay: Receiving` (or `Replay: Protocol mismatch`), and after the last frame `Replay finished` until `Exit`. A problem with the file shows as `Replay error: <reason>` with `file not found`, `not a recording`, `unsupported version`, `invalid line <n>` or `read failed`.
+- **Invalid command line:** an unknown argument, `--speed` without `--replay`, a speed outside the range, `--replay` without a file, or `--record` together with `--replay` show `Censio Companion: Invalid command line`; the Companion then neither records nor replays, and `Exit` works.
+
+**A recording is private.** It holds the savegame headline, island names and economic data exactly as the game sent them. It stays in the folder on your computer, the Companion never sends it anywhere and never deletes it. Do not attach or post a raw recording publicly (not in an issue either); only anonymised fixtures are meant to be shared. Delete the files yourself when you no longer need them.
+
 ### Build from source
 
 To run a state of the repository that has not been released, build it from a checkout of this repository, with the commands run in its root directory. No edge builds are offered. In the other `docker run` commands of this guide, add `--pull never` and use the local name `censio` instead of `networlddev/censio:0.1.0`.
@@ -173,7 +183,7 @@ Companion: the program opens no window and shows no taskbar button. One icon app
 
 Server: the data directory is `/config` in the Docker image. It holds the data-protection key ring in `/config/data-protection-keys`; the keys are unencrypted, so keep the directory and its backups private. The server writes its log to the console; read it with `docker logs censio`. Log times are UTC. The settings are listed in the [README](../README.md#configuration).
 
-Companion: it stores no data and writes no log yet.
+Companion: it stores no data and writes no log. Only with `--record` does it write recording files to `%LOCALAPPDATA%\Censio\Recordings`; they hold the data of your game as it was sent, stay on your computer and are never deleted by the program, so delete them by hand (*Recording and replay*).
 
 ## Reporting problems
 
@@ -181,7 +191,7 @@ Open a GitHub issue with the [Bug report](../.github/ISSUE_TEMPLATE/bug_report.m
 
 - the version: the start page (`Version <version>`) or the Companion's tray menu;
 - how you run it: your `docker run` command (without secrets and private paths) or how you started the Companion, and your host operating system;
-- the log: an excerpt of `docker logs censio` (redact tokens and other secrets); the Companion writes no log yet.
+- the log: an excerpt of `docker logs censio` (redact tokens and other secrets); the Companion writes no log. Never attach a raw recording (`--record`) to an issue or post it publicly, it holds private names and game data; describe the problem and the tooltip instead, and keep the file until a maintainer asks how to hand it in.
 
 Report a security vulnerability privately as [SECURITY.md](../SECURITY.md) describes, never in a public issue.
 
@@ -314,6 +324,16 @@ Mit der Maus über das Tray-Symbol fahren: Der Tooltip lautet `Censio Companion:
 
 Beendet man das Spiel, kehrt der Companion zu `Waiting for game` zurück und verbindet sich von selbst wieder, sobald das Spiel zurück ist; das Laden eines anderen Spielstands und der Wechsel ins Hauptmenü behalten die Verbindung. `Exit` im Tray-Menü funktioniert in jedem Zustand und beendet das Programm innerhalb von 2 Sekunden.
 
+#### Aufzeichnen und Abspielen
+
+Für Tests und Fehlermeldungen kann der Companion aufzeichnen, was das Spiel sendet, und es später wieder abspielen. Beides wird mit einem Schalter in der Kommandozeile gestartet (zum Beispiel `Censio.Companion.exe --record` in einem Terminal oder im Ziel einer Verknüpfung); das Tray-Menü hat dafür keinen Eintrag. Einen laufenden Companion vorher schließen: Ein zweiter Start endet sofort.
+
+- **Aufzeichnen:** `Censio.Companion.exe --record` verbindet sich wie gewohnt mit dem Spiel und schreibt jede Verbindung in eine eigene Datei in `%LOCALAPPDATA%\Censio\Recordings` (den Pfad in die Adressleiste des Explorers einfügen). Eine Datei `recording-<yyyyMMdd-HHmmss>Z.jsonl` (UTC-Zeit der ersten Daten) entsteht, sobald die ersten Daten des Spiels eintreffen; wird das Spiel beendet und neu gestartet, schreibt die nächste Verbindung eine neue Datei. Der Tooltip endet dann mit `(recording)`. Schlägt das Schreiben fehl (zum Beispiel weil die Platte voll oder zu langsam ist), endet die Aufzeichnung für den Rest des Laufs, der Tooltip endet mit `(recording failed)`, und der Companion arbeitet weiter. `Exit` im Tray-Menü schreibt noch Wartendes, höchstens 1 Sekunde lang, und beendet das Programm. Wird der Companion beendet („abgeschossen“) oder fällt der Strom aus, können die letzten Zeilen einer Datei fehlen; ob Windows beim Abmelden oder Herunterfahren sie schreibt, ist nicht ausprobiert.
+- **Abspielen:** `Censio.Companion.exe --replay <Datei> [--speed <Faktor>|max]` liest eine Aufzeichnung aus einer lokalen Datei statt aus der Pipe des Spiels und spielt sie so ab, wie das Spiel sie gesendet hat. `--speed` ist `max` (keine Pausen) oder eine Zahl von `0.1` bis `1000`, auch unter deutschem Windows mit Dezimalpunkt geschrieben (`--speed 10` macht die Pausen auf ein Zehntel kürzer); ohne Angabe läuft das Abspielen in Echtzeit. Der Companion öffnet beim Abspielen die Pipe nicht, und die Datei wird nur gelesen. Die abgespielten Daten verwendet noch nichts, daher zeigt nur der Tooltip den Fortschritt: `Replay: Connected`, dann `Replay: Receiving` (oder `Replay: Protocol mismatch`) und nach dem letzten Frame `Replay finished` bis `Exit`. Ein Problem mit der Datei erscheint als `Replay error: <Grund>` mit `file not found`, `not a recording`, `unsupported version`, `invalid line <n>` oder `read failed`.
+- **Ungültige Kommandozeile:** ein unbekanntes Argument, `--speed` ohne `--replay`, eine Geschwindigkeit außerhalb des Bereichs, `--replay` ohne Datei oder `--record` zusammen mit `--replay` zeigen `Censio Companion: Invalid command line`; der Companion zeichnet dann weder auf noch spielt er ab, und `Exit` funktioniert.
+
+**Eine Aufzeichnung ist privat.** Sie enthält die Überschrift des Spielstands, Inselnamen und Wirtschaftsdaten genau so, wie das Spiel sie gesendet hat. Sie bleibt im Ordner auf dem eigenen Rechner, der Companion sendet sie nirgendwohin und löscht sie nie. Eine unbearbeitete Aufzeichnung nie öffentlich anhängen oder posten (auch nicht in einem Issue); geteilt werden sollen nur anonymisierte Testdaten. Die Dateien selbst löschen, wenn sie nicht mehr gebraucht werden.
+
 ### Aus dem Quellcode bauen
 
 Um einen Stand des Repositorys auszuführen, der nicht veröffentlicht ist, ihn aus einem Checkout dieses Repositorys bauen; die Befehle laufen in dessen Hauptverzeichnis. Edge-Builds werden nicht angeboten. In den übrigen `docker run`-Befehlen dieser Anleitung `--pull never` ergänzen und den lokalen Namen `censio` statt `networlddev/censio:0.1.0` verwenden.
@@ -360,7 +380,7 @@ Companion: Das Programm öffnet kein Fenster und zeigt keine Schaltfläche in de
 
 Server: Das Datenverzeichnis ist im Docker-Image `/config`. Es enthält den Data-Protection-Schlüsselring in `/config/data-protection-keys`; die Schlüssel sind unverschlüsselt, deshalb das Verzeichnis und seine Sicherungen privat halten. Der Server schreibt sein Log auf die Konsole; Lesen mit `docker logs censio`. Die Logzeiten sind UTC. Die Einstellungen stehen in der [README](../README.md#konfiguration).
 
-Companion: Er speichert keine Daten und schreibt noch kein Log.
+Companion: Er speichert keine Daten und schreibt kein Log. Nur mit `--record` schreibt er Aufzeichnungsdateien nach `%LOCALAPPDATA%\Censio\Recordings`; sie enthalten die Daten des eigenen Spiels, wie sie gesendet wurden, bleiben auf dem Rechner und werden vom Programm nie gelöscht, also von Hand löschen (*Aufzeichnen und Abspielen*).
 
 ## Probleme melden
 
@@ -368,6 +388,6 @@ Ein GitHub-Issue mit der Vorlage [Bug report](../.github/ISSUE_TEMPLATE/bug_repo
 
 - die Version: die Startseite (`Version <version>`) oder das Tray-Menü des Companions;
 - wie er läuft: den `docker run`-Befehl (ohne Geheimnisse und private Pfade) oder wie der Companion gestartet wurde, und das Host-Betriebssystem;
-- das Log: einen Auszug aus `docker logs censio` (Tokens und andere Geheimnisse schwärzen); der Companion schreibt noch kein Log.
+- das Log: einen Auszug aus `docker logs censio` (Tokens und andere Geheimnisse schwärzen); der Companion schreibt kein Log. Eine unbearbeitete Aufzeichnung (`--record`) nie an ein Issue anhängen oder öffentlich posten, sie enthält private Namen und Spieldaten; stattdessen das Problem und den Tooltip beschreiben und die Datei aufheben, bis ein Maintainer sagt, wie sie übergeben werden kann.
 
 Eine Sicherheitslücke privat melden, wie [SECURITY.md](../SECURITY.md) es beschreibt, nie in einem öffentlichen Issue.
