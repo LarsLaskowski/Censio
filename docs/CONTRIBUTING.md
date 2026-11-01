@@ -136,7 +136,30 @@ For PR naming use the following convention: `[area] Description` (no period at t
   the change entails is enough; there is room to elaborate in the description.
 
 <!-- project:begin areas -->
-Areas: `Companion`, `Server`, `Tests`, `Docker`, `CI`, `Docs`.
+Issues and pull requests use the same areas (they are not the area documents of [`areas/`](areas/README.md)). A
+pull request that closes an issue normally takes the issue's area; a change across several areas takes the one it
+changes most.
+
+- `Pipe` — the statistics pipe: connection, frame reader and parser, tick assembly, recorder and replay.
+- `GameData` — the game installation, the game files and the catalog extracted from them.
+- `Contracts` — the shared types and formats between the Companion and the server.
+- `Companion` — the Windows Companion: tray app, its windows, local and forward mode.
+- `Server` — the server: ingest, live state, persistence and configuration.
+- `History` — the stored time series and their retention.
+- `UI` — the web interface: layout, views and charts.
+- `Alerts` — notifications the server sends out.
+- `Tests` — test projects and test data without a product change.
+- `Tooling` — developer tools beside the product, such as the recording anonymiser.
+- `Repo` — the solution, the repository layout and the shared build configuration.
+- `Docker` — the server image and its build.
+- `CI` — the checks on pushes and pull requests: build, analysis, CodeQL, Dependabot, SonarQube Cloud.
+- `Release` — publishing: the release and edge-build workflows, release notes, the Windows ZIP and image tags.
+- `Security` — security reviews and hardening that belong to no single area.
+- `Docs` — `README.md`, the user guide and the documents under `docs/`.
+- `Squad` — the squad's project knowledge (`.squad/stack.md`, `.squad/project.md`, the project blocks of the
+  marked files) and squad-maintenance changes.
+- `Manual` — a task done by hand outside the repository, such as recording reference sessions.
+
 <!-- project:end areas -->
 
 When a PR is related to an issue, use the `Closes #issuenumber` syntax so the issue links to the
