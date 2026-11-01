@@ -1,16 +1,16 @@
 # Plan: Recorder and replay of the statistics pipe
 
 Source: Issue #12 | [spec.md](spec.md)
-Status: Draft
+Status: Revised (1)
 Tier: standard — new behavior (recording files, replay from a file) that creates, changes or removes no security control: the recording path is fixed and built from no input, and the replay file's line bounds are input handling.
 Security areas touched: File paths for recordings (`PipeRecordingFiles`, `%LOCALAPPDATA%\Censio\Recordings`); Parsing of external input (a recording file read by `PipeReplayStream`); Logging of external data (unchanged: nothing is logged, tooltips carry no file content)
 
 ## Problem / root cause
 
-Feature: see [spec.md](spec.md) (S1–S8, E1–E11, AC1–AC10). Spec defects fixed while planning: E6 gains the reason
-`read failed` (an I/O error after the file was opened had no reason), a field given twice is `invalid line <n>`;
-E10 says a line a stalled disk is still writing at the 1-second limit may be cut off (the process ends, as in E2);
-E11 accepts a UTF-8 byte order mark before the header and requires only `format` and `version` in it.
+Feature: see [spec.md](spec.md) (S1–S8, E1–E11, AC1–AC10). Spec fixes made while planning: E6 (`read failed`, field
+twice, unusable times, nesting), E10 (cut line at the `Exit` limit; line cost per entry), E11 (byte order mark;
+header needs `format` and `version`), E2 (no power-loss promise), E3 (folder not a full path), S5 (first tooltip
+per the status rule).
 
 ## Verified facts
 
@@ -22,15 +22,18 @@ E11 accepts a UTF-8 byte order mark before the header and requires only `format`
 | 4 | The live Companion reads messages without a tick assembler | `PipeConnection.RunSessionAsync` loops on `PipeMessageReader.ReadAsync` and only sets the status | confirmed |
 | 5 | Skipped frames (empty, unknown type, malformed, protocol mismatch) are built in `PipeMessageReader.ReadAsync` or `PipeMessageParser.Parse` from a whole frame; stream-ending errors and the end carry none | `PipeMessageReader.ReadAsync`; `PipeFrameReader.Fail` | confirmed |
 | 6 | No release tag exists, so every record is unreleased | `git ls-remote --tags origin` printed nothing | confirmed |
-| 7 | The Windows shell is outside the coverage measure: it has no test project, so its lines are absent from the local report, and CI excludes `src/Censio.Companion/**` | `.squad/tools/coverage-check.py` `new_code_coverage` counts only lines present in the report; `.github/workflows/ci.yml` line 71; record 0004 | confirmed |
-| 8 | The server image does not build `Censio.Pipe` or `Censio.Companion.Core` | `src/Censio.Server/Censio.Server.csproj` references only Contracts and Server.Data | confirmed |
+| 7 | The Windows shell is outside both coverage measures | `coverage-check.py` `new_code_coverage` counts only reported lines (no test project); `ci.yml` line 71 excludes `src/Censio.Companion/**` | confirmed |
+| 8 | The server image builds neither changed project | `Censio.Server.csproj` references Contracts and Server.Data only | confirmed |
 | 9 | Base64 of 1 MiB is 1,398,104 characters | 4 × ceil(1,048,576 / 3) | confirmed |
-| 10 | `Task.Delay(TimeSpan, TimeProvider, CancellationToken)` waits only through `TimeProvider.CreateTimer`, so a clock that fires its timers in `SetUtcNow` drives the assembler's quiet period | to verify: Dev reads `dotnet/runtime` `release/10.0` `Task.Delay` with `TimeProvider` before writing `PipeReplayClock`; Tester's `PipeReplayClockTests` and the AC1 quiet-period test confirm it | unverified |
+| 10 | The replay clock's timers need never fire: the assembler races the quiet timer against the pending read (`Step`, `Task.WhenAny`) and cancels the delay after it; with a timer that never fires the read decides, and `Add` closes the quiet tick first (fact 3), so the items are the same | `PipeTickAssembler.Step`; `PipeTickBuilder.Add` | confirmed |
+| 16 | `FileStream.FlushAsync` and `Flush()` hand the bytes to the operating system only; `Flush(true)` or `FileOptions.WriteThrough` reach the disk. Bytes handed to the system survive the end of the process, not a power loss | Devil's Advocate M1; .NET API documentation of `FileStream.Flush(Boolean)` | confirmed |
+| 17 | `Task.Delay` refuses a delay over `UInt32.MaxValue − 1` milliseconds (about 49.7 days); `DateTimeOffset` + 30 s throws near `MaxValue`; `Utf8JsonReader.GetDateTimeOffset` throws `FormatException` where `TryGetDateTimeOffset` returns false; `Skip` past the depth limit (64) throws `JsonException` | Security plan review B1 | confirmed |
+| 18 | `Environment.GetFolderPath(LocalApplicationData)` returns an empty string when the folder cannot be determined | Security plan review B3; .NET API documentation of `GetFolderPath` | confirmed |
 | 11 | WPF raises `Application.Exit` (`OnExit`) after an uncancelled `SessionEnding` at sign-out and shutdown, so the recording flush in `OnExit` also runs then | to verify: Dev reads the WPF `Application` source (`release/10.0`); maintainer's manual test on Windows (sign-out with `--record`, file ends with a complete line) in step 9 | unverified |
 | 12 | `NotifyIcon.Text` accepts up to 127 characters on .NET 10; the longest new tooltip (`Censio Companion: Replay error: invalid line 9223372036854775807`) has 64 | to verify: Dev reads `System.Windows.Forms` `NotifyIcon.Text` (`release/10.0`) | unverified |
 | 13 | A full disk and a deleted folder surface from `FileStream` writes and flushes as `IOException` (access denied as `UnauthorizedAccessException`), the cases `ControlledWriteStream` models | to verify: Dev reads `dotnet/runtime` `release/10.0` `Win32Marshal.GetExceptionForWin32Error` (`ERROR_DISK_FULL`, `ERROR_ACCESS_DENIED`) before the Tester writes the double | unverified |
-| 14 | The issue's claims: recording of raw frames with receive time as JSON lines with base64 payload, one file per session, replay at real, factor and maximum speed — buildable on the merged #9/#10 code | `src/Censio.Pipe` (reader, assembler on an injected clock); "session" read as connection (spec Q2) | confirmed |
-| 15 | No real sample exists of the recording format: it is defined by this change; samples are produced by `PipeRecorder` in the tests, and real recordings come with #17 and are anonymised by #20 | spec *Out of scope*; record 0029 | confirmed |
+| 14 | The issue's claims (raw frames with receive time as base64 JSON lines, a file per session, three speeds) fit the merged #9/#10 code | `src/Censio.Pipe`; "session" = connection (spec Q2) | confirmed |
+| 15 | The recording format is defined here, so no real sample exists; tests use `PipeRecorder` output; real recordings come with #17, anonymised by #20 | record 0029 | confirmed |
 
 ## Tests per criterion
 
@@ -39,25 +42,27 @@ E11 accepts a UTF-8 byte order mark before the header and requires only `format`
 | AC1 | `PipeReplayStreamRecordedRunReplaysSameItemsAtMaximumSpeed`, `PipeReplayStreamRecordedRunReplaysSameItemsAtFactorSpeed`, `PipeReplayStreamClockMovedInsideChunkedFrameKeepsReceiveTime`, `PipeReplayStreamQuietPeriodCloseReplaysAsQuietPeriod`, `PipeReplayStreamLastTickClosedByQuietPeriodReplaysAsStreamEnded`, `PipeReplayStreamSessionEventsAndVersionsReplayInOrder` | `tests/Censio.Pipe.Tests/PipeReplayStreamTests.cs` |
 | AC1 | `PipeTickAssemblerReadObserverGetsEachResultWithItsStamp`, `PipeTickAssemblerThrowingReadObserverKeepsReading` | `tests/Censio.Pipe.Tests/PipeTickAssemblerTests.cs` |
 | AC2 | `PipeMessageReaderResultCarriesWholeFrame` (message, empty, unknown type, malformed, protocol mismatch), `PipeMessageReaderEndAndStreamEndingErrorCarryNoFrame` | `tests/Censio.Pipe.Tests/PipeMessageReaderTests.cs` |
-| AC2 | `PipeRecorderRecordsEachFrameOnceInOrder`, `PipeRecorderResultWithoutFrameIsNotRecorded`, `PipeRecorderCompleteWritesQueuedFramesAsCompleteLines`, `PipeRecorderFlushesEachLine` | `tests/Censio.Pipe.Tests/PipeRecorderTests.cs` |
+| AC2 | `PipeRecorderRecordsEachFrameOnceInOrder`, `PipeRecorderResultWithoutFrameIsNotRecorded`, `PipeRecorderCompleteWritesQueuedFramesAsCompleteLines`, `PipeRecorderFlushesEachLine`, `PipeRecorderWrittenLinesFreeQueueSpace` | `tests/Censio.Pipe.Tests/PipeRecorderTests.cs` |
 | AC2 | `PipeConnectionRecordingEndInsideChunkedFrameRecordsOnlyWholeFrames`, `PipeConnectionRecordingStopInsideChunkedFrameRecordsOnlyWholeFrames`, `PipeConnectionRecordingStampsEachFrameOnce` | `tests/Censio.Companion.Core.Tests/PipeConnectionTests.cs` |
 | AC3 | `PipeRecordingFormatHeaderHasFormatVersionAndStarted`, `PipeRecordingFormatFrameLineHasSevenDigitUtcTimeAndBase64`, `PipeRecordingFormatFileNameUsesStartSecondAndSuffix` | `tests/Censio.Pipe.Tests/PipeRecordingFormatTests.cs` |
 | AC3 | `PipeRecorderOpensFileAtFirstFrameWithItsTime`, `PipeRecorderWritesHeaderBeforeFirstFrame` | `tests/Censio.Pipe.Tests/PipeRecorderTests.cs` |
-| AC3 | `PipeRecordingFilesCreatesFolderAndFile`, `PipeRecordingFilesSameSecondGetsNextSuffix`, `PipeRecordingFilesNeverOverwrites` | `tests/Censio.Companion.Core.Tests/PipeRecordingFilesTests.cs` |
-| AC4 | `PipeConnectionRecordingWritesOneFilePerConnection`, `PipeConnectionRecordingCreatesNoFileWithoutFrame`, `PipeConnectionWithoutRecordingCreatesNoRecorder` | `tests/Censio.Companion.Core.Tests/PipeConnectionTests.cs` |
+| AC3 | `PipeRecordingFilesCreatesFolderAndFile`, `PipeRecordingFilesSameSecondGetsNextSuffix`, `PipeRecordingFilesNeverOverwrites`, `PipeRecordingFilesOtherCreateErrorIsNotRetried` (a directory with the file's name), `PipeRecordingFilesNameIsGregorianUnderOtherCulture` (`th-TH`) | `tests/Censio.Companion.Core.Tests/PipeRecordingFilesTests.cs` |
+| AC4 | `PipeConnectionRecordingWritesOneFilePerConnection`, `PipeConnectionRecordingCreatesNoFileWithoutFrame`, `PipeConnectionWithoutRecordingCreatesNoRecorder`, `PipeConnectionRecordingReplaysSameTicksAsLiveAssembler` (a `ScriptedPipeConnector` connection over a `ControlledPipeStream` fed in chunks while the `FakeTimeProvider` moves, recorded, replayed at maximum speed, compared with a `PipeTickAssembler` over the same chunks and clock moves) | `tests/Censio.Companion.Core.Tests/PipeConnectionTests.cs` |
 | AC4 | `PipeRecordingSessionEndConnectionClosesFile` | `tests/Censio.Companion.Core.Tests/PipeRecordingSessionTests.cs` |
-| AC5 | `PipeRecorderQueueOverLimitFailsAndKeepsQueuedFrames`, `PipeRecorderRecordDoesNotWaitForStalledWrite`, `PipeRecorderWriteFailureFailsAndKeepsCompleteLines`, `PipeRecorderOpenFailureFails`, `PipeRecorderCompleteCancelledStopsWaiting`, `PipeRecorderThrowingFailedHandlerIsIgnored` | `tests/Censio.Pipe.Tests/PipeRecorderTests.cs` |
-| AC5 | `PipeRecordingSessionStateIsRecordingUntilFailure`, `PipeRecordingSessionFailureStopsRecordingForRestOfRun`, `PipeRecordingSessionStopReturnsWithinTimeoutOnStalledDisk`, `PipeRecordingSessionStopCompletesAllConnections` | `tests/Censio.Companion.Core.Tests/PipeRecordingSessionTests.cs` |
+| AC5 | `PipeRecorderQueueOverLimitFailsAndKeepsQueuedFrames`, `PipeRecorderEmptyFramesOnHeldStreamFailAtEntryLimit` (fails at entry 131,073), `PipeRecorderRecordDoesNotWaitForStalledWrite`, `PipeRecorderWriteFailureFailsAndKeepsCompleteLines`, `PipeRecorderOpenFailureFails`, `PipeRecorderCompleteCancelledStopsWaiting`, `PipeRecorderThrowingFailedHandlerIsIgnored` | `tests/Censio.Pipe.Tests/PipeRecorderTests.cs` |
+| AC5 | `PipeRecordingSessionStateIsRecordingUntilFailure`, `PipeRecordingSessionFailureStopsRecordingForRestOfRun`, `PipeRecordingSessionStopReturnsWithinTimeoutOnStalledDisk`, `PipeRecordingSessionStopCompletesAllConnections` |
+| AC5 | `PipeRecordingFilesFolderNotFullyQualifiedIsRefused` (empty, relative) | `tests/Censio.Companion.Core.Tests/PipeRecordingFilesTests.cs` | `tests/Censio.Companion.Core.Tests/PipeRecordingSessionTests.cs` |
 | AC5 | `PipeConnectionRecordingFailureKeepsStatesAndReads` | `tests/Censio.Companion.Core.Tests/PipeConnectionTests.cs` |
 | AC5 | `TrayMenuFormatToolTipWithRecordingStateAppendsSuffix` (off, recording, failed per state) | `tests/Censio.Companion.Core.Tests/TrayMenuTests.cs` |
 | AC6 | `PipeReplayStreamSkippedFramesReplayAsSkipped`, `PipeReplayStreamFrameBeforeVersionGivesProtocolMismatch`, `PipeReplayStreamTickLimitAppliesToReplayedFrames` | `tests/Censio.Pipe.Tests/PipeReplayStreamTests.cs` |
-| AC7 | `PipeReplayStreamEmptyFileIsNotARecording`, `PipeReplayStreamOtherFormatIsNotARecording`, `PipeReplayStreamHeaderWithoutVersionIsNotARecording`, `PipeReplayStreamOtherVersionIsUnsupported`, `PipeReplayStreamInvalidLineEndsAfterEarlierFrames` (invalid JSON, invalid base64, missing time, missing frame, field twice, frame over 1 MiB, cut last line), `PipeReplayStreamLineOverMaxLengthIsInvalidWithoutReadingItWhole`, `PipeReplayStreamAcceptedLineForms` (CRLF, no final line feed, one empty last line, byte order mark, unknown fields, any field order), `PipeReplayStreamEmptyLineInsideIsInvalid`, `PipeReplayStreamReadFailureIsReadFailed`, `PipeReplayStreamHeaderOnlyEndsAtOnce` | `tests/Censio.Pipe.Tests/PipeReplayStreamTests.cs` |
+| AC7 | `PipeReplayStreamEmptyFileIsNotARecording`, `PipeReplayStreamOtherFormatIsNotARecording`, `PipeReplayStreamHeaderWithoutVersionIsNotARecording`, `PipeReplayStreamOtherVersionIsUnsupported`, `PipeReplayStreamInvalidLineEndsAfterEarlierFrames` (invalid JSON, invalid base64, missing time, missing frame, field twice, frame over 1 MiB, a frame string of 1,398,104 characters without padding, cut last line, time `9999-12-31T23:59:59.9999999Z`, time `0001-01-01T00:00:00+01:00`, an unknown field nested 65 deep), `PipeReplayStreamLineOverMaxLengthIsInvalidWithoutReadingItWhole`, `PipeReplayStreamAcceptedLineForms` (CRLF, no final line feed, one empty last line, byte order mark, unknown fields, any field order), `PipeReplayStreamEmptyLineInsideIsInvalid`, `PipeReplayStreamReadFailureIsReadFailed`, `PipeReplayStreamHeaderOnlyEndsAtOnce` | `tests/Censio.Pipe.Tests/PipeReplayStreamTests.cs` |
 | AC7 | `PipeReplayRunnerMissingFileIsFileNotFound`, `PipeReplayRunnerDeniedFileIsFileNotFound` | `tests/Censio.Companion.Core.Tests/PipeReplayRunnerTests.cs` |
 | AC8 | `PipeReplayStreamRealSpeedWaitsRecordedPause`, `PipeReplayStreamFactorDividesPause`, `PipeReplayStreamMaximumSpeedDoesNotWait`, `PipeReplayStreamBackwardOrRepeatedTimeDoesNotWaitAndKeepsTime`, `PipeReplayStreamCancelledWaitThrowsCancellation` | `tests/Censio.Pipe.Tests/PipeReplayStreamTests.cs` |
 | AC8 | `PipeReplaySpeedTryParseAcceptsValidValues` (`max`, `1`, `0.1`, `1000`, `10`), `PipeReplaySpeedTryParseRejectsInvalidValues` (`0.09`, `1000.1`, `0`, `-1`, `1,5`, `NaN`, `Infinity`, empty, null), `PipeReplaySpeedScaleDividesPause` | `tests/Censio.Pipe.Tests/PipeReplaySpeedTests.cs` |
-| AC8 | `PipeReplayClockSetUtcNowFiresDueTimers`, `PipeReplayClockSetBackwardsFiresNothing`, `PipeReplayClockChangedOrDisposedTimerDoesNotFire`, `PipeReplayClockInfiniteDueTimeNeverFires` | `tests/Censio.Pipe.Tests/PipeReplayClockTests.cs` |
+| AC8 | `PipeReplayClockGetUtcNowReturnsLastSetTimeAlsoBackwards`, `PipeReplayClockTimerNeverFiresAndAcceptsChangeAndDispose` | `tests/Censio.Pipe.Tests/PipeReplayClockTests.cs` |
+| AC8 | `PipeReplayStreamGapOverDelayLimitIsWaitedInSteps` (60-day gap at speed 1), `PipeReplaySpeedScaleSaturatesAtMaximum` (full-range gap at speed 0.1) | `tests/Censio.Pipe.Tests/PipeReplayStreamTests.cs`, `tests/Censio.Pipe.Tests/PipeReplaySpeedTests.cs` |
 | AC9 | `CompanionCommandLineParseReturnsMode` (none, `--record`, `--replay f`, `--replay f --speed 10`, `--speed max --replay f`, option names in any case), `CompanionCommandLineParseInvalidReturnsInvalid` (unknown argument, `--speed` alone, bad speed, `--replay` without file, `--record --replay f`, an option twice) | `tests/Censio.Companion.Core.Tests/CompanionCommandLineTests.cs` |
-| AC9 | `PipeReplayRunnerConnectedUntilFirstMessage`, `PipeReplayRunnerReceivingAfterVersion2`, `PipeReplayRunnerProtocolMismatchAfterOtherVersion`, `PipeReplayRunnerFinishedAfterLastFrame`, `PipeReplayRunnerProblemShownAfterEarlierFrames`, `PipeReplayRunnerCancelledEndsWithoutEvent` | `tests/Censio.Companion.Core.Tests/PipeReplayRunnerTests.cs` |
+| AC9 | `PipeReplayRunnerConnectedUntilFirstStatus` (skipped frames keep `Connected`), `PipeReplayRunnerFrameBeforeVersionShowsProtocolMismatch`, `PipeReplayRunnerReceivingAfterVersion2`, `PipeReplayRunnerProtocolMismatchAfterOtherVersion`, `PipeReplayRunnerFinishedAfterLastFrame`, `PipeReplayRunnerProblemShownAfterEarlierFrames`, `PipeReplayRunnerCancelledEndsWithoutEvent` | `tests/Censio.Companion.Core.Tests/PipeReplayRunnerTests.cs` |
 | AC9 | `PipeStatusRuleForReadReturnsStatusPerResult` (message, skip, protocol mismatch with and without version, each stream-ending error, end) | `tests/Censio.Companion.Core.Tests/PipeStatusRuleTests.cs` |
 | AC9 | `TrayMenuFormatReplayToolTipReturnsTextPerStatus` (connected, receiving, protocol mismatch, finished, each problem), `TrayMenuInvalidCommandLineToolTipHasExactText` | `tests/Censio.Companion.Core.Tests/TrayMenuTests.cs` |
 | AC10 | Reviewer check, no unit test: `README.md` and `docs/USER_GUIDE.md` describe `--record`, the folder, privacy, `--replay` and `--speed`, English first, then German (step 8) | `README.md`, `docs/USER_GUIDE.md` |
@@ -79,28 +84,34 @@ value to the recorder (it uses the same value for `_receivingSince`).
 
 **Format** (`PipeRecordingFormat`). Header `{"format":"censio-pipe-recording","version":1,"started":"<time>"}`, frame
 line `{"time":"<time>","frame":"<base64>"}`, fields in this order when written, each line ending with `\n`. Time:
-UTC, `yyyy-MM-ddTHH:mm:ss.fffffffZ`, invariant culture. File name `recording-yyyyMMdd-HHmmssZ.jsonl`, sequence 2 and
-up adds `-<n>` before `.jsonl`. Written with `System.Text.Json`'s `Utf8JsonWriter`; read with `Utf8JsonReader`:
+UTC, `yyyy-MM-ddTHH:mm:ss.fffffffZ`, invariant culture (Gregorian). File name `recording-yyyyMMdd-HHmmssZ.jsonl`,
+invariant culture, sequence 2 and up adds `-<n>` before `.jsonl`. Written with `System.Text.Json`'s `Utf8JsonWriter`; read with `Utf8JsonReader`:
 header needs `format` (exact string) and `version` (integer; other integer → unsupported version; missing or not an
-integer → not a recording), skips other fields and their values; frame line needs `time` (parsed as ISO 8601 with
-`GetDateTimeOffset`, converted to UTC) and `frame` (base64 string at most 1,398,104 characters, checked before
-decoding, decoded at most 1,048,576 bytes); a field twice, another JSON value than an object, or trailing content →
-invalid line. `MaxLineLength` = 1,398,104 + 4,096 bytes, counted before decoding, line terminator excluded.
+integer → not a recording), skips other fields and their values; frame line needs `time` (`TryGetDateTimeOffset`, converted to UTC, and at
+most `DateTimeOffset.MaxValue` − 30 seconds so the quiet deadline cannot overflow) and `frame` (base64 string at
+most 1,398,104 characters, checked before decoding, and at most 1,048,576 bytes after decoding — 1,398,104
+characters without padding decode to 1,048,578); a field twice, another JSON value than an object, trailing
+content, a `FormatException` or `JsonException` of the reader (depth over 64 included) → invalid line. `MaxLineLength` = 1,398,104 + 4,096 bytes, counted before decoding, line terminator excluded.
 
 **Recorder** (`PipeRecorder`, `Censio.Pipe`). `Record` is synchronous and never waits: it ignores a result without
-frame and every call after a failure or `CompleteAsync`; otherwise it adds the frame length to the queued byte count
-(`Interlocked`), and if that would exceed `MaxQueuedBytes` (16,777,216) it marks the recorder failed (the frames
+frame and every call after a failure or `CompleteAsync`; otherwise it adds the entry's cost `EntryCost(frame length)` = 4 × ceil(length / 3) +
+`EntryOverhead` (128) to the queued count (`Interlocked`), and if that would exceed `MaxQueuedBytes` (16,777,216)
+it marks the recorder failed (so at most 131,072 empty frames queue) (the frames
 already queued are still written) — else it enqueues `(frame, time)` on an unbounded `Channel` and starts the
 writer task on the first frame. The writer opens the file through the factory with the first frame's time, writes
-the header, then one line per frame as one `WriteAsync` of the whole line followed by `FlushAsync`. An exception
+the header, then one line per frame as one `WriteAsync` of the whole line followed by `FlushAsync`, and subtracts
+the entry's cost once the line is flushed. The flush hands the line to the operating system (fact 16): it survives
+a killed Companion, not a power loss; no disk sync per line, so the 1-second flush at `Exit` is not spent on it. An exception
 from the factory, a write or a flush (any exception, the factory's included) marks it failed, drops the queue and
 disposes the stream. `Failed` is raised once, on the thread that detected the failure, each handler in its own
 `try`. `CompleteAsync(token)` closes the channel and waits for the writer; a cancelled token stops the wait only
 (the writer is abandoned, its task observed). `DisposeAsync` = `CompleteAsync(CancellationToken.None)`.
 
 **Recording in the Companion** (`Censio.Companion.Core`). `PipeRecordingFiles.Create(started)` creates the folder
-and the file with `FileMode.CreateNew`, `FileAccess.Write`, `FileShare.Read`; an `IOException` because the file
-exists tries the next suffix, up to 1,000, then rethrows. The folder comes only from the constructor
+and the file with `FileMode.CreateNew`, `FileAccess.Write`, `FileShare.Read`; an `IOException` after which
+`File.Exists(path)` is true tries the next suffix, up to 1,000; any other exception is rethrown at once. A folder
+that is not `Path.IsPathFullyQualified` is refused with `InvalidOperationException` in `Create` (fact 18), so the
+recorder fails as E3. The folder comes only from the constructor
 (`DefaultFolder(localApplicationData)` = `<LocalApplicationData>\Censio\Recordings`); the name only from the time
 and the sequence. `PipeRecordingSession` hands out one `PipeRecorder` per connection (`BeginConnection`, `null` once
 failed), completes it in the background on `EndConnection` (tracked), switches `State` from `Recording` to `Failed`
@@ -113,16 +124,19 @@ rest of the current frame's bytes (4-byte little-endian length, then the frame),
 next line. It reads the recording in chunks into a buffer of at most `MaxLineLength` + 2 bytes; a line longer than
 that is invalid at once. The first line (after an optional UTF-8 BOM) must be the header. Before serving a frame
 it waits `speed.Scale(time − previous time)` on the wait provider (no wait for the first frame, for a pause of zero
-or less, or at maximum speed), then sets the replay clock to the frame's time. A problem or the end of the file
+or less, or at maximum speed), in steps of at most one day (fact 17), then sets the replay clock to the frame's
+time. `Scale` computes in `double` ticks and saturates at `TimeSpan.MaxValue`. A problem or the end of the file
 returns 0 at a frame boundary and leaves `Problem` set (or `null`); an `IOException` of the recording is
 `ReadFailed`. Synchronous `Read` throws `NotSupportedException`. `PipeReplayClock` is a `TimeProvider` whose time
-changes only by `SetUtcNow` (also backwards); its timers fire inside `SetUtcNow` once the time reaches their due
-time, outside its lock, a finite period rescheduling them. A test replays with
+changes only by `SetUtcNow` (also backwards); `CreateTimer` returns a timer that never fires and accepts `Change`
+and `Dispose` (fact 10); the real waits run on the wait provider. A test replays with
 `new PipeTickAssembler(new PipeMessageReader(new PipeReplayStream(file, PipeReplaySpeed.Maximum, clock, TimeProvider.System)), clock)`.
 
 **Replay in the Companion.** `PipeReplayRunner` opens the file (`FileNotFoundException`,
 `DirectoryNotFoundException`, `UnauthorizedAccessException`, `IOException` on open → problem `FileNotFound`),
-builds that pipeline with a read observer that applies `PipeStatusRule.ForRead` (end results ignored), reads items
+builds that pipeline with a read observer that applies `PipeStatusRule.ForRead` (end results ignored; the status
+stays `Connected` until the first result the rule maps to a status, so a recording whose first frame is not a
+`Version` shows `Protocol mismatch`), reads items
 until the end, then sets `IsFinished` (and the stream's problem). `PipeStatusRule.ForRead` is the rule moved out of
 `PipeConnection.RunSessionAsync` (message → `Receiving`, protocol mismatch → `Protocol mismatch` with version,
 stream-ending error → `Error` with kind, end → `Waiting for game`, skipped → `null`); `PipeConnection` calls it, its
@@ -152,10 +166,7 @@ generic over the status type for the replay tooltip.
 
 ## Options considered
 
-The weighed options and why each lost are in record 0036: the frame on the read result versus a tee stream or a
-frame-reader hook; a bounded queue versus writing on the read path; replay as a byte stream into the live reader
-and assembler versus feeding the pure core, an own message source, or the test library's clock; a header line;
-flush per line. Also weighed here: `TrayStatusUpdater` generic versus a second updater type (a copy) — generic wins,
+In record 0036 (options 1–11). Also: `TrayStatusUpdater` generic versus a second updater type — generic wins,
 the Tester adapts its tests.
 
 ## Affected projects and types
@@ -182,7 +193,7 @@ Censio.Pipe:
 - `PipeReadResult.Frame: public ReadOnlyMemory<byte>? Frame { get; }` and `public PipeReadResult WithFrame(ReadOnlyMemory<byte> frame)`
 - `public PipeTickAssembler(IPipeMessageSource source, TimeProvider timeProvider, Action<PipeReadResult, DateTimeOffset>? readObserver)` (the existing constructor chains with null)
 - `public static class PipeRecordingFormat` with `PipeRecordingFormat.FormatName: public const string = "censio-pipe-recording"`, `PipeRecordingFormat.FormatVersion: public const int = 1`, `PipeRecordingFormat.MaxLineLength: public const int = 1402200`, `public static string FormatHeader(DateTimeOffset started)`, `public static string FormatFrameLine(DateTimeOffset receiveTime, ReadOnlySpan<byte> frame)`, `public static string FormatFileName(DateTimeOffset started, int sequence)`, `public static PipeReplayProblemKind? CheckHeader(ReadOnlySpan<byte> line)`, `public static bool TryParseFrameLine(ReadOnlySpan<byte> line, out DateTimeOffset receiveTime, out byte[] frame)`
-- `public class PipeRecorder : IAsyncDisposable` with `PipeRecorder.MaxQueuedBytes: public const long = 16777216`, `public PipeRecorder(Func<DateTimeOffset, Stream> openFile)`, `PipeRecorder.HasFailed: public bool { get; }`, `PipeRecorder.Failed: public event EventHandler?`, `public void Record(PipeReadResult result, DateTimeOffset receiveTime)`, `public Task CompleteAsync(CancellationToken cancellationToken)`, `public ValueTask DisposeAsync()`
+- `public class PipeRecorder : IAsyncDisposable` with `PipeRecorder.MaxQueuedBytes: public const long = 16777216`, `PipeRecorder.EntryOverhead: public const int = 128`, `public static long EntryCost(int frameLength)`, `public PipeRecorder(Func<DateTimeOffset, Stream> openFile)`, `PipeRecorder.HasFailed: public bool { get; }`, `PipeRecorder.Failed: public event EventHandler?`, `public void Record(PipeReadResult result, DateTimeOffset receiveTime)`, `public Task CompleteAsync(CancellationToken cancellationToken)`, `public ValueTask DisposeAsync()`
 - `public class PipeReplayClock : TimeProvider` with `public PipeReplayClock(DateTimeOffset start)`, `public void SetUtcNow(DateTimeOffset now)`, `public override DateTimeOffset GetUtcNow()`, `public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)`
 - `public readonly record struct PipeReplaySpeed` with `PipeReplaySpeed.RealTime: public static PipeReplaySpeed { get; }`, `PipeReplaySpeed.Maximum: public static PipeReplaySpeed { get; }`, `PipeReplaySpeed.Factor: public double? { get; }` (null at maximum speed), `public static bool TryParse(string? text, out PipeReplaySpeed speed)`, `public TimeSpan Scale(TimeSpan recordedPause)`
 - `public enum PipeReplayProblemKind { FileNotFound, NotARecording, UnsupportedVersion, InvalidLine, ReadFailed }`
@@ -215,11 +226,9 @@ New: `tests/Censio.Pipe.Tests/PipeRecordingFormatTests.cs`, `PipeRecorderTests.c
 `PipeReplayRunnerTests.cs`, `CompanionCommandLineTests.cs`. Extended: `PipeMessageReaderTests.cs`,
 `PipeTickAssemblerTests.cs`, `PipeConnectionTests.cs`, `TrayMenuTests.cs`.
 
-New test double: `ControlledWriteStream` (`tests/Censio.Pipe.Tests/ControlledWriteStream.cs`, linked into
-`tests/Censio.Companion.Core.Tests` as a `Compile` item like `PipeFrameBuilder`): a writable stream that keeps the
-bytes written, can hold writes until released, fails a given write or flush with a given exception, counts flushes
-and records its disposal; it models `FileStream` failures as fact 13 states. AC1's tests use `ChunkedStream` or
-`ControlledPipeStream` and `FakeTimeProvider` for the live run.
+New test double `ControlledWriteStream` (`tests/Censio.Pipe.Tests`, linked into `Censio.Companion.Core.Tests` like
+`PipeFrameBuilder`): keeps the bytes written, holds writes until released, fails a given write or flush with a given
+exception, counts flushes, records disposal; models `FileStream` failures (fact 13).
 
 Existing call sites of a changed signature: `TrayStatusUpdaterTests.cs` (`new TrayStatusUpdater(...)` becomes
 `TrayStatusUpdater<PipeConnectionStatus>`) — adapted by the Tester. The `PipeConnection` and `PipeTickAssembler`
@@ -238,49 +247,35 @@ has no test project (record 0004) and is outside both coverage measures already 
 
 All owned by the Dev, written once the code is green; *Test doubles* by the Tester.
 
-- `docs/areas/pipe.md`: *Scope* names recording and replay; a new section *Recording and replay* after *Ticks and
-  sessions*: what is recorded (each whole frame with its one receive time, skipped frames included, nothing for
-  stream-ending errors), one file per connection opened at its first frame, the format of *Approach* (header, frame
-  line, time form, line feed, file name and suffix), the 16 MiB queue and what stops a recording, flush per line,
-  the replay pipeline and clock, speeds and waits, E7's backward times, the line rules of E11, the replay problems
-  and `MaxLineLength`; *Residual risks* gains: the last replayed tick closes as *stream ended* (already there, link
-  the section), a recorder started mid-connection must write the last `Version` first (#13), a stalled disk at
-  `Exit` can cut the last line; *Related decisions* gains 0036; *Not here* drops "Recording the stream (#12)" and
-  gains "Anonymising recordings (#20)".
-- `docs/areas/companion.md`: a *Command line* section (`--record`, `--replay <file>`, `--speed`, invalid command line,
-  single instance applies); *Tray icon and menu* adds the tooltip suffixes and replay tooltips; a *Recordings*
-  bullet (folder, never deleted, private content); *Limits and errors* says the Companion writes recordings only
-  with `--record`; *Related decisions* gains 0036; *Not here* keeps the format in `pipe.md`.
-- `docs/areas/README.md`: pipe row's scope adds "recording and replay", *Not here* becomes "Anonymising
-  recordings"; companion row's scope adds "command line, recordings, replay".
-- `docs/ARCHITECTURE.md`: `Censio.Pipe` row adds recording and replay; `Censio.Companion.Core` row adds command
-  line, recording session and replay runner; one sentence after the tick sentence: the Companion records the raw
-  frames with `--record` and replays a recording through the same reader and assembler (record 0036).
-- `README.md`: *What works* bullet for `--record` and `--replay`; a *Recording and replay* subsection under
-  *Companion* (start from a command prompt or a shortcut: `Censio.Companion.exe --record`, folder, privacy and
-  anonymisation note, `--replay <file> [--speed <factor>|max]`, the replay tooltips, close the running Companion
-  first); then the same in the German half.
-- `docs/USER_GUIDE.md`: a *Recording and replay* subsection under *Companion* with the switches, file format in one
-  sentence linking `docs/areas/pipe.md`, the tooltips and the errors; *Data and logs*: the Companion stores
-  recordings in `%LOCALAPPDATA%\Censio\Recordings` only with `--record`, deleted by hand; *Reporting problems*: never
-  attach a raw recording publicly; then the same in the German half.
-- `.squad/project.md` *Security areas*: the recordings line names `PipeRecordingFiles` and the fixed folder; the
-  parsing line adds recording files read by `PipeReplayStream`. *Test doubles* (Tester): `ControlledWriteStream`.
+- `docs/areas/pipe.md`: *Scope* names recording and replay; new section *Recording and replay* after *Ticks and
+  sessions*, stating the rules of *Approach* (what is recorded, file per connection, format, queue and its cost,
+  flush, replay pipeline, clock, speeds, waits, line rules, problems, limits); *Residual risks*: mid-connection
+  start needs the last `Version` (#13), a stalled disk or power loss can lose the last lines; *Related decisions*
+  gains 0036; *Not here*: "Anonymising recordings (#20)" instead of "Recording the stream (#12)".
+- `docs/areas/companion.md`: *Command line* section (the switches, invalid command line, single instance); the
+  tooltips; recordings folder (never deleted, private); *Related decisions* gains 0036.
+- `docs/areas/README.md`: pipe row adds "recording and replay", *Not here* "Anonymising recordings"; companion row
+  adds "command line, recordings, replay".
+- `docs/ARCHITECTURE.md`: the `Censio.Pipe` and `Censio.Companion.Core` rows; one flow sentence on recording and
+  replay through the same reader and assembler (record 0036).
+- `README.md` and `docs/USER_GUIDE.md`, English then German: *What works* bullet (README); *Recording and replay*
+  under *Companion* (`--record`, folder, privacy and anonymisation, `--replay <file> [--speed <factor>|max]` on a
+  local file, tooltips, close the running Companion first); user guide also *Data and logs* (recordings only with
+  `--record`, deleted by hand) and *Reporting problems* (never attach a raw recording publicly).
+- `.squad/project.md` *Security areas*: recordings line names `PipeRecordingFiles` and the folder; parsing line
+  adds recording files (`PipeReplayStream`). *Test doubles* (Tester): `ControlledWriteStream`.
 
 ## Architecture check
 
-No guarantee in `.squad/project.md` exists yet. Record 0018 (the format stays in `Censio.Pipe`) holds: the
-recording format and replay live in `Censio.Pipe`; the Companion core only names files and states. Record 0034
-holds: replay uses its assembler and clock injection unchanged, plus an observer. Record 0035's connection
-behavior is unchanged with and without recording (the rule extraction is behavior-neutral, its tests stay).
-Record 0004 holds: all new logic is in tested platform-neutral projects.
+No guarantee exists yet. Record 0018 holds (format and replay in `Censio.Pipe`), 0034 (assembler unchanged plus an
+observer), 0035 (connection behavior unchanged; the rule extraction keeps its tests), 0004 (new logic tested).
 
 ## Security considerations
 
 - [ ] Limits on the recording file, each before decoding: a line is at most `MaxLineLength` bytes (refused before
   it is buffered whole); a `frame` string at most 1,398,104 characters before base64 decoding, the decoded frame
-  at most 1,048,576 bytes; the decoded frame then passes the reader's own limits. The recorder's queue counts raw
-  frame bytes (16,777,216), before base64 encoding. Strings are not decoded beyond JSON, so U+FFFD cannot grow them.
+  at most 1,048,576 bytes; the decoded frame then passes the reader's own limits. The recorder's queue counts each
+  entry's line cost (`EntryCost`, base64 length plus 128), at most 16,777,216 in total. Strings are not decoded beyond JSON, so U+FFFD cannot grow them.
 - [ ] Exceptions reaching a user-visible text: file open (`FileNotFoundException`, `DirectoryNotFoundException`,
   `UnauthorizedAccessException`, `IOException`) → `Replay error: file not found`; read `IOException` →
   `Replay error: read failed`; recording factory, write or flush exceptions → `(recording failed)`. No exception
@@ -291,6 +286,28 @@ Record 0004 holds: all new logic is in tested platform-neutral projects.
 ## Decision records
 
 - `docs/decisions/0036-pipe-recording-raw-frames-and-replay-on-a-recorded-clock.md` (Proposed), index row added.
+
+## Challenge
+
+Devil's Advocate plan challenge, all accepted (reasons in record 0036 where they are decisions):
+
+- M1: narrowed. E2 covers a killed or crashed Companion; per-line `FlushAsync` reaches the OS only (fact 16); no
+  disk sync per line (record 0036 option 11).
+- m1: S5 and *Approach* follow `PipeStatusRule`; AC9 tests renamed and added.
+- m2: the replay clock's timers never fire (fact 10); timer-firing tests dropped.
+- m3: `PipeConnectionRecordingReplaysSameTicksAsLiveAssembler` (AC4).
+- m4: suffix only when `File.Exists`; other errors rethrown; test in AC3.
+
+## Security review
+
+Plan review `CHANGES_REQUIRED`, all resolved:
+
+- B1: `TryGetDateTimeOffset`; late times, `FormatException`, `JsonException` → `invalid line <n>`; `Scale`
+  saturates; waits in steps of a day; tests in AC7 and AC8; spec E6 updated.
+- B2: per-entry cost (`EntryCost`); `PipeRecorderEmptyFramesOnHeldStreamFailAtEntryLimit`; spec E10 and NFR.
+- B3: a folder not fully qualified is refused; `PipeRecordingFilesFolderNotFullyQualifiedIsRefused`; spec E3.
+- N1, N2, N3, N5: taken (cost freed after flush; invariant Gregorian names; 1,398,104-character case; local-file
+  note in the docs). N4: moot, timers never fire.
 
 ## Out of scope / follow-ups
 

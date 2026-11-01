@@ -40,7 +40,8 @@ an injected clock (record 0034). The tooltip is the Companion's only output
   does not open the pipe; it feeds the file's frames at their recorded pace through the same message reader (with
   its version gate) and tick assembler a test uses, and derives the tooltip from them with the same state rules as
   the live connection, not a copy of them. The tooltip reads `Censio Companion: Replay: Connected` from the start
-  until the first message (also while frames before `Version 2` are replayed), then
+  until the first replayed frame that changes the live state (skipped frames do not; a first non-empty frame that
+  is not a `Version` shows `Protocol mismatch`, as live), then
   `Censio Companion: Replay: Receiving` or `Censio Companion: Replay: Protocol mismatch` as the live states would,
   and after the last frame `Censio Companion: Replay finished` until `Exit`. A replay never shows `Error`: a frame
   that would end a live stream cannot be in a valid file, and a file problem shows as E6 describes.
@@ -58,11 +59,13 @@ an injected clock (record 0034). The tooltip is the Companion's only output
   the Companion exits while a frame is only partly received: the file holds every frame received whole; an
   incomplete or oversized frame is not recorded. The replay's last tick closes as *stream ended*; where the live
   run closed it by the quiet period, this is the one accepted difference (record 0034).
-- E2: The Companion is killed or the machine loses power: the lines written before stay complete; at most the last
-  line is cut off, and its replay reports it as E6 describes.
+- E2: The Companion is killed or crashes: the lines written before stay complete; at most the last line is cut
+  off, and its replay reports it as E6 describes. A power loss can also lose the last lines the operating system
+  had not yet written to the disk.
 - E3: The recordings folder cannot be created or a write fails (disk full, folder deleted): recording stops for the
   rest of the run, the lines written so far stay complete, the tooltip reads `Censio Companion: <state> (recording
-  failed)` until `Exit`; the connection and its states are not affected.
+  failed)` until `Exit`; the connection and its states are not affected. A recordings folder Windows cannot name
+(not a full path) counts as a folder that cannot be created.
 - E4: Two connections whose first frames fall in the same second: the second file gets the suffix `-2` (`-3`, …); no
   file is overwritten.
 - E5: The frames of a pipe are untrusted, so are the frames in a recording: a replayed frame passes the same limits
@@ -72,7 +75,8 @@ an injected clock (record 0034). The tooltip is the Companion's only output
   `Censio Companion: Replay error: <reason>` after the frames before it were replayed: `file not found` (also no
   access), `not a recording` (first line is not the header; also an empty file), `unsupported version` (header
   version other than 1), `invalid line <n>` (not valid JSON of the frame form, invalid base64, a frame over 1 MiB, a
-  line over the size such a frame needs, a missing time, a field given twice), `read failed` (the file cannot be read
+  line over the size such a frame needs, a missing time, a time too late to add 30 seconds to or not convertible to UTC, nesting deeper than 64, a field
+  given twice), `read failed` (the file cannot be read
   on after it was opened). A header-only recording replays as finished at once.
 - E7: Recorded times that go backwards or repeat: the replay does not wait before such a frame, and the frame is
   stamped with its recorded time unchanged, so the ticks are the ones the recorded times give; a large gap is waited
@@ -83,7 +87,8 @@ an injected clock (record 0034). The tooltip is the Companion's only output
   the pipe, and `Exit` works as usual.
 - E9: A Companion already runs: a start with `--record` or `--replay` ends at once like any second start (single
   instance, [`companion.md`](../../docs/areas/companion.md)); the tester closes the running one first.
-- E10: The disk is slower than the pipe: frames wait to be written in a queue of at most 16 MiB of frame bytes; the
+- E10: The disk is slower than the pipe: frames wait to be written in a queue of at most 16 MiB, each frame counted as its line's base64 length plus 128
+  bytes; the
   pipe is read on without waiting for the disk. When a frame does not fit, or frames are still queued 1 second after
   `Exit`, sign-out or shutdown began, the recording stops as E3 describes: the file ends with the last complete line
   written, the frames after it are not recorded, and the live run is unchanged. A line a stalled disk is still
@@ -98,7 +103,7 @@ an injected clock (record 0034). The tooltip is the Companion's only output
 
 - Recording never changes the live run: the frames, states and receive times of a connection are the same with and
   without it, also with a stalled disk; a slow disk can cost the recording (E10), never the live run.
-- Memory: recording adds at most 16 MiB of queued frames to the frame the reader holds.
+- Memory: recording adds at most 16 MiB of queued lines (E10's count) to the frame the reader holds.
 - The folder is fixed (`%LOCALAPPDATA%\Censio\Recordings`); no part of a file name or path comes from pipe data.
 - Privacy: a recording holds the savegame headline, island names and economic data as the game sent them. It stays
   local, is never sent anywhere, and is never deleted automatically; README and user guide say so and say that only
