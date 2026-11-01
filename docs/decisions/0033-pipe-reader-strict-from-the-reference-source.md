@@ -1,6 +1,6 @@
 # 0033: The pipe reader is strict, fails closed and is built from the reference source with synthetic frames
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-01
 - **Area:** pipe
 - **Source:** Issue #9
