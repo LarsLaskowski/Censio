@@ -145,6 +145,18 @@ public sealed class PipeFrameBuilder
                                   IReadOnlyCollection<KeyValuePair<int, int>> workforce,
                                   IReadOnlyCollection<KeyValuePair<int, int>> buildings)
     {
+        EntryFields(productGuid);
+
+        return Map(workforce).Map(buildings);
+    }
+
+    /// <summary>
+    /// Appends the twelve scalar values of a production entry, without its maps.
+    /// </summary>
+    /// <param name="productGuid">The product GUID</param>
+    /// <returns>This builder</returns>
+    public PipeFrameBuilder EntryFields(int productGuid)
+    {
         Int32(productGuid);
 
         for (var index = 1; index <= 5; index++)
@@ -153,9 +165,8 @@ public sealed class PipeFrameBuilder
         }
 
         Int32(productGuid + 6).Int32(productGuid + 7).Float32(productGuid + 8.5f).Int32(productGuid + 9);
-        Float32(productGuid + 10.25f).Float32(productGuid + 11.75f);
 
-        return Map(workforce).Map(buildings);
+        return Float32(productGuid + 10.25f).Float32(productGuid + 11.75f);
     }
 
     /// <summary>
