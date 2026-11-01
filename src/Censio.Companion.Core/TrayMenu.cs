@@ -32,6 +32,17 @@ public static class TrayMenu
     }
 
     /// <summary>
+    /// Formats the tooltip of the tray icon for a connection state.
+    /// </summary>
+    /// <param name="state">The connection state</param>
+    /// <returns>The tooltip text</returns>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="state" /> is not a defined value</exception>
+    public static string FormatToolTip(PipeConnectionState state)
+    {
+        throw new NotImplementedException();
+    }
+
+    /// <summary>
     /// Creates the entries of the tray menu.
     /// </summary>
     /// <param name="version">The product version</param>
