@@ -18,11 +18,6 @@ public sealed class PipeTickAssembler : IDisposable
     private readonly TimeProvider _timeProvider;
 
     /// <summary>
-    /// The builder that groups the results.
-    /// </summary>
-    private readonly PipeTickBuilder _builder = new();
-
-    /// <summary>
     /// The items produced but not yet delivered.
     /// </summary>
     private readonly Queue<PipeTickResult> _queue = new();
@@ -31,6 +26,11 @@ public sealed class PipeTickAssembler : IDisposable
     /// The cancellation of the source reads.
     /// </summary>
     private readonly CancellationTokenSource _readCancellation = new();
+
+    /// <summary>
+    /// The builder that groups the results.
+    /// </summary>
+    private PipeTickBuilder _builder = new();
 
     /// <summary>
     /// The read that has not been fed to the builder yet.
@@ -198,6 +198,7 @@ public sealed class PipeTickAssembler : IDisposable
     {
         _ended = true;
         _queue.Clear();
+        _builder = new PipeTickBuilder();
 
         if (_disposed == false)
         {
