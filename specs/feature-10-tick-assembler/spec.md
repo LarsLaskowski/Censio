@@ -1,7 +1,7 @@
 # Spec: Tick assembler and island identity
 
 Source: Issue #10
-Status: Draft
+Status: Approved by Lead
 
 ## Problem
 
