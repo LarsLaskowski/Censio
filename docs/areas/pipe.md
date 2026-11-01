@@ -248,12 +248,12 @@ Until fixtures from real recordings (#20) test the reader:
   - The game serves one client at a time. While the reference reader held the pipe, the Companion showed `Pipe busy`
     and switched to `Receiving` when that reader ended, so the game accepts a new client after the previous one ended.
   - The game sends `Version` at once after the connect, without a loaded save, so `Connected` is not visible in
-    practice. A return to the main menu kept `Receiving`.
+    practice. A return to the main menu and loading another save while connected kept `Receiving`.
   - A Companion restarted while the game runs shows `Receiving` at once with a loaded save. With the game in the
     main menu it stays at `Pipe busy` until a game is loaded or started; the game apparently releases the old
     connection only when it next sends something. The Companion keeps retrying every 10 seconds meanwhile.
   - `Exit` in `Pipe busy` ended the process in under 2 seconds.
-  - Not tested: a save load while connected, and the exact name `x\anno117` with the game on.
+  - Not tested: the exact name `x\anno117` with the game on.
 - A program that created `\\.\pipe\anno117` before the game is read as the game, within the limits above, and
   cannot act with the player's Windows rights through the connection; it can still show `Receiving` with false data.
 - A stall of more than 30 seconds in the stream splits a tick into two ticks with one game time.
