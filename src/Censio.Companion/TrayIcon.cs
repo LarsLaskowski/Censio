@@ -79,6 +79,19 @@ internal sealed class TrayIcon : IDisposable
 
     #endregion // Constructors
 
+    #region Methods
+
+    /// <summary>
+    /// Sets the tooltip of the icon; does nothing once the icon is disposed.
+    /// </summary>
+    /// <param name="text">The tooltip text</param>
+    public void SetToolTip(string text)
+    {
+        throw new NotImplementedException();
+    }
+
+    #endregion // Methods
+
     #region IDisposable
 
     /// <inheritdoc />
