@@ -85,8 +85,7 @@ request.
 - **SonarQube Cloud** (organisation `networlddev`, project `networlddev_censio`; check *SonarCloud Code
   Analysis*): analyses build and tests inside the CI job and shows the quality gate as its own check, which does
   not decide the result of *CI*. It is skipped when the repository secret `SONAR_TOKEN` is not available (fork
-  and Dependabot pull requests); a rejected token or an unreachable server fails the CI job. Locally the *Sonar
-  gate* of `.squad/stack.md` runs it.
+  and Dependabot pull requests); a rejected token or an unreachable server fails the CI job. The *Sonar gate* of `.squad/stack.md` reads its result for a pull request.
 - **CodeQL** (`.github/workflows/codeql.yml`): analyses C# and the workflows on pushes to `main`, on pull
   requests and weekly (Sunday 01:30 UTC); its checks *Analyze (csharp)* and *Analyze (actions)* turn red when
   the analysis itself fails, and the alerts it finds appear under *Security > Code scanning*. No local command
@@ -114,8 +113,7 @@ When a Dependabot pull request raises `Reihitsu.Analyzer` and `Reihitsu.Cli` tog
 formats the code differently, the format check turns it red. A maintainer first reviews the Dependabot diff,
 because a push to its branch gives that run the repository secrets while the raised packages build; then checks
 out the branch, runs *Format* and pushes the result. A raised `dotnet-sonarscanner` gets no SonarQube run on a
-Dependabot pull request, so before merging a maintainer pushes a commit to its branch or runs the *Sonar gate*
-locally. If *Check tool versions* is red, raise the package that is behind.
+Dependabot pull request, so before merging a maintainer pushes a commit to its branch, which runs the analysis with the raised scanner. If *Check tool versions* is red, raise the package that is behind.
 <!-- project:end getting-started -->
 
 ## Submitting a pull request

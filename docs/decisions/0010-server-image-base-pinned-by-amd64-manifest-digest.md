@@ -54,9 +54,7 @@ lacks is. The tag list (`/v2/dotnet/<image>/tags/list`) is anonymous and unpagin
 
 For `docker:S8431` on option 1's `FROM` lines:
 
-8. **Exclude `docker:S8431` for `src/Censio.Server/Dockerfile` with `sonar.issue.ignore.multicriteria`, passed
-   by the CI scanner and the *Sonar gate* alike** (chosen) — reviewable in the repository, survives each base
-   bump. Con: a second scanner argument kept equal in two places.
+8. **Exclude `docker:S8431` for `src/Censio.Server/Dockerfile` with `sonar.issue.ignore.multicriteria`, passed by the CI scanner** (chosen) — reviewable in the repository, survives each base bump. Con: a scanner argument in the CI workflow that a change to the workflow must keep.
 9. **Digest only** — satisfies the rule. Con: Dependabot cannot propose a tag update without a tag, and
    `base.name` could no longer name the image.
 10. **Tag only** — satisfies the rule. Con: the pull follows a mutable tag; the base image is no longer pinned.
