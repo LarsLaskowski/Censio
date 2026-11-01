@@ -96,7 +96,10 @@ the Docker health probe rely on it.
   label (and `base.name`) set by hand to the new `FROM` line.
 - The server logs to the console (`docker logs`).
 - Published on Docker Hub as `networlddev/censio:<version>` for every release and as `latest`, which points to the
-  last promoted release; both tags resolve to the same single linux/amd64 image manifest (no attestation index), the
+  promoted release of the highest version: a release whose tag is not the highest `vMAJOR.MINOR.PATCH` tag is
+  refused and leaves `latest` where it was, and a re-run of only the publish jobs of such a run re-pushes its own
+  `<version>`. GitHub's *Latest* mark is not protected: anyone with write access can set it by hand or by publishing
+  an old tag's release as a full release. `<version>` and `latest` resolve to the same single linux/amd64 image manifest (no attestation index), the
   image that passed the release checks (the start page shows `Version <version>`, `/health` answers `Healthy`). A
   release creates no other tag, and an earlier release's tag stays unchanged unless its run is re-run.
 
