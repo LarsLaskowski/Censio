@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace Censio.Pipe;
 
 /// <summary>
@@ -39,12 +41,38 @@ public sealed class PipeError
 
     #endregion // Properties
 
+    #region Methods
+
+    /// <summary>
+    /// Adds a <c>name=value</c> entry when the value is set.
+    /// </summary>
+    /// <param name="fields">The entries</param>
+    /// <param name="name">The field name</param>
+    /// <param name="value">The value</param>
+    private static void AddField(List<string> fields, string name, int? value)
+    {
+        if (value.HasValue)
+        {
+            fields.Add(string.Create(CultureInfo.InvariantCulture, $"{name}={value.Value}"));
+        }
+    }
+
+    #endregion // Methods
+
     #region Object
 
     /// <inheritdoc />
     public override string ToString()
     {
-        throw new NotImplementedException();
+        var fields = new List<string>();
+
+        AddField(fields, "length", Length);
+        AddField(fields, "type", TypeValue);
+        AddField(fields, "offset", Offset);
+        AddField(fields, "received", ReceivedVersion);
+        AddField(fields, "expected", ExpectedVersion);
+
+        return fields.Count == 0 ? Kind.ToString() : $"{Kind}: {string.Join(", ", fields)}";
     }
 
     #endregion // Object

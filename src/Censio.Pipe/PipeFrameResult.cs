@@ -5,6 +5,15 @@ namespace Censio.Pipe;
 /// </summary>
 public sealed class PipeFrameResult
 {
+    #region Fields
+
+    /// <summary>
+    /// The shared end-of-stream result.
+    /// </summary>
+    private static readonly PipeFrameResult _endResult = new(PipeFrameResultKind.EndOfStream, ReadOnlyMemory<byte>.Empty, null);
+
+    #endregion // Fields
+
     #region Constructors
 
     /// <summary>
@@ -27,7 +36,7 @@ public sealed class PipeFrameResult
     /// <summary>
     /// Gets the end-of-stream result.
     /// </summary>
-    public static PipeFrameResult End => throw new NotImplementedException();
+    public static PipeFrameResult End => _endResult;
 
     /// <summary>
     /// Gets the outcome.
@@ -55,7 +64,7 @@ public sealed class PipeFrameResult
     /// <returns>The result</returns>
     public static PipeFrameResult FromFrame(ReadOnlyMemory<byte> frame)
     {
-        throw new NotImplementedException();
+        return new PipeFrameResult(PipeFrameResultKind.Frame, frame, null);
     }
 
     /// <summary>
@@ -65,7 +74,9 @@ public sealed class PipeFrameResult
     /// <returns>The result</returns>
     public static PipeFrameResult FromError(PipeError error)
     {
-        throw new NotImplementedException();
+        ArgumentNullException.ThrowIfNull(error);
+
+        return new PipeFrameResult(PipeFrameResultKind.Error, ReadOnlyMemory<byte>.Empty, error);
     }
 
     #endregion // Methods
