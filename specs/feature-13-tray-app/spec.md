@@ -178,3 +178,32 @@ delivered in this run, live or replayed.
 - `docs/ARCHITECTURE.md` (component row of `Censio.Companion.Core`, the flow paragraph), `README.md` and
   `docs/USER_GUIDE.md` in English and German (*Recording and replay*, *First start*, *Data and logs*, *Reporting
   problems*: where the log is and to check it before sharing).
+
+## Challenge notes
+
+Minor objections of the spec challenge, verbatim; the Lead answers them while planning.
+
+1. **minor**: E7 (a new `Start recording` retries after a failure) contradicts documented rules that the *Area documents* list does not name. Why: those documents would still say a failure stops recording for the rest of the run.
+   - `docs/areas/pipe.md` *Writing* (lines ~162-164): "stops for the rest of the run … A connection that starts afterwards records nothing".
+   - `docs/areas/companion.md` *Recording*: "(recording failed) until Exit".
+   - `docs/USER_GUIDE.md` line 128 and its German counterpart, line 288: "recording stops for the rest of the run".
+   - The code agrees with them: `PipeRecordingSession.SetFailed` is one-way, and `BeginConnection` returns `null` once the session has failed.
+   - Instruction: list these passages under *Area documents*, and plan a session whose failed state a new start can reset.
+2. **minor**: E8 lets a stopped recording finish writing in the background while a new one runs, but does not say what that old recording's later write failure does. Why: today any recorder's `Failed` event (`PipeRecordingSession.OnRecorderFailed` → `SetFailed`) marks the whole session failed, so a healthy new recording would show ` (recording failed)`.
+   - Instruction: state whether a stopped recording's background failure is only logged, or also changes the suffix and the menu entry.
+3. **minor**: S8 lists only `Waiting for game` and `Pipe busy` as "no connection open". Why: `Error` is also reached between attempts (`PipeConnection.RunLoopAsync` sets the end status and then waits the retry delay).
+   - Instruction: add `Error` to S8, or say that every state outside an open connection behaves as S8.
+4. **minor**: The issue's first acceptance criterion, "With the game running, the tray shows 'receiving' and the time of the last tick", is only verified against fakes. Why: the shell that wires connection, assembler, tooltip and menu (`src/Censio.Companion/App.xaml.cs`, `TrayIcon.cs`) has no test project. The game's timing is also still unconfirmed third-party observation (`docs/areas/pipe.md` ~346-348). So AC1 and AC4 could pass on a build whose live wiring is broken.
+   - Instruction: extend AC10's manual Windows run. With the game started with `/pipe` and a save loaded, the tooltip should show `Receiving` and a `Last tick`. A recording toggled from the menu should replay with `--replay` to `Replay: Receiving` and then `Replay finished`.
+5. **minor**: Replay times are untrusted, and E2/S11 do not say how an extreme recorded time is shown in local time. Why: `docs/areas/pipe.md` *Line rules* accepts any time that converts to UTC and is at least 30 s before the maximum, such as `0001-01-01T00:00:00Z`. The conversion to local time can then go out of range: depending on the API, `DateTimeOffset.ToLocalTime` clamps and `TimeZoneInfo.ConvertTime` throws. A throw inside the tooltip update on the dispatcher would end the process.
+   - Instruction: state the fallback for a time that cannot be shown in local time (for example, show it in UTC with `Z`) and require that formatting never throws.
+6. **minor**: The issue asks for "structured logging", but S10 defines plain text lines (time, level, message) without saying that this answers "structured". Why: the plan could add a logging package without the decision being made. A new package touches the dependency security area and must be embedded in the single-file exe (record 0027). `Directory.Packages.props` has no logging package today.
+   - Instruction: add an `Answered:` open question that says what "structured" means here and whether a library is allowed or the writer is hand-written.
+7. **minor**: E12 does not give the exact name of a continuation file or what "newest" means. Why: without them, "older ones of this pattern are deleted; other files never touched" cannot be tested, and the deletion pattern is part of the fixed-folder file handling Security will review.
+   - Instruction: give the exact name (for example `companion-<yyyyMMdd>-<n>.log`), say whether "newest" is ordered by name or by write time, and say that only names matching that exact pattern are deleted.
+8. **minor**: S10 asks for "recording started … (with the file name)", but no file name exists at the click. Why: the file is created by `PipeRecordingFiles.Create` at the first frame, which comes later or, with S8, at the next connection.
+   - Instruction: log the start at the click without a name, and log the file name when the file is created.
+9. **minor**: The privacy NFR contradicts itself. It says the log holds "no full path the Companion builds itself", yet it logs Windows exception texts "as given". Why: an `IOException` from the `FileStream` in `PipeRecordingFiles.Create`, or from `Directory.CreateDirectory`, names the full recording path, which contains the Windows user name. The user guide's *Reporting problems* will tell testers to share the log.
+   - Instruction: say that the profile path, and so the user name, can appear through exception texts, and have *Reporting problems* in both languages say so.
+10. **minor**: The recording started mid-connection breaks a rule that `docs/areas/pipe.md` *What is recorded* (line ~128) states. The rule: every frame is recorded "with the receive time the pipeline gave it". Why: the prepended `Version` line carries the first recorded frame's time, not its own receive time, and the *Area documents* entry for `pipe.md` names only the *Recorder started in the middle* section.
+    - Instruction: list the *What is recorded* rule too, and state the exception there.
