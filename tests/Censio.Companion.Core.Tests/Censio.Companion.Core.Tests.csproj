@@ -13,5 +13,6 @@
     <Compile Include="..\Censio.Pipe.Tests\PipeFrameBuilder.cs" Link="PipeFrameBuilder.cs" />
     <Compile Include="..\Censio.Pipe.Tests\ControlledWriteStream.cs" Link="ControlledWriteStream.cs" />
     <Compile Include="..\Censio.Pipe.Tests\RecordingTimeProvider.cs" Link="RecordingTimeProvider.cs" />
+    <Compile Include="..\Censio.Server.Tests\RecordingLogger.cs" Link="RecordingLogger.cs" />
   </ItemGroup>
 </Project>
