@@ -17,11 +17,11 @@ except the Windows shell:
 | Project | Responsibility | References |
 | ------- | -------------- | ---------- |
 | `Censio.Contracts` | The types shared by Companion and server, and the product version | — |
-| `Censio.Pipe` | Framing and parsing the statistics pipe into typed messages and assembling them into ticks ([`areas/pipe.md`](areas/pipe.md)) | — |
+| `Censio.Pipe` | Framing and parsing the statistics pipe into typed messages and assembling them into ticks, recording frames to a file and replaying it ([`areas/pipe.md`](areas/pipe.md)) | — |
 | `Censio.GameData` | Reading the game files and the catalog | — |
 | `Censio.Server.Data` | Persistence of the server | — |
 | `Censio.Server` | Web host, UI, later the ingest | Contracts, Server.Data |
-| `Censio.Companion.Core` | The Companion's platform-neutral logic (tray menu, single-instance rule, pipe connection state machine and tooltip texts) | Contracts, Pipe, GameData |
+| `Censio.Companion.Core` | The Companion's platform-neutral logic (tray menu, single-instance rule, pipe connection state machine, command line, recording session and replay runner, tooltip texts) | Contracts, Pipe, GameData |
 | `Censio.Companion` | The Windows tray shell (WPF application, Windows Forms tray icon); no test project | Companion.Core |
 
 All assemblies carry the version of the build property `Version` (default `0.0.0`) as informational version
@@ -44,6 +44,9 @@ The Companion opens the pipe itself, reconnects when the game restarts and shows
 tooltip ([`decisions/0035`](decisions/0035-pipe-connection-states-retry-and-identification-level.md),
 [`areas/pipe.md`](areas/pipe.md)). The Companion groups the messages into ticks with an island identity and session events
 ([`decisions/0034`](decisions/0034-ticks-assembled-by-close-rules-on-an-injected-clock.md)).
+With `--record` the Companion also writes the frames of each connection to a local file, and with `--replay` it feeds
+such a file through the same message reader and tick assembler instead of the pipe
+([`decisions/0036`](decisions/0036-pipe-recording-raw-frames-and-replay-on-a-recorded-clock.md)).
 The server accepts data only from a client that presents the ingest token. Guarantees are listed in
 `.squad/project.md` (*Guarantees*) and linked to their decision record as they are made.
 

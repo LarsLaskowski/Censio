@@ -1,16 +1,17 @@
 namespace Censio.Companion.Core;
 
 /// <summary>
-/// Hands the connection status over to the tray with at most one pending update.
+/// Hands a status over to the tray with at most one pending update.
 /// </summary>
-public sealed class TrayStatusUpdater
+/// <typeparam name="TStatus">The type of the status</typeparam>
+public sealed class TrayStatusUpdater<TStatus>
 {
     #region Fields
 
     /// <summary>
     /// Reads the current status.
     /// </summary>
-    private readonly Func<PipeConnectionStatus> _readStatus;
+    private readonly Func<TStatus> _readStatus;
 
     /// <summary>
     /// Posts a callback to the thread of the tray.
@@ -20,7 +21,7 @@ public sealed class TrayStatusUpdater
     /// <summary>
     /// Shows a status in the tray.
     /// </summary>
-    private readonly Action<PipeConnectionStatus> _show;
+    private readonly Action<TStatus> _show;
 
     /// <summary>
     /// Whether a post is waiting to run; 1 if so, otherwise 0.
@@ -32,13 +33,13 @@ public sealed class TrayStatusUpdater
     #region Constructor
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="TrayStatusUpdater" /> class.
+    /// Initializes a new instance of the <see cref="TrayStatusUpdater{TStatus}" /> class.
     /// </summary>
     /// <param name="readStatus">Reads the current status</param>
     /// <param name="post">Posts a callback to the thread of the tray</param>
     /// <param name="show">Shows a status in the tray</param>
     /// <exception cref="ArgumentNullException">An argument is <c>null</c></exception>
-    public TrayStatusUpdater(Func<PipeConnectionStatus> readStatus, Action<Action> post, Action<PipeConnectionStatus> show)
+    public TrayStatusUpdater(Func<TStatus> readStatus, Action<Action> post, Action<TStatus> show)
     {
         ArgumentNullException.ThrowIfNull(readStatus);
         ArgumentNullException.ThrowIfNull(post);

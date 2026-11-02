@@ -1,7 +1,7 @@
 namespace Censio.Companion.Core.Tests;
 
 /// <summary>
-/// Tests for <see cref="TrayStatusUpdater" />.
+/// Tests for <see cref="TrayStatusUpdater{TStatus}" />.
 /// </summary>
 [TestClass]
 public sealed class TrayStatusUpdaterTests
@@ -26,7 +26,7 @@ public sealed class TrayStatusUpdaterTests
     /// <summary>
     /// The updater a show callback announces a change to.
     /// </summary>
-    private TrayStatusUpdater? _updater;
+    private TrayStatusUpdater<PipeConnectionStatus>? _updater;
 
     /// <summary>
     /// The number of posts made.
@@ -114,15 +114,15 @@ public sealed class TrayStatusUpdaterTests
     /// </summary>
     /// <param name="show">Shows a status</param>
     /// <returns>The updater</returns>
-    private TrayStatusUpdater CreateUpdater(Action<PipeConnectionStatus> show)
+    private TrayStatusUpdater<PipeConnectionStatus> CreateUpdater(Action<PipeConnectionStatus> show)
     {
-        return new TrayStatusUpdater(() => _current,
-                                     action =>
-                                     {
-                                         _postCount++;
-                                         _posted.Enqueue(action);
-                                     },
-                                     show);
+        return new TrayStatusUpdater<PipeConnectionStatus>(() => _current,
+                                                           action =>
+                                                           {
+                                                               _postCount++;
+                                                               _posted.Enqueue(action);
+                                                           },
+                                                           show);
     }
 
     /// <summary>
@@ -130,7 +130,7 @@ public sealed class TrayStatusUpdaterTests
     /// </summary>
     /// <param name="updater">The updater</param>
     /// <param name="count">The number of changes</param>
-    private void NotifyChanges(TrayStatusUpdater updater, int count)
+    private void NotifyChanges(TrayStatusUpdater<PipeConnectionStatus> updater, int count)
     {
         for (var version = 1; version <= count; version++)
         {

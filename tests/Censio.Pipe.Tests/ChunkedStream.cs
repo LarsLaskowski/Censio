@@ -39,6 +39,11 @@ public sealed class ChunkedStream : Stream
     private readonly bool _readable;
 
     /// <summary>
+    /// Whether the failing read throws an <see cref="UnauthorizedAccessException" /> instead of an <see cref="IOException" />.
+    /// </summary>
+    private readonly bool _accessDenied;
+
+    /// <summary>
     /// Whether the stream is disposed.
     /// </summary>
     private bool _disposed;
@@ -56,12 +61,14 @@ public sealed class ChunkedStream : Stream
     /// <param name="cancelOffset">The offset at which a read cancels <paramref name="cancellationSource" />, if any</param>
     /// <param name="cancellationSource">The source to cancel at <paramref name="cancelOffset" /></param>
     /// <param name="readable">The value of <see cref="CanRead" /></param>
+    /// <param name="accessDenied">Whether the failing read throws an <see cref="UnauthorizedAccessException" /> instead</param>
     public ChunkedStream(byte[] data,
                          int chunkSize = int.MaxValue,
                          int? ioErrorOffset = null,
                          int? cancelOffset = null,
                          CancellationTokenSource? cancellationSource = null,
-                         bool readable = true)
+                         bool readable = true,
+                         bool accessDenied = false)
     {
         _data = data;
         _chunkSize = chunkSize;
@@ -69,6 +76,7 @@ public sealed class ChunkedStream : Stream
         _cancelOffset = cancelOffset;
         _cancellationSource = cancellationSource;
         _readable = readable;
+        _accessDenied = accessDenied;
     }
 
     #endregion // Constructors
@@ -103,7 +111,7 @@ public sealed class ChunkedStream : Stream
 
         if (_ioErrorOffset == Offset)
         {
-            throw new IOException("Simulated I/O error");
+            throw _accessDenied ? new UnauthorizedAccessException("Simulated access denied") : new IOException("Simulated I/O error");
         }
 
         var count = Math.Min(Math.Min(destination.Length, _chunkSize), _data.Length - Offset);

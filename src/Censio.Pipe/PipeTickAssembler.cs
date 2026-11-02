@@ -8,6 +8,11 @@ public sealed class PipeTickAssembler : IDisposable
     #region Fields
 
     /// <summary>
+    /// The longest single wait for the quiet period; a longer wait is made in steps that re-read the clock.
+    /// </summary>
+    private static readonly TimeSpan _maxQuietWait = TimeSpan.FromDays(1);
+
+    /// <summary>
     /// The source of the messages.
     /// </summary>
     private readonly IPipeMessageSource _source;
@@ -16,6 +21,11 @@ public sealed class PipeTickAssembler : IDisposable
     /// The clock that stamps the receive times and times the quiet period.
     /// </summary>
     private readonly TimeProvider _timeProvider;
+
+    /// <summary>
+    /// The observer that sees each read with its stamp, or <see langword="null" />.
+    /// </summary>
+    private readonly Action<PipeReadResult, DateTimeOffset>? _readObserver;
 
     /// <summary>
     /// The items produced but not yet delivered.
@@ -57,9 +67,21 @@ public sealed class PipeTickAssembler : IDisposable
     /// <param name="source">The source of the messages</param>
     /// <param name="timeProvider">The clock</param>
     public PipeTickAssembler(IPipeMessageSource source, TimeProvider timeProvider)
+        : this(source, timeProvider, null)
+    {
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="PipeTickAssembler" /> class.
+    /// </summary>
+    /// <param name="source">The source of the messages</param>
+    /// <param name="timeProvider">The clock</param>
+    /// <param name="readObserver">The observer called with each read result and its stamp, or <see langword="null" /></param>
+    public PipeTickAssembler(IPipeMessageSource source, TimeProvider timeProvider, Action<PipeReadResult, DateTimeOffset>? readObserver)
     {
         _source = source;
         _timeProvider = timeProvider;
+        _readObserver = readObserver;
     }
 
     #endregion // Constructors
@@ -140,7 +162,7 @@ public sealed class PipeTickAssembler : IDisposable
 
         using var delaySource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
-        var delay = Task.Delay(deadline.Value - now, _timeProvider, delaySource.Token);
+        var delay = Task.Delay(TimeSpan.FromTicks(Math.Min((deadline.Value - now).Ticks, _maxQuietWait.Ticks)), _timeProvider, delaySource.Token);
 
         await Task.WhenAny(_pending, delay).ConfigureAwait(false);
         await delaySource.CancelAsync().ConfigureAwait(false);
@@ -187,8 +209,33 @@ public sealed class PipeTickAssembler : IDisposable
     private async Task<(PipeReadResult Result, DateTimeOffset Stamp)> ReadStampedAsync(CancellationToken cancellationToken)
     {
         var result = await _source.ReadAsync(cancellationToken).ConfigureAwait(false);
+        var stamp = _timeProvider.GetUtcNow();
 
-        return (result, _timeProvider.GetUtcNow());
+        Observe(result, stamp);
+
+        return (result, stamp);
+    }
+
+    /// <summary>
+    /// Hands a read to the observer; an exception of the observer is ignored.
+    /// </summary>
+    /// <param name="result">The read result</param>
+    /// <param name="stamp">The receive time</param>
+    private void Observe(PipeReadResult result, DateTimeOffset stamp)
+    {
+        if (_readObserver is null)
+        {
+            return;
+        }
+
+        try
+        {
+            _readObserver(result, stamp);
+        }
+        catch (Exception)
+        {
+            // An observer must never stop the reading
+        }
     }
 
     /// <summary>
