@@ -424,6 +424,7 @@ public sealed class LogFileLoggerProviderTests
     [DataRow(LogLevel.Warning, true)]
     [DataRow(LogLevel.Error, true)]
     [DataRow(LogLevel.Critical, true)]
+    [DataRow(LogLevel.None, false)]
     public void LogFileLoggerProviderIsEnabledFromInformation(LogLevel level, bool expected)
     {
         // Arrange
@@ -435,6 +436,23 @@ public sealed class LogFileLoggerProviderTests
 
         // Assert
         Assert.AreEqual(expected, enabled, $"The level {level} should be enabled only from Information");
+    }
+
+    /// <summary>
+    /// The logger keeps no scopes.
+    /// </summary>
+    [TestMethod]
+    public void LogFileLoggerProviderBeginScopeReturnsNull()
+    {
+        // Arrange
+        using var provider = new LogFileLoggerProvider(Folder, _clock);
+        var logger = provider.CreateLogger("Censio");
+
+        // Act
+        var scope = logger.BeginScope("scope");
+
+        // Assert
+        Assert.IsNull(scope, "The logger should return no scope");
     }
 
     /// <summary>

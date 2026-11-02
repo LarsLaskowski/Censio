@@ -1082,6 +1082,8 @@ public sealed class PipeConnectionTests
         var second = EnqueueWire(PipeTestFrames.Version(2), PipeTestFrames.Island(1, 100));
         var session = new PipeRecordingSession(OpenSink);
 
+        session.Start();
+
         StartRun(CreateConnection(session));
 
         await WaitForPendingReadsAsync(first, 1);
@@ -1141,6 +1143,8 @@ public sealed class PipeConnectionTests
         var stream = EnqueueStream();
         var session = new PipeRecordingSession(OpenSink);
 
+        session.Start();
+
         StartRun(CreateConnection(session));
 
         await WaitForPendingReadsAsync(stream, 1);
@@ -1165,6 +1169,8 @@ public sealed class PipeConnectionTests
         // Arrange
         var stream = EnqueueStream(PipeTestFrames.Wire(PipeTestFrames.Version(2)), PipeTestFrames.Wire(PipeTestFrames.Island(1, 100))[..10]);
         var session = new PipeRecordingSession(OpenSink);
+
+        session.Start();
 
         StartRun(CreateConnection(session));
 
@@ -1191,6 +1197,8 @@ public sealed class PipeConnectionTests
         var stream = EnqueueStream(PipeTestFrames.Wire(PipeTestFrames.Version(2)), PipeTestFrames.Wire(PipeTestFrames.Island(1, 100))[..10]);
         var session = new PipeRecordingSession(OpenSink);
 
+        session.Start();
+
         StartRun(CreateConnection(session));
 
         await WaitForPendingReadsAsync(stream, 1);
@@ -1216,6 +1224,8 @@ public sealed class PipeConnectionTests
         var island = PipeTestFrames.Wire(PipeTestFrames.Island(1, 100));
         var stream = EnqueueStream();
         var session = new PipeRecordingSession(OpenSink);
+
+        session.Start();
 
         StartRun(CreateConnection(session));
 
@@ -1261,6 +1271,9 @@ public sealed class PipeConnectionTests
         // Arrange
         var stream = EnqueueStream();
         var session = new PipeRecordingSession(_ => throw new IOException("Disk full"));
+
+        session.Start();
+
         var failed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
         var ended = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -1322,6 +1335,8 @@ public sealed class PipeConnectionTests
 
         var stream = EnqueueStream();
         var session = new PipeRecordingSession(OpenSink);
+
+        session.Start();
 
         StartRun(CreateConnection(session));
 
