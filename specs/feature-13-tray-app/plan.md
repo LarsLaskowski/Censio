@@ -313,3 +313,9 @@ and `_receivingSince` observer-only, `StateChanged` outside the lock (*Approach*
 ## Out of scope / follow-ups
 
 See spec, *Out of scope*. No follow-up issue.
+
+## Security notes
+
+Non-blocking finding of Security's plan review, round 2, verbatim.
+
+**N5. A null exception would go into a non-nullable parameter.** For a relative folder, `FolderOpener` logs the warning "without exception", but the planned signature is `FolderOpenFailed(ILogger logger, string folder, Exception exception)`. Make the parameter `Exception?` in the skeleton, or the call passes null into a non-nullable parameter and gets a nullable warning.
