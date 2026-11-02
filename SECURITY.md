@@ -43,7 +43,7 @@ The following are considered in scope for vulnerability reports:
 - The Companion's local connection to the statistics pipe `\\.\pipe\anno117` (read-only, impersonation level identification)
 - The WebSocket ingest and its token (server)
 - The server's HTTP endpoints (start page, `/health`, the Blazor hub)
-- File paths for the cache and for recordings
+- File paths for the cache, for recordings and for the Companion's log folder (including the pruning of old log files and opening these folders in Explorer)
 - The data-protection key ring in the data directory
 - Logging of external data
 - Dependency vulnerabilities in packages consumed by the project
