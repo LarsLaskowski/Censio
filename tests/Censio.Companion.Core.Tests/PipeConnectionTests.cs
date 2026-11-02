@@ -37,7 +37,7 @@ public sealed class PipeConnectionTests
     /// <summary>
     /// The fake clock of the connection and the connector.
     /// </summary>
-    private readonly FakeTimeProvider _clock = new(_start);
+    private readonly RecordingTimeProvider _clock = new(_start);
 
     /// <summary>
     /// The connector of the connection.
@@ -1438,7 +1438,10 @@ public sealed class PipeConnectionTests
 
         // Act
         first.End();
-        AdvanceInSteps(TimeSpan.FromSeconds(1));
+
+        await WaitForDelayAsync(TimeSpan.FromSeconds(1));
+
+        _clock.Advance(TimeSpan.FromSeconds(1));
 
         await WaitForPendingReadsAsync(second, 1);
 
@@ -1560,6 +1563,158 @@ public sealed class PipeConnectionTests
         Assert.HasCount(2, live, "The live run should give two ticks");
         Assert.HasCount(2, replayedTicks, "The replay should give two ticks");
         Assert.AreEqual(live[1], replayedTicks[1], "The tick opened after the first recorded frame should equal the live tick");
+    }
+
+    /// <summary>
+    /// A tick that has not closed sets no last tick and raises no tick event, up to the end of its quiet period.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    public async Task PipeConnectionNoTickBeforeClose()
+    {
+        // Arrange
+        var stream = EnqueueStream();
+        var connection = TrackTicks(CreateConnection(null));
+
+        StartRun(connection);
+
+        await WaitForPendingReadsAsync(stream, 1);
+
+        stream.Feed(PipeTestFrames.Wire(PipeTestFrames.Version(2), PipeTestFrames.Island(1, 100), PipeTestFrames.Island(2, 100)));
+
+        await WaitForPendingReadsAsync(stream, 2);
+        await WaitForDelayAsync(TimeSpan.FromSeconds(30));
+
+        // Act
+        _clock.Advance(TimeSpan.FromSeconds(30) - TimeSpan.FromTicks(1));
+
+        // Assert
+        Assert.IsNull(connection.LastTick, "An open tick should not set the last tick");
+        Assert.IsEmpty(_ticks, "An open tick should raise no tick event");
+        Assert.AreEqual(Status(PipeConnectionState.Receiving), connection.Status, "The connection should keep receiving");
+    }
+
+    /// <summary>
+    /// A recording started in the middle of a connection writes the connection's last version frame first, with the
+    /// receive time of the first recorded frame.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    public async Task PipeConnectionRecordingStartedMidConnectionWritesVersionFirst()
+    {
+        // Arrange
+        var started = _start.AddSeconds(5);
+        var session = new PipeRecordingSession(OpenSink);
+        var stream = await StartMidConnectionRecordingAsync(session, PipeTestFrames.Version(2));
+
+        // Act
+        stream.Feed(PipeTestFrames.Wire(PipeTestFrames.Island(2, 100)));
+
+        await WaitForPendingReadsAsync(stream, 3);
+        await session.StopAsync(_guard).WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(RecordingText(started, (started, PipeTestFrames.Version(2)), (started, PipeTestFrames.Island(2, 100))), Sinks().Single().Text, "The version frame should come first, with the time of the first recorded frame");
+    }
+
+    /// <summary>
+    /// A recording started in the middle of a connection replays to receiving and finishes without a problem.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    public async Task PipeConnectionRecordingStartedMidConnectionReplaysAsReceiving()
+    {
+        // Arrange
+        var session = new PipeRecordingSession(OpenSink);
+        var stream = await StartMidConnectionRecordingAsync(session, PipeTestFrames.Version(2));
+
+        stream.Feed(PipeTestFrames.Wire(PipeTestFrames.Island(2, 100), PipeTestFrames.SessionEnd()));
+
+        await WaitForPendingReadsAsync(stream, 3);
+        await session.StopAsync(_guard).WaitAsync(_guard, TestContext.CancellationToken);
+
+        var statuses = new ConcurrentQueue<PipeReplayStatus>();
+        var runner = new PipeReplayRunner(() => new MemoryStream(Sinks().Single().ToArray()), PipeReplaySpeed.Maximum, TimeProvider.System);
+
+        runner.StatusChanged += (_, status) => statuses.Enqueue(status);
+
+        // Act
+        await runner.RunAsync(TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        PipeReplayStatus[] expected = [
+                                          new()
+                                          {
+                                              State = PipeConnectionState.Receiving
+                                          },
+                                          new()
+                                          {
+                                              State = PipeConnectionState.Receiving,
+                                              IsFinished = true
+                                          }
+                                      ];
+
+        Assert.AreSequenceEqual(expected, statuses.ToArray(), "The replay should show receiving and then finish without a problem");
+    }
+
+    /// <summary>
+    /// A recording started in a protocol mismatch writes the received version first and replays as a mismatch.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    public async Task PipeConnectionRecordingStartedMidConnectionInMismatchReplaysAsMismatch()
+    {
+        // Arrange
+        var session = new PipeRecordingSession(OpenSink);
+        var stream = await StartMidConnectionRecordingAsync(session, PipeTestFrames.Version(3));
+
+        stream.Feed(PipeTestFrames.Wire(PipeTestFrames.Island(2, 100)));
+
+        await WaitForPendingReadsAsync(stream, 3);
+        await session.StopAsync(_guard).WaitAsync(_guard, TestContext.CancellationToken);
+
+        var runner = new PipeReplayRunner(() => new MemoryStream(Sinks().Single().ToArray()), PipeReplaySpeed.Maximum, TimeProvider.System);
+
+        // Act
+        await runner.RunAsync(TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(new PipeReplayStatus
+                        {
+                            State = PipeConnectionState.ProtocolMismatch,
+                            IsFinished = true
+                        },
+                        runner.Status,
+                        "The replay should end in the protocol mismatch of the live run");
+    }
+
+    /// <summary>
+    /// A recording started before any version frame writes no extra line.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    public async Task PipeConnectionRecordingStartedMidConnectionBeforeVersionWritesNoExtraLine()
+    {
+        // Arrange
+        var started = _start.AddSeconds(1);
+        var session = new PipeRecordingSession(OpenSink);
+        var stream = EnqueueStream();
+
+        StartRun(CreateConnection(session));
+
+        await WaitForPendingReadsAsync(stream, 1);
+
+        session.Start();
+        _clock.Advance(TimeSpan.FromSeconds(1));
+
+        // Act
+        stream.Feed(PipeTestFrames.Wire(PipeTestFrames.Version(2), PipeTestFrames.Island(1, 100)));
+
+        await WaitForPendingReadsAsync(stream, 2);
+        await session.StopAsync(_guard).WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(RecordingText(started, (started, PipeTestFrames.Version(2)), (started, PipeTestFrames.Island(1, 100))), Sinks().Single().Text, "The file should hold the received frames only");
     }
 
     /// <summary>
@@ -1937,6 +2092,31 @@ public sealed class PipeConnectionTests
     }
 
     /// <summary>
+    /// Starts a run with a recording session that is off, feeds a version frame and an island frame, moves the clock
+    /// 5 seconds and starts the recording.
+    /// </summary>
+    /// <param name="session">The recording session</param>
+    /// <param name="version">The version frame without its length prefix</param>
+    /// <returns>The stream, with two pending reads reached</returns>
+    private async Task<ControlledPipeStream> StartMidConnectionRecordingAsync(PipeRecordingSession session, byte[] version)
+    {
+        var stream = EnqueueStream();
+
+        StartRun(CreateConnection(session));
+
+        await WaitForPendingReadsAsync(stream, 1);
+
+        stream.Feed(PipeTestFrames.Wire(version, PipeTestFrames.Island(1, 100)));
+
+        await WaitForPendingReadsAsync(stream, 2);
+
+        _clock.Advance(TimeSpan.FromSeconds(5));
+        session.Start();
+
+        return stream;
+    }
+
+    /// <summary>
     /// Starts a run that the cleanup of the test stops.
     /// </summary>
     /// <param name="connection">The connection</param>
@@ -2072,6 +2252,17 @@ public sealed class PipeConnectionTests
     private Task WaitForAttemptsAsync(int count)
     {
         return _connector.WaitForAttemptsAsync(count, TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+    }
+
+    /// <summary>
+    /// Waits until a timer with the given due time exists on the connection's clock, such as the retry delay that
+    /// starts on the thread pool after a stream with an open tick ended.
+    /// </summary>
+    /// <param name="dueTime">The due time of the timer</param>
+    /// <returns>The task</returns>
+    private Task WaitForDelayAsync(TimeSpan dueTime)
+    {
+        return _clock.WaitForDelayAsync(dueTime, TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
     }
 
     /// <summary>

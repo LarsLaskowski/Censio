@@ -4,7 +4,8 @@ namespace Censio.Pipe.Tests;
 
 /// <summary>
 /// A <see cref="FakeTimeProvider" /> that records the due time of every timer created on it, lets a test wait until a
-/// number of timers exist and advances through the waits a pending task starts. It models no real component.
+/// number of timers or a timer of a given due time exists and advances through the waits a pending task starts. It
+/// models no real component.
 /// </summary>
 public sealed class RecordingTimeProvider : FakeTimeProvider
 {
@@ -21,9 +22,9 @@ public sealed class RecordingTimeProvider : FakeTimeProvider
     private readonly List<TimeSpan> _delays = [];
 
     /// <summary>
-    /// The tests waiting for a number of timers.
+    /// The tests waiting for the timers, each with the condition on the due times that ends its wait.
     /// </summary>
-    private readonly List<(int Count, TaskCompletionSource Source)> _waiters = [];
+    private readonly List<(Func<List<TimeSpan>, bool> IsReached, TaskCompletionSource Source)> _waiters = [];
 
     /// <summary>
     /// The lock of the delays and the waiters.
@@ -78,23 +79,18 @@ public sealed class RecordingTimeProvider : FakeTimeProvider
     /// <returns>The task that completes when the timers exist</returns>
     public Task WaitForTimersAsync(int count, CancellationToken cancellationToken)
     {
-        TaskCompletionSource source;
+        return WaitAsync(delays => delays.Count >= count, cancellationToken);
+    }
 
-        lock (_lock)
-        {
-            source = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-
-            if (_delays.Count >= count)
-            {
-                source.SetResult();
-            }
-            else
-            {
-                _waiters.Add((count, source));
-            }
-        }
-
-        return source.Task.WaitAsync(cancellationToken);
+    /// <summary>
+    /// Waits until a timer with the given due time was created.
+    /// </summary>
+    /// <param name="dueTime">The due time of the timer</param>
+    /// <param name="cancellationToken">The token that ends the wait</param>
+    /// <returns>The task that completes when the timer exists</returns>
+    public Task WaitForDelayAsync(TimeSpan dueTime, CancellationToken cancellationToken)
+    {
+        return WaitAsync(delays => delays.Contains(dueTime), cancellationToken);
     }
 
     /// <summary>
@@ -129,6 +125,31 @@ public sealed class RecordingTimeProvider : FakeTimeProvider
         }
     }
 
+    /// <summary>
+    /// Waits until the due times of the created timers meet a condition.
+    /// </summary>
+    /// <param name="isReached">The condition on the due times</param>
+    /// <param name="cancellationToken">The token that ends the wait</param>
+    /// <returns>The task that completes when the condition is met</returns>
+    private Task WaitAsync(Func<List<TimeSpan>, bool> isReached, CancellationToken cancellationToken)
+    {
+        var source = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        lock (_lock)
+        {
+            if (isReached(_delays))
+            {
+                source.SetResult();
+            }
+            else
+            {
+                _waiters.Add((isReached, source));
+            }
+        }
+
+        return source.Task.WaitAsync(cancellationToken);
+    }
+
     #endregion // Methods
 
     #region TimeProvider
@@ -142,7 +163,7 @@ public sealed class RecordingTimeProvider : FakeTimeProvider
         {
             _delays.Add(dueTime);
 
-            foreach (var waiter in _waiters.Where(waiter => _delays.Count >= waiter.Count).ToList())
+            foreach (var waiter in _waiters.Where(waiter => waiter.IsReached(_delays)).ToList())
             {
                 waiter.Source.TrySetResult();
                 _waiters.Remove(waiter);

@@ -440,6 +440,35 @@ public sealed class PipeReplayRunnerTests
     }
 
     /// <summary>
+    /// A tick subscriber that throws neither stops the replay nor the other tick subscribers.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    public async Task PipeReplayRunnerThrowingTickHandlerIsIgnored()
+    {
+        // Arrange
+        var recording = PipeTestFrames.Recording(_start,
+                                                 (_start, PipeTestFrames.Version(2)),
+                                                 (_start.AddSeconds(1), PipeTestFrames.Island(1, 100)),
+                                                 (_start.AddSeconds(2), PipeTestFrames.Island(1, 200)),
+                                                 (_start.AddSeconds(3), PipeTestFrames.SessionEnd()));
+        var runner = CreateRunner(recording);
+        var ticks = new ConcurrentQueue<PipeTick>();
+
+        runner.TickReceived += (_, _) => throw new InvalidOperationException("The subscriber failed");
+        runner.TickReceived += (_, tick) => ticks.Enqueue(tick);
+
+        // Act
+        await runner.RunAsync(TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        long[] expected = [100L, 200L];
+
+        Assert.AreSequenceEqual(expected, ticks.Select(tick => tick.GameTime).ToArray(), "The other subscriber should get every tick");
+        Assert.AreEqual(Status(PipeConnectionState.Receiving, true), runner.Status, "The replay should finish although a tick subscriber threw");
+    }
+
+    /// <summary>
     /// The end of a replay is logged, as finished or with its problem.
     /// </summary>
     /// <param name="tail">The text after the recorded frame</param>
