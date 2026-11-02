@@ -31,8 +31,6 @@ See [spec.md](spec.md), *Problem*.
 | 16 | `explorer.exe <folder>` opens the folder (Explorer splits its command line at commas: a profile path with a comma would open another folder) | to verify: maintainer's manual run on Windows (AC10) | unverified |
 | 18 | `Microsoft.Extensions.Logging.Abstractions` 10.0.14 for `net10.0` depends only on `Microsoft.Extensions.DependencyInjection.Abstractions` 10.0.14 | its `.nuspec` in the local NuGet cache | confirmed |
 | 19 | Deleting a symbolic link deletes the link, not its target; `Directory.EnumerateFiles` returns no directories, so no junction | `DeleteFileW`, Remarks (Microsoft Learn: "If the path points to a symbolic link, the symbolic link is deleted, not the target"); `File.Delete` calls it | confirmed |
-| 20 | `char.GetUnicodeCategory` gives `Surrogate` for both halves of a pair, `Rune.GetUnicodeCategory` gives `Format` for U+E0001, U+E0041, U+1D173 | Security's probe (plan review B1) | confirmed |
-| 21 | `int.TryParse` accepts `+2`, ` 2`, `2 `; `char.IsDigit` is true for U+0662 and U+FF12 | Security's probe (plan review B2) | confirmed |
 | 22 | `new Icon(Stream)` accepts an ICO whose one entry is PNG-compressed | to verify: maintainer's manual run on Windows (AC10): all three looks show | unverified |
 | 23 | `ContextMenuStrip.Opening` arrives with `e.Cancel = true` when the strip has no items | Devil's Advocate objection 3 (WinForms `ToolStripDropDown` source) | confirmed |
 | 17 | Existing call sites of changed members: `PipeRecordingSessionTests.cs` (27), `PipeConnectionTests.cs` (11), `PipeReplayRunnerTests.cs` (4), `TrayMenuTests.cs` (4) | `grep` of `new PipeRecordingSession`, `BeginConnection`, `EndConnection`, `new PipeConnection(`, `new PipeReplayRunner(`, `TrayMenu.Create` | confirmed |
@@ -213,7 +211,7 @@ type after them.
 - `public static class CompanionFolders` with `public static string Logs(string localApplicationData)`
 - sealed class `FolderOpener` with `public FolderOpener(Action<string> launch, ILogger logger)`
 - `public void Open(string folder, string displayName)`
-- static partial class `CompanionLog` with these source-generated methods (each public static partial void): `Started(ILogger logger, string version, CompanionMode mode)`, `ConnectionStateChanged(ILogger logger, PipeConnectionState state, PipeErrorKind? errorKind, int? errorCode, int? receivedVersion)`, `RecordingStarted(ILogger logger)`, `RecordingStopped(ILogger logger)`, `RecordingFileCreated(ILogger logger, string fileName)`, `RecordingFailed(ILogger logger)`, `StoppedRecordingFailed(ILogger logger)`, `ReplayStarted(ILogger logger, string fileName)`, `ReplayFinished(ILogger logger)`, `ReplayProblem(ILogger logger, string reason)`, `FolderOpenFailed(ILogger logger, string folder, Exception exception)`, `BackgroundTaskFailed(ILogger logger, Exception exception)`, `Exiting(ILogger logger)`
+- static partial class `CompanionLog` with these source-generated methods (each public static partial void): `Started(ILogger logger, string version, CompanionMode mode)`, `ConnectionStateChanged(ILogger logger, PipeConnectionState state, PipeErrorKind? errorKind, int? errorCode, int? receivedVersion)`, `RecordingStarted(ILogger logger)`, `RecordingStopped(ILogger logger)`, `RecordingFileCreated(ILogger logger, string fileName)`, `RecordingFailed(ILogger logger)`, `StoppedRecordingFailed(ILogger logger)`, `ReplayStarted(ILogger logger, string fileName)`, `ReplayFinished(ILogger logger)`, `ReplayProblem(ILogger logger, string reason)`, `FolderOpenFailed(ILogger logger, string folder, Exception? exception)` (null for a relative folder, N5), `BackgroundTaskFailed(ILogger logger, Exception exception)`, `Exiting(ILogger logger)`
 - `public static class LogFileNames` with `public static string Format(DateOnly date, int sequence)`, `public static bool TryParse(string fileName, out DateOnly date, out int sequence)`, `public static IReadOnlyList<string> SelectForDeletion(IEnumerable<string> fileNames, int keep)`
 - `public static class LogLine` with `LogLine.MaxMessageLength` (const int 2048), `LogLine.MaxExceptionLength` (const int 16384), `public static string Format(DateTimeOffset localTime, LogLevel level, string message, Exception? exception)`, `public static string Sanitize(string text, int maxLength)`
 - sealed class `LogFileLoggerProvider` (an ILoggerProvider) with `LogFileLoggerProvider.MaxFileBytes` (const long 10485760), `LogFileLoggerProvider.MaxFiles` (const int 10), `LogFileLoggerProvider.MaxQueuedChars` (const int 1048576), `public LogFileLoggerProvider(string folder, TimeProvider timeProvider)`, `public ILogger CreateLogger(string categoryName)`, `public Task FlushAsync(TimeSpan timeout)`, `public void Dispose()`
@@ -301,14 +299,9 @@ and `_receivingSince` observer-only, `StateChanged` outside the lock (*Approach*
 
 ## Security review
 
-- B1: `LogLine.Sanitize` classifies by code point; rows U+E0001, U+E0041, U+1D173 added (one `?` each), the full row list
-  re-checked.
-- B2: ASCII-only names, ASCII digits, round trip through `LogFileNames.Format`; refused rows added, plus the dotless i
-  (U+0131) found while re-checking.
-- B3: relative folder — the provider and `FolderOpener` do nothing but drop or warn; two tests; spec E10, E11.
-- N1: queue bounded in characters; worst line in *Security considerations*. N2: accepted as user-driven, written there
-  and in `companion.md`. N3: fact 19. N4: `UseShellExecute = false` kept, comma noted (fact 16), transitive package
-  named (fact 18).
+Round 1, all answered in the body: B1 code-point sanitizing, B2 ASCII round-trip names (plus the dotless i), B3
+relative folder (two tests, spec E10/E11), N1 queue in characters, N2 accepted as user-driven, N3 fact 19, N4 comma noted
+and transitive package named. N5 (round 2): `FolderOpenFailed` takes `Exception?`.
 
 ## Out of scope / follow-ups
 
