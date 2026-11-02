@@ -721,6 +721,84 @@ public sealed class PipeRecordingSessionTests
     }
 
     /// <summary>
+    /// The stop at exit that gives up on a stopped recorder while the session is off logs the stopped recording's
+    /// failure and leaves the state off.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    public async Task PipeRecordingSessionStopAsyncTimeoutWhileOffLogsStoppedRecordingFailed()
+    {
+        // Arrange
+        var sink = new ControlledWriteStream();
+        var logger = new RecordingLogger();
+        var session = new PipeRecordingSession(_ => sink, logger);
+        var changes = 0;
+
+        sink.HoldWrites();
+        session.Start();
+        session.BeginConnection().Record(Result(PipeTestFrames.Version(2)), _start);
+
+        await sink.WaitForWritesAsync(1, TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+
+        session.Stop();
+        session.StateChanged += (_, _) => Interlocked.Increment(ref changes);
+
+        // Act
+        await session.StopAsync(TimeSpan.FromMilliseconds(100)).WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        (LogLevel, string)[] expected = [
+                                            (LogLevel.Information, "Recording started"),
+                                            (LogLevel.Information, "Recording stopped"),
+                                            (LogLevel.Warning, "A stopped recording failed while writing its remaining frames"),
+                                        ];
+
+        Assert.AreEqual(PipeRecordingState.Off, session.State, "The timeout of a stopped recorder should leave the state off");
+        Assert.AreEqual(0, Volatile.Read(ref changes), "The timeout of a stopped recorder should raise no state change");
+        Assert.AreSequenceEqual(expected, logger.Entries.Select(entry => (entry.Level, entry.Message)).ToArray(), "The timeout should be logged as the stopped recording's failure, not as a failed recording");
+
+        sink.ReleaseWrites();
+    }
+
+    /// <summary>
+    /// The stop at exit that gives up on the active recorder sets the failed state, raises the state change and
+    /// logs the failed recording.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    public async Task PipeRecordingSessionStopAsyncTimeoutWhileRecordingSetsFailed()
+    {
+        // Arrange
+        var sink = new ControlledWriteStream();
+        var logger = new RecordingLogger();
+        var session = new PipeRecordingSession(_ => sink, logger);
+        var changes = 0;
+
+        sink.HoldWrites();
+        session.Start();
+        session.BeginConnection().Record(Result(PipeTestFrames.Version(2)), _start);
+
+        await sink.WaitForWritesAsync(1, TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+
+        session.StateChanged += (_, _) => Interlocked.Increment(ref changes);
+
+        // Act
+        await session.StopAsync(TimeSpan.FromMilliseconds(100)).WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        (LogLevel, string)[] expected = [
+                                            (LogLevel.Information, "Recording started"),
+                                            (LogLevel.Warning, "Recording failed"),
+                                        ];
+
+        Assert.AreEqual(PipeRecordingState.Failed, session.State, "The timeout of the active recorder should set the failed state");
+        Assert.AreEqual(1, Volatile.Read(ref changes), "The timeout of the active recorder should raise one state change");
+        Assert.AreSequenceEqual(expected, logger.Entries.Select(entry => (entry.Level, entry.Message)).ToArray(), "The timeout should be logged as a failed recording");
+
+        sink.ReleaseWrites();
+    }
+
+    /// <summary>
     /// The start, the stop and the failure of a recording are logged.
     /// </summary>
     /// <returns>The task</returns>

@@ -525,6 +525,78 @@ public sealed class LogFileLoggerProviderTests
     }
 
     /// <summary>
+    /// The dispose returns long before a flush gives up while the writer is stalled. The stall is today's log file
+    /// made a named pipe; the provider runs on the real clock, so the flush timeout and the dispose are measured as
+    /// a ratio of two durations in the same test.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    [OSCondition(OperatingSystems.Linux)]
+    public async Task LogFileLoggerProviderDisposeReturnsPromptlyOnStalledWriter()
+    {
+        // Arrange
+        var path = await CreateStalledFileAsync();
+        var provider = new LogFileLoggerProvider(Folder, TimeProvider.System);
+        var logger = provider.CreateLogger("Censio");
+
+        Write(logger, LogLevel.Information, "first");
+
+        var flushWatch = Stopwatch.StartNew();
+
+        await provider.FlushAsync(TimeSpan.FromMilliseconds(500)).WaitAsync(_guard, TestContext.CancellationToken);
+
+        var flushTime = flushWatch.Elapsed;
+
+        // Act
+        var disposeWatch = Stopwatch.StartNew();
+
+        provider.Dispose();
+
+        var disposeTime = disposeWatch.Elapsed;
+
+        await Task.Run(() => ReadShared(path), TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        var ratio = disposeTime / flushTime;
+
+        Assert.IsLessThan(0.65, ratio, $"The dispose should not wait for the stalled writer: it took {disposeTime.TotalMilliseconds} ms against a flush timeout of {flushTime.TotalMilliseconds} ms");
+    }
+
+    /// <summary>
+    /// Lines queued behind a stalled write are not written once the provider was disposed, even when the stall ends
+    /// afterwards; at most the line being written when the writer stalled is.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    [OSCondition(OperatingSystems.Linux)]
+    public async Task LogFileLoggerProviderDisposeDropsLinesQueuedBehindStalledWrite()
+    {
+        // Arrange
+        var path = await CreateStalledFileAsync();
+        var provider = new LogFileLoggerProvider(Folder, TimeProvider.System);
+        var logger = provider.CreateLogger("Censio");
+
+        Write(logger, LogLevel.Information, "first");
+        Write(logger, LogLevel.Information, "second");
+        Write(logger, LogLevel.Information, "third");
+
+        await provider.FlushAsync(TimeSpan.FromMilliseconds(200)).WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Act
+        provider.Dispose();
+
+        var text = await Task.Run(() => ReadShared(path), TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        var messages = text.Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                           .Select(line => line[(line.IndexOf(" INF ", StringComparison.Ordinal) + " INF ".Length)..])
+                           .ToArray();
+
+        Assert.IsLessThanOrEqualTo(1, messages.Length, "Only the line being written when the writer stalled may be written after the dispose");
+        Assert.IsTrue(messages.All(message => message == "first"), $"The lines queued behind the stalled write should not be written, but the file holds: {string.Join(", ", messages)}");
+    }
+
+    /// <summary>
     /// A second dispose of the provider does nothing.
     /// </summary>
     [TestMethod]
@@ -685,6 +757,21 @@ public sealed class LogFileLoggerProviderTests
         {
             File.WriteAllText(Path.Combine(Folder, name), name + "\n");
         }
+    }
+
+    /// <summary>
+    /// Makes the log file of today's local date on the real clock a named pipe, so that opening it for writing waits
+    /// until the test opens it for reading.
+    /// </summary>
+    /// <returns>The path of the named pipe</returns>
+    private async Task<string> CreateStalledFileAsync()
+    {
+        var path = Path.Combine(Folder, LogFileNames.Format(DateOnly.FromDateTime(TimeProvider.System.GetLocalNow().DateTime), 1));
+
+        Directory.CreateDirectory(Folder);
+        await CreateNamedPipeAsync(path);
+
+        return path;
     }
 
     /// <summary>
