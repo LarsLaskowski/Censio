@@ -64,6 +64,7 @@ public sealed class LogFileNamesTests
     [DataRow("companion-20261102-+2.log", false)]
     [DataRow("companion-20261102- 2.log", false)]
     [DataRow("companion-20261102-2 .log", false)]
+    [DataRow("companion-20261102-.log", false)]
     public void LogFileNamesTryParseAcceptsOnlyExactForms(string fileName, bool expected)
     {
         // Act

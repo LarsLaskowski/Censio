@@ -21,4 +21,4 @@ Plan: [plan.md](plan.md) — Status: Draft
 | 15 | G6 | `ARCHITECTURE.md` row and flow paragraph | `docs/ARCHITECTURE.md` | AC1, AC8 | 13 | Dev | [x] |
 | 16 | G6 | README and user guide, English and German | `README.md`, `docs/USER_GUIDE.md` | AC2, AC4, AC7, AC8, AC10 | 13 | Dev | [x] |
 | 17 | G6 | `.squad/project.md` *Security areas* (log folder, pruning, Explorer, log sanitizing) | `.squad/project.md` | AC7, AC8 | 13 | Dev | [x] |
-| 18 | G6 | `.squad/project.md` *Test doubles*: `RecordingLogger` linked into the Companion Core tests | `.squad/project.md` | AC8 | 13 | Tester | [ ] |
+| 18 | G6 | `.squad/project.md` *Test doubles*: `RecordingLogger` linked into the Companion Core tests | `.squad/project.md` | AC8 | 13 | Tester | [x] |

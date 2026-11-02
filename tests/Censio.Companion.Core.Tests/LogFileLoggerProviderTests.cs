@@ -504,6 +504,64 @@ public sealed class LogFileLoggerProviderTests
     }
 
     /// <summary>
+    /// A flush after the provider was disposed returns at once, without waiting for its timeout.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    public async Task LogFileLoggerProviderFlushAfterDisposeReturnsAtOnce()
+    {
+        // Arrange
+        var provider = new LogFileLoggerProvider(Folder, _clock);
+
+        provider.Dispose();
+
+        // Act
+        var flush = provider.FlushAsync(TimeSpan.FromDays(1));
+
+        await flush.WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        Assert.IsTrue(flush.IsCompletedSuccessfully, "The flush should return without the fake clock reaching its timeout");
+    }
+
+    /// <summary>
+    /// A second dispose of the provider does nothing.
+    /// </summary>
+    [TestMethod]
+    public void LogFileLoggerProviderDisposeTwiceDoesNothing()
+    {
+        // Arrange
+        var provider = new LogFileLoggerProvider(Folder, _clock);
+
+        provider.Dispose();
+
+        // Act
+        var exception = Record(provider.Dispose);
+
+        // Assert
+        Assert.IsNull(exception, "A second dispose should not throw");
+    }
+
+    /// <summary>
+    /// Runs an action and returns the exception it threw.
+    /// </summary>
+    /// <param name="action">The action</param>
+    /// <returns>The exception, or <see langword="null" /> if the action did not throw</returns>
+    private static Exception? Record(Action action)
+    {
+        try
+        {
+            action();
+
+            return null;
+        }
+        catch (Exception exception)
+        {
+            return exception;
+        }
+    }
+
+    /// <summary>
     /// Creates the clock of the tests.
     /// </summary>
     /// <returns>The clock</returns>

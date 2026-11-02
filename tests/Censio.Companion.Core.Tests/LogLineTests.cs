@@ -176,6 +176,25 @@ public sealed class LogLineTests
     }
 
     /// <summary>
+    /// A cut of an exception that would fall between the two units of a surrogate pair is made before the pair.
+    /// </summary>
+    [TestMethod]
+    public void LogLineFormatExceptionCutNeverSplitsPair()
+    {
+        // Arrange
+        var prefixLength = $"{typeof(InvalidOperationException).FullName}: ".Length;
+        var exception = new InvalidOperationException($"{new string('x', LogLine.MaxExceptionLength - prefixLength - 1)}{char.ConvertFromUtf32(0x1F600)}tail");
+        var text = exception.ToString();
+
+        // Act
+        var line = LogLine.Format(_time, LogLevel.Warning, "A background task failed", exception);
+
+        // Assert
+        Assert.IsTrue(char.IsHighSurrogate(text[LogLine.MaxExceptionLength - 1]), "The limit should fall inside the surrogate pair");
+        Assert.AreEqual($"  {text[..(LogLine.MaxExceptionLength - 1)]}…", line.Split('\n')[1], "The exception should be cut before the surrogate pair");
+    }
+
+    /// <summary>
     /// Replaces every escape of a UTF-16 unit in the text by the unit it names.
     /// </summary>
     /// <param name="text">The text with escapes</param>
