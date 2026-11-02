@@ -41,3 +41,5 @@ are quoted in full.
 | 2026-11-02 20:27 | 8 Code check after fix round 1 | Orchestrator | main already contained; format check, build, tests (408/913/28), coverage gate 99.1%/99.0%, analyzer gate, scope check pass |
 | 2026-11-02 20:27 | 8 Review round 2 (security delta) | squad-security | APPROVED; no findings (opus/medium · 86,269 tokens · 5 tool uses · 28 s · continued from 3 Plan security review) |
 | 2026-11-02 20:27 | 8 Review round 2 (delta) | squad-reviewer | APPROVE; all three round-1 findings fixed, no new defect (opus/medium · 8,377 tokens · 3 tool uses · 31 s · continued) |
+| 2026-11-02 20:28 | 9 PR approval | squad-lead | RESULT: APPROVED; no open items; AC10 manual Windows run to be named in the PR body as a merge condition (opus/medium · 59,411 tokens · 9 tool uses · 40 s) |
+| 2026-11-02 20:29 | 9 Decision records | Orchestrator | Record 0037 and its index row set to Accepted; decision-check passes |

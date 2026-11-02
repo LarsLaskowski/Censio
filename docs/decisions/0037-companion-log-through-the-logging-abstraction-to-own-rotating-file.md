@@ -1,6 +1,6 @@
 # 0037: The Companion logs through .NET's logging abstraction into its own rotating text file
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-02
 - **Area:** companion
 - **Source:** Issue #13
