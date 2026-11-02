@@ -35,19 +35,26 @@ internal sealed class LogFileLogger : ILogger
     public IDisposable? BeginScope<TState>(TState state)
         where TState : notnull
     {
-        throw new NotImplementedException();
+        return null;
     }
 
     /// <inheritdoc />
     public bool IsEnabled(LogLevel logLevel)
     {
-        throw new NotImplementedException();
+        return logLevel is >= LogLevel.Information and not LogLevel.None;
     }
 
     /// <inheritdoc />
     public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
     {
-        throw new NotImplementedException();
+        if (IsEnabled(logLevel) == false)
+        {
+            return;
+        }
+
+        var localTime = _provider.TimeProvider.GetLocalNow();
+
+        _provider.Enqueue(DateOnly.FromDateTime(localTime.DateTime), LogLine.Format(localTime, logLevel, formatter(state, exception), exception));
     }
 
     #endregion // ILogger

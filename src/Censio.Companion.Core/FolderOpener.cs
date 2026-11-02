@@ -45,7 +45,22 @@ public sealed class FolderOpener
     /// <param name="displayName">The name of the folder in the log</param>
     public void Open(string folder, string displayName)
     {
-        throw new NotImplementedException();
+        if (Path.IsPathFullyQualified(folder) == false)
+        {
+            CompanionLog.FolderOpenFailed(_logger, displayName, null);
+
+            return;
+        }
+
+        try
+        {
+            Directory.CreateDirectory(folder);
+            _launch(folder);
+        }
+        catch (Exception exception)
+        {
+            CompanionLog.FolderOpenFailed(_logger, displayName, exception);
+        }
     }
 
     #endregion // Methods

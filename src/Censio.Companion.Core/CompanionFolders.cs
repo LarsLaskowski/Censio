@@ -14,7 +14,7 @@ public static class CompanionFolders
     /// <returns>The log folder</returns>
     public static string Logs(string localApplicationData)
     {
-        throw new NotImplementedException();
+        return Path.Combine(localApplicationData, "Censio", "Logs");
     }
 
     #endregion // Methods
