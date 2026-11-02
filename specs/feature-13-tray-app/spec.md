@@ -75,8 +75,8 @@ live or replayed.
   a new one runs; its later failure is only logged and changes neither suffix nor entry. Two files in one second get
   `-2`, `-3`, ... as today. The tray never waits for the disk.
 - E9: `Exit` gives the queues of all recordings 1 second together and ends within 2 seconds with exit code 0.
-- E10: A folder that cannot be created or opened: a warning is logged, nothing else changes.
-- E11: The log folder or file cannot be created or written: the lines are lost, nothing else changes, no message.
+- E10: A folder that cannot be created or opened, or is not a full path (local app data unresolved): a warning is logged, nothing else changes.
+- E11: The log folder or file cannot be created or written, or the folder is not a full path: the lines are lost, nothing else changes, no message.
 - E12: A log file is continued past 10 MiB in `companion-<yyyyMMdd>-<n>.log` (`n` from 2); a new local day starts a new
   file. Only the 10 newest files are kept, newest by the date and then `n` in the name; only names of exactly these two
   forms are deleted, other files in the folder never.
