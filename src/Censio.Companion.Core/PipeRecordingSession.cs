@@ -173,7 +173,26 @@ public sealed class PipeRecordingSession
         catch (OperationCanceledException)
         {
             // The disk did not finish in time: the last lines may be missing
-            SetFailed();
+            var recording = false;
+
+            lock (_lock)
+            {
+                if (State == PipeRecordingState.Recording)
+                {
+                    recording = true;
+                    Volatile.Write(ref _state, (int)PipeRecordingState.Failed);
+                }
+            }
+
+            if (recording)
+            {
+                CompanionLog.RecordingFailed(_logger);
+                RaiseStateChanged();
+            }
+            else
+            {
+                CompanionLog.StoppedRecordingFailed(_logger);
+            }
         }
     }
 
@@ -306,6 +325,7 @@ public sealed class PipeRecordingSession
     private void OnRecorderFailed(PipeRecordingConnection connection, PipeRecorder recorder)
     {
         bool active;
+        var changed = false;
 
         lock (_lock)
         {
@@ -314,31 +334,23 @@ public sealed class PipeRecordingSession
             if (active)
             {
                 connection.Recorder = null;
+                changed = State != PipeRecordingState.Failed;
+                Volatile.Write(ref _state, (int)PipeRecordingState.Failed);
             }
         }
 
         if (active)
         {
-            SetFailed();
+            if (changed)
+            {
+                CompanionLog.RecordingFailed(_logger);
+                RaiseStateChanged();
+            }
         }
         else
         {
             CompanionLog.StoppedRecordingFailed(_logger);
         }
-    }
-
-    /// <summary>
-    /// Sets the failed state and raises <see cref="StateChanged" /> if the state was not failed.
-    /// </summary>
-    private void SetFailed()
-    {
-        if (Interlocked.Exchange(ref _state, (int)PipeRecordingState.Failed) == (int)PipeRecordingState.Failed)
-        {
-            return;
-        }
-
-        CompanionLog.RecordingFailed(_logger);
-        RaiseStateChanged();
     }
 
     /// <summary>

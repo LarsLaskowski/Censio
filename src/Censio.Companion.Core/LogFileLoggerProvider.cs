@@ -179,6 +179,11 @@ public sealed class LogFileLoggerProvider : ILoggerProvider
             {
                 if (item.Marker is null)
                 {
+                    if (_stop.IsCancellationRequested)
+                    {
+                        break;
+                    }
+
                     Write(item.Date, item.Line);
                     Interlocked.Add(ref _queuedChars, -item.Line.Length);
                 }
@@ -349,8 +354,12 @@ public sealed class LogFileLoggerProvider : ILoggerProvider
 
         _stop.Cancel();
         _queue.Writer.TryComplete();
-        _writer.Wait(TimeSpan.FromSeconds(1), CancellationToken.None);
-        _stop.Dispose();
+
+        // A writer blocked on a stalled disk cannot be interrupted: wait only briefly so that Exit stays within its budget.
+        if (_writer.Wait(TimeSpan.FromMilliseconds(100), CancellationToken.None))
+        {
+            _stop.Dispose();
+        }
     }
 
     #endregion // IDisposable
