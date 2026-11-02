@@ -1,5 +1,8 @@
 using Censio.Pipe;
 
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+
 namespace Censio.Companion.Core;
 
 /// <summary>
@@ -13,6 +16,11 @@ public sealed class PipeRecordingSession
     /// Opens the file of a recording.
     /// </summary>
     private readonly Func<DateTimeOffset, Stream> _openFile;
+
+    /// <summary>
+    /// The logger.
+    /// </summary>
+    private readonly ILogger _logger;
 
     /// <summary>
     /// Guards <see cref="_recorders" />.
@@ -38,8 +46,19 @@ public sealed class PipeRecordingSession
     /// </summary>
     /// <param name="openFile">Opens the file of a recording</param>
     public PipeRecordingSession(Func<DateTimeOffset, Stream> openFile)
+        : this(openFile, NullLogger.Instance)
+    {
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="PipeRecordingSession" /> class.
+    /// </summary>
+    /// <param name="openFile">Opens the file of a recording</param>
+    /// <param name="logger">The logger</param>
+    public PipeRecordingSession(Func<DateTimeOffset, Stream> openFile, ILogger logger)
     {
         _openFile = openFile;
+        _logger = logger;
     }
 
     #endregion // Constructor
@@ -65,35 +84,45 @@ public sealed class PipeRecordingSession
     #region Methods
 
     /// <summary>
+    /// Starts the recording.
+    /// </summary>
+    public void Start()
+    {
+        throw new NotImplementedException();
+    }
+
+    /// <summary>
+    /// Stops the recording.
+    /// </summary>
+    public void Stop()
+    {
+        throw new NotImplementedException();
+    }
+
+    /// <summary>
+    /// Stops the recording if it is running, otherwise starts it.
+    /// </summary>
+    public void Toggle()
+    {
+        throw new NotImplementedException();
+    }
+
+    /// <summary>
     /// Begins the recording of a connection.
     /// </summary>
-    /// <returns>The recorder of the connection, or <c>null</c> if nothing is recorded</returns>
-    public PipeRecorder? BeginConnection()
+    /// <returns>The recording of the connection</returns>
+    public PipeRecordingConnection BeginConnection()
     {
-        if (State == PipeRecordingState.Failed)
-        {
-            return null;
-        }
-
-        var recorder = new PipeRecorder(_openFile);
-
-        recorder.Failed += OnRecorderFailed;
-
-        lock (_lock)
-        {
-            _recorders.Add(recorder);
-        }
-
-        return recorder;
+        throw new NotImplementedException();
     }
 
     /// <summary>
     /// Ends the recording of a connection.
     /// </summary>
-    /// <param name="recorder">The recorder of the connection</param>
-    public void EndConnection(PipeRecorder recorder)
+    /// <param name="connection">The recording of the connection</param>
+    public void EndConnection(PipeRecordingConnection connection)
     {
-        _ = FinishAsync(recorder);
+        throw new NotImplementedException();
     }
 
     /// <summary>
@@ -121,36 +150,6 @@ public sealed class PipeRecordingSession
             // The disk did not finish in time: the last lines may be missing
             SetFailed();
         }
-    }
-
-    /// <summary>
-    /// Completes a recorder and forgets it afterwards.
-    /// </summary>
-    /// <param name="recorder">The recorder</param>
-    /// <returns>A task that completes when the recorder has written its lines</returns>
-    private async Task FinishAsync(PipeRecorder recorder)
-    {
-        try
-        {
-            await recorder.CompleteAsync(CancellationToken.None).ConfigureAwait(false);
-        }
-        finally
-        {
-            lock (_lock)
-            {
-                _recorders.Remove(recorder);
-            }
-        }
-    }
-
-    /// <summary>
-    /// Handles the failure of a recorder.
-    /// </summary>
-    /// <param name="sender">The recorder</param>
-    /// <param name="eventArgs">The event data</param>
-    private void OnRecorderFailed(object? sender, EventArgs eventArgs)
-    {
-        SetFailed();
     }
 
     /// <summary>
