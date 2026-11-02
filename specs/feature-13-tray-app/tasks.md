@@ -17,8 +17,8 @@ Plan: [plan.md](plan.md) — Status: Draft
 | 11 | G4 | Tests first for the tray rows of AC1, AC2, AC3; adapt `TrayMenuTests` to the new `Create` | `tests/Censio.Companion.Core.Tests/TrayMenuTests.cs`, `tests/Censio.Companion.Core.Tests/TraySnapshotTests.cs` | AC1, AC2, AC3 | 10 | Tester | [x] |
 | 12 | G4 | Implement the tray model | as row 10 | AC1, AC2, AC3 | 11 | Dev | [x] |
 | 13 | G5 | no new API: shell wiring (`App.xaml.cs`), menu rebuild and dispatch (`TrayIcon.cs`), drawn PNG icons (`TrayIconImages.cs`), Explorer launch off the UI thread, midnight timer, exit order; run `release-check.sh companion` on a scratch folder | `src/Censio.Companion/App.xaml.cs`, `src/Censio.Companion/TrayIcon.cs`, `src/Censio.Companion/TrayIconImages.cs` | AC9, AC10 | 12 | Dev | [x] |
-| 14 | G6 | Area documents: companion, pipe, areas index row | `docs/areas/companion.md`, `docs/areas/pipe.md`, `docs/areas/README.md` | AC1, AC2, AC3, AC4, AC5, AC6, AC7, AC8 | 13 | Dev | [ ] |
-| 15 | G6 | `ARCHITECTURE.md` row and flow paragraph | `docs/ARCHITECTURE.md` | AC1, AC8 | 13 | Dev | [ ] |
-| 16 | G6 | README and user guide, English and German | `README.md`, `docs/USER_GUIDE.md` | AC2, AC4, AC7, AC8, AC10 | 13 | Dev | [ ] |
-| 17 | G6 | `.squad/project.md` *Security areas* (log folder, pruning, Explorer, log sanitizing) | `.squad/project.md` | AC7, AC8 | 13 | Dev | [ ] |
+| 14 | G6 | Area documents: companion, pipe, areas index row | `docs/areas/companion.md`, `docs/areas/pipe.md`, `docs/areas/README.md` | AC1, AC2, AC3, AC4, AC5, AC6, AC7, AC8 | 13 | Dev | [x] |
+| 15 | G6 | `ARCHITECTURE.md` row and flow paragraph | `docs/ARCHITECTURE.md` | AC1, AC8 | 13 | Dev | [x] |
+| 16 | G6 | README and user guide, English and German | `README.md`, `docs/USER_GUIDE.md` | AC2, AC4, AC7, AC8, AC10 | 13 | Dev | [x] |
+| 17 | G6 | `.squad/project.md` *Security areas* (log folder, pruning, Explorer, log sanitizing) | `.squad/project.md` | AC7, AC8 | 13 | Dev | [x] |
 | 18 | G6 | `.squad/project.md` *Test doubles*: `RecordingLogger` linked into the Companion Core tests | `.squad/project.md` | AC8 | 13 | Tester | [ ] |
