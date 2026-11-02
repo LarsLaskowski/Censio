@@ -39,7 +39,13 @@ internal sealed class TrayIcon : IDisposable
     {
         _menu = new ContextMenuStrip();
 
-        foreach (var entry in TrayMenu.Create(version))
+        foreach (var entry in TrayMenu.Create(version,
+                                              new TraySnapshot
+                                              {
+                                                  StatusText = TrayMenu.ToolTip,
+                                                  Look = TrayIconLook.Waiting
+                                              },
+                                              TimeProvider.System))
         {
             switch (entry.Kind)
             {

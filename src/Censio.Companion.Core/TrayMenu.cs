@@ -26,6 +26,31 @@ public static class TrayMenu
     /// </summary>
     public const string InvalidCommandLineToolTip = "Censio Companion: Invalid command line";
 
+    /// <summary>
+    /// The longest text the tray icon can show as a tooltip.
+    /// </summary>
+    public const int MaxToolTipLength = 127;
+
+    /// <summary>
+    /// The text of the entry that starts the recording.
+    /// </summary>
+    public const string StartRecordingText = "Start recording";
+
+    /// <summary>
+    /// The text of the entry that stops the recording.
+    /// </summary>
+    public const string StopRecordingText = "Stop recording";
+
+    /// <summary>
+    /// The text of the entry that opens the recordings folder.
+    /// </summary>
+    public const string OpenRecordingsFolderText = "Open recordings folder";
+
+    /// <summary>
+    /// The text of the entry that opens the log folder.
+    /// </summary>
+    public const string OpenLogFolderText = "Open log folder";
+
     #endregion // Constants
 
     #region Methods
@@ -114,18 +139,68 @@ public static class TrayMenu
     }
 
     /// <summary>
+    /// Formats the status text for a connection state and a recording state.
+    /// </summary>
+    /// <param name="state">The connection state</param>
+    /// <param name="recording">The recording state</param>
+    /// <returns>The status text</returns>
+    public static string FormatStatusText(PipeConnectionState state, PipeRecordingState recording)
+    {
+        throw new NotImplementedException();
+    }
+
+    /// <summary>
+    /// Formats the status text for a replay status.
+    /// </summary>
+    /// <param name="status">The replay status</param>
+    /// <returns>The status text</returns>
+    public static string FormatReplayStatusText(PipeReplayStatus status)
+    {
+        throw new NotImplementedException();
+    }
+
+    /// <summary>
+    /// Formats the text of the last tick.
+    /// </summary>
+    /// <param name="tick">The summary of the last tick, or <c>null</c> if none was received</param>
+    /// <param name="clock">The clock</param>
+    /// <returns>The text</returns>
+    public static string FormatLastTick(PipeTickSummary? tick, TimeProvider clock)
+    {
+        throw new NotImplementedException();
+    }
+
+    /// <summary>
+    /// Formats the tooltip of a snapshot.
+    /// </summary>
+    /// <param name="snapshot">The snapshot</param>
+    /// <param name="clock">The clock</param>
+    /// <returns>The tooltip text</returns>
+    public static string FormatSnapshotToolTip(TraySnapshot snapshot, TimeProvider clock)
+    {
+        throw new NotImplementedException();
+    }
+
+    /// <summary>
+    /// Gets the time until the next local midnight.
+    /// </summary>
+    /// <param name="clock">The clock</param>
+    /// <returns>The time, at least one second</returns>
+    public static TimeSpan UntilNextLocalMidnight(TimeProvider clock)
+    {
+        throw new NotImplementedException();
+    }
+
+    /// <summary>
     /// Creates the entries of the tray menu.
     /// </summary>
     /// <param name="version">The product version</param>
+    /// <param name="snapshot">The snapshot</param>
+    /// <param name="clock">The clock</param>
     /// <returns>The entries in display order</returns>
-    public static IReadOnlyList<TrayMenuEntry> Create(string version)
+    public static IReadOnlyList<TrayMenuEntry> Create(string version, TraySnapshot snapshot, TimeProvider clock)
     {
-        return
-        [
-            new TrayMenuEntry(TrayMenuEntryKind.Version, FormatVersion(version), false),
-            new TrayMenuEntry(TrayMenuEntryKind.Separator, string.Empty, false),
-            new TrayMenuEntry(TrayMenuEntryKind.Exit, ExitText, true)
-        ];
+        throw new NotImplementedException();
     }
 
     /// <summary>
@@ -133,7 +208,7 @@ public static class TrayMenu
     /// </summary>
     /// <param name="problem">The problem</param>
     /// <returns>The reason, or <see langword="null" /> if the problem kind is not a defined value</returns>
-    internal static string? FormatReplayReason(PipeReplayProblem problem)
+    public static string? FormatReplayReason(PipeReplayProblem problem)
     {
         return problem.Kind switch
                {
