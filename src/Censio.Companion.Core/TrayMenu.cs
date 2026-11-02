@@ -27,6 +27,11 @@ public static class TrayMenu
     public const string InvalidCommandLineToolTip = "Censio Companion: Invalid command line";
 
     /// <summary>
+    /// The status text when the command line is invalid.
+    /// </summary>
+    public const string InvalidCommandLineStatusText = "Invalid command line";
+
+    /// <summary>
     /// The longest text the tray icon can show as a tooltip.
     /// </summary>
     public const int MaxToolTipLength = 127;
@@ -146,7 +151,7 @@ public static class TrayMenu
     /// <returns>The status text</returns>
     public static string FormatStatusText(PipeConnectionState state, PipeRecordingState recording)
     {
-        throw new NotImplementedException();
+        return WithoutToolTipPrefix(FormatToolTip(state, recording));
     }
 
     /// <summary>
@@ -156,7 +161,7 @@ public static class TrayMenu
     /// <returns>The status text</returns>
     public static string FormatReplayStatusText(PipeReplayStatus status)
     {
-        throw new NotImplementedException();
+        return WithoutToolTipPrefix(FormatReplayToolTip(status));
     }
 
     /// <summary>
@@ -167,7 +172,32 @@ public static class TrayMenu
     /// <returns>The text</returns>
     public static string FormatLastTick(PipeTickSummary? tick, TimeProvider clock)
     {
-        throw new NotImplementedException();
+        if (tick is not { } summary)
+        {
+            return "Last tick: none";
+        }
+
+        var now = TimeZoneInfo.ConvertTime(clock.GetUtcNow(), clock.LocalTimeZone);
+        var count = summary.IslandCount == 1
+                        ? "1 island"
+                        : string.Create(CultureInfo.InvariantCulture, $"{summary.IslandCount} islands");
+        var time = summary.ReceiveTime;
+        string text;
+
+        if (time.UtcTicks - DateTimeOffset.MinValue.UtcTicks < TimeSpan.TicksPerDay || DateTimeOffset.MaxValue.UtcTicks - time.UtcTicks < TimeSpan.TicksPerDay)
+        {
+            text = time.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss'Z'", CultureInfo.InvariantCulture);
+        }
+        else
+        {
+            var local = TimeZoneInfo.ConvertTime(time, clock.LocalTimeZone);
+
+            text = local.Date == now.Date
+                       ? local.ToString("HH:mm:ss", CultureInfo.InvariantCulture)
+                       : local.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+        }
+
+        return $"Last tick: {text}, {count}";
     }
 
     /// <summary>
@@ -178,7 +208,11 @@ public static class TrayMenu
     /// <returns>The tooltip text</returns>
     public static string FormatSnapshotToolTip(TraySnapshot snapshot, TimeProvider clock)
     {
-        throw new NotImplementedException();
+        var text = $"{ToolTip}: {snapshot.StatusText}";
+
+        return snapshot.LastTick is null
+                   ? text
+                   : $"{text}\n{FormatLastTick(snapshot.LastTick, clock)}";
     }
 
     /// <summary>
@@ -188,7 +222,18 @@ public static class TrayMenu
     /// <returns>The time, at least one second</returns>
     public static TimeSpan UntilNextLocalMidnight(TimeProvider clock)
     {
-        throw new NotImplementedException();
+        var zone = clock.LocalTimeZone;
+        var utcNow = clock.GetUtcNow();
+        var target = TimeZoneInfo.ConvertTime(utcNow, zone).Date.AddDays(1);
+
+        if (zone.IsInvalidTime(target))
+        {
+            target = target.AddHours(1);
+        }
+
+        var delay = new DateTimeOffset(TimeZoneInfo.ConvertTimeToUtc(target, zone), TimeSpan.Zero) - utcNow;
+
+        return delay < TimeSpan.FromSeconds(1) ? TimeSpan.FromSeconds(1) : delay;
     }
 
     /// <summary>
@@ -200,7 +245,18 @@ public static class TrayMenu
     /// <returns>The entries in display order</returns>
     public static IReadOnlyList<TrayMenuEntry> Create(string version, TraySnapshot snapshot, TimeProvider clock)
     {
-        throw new NotImplementedException();
+        return [
+                   new TrayMenuEntry(TrayMenuEntryKind.Status, $"Status: {snapshot.StatusText}", false),
+                   new TrayMenuEntry(TrayMenuEntryKind.LastTick, FormatLastTick(snapshot.LastTick, clock), false),
+                   new TrayMenuEntry(TrayMenuEntryKind.Separator, string.Empty, false),
+                   new TrayMenuEntry(TrayMenuEntryKind.ToggleRecording, snapshot.IsRecording ? StopRecordingText : StartRecordingText, snapshot.CanRecord),
+                   new TrayMenuEntry(TrayMenuEntryKind.OpenRecordingsFolder, OpenRecordingsFolderText, true),
+                   new TrayMenuEntry(TrayMenuEntryKind.OpenLogFolder, OpenLogFolderText, true),
+                   new TrayMenuEntry(TrayMenuEntryKind.Separator, string.Empty, false),
+                   new TrayMenuEntry(TrayMenuEntryKind.Version, FormatVersion(version), false),
+                   new TrayMenuEntry(TrayMenuEntryKind.Separator, string.Empty, false),
+                   new TrayMenuEntry(TrayMenuEntryKind.Exit, ExitText, true)
+               ];
     }
 
     /// <summary>
@@ -219,6 +275,16 @@ public static class TrayMenu
                    PipeReplayProblemKind.ReadFailed => "read failed",
                    _ => null
                };
+    }
+
+    /// <summary>
+    /// Removes the application name and the colon from the start of a tooltip text.
+    /// </summary>
+    /// <param name="toolTip">The tooltip text</param>
+    /// <returns>The status text</returns>
+    private static string WithoutToolTipPrefix(string toolTip)
+    {
+        return toolTip[(ToolTip.Length + 2)..];
     }
 
     #endregion // Methods

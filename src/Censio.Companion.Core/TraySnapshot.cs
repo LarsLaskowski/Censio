@@ -1,3 +1,5 @@
+using Censio.Pipe;
+
 namespace Censio.Companion.Core;
 
 /// <summary>
@@ -45,7 +47,14 @@ public sealed record TraySnapshot
     /// <returns>The snapshot</returns>
     public static TraySnapshot ForConnection(PipeConnectionStatus status, PipeRecordingState recording, PipeTickSummary? lastTick)
     {
-        throw new NotImplementedException();
+        return new TraySnapshot
+               {
+                   StatusText = TrayMenu.FormatStatusText(status.State, recording),
+                   Look = LookOf(status.State),
+                   LastTick = lastTick,
+                   CanRecord = true,
+                   IsRecording = recording == PipeRecordingState.Recording
+               };
     }
 
     /// <summary>
@@ -56,7 +65,29 @@ public sealed record TraySnapshot
     /// <returns>The snapshot</returns>
     public static TraySnapshot ForReplay(PipeReplayStatus status, PipeTickSummary? lastTick)
     {
-        throw new NotImplementedException();
+        TrayIconLook look;
+
+        if (status.Problem is not null)
+        {
+            look = TrayIconLook.Problem;
+        }
+        else if (status.IsFinished)
+        {
+            look = TrayIconLook.Waiting;
+        }
+        else
+        {
+            look = LookOf(status.State);
+        }
+
+        return new TraySnapshot
+               {
+                   StatusText = TrayMenu.FormatReplayStatusText(status),
+                   Look = look,
+                   LastTick = lastTick,
+                   CanRecord = false,
+                   IsRecording = false
+               };
     }
 
     /// <summary>
@@ -65,7 +96,28 @@ public sealed record TraySnapshot
     /// <returns>The snapshot</returns>
     public static TraySnapshot ForInvalidCommandLine()
     {
-        throw new NotImplementedException();
+        return new TraySnapshot
+               {
+                   StatusText = TrayMenu.InvalidCommandLineStatusText,
+                   Look = TrayIconLook.Problem,
+                   CanRecord = false,
+                   IsRecording = false
+               };
+    }
+
+    /// <summary>
+    /// Gets the look of a connection state.
+    /// </summary>
+    /// <param name="state">The state</param>
+    /// <returns>The look</returns>
+    private static TrayIconLook LookOf(PipeConnectionState state)
+    {
+        return state switch
+               {
+                   PipeConnectionState.Receiving => TrayIconLook.Receiving,
+                   PipeConnectionState.ProtocolMismatch or PipeConnectionState.Error => TrayIconLook.Problem,
+                   _ => TrayIconLook.Waiting
+               };
     }
 
     #endregion // Methods
