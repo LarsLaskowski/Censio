@@ -1,5 +1,8 @@
 using Censio.Pipe;
 
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+
 namespace Censio.Companion.Core;
 
 /// <summary>
@@ -28,6 +31,11 @@ public sealed class PipeConnection
     /// Guards <see cref="_status" />.
     /// </summary>
     private readonly Lock _statusLock = new();
+
+    /// <summary>
+    /// The logger.
+    /// </summary>
+    private readonly ILogger _logger;
 
     /// <summary>
     /// The current status.
@@ -68,10 +76,23 @@ public sealed class PipeConnection
     /// <param name="timeProvider">The clock</param>
     /// <param name="recording">The recording session, or <c>null</c> if nothing is recorded</param>
     public PipeConnection(IPipeConnector connector, TimeProvider timeProvider, PipeRecordingSession? recording)
+        : this(connector, timeProvider, recording, NullLogger.Instance)
+    {
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="PipeConnection" /> class.
+    /// </summary>
+    /// <param name="connector">The connector that makes the attempts</param>
+    /// <param name="timeProvider">The clock</param>
+    /// <param name="recording">The recording session, or <c>null</c> if nothing is recorded</param>
+    /// <param name="logger">The logger</param>
+    public PipeConnection(IPipeConnector connector, TimeProvider timeProvider, PipeRecordingSession? recording, ILogger logger)
     {
         _connector = connector;
         _timeProvider = timeProvider;
         _recording = recording;
+        _logger = logger;
     }
 
     #endregion // Constructor
@@ -82,6 +103,11 @@ public sealed class PipeConnection
     /// Occurs when the status changes.
     /// </summary>
     public event EventHandler<PipeConnectionStatus>? StatusChanged;
+
+    /// <summary>
+    /// Occurs when a tick has been closed.
+    /// </summary>
+    public event EventHandler<PipeTick>? TickReceived;
 
     #endregion // Events
 
@@ -100,6 +126,11 @@ public sealed class PipeConnection
             }
         }
     }
+
+    /// <summary>
+    /// Gets the summary of the last tick, or <c>null</c> if none was received.
+    /// </summary>
+    public PipeTickSummary? LastTick => null;
 
     #endregion // Properties
 
