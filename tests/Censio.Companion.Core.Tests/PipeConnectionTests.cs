@@ -4,7 +4,9 @@ using System.Text;
 
 using Censio.Pipe;
 using Censio.Pipe.Tests;
+using Censio.Server.Tests;
 
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Time.Testing;
 
 namespace Censio.Companion.Core.Tests;
@@ -51,6 +53,16 @@ public sealed class PipeConnectionTests
     /// The files the recording session opened, with the start of their recordings.
     /// </summary>
     private readonly ConcurrentQueue<(DateTimeOffset Started, ControlledWriteStream Sink)> _sinks = [];
+
+    /// <summary>
+    /// The ticks the connection raised, in order.
+    /// </summary>
+    private readonly ConcurrentQueue<PipeTick> _ticks = [];
+
+    /// <summary>
+    /// Released once for every tick the connection raised.
+    /// </summary>
+    private readonly SemaphoreSlim _tickArrived = new(0);
 
     /// <summary>
     /// The runs started by the test.
@@ -100,6 +112,7 @@ public sealed class PipeConnectionTests
         await Task.WhenAll(_runs).WaitAsync(_guard, TestContext.CancellationToken);
 
         _stop.Dispose();
+        _tickArrived.Dispose();
     }
 
     /// <summary>
@@ -1361,6 +1374,239 @@ public sealed class PipeConnectionTests
     }
 
     /// <summary>
+    /// A closed tick sets the last tick and raises the tick event.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    public async Task PipeConnectionTickClosedSetsLastTickAndRaisesEvent()
+    {
+        // Arrange
+        var stream = EnqueueStream();
+        var connection = TrackTicks(CreateConnection(null));
+        var received = _start.AddSeconds(1);
+
+        StartRun(connection);
+
+        await WaitForPendingReadsAsync(stream, 1);
+
+        _clock.Advance(TimeSpan.FromSeconds(1));
+        stream.Feed(PipeTestFrames.Wire(PipeTestFrames.Version(2), PipeTestFrames.Island(1, 100), PipeTestFrames.Island(2, 100)));
+
+        await WaitForPendingReadsAsync(stream, 2);
+
+        _clock.Advance(TimeSpan.FromSeconds(1));
+
+        // Act
+        stream.Feed(PipeTestFrames.Wire(PipeTestFrames.Island(1, 200)));
+
+        await WaitForTicksAsync(1);
+
+        // Assert
+        Assert.AreEqual(new PipeTickSummary
+                        {
+                            ReceiveTime = received,
+                            IslandCount = 2
+                        },
+                        connection.LastTick,
+                        "The last tick should be the closed tick's receive time and island count");
+        Assert.HasCount(1, _ticks, "One tick should be raised");
+        Assert.AreEqual(100L, _ticks.Single().GameTime, "The raised tick should be the closed one");
+        Assert.AreEqual(PipeTickCloseReason.GameTimeChanged, _ticks.Single().CloseReason, "The tick should close when the game time changes");
+    }
+
+    /// <summary>
+    /// The last tick stays when its connection ends and the next connection opens.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    public async Task PipeConnectionLastTickSurvivesConnectionEnd()
+    {
+        // Arrange
+        var first = EnqueueStream();
+        var second = EnqueueStream();
+        var connection = TrackTicks(CreateConnection(null));
+        var received = _start.AddSeconds(1);
+
+        StartRun(connection);
+
+        await WaitForPendingReadsAsync(first, 1);
+
+        _clock.Advance(TimeSpan.FromSeconds(1));
+        first.Feed(PipeTestFrames.Wire(PipeTestFrames.Version(2), PipeTestFrames.Island(1, 100)));
+
+        await WaitForPendingReadsAsync(first, 2);
+
+        // Act
+        first.End();
+        AdvanceInSteps(TimeSpan.FromSeconds(1));
+
+        await WaitForPendingReadsAsync(second, 1);
+
+        // Assert
+        Assert.AreEqual(Status(PipeConnectionState.Connected), connection.Status, "The next connection should be open");
+        Assert.AreEqual(new PipeTickSummary
+                        {
+                            ReceiveTime = received,
+                            IslandCount = 1
+                        },
+                        connection.LastTick,
+                        "The last tick should outlive its connection");
+        Assert.AreEqual(PipeTickCloseReason.StreamEnded, _ticks.Single().CloseReason, "The end of the stream should close the open tick");
+    }
+
+    /// <summary>
+    /// A tick closes 30 seconds after its last island frame on the connection's clock.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    public async Task PipeConnectionQuietPeriodClosesTick()
+    {
+        // Arrange
+        var stream = EnqueueStream();
+        var connection = TrackTicks(CreateConnection(null));
+
+        StartRun(connection);
+
+        await WaitForPendingReadsAsync(stream, 1);
+
+        stream.Feed(PipeTestFrames.Wire(PipeTestFrames.Version(2), PipeTestFrames.Island(1, 100)));
+
+        await WaitForPendingReadsAsync(stream, 2);
+
+        // Act
+        AdvanceInSteps(TimeSpan.FromSeconds(30));
+
+        await WaitForTicksAsync(1);
+
+        // Assert
+        Assert.AreEqual(PipeTickCloseReason.QuietPeriod, _ticks.Single().CloseReason, "The tick should close after the quiet period");
+        Assert.AreEqual(new PipeTickSummary
+                        {
+                            ReceiveTime = _start,
+                            IslandCount = 1
+                        },
+                        connection.LastTick,
+                        "The last tick should be set by the quiet period");
+    }
+
+    /// <summary>
+    /// A tick handler that throws neither stops the other handlers nor the connection.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    public async Task PipeConnectionThrowingTickHandlerIsIgnored()
+    {
+        // Arrange
+        var stream = EnqueueStream();
+        var connection = CreateConnection(null);
+
+        connection.TickReceived += (_, _) => throw new InvalidOperationException("The handler failed.");
+        TrackTicks(connection);
+        StartRun(connection);
+
+        await WaitForPendingReadsAsync(stream, 1);
+
+        // Act
+        stream.Feed(PipeTestFrames.Wire(PipeTestFrames.Version(2), PipeTestFrames.Island(1, 100), PipeTestFrames.Island(1, 200), PipeTestFrames.Island(1, 300)));
+
+        await WaitForTicksAsync(2);
+        await WaitForPendingReadsAsync(stream, 2);
+
+        // Assert
+        long[] expected = [100L, 200L];
+
+        Assert.AreSequenceEqual(expected, _ticks.Select(tick => tick.GameTime).ToArray(), "The other handler should receive every tick");
+        Assert.AreEqual(Status(PipeConnectionState.Receiving), connection.Status, "The connection should keep receiving");
+    }
+
+    /// <summary>
+    /// The ticks that open after the first recorded frame are the same in the replay as in the live run.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    public async Task PipeConnectionRecordingStartedMidConnectionReplayedTicksEqualLiveTicks()
+    {
+        // Arrange
+        var session = new PipeRecordingSession(OpenSink);
+        var stream = EnqueueStream();
+        var connection = TrackTicks(CreateConnection(session));
+
+        StartRun(connection);
+
+        await WaitForPendingReadsAsync(stream, 1);
+
+        stream.Feed(PipeTestFrames.Wire(PipeTestFrames.Version(2), PipeTestFrames.Island(1, 100)));
+
+        await WaitForPendingReadsAsync(stream, 2);
+
+        session.Start();
+
+        await FeedOneSecondApartAsync(stream, 2, PipeTestFrames.Island(2, 100), PipeTestFrames.Island(1, 200), PipeTestFrames.Island(2, 200), PipeTestFrames.SessionEnd());
+        await WaitForTicksAsync(2);
+        await session.StopAsync(_guard).WaitAsync(_guard, TestContext.CancellationToken);
+
+        var replayClock = new PipeReplayClock(_start);
+
+        using var replay = new PipeReplayStream(new MemoryStream(Sinks().Single().ToArray()), PipeReplaySpeed.Maximum, replayClock, TimeProvider.System);
+        using var replayAssembler = new PipeTickAssembler(new PipeMessageReader(replay), replayClock);
+
+        // Act
+        var replayed = await DrainAsync(replayAssembler).WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        var live = _ticks.Select(DescribeTick).ToArray();
+        var replayedTicks = replayed.Where(item => item.Tick is not null).Select(item => DescribeTick(item.Tick!)).ToArray();
+
+        Assert.HasCount(2, live, "The live run should give two ticks");
+        Assert.HasCount(2, replayedTicks, "The replay should give two ticks");
+        Assert.AreEqual(live[1], replayedTicks[1], "The tick opened after the first recorded frame should equal the live tick");
+    }
+
+    /// <summary>
+    /// Every change of the connection state is logged with its cause; frames that keep the state log nothing.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    public async Task PipeConnectionLogsStateChangesOnly()
+    {
+        // Arrange
+        var logger = new RecordingLogger();
+        var stream = EnqueueStream();
+        var ended = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var connection = new PipeConnection(_connector, _clock, null, logger);
+
+        connection.StatusChanged += (_, status) => EndWhenWaiting(ended, status);
+
+        StartRun(connection);
+
+        await WaitForPendingReadsAsync(stream, 1);
+
+        // Act
+        stream.Feed(PipeTestFrames.Wire(PipeTestFrames.Version(2),
+                                        PipeTestFrames.UnknownType(),
+                                        PipeTestFrames.UnknownType(),
+                                        PipeTestFrames.Island(1, 100),
+                                        PipeTestFrames.Version(3),
+                                        PipeTestFrames.Version(3),
+                                        PipeTestFrames.UnknownType()));
+        stream.End();
+
+        await ended.Task.WaitAsync(_guard, TestContext.CancellationToken);
+        await _stop.CancelAsync();
+        await _runs[0].WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        (LogLevel, string)[] expected = [
+                                            (LogLevel.Information, "Connection state Connected, error kind (null), Windows error code (null), received version (null)"),
+                                            (LogLevel.Information, "Connection state Receiving, error kind (null), Windows error code (null), received version (null)"),
+                                            (LogLevel.Information, "Connection state ProtocolMismatch, error kind (null), Windows error code (null), received version 3"),
+                                            (LogLevel.Information, "Connection state WaitingForGame, error kind (null), Windows error code (null), received version (null)"),
+                                        ];
+
+        Assert.AreSequenceEqual(expected, logger.Entries.Select(entry => (entry.Level, entry.Message)).ToArray(), "Each state change, and only a change, should be logged with its cause");
+    }
+
+    /// <summary>
     /// Creates the given number of seconds as offsets.
     /// </summary>
     /// <param name="seconds">The seconds</param>
@@ -1566,9 +1812,19 @@ public sealed class PipeConnectionTests
             return string.Create(CultureInfo.InvariantCulture, $"{item.Kind} headline={item.Headline} version={item.Version} error={item.Error} key={item.IslandKey}");
         }
 
-        var islands = string.Join(";", item.Tick.Islands.Select(island => string.Create(CultureInfo.InvariantCulture, $"{island.Key.SessionGuid}/{island.Key.IslandId}/{island.Key.AreaIndex} {island.SessionId} {island.Name} [{string.Join(",", island.Entries.Select(entry => $"{entry.ProductGuid}:{entry.Generation:R}:{entry.Consumption:R}:{entry.BuildingCount}"))}]")));
+        return DescribeTick(item.Tick);
+    }
 
-        return string.Create(CultureInfo.InvariantCulture, $"Tick {item.Tick.CloseReason} game={item.Tick.GameTime} received={item.Tick.ReceiveTime:O} [{islands}]");
+    /// <summary>
+    /// Describes a tick with all its values.
+    /// </summary>
+    /// <param name="tick">The tick</param>
+    /// <returns>The description</returns>
+    private static string DescribeTick(PipeTick tick)
+    {
+        var islands = string.Join(";", tick.Islands.Select(island => string.Create(CultureInfo.InvariantCulture, $"{island.Key.SessionGuid}/{island.Key.IslandId}/{island.Key.AreaIndex} {island.SessionId} {island.Name} [{string.Join(",", island.Entries.Select(entry => $"{entry.ProductGuid}:{entry.Generation:R}:{entry.Consumption:R}:{entry.BuildingCount}"))}]")));
+
+        return string.Create(CultureInfo.InvariantCulture, $"Tick {tick.CloseReason} game={tick.GameTime} received={tick.ReceiveTime:O} [{islands}]");
     }
 
     /// <summary>
@@ -1732,6 +1988,59 @@ public sealed class PipeConnectionTests
         await WaitForPendingReadsAsync(stream, 1);
 
         return stream;
+    }
+
+    /// <summary>
+    /// Subscribes the tick list of the test to the ticks of a connection.
+    /// </summary>
+    /// <param name="connection">The connection</param>
+    /// <returns>The connection</returns>
+    private PipeConnection TrackTicks(PipeConnection connection)
+    {
+        connection.TickReceived += (_, tick) =>
+                                   {
+                                       _ticks.Enqueue(tick);
+                                       _tickArrived.Release();
+                                   };
+
+        return connection;
+    }
+
+    /// <summary>
+    /// Waits until the connection raised the given number of further ticks, within the guard.
+    /// </summary>
+    /// <param name="count">The number of ticks</param>
+    /// <returns>The task</returns>
+    private async Task WaitForTicksAsync(int count)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.CancellationToken);
+
+        timeout.CancelAfter(_guard);
+
+        for (var index = 0; index < count; index++)
+        {
+            await _tickArrived.WaitAsync(timeout.Token);
+        }
+    }
+
+    /// <summary>
+    /// Feeds frames one at a time, moving the clock one second before each, and waits until each was read.
+    /// </summary>
+    /// <param name="stream">The stream</param>
+    /// <param name="pending">The number of pending reads reached before the first frame</param>
+    /// <param name="frames">The frames without their length prefix</param>
+    /// <returns>The task</returns>
+    private async Task FeedOneSecondApartAsync(ControlledPipeStream stream, int pending, params byte[][] frames)
+    {
+        foreach (var frame in frames)
+        {
+            _clock.Advance(TimeSpan.FromSeconds(1));
+            stream.Feed(PipeTestFrames.Wire(frame));
+
+            pending++;
+
+            await WaitForPendingReadsAsync(stream, pending);
+        }
     }
 
     /// <summary>
