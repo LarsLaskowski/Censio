@@ -252,7 +252,6 @@ public sealed class PipeRecordingSession
     private void Transition(bool? start)
     {
         List<PipeRecorder> detached = [];
-        var changed = false;
 
         lock (_lock)
         {
@@ -282,8 +281,6 @@ public sealed class PipeRecordingSession
                 Volatile.Write(ref _state, (int)PipeRecordingState.Recording);
                 CompanionLog.RecordingStarted(_logger);
             }
-
-            changed = true;
         }
 
         foreach (var recorder in detached)
@@ -291,10 +288,7 @@ public sealed class PipeRecordingSession
             _ = FinishAsync(recorder);
         }
 
-        if (changed)
-        {
-            RaiseStateChanged();
-        }
+        RaiseStateChanged();
     }
 
     /// <summary>
