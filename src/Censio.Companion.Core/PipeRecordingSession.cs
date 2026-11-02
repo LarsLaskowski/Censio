@@ -23,7 +23,7 @@ public sealed class PipeRecordingSession
     private readonly ILogger _logger;
 
     /// <summary>
-    /// Guards <see cref="_recorders" />.
+    /// Guards <see cref="_recorders" />, <see cref="_connections" />, the state changes and the recorder of every connection.
     /// </summary>
     private readonly Lock _lock = new();
 
@@ -33,9 +33,14 @@ public sealed class PipeRecordingSession
     private readonly List<PipeRecorder> _recorders = [];
 
     /// <summary>
+    /// The connections that have begun and not ended.
+    /// </summary>
+    private readonly List<PipeRecordingConnection> _connections = [];
+
+    /// <summary>
     /// The state; the value of a <see cref="PipeRecordingState" />.
     /// </summary>
-    private int _state = (int)PipeRecordingState.Recording;
+    private int _state = (int)PipeRecordingState.Off;
 
     #endregion // Fields
 
@@ -84,19 +89,19 @@ public sealed class PipeRecordingSession
     #region Methods
 
     /// <summary>
-    /// Starts the recording.
+    /// Starts the recording; nothing happens while it is recording.
     /// </summary>
     public void Start()
     {
-        throw new NotImplementedException();
+        Transition(true);
     }
 
     /// <summary>
-    /// Stops the recording.
+    /// Stops the recording; nothing happens unless it is recording.
     /// </summary>
     public void Stop()
     {
-        throw new NotImplementedException();
+        Transition(false);
     }
 
     /// <summary>
@@ -104,7 +109,7 @@ public sealed class PipeRecordingSession
     /// </summary>
     public void Toggle()
     {
-        throw new NotImplementedException();
+        Transition(null);
     }
 
     /// <summary>
@@ -113,7 +118,14 @@ public sealed class PipeRecordingSession
     /// <returns>The recording of the connection</returns>
     public PipeRecordingConnection BeginConnection()
     {
-        throw new NotImplementedException();
+        var connection = new PipeRecordingConnection(this);
+
+        lock (_lock)
+        {
+            _connections.Add(connection);
+        }
+
+        return connection;
     }
 
     /// <summary>
@@ -122,7 +134,20 @@ public sealed class PipeRecordingSession
     /// <param name="connection">The recording of the connection</param>
     public void EndConnection(PipeRecordingConnection connection)
     {
-        throw new NotImplementedException();
+        PipeRecorder? recorder;
+
+        lock (_lock)
+        {
+            _connections.Remove(connection);
+
+            recorder = connection.Recorder;
+            connection.Recorder = null;
+        }
+
+        if (recorder is not null)
+        {
+            _ = FinishAsync(recorder);
+        }
     }
 
     /// <summary>
@@ -153,6 +178,156 @@ public sealed class PipeRecordingSession
     }
 
     /// <summary>
+    /// Records a read of a connection if the session is recording.
+    /// </summary>
+    /// <param name="connection">The connection</param>
+    /// <param name="read">The read</param>
+    /// <param name="receiveTime">The time the read was received</param>
+    internal void Record(PipeRecordingConnection connection, PipeReadResult read, DateTimeOffset receiveTime)
+    {
+        var isVersion = read.Frame is { Length: > 0 } frame && frame.Span[0] == 0;
+        PipeRecorder recorder;
+        PipeReadResult? version = null;
+
+        lock (_lock)
+        {
+            if (isVersion)
+            {
+                connection.LastVersion = read;
+            }
+
+            if (State != PipeRecordingState.Recording || read.Frame is null)
+            {
+                return;
+            }
+
+            if (connection.Recorder is null)
+            {
+                var created = new PipeRecorder(_openFile);
+
+                created.Failed += (_, _) => OnRecorderFailed(connection, created);
+                _recorders.Add(created);
+                connection.Recorder = created;
+
+                if (isVersion == false)
+                {
+                    version = connection.LastVersion;
+                }
+            }
+
+            recorder = connection.Recorder;
+        }
+
+        if (version is not null)
+        {
+            recorder.Record(version, receiveTime);
+        }
+
+        recorder.Record(read, receiveTime);
+    }
+
+    /// <summary>
+    /// Changes the state of the recording.
+    /// </summary>
+    /// <param name="start"><see langword="true" /> to start, <see langword="false" /> to stop, <see langword="null" /> to toggle</param>
+    private void Transition(bool? start)
+    {
+        List<PipeRecorder> detached = [];
+        var changed = false;
+
+        lock (_lock)
+        {
+            var recording = State == PipeRecordingState.Recording;
+
+            if ((start ?? recording == false) == recording)
+            {
+                return;
+            }
+
+            foreach (var connection in _connections)
+            {
+                if (connection.Recorder is { } recorder)
+                {
+                    detached.Add(recorder);
+                    connection.Recorder = null;
+                }
+            }
+
+            if (recording)
+            {
+                Volatile.Write(ref _state, (int)PipeRecordingState.Off);
+                CompanionLog.RecordingStopped(_logger);
+            }
+            else
+            {
+                Volatile.Write(ref _state, (int)PipeRecordingState.Recording);
+                CompanionLog.RecordingStarted(_logger);
+            }
+
+            changed = true;
+        }
+
+        foreach (var recorder in detached)
+        {
+            _ = FinishAsync(recorder);
+        }
+
+        if (changed)
+        {
+            RaiseStateChanged();
+        }
+    }
+
+    /// <summary>
+    /// Completes a recorder and forgets it afterwards.
+    /// </summary>
+    /// <param name="recorder">The recorder</param>
+    /// <returns>A task that completes when the recorder has written its lines</returns>
+    private async Task FinishAsync(PipeRecorder recorder)
+    {
+        try
+        {
+            await recorder.CompleteAsync(CancellationToken.None).ConfigureAwait(false);
+        }
+        finally
+        {
+            lock (_lock)
+            {
+                _recorders.Remove(recorder);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Handles the failure of a recorder: the active one of a connection fails the recording, a stopped one is only logged.
+    /// </summary>
+    /// <param name="connection">The connection the recorder was created for</param>
+    /// <param name="recorder">The recorder</param>
+    private void OnRecorderFailed(PipeRecordingConnection connection, PipeRecorder recorder)
+    {
+        bool active;
+
+        lock (_lock)
+        {
+            active = ReferenceEquals(connection.Recorder, recorder);
+
+            if (active)
+            {
+                connection.Recorder = null;
+            }
+        }
+
+        if (active)
+        {
+            SetFailed();
+        }
+        else
+        {
+            CompanionLog.StoppedRecordingFailed(_logger);
+        }
+    }
+
+    /// <summary>
     /// Sets the failed state and raises <see cref="StateChanged" /> if the state was not failed.
     /// </summary>
     private void SetFailed()
@@ -162,6 +337,15 @@ public sealed class PipeRecordingSession
             return;
         }
 
+        CompanionLog.RecordingFailed(_logger);
+        RaiseStateChanged();
+    }
+
+    /// <summary>
+    /// Raises <see cref="StateChanged" />; a failing subscriber does not stop the others.
+    /// </summary>
+    private void RaiseStateChanged()
+    {
         var handlers = StateChanged;
 
         if (handlers is null)

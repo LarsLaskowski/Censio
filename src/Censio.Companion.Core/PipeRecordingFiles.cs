@@ -87,11 +87,16 @@ public sealed class PipeRecordingFiles
 
         for (var sequence = 1; sequence <= MaxSequence; sequence++)
         {
-            var path = Path.Combine(_folder, PipeRecordingFormat.FormatFileName(started, sequence));
+            var name = PipeRecordingFormat.FormatFileName(started, sequence);
+            var path = Path.Combine(_folder, name);
 
             try
             {
-                return new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.Read);
+                var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.Read);
+
+                CompanionLog.RecordingFileCreated(_logger, name);
+
+                return stream;
             }
             catch (IOException) when (File.Exists(path))
             {
