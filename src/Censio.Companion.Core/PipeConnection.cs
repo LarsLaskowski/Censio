@@ -28,7 +28,7 @@ public sealed class PipeConnection
     private readonly PipeRecordingSession? _recording;
 
     /// <summary>
-    /// Guards <see cref="_status" />.
+    /// Guards <see cref="_status" /> and <see cref="_lastTick" />.
     /// </summary>
     private readonly Lock _statusLock = new();
 
@@ -44,6 +44,11 @@ public sealed class PipeConnection
                                            {
                                                State = PipeConnectionState.WaitingForGame
                                            };
+
+    /// <summary>
+    /// The summary of the last tick, kept across connections.
+    /// </summary>
+    private PipeTickSummary? _lastTick;
 
     /// <summary>
     /// Whether a run is in progress; 1 if so, otherwise 0.
@@ -130,7 +135,16 @@ public sealed class PipeConnection
     /// <summary>
     /// Gets the summary of the last tick, or <c>null</c> if none was received.
     /// </summary>
-    public PipeTickSummary? LastTick => null;
+    public PipeTickSummary? LastTick
+    {
+        get
+        {
+            lock (_statusLock)
+            {
+                return _lastTick;
+            }
+        }
+    }
 
     #endregion // Properties
 
@@ -284,18 +298,21 @@ public sealed class PipeConnection
                           },
                           cancellationToken);
 
-                var reader = new PipeMessageReader(stream);
-                PipeConnectionStatus endStatus;
+                // The observer runs on the read, before the assembler hands the read on; it alone writes the end
+                // status and the receiving time, and the loop reads them only after the end of the stream.
+                var endStatus = default(PipeConnectionStatus);
+
+                using var assembler = new PipeTickAssembler(new PipeMessageReader(stream),
+                                                            _timeProvider,
+                                                            (read, stamp) => endStatus = Observe(recorder, read, stamp, endStatus, cancellationToken));
 
                 while (true)
                 {
-                    PipeReadResult read;
-                    DateTimeOffset stamp;
+                    PipeTickResult item;
 
                     try
                     {
-                        read = await reader.ReadAsync(cancellationToken).ConfigureAwait(false);
-                        stamp = _timeProvider.GetUtcNow();
+                        item = await assembler.ReadAsync(cancellationToken).ConfigureAwait(false);
                     }
                     catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                     {
@@ -308,30 +325,14 @@ public sealed class PipeConnection
                         break;
                     }
 
-                    recorder?.Record(read, stamp);
-
-                    var status = PipeStatusRule.ForRead(read);
-
-                    if (IsSessionEnding(read))
+                    if (item.Kind == PipeTickResultKind.EndOfStream)
                     {
-                        endStatus = status!.Value;
-
                         break;
                     }
 
-                    if (status is not { } next)
+                    if (item.Tick is { } tick)
                     {
-                        continue;
-                    }
-
-                    if (next.State == PipeConnectionState.Receiving)
-                    {
-                        EnterReceiving(stamp, cancellationToken);
-                    }
-                    else
-                    {
-                        LeaveReceiving();
-                        SetStatus(next, cancellationToken);
+                        PublishTick(tick);
                     }
                 }
 
@@ -347,6 +348,75 @@ public sealed class PipeConnection
             if (recorder is not null)
             {
                 _recording!.EndConnection(recorder);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Handles a read as it arrives: records it, applies the status rule and keeps the receiving time.
+    /// </summary>
+    /// <param name="recorder">The recording of the connection, or <c>null</c></param>
+    /// <param name="read">The read</param>
+    /// <param name="stamp">The time of the read</param>
+    /// <param name="endStatus">The end status so far</param>
+    /// <param name="cancellationToken">The token that stops the run</param>
+    /// <returns>The end status after the read</returns>
+    private PipeConnectionStatus Observe(PipeRecordingConnection? recorder, PipeReadResult read, DateTimeOffset stamp, PipeConnectionStatus endStatus, CancellationToken cancellationToken)
+    {
+        recorder?.Record(read, stamp);
+
+        var status = PipeStatusRule.ForRead(read);
+
+        if (IsSessionEnding(read))
+        {
+            return status!.Value;
+        }
+
+        if (status is not { } next)
+        {
+            return endStatus;
+        }
+
+        if (next.State == PipeConnectionState.Receiving)
+        {
+            EnterReceiving(stamp, cancellationToken);
+        }
+        else
+        {
+            LeaveReceiving();
+            SetStatus(next, cancellationToken);
+        }
+
+        return endStatus;
+    }
+
+    /// <summary>
+    /// Keeps a closed tick as the last one and raises <see cref="TickReceived" />.
+    /// </summary>
+    /// <param name="tick">The tick</param>
+    private void PublishTick(PipeTick tick)
+    {
+        lock (_statusLock)
+        {
+            _lastTick = PipeTickSummary.From(tick);
+        }
+
+        var handlers = TickReceived;
+
+        if (handlers is null)
+        {
+            return;
+        }
+
+        foreach (var handler in handlers.GetInvocationList().Cast<EventHandler<PipeTick>>())
+        {
+            try
+            {
+                handler(this, tick);
+            }
+            catch (Exception)
+            {
+                // A failing subscriber must not stop the connection
             }
         }
     }
@@ -391,6 +461,8 @@ public sealed class PipeConnection
 
             _status = status;
         }
+
+        CompanionLog.ConnectionStateChanged(_logger, status.State, status.ErrorKind, status.ErrorCode, status.ReceivedVersion);
 
         var handlers = StatusChanged;
 

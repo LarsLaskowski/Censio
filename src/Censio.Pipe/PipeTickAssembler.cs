@@ -165,7 +165,9 @@ public sealed class PipeTickAssembler : IDisposable
         var delay = Task.Delay(TimeSpan.FromTicks(Math.Min((deadline.Value - now).Ticks, _maxQuietWait.Ticks)), _timeProvider, delaySource.Token);
 
         await Task.WhenAny(_pending, delay).ConfigureAwait(false);
-        await delaySource.CancelAsync().ConfigureAwait(false);
+
+        // A zero delay cancels at once and runs the delay's only callback inline; CancelAsync would move the rest of the read to the thread pool
+        delaySource.CancelAfter(TimeSpan.Zero);
     }
 
     /// <summary>

@@ -30,7 +30,11 @@ public readonly record struct PipeTickSummary
     /// <returns>The summary</returns>
     public static PipeTickSummary From(PipeTick tick)
     {
-        throw new NotImplementedException();
+        return new PipeTickSummary
+               {
+                   ReceiveTime = tick.ReceiveTime,
+                   IslandCount = tick.Islands.Count
+               };
     }
 
     #endregion // Methods

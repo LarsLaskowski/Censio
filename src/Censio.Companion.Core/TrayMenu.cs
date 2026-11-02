@@ -92,15 +92,7 @@ public static class TrayMenu
     {
         if (status.Problem is { } problem)
         {
-            var reason = problem.Kind switch
-                         {
-                             PipeReplayProblemKind.FileNotFound => "file not found",
-                             PipeReplayProblemKind.NotARecording => "not a recording",
-                             PipeReplayProblemKind.UnsupportedVersion => "unsupported version",
-                             PipeReplayProblemKind.InvalidLine => string.Create(CultureInfo.InvariantCulture, $"invalid line {problem.LineNumber}").TrimEnd(),
-                             PipeReplayProblemKind.ReadFailed => "read failed",
-                             _ => throw new ArgumentOutOfRangeException(nameof(status), problem.Kind, "The problem kind is not defined")
-                         };
+            var reason = FormatReplayReason(problem) ?? throw new ArgumentOutOfRangeException(nameof(status), problem.Kind, "The problem kind is not defined");
 
             return $"{ToolTip}: Replay error: {reason}";
         }
@@ -134,6 +126,24 @@ public static class TrayMenu
             new TrayMenuEntry(TrayMenuEntryKind.Separator, string.Empty, false),
             new TrayMenuEntry(TrayMenuEntryKind.Exit, ExitText, true)
         ];
+    }
+
+    /// <summary>
+    /// Formats the reason of a replay problem.
+    /// </summary>
+    /// <param name="problem">The problem</param>
+    /// <returns>The reason, or <see langword="null" /> if the problem kind is not a defined value</returns>
+    internal static string? FormatReplayReason(PipeReplayProblem problem)
+    {
+        return problem.Kind switch
+               {
+                   PipeReplayProblemKind.FileNotFound => "file not found",
+                   PipeReplayProblemKind.NotARecording => "not a recording",
+                   PipeReplayProblemKind.UnsupportedVersion => "unsupported version",
+                   PipeReplayProblemKind.InvalidLine => string.Create(CultureInfo.InvariantCulture, $"invalid line {problem.LineNumber}").TrimEnd(),
+                   PipeReplayProblemKind.ReadFailed => "read failed",
+                   _ => null
+               };
     }
 
     #endregion // Methods
