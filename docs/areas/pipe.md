@@ -115,11 +115,12 @@ A tick is delivered when it closes, once, and is never reopened. It closes when:
   was set back (by a replay's recorded times or by the system) makes the assembler wait on and throws nothing. The
   steps change no item: a deadline that the clock reaches closes the tick as before.
 - The live connection requests items until the end of the stream, so it assembles ticks as a replay does. It keeps a
-  summary of the latest closed tick (its receive time and island count) across connections and raises an event for
-  each closed tick; a handler that throws affects neither the connection nor the other handlers. The tick itself has
-  no consumer yet.
+  summary of the latest closed tick (its receive time and island count) and the tick itself, whole, across connections,
+  and raises an event for each closed tick; a handler that throws affects neither the connection nor the other handlers.
+  The replay keeps the latest closed tick whole in the same way. The diagnostics window is the consumer of that tick
+  ([`companion.md`](companion.md), *Diagnostics window*).
 - The caller must keep requesting: the receive time of a frame is stamped when its read completes, but the next read
-  starts only on a request. A slow consumer belongs behind the tick buffer (#41) or the hand-off built with the first consumers (#12, #13).
+  starts only on a request. A slow consumer belongs behind the tick buffer (#41); the diagnostics window uses a coalescing hand-off instead: handing a tick over only stores it and signals, so a stalled window never delays the reading.
 
 ## Recording and replay
 
