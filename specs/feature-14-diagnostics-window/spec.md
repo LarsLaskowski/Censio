@@ -1,7 +1,7 @@
 # Spec: Diagnostics window for the last tick
 
 Source: Issue #14
-Status: Draft
+Status: Approved by Lead
 
 ## Problem
 
