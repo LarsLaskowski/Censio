@@ -22,7 +22,7 @@ Feature: see [spec.md](spec.md) (*Problem*); criteria AC1–AC12 live there.
 | 7 | The midnight timer refreshes the tray through `updater.Notify()` | `App.xaml.cs` `CreateUpdater` (timer callback calls `updater.Notify()` and `ArmMidnightTimer()`) | confirmed |
 | 8 | Menu clicks reach `Dispatch` only for kinds listed in `TrayIcon.BuildItems` | `TrayIcon.cs` `BuildItems`: `if (kind is ToggleRecording or OpenRecordingsFolder or OpenLogFolder or Exit)` | confirmed |
 | 9 | A replay reproduces the live ticks with their receive times | `pipe.md` *Replay*; `PipeReplayRunnerTests.PipeReplayRunnerTickSetsLastTickWithRecordedTime` | confirmed |
-| 10 | `float.ToString(CultureInfo.InvariantCulture)` on .NET 10 gives the shortest round-trip text, `-0` for negative zero, `NaN`, `Infinity`, `-Infinity`, `1E+38` | to verify: the AC2 float tests on the real runtime, Tester, step 5 (the .NET Core 3.0 formatting change documents it); a failing case is reported and the Lead decides the text | unverified |
+| 10 | `float.ToString(CultureInfo.InvariantCulture)` on .NET 10 gives the shortest round-trip text, `-0` for negative zero, `NaN`, `Infinity`, `-Infinity`, `1E+38` | the AC2 float tests on the real runtime (`DiagnosticsViewTests.cs:205-218`, Tester, step 5) pass on .NET 10 | confirmed |
 | 11a | `ListCollectionView(IList)` without sort, filter or live grouping uses the source list itself as its internal list (no copy), and a reset reads only `Count` | Security read `dotnet/wpf` `release/10.0` `ListCollectionView` in the plan review (N1) | confirmed |
 | 11b | A `DataGrid` with row virtualization, in a container that gives it a finite height, asks only for the rows on screen by index on the planned path; `Selector` enumerates every item only in select-all (`SelectAllImpl`, when multiple selection is allowed) and when it re-locates selected items or a selected value after a reset | Dev read `ItemContainerGenerator`, `VirtualizingStackPanel` and `Selector` in `dotnet/wpf` `release/10.0` in task 3 (no per-row scan on the planned path; the enumerating paths as named); the grid settings that avoid them are in *Approach*; final check in the manual run (AC10) | confirmed |
 | 11c | An `ItemsSource` that is already a `CollectionView` is used directly and adds no entry to WPF's `ViewManager` view table, whereas a plain `IList` is cached there and keeps the tick alive | Security read `ViewManager` (`CacheView` ~l.735, `GetExistingView` ~l.711, plan review B1); Dev read the `CollectionView` constructor and `ViewManager.GetSynchronizationInfo` in task 3 and confirmed no table entry for a `ListCollectionView` source | confirmed |
@@ -315,7 +315,8 @@ window. No new dependency, project, setting or file path.
 - Selection: `SelectionMode="Single"`, so select-all (Ctrl+A) is not available and never enumerates the rows, and
   `SelectedItem = null` before each `ItemsSource` swap, so no selected item or value is re-located after the reset
   (fact 11b). No selection at all (`IsHitTestVisible="False"`) lost: it also blocks the grid's scroll bars and wheel,
-  which E7 needs. Copying is out of scope (spec), so a single row selection is all the grid offers.
+  which E7 needs. Copying is out of scope (spec): the grid's default Ctrl+C is switched off with
+  `ClipboardCopyMode="None"` (step 9, Security N2), so a single row selection is all the grid offers.
 - `DiagnosticsRow` gets no value equality: a selected row that is scrolled out and back loses its highlight. This is
   accepted as cosmetic — selection has no function in the window, and equality by cells would format rows to compare
   and hash them, against the memory rule. The `companion.md` text does not promise a kept selection.

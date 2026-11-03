@@ -24,3 +24,4 @@ are quoted in full.
 | 2026-11-03 20:10 | 7 Code check | Orchestrator | main unchanged (38dcc54); format check, build 0 warn, tests all pass, coverage gate 100%/99.1%, analyzer gate 0, scope-check PASS |
 | 2026-11-03 20:13 | 8 Review round 1 | Security | APPROVED, no blocking; non-blocking: last tick kept even if window never opened (planned), Ctrl+C copy of sanitized text active (opus/medium · 63,084 tokens · 20 tool uses · 163 s) |
 | 2026-11-03 20:13 | 8 Review round 1 | Reviewer | APPROVE, no findings (code ef5063c) (opus/medium · 99,064 tokens · 24 tool uses · 190 s) |
+| 2026-11-03 20:15 | 9 PR approval | Lead | NOT APPROVED: fix Security N2 (ClipboardCopyMode None + companion.md), then delta Reviewer+Security; N1 accepted; PR needs manual-Windows-checks sentence (opus/medium · usage pending) |
