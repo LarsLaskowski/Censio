@@ -1,8 +1,8 @@
 # Plan: Diagnostics window for the last tick
 
 Source: Issue #14 | [spec.md](spec.md)
-Status: Draft
-Tier: standard — a new behavior (a window, a menu entry, the latest tick kept whole) that creates, changes or removes no security control; the island-name sanitizing reuses the log's existing rule unchanged.
+Status: Revised (1)
+Tier: security — the window is a new output of attacker-influenced pipe text (island names), and replacing their control and format characters at that sink is output escaping, a guard (`.squad/routing.md`, *Tiers*), even though it reuses the log's rule.
 Security areas touched: Parsing of external input and Logging of external data (`.squad/project.md`): pipe content (island names, GUIDs, values) is shown on screen for the first time, with names passed through the existing `LogLine.Sanitize`, unchanged; nothing is logged or written
 
 ## Problem / root cause
@@ -23,7 +23,9 @@ Feature: see [spec.md](spec.md) (*Problem*); criteria AC1–AC12 live there.
 | 8 | Menu clicks reach `Dispatch` only for kinds listed in `TrayIcon.BuildItems` | `TrayIcon.cs` `BuildItems`: `if (kind is ToggleRecording or OpenRecordingsFolder or OpenLogFolder or Exit)` | confirmed |
 | 9 | A replay reproduces the live ticks with their receive times | `pipe.md` *Replay*; `PipeReplayRunnerTests.PipeReplayRunnerTickSetsLastTickWithRecordedTime` | confirmed |
 | 10 | `float.ToString(CultureInfo.InvariantCulture)` on .NET 10 gives the shortest round-trip text, `-0` for negative zero, `NaN`, `Infinity`, `-Infinity`, `1E+38` | to verify: the AC2 float tests on the real runtime, Tester, step 5 (the .NET Core 3.0 formatting change documents it); a failing case is reported and the Lead decides the text | unverified |
-| 11 | A WPF `DataGrid` with row virtualization, no sorting or grouping, over a non-generic `IList` asks only for the rows on screen by index (does not enumerate the list or call `IndexOf` per row) | to verify: Dev reads `dotnet/wpf` `release/10.0` `ListCollectionView` (constructor, `InternalList`) and `ItemContainerGenerator` in step 6 and reports it; final check in the maintainer's manual run (AC10 manual part) | unverified |
+| 11a | `ListCollectionView(IList)` without sort, filter or live grouping uses the source list itself as its internal list (no copy), and a reset reads only `Count` | Security read `dotnet/wpf` `release/10.0` `ListCollectionView` in the plan review (N1) | confirmed |
+| 11b | A `DataGrid` with row virtualization, in a container that gives it a finite height, asks only for the rows on screen by index; `ItemContainerGenerator`, `VirtualizingStackPanel` and `Selector` neither enumerate the list nor need value equality of `DiagnosticsRow` (created anew per `this[index]`, no `Equals`) | to verify: Dev reads `ItemContainerGenerator`, `VirtualizingStackPanel` and `Selector` in `dotnet/wpf` `release/10.0` in task 3 and reports whether `DiagnosticsRow` needs equality by `Index` and cells; a grid that enumerates or scans per row stops the work before task 4 and goes back to the Lead; final check in the manual run (AC10) | unverified |
+| 11c | An `ItemsSource` that is already a `CollectionView` is used directly and adds no entry to WPF's `ViewManager` view table, whereas a plain `IList` is cached there (`ViewManager.CacheView`, inactive views purged only after two purge cycles at `ContextIdle`), keeping the tick alive | to verify: Dev reads the `CollectionView` constructor and `ViewManager.GetSynchronizationInfo` in task 3 and confirms no table entry for a `ListCollectionView` source; the caching of a plain `IList` Security read in `ViewManager` (`CacheView` ~l.735, `GetExistingView` ~l.711, plan review B1) | unverified |
 | 12 | `Application.Shutdown` closes the open windows, and `Exit` stays within 2 seconds with the window open | to verify: maintainer's manual run on Windows (AC6); the WPF documentation of `Application.Shutdown` says it closes the windows | unverified |
 | 13 | The shell is outside every coverage measure | `.github/workflows/ci.yml:71` `sonar.coverage.exclusions=…src/Censio.Companion/**`; no test project loads it (record 0004) | confirmed |
 | 14 | `TrayMenuTests.TrayMenuCreateListsEntriesInOrder` asserts the full entry list; the other `TrayMenu.Create` tests pick entries with `Single` | `tests/Censio.Companion.Core.Tests/TrayMenuTests.cs:56-95`, `:101-160` | confirmed |
@@ -67,11 +69,14 @@ Test rules for the Tester:
   `DiagnosticsView.Create` allocates less than 1 MiB (`GC.GetAllocatedBytesForCurrentThread` around the call), and
   that rows 0, 2,048 and 524,287 carry the expected island and good cells. `DiagnosticsViewIndexOfDoesNotScan`
   asserts `IndexOf` of row 524,287 returns 524,287 with less than 64 KiB allocated.
-- AC12: the window consumer is stalled by a `post` that queues the action and never runs it. The test asserts that
-  `readStatusText` and `readTick` were never called on the reading thread (call counts 0 while stalled), that at most
-  one action was queued, and that the ticks (game time, receive time, island count), the status sequence and — for
+- AC12: the session first `Open()`s a `FakeDiagnosticsWindow` (with a `post` that runs at once), the read counters
+  are taken after `Open()`, then `post` is switched to queue the action and never run it, and frames giving several
+  ticks are fed. The test asserts that the read counters did not change while the frames were read, that the queue
+  holds exactly one action, and that the ticks (game time, receive time, island count), the status sequence and — for
   the live test — the text of a `PipeRecordingSession` sink (`ControlledWriteStream`) equal those of the same run
   without a session.
+- `DiagnosticsWindowSessionClosedShowsNothingOnNotify` asserts that the `readStatusText` and `readTick` counters stay
+  0 after `Notify()` and the posted action ran with no window open.
 - AC4 midnight: `FakeTimeProvider` with a fixed local zone; a tick received at 23:59:00 shows `HH:mm:ss`; after
   `Advance` past midnight and `Notify`, the shown `Last tick:` line has the date.
 - A new hand-written fake `FakeDiagnosticsWindow` (`tests/Censio.Companion.Core.Tests/FakeDiagnosticsWindow.cs`)
@@ -85,15 +90,18 @@ The change has production and test code; these criteria, or parts of them, are v
 - AC6 (`Exit` with the window open, 2 seconds, exit code 0): the maintainer's manual run on Windows after the PR
   opens (fact 12); listed under "Not verified yet" in `companion.md` until then.
 - AC5, AC8, AC10 manual parts (close button and Alt+F4 close only the window; bring to front restored from
-  minimized; a tick at the limits scrolls, the tray stays responsive, the scroll position is kept): the same manual
-  run, the same list. AC10 also rests on fact 11, which the Dev reads in step 6.
+  minimized; a tick at the limits scrolls, the tray stays responsive, the vertical and horizontal scroll positions
+  are kept, and the process memory falls back after the window closes with a tick at the limits shown): the same
+  manual run, the same list. AC10 also rests on facts 11b and 11c, which the Dev reads in task 3.
 - AC11 (README and user guide, both languages): the Reviewer in step 8 against *Documentation updates*.
 
 ## Approach
 
 **Kept tick.** `PipeConnection` and `PipeReplayRunner` store the closed `PipeTick` itself next to the summary, in
 `PublishTick` under `_statusLock`, and expose it as `LatestTick`. It is replaced by the next tick only, kept across
-connections, and never cleared.
+connections, and never cleared. The `LatestTick` getter takes `_statusLock` like `LastTick`, so the tick and the
+summary are read consistently; the tick is never changed after it closed (its lists are arrays), so callers read it
+without a lock.
 
 **Window content (`DiagnosticsView`, Core).** Built by `DiagnosticsView.Create(statusText, tick, clock)` on the UI
 thread. Layout is the spec's *Window content*, fixed:
@@ -118,9 +126,10 @@ priority as `post`, and a factory of the WPF window.
 
 - `Open()` (UI thread): with a window open, `BringToFront()`; otherwise create one, subscribe `WindowClosed`, and
   `ShowView` a view of the current state at once.
-- `Notify()` (any thread): delegates to a `TrayStatusUpdater` whose read and show both run in the posted action on
-  the UI thread: with no window open it reads nothing and shows nothing; otherwise it creates the view and calls
-  `ShowView`. So the reading thread only does the updater's `Interlocked.Exchange` and the post.
+- `Notify()` (any thread): delegates to a `TrayStatusUpdater<DiagnosticsView?>` whose read and show both run in the
+  posted action on the UI thread. `TrayStatusUpdater.ShowCurrent` always calls its read delegate, so the session's
+  read delegate returns `null` without calling `readStatusText` or `readTick` when no window is open, and the show
+  delegate ignores `null`; otherwise it creates the view and calls `ShowView`. So the reading thread only does the updater's `Interlocked.Exchange` and the post.
 - `WindowClosed`: the session drops the window and its view.
 - `App` calls `Notify()` from `StatusChanged`, `TickReceived`, the recording's `StateChanged` and the midnight timer,
   next to the tray updater's `Notify()`.
@@ -130,13 +139,16 @@ priority as `post`, and a factory of the WPF window.
 `App.Dispatch` calls `_diagnostics?.Open()`.
 
 **WPF window (`DiagnosticsWindow.xaml`, shell).** Implements `IDiagnosticsWindow`. `Title` from
-`DiagnosticsView.Title`; default size 1000 × 600, resizable, `ShowInTaskbar` true. A header `ItemsControl` over
-`HeaderLines`, then a `DataGrid` with `AutoGenerateColumns="False"`, one `DataGridTextColumn` per entry of `Columns`
+`DiagnosticsView.Title`; default size 1000 × 600, resizable, `ShowInTaskbar` true. The content is a `Grid` with two rows, `Auto` and `*`
+(never a `StackPanel` or `ScrollViewer` around the grid: an infinite height turns virtualization off): a header
+`ItemsControl` over `HeaderLines` in row 0, a `DataGrid` in row 1 with `AutoGenerateColumns="False"`, one `DataGridTextColumn` per entry of `Columns`
 bound to `Cells[i]`, `IsReadOnly`, `CanUserSortColumns="False"`, `CanUserAddRows="False"`,
 `IsSynchronizedWithCurrentItem="False"`, `EnableRowVirtualization`, `EnableColumnVirtualization`,
 `VirtualizingPanel.VirtualizationMode="Recycling"`, `ScrollViewer.CanContentScroll="True"`, no grouping.
-`ShowView(view)`: remembers the grid's vertical scroll offset, sets the header and `ItemsSource = view`, restores the
-offset after layout (clamped by WPF), and calls `Show()` the first time. `BringToFront()`: `WindowState.Minimized` →
+`ShowView(view)`: remembers the grid's vertical and horizontal scroll offsets, sets the header and
+`ItemsSource = new ListCollectionView(view)` — never the view itself, so WPF's `ViewManager` keeps no cached view of
+the old tick (fact 11c) — restores both offsets after layout (clamped by WPF), and calls `Show()` the first time. On
+`Closed` it sets `ItemsSource = null` before raising `WindowClosed`, so a closed window holds no tick. `BringToFront()`: `WindowState.Minimized` →
 `Normal`, then `Activate()`. `Closed` raises `WindowClosed`. Exit: `Shutdown(0)` closes the window (fact 12).
 
 Layout: fixed by the spec's *Window content* and the values above; nothing is left to the Tester.
@@ -244,10 +256,15 @@ Owned by the Dev after the code is green, unless noted; both languages where the
   list (line 34) gains `Open diagnostics` after the first separator. New section *Diagnostics window* after
   *Folders*: title, *Window content* (header, columns, rows, number formats), update rules (each tick, status,
   local midnight, intermediate ticks may be skipped), the kept tick, close, single window, `Exit`, name sanitizing,
-  memory (rows on screen only), read path, privacy (on screen only, nothing logged or written). *Replay* (line 151):
+  memory (rows on screen only; at most three ticks referenced — the open one, the kept one and the shown one; a
+  replaced or closed window references none), read path, privacy (on screen only, nothing logged or written; no log
+  line). Name sanitizing says that exactly the categories control, format, line separator and paragraph separator
+  (and invalid UTF-16) are replaced, nothing else (combining marks and right-to-left letters stay; each cell is its
+  own text, so they cannot reorder another cell). Line 13's taskbar clause becomes "a taskbar button only while the
+  diagnostics window is open". *Replay* (line 151):
   the diagnostics window shows the replayed ticks. *Limits and errors*: "Not verified yet" adds the manual parts of
   AC5, AC6, AC8, AC10. *Related decisions*: record 0038.
-- `docs/areas/pipe.md`: *Order and end* (lines 310-315): the live connection and the replay keep the latest closed
+- `docs/areas/pipe.md`: *Order and end* (lines 117-122): the live connection and the replay keep the latest closed
   tick whole; "The tick itself has no consumer yet" becomes "the diagnostics window is its consumer"; the slow
   consumer sentence names the coalescing hand-off of the diagnostics window.
 - `docs/areas/README.md`: index row *companion* scope.
@@ -261,7 +278,8 @@ Owned by the Dev after the code is green, unless noted; both languages where the
 - `docs/USER_GUIDE.md` (EN and DE): *Companion* step 2 (line 109 and its German counterpart); a paragraph on the
   window after the tooltip paragraph (line 117 and counterpart), with the columns and that values are raw GUIDs until
   names exist; *Recording and replay* replay item (line 135 and counterpart) as in the README; the first-start
-  description (line 180 and counterpart) "opens no window until `Open diagnostics`"; *Data* (line 186 and
+  description (line 180 and German line 377) "opens no window until `Open diagnostics`" and "a taskbar button only
+  while the diagnostics window is open"; *Data* (line 186 and
   counterpart): the window stores nothing; *Reporting problems* (line 194) and *Probleme melden*: a screenshot of the
   diagnostics window shows your island names, next to the raw-recording warning.
 - `.squad/project.md` (Dev): *Security areas*, *Logging of external data* gains one sentence: the diagnostics window
@@ -290,6 +308,27 @@ window. No new dependency, project, setting or file path.
 
 - `docs/decisions/0038-diagnostics-window-flat-table-of-rows-made-on-demand.md` (Proposed), indexed in
   `docs/decisions/README.md`.
+
+## Challenge
+
+Challenge notes of the Devil's Advocate (verbatim) and their answers:
+
+1. "Wrong line reference: pipe.md *Order and end* bullets are at docs/areas/pipe.md lines 117-122, not 310-315 (that is *Limits and errors*)." — Accepted: *Documentation updates* names lines 117-122.
+2. "Taskbar sentence missed: the window has a taskbar button while open, but docs/areas/companion.md:13, docs/USER_GUIDE.md:180 and :377 (German) say "no taskbar button"; rewrite the taskbar clause in all three ("a taskbar button only while the diagnostics window is open")." — Accepted: all three in *Documentation updates*.
+3. "Layout container: header + DataGrid in a Grid with rows Auto and * (or DockPanel with grid as last filling child), never StackPanel or ScrollViewer (infinite height turns off virtualization); report in fact 11 note." — Accepted: *Approach* fixes a `Grid` with rows `Auto` and `*`; fact 11b names the finite height.
+4. "E8: save and restore both vertical and horizontal offsets around the ItemsSource swap; add "horizontal position kept" to the AC10 manual line." — Accepted: `ShowView` and *Verification without tests*.
+5. "TrayStatusUpdater.ShowCurrent always calls _readStatus(): the session's read delegate must return null without calling readStatusText/readTick when no window is open, show delegate ignores null; Tester asserts both read counters stay 0 in DiagnosticsWindowSessionClosedShowsNothingOnNotify." — Accepted: *Approach* (`Notify()`) and the test rules.
+6. "AC12 stall tests: Open() a FakeDiagnosticsWindow before feeding frames, snapshot read counters after Open(), assert unchanged while frames are read, assert the post queue holds exactly one action after several ticks." — Accepted: the AC12 test rule.
+7. "Fact 11: DiagnosticsRow created anew per this[index] with no Equals/GetHashCode; Dev (task 3) also reads how ItemContainerGenerator, VirtualizingStackPanel and Selector compare items and says whether DiagnosticsRow needs value equality by Index and cells; if the grid enumerates or scans per row, stop before task 4 and report to the Lead." — Accepted: fact 11b and task 3.
+
+## Security review
+
+- B1 (blocking, view cached by `ViewManager`) — resolved: `ShowView` sets `ItemsSource = new ListCollectionView(view)`, which WPF uses directly without a view-table entry, and a closed window sets `ItemsSource = null` (fact 11c, Dev confirms by reading in task 3). The memory text now says three ticks *referenced*, in record 0038, the planned `companion.md` text and the spec's *Memory* requirement (spec fixed: "at most three ticks exist" became "referenced", with a replaced or closed window referencing none). The AC10 manual run adds "memory falls back after the window closes". Not chosen: implementing `INotifyCollectionChanged` without raising it, an interface that lies about the list.
+- B2 (blocking, tier) — resolved: tier `security`; Security reviews the diff in step 8.
+- N1 — taken: fact 11 split; 11a confirmed by Security's reading, 11b stays for the Dev and the manual run.
+- N2 — taken: `companion.md` names exactly the replaced categories (*Documentation updates*).
+- N3 — taken: the `LatestTick` getter takes `_statusLock`; the tick is immutable after close (*Approach*, *Kept tick*).
+- N4 — taken: no new log line, stated in the planned `companion.md` text.
 
 ## Out of scope / follow-ups
 

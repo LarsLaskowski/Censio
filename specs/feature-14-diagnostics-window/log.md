@@ -12,3 +12,4 @@ are quoted in full.
 | 2026-11-03 19:20 | 2b Plan | Lead | plan.md, tasks.md, record 0038 written; tier standard; security areas: parsing of external input, logging of external data; plan-check PASS; RESULT: DONE (opus/medium · 67,533 tokens · 44 tool uses · 572 s · continued from 2a Spec) |
 | 2026-11-03 19:25 | 2b Plan challenge | Devil's Advocate | OBJECTIONS 0 major, 7 minor (opus/medium · 91,575 tokens · 26 tool uses · 258 s) |
 | 2026-11-03 19:25 | 3 Plan security review | Security | CHANGES_REQUIRED: B1 WPF ViewManager keeps replaced views (memory bound), B2 tier must be security (output escaping at new sink) (opus/medium · 74,866 tokens · 23 tool uses · 289 s) |
+| 2026-11-03 19:27 | 3 Plan revise | Lead | plan revised: tier security, ListCollectionView wrapper (B1), 7 DA minors answered; plan-check PASS; RESULT: DONE (opus/medium · usage pending) |

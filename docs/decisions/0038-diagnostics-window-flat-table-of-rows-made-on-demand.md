@@ -22,7 +22,7 @@ was closed.
 1. **A flat table over a read-only row list in `Censio.Companion.Core` that makes a row's text only when the row is
    asked for; the WPF grid virtualizes rows; the connection and the replay keep the latest tick whole; ticks reach
    the window through the tray's coalescing updater** — memory that does not grow with the row count beyond the
-   tick itself, all text rules unit-tested on Linux, the reading thread only signals. Relies on the WPF grid asking
+   tick itself, all text rules unit-tested on Linux, the reading thread only signals. The grid is handed a collection view of its own, so WPF caches no view that keeps old ticks. Relies on the WPF grid asking
    only for the rows on screen, which only a Windows run shows.
 2. **A tree (region, island, good)** — follows the issue's wording; a tree has no column headers for the eleven
    values, virtualizes expanded nodes poorly and loses its place when the content is replaced.
@@ -42,6 +42,9 @@ connection and the replay keep whole; its content and its open, update and close
 
 - The Companion keeps one more tick in memory, at most the bound of an open tick.
 - The row list must stay index-based (no sorting or grouping in the grid), or the grid would read every row.
+- The grid gets the row list wrapped in its own `ListCollectionView`, never the list itself: WPF caches the view of a
+  plain list in its view table and would keep replaced ticks, and the last one after the window closed, alive. A closed
+  window drops its rows.
 - That the grid really reads only the visible rows, keeps the scroll position and leaves the tray responsive at the
   limits is verified by the maintainer's run on Windows, not by a unit test.
 - Names and icons (M3) can later replace the GUID cells without changing the structure.

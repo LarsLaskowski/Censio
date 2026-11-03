@@ -77,8 +77,8 @@ view of the last tick, live and in a replay, to see that data arrives and to com
   savegame's island names, and the user guide says so where it asks for problem reports.
 - Memory: the latest closed tick is kept whole, window open or not (S3), across connections; at the limits that
   adds one open tick's bound ([`pipe.md`](../../docs/areas/pipe.md), *Limits and errors*). With the window closed
-  nothing else is held. Open, it makes text only for the rows on screen, never for the whole table, and releases the
-  replaced tick's content: at most three ticks exist at once (open, kept, shown).
+  nothing else is held. Open, it makes text only for the rows on screen and releases the
+  replaced tick: at most three ticks are referenced (open, kept, shown), a closed window none.
 - Read path: handing a closed tick to the window only stores it as the latest and signals; its text is made on the
   window's thread, never on the thread that reads the pipe or the recording. Receive times, states, ticks and
   recorded frames are the same with the window open, closed or stalled ([`pipe.md`](../../docs/areas/pipe.md),
