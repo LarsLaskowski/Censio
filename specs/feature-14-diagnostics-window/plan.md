@@ -24,8 +24,8 @@ Feature: see [spec.md](spec.md) (*Problem*); criteria AC1–AC12 live there.
 | 9 | A replay reproduces the live ticks with their receive times | `pipe.md` *Replay*; `PipeReplayRunnerTests.PipeReplayRunnerTickSetsLastTickWithRecordedTime` | confirmed |
 | 10 | `float.ToString(CultureInfo.InvariantCulture)` on .NET 10 gives the shortest round-trip text, `-0` for negative zero, `NaN`, `Infinity`, `-Infinity`, `1E+38` | to verify: the AC2 float tests on the real runtime, Tester, step 5 (the .NET Core 3.0 formatting change documents it); a failing case is reported and the Lead decides the text | unverified |
 | 11a | `ListCollectionView(IList)` without sort, filter or live grouping uses the source list itself as its internal list (no copy), and a reset reads only `Count` | Security read `dotnet/wpf` `release/10.0` `ListCollectionView` in the plan review (N1) | confirmed |
-| 11b | A `DataGrid` with row virtualization, in a container that gives it a finite height, asks only for the rows on screen by index; `ItemContainerGenerator`, `VirtualizingStackPanel` and `Selector` neither enumerate the list nor need value equality of `DiagnosticsRow` (created anew per `this[index]`, no `Equals`) | to verify: Dev reads `ItemContainerGenerator`, `VirtualizingStackPanel` and `Selector` in `dotnet/wpf` `release/10.0` in task 3 and reports whether `DiagnosticsRow` needs equality by `Index` and cells; a grid that enumerates or scans per row stops the work before task 4 and goes back to the Lead; final check in the manual run (AC10) | unverified |
-| 11c | An `ItemsSource` that is already a `CollectionView` is used directly and adds no entry to WPF's `ViewManager` view table, whereas a plain `IList` is cached there (`ViewManager.CacheView`, inactive views purged only after two purge cycles at `ContextIdle`), keeping the tick alive | to verify: Dev reads the `CollectionView` constructor and `ViewManager.GetSynchronizationInfo` in task 3 and confirms no table entry for a `ListCollectionView` source; the caching of a plain `IList` Security read in `ViewManager` (`CacheView` ~l.735, `GetExistingView` ~l.711, plan review B1) | unverified |
+| 11b | A `DataGrid` with row virtualization, in a container that gives it a finite height, asks only for the rows on screen by index on the planned path; `Selector` enumerates every item only in select-all (`SelectAllImpl`, when multiple selection is allowed) and when it re-locates selected items or a selected value after a reset | Dev read `ItemContainerGenerator`, `VirtualizingStackPanel` and `Selector` in `dotnet/wpf` `release/10.0` in task 3 (no per-row scan on the planned path; the enumerating paths as named); the grid settings that avoid them are in *Approach*; final check in the manual run (AC10) | confirmed |
+| 11c | An `ItemsSource` that is already a `CollectionView` is used directly and adds no entry to WPF's `ViewManager` view table, whereas a plain `IList` is cached there and keeps the tick alive | Security read `ViewManager` (`CacheView` ~l.735, `GetExistingView` ~l.711, plan review B1); Dev read the `CollectionView` constructor and `ViewManager.GetSynchronizationInfo` in task 3 and confirmed no table entry for a `ListCollectionView` source | confirmed |
 | 12 | `Application.Shutdown` closes the open windows, and `Exit` stays within 2 seconds with the window open | to verify: maintainer's manual run on Windows (AC6); the WPF documentation of `Application.Shutdown` says it closes the windows | unverified |
 | 13 | The shell is outside every coverage measure | `.github/workflows/ci.yml:71` `sonar.coverage.exclusions=…src/Censio.Companion/**`; no test project loads it (record 0004) | confirmed |
 | 14 | `TrayMenuTests.TrayMenuCreateListsEntriesInOrder` asserts the full entry list; the other `TrayMenu.Create` tests pick entries with `Single` | `tests/Censio.Companion.Core.Tests/TrayMenuTests.cs:56-95`, `:101-160` | confirmed |
@@ -143,10 +143,11 @@ priority as `post`, and a factory of the WPF window.
 (never a `StackPanel` or `ScrollViewer` around the grid: an infinite height turns virtualization off): a header
 `ItemsControl` over `HeaderLines` in row 0, a `DataGrid` in row 1 with `AutoGenerateColumns="False"`, one `DataGridTextColumn` per entry of `Columns`
 bound to `Cells[i]`, `IsReadOnly`, `CanUserSortColumns="False"`, `CanUserAddRows="False"`,
-`IsSynchronizedWithCurrentItem="False"`, `EnableRowVirtualization`, `EnableColumnVirtualization`,
+`IsSynchronizedWithCurrentItem="False"`, `SelectionMode="Single"`, `SelectionUnit="FullRow"`, no
+`SelectedValuePath` and no binding of `SelectedItem` or `SelectedValue`, `EnableRowVirtualization`, `EnableColumnVirtualization`,
 `VirtualizingPanel.VirtualizationMode="Recycling"`, `ScrollViewer.CanContentScroll="True"`, no grouping.
 `ShowView(view)`: remembers the grid's vertical and horizontal scroll offsets, sets the header and
-`ItemsSource = new ListCollectionView(view)` — never the view itself, so WPF's `ViewManager` keeps no cached view of
+`SelectedItem = null`, then `ItemsSource = new ListCollectionView(view)` — never the view itself, so WPF's `ViewManager` keeps no cached view of
 the old tick (fact 11c) — restores both offsets after layout (clamped by WPF), and calls `Show()` the first time. On
 `Closed` it sets `ItemsSource = null` before raising `WindowClosed`, so a closed window holds no tick. `BringToFront()`: `WindowState.Minimized` →
 `Normal`, then `Activate()`. `Closed` raises `WindowClosed`. Exit: `Shutdown(0)` closes the window (fact 12).
@@ -309,17 +310,27 @@ window. No new dependency, project, setting or file path.
 - `docs/decisions/0038-diagnostics-window-flat-table-of-rows-made-on-demand.md` (Proposed), indexed in
   `docs/decisions/README.md`.
 
+**Decisions during implementation (Lead, mode `decide`, after task 3).**
+
+- Selection: `SelectionMode="Single"`, so select-all (Ctrl+A) is not available and never enumerates the rows, and
+  `SelectedItem = null` before each `ItemsSource` swap, so no selected item or value is re-located after the reset
+  (fact 11b). No selection at all (`IsHitTestVisible="False"`) lost: it also blocks the grid's scroll bars and wheel,
+  which E7 needs. Copying is out of scope (spec), so a single row selection is all the grid offers.
+- `DiagnosticsRow` gets no value equality: a selected row that is scrolled out and back loses its highlight. This is
+  accepted as cosmetic — selection has no function in the window, and equality by cells would format rows to compare
+  and hash them, against the memory rule. The `companion.md` text does not promise a kept selection.
+
 ## Challenge
 
-Challenge notes of the Devil's Advocate (verbatim) and their answers:
+Challenge notes of the Devil's Advocate, all accepted and folded into the plan:
 
-1. "Wrong line reference: pipe.md *Order and end* bullets are at docs/areas/pipe.md lines 117-122, not 310-315 (that is *Limits and errors*)." — Accepted: *Documentation updates* names lines 117-122.
-2. "Taskbar sentence missed: the window has a taskbar button while open, but docs/areas/companion.md:13, docs/USER_GUIDE.md:180 and :377 (German) say "no taskbar button"; rewrite the taskbar clause in all three ("a taskbar button only while the diagnostics window is open")." — Accepted: all three in *Documentation updates*.
-3. "Layout container: header + DataGrid in a Grid with rows Auto and * (or DockPanel with grid as last filling child), never StackPanel or ScrollViewer (infinite height turns off virtualization); report in fact 11 note." — Accepted: *Approach* fixes a `Grid` with rows `Auto` and `*`; fact 11b names the finite height.
-4. "E8: save and restore both vertical and horizontal offsets around the ItemsSource swap; add "horizontal position kept" to the AC10 manual line." — Accepted: `ShowView` and *Verification without tests*.
-5. "TrayStatusUpdater.ShowCurrent always calls _readStatus(): the session's read delegate must return null without calling readStatusText/readTick when no window is open, show delegate ignores null; Tester asserts both read counters stay 0 in DiagnosticsWindowSessionClosedShowsNothingOnNotify." — Accepted: *Approach* (`Notify()`) and the test rules.
-6. "AC12 stall tests: Open() a FakeDiagnosticsWindow before feeding frames, snapshot read counters after Open(), assert unchanged while frames are read, assert the post queue holds exactly one action after several ticks." — Accepted: the AC12 test rule.
-7. "Fact 11: DiagnosticsRow created anew per this[index] with no Equals/GetHashCode; Dev (task 3) also reads how ItemContainerGenerator, VirtualizingStackPanel and Selector compare items and says whether DiagnosticsRow needs value equality by Index and cells; if the grid enumerates or scans per row, stop before task 4 and report to the Lead." — Accepted: fact 11b and task 3.
+1. `pipe.md` *Order and end* is at lines 117-122 — *Documentation updates*.
+2. The "no taskbar button" sentences (`companion.md:13`, `USER_GUIDE.md:180`, German `:377`) — *Documentation updates*.
+3. Grid in a `Grid` with rows `Auto` and `*`, never a `StackPanel` or `ScrollViewer` — *Approach*, fact 11b.
+4. Vertical and horizontal offsets kept — `ShowView`, *Verification without tests*.
+5. The read delegate returns `null` without reading while closed; counters stay 0 — *Approach*, test rules.
+6. AC12 stall tests open the fake window first, exactly one queued action — test rules.
+7. Equality of `DiagnosticsRow` and enumerating grid paths read in task 3 — fact 11b, decided under *Approach*.
 
 ## Security review
 

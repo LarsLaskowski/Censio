@@ -498,6 +498,229 @@ public sealed class DiagnosticsViewTests
     }
 
     /// <summary>
+    /// As an <see cref="IList" /> the view is read-only, of fixed size and not synchronized, with itself as its root.
+    /// </summary>
+    [TestMethod]
+    public void DiagnosticsViewListIsReadOnlyFixedSize()
+    {
+        // Arrange
+        var view = DiagnosticsView.Create("Receiving", CreateTwoIslandTick(), CreateClock());
+
+        // Act
+        IList list = view;
+
+        // Assert
+        Assert.IsTrue(list.IsReadOnly, "The view should be read-only");
+        Assert.IsTrue(list.IsFixedSize, "The view should be of fixed size");
+        Assert.IsFalse(list.IsSynchronized, "The view should not be synchronized");
+        Assert.AreSame(view, list.SyncRoot, "The view should be its own synchronization root");
+    }
+
+    /// <summary>
+    /// Every member that would change the list throws <see cref="NotSupportedException" /> and leaves the rows as they
+    /// are.
+    /// </summary>
+    /// <param name="member">The name of the mutating member</param>
+    [TestMethod]
+    [DataRow("Add")]
+    [DataRow("Clear")]
+    [DataRow("Insert")]
+    [DataRow("Remove")]
+    [DataRow("RemoveAt")]
+    [DataRow("Indexer")]
+    public void DiagnosticsViewListMutatorThrowsNotSupported(string member)
+    {
+        // Arrange
+        var view = DiagnosticsView.Create("Receiving", CreateTwoIslandTick(), CreateClock());
+        IList list = view;
+        var row = view[0];
+        Action mutate = member switch
+                        {
+                            "Add" => () => list.Add(row),
+                            "Clear" => list.Clear,
+                            "Insert" => () => list.Insert(0, row),
+                            "Remove" => () => list.Remove(row),
+                            "RemoveAt" => () => list.RemoveAt(0),
+                            _ => () => list[0] = row
+                        };
+
+        // Act
+        var exception = Assert.ThrowsExactly<NotSupportedException>(mutate, $"{member} should not be supported");
+
+        // Assert
+        Assert.AreEqual("The view is read-only", exception.Message, "The exception should say that the view is read-only");
+        Assert.HasCount(3, view, "The rows should be left as they are");
+    }
+
+    /// <summary>
+    /// The untyped indexer returns the row of the typed one, with the same index and cells.
+    /// </summary>
+    [TestMethod]
+    public void DiagnosticsViewListIndexerReturnsRow()
+    {
+        // Arrange
+        var view = DiagnosticsView.Create("Receiving", CreateTwoIslandTick(), CreateClock());
+        IList list = view;
+
+        // Act
+        var item = list[2];
+
+        // Assert
+        var row = item as DiagnosticsRow;
+
+        Assert.IsNotNull(row, "The item should be a row");
+        Assert.AreEqual(2, row.Index, "The row should carry its index");
+        Assert.AreSequenceEqual(view[2].Cells.ToArray(), row.Cells.ToArray(), "The row should have the cells of the typed indexer");
+    }
+
+    /// <summary>
+    /// An index outside the rows throws <see cref="ArgumentOutOfRangeException" />.
+    /// </summary>
+    /// <param name="index">The index</param>
+    [TestMethod]
+    [DataRow(-1)]
+    [DataRow(3)]
+    public void DiagnosticsViewIndexerOutsideRowsThrows(int index)
+    {
+        // Arrange
+        var view = DiagnosticsView.Create("Receiving", CreateTwoIslandTick(), CreateClock());
+
+        // Act
+        var exception = Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => view[index], "An index outside the rows should throw");
+
+        // Assert
+        Assert.AreEqual("index", exception.ParamName, "The exception should name the index");
+    }
+
+    /// <summary>
+    /// A row of the view is found at its index and contained; a row whose index is outside the rows, a row whose cells
+    /// differ from the ones at its index, null and an object that is no row are not.
+    /// </summary>
+    /// <param name="index">The index the row carries</param>
+    /// <param name="goodCell">The good cell of the row, or null for the cells the view has at that index</param>
+    /// <param name="expected">The expected index</param>
+    [TestMethod]
+    [DataRow(1, null, 1)]
+    [DataRow(2, null, 2)]
+    [DataRow(1, "30", -1)]
+    [DataRow(-1, null, -1)]
+    [DataRow(3, null, -1)]
+    public void DiagnosticsViewListIndexOfAndContainsCompareCells(int index, string? goodCell, int expected)
+    {
+        // Arrange
+        var view = DiagnosticsView.Create("Receiving", CreateTwoIslandTick(), CreateClock());
+        IList list = view;
+        var cells = view[Math.Clamp(index, 0, view.Count - 1)].Cells.ToArray();
+
+        if (goodCell is not null)
+        {
+            cells[5] = goodCell;
+        }
+
+        var row = new DiagnosticsRow(index, cells);
+
+        // Act
+        var found = list.IndexOf(row);
+
+        // Assert
+        Assert.AreEqual(expected, found, "The row should be found only at its own index with the cells of that index");
+        Assert.AreEqual(expected >= 0, list.Contains(row), "Contains should agree with IndexOf");
+    }
+
+    /// <summary>
+    /// Null and an object that is no row are neither found nor contained.
+    /// </summary>
+    /// <param name="useNull">Whether the value is null instead of a string</param>
+    [TestMethod]
+    [DataRow(true)]
+    [DataRow(false)]
+    public void DiagnosticsViewListIndexOfNonRowReturnsMinusOne(bool useNull)
+    {
+        // Arrange
+        var view = DiagnosticsView.Create("Receiving", CreateTwoIslandTick(), CreateClock());
+        IList list = view;
+        var value = useNull ? null : "30";
+
+        // Act
+        var found = list.IndexOf(value);
+
+        // Assert
+        Assert.AreEqual(-1, found, "A value that is no row should not be found");
+        Assert.IsFalse(list.Contains(value), "A value that is no row should not be contained");
+    }
+
+    /// <summary>
+    /// Enumerating the view, typed and untyped, yields its rows in order with their indexes and cells.
+    /// </summary>
+    [TestMethod]
+    public void DiagnosticsViewEnumerationYieldsRowsInOrder()
+    {
+        // Arrange
+        var view = DiagnosticsView.Create("Receiving", CreateTwoIslandTick(), CreateClock());
+        IEnumerable untyped = view;
+
+        // Act
+        var typedRows = view.ToArray();
+        var untypedRows = untyped.Cast<DiagnosticsRow>().ToArray();
+
+        // Assert
+        string[] expected = ["30", "10", "20"];
+        int[] indexes = [0, 1, 2];
+
+        Assert.AreSequenceEqual(indexes, typedRows.Select(row => row.Index).ToArray(), "The typed enumeration should yield the rows in order");
+        Assert.AreSequenceEqual(expected, typedRows.Select(row => row.Cells[5]).ToArray(), "The typed enumeration should yield the cells of each row");
+        Assert.AreSequenceEqual(indexes, untypedRows.Select(row => row.Index).ToArray(), "The untyped enumeration should yield the rows in order");
+        Assert.AreSequenceEqual(expected, untypedRows.Select(row => row.Cells[5]).ToArray(), "The untyped enumeration should yield the cells of each row");
+    }
+
+    /// <summary>
+    /// Copying the view into an array writes its rows in order from the given index on.
+    /// </summary>
+    [TestMethod]
+    public void DiagnosticsViewCopyToWritesRowsFromIndex()
+    {
+        // Arrange
+        var view = DiagnosticsView.Create("Receiving", CreateTwoIslandTick(), CreateClock());
+        ICollection collection = view;
+        var array = new object?[5];
+
+        // Act
+        collection.CopyTo(array, 1);
+
+        // Assert
+        Assert.IsNull(array[0], "The slot before the index should stay empty");
+        Assert.IsNull(array[4], "The slot after the rows should stay empty");
+        Assert.AreSequenceEqual(new[] { "30", "10", "20" }, array.Skip(1).Take(3).Cast<DiagnosticsRow>().Select(row => row.Cells[5]).ToArray(), "The rows should be copied in order from the index on");
+    }
+
+    /// <summary>
+    /// Copying the view into no array throws <see cref="ArgumentNullException" />.
+    /// </summary>
+    [TestMethod]
+    public void DiagnosticsViewCopyToNullArrayThrows()
+    {
+        // Arrange
+        ICollection collection = DiagnosticsView.Create("Receiving", CreateTwoIslandTick(), CreateClock());
+
+        // Act
+        var exception = Assert.ThrowsExactly<ArgumentNullException>(() => collection.CopyTo(null!, 0), "Copying into no array should throw");
+
+        // Assert
+        Assert.AreEqual("array", exception.ParamName, "The exception should name the array");
+    }
+
+    /// <summary>
+    /// Creates a tick of two islands with the goods 30 and 10, and 20: three rows.
+    /// </summary>
+    /// <returns>The tick</returns>
+    private static PipeTick CreateTwoIslandTick()
+    {
+        return CreateTick(100,
+                          CreateIsland(new PipeIslandKey(-77, 2, 3), 4, "Ostia", CreateEntry(30), CreateEntry(10)),
+                          CreateIsland(new PipeIslandKey(5, 1, 0), 6, "Capua", CreateEntry(20)));
+    }
+
+    /// <summary>
     /// Creates a clock at <see cref="_now" /> in a local time zone without offset.
     /// </summary>
     /// <returns>The clock</returns>
