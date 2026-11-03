@@ -25,3 +25,4 @@ are quoted in full.
 | 2026-11-03 20:13 | 8 Review round 1 | Security | APPROVED, no blocking; non-blocking: last tick kept even if window never opened (planned), Ctrl+C copy of sanitized text active (opus/medium · 63,084 tokens · 20 tool uses · 163 s) |
 | 2026-11-03 20:13 | 8 Review round 1 | Reviewer | APPROVE, no findings (code ef5063c) (opus/medium · 99,064 tokens · 24 tool uses · 190 s) |
 | 2026-11-03 20:15 | 9 PR approval | Lead | NOT APPROVED: fix Security N2 (ClipboardCopyMode None + companion.md), then delta Reviewer+Security; N1 accepted; PR needs manual-Windows-checks sentence (opus/medium · 42,353 tokens · 8 tool uses · 75 s) |
+| 2026-11-03 20:17 | 6 Fix N2 clipboard | Dev | ClipboardCopyMode None on DataGrid; companion.md Table bullet and Not verified yet updated (sonnet/medium · 1,375 tokens · 2 tool uses · 43 s · continued from 6 Implement G1) |
