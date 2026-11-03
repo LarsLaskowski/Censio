@@ -146,6 +146,11 @@ public sealed class PipeConnection
         }
     }
 
+    /// <summary>
+    /// Gets the latest closed tick whole, or <c>null</c> if none was received.
+    /// </summary>
+    public PipeTick? LatestTick => throw new NotImplementedException();
+
     #endregion // Properties
 
     #region Methods

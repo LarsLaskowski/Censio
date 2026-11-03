@@ -56,6 +56,11 @@ public static class TrayMenu
     /// </summary>
     public const string OpenLogFolderText = "Open log folder";
 
+    /// <summary>
+    /// The text of the entry that opens the diagnostics window.
+    /// </summary>
+    public const string OpenDiagnosticsText = "Open diagnostics";
+
     #endregion // Constants
 
     #region Methods

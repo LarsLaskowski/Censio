@@ -36,6 +36,11 @@ public enum TrayMenuEntryKind
     OpenLogFolder,
 
     /// <summary>
+    /// The entry that opens the diagnostics window.
+    /// </summary>
+    OpenDiagnostics,
+
+    /// <summary>
     /// A separator line.
     /// </summary>
     Separator,
