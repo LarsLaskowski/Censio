@@ -1,6 +1,6 @@
 # 0038: The diagnostics window is a flat table whose rows are made on demand from the latest tick, kept whole
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-03
 - **Area:** companion
 - **Source:** Issue #14

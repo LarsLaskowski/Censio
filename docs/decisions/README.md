@@ -90,5 +90,5 @@ once in the [area document](../areas/README.md) of the record's area, and the re
 | [0035](0035-pipe-connection-states-retry-and-identification-level.md) | The pipe connection is a platform-neutral state machine over a Windows connector that checks the pipe exists first and connects at identification level | Accepted | 2026-11-01 |
 | [0036](0036-pipe-recording-raw-frames-and-replay-on-a-recorded-clock.md) | Recordings hold the raw frames as JSON lines, written off the read path; replay feeds them back as a byte stream on a recorded clock | Accepted | 2026-11-01 |
 | [0037](0037-companion-log-through-the-logging-abstraction-to-own-rotating-file.md) | The Companion logs through .NET's logging abstraction into its own rotating text file | Accepted | 2026-11-02 |
-| [0038](0038-diagnostics-window-flat-table-of-rows-made-on-demand.md) | The diagnostics window is a flat table whose rows are made on demand from the latest tick, kept whole | Proposed | 2026-11-03 |
+| [0038](0038-diagnostics-window-flat-table-of-rows-made-on-demand.md) | The diagnostics window is a flat table whose rows are made on demand from the latest tick, kept whole | Accepted | 2026-11-03 |
 <!-- project:end index -->

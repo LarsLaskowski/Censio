@@ -22,3 +22,5 @@ are quoted in full.
 | 2026-11-03 20:04 | 6 Implement G2 shell | Dev | Shell DiagnosticsWindow, App wiring, TrayIcon click done; build 0 warn; gates pass; manual Windows checks listed (sonnet/medium · 17,860 tokens · 6 tool uses · 111 s · continued from 6 Implement G1) |
 | 2026-11-03 20:07 | 6 Documentation G3 | Dev | Docs tasks 5-10 written (companion, pipe, areas index, ARCHITECTURE, README EN/DE, USER_GUIDE EN/DE, project.md); decision/config/scope checks PASS (sonnet/medium · 35,659 tokens · 15 tool uses · 264 s · continued from 6 Implement G1) |
 | 2026-11-03 20:10 | 7 Code check | Orchestrator | main unchanged (38dcc54); format check, build 0 warn, tests all pass, coverage gate 100%/99.1%, analyzer gate 0, scope-check PASS |
+| 2026-11-03 20:13 | 8 Review round 1 | Security | APPROVED, no blocking; non-blocking: last tick kept even if window never opened (planned), Ctrl+C copy of sanitized text active (opus/medium · 63,084 tokens · 20 tool uses · 163 s) |
+| 2026-11-03 20:13 | 8 Review round 1 | Reviewer | APPROVE, no findings (code ef5063c) (opus/medium · 99,064 tokens · 24 tool uses · 190 s) |
