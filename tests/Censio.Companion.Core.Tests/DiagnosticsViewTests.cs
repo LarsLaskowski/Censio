@@ -643,10 +643,11 @@ public sealed class DiagnosticsViewTests
 
         // Act
         var found = list.IndexOf(value);
+        var contained = list.Contains(value);
 
         // Assert
         Assert.AreEqual(-1, found, "A value that is no row should not be found");
-        Assert.IsFalse(list.Contains(value), "A value that is no row should not be contained");
+        Assert.IsFalse(contained, "A value that is no row should not be contained");
     }
 
     /// <summary>
@@ -661,7 +662,13 @@ public sealed class DiagnosticsViewTests
 
         // Act
         var typedRows = view.ToArray();
-        var untypedRows = untyped.Cast<DiagnosticsRow>().ToArray();
+        var untypedRows = new List<DiagnosticsRow>();
+        var enumerator = untyped.GetEnumerator();
+
+        while (enumerator.MoveNext())
+        {
+            untypedRows.Add((DiagnosticsRow)enumerator.Current);
+        }
 
         // Assert
         string[] expected = ["30", "10", "20"];
@@ -688,9 +695,11 @@ public sealed class DiagnosticsViewTests
         collection.CopyTo(array, 1);
 
         // Assert
+        string[] expected = ["30", "10", "20"];
+
         Assert.IsNull(array[0], "The slot before the index should stay empty");
         Assert.IsNull(array[4], "The slot after the rows should stay empty");
-        Assert.AreSequenceEqual(new[] { "30", "10", "20" }, array.Skip(1).Take(3).Cast<DiagnosticsRow>().Select(row => row.Cells[5]).ToArray(), "The rows should be copied in order from the index on");
+        Assert.AreSequenceEqual(expected, array.Skip(1).Take(3).Cast<DiagnosticsRow>().Select(row => row.Cells[5]).ToArray(), "The rows should be copied in order from the index on");
     }
 
     /// <summary>
