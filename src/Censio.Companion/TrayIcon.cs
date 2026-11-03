@@ -138,7 +138,7 @@ internal sealed class TrayIcon : IDisposable
                        };
             var kind = entry.Kind;
 
-            if (kind is TrayMenuEntryKind.ToggleRecording or TrayMenuEntryKind.OpenRecordingsFolder or TrayMenuEntryKind.OpenLogFolder or TrayMenuEntryKind.Exit)
+            if (kind is TrayMenuEntryKind.OpenDiagnostics or TrayMenuEntryKind.ToggleRecording or TrayMenuEntryKind.OpenRecordingsFolder or TrayMenuEntryKind.OpenLogFolder or TrayMenuEntryKind.Exit)
             {
                 item.Click += (_, _) => _dispatch(kind);
             }
