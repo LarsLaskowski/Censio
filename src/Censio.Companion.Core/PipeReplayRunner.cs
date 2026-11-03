@@ -28,7 +28,7 @@ public sealed class PipeReplayRunner
     private readonly TimeProvider _waitProvider;
 
     /// <summary>
-    /// Guards <see cref="_status" /> and <see cref="_lastTick" />.
+    /// Guards <see cref="_status" />, <see cref="_lastTick" /> and <see cref="_latestTick" />.
     /// </summary>
     private readonly Lock _statusLock = new();
 
@@ -49,6 +49,11 @@ public sealed class PipeReplayRunner
     /// The summary of the last tick.
     /// </summary>
     private PipeTickSummary? _lastTick;
+
+    /// <summary>
+    /// The last closed tick whole, kept across connections.
+    /// </summary>
+    private PipeTick? _latestTick;
 
     #endregion // Fields
 
@@ -129,7 +134,16 @@ public sealed class PipeReplayRunner
     /// <summary>
     /// Gets the latest closed tick whole, or <c>null</c> if none was received.
     /// </summary>
-    public PipeTick? LatestTick => throw new NotImplementedException();
+    public PipeTick? LatestTick
+    {
+        get
+        {
+            lock (_statusLock)
+            {
+                return _latestTick;
+            }
+        }
+    }
 
     #endregion // Properties
 
@@ -199,6 +213,7 @@ public sealed class PipeReplayRunner
         lock (_statusLock)
         {
             _lastTick = PipeTickSummary.From(tick);
+            _latestTick = tick;
         }
 
         var handlers = TickReceived;

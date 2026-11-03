@@ -28,7 +28,7 @@ public sealed class PipeConnection
     private readonly PipeRecordingSession? _recording;
 
     /// <summary>
-    /// Guards <see cref="_status" /> and <see cref="_lastTick" />.
+    /// Guards <see cref="_status" />, <see cref="_lastTick" /> and <see cref="_latestTick" />.
     /// </summary>
     private readonly Lock _statusLock = new();
 
@@ -49,6 +49,11 @@ public sealed class PipeConnection
     /// The summary of the last tick, kept across connections.
     /// </summary>
     private PipeTickSummary? _lastTick;
+
+    /// <summary>
+    /// The last closed tick whole, kept across connections.
+    /// </summary>
+    private PipeTick? _latestTick;
 
     /// <summary>
     /// Whether a run is in progress; 1 if so, otherwise 0.
@@ -149,7 +154,16 @@ public sealed class PipeConnection
     /// <summary>
     /// Gets the latest closed tick whole, or <c>null</c> if none was received.
     /// </summary>
-    public PipeTick? LatestTick => throw new NotImplementedException();
+    public PipeTick? LatestTick
+    {
+        get
+        {
+            lock (_statusLock)
+            {
+                return _latestTick;
+            }
+        }
+    }
 
     #endregion // Properties
 
@@ -404,6 +418,7 @@ public sealed class PipeConnection
         lock (_statusLock)
         {
             _lastTick = PipeTickSummary.From(tick);
+            _latestTick = tick;
         }
 
         var handlers = TickReceived;

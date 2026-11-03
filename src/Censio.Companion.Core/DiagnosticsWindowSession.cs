@@ -25,14 +25,19 @@ public sealed class DiagnosticsWindowSession
     private readonly TimeProvider _clock;
 
     /// <summary>
-    /// Runs an action on the thread of the window.
-    /// </summary>
-    private readonly Action<Action> _post;
-
-    /// <summary>
     /// Creates the window.
     /// </summary>
     private readonly Func<IDiagnosticsWindow> _createWindow;
+
+    /// <summary>
+    /// Hands the content over to the window with at most one pending update.
+    /// </summary>
+    private readonly TrayStatusUpdater<DiagnosticsView?> _updater;
+
+    /// <summary>
+    /// The open window, or <c>null</c> if none.
+    /// </summary>
+    private IDiagnosticsWindow? _window;
 
     #endregion // Fields
 
@@ -51,8 +56,8 @@ public sealed class DiagnosticsWindowSession
         _readStatusText = readStatusText;
         _readTick = readTick;
         _clock = clock;
-        _post = post;
         _createWindow = createWindow;
+        _updater = new TrayStatusUpdater<DiagnosticsView?>(ReadView, post, ShowUpdate);
     }
 
     #endregion // Constructor
@@ -62,26 +67,82 @@ public sealed class DiagnosticsWindowSession
     /// <summary>
     /// Gets a value indicating whether the window is open.
     /// </summary>
-    public bool IsOpen => throw new NotImplementedException();
+    public bool IsOpen => _window is not null;
 
     #endregion // Properties
 
     #region Methods
 
     /// <summary>
-    /// Opens the window, or brings the open one to the front.
+    /// Opens the window, or brings the open one to the front; callable on the thread of the window only.
     /// </summary>
     public void Open()
     {
-        throw new NotImplementedException();
+        if (_window is { } open)
+        {
+            open.BringToFront();
+
+            return;
+        }
+
+        var window = _createWindow();
+
+        window.WindowClosed += OnWindowClosed;
+        _window = window;
+        window.ShowView(CreateView());
     }
 
     /// <summary>
-    /// Tells the session that the content may have changed.
+    /// Tells the session that the content may have changed; callable from any thread.
     /// </summary>
     public void Notify()
     {
-        throw new NotImplementedException();
+        _updater.Notify();
+    }
+
+    /// <summary>
+    /// Creates a view of the current state.
+    /// </summary>
+    /// <returns>The view</returns>
+    private DiagnosticsView CreateView()
+    {
+        return DiagnosticsView.Create(_readStatusText(), _readTick(), _clock);
+    }
+
+    /// <summary>
+    /// Creates the view for an update, or nothing while no window is open.
+    /// </summary>
+    /// <returns>The view, or <c>null</c> if no window is open</returns>
+    private DiagnosticsView? ReadView()
+    {
+        return _window is null ? null : CreateView();
+    }
+
+    /// <summary>
+    /// Shows a view in the open window.
+    /// </summary>
+    /// <param name="view">The view, or <c>null</c> if none</param>
+    private void ShowUpdate(DiagnosticsView? view)
+    {
+        if (view is not null)
+        {
+            _window?.ShowView(view);
+        }
+    }
+
+    /// <summary>
+    /// Drops the window and its view.
+    /// </summary>
+    /// <param name="sender">The window</param>
+    /// <param name="eventArgs">The event data</param>
+    private void OnWindowClosed(object? sender, EventArgs eventArgs)
+    {
+        if (sender is IDiagnosticsWindow window)
+        {
+            window.WindowClosed -= OnWindowClosed;
+        }
+
+        _window = null;
     }
 
     #endregion // Methods

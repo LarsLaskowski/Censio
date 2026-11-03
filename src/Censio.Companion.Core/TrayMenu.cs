@@ -254,6 +254,7 @@ public static class TrayMenu
                    new TrayMenuEntry(TrayMenuEntryKind.Status, $"Status: {snapshot.StatusText}", false),
                    new TrayMenuEntry(TrayMenuEntryKind.LastTick, FormatLastTick(snapshot.LastTick, clock), false),
                    new TrayMenuEntry(TrayMenuEntryKind.Separator, string.Empty, false),
+                   new TrayMenuEntry(TrayMenuEntryKind.OpenDiagnostics, OpenDiagnosticsText, true),
                    new TrayMenuEntry(TrayMenuEntryKind.ToggleRecording, snapshot.IsRecording ? StopRecordingText : StartRecordingText, snapshot.CanRecord),
                    new TrayMenuEntry(TrayMenuEntryKind.OpenRecordingsFolder, OpenRecordingsFolderText, true),
                    new TrayMenuEntry(TrayMenuEntryKind.OpenLogFolder, OpenLogFolderText, true),
