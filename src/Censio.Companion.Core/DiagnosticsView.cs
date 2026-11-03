@@ -22,6 +22,11 @@ public sealed class DiagnosticsView : IReadOnlyList<DiagnosticsRow>, IList
     /// </summary>
     public const string NoEntriesText = "(no entries)";
 
+    /// <summary>
+    /// The message of the exception thrown by every mutating <see cref="IList" /> member.
+    /// </summary>
+    private const string ReadOnlyText = "The view is read-only";
+
     #endregion // Constants
 
     #region Fields
@@ -313,7 +318,7 @@ public sealed class DiagnosticsView : IReadOnlyList<DiagnosticsRow>, IList
     object? IList.this[int index]
     {
         get => this[index];
-        set => throw new NotSupportedException("The view is read-only");
+        set => throw new NotSupportedException(ReadOnlyText);
     }
 
     /// <inheritdoc />
@@ -331,31 +336,31 @@ public sealed class DiagnosticsView : IReadOnlyList<DiagnosticsRow>, IList
     /// <inheritdoc />
     int IList.Add(object? value)
     {
-        throw new NotSupportedException("The view is read-only");
+        throw new NotSupportedException(ReadOnlyText);
     }
 
     /// <inheritdoc />
     void IList.Clear()
     {
-        throw new NotSupportedException("The view is read-only");
+        throw new NotSupportedException(ReadOnlyText);
     }
 
     /// <inheritdoc />
     void IList.Insert(int index, object? value)
     {
-        throw new NotSupportedException("The view is read-only");
+        throw new NotSupportedException(ReadOnlyText);
     }
 
     /// <inheritdoc />
     void IList.Remove(object? value)
     {
-        throw new NotSupportedException("The view is read-only");
+        throw new NotSupportedException(ReadOnlyText);
     }
 
     /// <inheritdoc />
     void IList.RemoveAt(int index)
     {
-        throw new NotSupportedException("The view is read-only");
+        throw new NotSupportedException(ReadOnlyText);
     }
 
     #endregion // IList
