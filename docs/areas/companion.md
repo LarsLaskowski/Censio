@@ -123,7 +123,7 @@ sent it: GUIDs are raw numbers until names and icons exist.
   consumption`, `Buildings`, `Maintenance`, `Income`, `Profit`, `Productivity (sum)`, `Productivity (avg)`. Rows follow
   the tick: islands in the order the tick holds them, the goods of an island in frame order, the region and island
   columns repeated on every row of the island. An island without entries has one row with `(no entries)` in `Good` and
-  the value columns empty. The table cannot be sorted or edited.
+  the value columns empty. The table cannot be sorted, edited or copied.
 - **Numbers** are culture-independent, also on a German Windows: integers in decimal with a leading `-` when negative,
   floats with the decimal point `.`, no digit grouping, as the shortest text that reads back as the same 32-bit value
   (`0.1`, `-2.5`, `1E+38`), negative zero as `-0`, and `NaN`, `Infinity`, `-Infinity`.
@@ -217,7 +217,7 @@ sent it: GUIDs are raw numbers until names and icons exist.
 - Stopped recordings are not capped in total (*Recording*).
 - Not verified yet (the maintainer's manual run on Windows, issue #13): that the line break shows as a second tooltip
   line, that the menu stays light with Windows in dark mode, that the three icon looks show, and that Explorer opens a
-  folder whose path holds a comma (Explorer splits its command line at commas). Not verified yet for the diagnostics window (the maintainer's manual run on Windows, issue #14): that `Exit` with the window open ends the Companion within 2 seconds with exit code 0; that the close button and Alt+F4 close only the window and leave the icon; that `Open diagnostics` brings an open window to the front, restored when minimized; that the window renders as described; and, with a tick at the limits (256 islands, 524,288 entries), that the table scrolls, the tray menu opens and `Exit` keeps its bound while the tick is shown or replaced, a new tick keeps the scroll position, and the process memory falls back after the window closes.
+  folder whose path holds a comma (Explorer splits its command line at commas). Not verified yet for the diagnostics window (the maintainer's manual run on Windows, issue #14): that `Exit` with the window open ends the Companion within 2 seconds with exit code 0; that the close button and Alt+F4 close only the window and leave the icon; that `Open diagnostics` brings an open window to the front, restored when minimized; that the window renders as described; that Ctrl+C in the table copies nothing; and, with a tick at the limits (256 islands, 524,288 entries), that the table scrolls, the tray menu opens and `Exit` keeps its bound while the tick is shown or replaced, a new tick keeps the scroll position, and the process memory falls back after the window closes.
 
 ## Related decisions
 

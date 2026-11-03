@@ -25,6 +25,7 @@
                   Grid.Row="1"
                   AutoGenerateColumns="False"
                   IsReadOnly="True"
+                  ClipboardCopyMode="None"
                   CanUserSortColumns="False"
                   CanUserAddRows="False"
                   CanUserDeleteRows="False"
