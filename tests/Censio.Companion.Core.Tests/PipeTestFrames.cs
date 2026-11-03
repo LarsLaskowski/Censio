@@ -62,6 +62,48 @@ public static class PipeTestFrames
     }
 
     /// <summary>
+    /// Creates an island frame (area production statistics) with the given key, name and entries, without its length
+    /// prefix; each entry is written with all its values and its maps.
+    /// </summary>
+    /// <param name="key">The key of the island</param>
+    /// <param name="sessionId">The session ID</param>
+    /// <param name="name">The area name</param>
+    /// <param name="timestamp">The game time</param>
+    /// <param name="entries">The production entries, in frame order</param>
+    /// <returns>The frame</returns>
+    public static byte[] Island(PipeIslandKey key, byte sessionId, string name, long timestamp, params ProductionEntry[] entries)
+    {
+        var builder = new PipeFrameBuilder().Byte((byte)PipeMessageType.AreaProductionStatistics)
+                                            .Byte(sessionId)
+                                            .Byte(key.IslandId)
+                                            .Byte(key.AreaIndex)
+                                            .Int32(key.SessionGuid)
+                                            .String(name)
+                                            .Int64(timestamp)
+                                            .Int32(entries.Length);
+
+        foreach (var entry in entries)
+        {
+            builder.Int32(entry.ProductGuid)
+                   .Float32(entry.Generation)
+                   .Float32(entry.Consumption)
+                   .Float32(entry.Delta)
+                   .Float32(entry.PerfectGeneration)
+                   .Float32(entry.PerfectConsumption)
+                   .Int32(entry.BuildingCount)
+                   .Int32(entry.Maintenance)
+                   .Float32(entry.Income)
+                   .Int32(entry.Profit)
+                   .Float32(entry.SummedProductivity)
+                   .Float32(entry.AverageProductivity)
+                   .Map(entry.WorkforceAmounts)
+                   .Map(entry.BuildingAmounts);
+        }
+
+        return builder.Build();
+    }
+
+    /// <summary>
     /// Creates a frame of a type the reader does not know, without its length prefix.
     /// </summary>
     /// <returns>The frame</returns>

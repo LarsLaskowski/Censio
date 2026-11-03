@@ -1458,6 +1458,72 @@ public sealed class PipeConnectionTests
     }
 
     /// <summary>
+    /// The connection keeps the latest closed tick whole: the tick it raised, with its islands and entries.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    public async Task PipeConnectionLatestTickHoldsLastTickWhole()
+    {
+        // Arrange
+        var stream = EnqueueStream();
+        var connection = TrackTicks(CreateConnection(null));
+
+        StartRun(connection);
+
+        await WaitForPendingReadsAsync(stream, 1);
+
+        stream.Feed(PipeTestFrames.Wire(PipeTestFrames.Version(2), PipeTestFrames.Island(1, 100), PipeTestFrames.Island(2, 100), PipeTestFrames.Island(1, 200)));
+
+        await WaitForTicksAsync(1);
+        await WaitForPendingReadsAsync(stream, 2);
+
+        // Act
+        var latest = connection.LatestTick;
+
+        // Assert
+        Assert.AreSame(_ticks.Single(), latest, "The latest tick should be the closed tick itself");
+        Assert.HasCount(2, latest!.Islands, "The latest tick should hold both islands");
+        Assert.AreEqual(11, latest.Islands[0].Entries.Single().ProductGuid, "The latest tick should hold the entries of its islands");
+    }
+
+    /// <summary>
+    /// The latest closed tick stays when its connection ends and the next connection opens.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    public async Task PipeConnectionLatestTickStaysAfterConnectionEnds()
+    {
+        // Arrange
+        var first = EnqueueStream();
+        var second = EnqueueStream();
+        var connection = TrackTicks(CreateConnection(null));
+
+        StartRun(connection);
+
+        await WaitForPendingReadsAsync(first, 1);
+
+        first.Feed(PipeTestFrames.Wire(PipeTestFrames.Version(2), PipeTestFrames.Island(1, 100)));
+
+        await WaitForPendingReadsAsync(first, 2);
+
+        first.End();
+
+        await WaitForTicksAsync(1);
+        await WaitForDelayAsync(TimeSpan.FromSeconds(1));
+
+        _clock.Advance(TimeSpan.FromSeconds(1));
+
+        await WaitForPendingReadsAsync(second, 1);
+
+        // Act
+        var latest = connection.LatestTick;
+
+        // Assert
+        Assert.AreEqual(Status(PipeConnectionState.Connected), connection.Status, "The next connection should be open");
+        Assert.AreSame(_ticks.Single(), latest, "The latest tick should outlive its connection");
+    }
+
+    /// <summary>
     /// A tick closes 30 seconds after its last island frame on the connection's clock.
     /// </summary>
     /// <returns>The task</returns>

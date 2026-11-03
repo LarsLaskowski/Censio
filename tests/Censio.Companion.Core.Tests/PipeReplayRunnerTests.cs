@@ -440,6 +440,62 @@ public sealed class PipeReplayRunnerTests
     }
 
     /// <summary>
+    /// The replay keeps the latest closed tick whole: the last tick it raised, with its islands and entries.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    public async Task PipeReplayRunnerLatestTickHoldsLastTickWhole()
+    {
+        // Arrange
+        var recording = PipeTestFrames.Recording(_start,
+                                                 (_start, PipeTestFrames.Version(2)),
+                                                 (_start.AddSeconds(1), PipeTestFrames.Island(1, 100)),
+                                                 (_start.AddSeconds(2), PipeTestFrames.Island(2, 200)),
+                                                 (_start.AddSeconds(3), PipeTestFrames.Island(3, 200)));
+        var runner = CreateRunner(recording);
+        var ticks = new ConcurrentQueue<PipeTick>();
+
+        runner.TickReceived += (_, tick) => ticks.Enqueue(tick);
+
+        // Act
+        await runner.RunAsync(TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        var latest = runner.LatestTick;
+        int[] goods = [12, 13];
+
+        Assert.HasCount(2, ticks, "Two ticks should be raised");
+        Assert.AreSame(ticks.Last(), latest, "The latest tick should be the last closed tick itself");
+        Assert.AreSequenceEqual(goods, latest!.Islands.Select(island => island.Entries.Single().ProductGuid).ToArray(), "The latest tick should hold the entries of its islands");
+    }
+
+    /// <summary>
+    /// After a replay error the latest closed tick stays.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    public async Task PipeReplayRunnerLatestTickStaysAfterReplayError()
+    {
+        // Arrange
+        var recording = PipeTestFrames.Recording(_start,
+                                                 (_start, PipeTestFrames.Version(2)),
+                                                 (_start.AddSeconds(1), PipeTestFrames.Island(1, 100)),
+                                                 (_start.AddSeconds(2), PipeTestFrames.Island(1, 200)));
+        var runner = CreateRunner([.. recording, .. Encoding.UTF8.GetBytes("not json\n")]);
+        var ticks = new ConcurrentQueue<PipeTick>();
+
+        runner.TickReceived += (_, tick) => ticks.Enqueue(tick);
+
+        // Act
+        await runner.RunAsync(TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        Assert.IsNotNull(runner.Status.Problem, "The replay should end with its error");
+        Assert.IsNotEmpty(ticks, "A tick should close before the error");
+        Assert.AreSame(ticks.Last(), runner.LatestTick, "The latest tick should stay after the replay error");
+    }
+
+    /// <summary>
     /// A tick subscriber that throws neither stops the replay nor the other tick subscribers.
     /// </summary>
     /// <returns>The task</returns>

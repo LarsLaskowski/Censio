@@ -49,8 +49,8 @@ public sealed class TrayMenuTests
     }
 
     /// <summary>
-    /// The menu lists status, last tick, separator, toggle, both folder entries, separator, version, separator and exit, in
-    /// this order, with the status and last-tick entries greyed out.
+    /// The menu lists status, last tick, separator, open diagnostics, toggle, both folder entries, separator, version,
+    /// separator and exit, in this order, with the status and last-tick entries greyed out.
     /// </summary>
     [TestMethod]
     public void TrayMenuCreateListsEntriesInOrder()
@@ -62,6 +62,7 @@ public sealed class TrayMenuTests
                                 TrayMenuEntryKind.Status,
                                 TrayMenuEntryKind.LastTick,
                                 TrayMenuEntryKind.Separator,
+                                TrayMenuEntryKind.OpenDiagnostics,
                                 TrayMenuEntryKind.ToggleRecording,
                                 TrayMenuEntryKind.OpenRecordingsFolder,
                                 TrayMenuEntryKind.OpenLogFolder,
@@ -75,6 +76,7 @@ public sealed class TrayMenuTests
                                 "Status: Receiving",
                                 "Last tick: 00:30:00, 3 islands",
                                 string.Empty,
+                                "Open diagnostics",
                                 "Start recording",
                                 "Open recordings folder",
                                 "Open log folder",
@@ -83,15 +85,42 @@ public sealed class TrayMenuTests
                                 string.Empty,
                                 "Exit"
                             };
-        var expectedEnabled = new[] { false, false, false, true, true, true, false, false, false, true };
+        var expectedEnabled = new[] { false, false, false, true, true, true, true, false, false, false, true };
 
         // Act
         var entries = TrayMenu.Create("1.2.3", snapshot, CreateClock(1));
 
         // Assert
         Assert.AreSequenceEqual(expectedKinds, entries.Select(entry => entry.Kind).ToArray(), "The entries should be in the order of the menu");
-        Assert.AreSequenceEqual(expectedTexts, entries.Select(entry => entry.Text).ToArray(), "The entries should carry the status, the last tick, the toggle, the folders, the version and Exit");
+        Assert.AreSequenceEqual(expectedTexts, entries.Select(entry => entry.Text).ToArray(), "The entries should carry the status, the last tick, open diagnostics, the toggle, the folders, the version and Exit");
         Assert.AreSequenceEqual(expectedEnabled, entries.Select(entry => entry.IsEnabled).ToArray(), "Status, last tick, version and separators should be greyed out, the rest enabled");
+    }
+
+    /// <summary>
+    /// The open-diagnostics entry is enabled and directly after the first separator live, while recording, in a replay and
+    /// with an invalid command line.
+    /// </summary>
+    /// <param name="mode">The mode of the Companion: live, recording, replay or invalid</param>
+    [TestMethod]
+    [DataRow("live")]
+    [DataRow("recording")]
+    [DataRow("replay")]
+    [DataRow("invalid")]
+    public void TrayMenuCreateOpenDiagnosticsEnabledInEveryMode(string mode)
+    {
+        // Arrange
+        var snapshot = CreateSnapshotForMode(mode);
+
+        // Act
+        var entries = TrayMenu.Create("1.2.3", snapshot, CreateClock(1));
+
+        // Assert
+        var kinds = entries.Select(entry => entry.Kind).ToList();
+        var diagnostics = entries.Single(entry => entry.Kind == TrayMenuEntryKind.OpenDiagnostics);
+
+        Assert.AreEqual(kinds.IndexOf(TrayMenuEntryKind.Separator) + 1, kinds.IndexOf(TrayMenuEntryKind.OpenDiagnostics), "The entry should be directly after the first separator");
+        Assert.AreEqual("Open diagnostics", diagnostics.Text, "The entry should read Open diagnostics");
+        Assert.IsTrue(diagnostics.IsEnabled, "The entry should be enabled in every mode");
     }
 
     /// <summary>
@@ -842,6 +871,36 @@ public sealed class TrayMenuTests
                    LastTick = _todayTick,
                    CanRecord = canRecord,
                    IsRecording = isRecording
+               };
+    }
+
+    /// <summary>
+    /// Creates the snapshot of a mode of the Companion.
+    /// </summary>
+    /// <param name="mode">The mode: live, recording, replay or invalid</param>
+    /// <returns>The snapshot</returns>
+    private static TraySnapshot CreateSnapshotForMode(string mode)
+    {
+        return mode switch
+               {
+                   "live" => TraySnapshot.ForConnection(new PipeConnectionStatus
+                                                        {
+                                                            State = PipeConnectionState.Receiving
+                                                        },
+                                                        PipeRecordingState.Off,
+                                                        _todayTick),
+                   "recording" => TraySnapshot.ForConnection(new PipeConnectionStatus
+                                                             {
+                                                                 State = PipeConnectionState.Receiving
+                                                             },
+                                                             PipeRecordingState.Recording,
+                                                             _todayTick),
+                   "replay" => TraySnapshot.ForReplay(new PipeReplayStatus
+                                                      {
+                                                          State = PipeConnectionState.Receiving
+                                                      },
+                                                      _todayTick),
+                   _ => TraySnapshot.ForInvalidCommandLine()
                };
     }
 

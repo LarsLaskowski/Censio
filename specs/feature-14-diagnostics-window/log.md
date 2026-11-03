@@ -15,3 +15,4 @@ are quoted in full.
 | 2026-11-03 19:27 | 3 Plan revise | Lead | plan revised: tier security, ListCollectionView wrapper (B1), 7 DA minors answered; plan-check PASS; RESULT: DONE (opus/medium · 16,569 tokens · 8 tool uses · 110 s · continued from 2a Spec) |
 | 2026-11-03 19:29 | 3 Plan security review (revise round 2) | Security | APPROVED: B1, B2 resolved, no new finding; non-blocking: duplicate Closed/WindowClosed sentence in WPF window paragraph (opus/medium · 8,359 tokens · 4 tool uses · 58 s · continued) |
 | 2026-11-03 19:33 | 4 Skeleton G1 | Dev | Skeleton for G1 task 1 built, 0 errors (sonnet/medium · 91,387 tokens · 11 tool uses · 260 s) |
+| 2026-11-03 19:49 | 5 Tests first G1 | Tester | 52 new/adapted tests fail on skeleton (47 NotImplemented, 5 assertion), 407 existing pass; no deferred; fact 10 verified; deviation: ClosedHoldsNoView checks no reads instead of GC (opus/medium · 264,907 tokens · 75 tool uses · 917 s) |
