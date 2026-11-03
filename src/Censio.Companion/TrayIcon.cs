@@ -22,6 +22,26 @@ internal sealed class TrayIcon : IDisposable
     private readonly ContextMenuStrip _menu;
 
     /// <summary>
+    /// The icons of the looks
+    /// </summary>
+    private readonly TrayIconImages _images;
+
+    /// <summary>
+    /// The product version
+    /// </summary>
+    private readonly string _version;
+
+    /// <summary>
+    /// Gets the current snapshot
+    /// </summary>
+    private readonly Func<TraySnapshot> _snapshot;
+
+    /// <summary>
+    /// Runs the action of a menu entry
+    /// </summary>
+    private readonly Action<TrayMenuEntryKind> _dispatch;
+
+    /// <summary>
     /// Whether the icon is disposed
     /// </summary>
     private bool _disposed;
@@ -34,48 +54,28 @@ internal sealed class TrayIcon : IDisposable
     /// Initializes a new instance of the <see cref="TrayIcon" /> class.
     /// </summary>
     /// <param name="version">The product version</param>
-    /// <param name="exit">The action the exit entry runs</param>
-    public TrayIcon(string version, Action exit)
+    /// <param name="images">The icons of the looks</param>
+    /// <param name="snapshot">Gets the current snapshot</param>
+    /// <param name="dispatch">Runs the action of a menu entry</param>
+    public TrayIcon(string version, TrayIconImages images, Func<TraySnapshot> snapshot, Action<TrayMenuEntryKind> dispatch)
     {
+        _version = version;
+        _images = images;
+        _snapshot = snapshot;
+        _dispatch = dispatch;
         _menu = new ContextMenuStrip();
 
-        foreach (var entry in TrayMenu.Create(version))
-        {
-            switch (entry.Kind)
-            {
-                case TrayMenuEntryKind.Separator:
-                    {
-                        _menu.Items.Add(new ToolStripSeparator());
-                    }
-                    break;
+        BuildItems();
 
-                case TrayMenuEntryKind.Exit:
-                    {
-                        var item = new ToolStripMenuItem(entry.Text)
-                                   {
-                                       Enabled = entry.IsEnabled
-                                   };
-
-                        item.Click += (_, _) => exit();
-
-                        _menu.Items.Add(item);
-                    }
-                    break;
-
-                default:
-                    {
-                        _menu.Items.Add(new ToolStripMenuItem(entry.Text)
-                                        {
-                                            Enabled = entry.IsEnabled
-                                        });
-                    }
-                    break;
-            }
-        }
+        _menu.Opening += (_, e) =>
+                         {
+                             BuildItems();
+                             e.Cancel = false;
+                         };
 
         _notifyIcon = new NotifyIcon
                       {
-                          Icon = System.Drawing.SystemIcons.Application,
+                          Icon = images.Get(TrayIconLook.Waiting),
                           Text = TrayMenu.ToolTip,
                           ContextMenuStrip = _menu,
                           Visible = true
@@ -97,7 +97,59 @@ internal sealed class TrayIcon : IDisposable
             return;
         }
 
-        _notifyIcon.Text = text;
+        _notifyIcon.Text = text.Length > TrayMenu.MaxToolTipLength ? text[..TrayMenu.MaxToolTipLength] : text;
+    }
+
+    /// <summary>
+    /// Sets the look of the icon; does nothing once the icon is disposed.
+    /// </summary>
+    /// <param name="look">The look</param>
+    public void SetLook(TrayIconLook look)
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _notifyIcon.Icon = _images.Get(look);
+    }
+
+    /// <summary>
+    /// Replaces the items of the menu by the entries of the current snapshot, disposing the old ones.
+    /// </summary>
+    private void BuildItems()
+    {
+        var old = _menu.Items.Cast<ToolStripItem>().ToList();
+
+        _menu.Items.Clear();
+
+        foreach (var entry in TrayMenu.Create(_version, _snapshot(), TimeProvider.System))
+        {
+            if (entry.Kind == TrayMenuEntryKind.Separator)
+            {
+                _menu.Items.Add(new ToolStripSeparator());
+
+                continue;
+            }
+
+            var item = new ToolStripMenuItem(entry.Text)
+                       {
+                           Enabled = entry.IsEnabled
+                       };
+            var kind = entry.Kind;
+
+            if (kind is TrayMenuEntryKind.ToggleRecording or TrayMenuEntryKind.OpenRecordingsFolder or TrayMenuEntryKind.OpenLogFolder or TrayMenuEntryKind.Exit)
+            {
+                item.Click += (_, _) => _dispatch(kind);
+            }
+
+            _menu.Items.Add(item);
+        }
+
+        foreach (var item in old)
+        {
+            item.Dispose();
+        }
     }
 
     #endregion // Methods

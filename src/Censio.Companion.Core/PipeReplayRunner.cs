@@ -1,5 +1,8 @@
 using Censio.Pipe;
 
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+
 namespace Censio.Companion.Core;
 
 /// <summary>
@@ -25,9 +28,14 @@ public sealed class PipeReplayRunner
     private readonly TimeProvider _waitProvider;
 
     /// <summary>
-    /// Guards <see cref="_status" />.
+    /// Guards <see cref="_status" /> and <see cref="_lastTick" />.
     /// </summary>
     private readonly Lock _statusLock = new();
+
+    /// <summary>
+    /// The logger.
+    /// </summary>
+    private readonly ILogger _logger;
 
     /// <summary>
     /// The current status.
@@ -36,6 +44,11 @@ public sealed class PipeReplayRunner
                                        {
                                            State = PipeConnectionState.Connected
                                        };
+
+    /// <summary>
+    /// The summary of the last tick.
+    /// </summary>
+    private PipeTickSummary? _lastTick;
 
     #endregion // Fields
 
@@ -48,10 +61,23 @@ public sealed class PipeReplayRunner
     /// <param name="speed">The replay speed</param>
     /// <param name="waitProvider">The clock of the waits between the lines</param>
     public PipeReplayRunner(Func<Stream> openRecording, PipeReplaySpeed speed, TimeProvider waitProvider)
+        : this(openRecording, speed, waitProvider, NullLogger.Instance)
+    {
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="PipeReplayRunner" /> class.
+    /// </summary>
+    /// <param name="openRecording">Opens the recording</param>
+    /// <param name="speed">The replay speed</param>
+    /// <param name="waitProvider">The clock of the waits between the lines</param>
+    /// <param name="logger">The logger</param>
+    public PipeReplayRunner(Func<Stream> openRecording, PipeReplaySpeed speed, TimeProvider waitProvider, ILogger logger)
     {
         _openRecording = openRecording;
         _speed = speed;
         _waitProvider = waitProvider;
+        _logger = logger;
     }
 
     #endregion // Constructor
@@ -62,6 +88,11 @@ public sealed class PipeReplayRunner
     /// Occurs when the status changes.
     /// </summary>
     public event EventHandler<PipeReplayStatus>? StatusChanged;
+
+    /// <summary>
+    /// Occurs when a tick has been closed.
+    /// </summary>
+    public event EventHandler<PipeTick>? TickReceived;
 
     #endregion // Events
 
@@ -77,6 +108,20 @@ public sealed class PipeReplayRunner
             lock (_statusLock)
             {
                 return _status;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets the summary of the last tick, or <c>null</c> if none was received.
+    /// </summary>
+    public PipeTickSummary? LastTick
+    {
+        get
+        {
+            lock (_statusLock)
+            {
+                return _lastTick;
             }
         }
     }
@@ -123,6 +168,11 @@ public sealed class PipeReplayRunner
                 do
                 {
                     item = await assembler.ReadAsync(cancellationToken).ConfigureAwait(false);
+
+                    if (item.Tick is { } tick)
+                    {
+                        PublishTick(tick);
+                    }
                 }
                 while (item.Kind != PipeTickResultKind.EndOfStream);
             }
@@ -132,6 +182,37 @@ public sealed class PipeReplayRunner
             }
 
             Finish(replay.Problem, cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// Keeps a closed tick as the last one and raises <see cref="TickReceived" />.
+    /// </summary>
+    /// <param name="tick">The tick</param>
+    private void PublishTick(PipeTick tick)
+    {
+        lock (_statusLock)
+        {
+            _lastTick = PipeTickSummary.From(tick);
+        }
+
+        var handlers = TickReceived;
+
+        if (handlers is null)
+        {
+            return;
+        }
+
+        foreach (var handler in handlers.GetInvocationList().Cast<EventHandler<PipeTick>>())
+        {
+            try
+            {
+                handler(this, tick);
+            }
+            catch (Exception)
+            {
+                // A failing subscriber must not stop the replay
+            }
         }
     }
 
@@ -166,6 +247,18 @@ public sealed class PipeReplayRunner
         lock (_statusLock)
         {
             state = _status.State;
+        }
+
+        if (cancellationToken.IsCancellationRequested == false)
+        {
+            if (problem is null)
+            {
+                CompanionLog.ReplayFinished(_logger);
+            }
+            else
+            {
+                CompanionLog.ReplayProblem(_logger, TrayMenu.FormatReplayReason(problem) ?? problem.Kind.ToString());
+            }
         }
 
         Publish(new PipeReplayStatus

@@ -9,7 +9,7 @@ states, reconnect and stop, and recording the frames to a file and replaying suc
 untrusted input: the format is known only from Ubisoft's example reader (`UbisoftMainzAnno/anno117_pipe_example`,
 read on 2026-11-01, "for documentation purposes only"), and a game update may change it without notice. The
 reader is in `Censio.Pipe`; it works on any readable byte stream and does not depend on Windows or on the
-named pipe. The connection logic is in `Censio.Companion.Core`, the Windows pipe access in the Companion shell. Ticks are assembled on an injected clock, so the same rules serve a live stream and a replay. A recording file is untrusted input as well.
+named pipe. The connection logic is in `Censio.Companion.Core`, the Windows pipe access in the Companion shell. Ticks are assembled on an injected clock, so the same rules serve a live stream and a replay; the live connection assembles them too and keeps the latest closed one. A recording file is untrusted input as well.
 
 ## Behavior
 
@@ -114,6 +114,10 @@ A tick is delivered when it closes, once, and is never reopened. It closes when:
 - The quiet period is waited in steps of at most one day and the clock is read again after each step, so a clock that
   was set back (by a replay's recorded times or by the system) makes the assembler wait on and throws nothing. The
   steps change no item: a deadline that the clock reaches closes the tick as before.
+- The live connection requests items until the end of the stream, so it assembles ticks as a replay does. It keeps a
+  summary of the latest closed tick (its receive time and island count) across connections and raises an event for
+  each closed tick; a handler that throws affects neither the connection nor the other handlers. The tick itself has
+  no consumer yet.
 - The caller must keep requesting: the receive time of a frame is stamped when its read completes, but the next read
   starts only on a request. A slow consumer belongs behind the tick buffer (#41) or the hand-off built with the first consumers (#12, #13).
 
@@ -133,6 +137,8 @@ Companion's switches, folder and tooltips are in [`companion.md`](companion.md).
 - One connection is one file. The file is created when the connection delivers its first frame and closed when the
   connection ends; a connection that delivers no frame creates no file. A game session is not a file: the game sends
   `Version` once after the connect, and a replay of a part of a connection without it would be skipped.
+- The one exception to "recorded exactly as read" is the `Version` line a recording started in the middle of a
+  connection begins with (*Recorder started in the middle of a connection*).
 - Recording never changes the live run: frames, states and receive times are the same with and without it.
 
 ### File format (version 1)
@@ -159,11 +165,15 @@ Companion's switches, folder and tooltips are in [`companion.md`](companion.md).
 - Each line is flushed to the operating system after it is written. A killed or crashed Companion therefore loses
   at most the line it was writing; a power loss can also lose the lines the operating system had not yet written to
   the disk (there is no sync per line).
-- The recording stops for the rest of the run, with the lines already written complete, when the folder or file cannot
+- The recording stops, with the lines already written complete, when the folder or file cannot
   be created, a write or a flush fails, or a frame does not fit into the queue; frames already queued are still
-  written, the frames after the failure are not recorded. A connection that starts afterwards records nothing.
+  written, the frames after the failure are not recorded, and a connection that starts while it is failed records
+  nothing. A new start of the recording (the tray menu) resets the failure and writes a new file. A recording that was
+  stopped by the user and fails while it writes its remaining frames is only logged.
   The live connection and its states are not affected. The Companion reports this in its tooltip.
-- When the Companion exits, the queue is written for at most 1 second; frames still queued then count as a failed
+- Stopped recordings that are still writing are not capped in total: each holds a queue of up to 16 MiB while its disk
+  stalls, and only a user click adds one (accepted).
+- When the Companion exits, the queues of all recordings are written together for at most 1 second; frames still queued then count as a failed
   recording, and a line the disk is still writing at that moment may be cut off, as after a crash.
 
 ### Replay
@@ -215,9 +225,17 @@ shared publicly.
 
 ### Recorder started in the middle of a connection
 
-Recording from the start of a connection is what exists. A recorder that starts in the middle of a connection (a
-tray toggle, #13) has to write the connection's last `Version` frame first, or the replay shows `Protocol mismatch`:
-the version gate skips every frame of a file without it.
+A recorder that starts in the middle of a connection (the tray menu, #13) first writes the connection's last `Version`
+frame, the frame whose type byte is `0` (also when its version is not 2), or the replay would show `Protocol
+mismatch`: the version gate skips every frame of a file without it.
+
+- The `Version` line is stamped with the receive time of the first frame the recorder records, so the file name and
+  header carry that time and a replay waits for nothing before it. This is the one line that does not carry its own
+  receive time; version messages close no tick and start no quiet period, so the replayed ticks are unchanged.
+- A start before any `Version` arrived writes nothing extra. A start in `Protocol mismatch` writes the last `Version`
+  frame, and the replay shows `Protocol mismatch`. If the first recorded frame is itself a `Version`, nothing is added.
+- The recording lacks the islands of a tick sent before the start and a session start sent before it, so its first
+  replayed tick is partial; the ticks opened after its first frame equal the live run's.
 
 ## Connection
 
@@ -264,7 +282,7 @@ The state is shown in the tray tooltip ([`companion.md`](companion.md)).
   the connection as read failed. The stream is closed when the connection ends.
 - Every change of the state or of its cause is raised as an event on whatever thread the connection runs on; a
   handler that throws affects neither the connection nor the other handlers. An unchanged state raises no event.
-  Events carry the state, the error kind, the Windows error code or the received version, and no pipe content.
+  Events carry the state, the error kind, the Windows error code or the received version, and no pipe content. The same values are written to the Companion's log ([`companion.md`](companion.md), *Log*), once per change.
 
 ### Retry
 
@@ -365,7 +383,6 @@ Until fixtures from real recordings (#20) test the reader:
 - A game that sends one island twice in a tick splits it as *island repeated*.
 - A replay that ends at its last frame closes the last tick as *stream ended*.
 - A caller that pauses for more than 30 seconds between requests stamps frames late and may split ticks.
-- A recorder that starts in the middle of a connection needs the connection's last `Version` frame first (#13).
 - A recording ends at the last line the operating system had written: a stalled disk at `Exit` or a power loss can
   cost the last lines.
 - Whether Windows sign-out or shutdown gives the Companion the same 1 second to write the queue as `Exit` is not

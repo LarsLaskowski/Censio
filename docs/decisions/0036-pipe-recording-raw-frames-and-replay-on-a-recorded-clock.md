@@ -3,15 +3,16 @@
 - **Status:** Accepted
 - **Date:** 2026-11-01
 - **Area:** pipe
-- **Source:** Issue #12
+- **Source:** Issue #12; Issue #13 (recording toggled from the tray menu)
 - **Supersedes:** —
 
 ## Context
 
 Everything after the pipe reader has to be built and tested against what the game really sends, and an external
 tester has to be able to hand that in (issue #12, `specs/feature-12-recorder-replay/spec.md` on the work branch).
-The Product Manager decided that recording is started only by the Companion's switch `--record` and runs until
-`Exit`. A replay must give the live run's ticks (record [0034](0034-ticks-assembled-by-close-rules-on-an-injected-clock.md)),
+Issue #12 started recording only with the Companion's switch `--record`, until `Exit`; issue #13 adds
+`Start recording` and `Stop recording` to the tray menu, so a recording can begin in the middle of a connection and
+end before `Exit`, and a failed one can be started again (`specs/feature-13-tray-app/spec.md` on the work branch). A replay must give the live run's ticks (record [0034](0034-ticks-assembled-by-close-rules-on-an-injected-clock.md)),
 which assigns every frame its receive time once, when its read completes. The pipe is untrusted, sends frames of up
 to 1 MiB, and is read by one caller that has to keep requesting; a slow disk must not slow it down, and the
 Companion must still end within 2 seconds.
@@ -57,21 +58,35 @@ Companion must still end within 2 seconds.
     without its recording. Rejected: sign-out and shutdown are left to the `Exit` stop in `OnExit`, which WPF is expected
     to raise when the session ends (not verified; checked by the maintainer's manual test on Windows); whether
     Windows waits for its second is not promised.
+15. **A recording started mid-connection first writes the connection's last `Version` frame, stamped with the
+    receive time of the first frame it records** (chosen, #13) — the version gate skips every frame of a file without
+    it; the stamp keeps the replay from waiting before the first frame and names the file by the start. Con: that one
+    line does not carry its own receive time (version messages close no tick and start no quiet period, so the
+    replayed ticks are unchanged).
+16. **The same `Version` frame with its own receive time** — every line true to the pipe; the replay at speed 1 would
+    wait out the whole time from the connect to the start, and the file name would carry the connect time.
+17. **Starting the file only at the next `Version` frame** — no synthetic line; the game sends `Version` once per
+    connection, so a start while receiving would record nothing.
+18. **A failure stops recording for the rest of the run** (#12) — simple; with a menu the user can only retry by
+    restarting the Companion. Rejected for #13: a new `Start recording` resets the failure, and a stopped recording that
+    fails while it writes its last frames is only logged, so it cannot mark a healthy new recording as failed.
 
 ## Decision
 
-Options 1, 5, 6, 12 and the header of 9: each whole frame travels with its read result and is recorded with the
+Options 1, 5, 6, 12, 15 and the header of 9: each whole frame travels with its read result and is recorded with the
 receive time the pipeline read once, through a queue bounded to 16 MiB of line cost that a writer drains to a
 file flushed per line to the operating system; a replay turns a recording back into the pipe's byte stream for the same message reader and
-tick assembler, on a clock that reads the recorded times. The format, the limits and the replay errors are in
+tick assembler, on a clock that reads the recorded times. A recording is started and stopped from the tray menu
+as well; one started mid-connection begins with the connection's last `Version` frame (option 15), and a new start
+resets a failure (option 18). The format, the limits and the replay errors are in
 [`areas/pipe.md`](../areas/pipe.md); the switches and tooltips in [`areas/companion.md`](../areas/companion.md).
 
 ## Consequences
 
 - The last tick of a replay closes as *stream ended* where the live run may have closed it by the quiet period
   (record 0034); the stream-ending error itself is not recorded.
-- A recorder that starts in the middle of a connection (a tray toggle, #13) has to write the connection's last
-  `Version` frame first, or its replay shows `Protocol mismatch`.
+- A recording started mid-connection lacks the islands of the open tick sent before the start and the session start
+  before it; its first replayed tick is therefore partial (#13).
 - The anonymiser (#20) writes format version 1; a change to the format raises the header version.
 - A recording holds private names and stays local; only anonymised fixtures are committed (record
   [0029](0029-anonymised-test-fixtures-only.md)).

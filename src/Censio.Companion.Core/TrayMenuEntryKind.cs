@@ -11,6 +11,31 @@ public enum TrayMenuEntryKind
     Version,
 
     /// <summary>
+    /// The entry that shows the status.
+    /// </summary>
+    Status,
+
+    /// <summary>
+    /// The entry that shows the last tick.
+    /// </summary>
+    LastTick,
+
+    /// <summary>
+    /// The entry that starts or stops the recording.
+    /// </summary>
+    ToggleRecording,
+
+    /// <summary>
+    /// The entry that opens the recordings folder.
+    /// </summary>
+    OpenRecordingsFolder,
+
+    /// <summary>
+    /// The entry that opens the log folder.
+    /// </summary>
+    OpenLogFolder,
+
+    /// <summary>
     /// A separator line.
     /// </summary>
     Separator,

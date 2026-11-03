@@ -26,6 +26,36 @@ public static class TrayMenu
     /// </summary>
     public const string InvalidCommandLineToolTip = "Censio Companion: Invalid command line";
 
+    /// <summary>
+    /// The status text when the command line is invalid.
+    /// </summary>
+    public const string InvalidCommandLineStatusText = "Invalid command line";
+
+    /// <summary>
+    /// The longest text the tray icon can show as a tooltip.
+    /// </summary>
+    public const int MaxToolTipLength = 127;
+
+    /// <summary>
+    /// The text of the entry that starts the recording.
+    /// </summary>
+    public const string StartRecordingText = "Start recording";
+
+    /// <summary>
+    /// The text of the entry that stops the recording.
+    /// </summary>
+    public const string StopRecordingText = "Stop recording";
+
+    /// <summary>
+    /// The text of the entry that opens the recordings folder.
+    /// </summary>
+    public const string OpenRecordingsFolderText = "Open recordings folder";
+
+    /// <summary>
+    /// The text of the entry that opens the log folder.
+    /// </summary>
+    public const string OpenLogFolderText = "Open log folder";
+
     #endregion // Constants
 
     #region Methods
@@ -92,15 +122,7 @@ public static class TrayMenu
     {
         if (status.Problem is { } problem)
         {
-            var reason = problem.Kind switch
-                         {
-                             PipeReplayProblemKind.FileNotFound => "file not found",
-                             PipeReplayProblemKind.NotARecording => "not a recording",
-                             PipeReplayProblemKind.UnsupportedVersion => "unsupported version",
-                             PipeReplayProblemKind.InvalidLine => string.Create(CultureInfo.InvariantCulture, $"invalid line {problem.LineNumber}").TrimEnd(),
-                             PipeReplayProblemKind.ReadFailed => "read failed",
-                             _ => throw new ArgumentOutOfRangeException(nameof(status), problem.Kind, "The problem kind is not defined")
-                         };
+            var reason = FormatReplayReason(problem) ?? throw new ArgumentOutOfRangeException(nameof(status), problem.Kind, "The problem kind is not defined");
 
             return $"{ToolTip}: Replay error: {reason}";
         }
@@ -122,18 +144,147 @@ public static class TrayMenu
     }
 
     /// <summary>
+    /// Formats the status text for a connection state and a recording state.
+    /// </summary>
+    /// <param name="state">The connection state</param>
+    /// <param name="recording">The recording state</param>
+    /// <returns>The status text</returns>
+    public static string FormatStatusText(PipeConnectionState state, PipeRecordingState recording)
+    {
+        return WithoutToolTipPrefix(FormatToolTip(state, recording));
+    }
+
+    /// <summary>
+    /// Formats the status text for a replay status.
+    /// </summary>
+    /// <param name="status">The replay status</param>
+    /// <returns>The status text</returns>
+    public static string FormatReplayStatusText(PipeReplayStatus status)
+    {
+        return WithoutToolTipPrefix(FormatReplayToolTip(status));
+    }
+
+    /// <summary>
+    /// Formats the text of the last tick.
+    /// </summary>
+    /// <param name="tick">The summary of the last tick, or <c>null</c> if none was received</param>
+    /// <param name="clock">The clock</param>
+    /// <returns>The text</returns>
+    public static string FormatLastTick(PipeTickSummary? tick, TimeProvider clock)
+    {
+        if (tick is not { } summary)
+        {
+            return "Last tick: none";
+        }
+
+        var now = TimeZoneInfo.ConvertTime(clock.GetUtcNow(), clock.LocalTimeZone);
+        var count = summary.IslandCount == 1
+                        ? "1 island"
+                        : string.Create(CultureInfo.InvariantCulture, $"{summary.IslandCount} islands");
+        var time = summary.ReceiveTime;
+        string text;
+
+        if (time.UtcTicks - DateTimeOffset.MinValue.UtcTicks < TimeSpan.TicksPerDay || DateTimeOffset.MaxValue.UtcTicks - time.UtcTicks < TimeSpan.TicksPerDay)
+        {
+            text = time.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss'Z'", CultureInfo.InvariantCulture);
+        }
+        else
+        {
+            var local = TimeZoneInfo.ConvertTime(time, clock.LocalTimeZone);
+
+            text = local.Date == now.Date
+                       ? local.ToString("HH:mm:ss", CultureInfo.InvariantCulture)
+                       : local.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+        }
+
+        return $"Last tick: {text}, {count}";
+    }
+
+    /// <summary>
+    /// Formats the tooltip of a snapshot.
+    /// </summary>
+    /// <param name="snapshot">The snapshot</param>
+    /// <param name="clock">The clock</param>
+    /// <returns>The tooltip text</returns>
+    public static string FormatSnapshotToolTip(TraySnapshot snapshot, TimeProvider clock)
+    {
+        var text = $"{ToolTip}: {snapshot.StatusText}";
+
+        return snapshot.LastTick is null
+                   ? text
+                   : $"{text}\n{FormatLastTick(snapshot.LastTick, clock)}";
+    }
+
+    /// <summary>
+    /// Gets the time until the next local midnight.
+    /// </summary>
+    /// <param name="clock">The clock</param>
+    /// <returns>The time, at least one second</returns>
+    public static TimeSpan UntilNextLocalMidnight(TimeProvider clock)
+    {
+        var zone = clock.LocalTimeZone;
+        var utcNow = clock.GetUtcNow();
+        var target = TimeZoneInfo.ConvertTime(utcNow, zone).Date.AddDays(1);
+
+        if (zone.IsInvalidTime(target))
+        {
+            target = target.AddHours(1);
+        }
+
+        var delay = new DateTimeOffset(TimeZoneInfo.ConvertTimeToUtc(target, zone), TimeSpan.Zero) - utcNow;
+
+        return delay < TimeSpan.FromSeconds(1) ? TimeSpan.FromSeconds(1) : delay;
+    }
+
+    /// <summary>
     /// Creates the entries of the tray menu.
     /// </summary>
     /// <param name="version">The product version</param>
+    /// <param name="snapshot">The snapshot</param>
+    /// <param name="clock">The clock</param>
     /// <returns>The entries in display order</returns>
-    public static IReadOnlyList<TrayMenuEntry> Create(string version)
+    public static IReadOnlyList<TrayMenuEntry> Create(string version, TraySnapshot snapshot, TimeProvider clock)
     {
-        return
-        [
-            new TrayMenuEntry(TrayMenuEntryKind.Version, FormatVersion(version), false),
-            new TrayMenuEntry(TrayMenuEntryKind.Separator, string.Empty, false),
-            new TrayMenuEntry(TrayMenuEntryKind.Exit, ExitText, true)
-        ];
+        return [
+                   new TrayMenuEntry(TrayMenuEntryKind.Status, $"Status: {snapshot.StatusText}", false),
+                   new TrayMenuEntry(TrayMenuEntryKind.LastTick, FormatLastTick(snapshot.LastTick, clock), false),
+                   new TrayMenuEntry(TrayMenuEntryKind.Separator, string.Empty, false),
+                   new TrayMenuEntry(TrayMenuEntryKind.ToggleRecording, snapshot.IsRecording ? StopRecordingText : StartRecordingText, snapshot.CanRecord),
+                   new TrayMenuEntry(TrayMenuEntryKind.OpenRecordingsFolder, OpenRecordingsFolderText, true),
+                   new TrayMenuEntry(TrayMenuEntryKind.OpenLogFolder, OpenLogFolderText, true),
+                   new TrayMenuEntry(TrayMenuEntryKind.Separator, string.Empty, false),
+                   new TrayMenuEntry(TrayMenuEntryKind.Version, FormatVersion(version), false),
+                   new TrayMenuEntry(TrayMenuEntryKind.Separator, string.Empty, false),
+                   new TrayMenuEntry(TrayMenuEntryKind.Exit, ExitText, true)
+               ];
+    }
+
+    /// <summary>
+    /// Formats the reason of a replay problem.
+    /// </summary>
+    /// <param name="problem">The problem</param>
+    /// <returns>The reason, or <see langword="null" /> if the problem kind is not a defined value</returns>
+    public static string? FormatReplayReason(PipeReplayProblem problem)
+    {
+        return problem.Kind switch
+               {
+                   PipeReplayProblemKind.FileNotFound => "file not found",
+                   PipeReplayProblemKind.NotARecording => "not a recording",
+                   PipeReplayProblemKind.UnsupportedVersion => "unsupported version",
+                   PipeReplayProblemKind.InvalidLine => string.Create(CultureInfo.InvariantCulture, $"invalid line {problem.LineNumber}").TrimEnd(),
+                   PipeReplayProblemKind.ReadFailed => "read failed",
+                   _ => null
+               };
+    }
+
+    /// <summary>
+    /// Removes the application name and the colon from the start of a tooltip text.
+    /// </summary>
+    /// <param name="toolTip">The tooltip text</param>
+    /// <returns>The status text</returns>
+    private static string WithoutToolTipPrefix(string toolTip)
+    {
+        return toolTip[(ToolTip.Length + 2)..];
     }
 
     #endregion // Methods

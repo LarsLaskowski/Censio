@@ -1,5 +1,8 @@
 using Censio.Pipe;
 
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+
 namespace Censio.Companion.Core;
 
 /// <summary>
@@ -23,6 +26,11 @@ public sealed class PipeRecordingFiles
     /// </summary>
     private readonly string _folder;
 
+    /// <summary>
+    /// The logger.
+    /// </summary>
+    private readonly ILogger _logger;
+
     #endregion // Fields
 
     #region Constructor
@@ -32,8 +40,19 @@ public sealed class PipeRecordingFiles
     /// </summary>
     /// <param name="folder">The recordings folder</param>
     public PipeRecordingFiles(string folder)
+        : this(folder, NullLogger.Instance)
+    {
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="PipeRecordingFiles" /> class.
+    /// </summary>
+    /// <param name="folder">The recordings folder</param>
+    /// <param name="logger">The logger</param>
+    public PipeRecordingFiles(string folder, ILogger logger)
     {
         _folder = folder;
+        _logger = logger;
     }
 
     #endregion // Constructor
@@ -68,11 +87,16 @@ public sealed class PipeRecordingFiles
 
         for (var sequence = 1; sequence <= MaxSequence; sequence++)
         {
-            var path = Path.Combine(_folder, PipeRecordingFormat.FormatFileName(started, sequence));
+            var name = PipeRecordingFormat.FormatFileName(started, sequence);
+            var path = Path.Combine(_folder, name);
 
             try
             {
-                return new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.Read);
+                var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.Read);
+
+                CompanionLog.RecordingFileCreated(_logger, name);
+
+                return stream;
             }
             catch (IOException) when (File.Exists(path))
             {

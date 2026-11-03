@@ -3,6 +3,9 @@ using System.Text;
 
 using Censio.Pipe;
 using Censio.Pipe.Tests;
+using Censio.Server.Tests;
+
+using Microsoft.Extensions.Logging;
 
 namespace Censio.Companion.Core.Tests;
 
@@ -401,6 +404,93 @@ public sealed class PipeReplayRunnerTests
 
         // Assert
         Assert.AreEqual(Status(PipeConnectionState.Receiving, true), runner.Status, "The replay should finish without a subscriber");
+    }
+
+    /// <summary>
+    /// A replayed tick sets the last tick with its recorded receive time and raises the tick event.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    public async Task PipeReplayRunnerTickSetsLastTickWithRecordedTime()
+    {
+        // Arrange
+        var recording = PipeTestFrames.Recording(_start,
+                                                 (_start, PipeTestFrames.Version(2)),
+                                                 (_start.AddSeconds(1), PipeTestFrames.Island(1, 100)),
+                                                 (_start.AddSeconds(2), PipeTestFrames.Island(2, 100)),
+                                                 (_start.AddSeconds(3), PipeTestFrames.SessionEnd()));
+        var runner = CreateRunner(recording);
+        var ticks = new ConcurrentQueue<PipeTick>();
+
+        runner.TickReceived += (_, tick) => ticks.Enqueue(tick);
+
+        // Act
+        await runner.RunAsync(TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(new PipeTickSummary
+                        {
+                            ReceiveTime = _start.AddSeconds(2),
+                            IslandCount = 2
+                        },
+                        runner.LastTick,
+                        "The last tick should carry the recorded receive time of the latest tick");
+        Assert.HasCount(1, ticks, "One tick should be raised");
+        Assert.AreEqual(100L, ticks.Single().GameTime, "The raised tick should be the replayed one");
+    }
+
+    /// <summary>
+    /// A tick subscriber that throws neither stops the replay nor the other tick subscribers.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    public async Task PipeReplayRunnerThrowingTickHandlerIsIgnored()
+    {
+        // Arrange
+        var recording = PipeTestFrames.Recording(_start,
+                                                 (_start, PipeTestFrames.Version(2)),
+                                                 (_start.AddSeconds(1), PipeTestFrames.Island(1, 100)),
+                                                 (_start.AddSeconds(2), PipeTestFrames.Island(1, 200)),
+                                                 (_start.AddSeconds(3), PipeTestFrames.SessionEnd()));
+        var runner = CreateRunner(recording);
+        var ticks = new ConcurrentQueue<PipeTick>();
+
+        runner.TickReceived += (_, _) => throw new InvalidOperationException("The subscriber failed");
+        runner.TickReceived += (_, tick) => ticks.Enqueue(tick);
+
+        // Act
+        await runner.RunAsync(TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        long[] expected = [100L, 200L];
+
+        Assert.AreSequenceEqual(expected, ticks.Select(tick => tick.GameTime).ToArray(), "The other subscriber should get every tick");
+        Assert.AreEqual(Status(PipeConnectionState.Receiving, true), runner.Status, "The replay should finish although a tick subscriber threw");
+    }
+
+    /// <summary>
+    /// The end of a replay is logged, as finished or with its problem.
+    /// </summary>
+    /// <param name="tail">The text after the recorded frame</param>
+    /// <param name="level">The expected level</param>
+    /// <param name="message">The expected message</param>
+    /// <returns>The task</returns>
+    [TestMethod]
+    [DataRow("", LogLevel.Information, "Replay finished")]
+    [DataRow("not json\n", LogLevel.Warning, "Replay error: invalid line 3")]
+    public async Task PipeReplayRunnerLogsFinishAndProblem(string tail, LogLevel level, string message)
+    {
+        // Arrange
+        var logger = new RecordingLogger();
+        var recording = PipeTestFrames.Recording(_start, (_start, PipeTestFrames.Version(2)));
+        var runner = new PipeReplayRunner(() => new MemoryStream([.. recording, .. Encoding.UTF8.GetBytes(tail)]), PipeReplaySpeed.Maximum, TimeProvider.System, logger);
+
+        // Act
+        await runner.RunAsync(TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        Assert.HasCount(1, logger.Entries.Where(entry => entry.Message.StartsWith("Replay", StringComparison.Ordinal)), "The end of the replay should be logged once");
+        Assert.AreEqual((level, message), (logger.Entries[^1].Level, logger.Entries[^1].Message), "The end of the replay should be logged last");
     }
 
     /// <summary>

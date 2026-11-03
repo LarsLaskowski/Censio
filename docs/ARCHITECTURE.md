@@ -21,7 +21,7 @@ except the Windows shell:
 | `Censio.GameData` | Reading the game files and the catalog | — |
 | `Censio.Server.Data` | Persistence of the server | — |
 | `Censio.Server` | Web host, UI, later the ingest | Contracts, Server.Data |
-| `Censio.Companion.Core` | The Companion's platform-neutral logic (tray menu, single-instance rule, pipe connection state machine, command line, recording session and replay runner, tooltip texts) | Contracts, Pipe, GameData |
+| `Censio.Companion.Core` | The Companion's platform-neutral logic (tray menu and snapshot, single-instance rule, pipe connection state machine, command line, recording session and replay runner, tooltip texts, the log file writer) | Contracts, Pipe, GameData |
 | `Censio.Companion` | The Windows tray shell (WPF application, Windows Forms tray icon); no test project | Companion.Core |
 
 All assemblies carry the version of the build property `Version` (default `0.0.0`) as informational version
@@ -43,10 +43,13 @@ The pipe stream is parsed strictly: a frame the parser cannot read is reported a
 The Companion opens the pipe itself, reconnects when the game restarts and shows the connection state in its tray
 tooltip ([`decisions/0035`](decisions/0035-pipe-connection-states-retry-and-identification-level.md),
 [`areas/pipe.md`](areas/pipe.md)). The Companion groups the messages into ticks with an island identity and session events
-([`decisions/0034`](decisions/0034-ticks-assembled-by-close-rules-on-an-injected-clock.md)).
-With `--record` the Companion also writes the frames of each connection to a local file, and with `--replay` it feeds
+([`decisions/0034`](decisions/0034-ticks-assembled-by-close-rules-on-an-injected-clock.md)), in the live connection as in a replay, and the tray shows the latest closed tick.
+From the tray menu (or from the start with `--record`) the Companion writes the frames of each connection to a local file, and with `--replay` it feeds
 such a file through the same message reader and tick assembler instead of the pipe
 ([`decisions/0036`](decisions/0036-pipe-recording-raw-frames-and-replay-on-a-recorded-clock.md)).
+The Companion logs through .NET's logging abstraction into its own rotating text file in the local app data folder
+([`decisions/0037`](decisions/0037-companion-log-through-the-logging-abstraction-to-own-rotating-file.md),
+[`areas/companion.md`](areas/companion.md)).
 The server accepts data only from a client that presents the ingest token. Guarantees are listed in
 `.squad/project.md` (*Guarantees*) and linked to their decision record as they are made.
 

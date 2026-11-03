@@ -2,6 +2,9 @@ using System.Globalization;
 using System.Text;
 
 using Censio.Pipe;
+using Censio.Server.Tests;
+
+using Microsoft.Extensions.Logging;
 
 namespace Censio.Companion.Core.Tests;
 
@@ -258,6 +261,25 @@ public sealed class PipeRecordingFilesTests
 
         // Assert
         Assert.IsTrue(File.Exists(Path.Combine(folder, "recording-20261101-170900Z.jsonl")), "The year should be the Gregorian one, not the Buddhist 2569");
+    }
+
+    /// <summary>
+    /// The creation logs the name of the file, without its folder.
+    /// </summary>
+    [TestMethod]
+    public void PipeRecordingFilesLogsFileName()
+    {
+        // Arrange
+        var logger = new RecordingLogger();
+        var files = new PipeRecordingFiles(Path.Combine(_root, "Recordings"), logger);
+
+        // Act
+        files.Create(_started).Dispose();
+
+        // Assert
+        Assert.HasCount(1, logger.Entries, "One entry should be logged");
+        Assert.AreEqual(LogLevel.Information, logger.Entries[0].Level, "The entry should be information");
+        Assert.AreEqual("Recording file recording-20261101-170900Z.jsonl created", logger.Entries[0].Message, "The entry should name the file only");
     }
 
     #endregion // Methods
