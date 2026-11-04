@@ -1,7 +1,7 @@
 # Spec: Enabling the pipe and recording sessions (README and user guide)
 
 Source: Issue #16
-Status: Draft
+Status: Approved by Product Manager
 
 ## Problem
 
