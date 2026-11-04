@@ -166,10 +166,10 @@ Terms used below:
 
 ## Challenge
 
-- M1 (AC1 and E4 untestable, "exactly" over-promises): accepted. *Problem* defines the startup entry, its command,
-  *matches this exe* and *turned off in Windows*; AC1 checks the three conditions observably and counts an
-  unrecognised off record as off (E4); AC2 says re-enabling clears the off switch; a policy that stops startup
-  programs is E11, documented, not promised; the undocumented off record is named in the NFR, AC6 and AC8.
+- M1 (AC1 and E4 untestable, "exactly" over-promises): accepted. *Problem* defines the startup entry, its command
+  and *matches this exe*; AC1 checks these observably; a policy that stops startup programs is E11, documented, not
+  promised. The off-switch part of the first answer (reading the startup apps list's switch-off) was dropped by the
+  Product Manager's decision below: a switch-off is not read, and E4 documents the limitation.
 - m1 (read failure while the menu opens): accepted; E1 and AC4 cover it — unchecked, clickable, other entries
   present, warning logged.
 - m2 (quoting, security area): accepted; the command is `"<full path>"` without arguments (terms, E5, AC2); the NFR
@@ -177,8 +177,9 @@ Terms used below:
   (not `Assembly.Location`) is the plan's to name.
 - m3 (path comparison, foreign entry): accepted; *matches this exe* compares case-insensitively without the quotes;
   E10 covers an entry with arguments or another program.
-- m4 (turning off leaves the off record): accepted; AC2 and the NFR remove the off switch with the entry; AC6
-  checks the startup apps list after turning off.
+- m4 (turning off leaves the off record): changed by the Product Manager's decision below: turning off deletes the
+  Run value only; a switch-off Windows recorded for it is Windows' own and stays (NFR, E4); AC6 checks that the
+  startup apps list no longer shows the Companion after turning off.
 - m5 (removing a stale entry): accepted; AC7 names the steps.
 - m6 (exe run from inside the ZIP): decided for documentation only. A rule on temporary folders would grey out a
   legitimate location by guess and adds a case to test, while the failure is harmless and visible (the next manual
