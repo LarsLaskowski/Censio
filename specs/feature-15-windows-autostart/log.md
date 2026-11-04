@@ -17,4 +17,4 @@ are quoted in full.
 | 2026-11-04 07:01 | 3 Plan revise (round 2) | squad-lead | RESULT: DONE, off-switch handling removed per PM decision, plan/spec/tasks/record 0017 updated, plan-check passes (opus/medium · 28,662 tokens · 8 tool uses · 156 s · continued from 2a Spec) |
 | 2026-11-04 07:02 | 3 Plan security review (round 2) | squad-security | APPROVED; non-blocking: stale sentences in spec Challenge M1/m4 (lines 169-172, 180) to be updated (opus/medium · 13,995 tokens · 2 tool uses · 31 s · continued from 3 Plan security review) |
 | 2026-11-04 07:03 | 3 Plan revise (stale sentences) | squad-lead | RESULT: DONE, Challenge section consistent with current criteria (opus/medium · 1,393 tokens · 2 tool uses · 19 s · continued from 2a Spec) |
-| 2026-11-04 07:06 | 4 Skeleton | squad-dev | Skeleton built (0 errors); TrayMenu.Create zero-value stub (old tests still pass), nine call sites adapted mechanically (sonnet/medium · usage pending) |
+| 2026-11-04 07:06 | 4 Skeleton | squad-dev | Skeleton built (0 errors); TrayMenu.Create zero-value stub (old tests still pass), nine call sites adapted mechanically (sonnet/medium · 98,839 tokens · 10 tool uses · 201 s) |
