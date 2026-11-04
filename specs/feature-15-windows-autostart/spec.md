@@ -1,7 +1,7 @@
 # Spec: Optional Windows autostart for the Companion
 
 Source: Issue #15
-Status: Draft
+Status: Approved by Lead
 
 ## Problem
 
@@ -16,8 +16,8 @@ so the exe lives wherever the player extracted it.
 Terms used below:
 
 - The *startup entry* is the one entry named `Censio Companion` in the signed-in user's own list of programs Windows
-  starts at sign-in (the list Settings > Apps > Startup and Task Manager > Startup apps show). How it is stored is
-  decided in the plan.
+  starts at sign-in (the list Settings > Apps > Startup and Task Manager > Startup apps show; they may show it under
+  the name Windows takes from the exe). It is stored as a per-user Run value (record 0017).
 - Its *command* is the exe's full path in double quotes and nothing else: `"<full path>"`.
 - It *matches this exe* when its command, with the surrounding double quotes removed, equals the full path of the
   running exe, compared case-insensitively, and holds no arguments.
@@ -29,13 +29,13 @@ Terms used below:
   the entry `Start with Windows` without a check mark, between `Open log folder` and `Version <version>`, set off by
   a separator above and below it.
 - S2: Given S1, when the player clicks `Start with Windows`, then the next time the menu opens the entry carries a
-  check mark, and Windows' startup apps list shows `Censio Companion` as enabled. The running Companion goes on
+  check mark, and Windows' startup apps list shows the Companion as enabled. The running Companion goes on
   unchanged.
 - S3: Given S2, when the player signs out and in again or restarts the PC, then the Companion starts with the
   player's sign-in exactly as a start by hand without switches: one icon, no window, `Waiting for game` until the
   game runs, recording off, and the menu shows `Start with Windows` checked.
 - S4: Given autostart is on, when the player clicks the checked `Start with Windows`, then the check mark is gone
-  the next time the menu opens, `Censio Companion` is no longer in the startup apps list, the running Companion goes
+  the next time the menu opens, the Companion is no longer in the startup apps list, the running Companion goes
   on, and after the next sign-in or restart no Companion starts.
 - S5: Given a Companion started with `--record`, `--replay <file>` or an invalid command line, when the player
   toggles `Start with Windows`, then it works as in S2 and S4, and the start at sign-in is a start without switches.
@@ -55,7 +55,7 @@ Terms used below:
 - E3: Two copies of the exe in different folders. There is one startup entry per Windows user: turning it on in one
   copy replaces the other's, whose menu then shows the entry unchecked. Only the copy that holds it starts at
   sign-in.
-- E4: The player turned `Censio Companion` off in Windows' startup apps list. The menu shows `Start with Windows`
+- E4: The player turned the Companion off in Windows' startup apps list. The menu shows `Start with Windows`
   unchecked; a click turns it on again, and the startup apps list shows it enabled. When Windows' record of the
   off switch for the entry cannot be recognised, the Companion treats the entry as turned off.
 - E5: The exe's path holds spaces, a comma, non-ASCII letters, or is long (up to the Windows path limit the
@@ -112,11 +112,12 @@ Terms used below:
   state read then; a successful click logs `Autostart enabled` or `Autostart disabled`, without the exe path (E1).
 - [ ] AC5: Turning autostart on or off writes only the signed-in user's settings and needs no administrator rights
   (S6).
-- [ ] AC6: Verified by hand on Windows with the release ZIP, under a standard (non-administrator) account: no UAC
+- [ ] AC6: Verified by hand on Windows with an exe built with the release flags (README, *Build the Companion from
+  source*), under a standard (non-administrator) account: no UAC
   prompt appears and nothing is written outside the signed-in user's settings and profile; on, then restart, the
   Companion starts as in S3 (and whether SmartScreen asks, E9); off, then restart, no Companion starts; switching it
   off in the startup apps list shows unchecked in the menu, and a click turns it on there again; turning it off in
-  the menu leaves no `Censio Companion` in the startup apps list; a path with spaces starts (E5); a second Windows
+  the menu leaves no Companion entry in the startup apps list; a path with spaces starts (E5); a second Windows
   user is unaffected (S2, S3, S4, S6, E4, E5).
 - [ ] AC7: README and the user guide, English first and then German, describe the entry, that it is off by default
   and per-user, to extract the ZIP to a folder that stays, what moving the exe or a new version in another folder
@@ -148,8 +149,8 @@ Terms used below:
 - Which path does autostart start when the player moves the exe or keeps two copies? Answered: the exe whose
   menu turned it on last; the menu shows the truth for the running exe (E2, E3), which follows from 0017's "per-user
   setting" without an installer that owns one location (0027).
-- Where is the startup entry stored? Answered: decided in the plan with a decision record referring to 0017; it
-  must appear in the startup apps list (S2), which rules out a scheduled task.
+- Where is the startup entry stored? Answered: as a per-user Run value, decided in the plan and recorded in 0017;
+  it must appear in the startup apps list (S2), which rules out a scheduled task.
 
 ## Area documents
 
