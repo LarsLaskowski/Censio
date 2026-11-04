@@ -21,4 +21,4 @@ are quoted in full.
 | 2026-11-04 07:15 | 5 Tests first | squad-tester | Tests written (FakeStartupEntryStore, CompanionAutostartTests, TrayMenuTests); confirmed: compile, 65 fail / 478 pass; none deferred (opus/medium · 155,416 tokens · 24 tool uses · 466 s) |
 | 2026-11-04 07:19 | 6 Implement | squad-dev | Implemented + docs; Coverage gate PASS (new 100% 46/46, overall 99.1%), 543 Core tests pass; no tester coverage pass needed (no uncovered lines) (sonnet/medium · 117,943 tokens · 16 tool uses · 215 s) |
 | 2026-11-04 07:19 | 7 Code check | Orchestrator | Build 0 warnings, all tests pass, Coverage gate PASS, Analyzer gate PASS (0), Format check PASS, scope-check PASS |
-| 2026-11-04 07:21 | 8 Review | squad-security | diff round 1 @31fddce: APPROVED; non-blocking N1 (README/USER_GUIDE state 'no admin rights' as fact while AC6 lists it as not yet tried; add qualifier) (opus/medium · usage pending) |
+| 2026-11-04 07:21 | 8 Review | squad-security | diff round 1 @31fddce: APPROVED; non-blocking N1 (README/USER_GUIDE state 'no admin rights' as fact while AC6 lists it as not yet tried; add qualifier) (opus/medium · 48,650 tokens · 6 tool uses · 57 s) |
