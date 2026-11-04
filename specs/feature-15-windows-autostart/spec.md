@@ -46,7 +46,7 @@ Terms used below:
 
 - E1: The startup entry cannot be read, written or removed (for example a policy blocks it). Reading fails: the menu
   still opens with all other entries, `Start with Windows` shows unchecked and stays clickable, and a warning is
-  logged. Writing or removing fails: the check mark shows the state read when the menu opens next; no message or
+  logged once, not again until a read has succeeded. Writing or removing fails: the check mark shows the state read when the menu opens next; no message or
   dialog appears, and a warning is logged.
 - E2: The player moved or renamed the exe, or extracted a new version to another folder, after turning autostart
   on. The startup entry still starts the old path: if the exe is gone, nothing starts at sign-in and Windows shows
@@ -58,8 +58,10 @@ Terms used below:
 - E4: The player turned the Companion off in Windows' startup apps list. The menu shows `Start with Windows`
   unchecked; a click turns it on again, and the startup apps list shows it enabled. When Windows' record of the
   off switch for the entry cannot be recognised, the Companion treats the entry as turned off.
-- E5: The exe's path holds spaces, a comma, non-ASCII letters, or is long (up to the Windows path limit the
-  Companion already runs from). The command is that path in double quotes, and autostart starts the exe at that path.
+- E5: The exe's path holds spaces, a comma, `&` or non-ASCII letters. The command is that path in double quotes, and
+  autostart starts the exe at that path. A path holding `%` or longer than 200 characters cannot be turned on: a
+  click leaves `Start with Windows` unchecked, writes nothing and logs a warning (Windows might expand `%` or cut a
+  long command, so the Companion does not risk starting another file).
 - E6: The player started the exe from inside the ZIP without extracting it, so Windows ran it from a temporary
   folder. The entry works as everywhere else and registers that path, which is gone after Windows cleans the folder:
   nothing starts at sign-in (as E2). README and user guide say to extract the ZIP to a folder that stays.
@@ -102,13 +104,14 @@ Terms used below:
   when the menu opens exactly when the startup entry exists, matches this exe, and is not turned off in Windows (an
   unrecognised off record counts as off); otherwise it is unchecked (S1, S5, E2, E3, E4, E10, E11).
 - [ ] AC2: Clicking the unchecked entry writes the startup entry with this exe's command (`"<full path>"`, no
-  arguments), replacing any other command under that name, and clears Windows' off switch for it; clicking the
+  arguments), replacing any other command under that name, and clears Windows' off switch for it — unless the path
+  holds `%` or is longer than 200 characters, when it writes nothing and logs a warning; clicking the
   checked entry removes the startup entry and Windows' off switch for it; the running Companion goes on in both
   cases (S2, S4, S5, E2, E3, E4, E5, E7, E10).
 - [ ] AC3: Autostart is off until the player turns it on; nothing the Companion does on start, `Exit` or in any
   mode writes or removes the startup entry (S1, S5).
 - [ ] AC4: A read that fails shows the entry unchecked and clickable with every other menu entry present, and logs
-  a warning; a write or removal that fails shows no message and logs a warning, and the next opening shows the
+  a warning once until a read succeeds again; a write or removal that fails shows no message and logs a warning, and the next opening shows the
   state read then; a successful click logs `Autostart enabled` or `Autostart disabled`, without the exe path (E1).
 - [ ] AC5: Turning autostart on or off writes only the signed-in user's settings and needs no administrator rights
   (S6).
@@ -120,7 +123,8 @@ Terms used below:
   the menu leaves no Companion entry in the startup apps list; a path with spaces starts (E5); a second Windows
   user is unaffected (S2, S3, S4, S6, E4, E5).
 - [ ] AC7: README and the user guide, English first and then German, describe the entry, that it is off by default
-  and per-user, to extract the ZIP to a folder that stays, what moving the exe or a new version in another folder
+  and per-user, to extract the ZIP to a folder of the player's own profile that stays (not a shared or root-level
+  folder other users can write), that a folder path holding `%` or longer than 200 characters cannot be used, what moving the exe or a new version in another folder
   does, to turn it off before removing the Companion, and how to remove a stale entry: start any copy, click `Start
   with Windows` (it replaces the stale entry), then click it again to turn it off (E2, E6, E9).
 - [ ] AC8: [`companion.md`](../../docs/areas/companion.md) describes the entry, its place in the menu, its rules,

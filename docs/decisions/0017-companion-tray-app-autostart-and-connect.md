@@ -39,7 +39,7 @@ Option 3. The Companion is a WPF tray application. Starting with Windows is a pe
 once configured, the Companion connects to its server without a user action and reconnects on its own (#40).
 Autostart is stored as the per-user Run value (option 1 of the second list): its command is the exe's full path in
 double quotes without arguments, the menu reads the value and the off switch each time it opens, and an off switch it
-does not recognise counts as off.
+does not recognise (anything but the bytes measured for *on*) counts as off.
 
 ## Consequences
 
@@ -50,4 +50,6 @@ does not recognise counts as off.
 - The off switch of the startup apps list is read and cleared by an undocumented format; a Windows update that
   changes it shows the entry unchecked (fail closed), and the format is checked by hand on Windows.
 - A Windows policy that stops Run processing is invisible to the menu.
+- A path holding `%` or longer than 200 characters is refused rather than measured: whether Explorer expands `%` or
+  cuts a long command is never relied on. Only the exact quoted command counts as the Companion's.
 - The behavior is written in [`areas/companion.md`](../areas/companion.md) as each issue builds it.
