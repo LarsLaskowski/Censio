@@ -16,4 +16,4 @@ are quoted in full.
 | 2026-11-04 06:59 | 3 Escalation answer | Product Manager | No measurement; plain per-user Run value API (SetValue/DeleteValue/GetValue). Windows 11 hand test by the PM before merge. Off-switch (StartupApproved) handling dropped. |
 | 2026-11-04 07:01 | 3 Plan revise (round 2) | squad-lead | RESULT: DONE, off-switch handling removed per PM decision, plan/spec/tasks/record 0017 updated, plan-check passes (opus/medium · 28,662 tokens · 8 tool uses · 156 s · continued from 2a Spec) |
 | 2026-11-04 07:02 | 3 Plan security review (round 2) | squad-security | APPROVED; non-blocking: stale sentences in spec Challenge M1/m4 (lines 169-172, 180) to be updated (opus/medium · 13,995 tokens · 2 tool uses · 31 s · continued from 3 Plan security review) |
-| 2026-11-04 07:03 | 3 Plan revise (stale sentences) | squad-lead | RESULT: DONE, Challenge section consistent with current criteria (opus/medium · usage pending · continued from 2a Spec) |
+| 2026-11-04 07:03 | 3 Plan revise (stale sentences) | squad-lead | RESULT: DONE, Challenge section consistent with current criteria (opus/medium · 1,393 tokens · 2 tool uses · 19 s · continued from 2a Spec) |
