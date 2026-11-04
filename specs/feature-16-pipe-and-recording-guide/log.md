@@ -10,3 +10,5 @@ are quoted in full.
 | 2026-11-04 16:37 | 2a Spec | Product Manager | Answer: option (b) both launchers described, Ubisoft Connect default path, PM dry-runs the launcher owned, other 'Not yet tried'; PM's Ubisoft Connect and Steam are set to German |
 | 2026-11-04 16:38 | 2a Spec (revise) | Lead | DONE: spec updated with PM answer, plan-check --spec passes (opus/medium · usage pending) |
 | 2026-11-04 16:39 | 2a Spec challenge | Devil's Advocate | OBJECTIONS 1 major (--replay needs tray Exit and a named console), 6 minor (opus/medium · usage pending) |
+| 2026-11-04 16:48 | 4-5 Skeleton, tests first | Orchestrator | skipped: documentation only, no production or test code |
+| 2026-11-04 16:48 | 6 Implement G1 | Dev | DONE: USER_GUIDE walkthrough, launcher steps, tray table, README short path, EN+DE; labels marked Not yet tried (sonnet/medium · usage pending) |
