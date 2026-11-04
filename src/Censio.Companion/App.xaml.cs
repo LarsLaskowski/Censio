@@ -4,6 +4,7 @@ using System.Windows.Threading;
 
 using Censio.Companion.Core;
 using Censio.Contracts;
+using Censio.Pipe;
 
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -78,6 +79,11 @@ public partial class App : Application
     private Func<TraySnapshot> _snapshot = TraySnapshot.ForInvalidCommandLine;
 
     /// <summary>
+    /// The session of the diagnostics window
+    /// </summary>
+    private DiagnosticsWindowSession? _diagnostics;
+
+    /// <summary>
     /// Whether the application is exiting
     /// </summary>
     private volatile bool _exiting;
@@ -103,6 +109,19 @@ public partial class App : Application
     }
 
     /// <summary>
+    /// Creates the session of the diagnostics window.
+    /// </summary>
+    /// <param name="readTick">Reads the latest closed tick</param>
+    private void CreateDiagnostics(Func<PipeTick?> readTick)
+    {
+        _diagnostics = new DiagnosticsWindowSession(() => _snapshot().StatusText,
+                                                    readTick,
+                                                    TimeProvider.System,
+                                                    action => Dispatcher.BeginInvoke(DispatcherPriority.Background, action),
+                                                    () => new DiagnosticsWindow());
+    }
+
+    /// <summary>
     /// Creates the updater of the tray and the timer that refreshes it at local midnight.
     /// </summary>
     /// <param name="trayIcon">The notification area icon</param>
@@ -120,6 +139,7 @@ public partial class App : Application
         _midnightTimer = TimeProvider.System.CreateTimer(_ =>
                                                          {
                                                              updater.Notify();
+                                                             _diagnostics?.Notify();
                                                              ArmMidnightTimer();
                                                          },
                                                          null,
@@ -165,12 +185,14 @@ public partial class App : Application
 
         _snapshot = () => TraySnapshot.ForConnection(connection.Status, recording.State, connection.LastTick);
 
+        CreateDiagnostics(() => connection.LatestTick);
+
         var trayIcon = CreateTrayIcon();
         var updater = CreateUpdater(trayIcon);
 
-        connection.StatusChanged += (_, _) => updater.Notify();
-        connection.TickReceived += (_, _) => updater.Notify();
-        recording.StateChanged += (_, _) => updater.Notify();
+        connection.StatusChanged += (_, _) => Notify(updater);
+        connection.TickReceived += (_, _) => Notify(updater);
+        recording.StateChanged += (_, _) => Notify(updater);
         updater.Notify();
 
         Run(connection.RunAsync);
@@ -190,14 +212,26 @@ public partial class App : Application
 
         _snapshot = () => TraySnapshot.ForReplay(runner.Status, runner.LastTick);
 
+        CreateDiagnostics(() => runner.LatestTick);
+
         var trayIcon = CreateTrayIcon();
         var updater = CreateUpdater(trayIcon);
 
-        runner.StatusChanged += (_, _) => updater.Notify();
-        runner.TickReceived += (_, _) => updater.Notify();
+        runner.StatusChanged += (_, _) => Notify(updater);
+        runner.TickReceived += (_, _) => Notify(updater);
         updater.Notify();
 
         Run(runner.RunAsync);
+    }
+
+    /// <summary>
+    /// Announces a change to the tray and to the diagnostics window.
+    /// </summary>
+    /// <param name="updater">The updater of the tray</param>
+    private void Notify(TrayStatusUpdater<TraySnapshot> updater)
+    {
+        updater.Notify();
+        _diagnostics?.Notify();
     }
 
     /// <summary>
@@ -220,6 +254,12 @@ public partial class App : Application
     {
         switch (kind)
         {
+            case TrayMenuEntryKind.OpenDiagnostics:
+                {
+                    _diagnostics?.Open();
+                }
+                break;
+
             case TrayMenuEntryKind.ToggleRecording:
                 {
                     _recording?.Toggle();
@@ -311,6 +351,8 @@ public partial class App : Application
             {
                 case CompanionMode.Invalid:
                     {
+                        CreateDiagnostics(() => null);
+
                         var trayIcon = CreateTrayIcon();
                         var updater = CreateUpdater(trayIcon);
 

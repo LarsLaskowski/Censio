@@ -4,13 +4,13 @@
 
 The Companion process on Windows: its tray icon, tooltip and menu, how it exits, how many instances run, the
 version it shows, its command line (recording the pipe and replaying a recording), starting and stopping a recording
-from the menu, the folders it opens, its log file, and the release ZIP it ships in. The user who starts the Companion relies on it.
+from the menu, the diagnostics window with the last tick, the folders it opens, its log file, and the release ZIP it ships in. The user who starts the Companion relies on it.
 
 ## Behavior
 
 ### Tray icon and menu
 
-- Started, the Companion shows one icon in the notification area. It opens no window and shows no taskbar button.
+- Started, the Companion shows one icon in the notification area. It opens no window until `Open diagnostics` is chosen, and shows a taskbar button only while the diagnostics window is open.
 - The *status text* is the state of the pipe connection ([`pipe.md`](pipe.md)): `Waiting for game`, `Connected`,
   `Receiving`, `Pipe busy`, `Protocol mismatch` or `Error`; before the first attempt it reads `Waiting for game`. In a
   replay it is the replay's text (*Replay*), with an invalid command line `Invalid command line`.
@@ -32,9 +32,9 @@ from the menu, the folders it opens, its log file, and the release ZIP it ships 
   (*problem*) for `Protocol mismatch`, `Error` and an invalid command line. In a replay the icon follows the replayed
   state, shows *waiting* after `Replay finished` and *problem* after `Replay error`.
 - The context menu holds, top to bottom: `Status: <status text>` (greyed out), `Last tick: <time>, <n> islands` or
-  `Last tick: none` (greyed out), a separator, `Start recording` or `Stop recording`, `Open recordings folder`, `Open
+  `Last tick: none` (greyed out), a separator, `Open diagnostics`, `Start recording` or `Stop recording`, `Open recordings folder`, `Open
   log folder`, a separator, `Version <version>` (greyed out, nothing happens on click), a separator and `Exit`. The
-  values are current each time the menu opens. `Start recording` is greyed out in a replay and with an invalid command
+  values are current each time the menu opens. `Open diagnostics` is enabled in every mode (live, `--record`, replay and an invalid command line); `Start recording` is greyed out in a replay and with an invalid command
   line. The menu is light, also with Windows in dark mode.
 - `<version>` is the informational version the Companion was built with: `0.0.0` without a version, otherwise
   the build property `Version` exactly as passed.
@@ -108,6 +108,47 @@ described in the other sections.
 - The menu does not wait for the disk or for Explorer. If a folder cannot be created or opened, or is not a full path
   (local app data unresolved), a warning is logged and nothing else changes.
 
+### Diagnostics window
+
+`Open diagnostics` opens one window, titled `Censio Companion: Diagnostics`, with the latest closed tick (record
+[0038](../decisions/0038-diagnostics-window-flat-table-of-rows-made-on-demand.md)). It shows every value as the game
+sent it: GUIDs are raw numbers until names and icons exist.
+
+- **Header**, top to bottom: `Status: <status text>`; `Last tick: <time>, <n> islands` or `Last tick: none`, exactly the
+  text of the menu entry of the same name (*Tray icon and menu*); and, once a tick exists, `Game time: <game time>`, with
+  ` (no data yet)` appended when every island of the tick has no entries. Before the first tick, and with an invalid
+  command line, the header holds `Status:` and `Last tick: none` only, and the table is empty.
+- **Table**, 17 columns left to right: `Region` (session GUID), `Island` (island ID), `Area` (area index), `Session ID`,
+  `Name` (area name), `Good` (product GUID), `Generation`, `Consumption`, `Delta`, `Perfect generation`, `Perfect
+  consumption`, `Buildings`, `Maintenance`, `Income`, `Profit`, `Productivity (sum)`, `Productivity (avg)`. Rows follow
+  the tick: islands in the order the tick holds them, the goods of an island in frame order, the region and island
+  columns repeated on every row of the island. An island without entries has one row with `(no entries)` in `Good` and
+  the value columns empty. The table cannot be sorted, edited or copied.
+- **Numbers** are culture-independent, also on a German Windows: integers in decimal with a leading `-` when negative,
+  floats with the decimal point `.`, no digit grouping, as the shortest text that reads back as the same 32-bit value
+  (`0.1`, `-2.5`, `1E+38`), negative zero as `-0`, and `NaN`, `Infinity`, `-Infinity`.
+- **Names** pass the rule of the log (*Log*): each control character, format character, line separator, paragraph
+  separator (the categories Cc, Cf, Zl, Zp) and unpaired surrogate is shown as one `?`, nothing else is changed (combining
+  marks, right-to-left letters and spaces stay as sent), and a name is never cut, also at the longest pipe string of 255
+  bytes. Each cell is its own text, so a name cannot reorder another cell.
+- **Update:** the window follows each closed tick, each change of the status text, and the next local midnight (when
+  `Last tick:` changes from `HH:mm:ss` to the dated form). At most one update waits at a time; with ticks closing faster
+  than the window shows them (a replay with `--speed max`) intermediate ticks may be skipped and the window always ends
+  with the latest tick. The scroll position (vertical and horizontal) is kept as far as the new table reaches.
+- **Kept tick:** the Companion keeps the latest closed tick whole while the window is closed, across connections, until the
+  next tick replaces it. Opening the window shows it at once, also a tick that closed while no window was open.
+- **Close and single window:** the close button and Alt+F4 close only the window; the icon, the connection, a running
+  recording or replay, the tooltip and the menu go on. `Open diagnostics` with a window open brings that window to the
+  front (restored when minimized) and opens no second one; after a close it opens a new one. `Exit` closes the window with
+  the icon and keeps its 2-second bound with the window open.
+- **Read path:** handing a closed tick to the window only stores it and signals; its text is made on the window's thread,
+  never on the thread that reads the pipe or the recording. Receive times, states, ticks and recorded frames are the same
+  with the window open, closed or stalled.
+- **Memory:** the window makes text only for the rows on screen. At most three ticks are referenced: the open one, the
+  kept one and the one shown; a replaced or a closed window references none.
+- **Privacy:** the window shows island names and economic data on screen only. Nothing of it is written to disk, logged
+  or sent anywhere, and the window adds no log line. A screenshot holds the savegame's island names.
+
 ### Log
 
 - The Companion writes a log to `%LOCALAPPDATA%\Censio\Logs\companion-<yyyyMMdd>.log` (the local date). The folder
@@ -148,7 +189,7 @@ described in the other sections.
 - A problem with the file ends the replay with the status text `Replay error: <reason>` after the frames before it
   were replayed. The reasons are `file not found`, `not a recording`, `unsupported version`, `invalid line <n>` and
   `read failed` ([`pipe.md`](pipe.md), *Replay problems*).
-- The replayed ticks have no consumer yet: the tooltip, the last tick and the icon show the progress. The last tick is the recorded receive time of the latest replayed tick.
+- The tooltip, the last tick and the icon show the progress, and the diagnostics window shows the replayed ticks and follows the replay tick by tick; after `Replay finished` it keeps the last tick of the file. The last tick is the recorded receive time of the latest replayed tick.
 
 ### Single instance
 
@@ -177,6 +218,7 @@ described in the other sections.
 - Not verified yet (the maintainer's manual run on Windows, issue #13): that the line break shows as a second tooltip
   line, that the menu stays light with Windows in dark mode, that the three icon looks show, and that Explorer opens a
   folder whose path holds a comma (Explorer splits its command line at commas).
+- Verified for the diagnostics window (the maintainer's manual run on Windows, issue #14): that `Exit` with the window open ends the Companion within 2 seconds with exit code 0; that the close button and Alt+F4 close only the window and leave the icon; that `Open diagnostics` brings an open window to the front, restored when minimized; that the window renders as described; that Ctrl+C in the table copies nothing; and, with a tick at the limits (256 islands, 524,288 entries), that the table scrolls, the tray menu opens and `Exit` keeps its bound while the tick is shown or replaced, a new tick keeps the scroll position, and the process memory falls back after the window closes.
 
 ## Related decisions
 
@@ -186,6 +228,7 @@ described in the other sections.
 - [`decisions/0027-companion-zip-self-contained-single-file-unsigned.md`](../decisions/0027-companion-zip-self-contained-single-file-unsigned.md) — self-contained single-file exe in a ZIP, not signed.
 - [`decisions/0036-pipe-recording-raw-frames-and-replay-on-a-recorded-clock.md`](../decisions/0036-pipe-recording-raw-frames-and-replay-on-a-recorded-clock.md) — recordings hold the raw frames, written off the read path; a replay feeds them back on a recorded clock.
 - [`decisions/0037-companion-log-through-the-logging-abstraction-to-own-rotating-file.md`](../decisions/0037-companion-log-through-the-logging-abstraction-to-own-rotating-file.md) — the Companion logs through .NET's logging abstraction into its own rotating text file.
+- [`decisions/0038-diagnostics-window-flat-table-of-rows-made-on-demand.md`](../decisions/0038-diagnostics-window-flat-table-of-rows-made-on-demand.md) — the diagnostics window is a flat table whose rows are made on demand from the latest tick, kept whole.
 
 ## Not here
 
