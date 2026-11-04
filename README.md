@@ -11,7 +11,7 @@ Censio is in milestone M0 (Foundation). No release exists yet; the first one is 
 Works today:
 
 - The server runs as a Docker image. Its start page shows `Version <version>`, and `GET /health` answers `Healthy`.
-- The Companion starts on Windows as a tray icon. Its menu shows the status, the last tick, `Open diagnostics` (a window with the last tick), `Start recording`/`Stop recording`, two folder entries, `Version <version>` and `Exit`, and its tooltip and icon show the state of the connection to the game's statistics pipe (the game needs the launch argument `/pipe`). It records what the game sends to a local file from the menu or with the switch `--record`, writes a log file to `%LOCALAPPDATA%\Censio\Logs`, and with `--replay <file>` it plays such a file back (*Recording and replay*).
+- The Companion starts on Windows as a tray icon. Its menu shows the status, the last tick, `Open diagnostics` (a window with the last tick), `Start recording`/`Stop recording`, two folder entries, `Start with Windows` (off by default), `Version <version>` and `Exit`, and its tooltip and icon show the state of the connection to the game's statistics pipe (the game needs the launch argument `/pipe`). It records what the game sends to a local file from the menu or with the switch `--record`, writes a log file to `%LOCALAPPDATA%\Censio\Logs`, and with `--replay <file>` it plays such a file back (*Recording and replay*).
 
 Not yet:
 
@@ -100,9 +100,20 @@ Then check `http://localhost:8080/health` (`Healthy`) and `http://localhost:8080
 The Companion is the Windows program that reads the statistics of the running game. Download `Censio-<version>-win-x64.zip` from the release page `https://github.com/LarsLaskowski/Censio/releases` (under *Assets* of the release). It needs Windows 10 22H2 or Windows 11, 64-bit; it needs no installed .NET, no installer and no administrator rights. Not yet tried: the ZIP on a machine without .NET, until a release exists and it has been tried on a Windows machine.
 
 1. Extract the ZIP to a folder of your choice. It holds one file, `Censio.Companion.exe`.
-2. Start `Censio.Companion.exe`. A tray icon appears; its menu shows the status, the last tick, `Open diagnostics`, `Start recording`, `Open recordings folder`, `Open log folder`, `Version <version>` and `Exit`.
+2. Start `Censio.Companion.exe`. A tray icon appears; its menu shows the status, the last tick, `Open diagnostics`, `Start recording`, `Open recordings folder`, `Open log folder`, `Start with Windows`, `Version <version>` and `Exit`.
 
 The program is not signed, so Windows SmartScreen may show "Windows protected your PC" the first time. Choose "More info", then "Run anyway" (on a German Windows: "Weitere Informationen", then "Trotzdem ausführen").
+
+#### Start with Windows
+
+The Companion does not start with Windows unless you turn it on: choose `Start with Windows` in the tray menu. A check mark shows that it is on; choosing the entry again turns it off. Turning it on writes one value, `Censio Companion`, under `HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run`: it applies to your Windows account only, and the entry needs no administrator rights. The value is the full path of the running `Censio.Companion.exe` in quotes, without arguments, so the Companion starts the way a double click starts it (it neither records nor replays).
+
+- Extract the ZIP to a folder in your own profile that stays where it is, for example `%LOCALAPPDATA%\Programs\Censio`. Do not use a shared folder or the root of a drive that other users can write to: whoever can replace the file there runs it at your next sign-in.
+- A folder path that contains `%` or is longer than 200 characters cannot be used: the entry stays unchecked, nothing is written and the log says `Could not change the autostart setting`.
+- If you move the exe, or start a new version from another folder, the old entry still points to the old file and the menu shows the entry unchecked. Choose it once from the new location to point the entry to it. Turn the entry off before you delete the folder; to remove a leftover entry, delete the value `Censio Companion` in the Registry Editor at the key above, or switch the old program off in the Windows startup apps list.
+- A value with another path or with arguments counts as off; choosing the entry then replaces it.
+- If you switch the Companion off in the Windows startup apps list (Settings, Apps, Startup), the menu does not show it and still shows the check mark; switch it on again in that list. A policy of your organization that blocks startup programs is not visible to the Companion either.
+- Not yet tried on Windows: that no administrator prompt appears, whether SmartScreen asks at the first automatic start, which name the startup apps list shows, and folders with spaces, `&` or `,` in the path. This text is updated after the test.
 
 #### Connecting to the game
 
@@ -173,7 +184,7 @@ Censio befindet sich im Meilenstein M0 (Foundation). Es gibt noch kein Release; 
 Funktioniert heute:
 
 - Der Server läuft als Docker-Image. Seine Startseite zeigt `Version <version>`, und `GET /health` antwortet mit `Healthy`.
-- Der Companion startet unter Windows als Tray-Symbol. Sein Menü zeigt den Status, den letzten Tick, `Open diagnostics` (ein Fenster mit dem letzten Tick), `Start recording`/`Stop recording`, zwei Ordnereinträge, `Version <version>` und `Exit`, und sein Tooltip und Symbol zeigen den Zustand der Verbindung zur Statistik-Pipe des Spiels (das Spiel braucht das Startargument `/pipe`). Er zeichnet auf, was das Spiel sendet, in eine lokale Datei, über das Menü oder mit dem Schalter `--record`, schreibt eine Logdatei nach `%LOCALAPPDATA%\Censio\Logs`, und mit `--replay <Datei>` spielt er eine solche Datei ab (*Aufzeichnen und Abspielen*).
+- Der Companion startet unter Windows als Tray-Symbol. Sein Menü zeigt den Status, den letzten Tick, `Open diagnostics` (ein Fenster mit dem letzten Tick), `Start recording`/`Stop recording`, zwei Ordnereinträge, `Start with Windows` (standardmäßig aus), `Version <version>` und `Exit`, und sein Tooltip und Symbol zeigen den Zustand der Verbindung zur Statistik-Pipe des Spiels (das Spiel braucht das Startargument `/pipe`). Er zeichnet auf, was das Spiel sendet, in eine lokale Datei, über das Menü oder mit dem Schalter `--record`, schreibt eine Logdatei nach `%LOCALAPPDATA%\Censio\Logs`, und mit `--replay <Datei>` spielt er eine solche Datei ab (*Aufzeichnen und Abspielen*).
 
 Noch nicht:
 
@@ -262,9 +273,20 @@ Dann `http://localhost:8080/health` (`Healthy`) und `http://localhost:8080/` wie
 Der Companion ist das Windows-Programm, das die Statistik des laufenden Spiels liest. `Censio-<version>-win-x64.zip` von der Release-Seite `https://github.com/LarsLaskowski/Censio/releases` herunterladen (beim Release unter *Assets*). Er braucht Windows 10 22H2 oder Windows 11, 64 Bit; er braucht kein installiertes .NET, keinen Installer und keine Administratorrechte. Noch nicht ausprobiert: das ZIP auf einem Rechner ohne .NET, bis ein Release existiert und es auf einem Windows-Rechner ausprobiert wurde.
 
 1. Das ZIP in einen beliebigen Ordner entpacken. Es enthält eine Datei, `Censio.Companion.exe`.
-2. `Censio.Companion.exe` starten. Ein Tray-Symbol erscheint; sein Menü zeigt den Status, den letzten Tick, `Open diagnostics`, `Start recording`, `Open recordings folder`, `Open log folder`, `Version <version>` und `Exit`.
+2. `Censio.Companion.exe` starten. Ein Tray-Symbol erscheint; sein Menü zeigt den Status, den letzten Tick, `Open diagnostics`, `Start recording`, `Open recordings folder`, `Open log folder`, `Start with Windows`, `Version <version>` und `Exit`.
 
 Das Programm ist nicht signiert, deshalb zeigt Windows SmartScreen beim ersten Start unter Umständen „Der Computer wurde durch Windows geschützt“. „Weitere Informationen“ wählen, dann „Trotzdem ausführen“ (unter englischem Windows: "More info", "Run anyway").
+
+#### Start mit Windows
+
+Der Companion startet nur dann mit Windows, wenn Sie es einschalten: im Tray-Menü `Start with Windows` wählen. Ein Häkchen zeigt, dass es eingeschaltet ist; den Eintrag erneut zu wählen schaltet es aus. Das Einschalten schreibt einen Wert, `Censio Companion`, unter `HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run`: Er gilt nur für Ihr Windows-Konto, und der Eintrag braucht keine Administratorrechte. Der Wert ist der vollständige Pfad der laufenden `Censio.Companion.exe` in Anführungszeichen, ohne Argumente; der Companion startet also wie bei einem Doppelklick (er zeichnet weder auf noch spielt er ab).
+
+- Das ZIP in einen Ordner im eigenen Profil entpacken, der an seinem Platz bleibt, zum Beispiel `%LOCALAPPDATA%\Programs\Censio`. Keinen gemeinsamen Ordner und nicht das Stammverzeichnis eines Laufwerks verwenden, in das andere Benutzer schreiben können: Wer die Datei dort ersetzen kann, führt sie bei Ihrer nächsten Anmeldung aus.
+- Ein Ordnerpfad mit `%` oder mit mehr als 200 Zeichen kann nicht verwendet werden: Der Eintrag bleibt ohne Häkchen, es wird nichts geschrieben, und das Log meldet `Could not change the autostart setting`.
+- Wenn Sie die Exe verschieben oder eine neue Version aus einem anderen Ordner starten, zeigt der alte Eintrag noch auf die alte Datei, und das Menü zeigt den Eintrag ohne Häkchen. Wählen Sie ihn einmal am neuen Ort, damit er auf die neue Datei zeigt. Schalten Sie den Eintrag aus, bevor Sie den Ordner löschen; einen übrig gebliebenen Eintrag entfernen Sie, indem Sie den Wert `Censio Companion` im Registrierungs-Editor am oben genannten Schlüssel löschen oder das alte Programm in der Windows-Liste der Autostart-Apps ausschalten.
+- Ein Wert mit anderem Pfad oder mit Argumenten gilt als ausgeschaltet; die Wahl des Eintrags ersetzt ihn dann.
+- Wenn Sie den Companion in der Windows-Liste der Autostart-Apps ausschalten (Einstellungen, Apps, Autostart), zeigt das Menü das nicht und zeigt weiter das Häkchen; schalten Sie ihn in dieser Liste wieder ein. Eine Richtlinie Ihrer Organisation, die Startprogramme sperrt, sieht der Companion ebenfalls nicht.
+- Unter Windows noch nicht ausprobiert: dass keine Administrator-Abfrage erscheint, ob SmartScreen beim ersten automatischen Start fragt, welchen Namen die Autostart-Liste zeigt, und Ordner mit Leerzeichen, `&` oder `,` im Pfad. Dieser Text wird nach dem Test aktualisiert.
 
 #### Verbindung zum Spiel
 

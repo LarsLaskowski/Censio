@@ -265,6 +265,8 @@ public static class TrayMenu
                    new TrayMenuEntry(TrayMenuEntryKind.OpenRecordingsFolder, OpenRecordingsFolderText, true),
                    new TrayMenuEntry(TrayMenuEntryKind.OpenLogFolder, OpenLogFolderText, true),
                    new TrayMenuEntry(TrayMenuEntryKind.Separator, string.Empty, false),
+                   new TrayMenuEntry(TrayMenuEntryKind.ToggleAutostart, StartWithWindowsText, true, isAutostartEnabled),
+                   new TrayMenuEntry(TrayMenuEntryKind.Separator, string.Empty, false),
                    new TrayMenuEntry(TrayMenuEntryKind.Version, FormatVersion(version), false),
                    new TrayMenuEntry(TrayMenuEntryKind.Separator, string.Empty, false),
                    new TrayMenuEntry(TrayMenuEntryKind.Exit, ExitText, true)

@@ -14,6 +14,11 @@ public sealed class CompanionAutostart
     /// </summary>
     public const string EntryName = "Censio Companion";
 
+    /// <summary>
+    /// The longest executable path that is written.
+    /// </summary>
+    private const int MaxPathLength = 200;
+
     #endregion // Constants
 
     #region Fields
@@ -32,6 +37,11 @@ public sealed class CompanionAutostart
     /// The logger.
     /// </summary>
     private readonly ILogger _logger;
+
+    /// <summary>
+    /// Whether the last read failed and the failure was logged.
+    /// </summary>
+    private bool _readFailureLogged;
 
     #endregion // Fields
 
@@ -70,7 +80,12 @@ public sealed class CompanionAutostart
     /// <returns>The quoted path, or <see langword="null" /> if the path cannot be used</returns>
     public static string? FormatCommand(string? exePath)
     {
-        throw new NotImplementedException();
+        if (string.IsNullOrEmpty(exePath) || exePath.Length > MaxPathLength || Path.IsPathFullyQualified(exePath) == false || exePath.Contains('"') || exePath.Contains('%'))
+        {
+            return null;
+        }
+
+        return $"\"{exePath}\"";
     }
 
     /// <summary>
@@ -81,7 +96,9 @@ public sealed class CompanionAutostart
     /// <returns><see langword="true" /> if the command is the Companion's own</returns>
     public static bool Matches(string? command, string? exePath)
     {
-        throw new NotImplementedException();
+        var expected = FormatCommand(exePath);
+
+        return expected is not null && string.Equals(command, expected, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
@@ -90,7 +107,30 @@ public sealed class CompanionAutostart
     /// <returns><see langword="true" /> if the entry is the Companion's own</returns>
     public bool Refresh()
     {
-        throw new NotImplementedException();
+        if (FormatCommand(_exePath) is null)
+        {
+            IsEnabled = false;
+
+            return false;
+        }
+
+        try
+        {
+            IsEnabled = Matches(_store.ReadCommand(EntryName), _exePath);
+            _readFailureLogged = false;
+        }
+        catch (Exception exception)
+        {
+            IsEnabled = false;
+
+            if (_readFailureLogged == false)
+            {
+                _readFailureLogged = true;
+                CompanionLog.AutostartReadFailed(_logger, exception);
+            }
+        }
+
+        return IsEnabled;
     }
 
     /// <summary>
@@ -98,7 +138,32 @@ public sealed class CompanionAutostart
     /// </summary>
     public void Toggle()
     {
-        throw new NotImplementedException();
+        try
+        {
+            if (IsEnabled)
+            {
+                _store.RemoveCommand(EntryName);
+                CompanionLog.AutostartDisabled(_logger);
+
+                return;
+            }
+
+            var command = FormatCommand(_exePath);
+
+            if (command is null)
+            {
+                CompanionLog.AutostartChangeFailed(_logger, null);
+
+                return;
+            }
+
+            _store.WriteCommand(EntryName, command);
+            CompanionLog.AutostartEnabled(_logger);
+        }
+        catch (Exception exception)
+        {
+            CompanionLog.AutostartChangeFailed(_logger, exception);
+        }
     }
 
     #endregion // Methods

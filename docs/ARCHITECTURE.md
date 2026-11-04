@@ -21,8 +21,8 @@ except the Windows shell:
 | `Censio.GameData` | Reading the game files and the catalog | — |
 | `Censio.Server.Data` | Persistence of the server | — |
 | `Censio.Server` | Web host, UI, later the ingest | Contracts, Server.Data |
-| `Censio.Companion.Core` | The Companion's platform-neutral logic (tray menu and snapshot, single-instance rule, pipe connection state machine, command line, recording session and replay runner, tooltip texts, diagnostics window content and session, the log file writer) | Contracts, Pipe, GameData |
-| `Censio.Companion` | The Windows tray shell (WPF application, Windows Forms tray icon, the diagnostics window); no test project | Companion.Core |
+| `Censio.Companion.Core` | The Companion's platform-neutral logic (tray menu and snapshot, single-instance rule, pipe connection state machine, command line, recording session and replay runner, tooltip texts, diagnostics window content and session, the log file writer, the autostart rules) | Contracts, Pipe, GameData |
+| `Censio.Companion` | The Windows tray shell (WPF application, Windows Forms tray icon, the diagnostics window, the registry store of the autostart value); no test project | Companion.Core |
 
 All assemblies carry the version of the build property `Version` (default `0.0.0`) as informational version
 ([`decisions/0005`](decisions/0005-product-version-from-one-build-property.md)). What each component does is in
