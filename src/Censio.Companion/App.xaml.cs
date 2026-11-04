@@ -84,6 +84,11 @@ public partial class App : Application
     private DiagnosticsWindowSession? _diagnostics;
 
     /// <summary>
+    /// The rules of the start with Windows
+    /// </summary>
+    private CompanionAutostart? _autostart;
+
+    /// <summary>
     /// Whether the application is exiting
     /// </summary>
     private volatile bool _exiting;
@@ -241,7 +246,7 @@ public partial class App : Application
     private TrayIcon CreateTrayIcon()
     {
         _images = new TrayIconImages();
-        _trayIcon = new TrayIcon(ProductVersion.Read(typeof(App).Assembly), _images, () => _snapshot(), Dispatch);
+        _trayIcon = new TrayIcon(ProductVersion.Read(typeof(App).Assembly), _images, () => _snapshot(), () => _autostart?.Refresh() ?? false, Dispatch);
 
         return _trayIcon;
     }
@@ -275,6 +280,12 @@ public partial class App : Application
             case TrayMenuEntryKind.OpenLogFolder:
                 {
                     OpenFolder(_logFolder, "log");
+                }
+                break;
+
+            case TrayMenuEntryKind.ToggleAutostart:
+                {
+                    _autostart?.Toggle();
                 }
                 break;
 
@@ -340,6 +351,7 @@ public partial class App : Application
             _logFolder = CompanionFolders.Logs(localAppData);
             _logProvider = new LogFileLoggerProvider(_logFolder, TimeProvider.System);
             _logger = _logProvider.CreateLogger("Censio.Companion");
+            _autostart = new CompanionAutostart(new RegistryStartupEntryStore(), Environment.ProcessPath, _logger);
             _folderOpener = new FolderOpener(LaunchExplorer, _logger);
             _connectionCancellation = new CancellationTokenSource();
 

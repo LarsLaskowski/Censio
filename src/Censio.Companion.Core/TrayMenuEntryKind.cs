@@ -48,5 +48,10 @@ public enum TrayMenuEntryKind
     /// <summary>
     /// The entry that exits the application.
     /// </summary>
-    Exit
+    Exit,
+
+    /// <summary>
+    /// The entry that turns the start with Windows on or off.
+    /// </summary>
+    ToggleAutostart
 }

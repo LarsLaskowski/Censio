@@ -61,6 +61,11 @@ public static class TrayMenu
     /// </summary>
     public const string OpenDiagnosticsText = "Open diagnostics";
 
+    /// <summary>
+    /// The text of the entry that turns the start with Windows on or off.
+    /// </summary>
+    public const string StartWithWindowsText = "Start with Windows";
+
     #endregion // Constants
 
     #region Methods
@@ -246,9 +251,10 @@ public static class TrayMenu
     /// </summary>
     /// <param name="version">The product version</param>
     /// <param name="snapshot">The snapshot</param>
+    /// <param name="isAutostartEnabled">Whether the Companion starts with Windows</param>
     /// <param name="clock">The clock</param>
     /// <returns>The entries in display order</returns>
-    public static IReadOnlyList<TrayMenuEntry> Create(string version, TraySnapshot snapshot, TimeProvider clock)
+    public static IReadOnlyList<TrayMenuEntry> Create(string version, TraySnapshot snapshot, bool isAutostartEnabled, TimeProvider clock)
     {
         return [
                    new TrayMenuEntry(TrayMenuEntryKind.Status, $"Status: {snapshot.StatusText}", false),
