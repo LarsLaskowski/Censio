@@ -1,0 +1,12 @@
+# Line endings follow .editorconfig (end_of_line = lf): LF in the repository and in every checkout
+* text=auto eol=lf
+
+# Binary assets
+*.png binary
+*.jpg binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+
+# Shell scripts must keep LF, otherwise bash fails on the carriage returns
+*.sh text eol=lf
