@@ -1,7 +1,7 @@
 # Spec: Optional Windows autostart for the Companion
 
 Source: Issue #15
-Status: Approved by Lead
+Status: Approved by Product Manager
 
 ## Problem
 
@@ -15,13 +15,14 @@ so the exe lives wherever the player extracted it.
 
 Terms used below:
 
-- The *startup entry* is the one entry named `Censio Companion` in the signed-in user's own list of programs Windows
-  starts at sign-in (the list Settings > Apps > Startup and Task Manager > Startup apps show; they may show it under
-  the name Windows takes from the exe). It is stored as a per-user Run value (record 0017).
+- The *startup entry* is the one value named `Censio Companion` in the signed-in user's own Run list of programs
+  Windows starts at sign-in (record 0017); Settings > Apps > Startup and Task Manager > Startup apps list it, maybe
+  under the name Windows takes from the exe.
 - Its *command* is the exe's full path in double quotes and nothing else: `"<full path>"`.
-- It *matches this exe* when its command, with the surrounding double quotes removed, equals the full path of the
-  running exe, compared case-insensitively, and holds no arguments.
-- It is *turned off in Windows* when the startup apps list shows it disabled (the player switched it off there).
+- It *matches this exe* when its command equals `"<full path of the running exe>"` exactly, compared
+  case-insensitively.
+- The switch-off of Settings and Task Manager (the player turns an entry off there) is Windows' own record, which
+  the Companion neither reads nor changes (Product Manager's decision, *Challenge*).
 
 ## Scenarios
 
@@ -29,7 +30,7 @@ Terms used below:
   the entry `Start with Windows` without a check mark, between `Open log folder` and `Version <version>`, set off by
   a separator above and below it.
 - S2: Given S1, when the player clicks `Start with Windows`, then the next time the menu opens the entry carries a
-  check mark, and Windows' startup apps list shows the Companion as enabled. The running Companion goes on
+  check mark, and Windows' startup apps list shows the Companion. The running Companion goes on
   unchanged.
 - S3: Given S2, when the player signs out and in again or restarts the PC, then the Companion starts with the
   player's sign-in exactly as a start by hand without switches: one icon, no window, `Waiting for game` until the
@@ -55,9 +56,10 @@ Terms used below:
 - E3: Two copies of the exe in different folders. There is one startup entry per Windows user: turning it on in one
   copy replaces the other's, whose menu then shows the entry unchecked. Only the copy that holds it starts at
   sign-in.
-- E4: The player turned the Companion off in Windows' startup apps list. The menu shows `Start with Windows`
-  unchecked; a click turns it on again, and the startup apps list shows it enabled. When Windows' record of the
-  off switch for the entry cannot be recognised, the Companion treats the entry as turned off.
+- E4: The player turned the Companion off in Windows' startup apps list. Windows does not start it at sign-in, but
+  the menu still shows `Start with Windows` checked, since the switch-off is not read; a click deletes the startup
+  entry, and a later click writes it again while Windows keeps its switch-off. The player turns it on again in the
+  startup apps list. README, user guide and the area document say so.
 - E5: The exe's path holds spaces, a comma, `&` or non-ASCII letters. The command is that path in double quotes, and
   autostart starts the exe at that path. A path holding `%` or longer than 200 characters cannot be turned on: a
   click leaves `Start with Windows` unchecked, writes nothing and logs a warning (Windows might expand `%` or cut a
@@ -81,33 +83,31 @@ Terms used below:
 
 - Per-user only: turning autostart on or off needs no administrator rights and no UAC prompt, writes only settings
   of the signed-in Windows user, and changes nothing for other users. The Companion writes no file of its own for
-  it; the state is the one Windows holds, so Windows' startup apps list and the menu agree (except E11).
+  it; the state is the startup entry Windows holds (the check mark can disagree with Windows after E4 or E11).
 - Off by default: a Companion that was never toggled, on a new or an updated version, does not start with Windows.
 - What starts at sign-in is only the Companion exe itself, its full path in double quotes, without arguments. A
   command line Windows runs at every sign-in is a persistence point: the plan lists it under *Security areas
   touched*.
 - The menu does not wait noticeably: toggling and opening the menu stay as quick as the other entries.
 - Log: `Autostart enabled` and `Autostart disabled` (information) at the click, and a warning when a read, write or
-  removal fails (E1), with the exception text as the log already allows (record 0037). These lines do not hold the
+  removal fails or a path is refused (E1, E5), with the exception text as the log already allows (record 0037). These lines do not hold the
   exe path.
 - Compatibility: Windows 10 22H2 and Windows 11, x64, as the release ZIP ([`companion.md`](../../docs/areas/companion.md),
   *Platform*). No new configuration besides the menu entry.
-- Removing the Companion: turning autostart off removes the startup entry and Windows' off switch for it, so nothing
-  is left behind; a stale entry for a deleted exe starts nothing (E2), and README and user guide say how to remove it.
-- Windows' record of the off switch in the startup apps list is not documented by Microsoft; how the Companion reads
-  and clears it is verified by hand (AC6) and named in *Limits and errors* of the area document.
+- Removing the Companion: turning autostart off deletes the startup entry; a switch-off Windows recorded for it
+  (E4) is Windows' own and stays; a stale entry for a deleted exe starts nothing (E2), and README and user guide say
+  how to remove it.
 
 ## Acceptance criteria
 
 - [ ] AC1: The tray menu holds `Start with Windows` between `Open log folder` and `Version <version>`, with a
   separator above and below, enabled in every mode (live, `--record`, replay, invalid command line). It is checked
-  when the menu opens exactly when the startup entry exists, matches this exe, and is not turned off in Windows (an
-  unrecognised off record counts as off); otherwise it is unchecked (S1, S5, E2, E3, E4, E10, E11).
+  when the menu opens exactly when the startup entry exists and matches this exe; otherwise it is unchecked; a
+  switch-off in Windows' startup apps list is not read (S1, S5, E2, E3, E4, E10, E11).
 - [ ] AC2: Clicking the unchecked entry writes the startup entry with this exe's command (`"<full path>"`, no
-  arguments), replacing any other command under that name, and clears Windows' off switch for it — unless the path
-  holds `%` or is longer than 200 characters, when it writes nothing and logs a warning; clicking the
-  checked entry removes the startup entry and Windows' off switch for it; the running Companion goes on in both
-  cases (S2, S4, S5, E2, E3, E4, E5, E7, E10).
+  arguments), replacing any other command under that name — unless the path holds `%` or is longer than 200
+  characters, when it writes nothing and logs a warning; clicking the checked entry deletes the startup entry; the
+  running Companion goes on in both cases (S2, S4, S5, E2, E3, E5, E7, E10).
 - [ ] AC3: Autostart is off until the player turns it on; nothing the Companion does on start, `Exit` or in any
   mode writes or removes the startup entry (S1, S5).
 - [ ] AC4: A read that fails shows the entry unchecked and clickable with every other menu entry present, and logs
@@ -115,21 +115,21 @@ Terms used below:
   state read then; a successful click logs `Autostart enabled` or `Autostart disabled`, without the exe path (E1).
 - [ ] AC5: Turning autostart on or off writes only the signed-in user's settings and needs no administrator rights
   (S6).
-- [ ] AC6: Verified by hand on Windows with an exe built with the release flags (README, *Build the Companion from
-  source*), under a standard (non-administrator) account: no UAC
-  prompt appears and nothing is written outside the signed-in user's settings and profile; on, then restart, the
-  Companion starts as in S3 (and whether SmartScreen asks, E9); off, then restart, no Companion starts; switching it
-  off in the startup apps list shows unchecked in the menu, and a click turns it on there again; turning it off in
-  the menu leaves no Companion entry in the startup apps list; a path with spaces starts (E5); a second Windows
-  user is unaffected (S2, S3, S4, S6, E4, E5).
+- [ ] AC6: Verified by the Product Manager by hand on Windows 11 before the merge, with an exe built with the release
+  flags (README, *Build the Companion from source*), under a standard (non-administrator) account: no UAC prompt
+  appears; on, then restart, the Companion starts as in S3 from the exe's real path (and whether SmartScreen asks,
+  E9); off, then restart, no Companion starts and the startup apps list no longer shows it; the name the startup
+  apps list shows; a folder with spaces, `&` and `,` starts (E5); a folder holding `%` leaves the entry unchecked
+  (E5); a second Windows user is unaffected (S2, S3, S4, S6, E5).
 - [ ] AC7: README and the user guide, English first and then German, describe the entry, that it is off by default
   and per-user, to extract the ZIP to a folder of the player's own profile that stays (not a shared or root-level
-  folder other users can write), that a folder path holding `%` or longer than 200 characters cannot be used, what moving the exe or a new version in another folder
-  does, to turn it off before removing the Companion, and how to remove a stale entry: start any copy, click `Start
-  with Windows` (it replaces the stale entry), then click it again to turn it off (E2, E6, E9).
+  folder other users can write), that a folder path holding `%` or longer than 200 characters cannot be used, that
+  a switch-off in Windows' startup apps list is not shown in the menu and is undone only there (E4), what moving the
+  exe or a new version in another folder does, to turn it off before removing the Companion, and how to remove a stale entry: start any copy, click `Start
+  with Windows` (it replaces the stale entry), then click it again to turn it off (E2, E4, E6, E9).
 - [ ] AC8: [`companion.md`](../../docs/areas/companion.md) describes the entry, its place in the menu, its rules,
-  its log lines, E11 and the undocumented off record under *Limits and errors*, and no longer lists autostart under
-  *Not here* (S1 to S6, E1 to E11).
+  its log lines, E4 and E11 under *Limits and errors*, and no longer lists autostart under *Not here* (S1 to S6, E1
+  to E11).
 
 ## Out of scope
 
@@ -137,6 +137,7 @@ Terms used below:
 - Starting with `--record` or any other switch at sign-in (S5 always starts without switches).
 - Moving the startup entry to a new path on its own when the exe moves (E2: the player clicks again).
 - Detecting a start from a temporary folder (E6: documented only).
+- Reading or clearing the switch-off of Windows' startup apps list (E4: documented only).
 - A scheduled task, an installer or uninstaller, and administrator-wide (all users) autostart.
 - E8 needs no criterion beyond the existing *Single instance* behavior.
 
@@ -160,7 +161,7 @@ Terms used below:
 
 - [`docs/areas/companion.md`](../../docs/areas/companion.md): a section *Start with Windows* with S1 to S6 and E1 to
   E10 as rules; the menu enumeration in *Tray icon and menu* gains the entry and its separators; *Log* gains the two
-  lines and the warning; *Limits and errors* names E11, the undocumented off record and what is verified by hand
+  lines and the warnings; *Limits and errors* names E4, E11 and what the Product Manager verified by hand
   (AC6); *Not here* drops "autostart"; *Related decisions* links 0017 and the plan's record.
 
 ## Challenge
@@ -186,3 +187,8 @@ Terms used below:
   the user's settings and profile.
 - m8 (Run value or Startup-folder shortcut): accepted as a planning decision; the plan records it in a decision
   record referring to 0017 (*Open questions*); a scheduled task is out of scope.
+- Product Manager's decision after the plan review (escalation of the off-switch measurement): the Companion uses the
+  Run value only — written, compared and deleted — and does not read or clear the startup apps list's switch-off.
+  E4 now describes the resulting limitation, AC1, AC2, AC6 and the NFR drop the off switch, and AC6 is the Product
+  Manager's own test on Windows 11 before the merge. This supersedes the answers to M1 (the off-switch part) and m4
+  above.
