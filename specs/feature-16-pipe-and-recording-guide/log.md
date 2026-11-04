@@ -6,3 +6,4 @@ are quoted in full.
 | Date | Step | Member | Result |
 | ---- | ---- | ------ | ------ |
 | 2026-11-04 11:56 | 1 Intake | Orchestrator | Issue 16 read (documentation label, user calls it a feature); branch claude/charming-galileo-5qc8r0 at a94a33d; work folder created |
+| 2026-11-04 12:01 | 2a Spec | Lead | ESCALATE: launch-argument path in Ubisoft Connect/Steam unknown; spec.md drafted (opus/medium · usage pending) |
