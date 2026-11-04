@@ -164,7 +164,7 @@ For testing and bug reports the Companion can keep what the game sends and play 
   4. The tooltip shows `Censio Companion: Replay: Receiving` and ends at `Censio Companion: Replay finished`. That means the file is readable.
   5. Choose `Exit`: it ends the replay. Start `Censio.Companion.exe` as usual to get the Companion back; `Start with Windows` starts it only at the next sign-in.
 
-  Tried by the Product Manager on Windows 11 (26H2) with a build the Product Manager runs: this procedure with `Exit` first and the *Run* dialog, which works; a second instance does not work, which is why `Exit` comes first. Not reported separately: the exact quoting and path details of the line.
+  Tried by the Product Manager on Windows 11 (26H2) with a Companion built from source with the documented publish command (tray menu `Version 0.0.0`): this procedure with `Exit` first and the *Run* dialog, which works; a second instance does not work, which is why `Exit` comes first. Not reported separately: the exact quoting and path details of the line.
 - **Invalid command line:** an unknown argument, `--speed` without `--replay`, a speed outside the range, `--replay` without a file, or `--record` together with `--replay` show `Censio Companion: Invalid command line`; the Companion then neither records nor replays, and `Exit` works.
 
 **A recording is private.** It holds the savegame headline, island names and economic data exactly as the game sent them. It stays in the folder on your computer, the Companion never sends it anywhere and never deletes it. Do not attach or post a raw recording publicly (not in an issue either); only anonymised fixtures are meant to be shared. Keep a recording until a maintainer asks how to hand it in (*Reporting problems*). Delete the files yourself when you no longer need them.
@@ -223,7 +223,7 @@ This path leads from the download to a recording file and its replay, on Windows
 12. Replay the file from the Windows *Run* dialog as described under *Recording and replay* (copy both paths with "Copy as path", then `"<path of Censio.Companion.exe>" --replay "<path of the file>" --speed max`).
 13. The tooltip ends at `Censio Companion: Replay finished`: the file is readable. Choose `Exit`, then start `Censio.Companion.exe` as in step 3 for normal use.
 
-Tried by the Product Manager on Windows 11 (26H2) with Ubisoft Connect in German and a build the Product Manager runs, with the real game: step 5 (entering `/pipe` and choosing *Close*), recording and its file, the tray icon in the overflow area, the tooltips and tray states, and the replay with `Exit` and the *Run* dialog (steps 7 to 13 in general). Not yet tried: the download from a release (no release exists yet, so steps 1 and 2 as written), a Steam copy, the English launcher labels, and the SmartScreen tip of *Download*.
+Tried by the Product Manager on Windows 11 (26H2) with Ubisoft Connect in German and a Companion built from source with the documented publish command (tray menu `Version 0.0.0`), with the real game: step 5 (entering `/pipe` and choosing *Close*), recording and its file, the tray icon in the overflow area, the tooltips and tray states, and the replay with `Exit` and the *Run* dialog (steps 7 to 13 in general). Not yet tried: the download from a release (no release exists yet, so steps 1 and 2 as written), a Steam copy, the English launcher labels, and the SmartScreen tip of *Download*.
 
 ## First start
 
