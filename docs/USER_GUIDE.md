@@ -127,10 +127,10 @@ The game creates its statistics pipe only when it is started with the launch arg
 
 **Adding `/pipe`.** The argument takes effect at the next start of the game: if the game runs, quit it, add the argument and start it again.
 
-- *Ubisoft Connect (every copy of the game, also one bought on Steam, which starts Ubisoft Connect too):* open Ubisoft Connect, choose *Games*, select Anno 117, open *Properties*, find *Game launch arguments*, switch on *Add command line arguments* and type `/pipe` into the field.
+- *Ubisoft Connect (every copy of the game, also one bought on Steam, which starts Ubisoft Connect too):* open Ubisoft Connect, choose *Library*, click the three dots on Anno 117 to open its pop-up menu, choose *Manage*, then *Properties*, type `/pipe` into the field *Add launch arguments* and choose *Close*.
 - *Steam (alternative for a Steam copy):* in the *Library* right-click Anno 117, choose *Properties…*, tab *General*, and type `/pipe` into the field *Launch Options*. If the tooltip stays at `Waiting for game` with this option set, the argument may not reach the game through Ubisoft Connect: add `/pipe` in Ubisoft Connect as above.
 
-Not yet tried: both paths and their labels in a real launcher (the labels are the usual ones and may differ with the launcher version).
+The Ubisoft Connect path was tried by the Product Manager on Windows 11 (26H2) with Ubisoft Connect in German: *Bibliothek*, the three dots on the game (pop-up menu), *Verwalten*, *Eigenschaften*, field *Startargumente hinzufügen*, `/pipe` entered, *Schließen*. Not yet tried: the English labels of this path (translated from the German ones; they may differ in an English Ubisoft Connect), whether the argument reached the game after saving, and the Steam path with its labels (they are the usual ones and may differ with the Steam version).
 
 Hover over the tray icon: the tooltip reads `Censio Companion: <state>`. As soon as the game has sent a complete tick, a second line shows `Last tick: <time>, <n> islands` (the time when it arrived, as `HH:mm:ss` of today, otherwise with the date). The icon shows the state too: a grey ring while waiting (`Waiting for game`, `Connected`, `Pipe busy`), a green circle while `Receiving`, a red triangle for `Protocol mismatch`, `Error` and an invalid command line. Right-click the icon for the menu, which shows the same status and last tick.
 
@@ -223,7 +223,7 @@ This path leads from the download to a recording file and its replay, on Windows
 12. Replay the file from the Windows *Run* dialog as described under *Recording and replay* (copy both paths with "Copy as path", then `"<path of Censio.Companion.exe>" --replay "<path of the file>" --speed max`).
 13. The tooltip ends at `Censio Companion: Replay finished`: the file is readable. Choose `Exit`, then start `Censio.Companion.exe` as in step 3 for normal use.
 
-Not yet tried: the whole path on a real Windows with the real game, in particular the steps 1 to 4 from a release download (no release exists yet), the overflow area of the notification area, the launcher steps of step 5 and the replay of step 12.
+Tried so far: step 5 up to entering `/pipe` and choosing *Close* in Ubisoft Connect (German), on Windows 11 (26H2). Not yet tried: the whole path on a real Windows with the real game, in particular the steps 1 to 4 from a release download (no release exists yet), the overflow area of the notification area, the launcher steps of step 5 after the argument was entered (only entering `/pipe` and choosing *Close* was tried, in German), the English launcher labels and the replay of step 12.
 
 ## First start
 
@@ -376,10 +376,10 @@ Das Spiel legt seine Statistik-Pipe nur an, wenn es mit dem Startargument `/pipe
 
 **`/pipe` hinzufügen.** Das Argument wirkt beim nächsten Start des Spiels: Läuft das Spiel, beenden Sie es, fügen das Argument hinzu und starten es neu.
 
-- *Ubisoft Connect (jede Kopie des Spiels, auch eine bei Steam gekaufte, die Ubisoft Connect mitstartet):* Ubisoft Connect öffnen, *Spiele* wählen, Anno 117 auswählen, *Eigenschaften* öffnen, unter *Startargumente* die Option *Befehlszeilenargumente hinzufügen* einschalten und `/pipe` in das Feld eintragen.
+- *Ubisoft Connect (jede Kopie des Spiels, auch eine bei Steam gekaufte, die Ubisoft Connect mitstartet):* Ubisoft Connect öffnen, *Bibliothek* wählen, bei Anno 117 auf die drei Punkte klicken (Popupmenü), *Verwalten* wählen, dann *Eigenschaften*, `/pipe` in das Feld *Startargumente hinzufügen* eintragen und *Schließen* wählen.
 - *Steam (Alternative für eine Steam-Kopie):* in der *Bibliothek* mit der rechten Maustaste auf Anno 117 klicken, *Eigenschaften…* wählen, Reiter *Allgemein*, und `/pipe` in das Feld *Startoptionen* eintragen. Bleibt der Tooltip mit dieser Option bei `Waiting for game`, erreicht das Argument das Spiel über Ubisoft Connect vielleicht nicht: `/pipe` dann wie oben in Ubisoft Connect eintragen.
 
-Noch nicht ausprobiert: beide Wege und ihre Bezeichnungen in einem echten Launcher (die Bezeichnungen sind die üblichen und können je nach Launcher-Version abweichen).
+Der Weg in Ubisoft Connect wurde vom Product Manager unter Windows 11 (26H2) mit deutschem Ubisoft Connect ausprobiert: *Bibliothek*, die drei Punkte beim Spiel (Popupmenü), *Verwalten*, *Eigenschaften*, Feld *Startargumente hinzufügen*, `/pipe` eingetragen, *Schließen*. Noch nicht ausprobiert: die englischen Bezeichnungen dieses Wegs (aus den deutschen übersetzt; sie können in einem englischen Ubisoft Connect abweichen), ob das Argument nach dem Speichern im Spiel ankam, und der Steam-Weg mit seinen Bezeichnungen (sie sind die üblichen und können je nach Steam-Version abweichen).
 
 Mit der Maus über das Tray-Symbol fahren: Der Tooltip lautet `Censio Companion: <Zustand>`. Sobald das Spiel einen vollständigen Tick gesendet hat, zeigt eine zweite Zeile `Last tick: <Zeit>, <n> islands` (die Ankunftszeit als `HH:mm:ss`, wenn sie heute war, sonst mit Datum). Auch das Symbol zeigt den Zustand: ein grauer Ring beim Warten (`Waiting for game`, `Connected`, `Pipe busy`), ein grüner Kreis bei `Receiving`, ein rotes Dreieck bei `Protocol mismatch`, `Error` und einer ungültigen Kommandozeile. Ein Rechtsklick auf das Symbol öffnet das Menü, das denselben Status und letzten Tick zeigt.
 
@@ -472,7 +472,7 @@ Dieser Weg führt vom Download bis zu einer Aufzeichnungsdatei und ihrem Abspiel
 12. Die Datei im Windows-Dialog *Ausführen* abspielen, wie unter *Aufzeichnen und Abspielen* beschrieben (beide Pfade mit „Als Pfad kopieren“ kopieren, dann `"<Pfad der Censio.Companion.exe>" --replay "<Pfad der Datei>" --speed max`).
 13. Der Tooltip endet bei `Censio Companion: Replay finished`: Die Datei ist lesbar. `Exit` wählen und `Censio.Companion.exe` wie in Schritt 3 für den normalen Betrieb starten.
 
-Noch nicht ausprobiert: der ganze Weg unter einem echten Windows mit dem echten Spiel, insbesondere die Schritte 1 bis 4 von einem Release-Download aus (es gibt noch kein Release), der Überlaufbereich des Infobereichs, die Launcher-Schritte aus Schritt 5 und das Abspielen aus Schritt 12.
+Bisher ausprobiert: Schritt 5 bis zum Eintragen von `/pipe` und *Schließen* in Ubisoft Connect (deutsch), unter Windows 11 (26H2). Noch nicht ausprobiert: der ganze Weg unter einem echten Windows mit dem echten Spiel, insbesondere die Schritte 1 bis 4 von einem Release-Download aus (es gibt noch kein Release), der Überlaufbereich des Infobereichs, die Launcher-Schritte von Schritt 5 nach dem Eintragen des Arguments (nur das Eintragen von `/pipe` und *Schließen* wurde ausprobiert, auf Deutsch), die englischen Launcher-Bezeichnungen und das Abspielen von Schritt 12.
 
 ## Erster Start
 

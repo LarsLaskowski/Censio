@@ -119,13 +119,13 @@ The Companion does not start with Windows unless you turn it on: choose `Start w
 
 #### First recording
 
-1. Add `/pipe` to the launch arguments of the game in Ubisoft Connect (*Games*, Anno 117, *Properties*, *Game launch arguments*); a Steam copy has an alternative in the user guide. The argument takes effect at the next game start.
+1. Add `/pipe` to the launch arguments of the game in Ubisoft Connect (*Library*, the three dots on Anno 117, *Manage*, *Properties*, field *Add launch arguments*, then *Close*); a Steam copy has an alternative in the user guide. The argument takes effect at the next game start.
 2. Start the game and load a save. The tray tooltip changes from `Waiting for game` to `Receiving`.
 3. Right-click the tray icon and choose `Start recording`.
 4. Play, then choose `Stop recording`.
 5. The file `recording-<yyyyMMdd-HHmmss>Z.jsonl` is in `%LOCALAPPDATA%\Censio\Recordings` (`Open recordings folder`). It is private: do not post or attach it.
 
-Not yet tried: this path on a real Windows with the real game. The full walkthrough, the launcher steps, the tray states with what to do, and how to replay a recording are in the [user guide](docs/USER_GUIDE.md#first-recording-step-by-step).
+Tried by the Product Manager on Windows 11 (26H2) with Ubisoft Connect in German: the launcher step 1 up to entering `/pipe` and *Schließen* (*Bibliothek*, the three dots, *Verwalten*, *Eigenschaften*, *Startargumente hinzufügen*). Not yet tried: the English launcher labels, and steps 2 to 5 on a real Windows with the real game. The full walkthrough, the launcher steps, the tray states with what to do, and how to replay a recording are in the [user guide](docs/USER_GUIDE.md#first-recording-step-by-step).
 
 ### Build the Companion from source
 
@@ -275,13 +275,13 @@ Der Companion startet nur dann mit Windows, wenn Sie es einschalten: im Tray-Men
 
 #### Erste Aufzeichnung
 
-1. `/pipe` in Ubisoft Connect zu den Startargumenten des Spiels hinzufügen (*Spiele*, Anno 117, *Eigenschaften*, *Startargumente*); für eine Steam-Kopie gibt es im Benutzerhandbuch eine Alternative. Das Argument wirkt beim nächsten Start des Spiels.
+1. `/pipe` in Ubisoft Connect zu den Startargumenten des Spiels hinzufügen (*Bibliothek*, die drei Punkte bei Anno 117, *Verwalten*, *Eigenschaften*, Feld *Startargumente hinzufügen*, dann *Schließen*); für eine Steam-Kopie gibt es im Benutzerhandbuch eine Alternative. Das Argument wirkt beim nächsten Start des Spiels.
 2. Das Spiel starten und einen Spielstand laden. Der Tray-Tooltip wechselt von `Waiting for game` zu `Receiving`.
 3. Mit der rechten Maustaste auf das Tray-Symbol klicken und `Start recording` wählen.
 4. Spielen, dann `Stop recording` wählen.
 5. Die Datei `recording-<yyyyMMdd-HHmmss>Z.jsonl` liegt in `%LOCALAPPDATA%\Censio\Recordings` (`Open recordings folder`). Sie ist privat: nicht posten oder anhängen.
 
-Noch nicht ausprobiert: dieser Weg unter einem echten Windows mit dem echten Spiel. Der ganze Ablauf, die Launcher-Schritte, die Tray-Zustände mit dem, was zu tun ist, und das Abspielen einer Aufzeichnung stehen im [Benutzerhandbuch](docs/USER_GUIDE.md#erste-aufzeichnung-schritt-für-schritt).
+Ausprobiert vom Product Manager unter Windows 11 (26H2) mit deutschem Ubisoft Connect: Schritt 1 bis zum Eintragen von `/pipe` und *Schließen* (*Bibliothek*, die drei Punkte, *Verwalten*, *Eigenschaften*, *Startargumente hinzufügen*). Noch nicht ausprobiert: die englischen Launcher-Bezeichnungen und die Schritte 2 bis 5 unter einem echten Windows mit dem echten Spiel. Der ganze Ablauf, die Launcher-Schritte, die Tray-Zustände mit dem, was zu tun ist, und das Abspielen einer Aufzeichnung stehen im [Benutzerhandbuch](docs/USER_GUIDE.md#erste-aufzeichnung-schritt-für-schritt).
 
 ### Companion aus dem Quellcode bauen
 
