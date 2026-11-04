@@ -10,7 +10,7 @@ Censio is in milestone M1. No release exists yet; the coming release `v0.1.0` co
 
 What `v0.1.0` can do:
 
-- The Companion runs on Windows as a tray icon. Its tooltip and icon show the state of the connection to the game's statistics pipe (the game needs the launch argument `/pipe`), and its menu shows the status and the last tick. It records what the game sends to a local file, from the menu or with the switch `--record`, and plays such a file back with `--replay <file>` (*First recording* and the [user guide](docs/USER_GUIDE.md#first-recording-step-by-step)). `Open diagnostics` opens a window with the last tick, with regions, islands and goods as raw numbers (GUIDs). It writes a log file to `%LOCALAPPDATA%\Censio\Logs`, and `Start with Windows` (off by default) starts it at sign-in.
+- The Companion runs on Windows as a tray icon. Its tooltip and icon show the state of the connection to the game's statistics pipe (the game needs the launch argument `/pipe`), and its menu shows the status and the last tick. It records what the game sends to a local file, from the menu or with the switch `--record` (*First recording*), and plays such a file back with `--replay <file>` ([user guide](docs/USER_GUIDE.md#first-recording-step-by-step)). `Open diagnostics` opens a window with the last tick, with regions, islands and goods as raw numbers (GUIDs). It writes a log file to `%LOCALAPPDATA%\Censio\Logs`, and `Start with Windows` (off by default) starts it at sign-in.
 - The server runs as a Docker image. Its start page shows `Version <version>`, and `GET /health` answers `Healthy`.
 
 What `v0.1.0` cannot do:
@@ -104,7 +104,7 @@ The Companion is the Windows program that reads the statistics of the running ga
 1. Extract the ZIP to a folder of your choice. It holds one file, `Censio.Companion.exe`.
 2. Start `Censio.Companion.exe`. A tray icon appears; its menu shows the status, the last tick, `Open diagnostics`, `Start recording`, `Open recordings folder`, `Open log folder`, `Start with Windows`, `Version <version>` and `Exit`.
 
-The program is not signed, so Windows SmartScreen may show "Windows protected your PC" the first time. Choose "More info", then "Run anyway" (on a German Windows: "Weitere Informationen", then "Trotzdem ausführen").
+The program is not signed, so Windows SmartScreen may show "Windows protected your PC" the first time. Choose "More info", then "Run anyway" (on a German Windows: "Weitere Informationen", then "Trotzdem ausführen"). Tip reported by the Product Manager, not tried against a real release download: open the properties of the extracted `Censio.Companion.exe` (or of the ZIP itself), choose *Allow* (German: *Zulassen*) and apply; SmartScreen then does not ask.
 
 #### Start with Windows
 
@@ -125,7 +125,7 @@ The Companion does not start with Windows unless you turn it on: choose `Start w
 4. Play, then choose `Stop recording`.
 5. The file `recording-<yyyyMMdd-HHmmss>Z.jsonl` is in `%LOCALAPPDATA%\Censio\Recordings` (`Open recordings folder`). It is private: do not post or attach it.
 
-Tried by the Product Manager on Windows 11 (26H2) with Ubisoft Connect in German: the launcher step 1 up to entering `/pipe` and *Schließen* (*Bibliothek*, the three dots, *Verwalten*, *Eigenschaften*, *Startargumente hinzufügen*). Not yet tried: the English launcher labels, and steps 2 to 5 on a real Windows with the real game. The full walkthrough, the launcher steps, the tray states with what to do, and how to replay a recording are in the [user guide](docs/USER_GUIDE.md#first-recording-step-by-step).
+Tried by the Product Manager on Windows 11 (26H2) with Ubisoft Connect in German: the launcher step 1 up to entering `/pipe` and *Schließen* (*Bibliothek*, the three dots, *Verwalten*, *Eigenschaften*, *Startargumente hinzufügen*). Also tried with the real game: recording and its file, the tooltips and tray states, and the replay. Not yet tried: the English launcher labels, a Steam copy and the download from a release (no release exists). The full walkthrough, the launcher steps, the tray states with what to do, and how to replay a recording are in the [user guide](docs/USER_GUIDE.md#first-recording-step-by-step).
 
 ### Build the Companion from source
 
@@ -166,7 +166,7 @@ Censio befindet sich im Meilenstein M1. Es gibt noch kein Release; das kommende 
 
 Das kann `v0.1.0`:
 
-- Der Companion läuft unter Windows als Tray-Symbol. Sein Tooltip und Symbol zeigen den Zustand der Verbindung zur Statistik-Pipe des Spiels (das Spiel braucht das Startargument `/pipe`), und sein Menü zeigt den Status und den letzten Tick. Er zeichnet auf, was das Spiel sendet, in eine lokale Datei, über das Menü oder mit dem Schalter `--record`, und spielt eine solche Datei mit `--replay <Datei>` ab (*Erste Aufzeichnung* und das [Benutzerhandbuch](docs/USER_GUIDE.md#erste-aufzeichnung-schritt-für-schritt)). `Open diagnostics` öffnet ein Fenster mit dem letzten Tick, mit Regionen, Inseln und Waren als rohen Zahlen (GUIDs). Er schreibt eine Logdatei nach `%LOCALAPPDATA%\Censio\Logs`, und `Start with Windows` (standardmäßig aus) startet ihn bei der Anmeldung.
+- Der Companion läuft unter Windows als Tray-Symbol. Sein Tooltip und Symbol zeigen den Zustand der Verbindung zur Statistik-Pipe des Spiels (das Spiel braucht das Startargument `/pipe`), und sein Menü zeigt den Status und den letzten Tick. Er zeichnet auf, was das Spiel sendet, in eine lokale Datei, über das Menü oder mit dem Schalter `--record` (*Erste Aufzeichnung*), und spielt eine solche Datei mit `--replay <Datei>` ab ([Benutzerhandbuch](docs/USER_GUIDE.md#erste-aufzeichnung-schritt-für-schritt)). `Open diagnostics` öffnet ein Fenster mit dem letzten Tick, mit Regionen, Inseln und Waren als rohen Zahlen (GUIDs). Er schreibt eine Logdatei nach `%LOCALAPPDATA%\Censio\Logs`, und `Start with Windows` (standardmäßig aus) startet ihn bei der Anmeldung.
 - Der Server läuft als Docker-Image. Seine Startseite zeigt `Version <version>`, und `GET /health` antwortet mit `Healthy`.
 
 Das kann `v0.1.0` nicht:
@@ -260,7 +260,7 @@ Der Companion ist das Windows-Programm, das die Statistik des laufenden Spiels l
 1. Das ZIP in einen beliebigen Ordner entpacken. Es enthält eine Datei, `Censio.Companion.exe`.
 2. `Censio.Companion.exe` starten. Ein Tray-Symbol erscheint; sein Menü zeigt den Status, den letzten Tick, `Open diagnostics`, `Start recording`, `Open recordings folder`, `Open log folder`, `Start with Windows`, `Version <version>` und `Exit`.
 
-Das Programm ist nicht signiert, deshalb zeigt Windows SmartScreen beim ersten Start unter Umständen „Der Computer wurde durch Windows geschützt“. „Weitere Informationen“ wählen, dann „Trotzdem ausführen“ (unter englischem Windows: "More info", "Run anyway").
+Das Programm ist nicht signiert, deshalb zeigt Windows SmartScreen beim ersten Start unter Umständen „Der Computer wurde durch Windows geschützt“. „Weitere Informationen“ wählen, dann „Trotzdem ausführen“ (unter englischem Windows: "More info", "Run anyway"). Tipp, vom Product Manager gemeldet und noch nicht an einem echten Release-Download ausprobiert: die Eigenschaften der entpackten `Censio.Companion.exe` (oder des ZIP selbst) öffnen, *Zulassen* wählen (unter englischem Windows: *Allow*) und übernehmen; SmartScreen fragt dann nicht.
 
 #### Start mit Windows
 
@@ -281,7 +281,7 @@ Der Companion startet nur dann mit Windows, wenn Sie es einschalten: im Tray-Men
 4. Spielen, dann `Stop recording` wählen.
 5. Die Datei `recording-<yyyyMMdd-HHmmss>Z.jsonl` liegt in `%LOCALAPPDATA%\Censio\Recordings` (`Open recordings folder`). Sie ist privat: nicht posten oder anhängen.
 
-Ausprobiert vom Product Manager unter Windows 11 (26H2) mit deutschem Ubisoft Connect: Schritt 1 bis zum Eintragen von `/pipe` und *Schließen* (*Bibliothek*, die drei Punkte, *Verwalten*, *Eigenschaften*, *Startargumente hinzufügen*). Noch nicht ausprobiert: die englischen Launcher-Bezeichnungen und die Schritte 2 bis 5 unter einem echten Windows mit dem echten Spiel. Der ganze Ablauf, die Launcher-Schritte, die Tray-Zustände mit dem, was zu tun ist, und das Abspielen einer Aufzeichnung stehen im [Benutzerhandbuch](docs/USER_GUIDE.md#erste-aufzeichnung-schritt-für-schritt).
+Ausprobiert vom Product Manager unter Windows 11 (26H2) mit deutschem Ubisoft Connect: Schritt 1 bis zum Eintragen von `/pipe` und *Schließen* (*Bibliothek*, die drei Punkte, *Verwalten*, *Eigenschaften*, *Startargumente hinzufügen*). Ebenfalls mit dem echten Spiel ausprobiert: die Aufzeichnung und ihre Datei, die Tooltips und Tray-Zustände und das Abspielen. Noch nicht ausprobiert: die englischen Launcher-Bezeichnungen, eine Steam-Kopie und der Download von einem Release (es gibt keins). Der ganze Ablauf, die Launcher-Schritte, die Tray-Zustände mit dem, was zu tun ist, und das Abspielen einer Aufzeichnung stehen im [Benutzerhandbuch](docs/USER_GUIDE.md#erste-aufzeichnung-schritt-für-schritt).
 
 ### Companion aus dem Quellcode bauen
 

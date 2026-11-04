@@ -108,7 +108,7 @@ The Companion is the Windows program that reads the statistics of the running ga
 1. Extract the ZIP to a folder of your choice. It holds one file, `Censio.Companion.exe`.
 2. Start `Censio.Companion.exe`. A tray icon appears; its menu shows the status, the last tick, `Open diagnostics`, `Start recording`, `Open recordings folder`, `Open log folder`, `Start with Windows`, `Version <version>` and `Exit`.
 
-The program is not signed, so Windows SmartScreen may show "Windows protected your PC" the first time. Choose "More info", then "Run anyway" (on a German Windows: "Weitere Informationen", then "Trotzdem ausführen").
+The program is not signed, so Windows SmartScreen may show "Windows protected your PC" the first time. Choose "More info", then "Run anyway" (on a German Windows: "Weitere Informationen", then "Trotzdem ausführen"). Tip reported by the Product Manager, not tried against a real release download: open the properties of the extracted `Censio.Companion.exe` (or of the ZIP itself), choose *Allow* (German: *Zulassen*) and apply; SmartScreen then does not ask.
 
 #### Start with Windows
 
@@ -164,7 +164,7 @@ For testing and bug reports the Companion can keep what the game sends and play 
   4. The tooltip shows `Censio Companion: Replay: Receiving` and ends at `Censio Companion: Replay finished`. That means the file is readable.
   5. Choose `Exit`: it ends the replay. Start `Censio.Companion.exe` as usual to get the Companion back; `Start with Windows` starts it only at the next sign-in.
 
-  Not yet tried: this procedure and the *Run* dialog line on a real Windows.
+  Tried by the Product Manager on Windows 11 (26H2) with a build the Product Manager runs: this procedure with `Exit` first and the *Run* dialog, which works; a second instance does not work, which is why `Exit` comes first. Not reported separately: the exact quoting and path details of the line.
 - **Invalid command line:** an unknown argument, `--speed` without `--replay`, a speed outside the range, `--replay` without a file, or `--record` together with `--replay` show `Censio Companion: Invalid command line`; the Companion then neither records nor replays, and `Exit` works.
 
 **A recording is private.** It holds the savegame headline, island names and economic data exactly as the game sent them. It stays in the folder on your computer, the Companion never sends it anywhere and never deletes it. Do not attach or post a raw recording publicly (not in an issue either); only anonymised fixtures are meant to be shared. Keep a recording until a maintainer asks how to hand it in (*Reporting problems*). Delete the files yourself when you no longer need them.
@@ -223,7 +223,7 @@ This path leads from the download to a recording file and its replay, on Windows
 12. Replay the file from the Windows *Run* dialog as described under *Recording and replay* (copy both paths with "Copy as path", then `"<path of Censio.Companion.exe>" --replay "<path of the file>" --speed max`).
 13. The tooltip ends at `Censio Companion: Replay finished`: the file is readable. Choose `Exit`, then start `Censio.Companion.exe` as in step 3 for normal use.
 
-Tried so far: step 5 up to entering `/pipe` and choosing *Close* in Ubisoft Connect (German), on Windows 11 (26H2). Not yet tried: the whole path on a real Windows with the real game, in particular the steps 1 to 4 from a release download (no release exists yet), the overflow area of the notification area, the launcher steps of step 5 after the argument was entered (only entering `/pipe` and choosing *Close* was tried, in German), the English launcher labels and the replay of step 12.
+Tried by the Product Manager on Windows 11 (26H2) with Ubisoft Connect in German and a build the Product Manager runs, with the real game: step 5 (entering `/pipe` and choosing *Close*), recording and its file, the tray icon in the overflow area, the tooltips and tray states, and the replay with `Exit` and the *Run* dialog (steps 7 to 13 in general). Not yet tried: the download from a release (no release exists yet, so steps 1 and 2 as written), a Steam copy, the English launcher labels, and the SmartScreen tip of *Download*.
 
 ## First start
 
@@ -357,7 +357,7 @@ Der Companion ist das Windows-Programm, das die Statistik des laufenden Spiels l
 1. Das ZIP in einen beliebigen Ordner entpacken. Es enthält eine Datei, `Censio.Companion.exe`.
 2. `Censio.Companion.exe` starten. Ein Tray-Symbol erscheint; sein Menü zeigt den Status, den letzten Tick, `Open diagnostics`, `Start recording`, `Open recordings folder`, `Open log folder`, `Start with Windows`, `Version <version>` und `Exit`.
 
-Das Programm ist nicht signiert, deshalb zeigt Windows SmartScreen beim ersten Start unter Umständen „Der Computer wurde durch Windows geschützt“. „Weitere Informationen“ wählen, dann „Trotzdem ausführen“ (unter englischem Windows: "More info", "Run anyway").
+Das Programm ist nicht signiert, deshalb zeigt Windows SmartScreen beim ersten Start unter Umständen „Der Computer wurde durch Windows geschützt“. „Weitere Informationen“ wählen, dann „Trotzdem ausführen“ (unter englischem Windows: "More info", "Run anyway"). Tipp, vom Product Manager gemeldet und noch nicht an einem echten Release-Download ausprobiert: die Eigenschaften der entpackten `Censio.Companion.exe` (oder des ZIP selbst) öffnen, *Zulassen* wählen (unter englischem Windows: *Allow*) und übernehmen; SmartScreen fragt dann nicht.
 
 #### Start mit Windows
 
@@ -413,7 +413,7 @@ Für Tests und Fehlermeldungen kann der Companion aufzeichnen, was das Spiel sen
   4. Der Tooltip zeigt `Censio Companion: Replay: Receiving` und endet bei `Censio Companion: Replay finished`. Das heißt, die Datei ist lesbar.
   5. `Exit` wählen: Das beendet das Abspielen. `Censio.Companion.exe` wie gewohnt starten, um den Companion zurückzubekommen; `Start with Windows` startet ihn erst bei der nächsten Anmeldung.
 
-  Noch nicht ausprobiert: dieses Verfahren und die Zeile im Dialog *Ausführen* unter einem echten Windows.
+  Vom Product Manager unter Windows 11 (26H2) mit einem Build ausprobiert, den der Product Manager nutzt: dieses Verfahren mit `Exit` zuerst und dem Dialog *Ausführen*, es funktioniert; eine zweite Instanz funktioniert nicht, deshalb kommt `Exit` zuerst. Nicht gesondert gemeldet: die Einzelheiten der Zeile zu Anführungszeichen und Pfaden.
 - **Ungültige Kommandozeile:** ein unbekanntes Argument, `--speed` ohne `--replay`, eine Geschwindigkeit außerhalb des Bereichs, `--replay` ohne Datei oder `--record` zusammen mit `--replay` zeigen `Censio Companion: Invalid command line`; der Companion zeichnet dann weder auf noch spielt er ab, und `Exit` funktioniert.
 
 **Eine Aufzeichnung ist privat.** Sie enthält die Überschrift des Spielstands, Inselnamen und Wirtschaftsdaten genau so, wie das Spiel sie gesendet hat. Sie bleibt im Ordner auf dem eigenen Rechner, der Companion sendet sie nirgendwohin und löscht sie nie. Eine unbearbeitete Aufzeichnung nie öffentlich anhängen oder posten (auch nicht in einem Issue); geteilt werden sollen nur anonymisierte Testdaten. Eine Aufzeichnung aufheben, bis ein Maintainer fragt, wie sie übergeben werden soll (*Probleme melden*). Die Dateien selbst löschen, wenn sie nicht mehr gebraucht werden.
@@ -472,7 +472,7 @@ Dieser Weg führt vom Download bis zu einer Aufzeichnungsdatei und ihrem Abspiel
 12. Die Datei im Windows-Dialog *Ausführen* abspielen, wie unter *Aufzeichnen und Abspielen* beschrieben (beide Pfade mit „Als Pfad kopieren“ kopieren, dann `"<Pfad der Censio.Companion.exe>" --replay "<Pfad der Datei>" --speed max`).
 13. Der Tooltip endet bei `Censio Companion: Replay finished`: Die Datei ist lesbar. `Exit` wählen und `Censio.Companion.exe` wie in Schritt 3 für den normalen Betrieb starten.
 
-Bisher ausprobiert: Schritt 5 bis zum Eintragen von `/pipe` und *Schließen* in Ubisoft Connect (deutsch), unter Windows 11 (26H2). Noch nicht ausprobiert: der ganze Weg unter einem echten Windows mit dem echten Spiel, insbesondere die Schritte 1 bis 4 von einem Release-Download aus (es gibt noch kein Release), der Überlaufbereich des Infobereichs, die Launcher-Schritte von Schritt 5 nach dem Eintragen des Arguments (nur das Eintragen von `/pipe` und *Schließen* wurde ausprobiert, auf Deutsch), die englischen Launcher-Bezeichnungen und das Abspielen von Schritt 12.
+Vom Product Manager unter Windows 11 (26H2) mit deutschem Ubisoft Connect und einem Build, den der Product Manager nutzt, mit dem echten Spiel ausprobiert: Schritt 5 (Eintragen von `/pipe` und *Schließen*), die Aufzeichnung und ihre Datei, das Tray-Symbol im Überlaufbereich, die Tooltips und Tray-Zustände und das Abspielen mit `Exit` und dem Dialog *Ausführen* (Schritte 7 bis 13 im Allgemeinen). Noch nicht ausprobiert: der Download von einem Release (es gibt noch keins, also die Schritte 1 und 2 wie beschrieben), eine Steam-Kopie, die englischen Launcher-Bezeichnungen und der SmartScreen-Tipp unter *Download*.
 
 ## Erster Start
 
