@@ -96,27 +96,27 @@ README *Status* still says M0 although issues #9 to #15 of M1 are closed.
 
 ## Acceptance criteria
 
-- [ ] AC1: `docs/USER_GUIDE.md` holds a numbered walkthrough from the release download to a recording file, in the order
+- [x] AC1: `docs/USER_GUIDE.md` holds a numbered walkthrough from the release download to a recording file, in the order
   of S1, each step naming what the tester sees, with the warnings of E3, E4 and E10 at the step they apply to (S1, E3,
   E4, E10).
-- [ ] AC2: The guide gives the steps to add `/pipe` in Ubisoft Connect and for a Steam copy, with the launcher's labels,
+- [x] AC2: The guide gives the steps to add `/pipe` in Ubisoft Connect and for a Steam copy, with the launcher's labels,
   the exact text to type, and that the argument takes effect at the next game start; each step not shown by a run is
   marked "Not yet tried" (S2, S3, E1, E2). The walkthrough's `/pipe` step uses the Ubisoft Connect path for every copy;
   the Steam path is a separate alternative for a Steam copy.
-- [ ] AC3: The guide's table of tray states gives for every state (`Waiting for game`, `Connected`, `Receiving`, `Pipe
+- [x] AC3: The guide's table of tray states gives for every state (`Waiting for game`, `Connected`, `Receiving`, `Pipe
   busy`, `Protocol mismatch`, `Error`, and the suffixes `(recording)` and `(recording failed)`) its meaning and what to
   do next (S4, E1, E5, E7, E9).
-- [ ] AC4: The guide's recording section says how to start and stop a recording, where the files go and how they are
+- [x] AC4: The guide's recording section says how to start and stop a recording, where the files go and how they are
   named (with the `-2`, `-3` suffixes), when a file appears, that a session can span several files, how to check a file
   as S5 says (`Exit` first, the *Run* dialog, quoted full paths) and what `Replay finished` means, and that a recording
   is private and kept until a maintainer asks for it (S5, E6, E7, E8, E11, E12).
-- [ ] AC5: The README *Status* names the current milestone correctly and lists what `v0.1.0` can and cannot do as in S6;
+- [x] AC5: The README *Status* names the current milestone correctly and lists what `v0.1.0` can and cannot do as in S6;
   the README's Companion section keeps the short path (download, extract, start, `/pipe`, `Start recording`) with a link
   to the guide's walkthrough, and the tray-state table and the recording and replay detail it carries today move to the
   guide alone, in both languages (S1, S6).
-- [ ] AC6: The German parts of `README.md` and `docs/USER_GUIDE.md` carry the same content as the English parts after
+- [x] AC6: The German parts of `README.md` and `docs/USER_GUIDE.md` carry the same content as the English parts after
   the change, with the Companion's strings in English and the launcher and Windows labels in German (S7).
-- [ ] AC7: The Product Manager (or a stated stand-in) follows the guide on Windows with the real game from the download
+- [x] AC7: The Product Manager (or a stated stand-in) follows the guide on Windows with the real game from the download
   (or the build the plan names, E10) to a recording file, chooses `Exit`, and replays it from the *Run* dialog as S5
   says to `Replay finished`, adding `/pipe` through the launcher they own with it set to German; the launcher path and its
   German labels that run used are confirmed, while the other launcher's path, the English labels (unless the run

@@ -24,10 +24,10 @@ recording, gives no action per tray state, and the README *Status* is stale.
 | 8 | The source-build command of *Build the Companion from source* yields one `Censio.Companion.exe` showing `Version 0.0.0` | `README.md` line 155 (the maintainer's run) | confirmed |
 | 9 | `Start with Windows` starts the Companion only at sign-in (a `Run` value), so after `Exit` it stays ended | `README.md` line 109; `docs/areas/companion.md` *Limits and errors* | confirmed |
 | 10 | The game creates the pipe only with `/pipe` | Ubisoft reference reader `UbisoftMainzAnno/anno117_pipe_example`, `README.md` line 37 | confirmed |
-| 11 | Ubisoft Connect: the game's page, *Properties*, *Game launch arguments*, *Add command line arguments*, a text field taking `/pipe`; German labels (*Eigenschaften*, *Startargumente*, …) | to verify: the Product Manager reads the labels in the German Ubisoft Connect during the dry run (task 3) if it is the launcher they own; the Dev writes the labels marked "Not yet tried" until then | unverified |
-| 12 | Steam: *Library*, right-click the game, *Properties…*, *General*, *Launch Options* (German *Bibliothek*, *Eigenschaften…*, *Allgemein*, *Startoptionen*); whether that argument reaches the game through Ubisoft Connect is unknown | to verify: the Product Manager in the dry run (task 3) if Steam is the launcher they own; otherwise it stays "Not yet tried" | unverified |
-| 13 | The Windows *Run* dialog (Windows key + R) starts `"<exe path>" --replay "<file path>" --speed max` with both quoted paths from Explorer's "Copy as path" (Shift + right-click on Windows 10), and the line fits the dialog | to verify: the Product Manager in the dry run (task 3), with the paths of their extraction folder and recording | unverified |
-| 14 | Windows can put a new tray icon in the overflow area (the arrow `^` next to the clock) | to verify: the Product Manager in the dry run (task 3) | unverified |
+| 11 | Ubisoft Connect (German): *Bibliothek*, the three dots on the game, *Verwalten*, *Eigenschaften*, field *Startargumente hinzufügen* taking `/pipe`, *Schließen* (the planned path *Properties*, *Game launch arguments* was refuted by the run); the English labels are translated, not seen | dry run (task 3), Product Manager, Windows 11 26H2, log rows 17:55 and 17:59 | confirmed |
+| 12 | Steam: *Library*, right-click the game, *Properties…*, *General*, *Launch Options* (German *Bibliothek*, *Eigenschaften…*, *Allgemein*, *Startoptionen*); whether that argument reaches the game through Ubisoft Connect is unknown | to verify: a run with a Steam copy, owner and step in the follow-up issue (the Product Manager owns no Steam copy); marked "Not yet tried" in both documents | unverified |
+| 13 | The Windows *Run* dialog (Windows key + R) starts `"<exe path>" --replay "<file path>" --speed max` with both quoted paths from Explorer's "Copy as path", after `Exit` of the tray Companion | dry run (task 3), Product Manager, log row 17:59; quoting details not reported separately and marked so | confirmed |
+| 14 | Windows can put a new tray icon in the overflow area (the arrow `^` next to the clock) | dry run (task 3), Product Manager, log row 17:58 | confirmed |
 
 ## Tests per criterion
 
@@ -157,4 +157,6 @@ documentation procedure without lasting architectural weight, settled in the spe
 
 ## Out of scope / follow-ups
 
-As in [spec.md](spec.md), *Out of scope*. No follow-up issue.
+As in [spec.md](spec.md), *Out of scope*. Follow-up issue (decided in PR approval): try the Steam path, the English
+Ubisoft Connect labels and the English *Unblock* label of the SmartScreen tip, and remove their "Not yet tried"
+notes. The release download and SmartScreen dialog stay with the first release (record 0013, *Consequences*).

@@ -1,6 +1,6 @@
 # Tasks: Enabling the pipe and recording sessions (README and user guide)
 
-Plan: [plan.md](plan.md) — Status: Draft
+Plan: [plan.md](plan.md) — Status: Approved
 
 All groups: no new API (documentation only; steps 4 and 5 not applicable).
 
