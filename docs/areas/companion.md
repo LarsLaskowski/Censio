@@ -4,7 +4,7 @@
 
 The Companion process on Windows: its tray icon, tooltip and menu, how it exits, how many instances run, the
 version it shows, its command line (recording the pipe and replaying a recording), starting and stopping a recording
-from the menu, the diagnostics window with the last tick, the folders it opens, its log file, and the release ZIP it ships in. The user who starts the Companion relies on it.
+from the menu, the optional start with Windows, the diagnostics window with the last tick, the folders it opens, its log file, and the release ZIP it ships in. The user who starts the Companion relies on it.
 
 ## Behavior
 
@@ -33,7 +33,7 @@ from the menu, the diagnostics window with the last tick, the folders it opens, 
   state, shows *waiting* after `Replay finished` and *problem* after `Replay error`.
 - The context menu holds, top to bottom: `Status: <status text>` (greyed out), `Last tick: <time>, <n> islands` or
   `Last tick: none` (greyed out), a separator, `Open diagnostics`, `Start recording` or `Stop recording`, `Open recordings folder`, `Open
-  log folder`, a separator, `Version <version>` (greyed out, nothing happens on click), a separator and `Exit`. The
+  log folder`, a separator, `Start with Windows` (checked while the autostart is on, enabled in every mode), a separator, `Version <version>` (greyed out, nothing happens on click), a separator and `Exit`. The
   values are current each time the menu opens. `Open diagnostics` is enabled in every mode (live, `--record`, replay and an invalid command line); `Start recording` is greyed out in a replay and with an invalid command
   line. The menu is light, also with Windows in dark mode.
 - `<version>` is the informational version the Companion was built with: `0.0.0` without a version, otherwise
@@ -149,6 +149,15 @@ sent it: GUIDs are raw numbers until names and icons exist.
 - **Privacy:** the window shows island names and economic data on screen only. Nothing of it is written to disk, logged
   or sent anywhere, and the window adds no log line. A screenshot holds the savegame's island names.
 
+### Start with Windows
+
+- Off by default: the Companion writes nothing about autostart until the entry is clicked (not at start, not when the menu opens). The entry is the string value `Censio Companion` under `HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run`, in the user's own hive; no other key or user is touched and no administrator rights are needed (tried on Windows 11, *Limits and errors*).
+- The menu entry `Start with Windows` is checked when the value is exactly the command the Companion writes: the full path of the running `Censio.Companion.exe` in double quotes, without arguments, compared ignoring case and unexpanded. The state is read from the registry each time the menu opens. Anything else counts as off: no value, another program's path, the same path unquoted, with arguments (for example `--record`), with spaces around it, or a value that is not a string. A click then writes the Companion's own quoted command, replacing what was there.
+- A click on an unchecked entry writes that command; a click on a checked entry deletes the value `Censio Companion`. The Companion starts with Windows the same way as when started by hand, without a command line argument, so it neither records nor replays.
+- The path of the exe is used only when it is a full path of at most 200 characters without `"` or `%`. For any other path (a folder with `%` in its name, a very long one) the click changes nothing and the change warning is logged; the entry stays unchecked.
+- Moving the exe, or starting a new version from another folder, leaves the old command behind; the entry then shows unchecked. To remove it, start any copy of the exe and click the entry (it replaces the stale command with this exe's), then click it again (it deletes the value), or delete the value under the key above in the Registry Editor; switching it off in Windows' startup apps list does not delete it.
+- Turning it on and off is logged (*Log*). The Companion does not read or change the switch of Windows' startup apps list (`Settings > Apps > Startup`): a value switched off there is still checked in the menu, and the player switches it on again in that list.
+
 ### Log
 
 - The Companion writes a log to `%LOCALAPPDATA%\Censio\Logs\companion-<yyyyMMdd>.log` (the local date). The folder
@@ -166,7 +175,7 @@ sent it: GUIDs are raw numbers until names and icons exist.
   connection state with the error kind, the Windows error code and the received version (only changes, never a line
   per skipped frame); recording started and stopped at the click, its file name (the name only) when the file is
   created, a recording failure and the failure of a stopped recording; a replay's start (the file name only), its
-  end and its problem reason; a folder that could not be opened; an unexpected error of a background task; and `Exit`.
+  end and its problem reason; a folder that could not be opened; the autostart turned on (`Autostart enabled`) or off (`Autostart disabled`) and, as warnings, `Could not read the autostart setting` (once until a read succeeds again, so a blocked registry does not log at every menu opening) and `Could not change the autostart setting`, with the exception where there is one and never the exe path; an unexpected error of a background task; and `Exit`.
 - The log holds no pipe content (headline, island names, values): recording files and folders are logged by name only.
 - Text that came from outside (a replay file name, exception texts) is sanitized: each control character, format
   character, line or paragraph separator and unpaired surrogate becomes one `?`, so a text cannot add a line or hide
@@ -215,6 +224,8 @@ sent it: GUIDs are raw numbers until names and icons exist.
 - The 1 second for writing the recording queues is given on `Exit`. That Windows sign-out or shutdown gives it too is
   not verified.
 - Stopped recordings are not capped in total (*Recording*).
+- A read failure (access denied, a policy, a value that is not a string): the entry is shown unchecked and stays clickable, and `Could not read the autostart setting` is logged once until a read succeeds again. If the value cannot be written or deleted, a click changes nothing, `Could not change the autostart setting` is logged and the player gets no message; the next opening shows the state read then. A policy that stops Windows from starting the user's startup programs while the value can still be written is not visible: the menu shows the state of the value only. A switch-off in Windows' startup apps list is not read: the entry stays checked while Windows does not start the Companion, and the player switches it on in that list; a click deletes the value, and a later click writes it again with Windows' switch-off still in place. An exe started from inside the ZIP runs from a temporary folder, so the entry registers that path and nothing starts at sign-in once Windows cleans the folder.
+- Tried on Windows 11 (the maintainer's manual run before the merge, issue #15): that Windows starts the Companion at sign-in after a restart with the entry on and not with it off, that no UAC prompt appears (under a standard account), folders with spaces, `&` or `,` in the path, that a second account is unaffected, and that turning the entry off removes the value. Not tried: whether SmartScreen asks at the first autostart, what name the startup apps list shows, and that a folder holding `%` stays unchecked.
 - Not verified yet (the maintainer's manual run on Windows, issue #13): that the line break shows as a second tooltip
   line, that the menu stays light with Windows in dark mode, that the three icon looks show, and that Explorer opens a
   folder whose path holds a comma (Explorer splits its command line at commas).
@@ -225,6 +236,7 @@ sent it: GUIDs are raw numbers until names and icons exist.
 - [`decisions/0004-companion-shell-and-linux-build.md`](../decisions/0004-companion-shell-and-linux-build.md) — logic in a platform-neutral project, the Windows shell builds on Linux.
 - [`decisions/0005-product-version-from-one-build-property.md`](../decisions/0005-product-version-from-one-build-property.md) — the version comes from the build property `Version`.
 - [`decisions/0012-release-pre-release-first-and-secret-free-builds.md`](../decisions/0012-release-pre-release-first-and-secret-free-builds.md) — the release ZIP is built on Linux without secrets and checked before it is attached.
+- [`decisions/0017-companion-tray-app-autostart-and-connect.md`](../decisions/0017-companion-tray-app-autostart-and-connect.md) — the autostart is a per-user Run value written on the player's click.
 - [`decisions/0027-companion-zip-self-contained-single-file-unsigned.md`](../decisions/0027-companion-zip-self-contained-single-file-unsigned.md) — self-contained single-file exe in a ZIP, not signed.
 - [`decisions/0036-pipe-recording-raw-frames-and-replay-on-a-recorded-clock.md`](../decisions/0036-pipe-recording-raw-frames-and-replay-on-a-recorded-clock.md) — recordings hold the raw frames, written off the read path; a replay feeds them back on a recorded clock.
 - [`decisions/0037-companion-log-through-the-logging-abstraction-to-own-rotating-file.md`](../decisions/0037-companion-log-through-the-logging-abstraction-to-own-rotating-file.md) — the Companion logs through .NET's logging abstraction into its own rotating text file.
@@ -233,4 +245,4 @@ sent it: GUIDs are raw numbers until names and icons exist.
 ## Not here
 
 - Opening and reading the statistics pipe, the connection states and the retry rules, the recording file format and the replay rules: see [`pipe.md`](pipe.md).
-- Reading the game files, the connection to the server, settings and autostart (later issues).
+- Reading the game files, the connection to the server, settings (later issues).

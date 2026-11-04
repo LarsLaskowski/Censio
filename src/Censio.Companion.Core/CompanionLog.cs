@@ -114,5 +114,35 @@ public static partial class CompanionLog
     [LoggerMessage(Level = LogLevel.Information, Message = "Exit")]
     public static partial void Exiting(ILogger logger);
 
+    /// <summary>
+    /// Logs that the autostart was turned on.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    [LoggerMessage(Level = LogLevel.Information, Message = "Autostart enabled")]
+    public static partial void AutostartEnabled(ILogger logger);
+
+    /// <summary>
+    /// Logs that the autostart was turned off.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    [LoggerMessage(Level = LogLevel.Information, Message = "Autostart disabled")]
+    public static partial void AutostartDisabled(ILogger logger);
+
+    /// <summary>
+    /// Logs that the autostart setting could not be read.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    /// <param name="exception">The exception, or <see langword="null" /> if there is none</param>
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Could not read the autostart setting")]
+    public static partial void AutostartReadFailed(ILogger logger, Exception? exception);
+
+    /// <summary>
+    /// Logs that the autostart setting could not be changed.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    /// <param name="exception">The exception, or <see langword="null" /> if there is none</param>
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Could not change the autostart setting")]
+    public static partial void AutostartChangeFailed(ILogger logger, Exception? exception);
+
     #endregion // Methods
 }

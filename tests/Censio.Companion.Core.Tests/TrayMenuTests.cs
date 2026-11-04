@@ -49,8 +49,9 @@ public sealed class TrayMenuTests
     }
 
     /// <summary>
-    /// The menu lists status, last tick, separator, open diagnostics, toggle, both folder entries, separator, version,
-    /// separator and exit, in this order, with the status and last-tick entries greyed out.
+    /// The menu lists status, last tick, separator, open diagnostics, toggle, both folder entries, separator, start with
+    /// Windows, separator, version, separator and exit, in this order, with the status and last-tick entries greyed out and
+    /// no entry checked while the autostart is off.
     /// </summary>
     [TestMethod]
     public void TrayMenuCreateListsEntriesInOrder()
@@ -67,6 +68,8 @@ public sealed class TrayMenuTests
                                 TrayMenuEntryKind.OpenRecordingsFolder,
                                 TrayMenuEntryKind.OpenLogFolder,
                                 TrayMenuEntryKind.Separator,
+                                TrayMenuEntryKind.ToggleAutostart,
+                                TrayMenuEntryKind.Separator,
                                 TrayMenuEntryKind.Version,
                                 TrayMenuEntryKind.Separator,
                                 TrayMenuEntryKind.Exit
@@ -81,19 +84,89 @@ public sealed class TrayMenuTests
                                 "Open recordings folder",
                                 "Open log folder",
                                 string.Empty,
+                                "Start with Windows",
+                                string.Empty,
                                 "Version 1.2.3",
                                 string.Empty,
                                 "Exit"
                             };
-        var expectedEnabled = new[] { false, false, false, true, true, true, true, false, false, false, true };
+        var expectedEnabled = new[] { false, false, false, true, true, true, true, false, true, false, false, false, true };
+        var expectedChecked = new bool[13];
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, CreateClock(1));
+        var entries = TrayMenu.Create("1.2.3", snapshot, false, CreateClock(1));
 
         // Assert
         Assert.AreSequenceEqual(expectedKinds, entries.Select(entry => entry.Kind).ToArray(), "The entries should be in the order of the menu");
         Assert.AreSequenceEqual(expectedTexts, entries.Select(entry => entry.Text).ToArray(), "The entries should carry the status, the last tick, open diagnostics, the toggle, the folders, the version and Exit");
         Assert.AreSequenceEqual(expectedEnabled, entries.Select(entry => entry.IsEnabled).ToArray(), "Status, last tick, version and separators should be greyed out, the rest enabled");
+        Assert.AreSequenceEqual(expectedChecked, entries.Select(entry => entry.IsChecked).ToArray(), "No entry should be checked while the autostart is off");
+    }
+
+    /// <summary>
+    /// The start-with-Windows entry reads Start with Windows and is enabled live, while recording, in a replay and with an
+    /// invalid command line.
+    /// </summary>
+    /// <param name="mode">The mode of the Companion: live, recording, replay or invalid</param>
+    [TestMethod]
+    [DataRow("live")]
+    [DataRow("recording")]
+    [DataRow("replay")]
+    [DataRow("invalid")]
+    public void TrayMenuCreateAutostartEnabledInEveryMode(string mode)
+    {
+        // Arrange
+        var snapshot = CreateSnapshotForMode(mode);
+
+        // Act
+        var entries = TrayMenu.Create("1.2.3", snapshot, false, CreateClock(1));
+
+        // Assert
+        var autostart = entries.SingleOrDefault(entry => entry.Kind == TrayMenuEntryKind.ToggleAutostart);
+
+        Assert.IsNotNull(autostart, "The menu should hold the start-with-Windows entry in every mode");
+        Assert.AreEqual("Start with Windows", autostart.Text, "The entry should read Start with Windows");
+        Assert.AreEqual("Start with Windows", TrayMenu.StartWithWindowsText, "The constant should read Start with Windows");
+        Assert.IsTrue(autostart.IsEnabled, "The entry should be enabled in every mode");
+    }
+
+    /// <summary>
+    /// The start-with-Windows entry carries a check mark when the autostart is on, and no other entry does.
+    /// </summary>
+    [TestMethod]
+    public void TrayMenuCreateAutostartCheckedWhenEnabled()
+    {
+        // Arrange
+        var snapshot = CreateSnapshot("Receiving", canRecord: true, isRecording: false);
+
+        // Act
+        var entries = TrayMenu.Create("1.2.3", snapshot, true, CreateClock(1));
+
+        // Assert
+        var checkedKinds = entries.Where(entry => entry.IsChecked).Select(entry => entry.Kind).ToArray();
+
+        Assert.AreSequenceEqual(new[] { TrayMenuEntryKind.ToggleAutostart }, checkedKinds, "Only the start-with-Windows entry should be checked when the autostart is on");
+        Assert.IsTrue(entries.Single(entry => entry.Kind == TrayMenuEntryKind.ToggleAutostart).IsEnabled, "The checked entry should stay enabled");
+    }
+
+    /// <summary>
+    /// The start-with-Windows entry carries no check mark when the autostart is off.
+    /// </summary>
+    [TestMethod]
+    public void TrayMenuCreateAutostartUncheckedWhenDisabled()
+    {
+        // Arrange
+        var snapshot = CreateSnapshot("Receiving", canRecord: true, isRecording: false);
+
+        // Act
+        var entries = TrayMenu.Create("1.2.3", snapshot, false, CreateClock(1));
+
+        // Assert
+        var autostart = entries.SingleOrDefault(entry => entry.Kind == TrayMenuEntryKind.ToggleAutostart);
+
+        Assert.IsNotNull(autostart, "The menu should hold the start-with-Windows entry");
+        Assert.IsFalse(autostart.IsChecked, "The entry should not be checked when the autostart is off");
+        Assert.IsTrue(autostart.IsEnabled, "The unchecked entry should stay enabled");
     }
 
     /// <summary>
@@ -112,7 +185,7 @@ public sealed class TrayMenuTests
         var snapshot = CreateSnapshotForMode(mode);
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, CreateClock(1));
+        var entries = TrayMenu.Create("1.2.3", snapshot, false, CreateClock(1));
 
         // Assert
         var kinds = entries.Select(entry => entry.Kind).ToList();
@@ -133,7 +206,7 @@ public sealed class TrayMenuTests
         var snapshot = CreateSnapshot("Receiving (recording)", canRecord: true, isRecording: true);
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, CreateClock(1));
+        var entries = TrayMenu.Create("1.2.3", snapshot, false, CreateClock(1));
 
         // Assert
         var toggle = entries.Single(entry => entry.Kind == TrayMenuEntryKind.ToggleRecording);
@@ -152,7 +225,7 @@ public sealed class TrayMenuTests
         var snapshot = CreateSnapshot("Replay: Receiving", canRecord: false, isRecording: false);
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, CreateClock(1));
+        var entries = TrayMenu.Create("1.2.3", snapshot, false, CreateClock(1));
 
         // Assert
         var toggle = entries.Single(entry => entry.Kind == TrayMenuEntryKind.ToggleRecording);
@@ -175,7 +248,7 @@ public sealed class TrayMenuTests
         var snapshot = TraySnapshot.ForInvalidCommandLine();
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, CreateClock(1));
+        var entries = TrayMenu.Create("1.2.3", snapshot, false, CreateClock(1));
 
         // Assert
         var toggle = entries.Single(entry => entry.Kind == TrayMenuEntryKind.ToggleRecording);
@@ -204,7 +277,7 @@ public sealed class TrayMenuTests
         var snapshot = CreateSnapshot(statusText, canRecord: true, isRecording: false);
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, CreateClock(1));
+        var entries = TrayMenu.Create("1.2.3", snapshot, false, CreateClock(1));
 
         // Assert
         var status = entries.Single(entry => entry.Kind == TrayMenuEntryKind.Status);
@@ -223,7 +296,7 @@ public sealed class TrayMenuTests
         const string version = "1.2.3";
 
         // Act
-        var entries = TrayMenu.Create(version, CreateSnapshot("Receiving", canRecord: true, isRecording: false), CreateClock(1));
+        var entries = TrayMenu.Create(version, CreateSnapshot("Receiving", canRecord: true, isRecording: false), false, CreateClock(1));
 
         // Assert
         Assert.IsFalse(entries.Single(entry => entry.Kind == TrayMenuEntryKind.Version).IsEnabled, "The version entry should be greyed out");
@@ -239,7 +312,7 @@ public sealed class TrayMenuTests
         const string version = "1.2.3";
 
         // Act
-        var entries = TrayMenu.Create(version, CreateSnapshot("Receiving", canRecord: true, isRecording: false), CreateClock(1));
+        var entries = TrayMenu.Create(version, CreateSnapshot("Receiving", canRecord: true, isRecording: false), false, CreateClock(1));
 
         // Assert
         Assert.IsTrue(entries.Single(entry => entry.Kind == TrayMenuEntryKind.Exit).IsEnabled, "The exit entry should be enabled");
@@ -255,7 +328,7 @@ public sealed class TrayMenuTests
         var version = ProductVersion.Read(typeof(TrayMenu).Assembly);
 
         // Act
-        var entries = TrayMenu.Create(version, CreateSnapshot("Receiving", canRecord: true, isRecording: false), CreateClock(1));
+        var entries = TrayMenu.Create(version, CreateSnapshot("Receiving", canRecord: true, isRecording: false), false, CreateClock(1));
 
         // Assert
         Assert.AreEqual("Version " + version, entries.Single(entry => entry.Kind == TrayMenuEntryKind.Version).Text, "The version entry should read Version followed by the product version");
