@@ -8,3 +8,4 @@ are quoted in full.
 | 2026-11-04 11:56 | 1 Intake | Orchestrator | Issue 16 read (documentation label, user calls it a feature); branch claude/charming-galileo-5qc8r0 at a94a33d; work folder created |
 | 2026-11-04 12:01 | 2a Spec | Lead | ESCALATE: launch-argument path in Ubisoft Connect/Steam unknown; spec.md drafted (opus/medium · usage pending) |
 | 2026-11-04 16:37 | 2a Spec | Product Manager | Answer: option (b) both launchers described, Ubisoft Connect default path, PM dry-runs the launcher owned, other 'Not yet tried'; PM's Ubisoft Connect and Steam are set to German |
+| 2026-11-04 16:38 | 2a Spec (revise) | Lead | DONE: spec updated with PM answer, plan-check --spec passes (opus/medium · usage pending) |

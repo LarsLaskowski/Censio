@@ -27,10 +27,11 @@ README *Status* still says "milestone M0 (Foundation)" although issues #9 to #15
   `Censio Companion: Receiving`, then `Censio Companion: Receiving (recording)` with the line
   `Last tick: <time>, <n> islands` once a tick has closed, and finally a file `recording-<yyyyMMdd-HHmmss>Z.jsonl` in
   `%LOCALAPPDATA%\Censio\Recordings`.
-- S2: Given the game is installed through Ubisoft Connect, when the tester looks up how to add `/pipe`, then the guide
-  gives the path through Ubisoft Connect's own labels to the field for launch arguments and what to type into it.
-- S3: Given the game is bought on Steam, when the tester looks up how to add `/pipe`, then the guide says where a Steam
-  copy takes it (Steam's launch options or Ubisoft Connect, which a Steam copy also starts) with the launcher's labels.
+- S2: Given any copy of the game (a Steam copy starts Ubisoft Connect too), when the tester reaches the walkthrough's
+  `/pipe` step, then it gives the usual menu path through Ubisoft Connect's labels to the field for launch arguments and
+  what to type into it.
+- S3: Given the game is bought on Steam, when the tester looks up how to add `/pipe`, then the guide also gives the usual
+  menu path to Steam's launch options with Steam's labels, as an alternative to the Ubisoft Connect path.
 - S4: Given the tray tooltip shows a state, when the tester looks it up in the guide, then the table gives its meaning
   and what to do next (for example `Waiting for game` while the game runs: check `/pipe` and restart the game).
 - S5: Given a finished session, when the tester wants to check the recording, then the guide shows how to replay it
@@ -46,8 +47,7 @@ README *Status* still says "milestone M0 (Foundation)" although issues #9 to #15
 
 ## Errors and edge cases
 
-- E1: The game runs without `/pipe` (the argument was not saved, typed into the wrong field, or into the other
-  launcher's field for a Steam copy): the tooltip stays at `Censio Companion: Waiting for game`; the guide's table
+- E1: The game runs without `/pipe` (the argument was not saved or was typed into the wrong field): the tooltip stays at `Censio Companion: Waiting for game`; the guide's table
   names this as the first thing to check.
 - E2: `/pipe` is added while the game runs: nothing changes until the game is quit and started again; the guide says
   the argument takes effect at the next game start.
@@ -90,7 +90,8 @@ README *Status* still says "milestone M0 (Foundation)" although issues #9 to #15
   E4, E10).
 - [ ] AC2: The guide gives the steps to add `/pipe` in Ubisoft Connect and for a Steam copy, with the launcher's labels,
   the exact text to type, and that the argument takes effect at the next game start; each step not shown by a run is
-  marked "Not yet tried" (S2, S3, E1, E2).
+  marked "Not yet tried" (S2, S3, E1, E2). The walkthrough's `/pipe` step uses the Ubisoft Connect path for every copy;
+  the Steam path is a separate alternative for a Steam copy.
 - [ ] AC3: The guide's table of tray states gives for every state (`Waiting for game`, `Connected`, `Receiving`, `Pipe
   busy`, `Protocol mismatch`, `Error`, and the suffixes `(recording)` and `(recording failed)`) its meaning and what to
   do next (S4, E1, E5, E7, E9).
@@ -103,7 +104,9 @@ README *Status* still says "milestone M0 (Foundation)" although issues #9 to #15
   the change (S7).
 - [ ] AC7: The Product Manager (or a stated stand-in) follows the guide on Windows with the real game from the download
   (or the build the plan names, E10) to a recording file whose replay with `--replay <file> --speed max` ends at
-  `Replay finished`; every statement that run did not show is marked "Not yet tried" (S1, S5).
+  `Replay finished`, adding `/pipe` through the launcher they own with it set to German; the launcher path and its
+  German labels that run used are confirmed, while the other launcher's path, the English labels (unless the run
+  confirmed them) and every other statement that run did not show stay marked "Not yet tried" (S1, S2, S3, S5, S7).
 
 ## Out of scope
 
@@ -129,8 +132,11 @@ README *Status* still says "milestone M0 (Foundation)" although issues #9 to #15
   origin` is empty); the plan names the build (the README's source build or the pre-release of record 0012) as
   *Criteria verified only in CI* requires.
 - Where does each launcher take `/pipe` (Ubisoft Connect's labels; for a Steam copy, Steam's launch options or Ubisoft
-  Connect), with the German labels, and which launchers can the Product Manager run in the dry run? Answered: not
-  yet — only someone with the game can see the launchers; escalated to the Product Manager.
+  Connect), with the German labels, and which launchers can the Product Manager run in the dry run? Answered: by the
+  Product Manager (escalation, option b): the guide gives both launchers' usual menu paths, Ubisoft Connect as the path
+  the walkthrough shows for every copy, since a Steam copy starts Ubisoft Connect too. The Product Manager dry-runs the
+  launcher they own, whose German labels (their Ubisoft Connect and Steam are set to German) are confirmed in the same
+  run; the other launcher and the English labels stay "Not yet tried" until someone runs them (AC2, AC7).
 
 ## Area documents
 
