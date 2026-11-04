@@ -12,3 +12,4 @@ are quoted in full.
 | 2026-11-04 16:39 | 2a Spec challenge | Devil's Advocate | OBJECTIONS 1 major (--replay needs tray Exit and a named console), 6 minor (opus/medium · usage pending) |
 | 2026-11-04 16:48 | 4-5 Skeleton, tests first | Orchestrator | skipped: documentation only, no production or test code |
 | 2026-11-04 16:48 | 6 Implement G1 | Dev | DONE: USER_GUIDE walkthrough, launcher steps, tray table, README short path, EN+DE; labels marked Not yet tried (sonnet/medium · usage pending) |
+| 2026-11-04 17:55 | 6 G2 dry run | Product Manager | Windows 11 26H2, Ubisoft Connect (German): Bibliothek > drei Punkte > Verwalten > Eigenschaften > Startargumente hinzufügen: /pipe eintragen > Schließen. No other step reported yet |
