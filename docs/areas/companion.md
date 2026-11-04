@@ -217,7 +217,8 @@ sent it: GUIDs are raw numbers until names and icons exist.
 - Stopped recordings are not capped in total (*Recording*).
 - Not verified yet (the maintainer's manual run on Windows, issue #13): that the line break shows as a second tooltip
   line, that the menu stays light with Windows in dark mode, that the three icon looks show, and that Explorer opens a
-  folder whose path holds a comma (Explorer splits its command line at commas). Not verified yet for the diagnostics window (the maintainer's manual run on Windows, issue #14): that `Exit` with the window open ends the Companion within 2 seconds with exit code 0; that the close button and Alt+F4 close only the window and leave the icon; that `Open diagnostics` brings an open window to the front, restored when minimized; that the window renders as described; that Ctrl+C in the table copies nothing; and, with a tick at the limits (256 islands, 524,288 entries), that the table scrolls, the tray menu opens and `Exit` keeps its bound while the tick is shown or replaced, a new tick keeps the scroll position, and the process memory falls back after the window closes.
+  folder whose path holds a comma (Explorer splits its command line at commas).
+- Verified for the diagnostics window (the maintainer's manual run on Windows, issue #14): that `Exit` with the window open ends the Companion within 2 seconds with exit code 0; that the close button and Alt+F4 close only the window and leave the icon; that `Open diagnostics` brings an open window to the front, restored when minimized; that the window renders as described; that Ctrl+C in the table copies nothing; and, with a tick at the limits (256 islands, 524,288 entries), that the table scrolls, the tray menu opens and `Exit` keeps its bound while the tick is shown or replaced, a new tick keeps the scroll position, and the process memory falls back after the window closes.
 
 ## Related decisions
 
