@@ -18,3 +18,4 @@ are quoted in full.
 | 2026-11-04 17:58 | 8 Review round 1 | Reviewer | BLOCKING 1 (AC7 unmet / run record without build; resolved by PM follow-up report, build still to name), NON-BLOCKING 1 (README Status link wording) (opus/medium · usage pending) |
 | 2026-11-04 17:59 | 6 G2 dry run (build) | Product Manager | Build: branch head fetched and built with the documented dotnet publish command (README, Build the Companion from source); replay via Exit and the Run dialog confirmed |
 | 2026-11-04 18:00 | 6 Fix round 1 | Dev | DONE: PM results applied (recording, replay via Exit+Run dialog, overflow, tooltips tried), SmartScreen tip, README link fix, companion.md tooltip verified, build named as source publish (sonnet/medium · usage pending) |
+| 2026-11-04 18:02 | 8 Verbatim fixes | Orchestrator | Applied reviewer's verbatim replacements (USER_GUIDE 167/226/416/475, companion.md 229, SmartScreen tip EN/DE in README and guide) |
