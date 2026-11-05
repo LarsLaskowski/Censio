@@ -244,7 +244,7 @@ One-time setup by the administrator, in this order (GitHub, *Settings*):
 The workflow cannot read the environment's settings, so no step can check that the rule exists; a missing Docker
 Hub secret fails the credentials check and the release stays a pre-release, and a missing `WEBSITE_DISPATCH_TOKEN`
 fails the job `dispatch` of `notify-website.yml` at its step `Check the website token`, with a message naming the
-secret. At `v0.1.0`, check that this step passes (it also shows that the secret is set). The protection holds only
+secret. At `v0.1.0` this step passed (it also shows that the secret is set). The protection holds only
 after steps 1 to 3 and 5.
 
 Who can do what:
@@ -264,8 +264,13 @@ Who can do what:
   writer can push a changed workflow to `main` without a pull request, and the administrator's next release runs it
   with the secrets ([issue #77](https://github.com/LarsLaskowski/Censio/issues/77)).
 
-Not yet tried (a settings dry run, D1 to D4 of the plan of issue #74, and the first release `v0.1.0` have not run;
-these statements stay unverified until they have):
+The first release `v0.1.0` ran on 2026-11-05 with all jobs green: the jobs `image-publish`, `promote` and `dispatch`
+reached the environment secrets (their credential checks passed), the ZIP was attached, the image was pushed as
+`networlddev/censio:0.1.0`, `latest` was moved and the release became the latest full release. A `release` event
+therefore runs on `refs/tags/<tag>` and passes the environment's rule, and the jobs need no `deployments` permission.
+
+Not yet tried (a settings dry run, D1 to D4 of the plan of issue #74, has not run; these statements stay
+unverified until it has):
 
 - D1: that the bypass actors of `tag-Protection` (administrator only) and `main-Protection` (administrator,
   maintain and write roles) are as stated above.
@@ -275,8 +280,8 @@ these statements stay unverified until they have):
 - D4: that an unknown environment is created without a rule, that `*` of the tag rule and of the ruleset's
   `refs/tags/v*` match the same tags, and the labels of the settings pages named above (including *Allow
   administrators to bypass configured protection rules*).
-- That a `release` event runs on `refs/tags/<tag>` and passes the rule, and that the jobs need no `deployments`
-  permission (the first release), and that a release published or re-run by a writer on an existing `v*` tag passes it as well.
+- That a release published or re-run by a writer on an existing `v*` tag passes the rule as well (the first release
+  was published by an administrator).
 
 Limits and rules:
 
@@ -287,7 +292,7 @@ Limits and rules:
   artifacts are kept. Later, or when the failure needs a rebuild, use *Re-run all jobs*: it rebuilds, replaces the ZIP
   asset and overwrites the image tag `<version>`. Releasing a lower version is not supported while a higher
   `v*` tag exists: its run is refused. A failed release cannot be completed after a higher tag was created.
-- The run uses the commit's `Release` workflow, so it can run for real only after it is merged; the first release is
+- The run uses the commit's `Release` workflow, so it can run for real only after it is merged; the first release was
   `v0.1.0`.
 
 Every assembly of the solution gets its version from the build property `Version` (`-p:Version=<v>`, default

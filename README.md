@@ -6,7 +6,7 @@ Deutsche Version: [Censio (Deutsch)](#censio-deutsch)
 
 ## Status
 
-Censio is in milestone M1. No release exists yet; the coming release `v0.1.0` completes the milestone. The state of `main` carries the version `0.0.0`.
+Censio is in milestone M1. The release `v0.1.0` completes the milestone; it is on the [release page](https://github.com/LarsLaskowski/Censio/releases/tag/v0.1.0) with the Companion ZIP, and the server image is `networlddev/censio:0.1.0`. The state of `main` carries the version `0.0.0`.
 
 What `v0.1.0` can do:
 
@@ -162,7 +162,7 @@ English version: [Censio](#censio)
 
 ## Status
 
-Censio befindet sich im Meilenstein M1. Es gibt noch kein Release; das kommende Release `v0.1.0` schließt den Meilenstein ab. Der Stand von `main` trägt die Version `0.0.0`.
+Censio befindet sich im Meilenstein M1. Das Release `v0.1.0` schließt den Meilenstein ab; es steht mit dem Companion-ZIP auf der [Release-Seite](https://github.com/LarsLaskowski/Censio/releases/tag/v0.1.0), und das Server-Image ist `networlddev/censio:0.1.0`. Der Stand von `main` trägt die Version `0.0.0`.
 
 Das kann `v0.1.0`:
 
