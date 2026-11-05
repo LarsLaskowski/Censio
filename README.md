@@ -6,18 +6,20 @@ Deutsche Version: [Censio (Deutsch)](#censio-deutsch)
 
 ## Status
 
-Censio is in milestone M0 (Foundation). No release exists yet; the first one is planned as `v0.1.0` (milestone M1). The state of `main` carries the version `0.0.0`.
+Censio is in milestone M1. No release exists yet; the coming release `v0.1.0` completes the milestone. The state of `main` carries the version `0.0.0`.
 
-Works today:
+What `v0.1.0` can do:
 
+- The Companion runs on Windows as a tray icon. Its tooltip and icon show the state of the connection to the game's statistics pipe (the game needs the launch argument `/pipe`), and its menu shows the status and the last tick. It records what the game sends to a local file, from the menu or with the switch `--record` (*First recording*), and plays such a file back with `--replay <file>` ([user guide](docs/USER_GUIDE.md#first-recording-step-by-step)). `Open diagnostics` opens a window with the last tick, with regions, islands and goods as raw numbers (GUIDs). It writes a log file to `%LOCALAPPDATA%\Censio\Logs`, and `Start with Windows` (off by default) starts it at sign-in.
 - The server runs as a Docker image. Its start page shows `Version <version>`, and `GET /health` answers `Healthy`.
-- The Companion starts on Windows as a tray icon. Its menu shows the status, the last tick, `Open diagnostics` (a window with the last tick), `Start recording`/`Stop recording`, two folder entries, `Start with Windows` (off by default), `Version <version>` and `Exit`, and its tooltip and icon show the state of the connection to the game's statistics pipe (the game needs the launch argument `/pipe`). It records what the game sends to a local file from the menu or with the switch `--record`, writes a log file to `%LOCALAPPDATA%\Censio\Logs`, and with `--replay <file>` it plays such a file back (*Recording and replay*).
 
-Not yet:
+What `v0.1.0` cannot do:
 
-- Game data is read from the pipe but not yet shown or stored.
+- No names or icons: game data appears only as raw numbers in the diagnostics window.
 - Nothing is sent from the Companion to the server.
-- There is no history.
+- The web application shows no game data and there is no history.
+- The Companion has no settings, such as a server address or a token.
+- There is no tool to anonymise a recording; a recording stays private.
 
 ## Getting Censio
 
@@ -102,7 +104,7 @@ The Companion is the Windows program that reads the statistics of the running ga
 1. Extract the ZIP to a folder of your choice. It holds one file, `Censio.Companion.exe`.
 2. Start `Censio.Companion.exe`. A tray icon appears; its menu shows the status, the last tick, `Open diagnostics`, `Start recording`, `Open recordings folder`, `Open log folder`, `Start with Windows`, `Version <version>` and `Exit`.
 
-The program is not signed, so Windows SmartScreen may show "Windows protected your PC" the first time. Choose "More info", then "Run anyway" (on a German Windows: "Weitere Informationen", then "Trotzdem ausführen").
+The program is not signed, so Windows SmartScreen may show "Windows protected your PC" the first time. Choose "More info", then "Run anyway" (on a German Windows: "Weitere Informationen", then "Trotzdem ausführen"). Tip reported by the Product Manager from a German Windows, not tried against a real release download: open the properties of the extracted `Censio.Companion.exe` (or of the ZIP itself), tick *Zulassen* (on an English Windows probably *Unblock*; not yet tried) and apply; SmartScreen then does not ask.
 
 #### Start with Windows
 
@@ -115,34 +117,15 @@ The Companion does not start with Windows unless you turn it on: choose `Start w
 - If you switch the Companion off in the Windows startup apps list (Settings, Apps, Startup), the menu does not show it and still shows the check mark; switch it on again in that list. A policy of your organization that blocks startup programs is not visible to the Companion either.
 - The maintainer tried this on Windows 11: the Companion started with Windows after a restart with the entry on and did not start with it off; no administrator prompt appeared (under a standard account); folders with spaces, `&` or `,` in the path worked; a second Windows account was unaffected; and turning the entry off removed it. Not tried: whether SmartScreen asks at the first automatic start, which name the startup apps list shows, and a folder path with `%`.
 
-#### Connecting to the game
+#### First recording
 
-The game creates its statistics pipe only when it is started with the launch argument `/pipe` (add `/pipe` to the launch options of your game launcher). Without it the Companion cannot connect, and it looks the same as a game that is not running. Start the Companion before or after the game; it needs no restart when the game is quit and started again. It only reads from the pipe and never writes to it.
+1. Add `/pipe` to the launch arguments of the game in Ubisoft Connect (*Library*, the three dots on Anno 117, *Manage*, *Properties*, field *Add launch arguments*, then *Close*); a Steam copy has an alternative in the user guide. The argument takes effect at the next game start.
+2. Start the game and load a save. The tray tooltip changes from `Waiting for game` to `Receiving`.
+3. Right-click the tray icon and choose `Start recording`.
+4. Play, then choose `Stop recording`.
+5. The file `recording-<yyyyMMdd-HHmmss>Z.jsonl` is in `%LOCALAPPDATA%\Censio\Recordings` (`Open recordings folder`). It is private: do not post or attach it.
 
-Hover over the tray icon: the tooltip reads `Censio Companion: <state>`. As soon as the game has sent a complete tick, a second line shows `Last tick: <time>, <n> islands` (the time when it arrived, as `HH:mm:ss` of today, otherwise with the date). The icon shows the state too: a grey ring while waiting (`Waiting for game`, `Connected`, `Pipe busy`), a green circle while `Receiving`, a red triangle for `Protocol mismatch`, `Error` and an invalid command line. Right-click the icon for the menu, which shows the same status and last tick.
-
-The menu entry `Open diagnostics` opens a window with the last tick: a header with `Status:`, `Last tick:` and `Game time:`, and a table with one row per good of each island (region, island, area, session ID, name, good, generation, consumption, delta, perfect generation, perfect consumption, buildings, maintenance, income, profit and the two productivity values). Names and icons do not exist yet, so regions, islands and goods are shown as the raw numbers (GUIDs) the game sent; numbers use the decimal point on every Windows. The window follows each new tick, also in a replay, and keeps the last tick when the connection ends. Closing it (close button or Alt+F4) leaves the Companion running; `Open diagnostics` opens it again with the last tick, and while it is open it brings the same window to the front. While it is open it has a taskbar button.
-
-| Tooltip | Meaning |
-| ------- | ------- |
-| `Waiting for game` | The pipe does not exist: the game is not running or was not started with `/pipe`. The Companion keeps looking (pauses grow from 1 to 10 seconds) |
-| `Connected` | The pipe is open; the game has not yet sent its first message. The game sends it at once, so you will hardly ever see this state |
-| `Receiving` | The game is sending data |
-| `Pipe busy` | The pipe exists but another program holds it (for example another pipe tool); the game serves one client at a time, so close other pipe readers. The Companion keeps retrying (pauses grow from 1 to 10 seconds) and shows `Receiving` at the next attempt after the pipe is free. It can also stay at `Pipe busy` after you restart the Companion while the game is in the main menu, until you load a game |
-| `Protocol mismatch` | The pipe speaks another protocol version than 2 (for example after a game update); the Companion stays connected and continues when version 2 arrives |
-| `Error` | Connecting failed or the connection broke off. When you quit the game, `Error` can show briefly before `Waiting for game`; that is normal |
-
-When the game quits, the Companion returns to `Waiting for game` and connects again by itself when the game is back; loading another save and a return to the main menu keep the connection. `Exit` in the tray menu works in every state and ends the program within 2 seconds.
-
-### Recording and replay
-
-For testing and bug reports the Companion can keep what the game sends and play it back later. Both can be started with a switch on the command line (for example `Censio.Companion.exe --record` in a terminal or in a shortcut's target); a recording can also be started and stopped from the tray menu (`Start recording`, `Stop recording`), a replay only with its switch. Close a running Companion first: a second start ends at once.
-
-- **Record:** `Censio.Companion.exe --record` starts with the recording on; without the switch choose `Start recording` in the tray menu at any time, also while the game is already sending. The Companion connects to the game as usual and writes every connection to its own file in `%LOCALAPPDATA%\Censio\Recordings` (the menu entry `Open recordings folder` opens it). A file `recording-<yyyyMMdd-HHmmss>Z.jsonl` (UTC time of the first data) is created when the game's first data arrives after the start; when the game is quit and started again, the next connection writes a new file, and every new start writes a new file. While recording, the tooltip ends with `(recording)` and the menu entry reads `Stop recording`; `Stop recording` writes what is still waiting and closes the file. If writing fails (for example the disk is full or too slow), recording stops, the tooltip ends with `(recording failed)` and the Companion keeps working; `Start recording` tries again with a new file. `Exit` in the tray menu writes what is still waiting, for at most 1 second, and ends the program. If the Companion is killed or the computer loses power, the last lines of a file can be missing; whether Windows sign-out or shutdown writes them is not tried.
-- **Replay:** `Censio.Companion.exe --replay <file> [--speed <factor>|max]` reads a recording from a local file instead of the game's pipe and plays it back as the game sent it. `--speed` is `max` (no pauses) or a number from `0.1` to `1000`, written with a decimal point also on a German Windows (`--speed 10` pauses a tenth as long); without it the replay runs at real speed. The Companion does not open the pipe while it replays, and the file is only read. The tooltip, the last tick, the icon and the window `Open diagnostics` show the progress, and the window shows the replayed ticks and keeps the last tick of the file (`Start recording` is greyed out during a replay): `Replay: Connected`, then `Replay: Receiving` (or `Replay: Protocol mismatch`), and after the last frame `Replay finished` until `Exit`. A problem with the file shows as `Replay error: <reason>` with `file not found`, `not a recording`, `unsupported version`, `invalid line <n>` or `read failed`.
-- **Invalid command line:** an unknown argument, `--speed` without `--replay`, a speed outside the range, `--replay` without a file, or `--record` together with `--replay` show `Censio Companion: Invalid command line`; the Companion then neither records nor replays, and `Exit` works.
-
-**A recording is private.** It holds the savegame headline, island names and economic data exactly as the game sent them. It stays in the folder on your computer, the Companion never sends it anywhere and never deletes it. Do not attach or post a raw recording publicly (not in an issue either); only anonymised fixtures are meant to be shared. Delete the files yourself when you no longer need them.
+Tried by the Product Manager on Windows 11 (26H2) with Ubisoft Connect in German: the launcher step 1 up to entering `/pipe` and *Schließen* (*Bibliothek*, the three dots, *Verwalten*, *Eigenschaften*, *Startargumente hinzufügen*). Also tried with the real game: recording and its file, the tooltips and tray states, and the replay. The Product Manager also confirmed the English path up to the field in Ubisoft Connect (*Library*, the three dots, *Manage*, *Properties*, *Add launch arguments*). Not yet tried: the English label for closing the dialog, a Steam copy and the download from a release (no release exists). The full walkthrough, the launcher steps, the tray states with what to do, and how to replay a recording are in the [user guide](docs/USER_GUIDE.md#first-recording-step-by-step).
 
 ### Build the Companion from source
 
@@ -179,18 +162,20 @@ English version: [Censio](#censio)
 
 ## Status
 
-Censio befindet sich im Meilenstein M0 (Foundation). Es gibt noch kein Release; das erste ist als `v0.1.0` geplant (Meilenstein M1). Der Stand von `main` trägt die Version `0.0.0`.
+Censio befindet sich im Meilenstein M1. Es gibt noch kein Release; das kommende Release `v0.1.0` schließt den Meilenstein ab. Der Stand von `main` trägt die Version `0.0.0`.
 
-Funktioniert heute:
+Das kann `v0.1.0`:
 
+- Der Companion läuft unter Windows als Tray-Symbol. Sein Tooltip und Symbol zeigen den Zustand der Verbindung zur Statistik-Pipe des Spiels (das Spiel braucht das Startargument `/pipe`), und sein Menü zeigt den Status und den letzten Tick. Er zeichnet auf, was das Spiel sendet, in eine lokale Datei, über das Menü oder mit dem Schalter `--record` (*Erste Aufzeichnung*), und spielt eine solche Datei mit `--replay <Datei>` ab ([Benutzerhandbuch](docs/USER_GUIDE.md#erste-aufzeichnung-schritt-für-schritt)). `Open diagnostics` öffnet ein Fenster mit dem letzten Tick, mit Regionen, Inseln und Waren als rohen Zahlen (GUIDs). Er schreibt eine Logdatei nach `%LOCALAPPDATA%\Censio\Logs`, und `Start with Windows` (standardmäßig aus) startet ihn bei der Anmeldung.
 - Der Server läuft als Docker-Image. Seine Startseite zeigt `Version <version>`, und `GET /health` antwortet mit `Healthy`.
-- Der Companion startet unter Windows als Tray-Symbol. Sein Menü zeigt den Status, den letzten Tick, `Open diagnostics` (ein Fenster mit dem letzten Tick), `Start recording`/`Stop recording`, zwei Ordnereinträge, `Start with Windows` (standardmäßig aus), `Version <version>` und `Exit`, und sein Tooltip und Symbol zeigen den Zustand der Verbindung zur Statistik-Pipe des Spiels (das Spiel braucht das Startargument `/pipe`). Er zeichnet auf, was das Spiel sendet, in eine lokale Datei, über das Menü oder mit dem Schalter `--record`, schreibt eine Logdatei nach `%LOCALAPPDATA%\Censio\Logs`, und mit `--replay <Datei>` spielt er eine solche Datei ab (*Aufzeichnen und Abspielen*).
 
-Noch nicht:
+Das kann `v0.1.0` nicht:
 
-- Spieldaten werden aus der Pipe gelesen, aber noch nicht angezeigt oder gespeichert.
+- Keine Namen oder Symbole: Spieldaten erscheinen nur als rohe Zahlen im Diagnosefenster.
 - Der Companion sendet nichts an den Server.
-- Es gibt keinen Verlauf.
+- Die Webanwendung zeigt keine Spieldaten, und es gibt keinen Verlauf.
+- Der Companion hat keine Einstellungen, etwa eine Serveradresse oder ein Token.
+- Es gibt kein Werkzeug, um eine Aufzeichnung zu anonymisieren; eine Aufzeichnung bleibt privat.
 
 ## Censio beziehen
 
@@ -275,7 +260,7 @@ Der Companion ist das Windows-Programm, das die Statistik des laufenden Spiels l
 1. Das ZIP in einen beliebigen Ordner entpacken. Es enthält eine Datei, `Censio.Companion.exe`.
 2. `Censio.Companion.exe` starten. Ein Tray-Symbol erscheint; sein Menü zeigt den Status, den letzten Tick, `Open diagnostics`, `Start recording`, `Open recordings folder`, `Open log folder`, `Start with Windows`, `Version <version>` und `Exit`.
 
-Das Programm ist nicht signiert, deshalb zeigt Windows SmartScreen beim ersten Start unter Umständen „Der Computer wurde durch Windows geschützt“. „Weitere Informationen“ wählen, dann „Trotzdem ausführen“ (unter englischem Windows: "More info", "Run anyway").
+Das Programm ist nicht signiert, deshalb zeigt Windows SmartScreen beim ersten Start unter Umständen „Der Computer wurde durch Windows geschützt“. „Weitere Informationen“ wählen, dann „Trotzdem ausführen“ (unter englischem Windows: "More info", "Run anyway"). Tipp, vom Product Manager unter deutschem Windows gemeldet und noch nicht an einem echten Release-Download ausprobiert: die Eigenschaften der entpackten `Censio.Companion.exe` (oder des ZIP selbst) öffnen, *Zulassen* ankreuzen (unter englischem Windows vermutlich *Unblock*; noch nicht ausprobiert) und übernehmen; SmartScreen fragt dann nicht.
 
 #### Start mit Windows
 
@@ -288,34 +273,15 @@ Der Companion startet nur dann mit Windows, wenn Sie es einschalten: im Tray-Men
 - Wenn Sie den Companion in der Windows-Liste der Autostart-Apps ausschalten (Einstellungen, Apps, Autostart), zeigt das Menü das nicht und zeigt weiter das Häkchen; schalten Sie ihn in dieser Liste wieder ein. Eine Richtlinie Ihrer Organisation, die Startprogramme sperrt, sieht der Companion ebenfalls nicht.
 - Der Maintainer hat dies unter Windows 11 ausprobiert: Der Companion startete nach einem Neustart mit Windows, wenn der Eintrag eingeschaltet war, und startete nicht, wenn er ausgeschaltet war; keine Administrator-Abfrage erschien (unter einem Standardkonto); Ordner mit Leerzeichen, `&` oder `,` im Pfad funktionierten; ein zweites Windows-Konto blieb unberührt; und das Ausschalten des Eintrags entfernte ihn. Nicht ausprobiert: ob SmartScreen beim ersten automatischen Start fragt, welchen Namen die Autostart-Liste zeigt, und ein Ordnerpfad mit `%`.
 
-#### Verbindung zum Spiel
+#### Erste Aufzeichnung
 
-Das Spiel legt seine Statistik-Pipe nur an, wenn es mit dem Startargument `/pipe` gestartet wird (`/pipe` zu den Startoptionen des Spiele-Launchers hinzufügen). Ohne dieses Argument kann der Companion sich nicht verbinden; das sieht genauso aus wie ein Spiel, das nicht läuft. Den Companion vor oder nach dem Spiel starten; er braucht keinen Neustart, wenn das Spiel beendet und erneut gestartet wird. Er liest nur aus der Pipe und schreibt nie hinein.
+1. `/pipe` in Ubisoft Connect zu den Startargumenten des Spiels hinzufügen (*Bibliothek*, die drei Punkte bei Anno 117, *Verwalten*, *Eigenschaften*, Feld *Startargumente hinzufügen*, dann *Schließen*); für eine Steam-Kopie gibt es im Benutzerhandbuch eine Alternative. Das Argument wirkt beim nächsten Start des Spiels.
+2. Das Spiel starten und einen Spielstand laden. Der Tray-Tooltip wechselt von `Waiting for game` zu `Receiving`.
+3. Mit der rechten Maustaste auf das Tray-Symbol klicken und `Start recording` wählen.
+4. Spielen, dann `Stop recording` wählen.
+5. Die Datei `recording-<yyyyMMdd-HHmmss>Z.jsonl` liegt in `%LOCALAPPDATA%\Censio\Recordings` (`Open recordings folder`). Sie ist privat: nicht posten oder anhängen.
 
-Mit der Maus über das Tray-Symbol fahren: Der Tooltip lautet `Censio Companion: <Zustand>`. Sobald das Spiel einen vollständigen Tick gesendet hat, zeigt eine zweite Zeile `Last tick: <Zeit>, <n> islands` (die Ankunftszeit als `HH:mm:ss`, wenn sie heute war, sonst mit Datum). Auch das Symbol zeigt den Zustand: ein grauer Ring beim Warten (`Waiting for game`, `Connected`, `Pipe busy`), ein grüner Kreis bei `Receiving`, ein rotes Dreieck bei `Protocol mismatch`, `Error` und einer ungültigen Kommandozeile. Ein Rechtsklick auf das Symbol öffnet das Menü, das denselben Status und letzten Tick zeigt.
-
-Der Menüeintrag `Open diagnostics` öffnet ein Fenster mit dem letzten Tick: einen Kopf mit `Status:`, `Last tick:` und `Game time:` und eine Tabelle mit einer Zeile je Ware jeder Insel (Region, Insel, Gebiet, Sitzungs-ID, Name, Ware, Erzeugung, Verbrauch, Delta, perfekte Erzeugung, perfekter Verbrauch, Gebäude, Unterhalt, Einkommen, Gewinn und die beiden Produktivitätswerte). Namen und Symbole gibt es noch nicht, daher werden Regionen, Inseln und Waren als die rohen Zahlen (GUIDs) gezeigt, die das Spiel gesendet hat; Zahlen haben unter jedem Windows den Dezimalpunkt. Das Fenster folgt jedem neuen Tick, auch beim Abspielen, und behält den letzten Tick, wenn die Verbindung endet. Schließen (Schließen-Schaltfläche oder Alt+F4) lässt den Companion weiterlaufen; `Open diagnostics` öffnet es wieder mit dem letzten Tick und holt ein offenes Fenster in den Vordergrund. Solange es offen ist, hat es eine Schaltfläche in der Taskleiste.
-
-| Tooltip | Bedeutung |
-| ------- | --------- |
-| `Waiting for game` | Die Pipe existiert nicht: Das Spiel läuft nicht oder wurde nicht mit `/pipe` gestartet. Der Companion sucht weiter (die Pausen wachsen von 1 auf 10 Sekunden) |
-| `Connected` | Die Pipe ist geöffnet; das Spiel hat noch keine erste Nachricht gesendet. Das Spiel sendet sie sofort, dieser Zustand ist daher kaum zu sehen |
-| `Receiving` | Das Spiel sendet Daten |
-| `Pipe busy` | Die Pipe existiert, wird aber von einem anderen Programm gehalten (zum Beispiel einem anderen Pipe-Werkzeug); das Spiel bedient nur einen Client gleichzeitig, andere Pipe-Leser also schließen. Der Companion versucht es weiter (die Pausen wachsen von 1 auf 10 Sekunden) und zeigt beim nächsten Versuch nach dem Freiwerden der Pipe `Receiving`. Er kann auch nach einem Neustart des Companions bei `Pipe busy` bleiben, solange das Spiel im Hauptmenü ist, bis ein Spiel geladen wird |
-| `Protocol mismatch` | Die Pipe spricht eine andere Protokollversion als 2 (zum Beispiel nach einem Spiel-Update); der Companion bleibt verbunden und macht weiter, sobald Version 2 eintrifft |
-| `Error` | Das Verbinden ist fehlgeschlagen oder die Verbindung ist abgebrochen. Beim Beenden des Spiels kann `Error` kurz vor `Waiting for game` erscheinen; das ist normal |
-
-Beendet man das Spiel, kehrt der Companion zu `Waiting for game` zurück und verbindet sich von selbst wieder, sobald das Spiel zurück ist; das Laden eines anderen Spielstands und der Wechsel ins Hauptmenü behalten die Verbindung. `Exit` im Tray-Menü funktioniert in jedem Zustand und beendet das Programm innerhalb von 2 Sekunden.
-
-### Aufzeichnen und Abspielen
-
-Für Tests und Fehlermeldungen kann der Companion aufzeichnen, was das Spiel sendet, und es später wieder abspielen. Beides kann mit einem Schalter in der Kommandozeile gestartet werden (zum Beispiel `Censio.Companion.exe --record` in einem Terminal oder im Ziel einer Verknüpfung); eine Aufzeichnung lässt sich auch im Tray-Menü starten und beenden (`Start recording`, `Stop recording`), ein Abspielen nur mit seinem Schalter. Einen laufenden Companion vorher schließen: Ein zweiter Start endet sofort.
-
-- **Aufzeichnen:** `Censio.Companion.exe --record` startet mit eingeschalteter Aufzeichnung; ohne den Schalter im Tray-Menü jederzeit `Start recording` wählen, auch wenn das Spiel schon sendet. Der Companion verbindet sich wie gewohnt mit dem Spiel und schreibt jede Verbindung in eine eigene Datei in `%LOCALAPPDATA%\Censio\Recordings` (der Menüeintrag `Open recordings folder` öffnet ihn). Eine Datei `recording-<yyyyMMdd-HHmmss>Z.jsonl` (UTC-Zeit der ersten Daten) entsteht, sobald nach dem Start die ersten Daten des Spiels eintreffen; wird das Spiel beendet und neu gestartet, schreibt die nächste Verbindung eine neue Datei, und jeder neue Start schreibt eine neue Datei. Während der Aufzeichnung endet der Tooltip mit `(recording)`, und der Menüeintrag lautet `Stop recording`; `Stop recording` schreibt noch Wartendes und schließt die Datei. Schlägt das Schreiben fehl (zum Beispiel weil die Platte voll oder zu langsam ist), endet die Aufzeichnung, der Tooltip endet mit `(recording failed)`, und der Companion arbeitet weiter; `Start recording` versucht es mit einer neuen Datei erneut. `Exit` im Tray-Menü schreibt noch Wartendes, höchstens 1 Sekunde lang, und beendet das Programm. Wird der Companion beendet („abgeschossen“) oder fällt der Strom aus, können die letzten Zeilen einer Datei fehlen; ob Windows beim Abmelden oder Herunterfahren sie schreibt, ist nicht ausprobiert.
-- **Abspielen:** `Censio.Companion.exe --replay <Datei> [--speed <Faktor>|max]` liest eine Aufzeichnung aus einer lokalen Datei statt aus der Pipe des Spiels und spielt sie so ab, wie das Spiel sie gesendet hat. `--speed` ist `max` (keine Pausen) oder eine Zahl von `0.1` bis `1000`, auch unter deutschem Windows mit Dezimalpunkt geschrieben (`--speed 10` macht die Pausen auf ein Zehntel kürzer); ohne Angabe läuft das Abspielen in Echtzeit. Der Companion öffnet beim Abspielen die Pipe nicht, und die Datei wird nur gelesen. Der Tooltip, der letzte Tick, das Symbol und das Fenster `Open diagnostics` zeigen den Fortschritt, und das Fenster zeigt die abgespielten Ticks und behält den letzten Tick der Datei (`Start recording` ist beim Abspielen ausgegraut): `Replay: Connected`, dann `Replay: Receiving` (oder `Replay: Protocol mismatch`) und nach dem letzten Frame `Replay finished` bis `Exit`. Ein Problem mit der Datei erscheint als `Replay error: <Grund>` mit `file not found`, `not a recording`, `unsupported version`, `invalid line <n>` oder `read failed`.
-- **Ungültige Kommandozeile:** ein unbekanntes Argument, `--speed` ohne `--replay`, eine Geschwindigkeit außerhalb des Bereichs, `--replay` ohne Datei oder `--record` zusammen mit `--replay` zeigen `Censio Companion: Invalid command line`; der Companion zeichnet dann weder auf noch spielt er ab, und `Exit` funktioniert.
-
-**Eine Aufzeichnung ist privat.** Sie enthält die Überschrift des Spielstands, Inselnamen und Wirtschaftsdaten genau so, wie das Spiel sie gesendet hat. Sie bleibt im Ordner auf dem eigenen Rechner, der Companion sendet sie nirgendwohin und löscht sie nie. Eine unbearbeitete Aufzeichnung nie öffentlich anhängen oder posten (auch nicht in einem Issue); geteilt werden sollen nur anonymisierte Testdaten. Die Dateien selbst löschen, wenn sie nicht mehr gebraucht werden.
+Ausprobiert vom Product Manager unter Windows 11 (26H2) mit deutschem Ubisoft Connect: Schritt 1 bis zum Eintragen von `/pipe` und *Schließen* (*Bibliothek*, die drei Punkte, *Verwalten*, *Eigenschaften*, *Startargumente hinzufügen*). Ebenfalls mit dem echten Spiel ausprobiert: die Aufzeichnung und ihre Datei, die Tooltips und Tray-Zustände und das Abspielen. Der Product Manager hat außerdem den englischen Weg bis zum Feld in Ubisoft Connect bestätigt (*Library*, die drei Punkte, *Manage*, *Properties*, *Add launch arguments*). Noch nicht ausprobiert: die englische Bezeichnung zum Schließen des Dialogs, eine Steam-Kopie und der Download von einem Release (es gibt keins). Der ganze Ablauf, die Launcher-Schritte, die Tray-Zustände mit dem, was zu tun ist, und das Abspielen einer Aufzeichnung stehen im [Benutzerhandbuch](docs/USER_GUIDE.md#erste-aufzeichnung-schritt-für-schritt).
 
 ### Companion aus dem Quellcode bauen
 
