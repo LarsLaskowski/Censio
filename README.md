@@ -6,7 +6,7 @@ Deutsche Version: [Censio (Deutsch)](#censio-deutsch)
 
 ## Status
 
-Censio is in milestone M1. No release exists yet; the coming release `v0.1.0` completes the milestone. The state of `main` carries the version `0.0.0`.
+Censio is in milestone M1. The release `v0.1.0` completes the milestone; it is on the [release page](https://github.com/LarsLaskowski/Censio/releases/tag/v0.1.0) with the Companion ZIP, and the server image is `networlddev/censio:0.1.0`. The state of `main` carries the version `0.0.0`.
 
 What `v0.1.0` can do:
 
@@ -41,7 +41,7 @@ Not supported: arm64 hosts, Windows containers, and Windows other than Windows 1
 
 ## Server (Docker)
 
-The Censio server runs as the Docker image `networlddev/censio` (linux/amd64) on Docker Hub. Every release publishes the tag `<version>` (for example `0.1.0`) and moves the tag `latest` to the newest release. You need Docker 23 or later (Linux Docker Engine, or Docker Desktop for Windows with the WSL 2 backend and Linux containers). The commands below use the version `0.1.0`; replace it with the version you want, or with `latest`. Run the commands one at a time: a command that fails makes the next one fail too. Not yet tried: pulling and running the published image, until the release `v0.1.0` exists.
+The Censio server runs as the Docker image `networlddev/censio` (linux/amd64) on Docker Hub. Every release publishes the tag `<version>` (for example `0.1.0`) and moves the tag `latest` to the newest release. You need Docker 23 or later (Linux Docker Engine, or Docker Desktop for Windows with the WSL 2 backend and Linux containers). The commands below use the version `0.1.0`; replace it with the version you want, or with `latest`. Run the commands one at a time: a command that fails makes the next one fail too. Not yet tried: pulling and running the published image `0.1.0`.
 
 ```text
 docker pull networlddev/censio:0.1.0
@@ -99,7 +99,7 @@ Then check `http://localhost:8080/health` (`Healthy`) and `http://localhost:8080
 
 ## Companion
 
-The Companion is the Windows program that reads the statistics of the running game. Download `Censio-<version>-win-x64.zip` from the release page `https://github.com/LarsLaskowski/Censio/releases` (under *Assets* of the release). It needs Windows 10 22H2 or Windows 11, 64-bit; it needs no installed .NET, no installer and no administrator rights. Not yet tried: the ZIP on a machine without .NET, until a release exists and it has been tried on a Windows machine.
+The Companion is the Windows program that reads the statistics of the running game. Download `Censio-<version>-win-x64.zip` from the release page `https://github.com/LarsLaskowski/Censio/releases` (under *Assets* of the release). It needs Windows 10 22H2 or Windows 11, 64-bit; it needs no installed .NET, no installer and no administrator rights. Not yet tried: the ZIP of `v0.1.0` on a machine without .NET.
 
 1. Extract the ZIP to a folder of your choice. It holds one file, `Censio.Companion.exe`.
 2. Start `Censio.Companion.exe`. A tray icon appears; its menu shows the status, the last tick, `Open diagnostics`, `Start recording`, `Open recordings folder`, `Open log folder`, `Start with Windows`, `Version <version>` and `Exit`.
@@ -125,7 +125,7 @@ The Companion does not start with Windows unless you turn it on: choose `Start w
 4. Play, then choose `Stop recording`.
 5. The file `recording-<yyyyMMdd-HHmmss>Z.jsonl` is in `%LOCALAPPDATA%\Censio\Recordings` (`Open recordings folder`). It is private: do not post or attach it.
 
-Tried by the Product Manager on Windows 11 (26H2) with Ubisoft Connect in German: the launcher step 1 up to entering `/pipe` and *Schließen* (*Bibliothek*, the three dots, *Verwalten*, *Eigenschaften*, *Startargumente hinzufügen*). Also tried with the real game: recording and its file, the tooltips and tray states, and the replay. The Product Manager also confirmed the English path in Ubisoft Connect (*Library*, the three dots, *Manage*, *Properties*, *Add launch arguments*, *Close*) and the labels of the Steam path in German and English (in the user guide). Not yet tried: whether `/pipe` set in Steam reaches the game through Ubisoft Connect, and the download from a release (no release exists). The full walkthrough, the launcher steps, the tray states with what to do, and how to replay a recording are in the [user guide](docs/USER_GUIDE.md#first-recording-step-by-step).
+Tried by the Product Manager on Windows 11 (26H2) with Ubisoft Connect in German: the launcher step 1 up to entering `/pipe` and *Schließen* (*Bibliothek*, the three dots, *Verwalten*, *Eigenschaften*, *Startargumente hinzufügen*). Also tried with the real game: recording and its file, the tooltips and tray states, and the replay. The Product Manager also confirmed the English path in Ubisoft Connect (*Library*, the three dots, *Manage*, *Properties*, *Add launch arguments*, *Close*) and the labels of the Steam path in German and English (in the user guide). Not yet tried: whether `/pipe` set in Steam reaches the game through Ubisoft Connect, and the download from the release `v0.1.0`. The full walkthrough, the launcher steps, the tray states with what to do, and how to replay a recording are in the [user guide](docs/USER_GUIDE.md#first-recording-step-by-step).
 
 ### Build the Companion from source
 
@@ -162,7 +162,7 @@ English version: [Censio](#censio)
 
 ## Status
 
-Censio befindet sich im Meilenstein M1. Es gibt noch kein Release; das kommende Release `v0.1.0` schließt den Meilenstein ab. Der Stand von `main` trägt die Version `0.0.0`.
+Censio befindet sich im Meilenstein M1. Das Release `v0.1.0` schließt den Meilenstein ab; es steht mit dem Companion-ZIP auf der [Release-Seite](https://github.com/LarsLaskowski/Censio/releases/tag/v0.1.0), und das Server-Image ist `networlddev/censio:0.1.0`. Der Stand von `main` trägt die Version `0.0.0`.
 
 Das kann `v0.1.0`:
 
@@ -197,7 +197,7 @@ Nicht unterstützt: arm64-Hosts, Windows-Container und Windows außer Windows 10
 
 ## Server (Docker)
 
-Der Censio-Server läuft als Docker-Image `networlddev/censio` (linux/amd64) auf Docker Hub. Jedes Release veröffentlicht den Tag `<version>` (zum Beispiel `0.1.0`) und setzt den Tag `latest` auf das neueste Release. Voraussetzung ist Docker 23 oder neuer (Docker Engine unter Linux oder Docker Desktop für Windows mit WSL-2-Backend und Linux-Containern). Die Befehle unten verwenden die Version `0.1.0`; sie durch die gewünschte Version oder durch `latest` ersetzen. Die Befehle werden einzeln ausgeführt: Schlägt ein Befehl fehl, schlägt auch der nächste fehl. Noch nicht ausprobiert: das Laden und Starten des veröffentlichten Images, bis das Release `v0.1.0` existiert.
+Der Censio-Server läuft als Docker-Image `networlddev/censio` (linux/amd64) auf Docker Hub. Jedes Release veröffentlicht den Tag `<version>` (zum Beispiel `0.1.0`) und setzt den Tag `latest` auf das neueste Release. Voraussetzung ist Docker 23 oder neuer (Docker Engine unter Linux oder Docker Desktop für Windows mit WSL-2-Backend und Linux-Containern). Die Befehle unten verwenden die Version `0.1.0`; sie durch die gewünschte Version oder durch `latest` ersetzen. Die Befehle werden einzeln ausgeführt: Schlägt ein Befehl fehl, schlägt auch der nächste fehl. Noch nicht ausprobiert: das Laden und Starten des veröffentlichten Images `0.1.0`.
 
 ```text
 docker pull networlddev/censio:0.1.0
@@ -255,7 +255,7 @@ Dann `http://localhost:8080/health` (`Healthy`) und `http://localhost:8080/` wie
 
 ## Companion
 
-Der Companion ist das Windows-Programm, das die Statistik des laufenden Spiels liest. `Censio-<version>-win-x64.zip` von der Release-Seite `https://github.com/LarsLaskowski/Censio/releases` herunterladen (beim Release unter *Assets*). Er braucht Windows 10 22H2 oder Windows 11, 64 Bit; er braucht kein installiertes .NET, keinen Installer und keine Administratorrechte. Noch nicht ausprobiert: das ZIP auf einem Rechner ohne .NET, bis ein Release existiert und es auf einem Windows-Rechner ausprobiert wurde.
+Der Companion ist das Windows-Programm, das die Statistik des laufenden Spiels liest. `Censio-<version>-win-x64.zip` von der Release-Seite `https://github.com/LarsLaskowski/Censio/releases` herunterladen (beim Release unter *Assets*). Er braucht Windows 10 22H2 oder Windows 11, 64 Bit; er braucht kein installiertes .NET, keinen Installer und keine Administratorrechte. Noch nicht ausprobiert: das ZIP von `v0.1.0` auf einem Rechner ohne .NET.
 
 1. Das ZIP in einen beliebigen Ordner entpacken. Es enthält eine Datei, `Censio.Companion.exe`.
 2. `Censio.Companion.exe` starten. Ein Tray-Symbol erscheint; sein Menü zeigt den Status, den letzten Tick, `Open diagnostics`, `Start recording`, `Open recordings folder`, `Open log folder`, `Start with Windows`, `Version <version>` und `Exit`.
@@ -281,7 +281,7 @@ Der Companion startet nur dann mit Windows, wenn Sie es einschalten: im Tray-Men
 4. Spielen, dann `Stop recording` wählen.
 5. Die Datei `recording-<yyyyMMdd-HHmmss>Z.jsonl` liegt in `%LOCALAPPDATA%\Censio\Recordings` (`Open recordings folder`). Sie ist privat: nicht posten oder anhängen.
 
-Ausprobiert vom Product Manager unter Windows 11 (26H2) mit deutschem Ubisoft Connect: Schritt 1 bis zum Eintragen von `/pipe` und *Schließen* (*Bibliothek*, die drei Punkte, *Verwalten*, *Eigenschaften*, *Startargumente hinzufügen*). Ebenfalls mit dem echten Spiel ausprobiert: die Aufzeichnung und ihre Datei, die Tooltips und Tray-Zustände und das Abspielen. Der Product Manager hat außerdem den englischen Weg in Ubisoft Connect bestätigt (*Library*, die drei Punkte, *Manage*, *Properties*, *Add launch arguments*, *Close*) sowie die Bezeichnungen des Steam-Wegs auf Deutsch und Englisch (im Benutzerhandbuch). Noch nicht ausprobiert: ob ein in Steam gesetztes `/pipe` das Spiel über Ubisoft Connect erreicht, und der Download von einem Release (es gibt keins). Der ganze Ablauf, die Launcher-Schritte, die Tray-Zustände mit dem, was zu tun ist, und das Abspielen einer Aufzeichnung stehen im [Benutzerhandbuch](docs/USER_GUIDE.md#erste-aufzeichnung-schritt-für-schritt).
+Ausprobiert vom Product Manager unter Windows 11 (26H2) mit deutschem Ubisoft Connect: Schritt 1 bis zum Eintragen von `/pipe` und *Schließen* (*Bibliothek*, die drei Punkte, *Verwalten*, *Eigenschaften*, *Startargumente hinzufügen*). Ebenfalls mit dem echten Spiel ausprobiert: die Aufzeichnung und ihre Datei, die Tooltips und Tray-Zustände und das Abspielen. Der Product Manager hat außerdem den englischen Weg in Ubisoft Connect bestätigt (*Library*, die drei Punkte, *Manage*, *Properties*, *Add launch arguments*, *Close*) sowie die Bezeichnungen des Steam-Wegs auf Deutsch und Englisch (im Benutzerhandbuch). Noch nicht ausprobiert: ob ein in Steam gesetztes `/pipe` das Spiel über Ubisoft Connect erreicht, und der Download vom Release `v0.1.0`. Der ganze Ablauf, die Launcher-Schritte, die Tray-Zustände mit dem, was zu tun ist, und das Abspielen einer Aufzeichnung stehen im [Benutzerhandbuch](docs/USER_GUIDE.md#erste-aufzeichnung-schritt-für-schritt).
 
 ### Companion aus dem Quellcode bauen
 

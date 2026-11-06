@@ -91,4 +91,5 @@ once in the [area document](../areas/README.md) of the record's area, and the re
 | [0036](0036-pipe-recording-raw-frames-and-replay-on-a-recorded-clock.md) | Recordings hold the raw frames as JSON lines, written off the read path; replay feeds them back as a byte stream on a recorded clock | Accepted | 2026-11-01 |
 | [0037](0037-companion-log-through-the-logging-abstraction-to-own-rotating-file.md) | The Companion logs through .NET's logging abstraction into its own rotating text file | Accepted | 2026-11-02 |
 | [0038](0038-diagnostics-window-flat-table-of-rows-made-on-demand.md) | The diagnostics window is a flat table whose rows are made on demand from the latest tick, kept whole | Accepted | 2026-11-03 |
+| [0039](0039-first-release-keeps-not-yet-tried-notes-until-tried.md) | The "Not yet tried" notes about the published image and ZIP stay until someone has tried them | Accepted | 2026-11-06 |
 <!-- project:end index -->
