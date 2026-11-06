@@ -265,7 +265,8 @@ Who can do what:
   with the secrets ([issue #77](https://github.com/LarsLaskowski/Censio/issues/77)).
 
 The first release `v0.1.0` ran on 2026-11-05 with all jobs green: the jobs `image-publish`, `promote` and `dispatch`
-reached the environment secrets (their credential checks passed), the ZIP was attached, the image was pushed as
+ran as deployments of the environment `release` on the ref `v0.1.0` and their credential checks passed (that the secrets
+came from the environment and that no repository secret of those names is left is D3 below), the ZIP was attached, the image was pushed as
 `networlddev/censio:0.1.0`, `latest` was moved and the release became the latest full release. A `release` event
 therefore runs on `refs/tags/<tag>` and passes the environment's rule, and the jobs need no `deployments` permission.
 
