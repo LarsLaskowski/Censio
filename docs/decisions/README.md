@@ -24,6 +24,8 @@ once in the [area document](../areas/README.md) of the record's area, and the re
   released record itself stays unedited.
 - Written by the squad Lead (see [`.claude/agents/squad-lead.md`](../../.claude/agents/squad-lead.md));
   anyone may add one for a change made outside the squad.
+- The squad's own process decisions are no records: they stand in [`process.md`](process.md), whose introduction
+  says how they change.
 - Committed together with the change it explains.
 - **Released or not decides how a record changes.** A record is *released* once the commit that added it is
   contained in a release tag (`v*`; check with `git tag --contains <commit>`, the commit is
@@ -38,24 +40,31 @@ once in the [area document](../areas/README.md) of the record's area, and the re
 - A new record that **amends** a released record without superseding it names the older one under
   *Supersedes* and says there, in one sentence, what it amends. The older record is **not edited** — not even
   with a pointer; a reader of the older record finds the amendment through the index and the new record.
-- **One record per decision that has lasting weight, grouped by topic — not one per pull request.** Not for
+- **One record per decision that has lasting weight — not one per pull request, and not one per topic.** Not for
   routine changes: a record is needed when a choice between real alternatives was made that shapes the
   architecture or behavior, a trade-off or limitation was accepted, or a documented guarantee was touched.
-  Before adding a record, look for an unreleased record on the same topic and extend it instead. A review
-  finding that was deliberately not fixed, a follow-up split, or a dependency change gets its own record only
-  if it touches a guarantee or the architecture; otherwise it belongs in the pull request description or the
-  follow-up issue, or as a sentence in the record of the topic it concerns.
+  Before adding a record, look for an unreleased record of the same decision and extend it instead (a changed
+  option, a new consequence); another decision on a topic that already has a record gets a record of its own,
+  which links the other. A review finding that was deliberately not fixed, a follow-up split, or a dependency
+  change gets its own record only if it touches a guarantee or the architecture; otherwise it belongs in the pull
+  request description or the follow-up issue, or as a sentence in the record of the decision it concerns.
+- **Size.** A record that an extension would take past `RECORD_MAX_WORDS` words or `RECORD_MAX_OPTIONS` options
+  (`.squad/tools/squad_settings.py`) holds more than one decision and is split instead: one record per decision,
+  each with its own context, options and consequences. An unreleased record keeps its number for one of them, the
+  others take the next free numbers with their index rows, and every link to it points at the record of its
+  decision; a released record is never split.
 - `.squad/tools/decision-check.py` (also run by `config-check.py`) checks the index, the links between records
-  and that no released record was changed.
+  and that no released record was changed, and warns about an unreleased record past the size limits and an area
+  document past `AREA_MAX_WORDS`, naming the split.
 
 ## Index
 
 <!-- project:begin index -->
 | #    | Title | Status | Date |
 | ---- | ----- | ------ | ---- |
-| [0001](0001-quality-gates-before-the-pull-request.md) | Quality gates before the pull request | Accepted | 2026-10-30 |
-| [0002](0002-squad-working-records-off-main.md) | Squad working records stay off main, and product PRs never change the squad | Accepted | 2026-10-30 |
-| [0003](0003-squash-merge-pull-requests.md) | Squash-merge pull requests | Accepted | 2026-10-30 |
+| [0001](0001-quality-gates-before-the-pull-request.md) | Quality gates before the pull request | Superseded by 0040 | 2026-10-30 |
+| [0002](0002-squad-working-records-off-main.md) | Squad working records stay off main, and product PRs never change the squad | Superseded by 0040 | 2026-10-30 |
+| [0003](0003-squash-merge-pull-requests.md) | Squash-merge pull requests | Superseded by 0040 | 2026-10-30 |
 | [0004](0004-companion-shell-and-linux-build.md) | Companion logic in a platform-neutral project; the Windows shell builds on Linux | Accepted | 2026-10-30 |
 | [0005](0005-product-version-from-one-build-property.md) | The product version comes from one build property; the first release is 0.1.0, without edge builds | Accepted | 2026-10-30 |
 | [0006](0006-server-plain-http-and-open-health.md) | The server serves plain HTTP; the web UI and the health check need no login | Accepted | 2026-10-30 |
@@ -92,4 +101,5 @@ once in the [area document](../areas/README.md) of the record's area, and the re
 | [0037](0037-companion-log-through-the-logging-abstraction-to-own-rotating-file.md) | The Companion logs through .NET's logging abstraction into its own rotating text file | Accepted | 2026-11-02 |
 | [0038](0038-diagnostics-window-flat-table-of-rows-made-on-demand.md) | The diagnostics window is a flat table whose rows are made on demand from the latest tick, kept whole | Accepted | 2026-11-03 |
 | [0039](0039-first-release-keeps-not-yet-tried-notes-until-tried.md) | The "Not yet tried" notes about the published image and ZIP stay until someone has tried them | Accepted | 2026-11-06 |
+| [0040](0040-the-squads-process-decisions-live-in-process-md.md) | The squad's process decisions live in process.md | Accepted | 2026-11-06 |
 <!-- project:end index -->

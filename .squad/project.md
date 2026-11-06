@@ -5,11 +5,18 @@ Advocate, Security, the Tester and the Reviewer. Not template-managed: `adopt-te
 and never overwrites it. A product PR updates it when the change makes an entry untrue
 (`.squad/routing.md`, *Scope of a product PR*).
 
+Every entry points: it names files, types or endpoints and links the document that says more. Behavior, values,
+limits and sequences are written once, in the area documents (`docs/areas/README.md`), and the reasons in the
+decision records; a copy here goes stale with the next change. `config-check.py` warns when this file grows past
+`PROJECT_MAX_WORDS` words (`.squad/tools/squad_settings.py`).
+
 ## Security areas
 
 A change that touches one of these lists it under *Security areas touched* in its plan, so Security reviews the
-plan (`.squad/routing.md`, *Tiers*, which also says when a change is tier `security`). Name the concrete types,
-files or endpoints.
+plan (`.squad/routing.md`, *Tiers*, which also says when a change is tier `security`). One line per area: what is
+protected, the concrete types, files or endpoints, and a link to the area document that states its rules
+(`- Session tokens: issued in src/Auth/, checked by every /api route — [Sessions](../docs/areas/sessions.md)`); no
+limits, patterns or sequences.
 
 - Ingest token: read from configuration or an environment variable, compared in constant time, never logged.
 - Authentication: the WebSocket ingest accepts a Companion only with a valid token; the web UI follows the deployment note in `SECURITY.md`.
@@ -25,8 +32,8 @@ files or endpoints.
 
 ## Guarantees
 
-Deliberate behavior that must not change without the Product Manager. Each one is described in
-`docs/ARCHITECTURE.md` and, where it was a real choice, has a decision record.
+Deliberate behavior that must not change without the Product Manager. One line each: the guarantee in a few words,
+a link to its decision record where it was a real choice, and a link to the area document that states it.
 
 - None recorded yet; a guarantee is added here with its decision record when the first one is made.
 
@@ -36,26 +43,26 @@ What the Reviewer checks when the diff introduces or changes a thing of this kin
 change with it.
 
 **A new or changed configuration option** touches:
-- the options type and its validation
-- registration and binding in the Companion or server host
-- the default configuration file (`appsettings.json`)
+- the key and its validation: `Censio:DataDirectory` in `DataProtectionSetup`, the Companion's command-line options in `CompanionCommandLine`
+- registration and binding in the host: `src/Censio.Server/Program.cs`, `src/Censio.Companion/App.xaml.cs`
+- the default in `src/Censio.Server/appsettings.json` and the `ENV` lines of `src/Censio.Server/Dockerfile`
 - the configuration table in `README.md` (key, environment variable, default; English first, then German)
-- the test that pins the binding
+- the test that pins it: `DataProtectionSetupTests`, `ProgramTests`, `CompanionCommandLineTests`
 
 **A new or changed service / module** touches:
-- its interface
-- registration and lifetime
-- the test double in the test project
-- the component list in `docs/ARCHITECTURE.md`
+- its interface, where the Companion's platform-neutral logic is separated from the Windows shell (`IPipeConnector`, `IStartupEntryStore`, `IDiagnosticsWindow` in `Censio.Companion.Core`)
+- registration and lifetime in `Program.cs` (server) or `App.xaml.cs` (Companion)
+- the fake or stub in the test project (*Test doubles* below)
+- the project table in `docs/ARCHITECTURE.md` and the area document in `docs/areas/`
 
 **A new external API call or DTO** touches:
-- the pipe/game-file reader or ingest message type and its DTOs — the external shape must not leak past it
-- the fake/stub in the tests
+- the pipe/game-file reader or ingest message type and its DTOs (`Censio.Pipe`, `Censio.Contracts`) — the external shape must not leak past it
+- the fake or synthetic frames in the tests (decisions 0029, 0033)
 
 ## Test doubles
 
 The hand-written fakes and stubs the tests reuse (no mocking library unless `docs/UNIT_TESTS.md` says
-otherwise):
+otherwise), one line each: the double, where it lives and what it stands in for; how it behaves is read in its code.
 
 - `RecordingLogger` (`tests/Censio.Server.Tests/RecordingLogger.cs`, linked into `tests/Censio.Companion.Core.Tests` as a `Compile` item like `PipeFrameBuilder`): an `ILogger` that is enabled for every level, begins no scope and keeps each entry's level, formatted message and exception in `Entries`, in the order written, for tests that assert what a component logs — `DataProtectionSetup` in the server tests, and `CompanionLog`, `FolderOpener`, `PipeConnection`, `PipeRecordingFiles`, `PipeRecordingSession` and `PipeReplayRunner` in the Companion tests. It models no real component.
 - `ChunkedStream` (`tests/Censio.Pipe.Tests/ChunkedStream.cs`): a read-only `Stream` that returns its bytes in chunks of a given size, can throw an `IOException` at an offset or cancel a `CancellationTokenSource` at an offset, can report `CanRead` as false, and throws `ObjectDisposedException` once disposed, for tests of the frame reader's partial reads, I/O errors and cancellation. It models no real component.
