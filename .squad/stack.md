@@ -173,7 +173,7 @@ Constructors store their arguments and never throw: a test harness builds these 
 fail.
 The `Skeleton` body above is the default. A zero-value stub is allowed only where it would break a test that
 exists and passes today: the new tests must still fail on the stub, and the Dev reports it as a deviation.
-A private member or parameter that nothing calls or reads yet fails the build as S1144 (unused private member) or
+A private member or parameter that nothing calls or reads yet fails the *Analyzer gate* as S1144 (unused private member) or
 S1172 (unused parameter). Wrap exactly those members in `#pragma warning disable S1144, S1172` /
 `#pragma warning restore S1144, S1172` with the comment `// Skeleton: removed with the implementation`; the Dev lists
 each pragma in its report and removes it in mode `implement`, and the Reviewer blocks one that is still there.

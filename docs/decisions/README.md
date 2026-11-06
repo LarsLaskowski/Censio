@@ -62,7 +62,7 @@ once in the [area document](../areas/README.md) of the record's area, and the re
 <!-- project:begin index -->
 | #    | Title | Status | Date |
 | ---- | ----- | ------ | ---- |
-| [0001](0001-quality-gates-before-the-pull-request.md) | Quality gates before the pull request | Superseded by 0040 | 2026-10-30 |
+| [0001](0001-quality-gates-before-the-pull-request.md) | Quality gates before the pull request | Accepted | 2026-10-30 |
 | [0002](0002-squad-working-records-off-main.md) | Squad working records stay off main, and product PRs never change the squad | Superseded by 0040 | 2026-10-30 |
 | [0003](0003-squash-merge-pull-requests.md) | Squash-merge pull requests | Superseded by 0040 | 2026-10-30 |
 | [0004](0004-companion-shell-and-linux-build.md) | Companion logic in a platform-neutral project; the Windows shell builds on Linux | Accepted | 2026-10-30 |

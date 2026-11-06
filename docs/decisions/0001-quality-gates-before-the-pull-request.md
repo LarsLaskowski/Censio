@@ -1,6 +1,6 @@
 # 0001: Quality gates before the pull request
 
-- **Status:** Superseded by 0040
+- **Status:** Accepted
 - **Date:** 2026-10-30
 - **Area:** —
 - **Source:** Squad adopted from Squad-Spec-Repository-Template; Issue #3 (format check in CI, pinned tools)
