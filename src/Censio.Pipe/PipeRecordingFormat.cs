@@ -41,6 +41,11 @@ public static class PipeRecordingFormat
     private const long TimeMarginTicks = 30 * TimeSpan.TicksPerSecond;
 
     /// <summary>
+    /// The earliest usable start in ticks: the longest shift of an anonymised recording of 365 days plus one day after the earliest time.
+    /// </summary>
+    private const long MinStartTicks = 366 * TimeSpan.TicksPerDay;
+
+    /// <summary>
     /// The format of a time in a recording.
     /// </summary>
     private const string TimeFormat = "yyyy-MM-dd'T'HH:mm:ss.fffffff'Z'";
@@ -117,13 +122,17 @@ public static class PipeRecordingFormat
     /// </summary>
     /// <param name="line">The line without its terminator</param>
     /// <returns>The start time in UTC, or <see langword="null" /> when it is missing or unusable</returns>
-    // Skeleton: removed with the implementation
-#pragma warning disable RH2003
     public static DateTimeOffset? ReadStarted(ReadOnlySpan<byte> line)
     {
-        throw new NotImplementedException();
+        try
+        {
+            return TryReadStarted(line, out var started) ? started : null;
+        }
+        catch (Exception exception) when (exception is JsonException or InvalidOperationException or FormatException)
+        {
+            return null;
+        }
     }
-#pragma warning restore RH2003
 
     /// <summary>
     /// Parses a frame line.
@@ -326,6 +335,63 @@ public static class PipeRecordingFormat
     {
         reader.Read();
         reader.Skip();
+
+        return true;
+    }
+
+    /// <summary>
+    /// Reads the start field of a header line; an unknown field is skipped.
+    /// </summary>
+    /// <param name="line">The line</param>
+    /// <param name="started">The start time in UTC</param>
+    /// <returns><see langword="true" /> when the line has a usable start</returns>
+    private static bool TryReadStarted(ReadOnlySpan<byte> line, out DateTimeOffset started)
+    {
+        started = default;
+
+        var reader = new Utf8JsonReader(line);
+
+        if (TryStartObject(ref reader) == false)
+        {
+            return false;
+        }
+
+        while (reader.Read() && reader.TokenType == JsonTokenType.PropertyName)
+        {
+            if (reader.ValueTextEquals("started"u8))
+            {
+                return reader.Read() && reader.TokenType == JsonTokenType.String && TryReadStart(ref reader, out started);
+            }
+
+            SkipValue(ref reader);
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Reads the start of a string token and checks that shifting it by the longest shift cannot pass the earliest time.
+    /// </summary>
+    /// <param name="reader">The reader on the string token</param>
+    /// <param name="started">The time in UTC</param>
+    /// <returns><see langword="true" /> when the start is usable</returns>
+    private static bool TryReadStart(ref Utf8JsonReader reader, out DateTimeOffset started)
+    {
+        started = default;
+
+        if (reader.TryGetDateTimeOffset(out var time) == false)
+        {
+            return false;
+        }
+
+        var utc = time.ToUniversalTime();
+
+        if (utc.UtcTicks < MinStartTicks)
+        {
+            return false;
+        }
+
+        started = utc;
 
         return true;
     }
