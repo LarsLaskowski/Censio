@@ -114,8 +114,8 @@ The solution is `Censio.slnx`; `docs/ARCHITECTURE.md` lists the projects and the
 - The product version is the one build property `Version` in `Directory.Build.props` (`0.0.0` on `main`), set
   only by the release build (record 0005); no project sets a version of its own.
 - `Censio.Server` requests the Blazor web assets itself with `RequiresAspNetWebAssets` (record 0007).
-- The runtime settings and the Companion's switches are listed in the configuration table of `README.md` and stated
-  in their area document under `docs/areas/`.
+- The server's runtime settings are listed in the configuration table of `README.md`, the Companion's switches in
+  `docs/USER_GUIDE.md`; both are stated in their area document under `docs/areas/`.
 <!-- project:end configuration -->
 
 ## Code style
