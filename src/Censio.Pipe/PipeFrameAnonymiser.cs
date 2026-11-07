@@ -380,7 +380,7 @@ internal sealed class PipeFrameAnonymiser
             candidate = candidate == lower ? upper : lower;
         }
 
-        if (candidate is >= int.MinValue and <= int.MaxValue)
+        if (candidate is >= int.MinValue and <= int.MaxValue && (candidate != profit || profit == 0))
         {
             return (int)candidate;
         }
