@@ -17,7 +17,7 @@ except the Windows shell:
 | Project | Responsibility | References |
 | ------- | -------------- | ---------- |
 | `Censio.Contracts` | The types shared by Companion and server, and the product version | — |
-| `Censio.Pipe` | Framing and parsing the statistics pipe into typed messages and assembling them into ticks, recording frames to a file and replaying it ([`areas/pipe.md`](areas/pipe.md)) | — |
+| `Censio.Pipe` | Framing and parsing the statistics pipe into typed messages and assembling them into ticks, recording frames to a file and replaying it ([`areas/pipe.md`](areas/pipe.md), [`areas/pipe-recording.md`](areas/pipe-recording.md)) | — |
 | `Censio.GameData` | Reading the game files and the catalog | — |
 | `Censio.Server.Data` | Persistence of the server | — |
 | `Censio.Server` | Web host, UI, later the ingest | Contracts, Server.Data |
@@ -42,11 +42,12 @@ The pipe stream is parsed strictly: a frame the parser cannot read is reported a
 ([`decisions/0033`](decisions/0033-pipe-reader-strict-from-the-reference-source.md)).
 The Companion opens the pipe itself, reconnects when the game restarts and shows the connection state in its tray
 tooltip ([`decisions/0035`](decisions/0035-pipe-connection-states-retry-and-identification-level.md),
-[`areas/pipe.md`](areas/pipe.md)). The Companion groups the messages into ticks with an island identity and session events
+[`areas/pipe-connection.md`](areas/pipe-connection.md)). The Companion groups the messages into ticks with an island identity and session events
 ([`decisions/0034`](decisions/0034-ticks-assembled-by-close-rules-on-an-injected-clock.md)), in the live connection as in a replay, and the tray and the diagnostics window show the latest closed tick ([`decisions/0038`](decisions/0038-diagnostics-window-flat-table-of-rows-made-on-demand.md)).
 From the tray menu (or from the start with `--record`) the Companion writes the frames of each connection to a local file, and with `--replay` it feeds
 such a file through the same message reader and tick assembler instead of the pipe
-([`decisions/0036`](decisions/0036-pipe-recording-raw-frames-and-replay-on-a-recorded-clock.md)).
+([`decisions/0036`](decisions/0036-pipe-recording-raw-frames-and-replay-on-a-recorded-clock.md),
+[`areas/pipe-recording.md`](areas/pipe-recording.md)).
 The Companion logs through .NET's logging abstraction into its own rotating text file in the local app data folder
 ([`decisions/0037`](decisions/0037-companion-log-through-the-logging-abstraction-to-own-rotating-file.md),
 [`areas/companion.md`](areas/companion.md)).
@@ -66,7 +67,7 @@ Companion; cache and recording paths are never derived from external input unche
 
 The Companion opens the pipe `\\.\pipe\anno117` read-only and at impersonation level identification, so the pipe's
 server cannot act with the player's Windows identity; a pipe created by another program is read within the reader's
-limits ([`areas/pipe.md`](areas/pipe.md), record 0035).
+limits ([`areas/pipe-connection.md`](areas/pipe-connection.md), record 0035).
 
 The server speaks plain HTTP only; TLS is the reverse proxy's job. Its start page and `/health` need no login, and
 `/health` reveals only its status ([`decisions/0006`](decisions/0006-server-plain-http-and-open-health.md),

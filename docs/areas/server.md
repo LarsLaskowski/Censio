@@ -56,9 +56,8 @@ the Docker health probe rely on it.
   creates no directory and exits with code 1 before it listens.
 - A data directory where the key directory cannot be created or written stops the start: the server logs one
   `Critical` entry `The data-protection key ring cannot be stored in '<key directory>'; the server stops. Make the data directory writable for the user the server runs as.`
-  with the exception and exits with code 1 before it listens. A refused write is reported by ASP.NET Core as a
-  `CryptographicException` wrapping the I/O exception, and ASP.NET Core logs its own `Error` entry before the
-  `Critical` one. Any other exception is not caught.
+  with the exception and exits with code 1 before it listens. ASP.NET Core logs its own `Error` entry about the
+  refused write before the `Critical` one. A failure of another kind is not handled by the server.
 
 ### Docker image
 

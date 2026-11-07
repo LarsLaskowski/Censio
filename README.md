@@ -108,14 +108,11 @@ The program is not signed, so Windows SmartScreen may show "Windows protected yo
 
 #### Start with Windows
 
-The Companion does not start with Windows unless you turn it on: choose `Start with Windows` in the tray menu. A check mark shows that it is on; choosing the entry again turns it off. Turning it on writes one value, `Censio Companion`, under `HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run`: it applies to your Windows account only, and the entry needs no administrator rights (the maintainer tried it on Windows 11: no administrator prompt appeared). The value is the full path of the running `Censio.Companion.exe` in quotes, without arguments, so the Companion starts the way a double click starts it (it neither records nor replays).
+The Companion does not start with Windows unless you turn it on: choose `Start with Windows` in the tray menu. A check mark shows that it is on; choosing the entry again turns it off. Turning it on writes one value, `Censio Companion`, under `HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run`: it applies to your Windows account only, and the entry needs no administrator rights. The value is the full path of the running `Censio.Companion.exe` in quotes, without arguments, so the Companion starts the way a double click starts it (it neither records nor replays).
 
 - Extract the ZIP to a folder in your own profile that stays where it is, for example `%LOCALAPPDATA%\Programs\Censio`. Do not use a shared folder or the root of a drive that other users can write to: whoever can replace the file there runs it at your next sign-in.
-- A folder path that contains `%` or is longer than 200 characters cannot be used: the entry stays unchecked, nothing is written and the log says `Could not change the autostart setting`.
-- If you move the exe, or start a new version from another folder, the old entry still points to the old file and the menu shows the entry unchecked. To remove such a leftover entry, start any copy of `Censio.Companion.exe`, choose `Start with Windows` (it replaces the leftover entry with the path of that copy), then choose it again to turn it off; or delete the value `Censio Companion` in the Registry Editor at the key above. Turn the entry off before you delete the folder. Switching the old program off in the Windows startup apps list does not delete the value.
-- A value with another path or with arguments counts as off; choosing the entry then replaces it.
-- If you switch the Companion off in the Windows startup apps list (Settings, Apps, Startup), the menu does not show it and still shows the check mark; switch it on again in that list. A policy of your organization that blocks startup programs is not visible to the Companion either.
-- The maintainer tried this on Windows 11: the Companion started with Windows after a restart with the entry on and did not start with it off; no administrator prompt appeared (under a standard account); folders with spaces, `&` or `,` in the path worked; a second Windows account was unaffected; and turning the entry off removed it. Not tried: whether SmartScreen asks at the first automatic start, which name the startup apps list shows, and a folder path with `%`.
+
+Paths that cannot be used, a leftover entry after moving the exe, and the Windows startup apps list are covered in the [user guide](docs/USER_GUIDE.md#start-with-windows).
 
 #### First recording
 
@@ -125,7 +122,7 @@ The Companion does not start with Windows unless you turn it on: choose `Start w
 4. Play, then choose `Stop recording`.
 5. The file `recording-<yyyyMMdd-HHmmss>Z.jsonl` is in `%LOCALAPPDATA%\Censio\Recordings` (`Open recordings folder`). It is private: do not post or attach it.
 
-Tried by the Product Manager on Windows 11 (26H2) with Ubisoft Connect in German: the launcher step 1 up to entering `/pipe` and *Schließen* (*Bibliothek*, the three dots, *Verwalten*, *Eigenschaften*, *Startargumente hinzufügen*). Also tried with the real game: recording and its file, the tooltips and tray states, and the replay. The Product Manager also confirmed the English path in Ubisoft Connect (*Library*, the three dots, *Manage*, *Properties*, *Add launch arguments*, *Close*) and the labels of the Steam path in German and English (in the user guide). Not yet tried: whether `/pipe` set in Steam reaches the game through Ubisoft Connect, and the download from the release `v0.1.0`. The full walkthrough, the launcher steps, the tray states with what to do, and how to replay a recording are in the [user guide](docs/USER_GUIDE.md#first-recording-step-by-step).
+Not yet tried: whether `/pipe` set in Steam reaches the game through Ubisoft Connect, and the download from the release `v0.1.0`. The full walkthrough, the launcher steps, the tray states with what to do, and how to replay a recording are in the [user guide](docs/USER_GUIDE.md#first-recording-step-by-step).
 
 ### Build the Companion from source
 
@@ -264,14 +261,11 @@ Das Programm ist nicht signiert, deshalb zeigt Windows SmartScreen beim ersten S
 
 #### Start mit Windows
 
-Der Companion startet nur dann mit Windows, wenn Sie es einschalten: im Tray-Menü `Start with Windows` wählen. Ein Häkchen zeigt, dass es eingeschaltet ist; den Eintrag erneut zu wählen schaltet es aus. Das Einschalten schreibt einen Wert, `Censio Companion`, unter `HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run`: Er gilt nur für Ihr Windows-Konto, und der Eintrag braucht keine Administratorrechte (der Maintainer hat es unter Windows 11 ausprobiert: keine Administrator-Abfrage erschien). Der Wert ist der vollständige Pfad der laufenden `Censio.Companion.exe` in Anführungszeichen, ohne Argumente; der Companion startet also wie bei einem Doppelklick (er zeichnet weder auf noch spielt er ab).
+Der Companion startet nur dann mit Windows, wenn Sie es einschalten: im Tray-Menü `Start with Windows` wählen. Ein Häkchen zeigt, dass es eingeschaltet ist; den Eintrag erneut zu wählen schaltet es aus. Das Einschalten schreibt einen Wert, `Censio Companion`, unter `HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run`: Er gilt nur für Ihr Windows-Konto, und der Eintrag braucht keine Administratorrechte. Der Wert ist der vollständige Pfad der laufenden `Censio.Companion.exe` in Anführungszeichen, ohne Argumente; der Companion startet also wie bei einem Doppelklick (er zeichnet weder auf noch spielt er ab).
 
 - Das ZIP in einen Ordner im eigenen Profil entpacken, der an seinem Platz bleibt, zum Beispiel `%LOCALAPPDATA%\Programs\Censio`. Keinen gemeinsamen Ordner und nicht das Stammverzeichnis eines Laufwerks verwenden, in das andere Benutzer schreiben können: Wer die Datei dort ersetzen kann, führt sie bei Ihrer nächsten Anmeldung aus.
-- Ein Ordnerpfad mit `%` oder mit mehr als 200 Zeichen kann nicht verwendet werden: Der Eintrag bleibt ohne Häkchen, es wird nichts geschrieben, und das Log meldet `Could not change the autostart setting`.
-- Wenn Sie die Exe verschieben oder eine neue Version aus einem anderen Ordner starten, zeigt der alte Eintrag noch auf die alte Datei, und das Menü zeigt den Eintrag ohne Häkchen. Um einen solchen übrig gebliebenen Eintrag zu entfernen, starten Sie eine beliebige Kopie von `Censio.Companion.exe`, wählen `Start with Windows` (der Eintrag wird durch den Pfad dieser Kopie ersetzt) und wählen es dann erneut, um es auszuschalten; oder löschen Sie den Wert `Censio Companion` im Registrierungs-Editor am oben genannten Schlüssel. Schalten Sie den Eintrag aus, bevor Sie den Ordner löschen. Das Ausschalten des alten Programms in der Windows-Liste der Autostart-Apps löscht den Wert nicht.
-- Ein Wert mit anderem Pfad oder mit Argumenten gilt als ausgeschaltet; die Wahl des Eintrags ersetzt ihn dann.
-- Wenn Sie den Companion in der Windows-Liste der Autostart-Apps ausschalten (Einstellungen, Apps, Autostart), zeigt das Menü das nicht und zeigt weiter das Häkchen; schalten Sie ihn in dieser Liste wieder ein. Eine Richtlinie Ihrer Organisation, die Startprogramme sperrt, sieht der Companion ebenfalls nicht.
-- Der Maintainer hat dies unter Windows 11 ausprobiert: Der Companion startete nach einem Neustart mit Windows, wenn der Eintrag eingeschaltet war, und startete nicht, wenn er ausgeschaltet war; keine Administrator-Abfrage erschien (unter einem Standardkonto); Ordner mit Leerzeichen, `&` oder `,` im Pfad funktionierten; ein zweites Windows-Konto blieb unberührt; und das Ausschalten des Eintrags entfernte ihn. Nicht ausprobiert: ob SmartScreen beim ersten automatischen Start fragt, welchen Namen die Autostart-Liste zeigt, und ein Ordnerpfad mit `%`.
+
+Nicht verwendbare Pfade, ein übrig gebliebener Eintrag nach dem Verschieben der Exe und die Windows-Liste der Autostart-Apps stehen im [Benutzerhandbuch](docs/USER_GUIDE.md#start-mit-windows).
 
 #### Erste Aufzeichnung
 
@@ -281,7 +275,7 @@ Der Companion startet nur dann mit Windows, wenn Sie es einschalten: im Tray-Men
 4. Spielen, dann `Stop recording` wählen.
 5. Die Datei `recording-<yyyyMMdd-HHmmss>Z.jsonl` liegt in `%LOCALAPPDATA%\Censio\Recordings` (`Open recordings folder`). Sie ist privat: nicht posten oder anhängen.
 
-Ausprobiert vom Product Manager unter Windows 11 (26H2) mit deutschem Ubisoft Connect: Schritt 1 bis zum Eintragen von `/pipe` und *Schließen* (*Bibliothek*, die drei Punkte, *Verwalten*, *Eigenschaften*, *Startargumente hinzufügen*). Ebenfalls mit dem echten Spiel ausprobiert: die Aufzeichnung und ihre Datei, die Tooltips und Tray-Zustände und das Abspielen. Der Product Manager hat außerdem den englischen Weg in Ubisoft Connect bestätigt (*Library*, die drei Punkte, *Manage*, *Properties*, *Add launch arguments*, *Close*) sowie die Bezeichnungen des Steam-Wegs auf Deutsch und Englisch (im Benutzerhandbuch). Noch nicht ausprobiert: ob ein in Steam gesetztes `/pipe` das Spiel über Ubisoft Connect erreicht, und der Download vom Release `v0.1.0`. Der ganze Ablauf, die Launcher-Schritte, die Tray-Zustände mit dem, was zu tun ist, und das Abspielen einer Aufzeichnung stehen im [Benutzerhandbuch](docs/USER_GUIDE.md#erste-aufzeichnung-schritt-für-schritt).
+Noch nicht ausprobiert: ob ein in Steam gesetztes `/pipe` das Spiel über Ubisoft Connect erreicht, und der Download vom Release `v0.1.0`. Der ganze Ablauf, die Launcher-Schritte, die Tray-Zustände mit dem, was zu tun ist, und das Abspielen einer Aufzeichnung stehen im [Benutzerhandbuch](docs/USER_GUIDE.md#erste-aufzeichnung-schritt-für-schritt).
 
 ### Companion aus dem Quellcode bauen
 
