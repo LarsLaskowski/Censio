@@ -12,3 +12,5 @@ are quoted in full.
 | 2026-11-07 14:38 | 2b Plan | Lead | RESULT: DONE - tier trivial, docs only plus decision record 0041, no security area, spec approved by Lead (opus/medium · 15,875 tokens · 11 tool uses · 92 s · 18 in · 9,555 out · 793,934 cache read · 15,325 cache write · 213,292 weighted · continued) |
 | 2026-11-07 14:38 | 2b Challenge skipped | Orchestrator | challenge skipped — tier trivial is never challenged |
 | 2026-11-07 14:39 | 4-5 Skipped | Orchestrator | no production or test code: see *Verification without tests* |
+| 2026-11-07 14:39 | 6 Implement | Dev | Docs tasks 2-5 done (pipe.md, protocol.md, pipe-recording.md, companion.md, USER_GUIDE EN+DE); AC4 grep clean; figure-name grep of diff passed (sonnet/medium · 80,906 tokens · 7 tool uses · 34 s · 14 in · 3,634 out · 451,315 cache read · 79,906 cache write · 163,198 weighted) |
+| 2026-11-07 14:41 | 7 Gate stamp | Orchestrator | PASS on dbd5641bf1f6b68d810ad35def1ec0a27f681a39 (tier trivial): Format check pass; Analyzer gate pass; Test with coverage pass; scope-check.py pass |
