@@ -359,7 +359,7 @@ internal sealed class PipeFrameAnonymiser
     }
 
     /// <summary>
-    /// Decodes a frame and applies the version gate as the message reader does; a session end holds no data and passes the gate.
+    /// Decodes a frame and applies the version gate as the message reader does.
     /// </summary>
     /// <param name="frame">The frame</param>
     /// <param name="message">The message, or <see langword="null" /> for an empty frame</param>
@@ -382,7 +382,7 @@ internal sealed class PipeFrameAnonymiser
             return _supported;
         }
 
-        return message is SessionEndMessage || (message is not null && _supported);
+        return message is not null && _supported;
     }
 
     /// <summary>
