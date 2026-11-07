@@ -1,3 +1,5 @@
+using Censio.Pipe;
+
 namespace Censio.Anonymiser;
 
 /// <summary>
@@ -12,14 +14,27 @@ public static class Program
     /// </summary>
     /// <param name="args">The command line arguments</param>
     /// <returns>The exit code</returns>
-    // Skeleton: removed with the implementation
-#pragma warning disable RH2003, S1172
-    public static Task<int> Main(string[] args)
+    public static async Task<int> Main(string[] args)
     {
-        throw new NotImplementedException();
-    }
+        using var cancellation = new CancellationTokenSource();
 
-#pragma warning restore RH2003, S1172
+        void OnCancel(object? sender, ConsoleCancelEventArgs eventArgs)
+        {
+            eventArgs.Cancel = true;
+            cancellation.Cancel();
+        }
+
+        Console.CancelKeyPress += OnCancel;
+
+        try
+        {
+            return await new AnonymiserCommand(Console.Out, Console.Error, new PipeAnonymiserRandom()).RunAsync(args, cancellation.Token).ConfigureAwait(false);
+        }
+        finally
+        {
+            Console.CancelKeyPress -= OnCancel;
+        }
+    }
 
     #endregion // Methods
 }

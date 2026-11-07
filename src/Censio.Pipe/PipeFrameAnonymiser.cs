@@ -379,7 +379,7 @@ internal sealed class PipeFrameAnonymiser
         {
             _supported = version.Version == PipeProtocol.SupportedVersion;
 
-            return _supported;
+            return true;
         }
 
         return message is not null && _supported;
