@@ -1,7 +1,7 @@
 # Spec: Anonymiser for recordings and test fixtures
 
 Source: Issue #20
-Status: Draft
+Status: Approved by Lead
 
 ## Problem
 
@@ -29,8 +29,7 @@ writes an anonymised copy in the same format.
 - S5: Given a maintainer with a local deny list (names to deny and, per fixture, the path of its original recording),
   when the suite runs with the environment variable that points to it, then the deny-list test checks every fixture;
   without the variable the test is reported inconclusive, not passed.
-- S6: Given a contributor, when they read `README.md` or the user guide, then they find how to run the anonymiser and
-  what it changes and keeps (English, then German).
+- S6: Given a contributor, when they read `README.md` or the user guide, then they find how to run the anonymiser.
 
 ## Errors and edge cases
 
@@ -38,7 +37,8 @@ The anonymiser prints one line `Error: <reason>` and exits with code 1; no file 
 
 - E1: The recording is refused for the reasons and with the texts a replay uses: `file not found`, `not a recording`,
   `unsupported version`, `invalid line <n>`, `read failed` ([`pipe-recording.md`](../../docs/areas/pipe-recording.md),
-  *Limits and errors*). A file that differs between the two passes (N5) gives `read failed`.
+  *Limits and errors*). A file that differs between the two passes (N5) gives `read failed`; a receive time the shift
+  (N2) would move before the earliest representable time gives `invalid line <n>`.
 - E2: A frame the anonymiser cannot decode — an unknown type, a malformed message, any frame but `Version` before a
   `Version 2` or after another version — gives `frame cannot be anonymised in line <n>`: its bytes could hold a name,
   so it is never copied and never dropped silently (fail closed). An empty frame holds nothing and is copied.
@@ -52,7 +52,7 @@ The anonymiser prints one line `Error: <reason>` and exits with code 1; no file 
   that repeats included; only their amounts change (N3).
 - E9: The deny list names a fixture whose original is missing or unreadable: the deny-list test fails and names the
   fixture.
-- E10: A recording of only the header gives an output of only the shifted header.
+- E10: A header-only recording gives a header-only output.
 
 ## Non-functional requirements
 
@@ -142,6 +142,6 @@ The anonymiser prints one line `Error: <reason>` and exits with code 1; no file 
    replayed items, not bytes.
 3. Time shift — accepted: 30 to 365 days plus a part below one day (N2, AC4); no original name or time in fixtures.
 4. Two passes — accepted (N5); a file changed in between is `read failed` (E1).
-5. A refused reference recording — accepted: AC6 names the fixtures produced; open question 5 reports a refusal.
+5. A refused reference recording — accepted: AC6 names the fixtures produced (open question 5).
 6. Name match — accepted with another rule: every non-empty fixture name must be an invented name and equal no deny
    entry (AC7), so no substring rule is needed and a short entry cannot fail on `Island <n>`.
