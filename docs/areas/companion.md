@@ -164,7 +164,7 @@ sent it: GUIDs are raw numbers until names and icons exist.
   per skipped frame); recording started and stopped at the click, its file name (the name only) when the file is
   created, a recording failure and the failure of a stopped recording; a replay's start (the file name only), its
   end and its problem reason; a folder that could not be opened; the autostart turned on (`Autostart enabled`) or off (`Autostart disabled`) and, as warnings, `Could not read the autostart setting` (once until a read succeeds again, so a blocked registry does not log at every menu opening) and `Could not change the autostart setting`, with the exception where there is one and never the exe path; an unexpected error of a background task; and `Exit`.
-- The log holds no pipe content (headline, island names, values): recording files and folders are logged by name only.
+- The log holds no pipe content (figure name, island names, values): recording files and folders are logged by name only.
 - Text that came from outside (a replay file name, exception texts) is sanitized: each control character, format
   character, line or paragraph separator and unpaired surrogate becomes one `?`, so a text cannot add a line or hide
   characters. A message is cut at 2,048 characters and an exception text at 16,384, each with `…` appended when cut.

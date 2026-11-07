@@ -8,10 +8,14 @@ Sources:
 - The reference reader of Ubisoft (read on 2026-11-01) and a third-party capture (`Dealwatch/Tabularium117`, its own
   `docs/protocol.md`, not this file).
 - One recording of Censio's own Companion of 2026-11-07: about 90 minutes, two loads of a game, one connection, 794
-  frames (1 version, 2 session starts, 2 session ends, 789 island frames). It is not published (#20); this document
-  states derived facts only: no frame, name, headline or path.
+  frames (1 version, 2 session starts, 2 session ends, 789 island frames). It is the source of every section below
+  unless a statement names the others.
+- Three more recordings of #17 (2026-11-03, 2026-11-04 and 2026-11-07), about 1,360 frames in all four. Only the
+  statements on the session start text and the connect sequence rest on all four.
 
-Each statement is marked *confirmed* (the recording of 2026-11-07) or *assumed* (with its source). What a single
+None is published (#20); this document states derived facts only: no frame, name or path.
+
+Each statement is marked *confirmed* (the recording of 2026-11-07, or all four where stated) or *assumed* (with its source). What a single
 recording cannot show stays *assumed*.
 
 ## Framing
@@ -28,8 +32,9 @@ no island frame has trailing bytes, and no float is NaN.
 
 ### SessionStart
 
-- Payload: a headline (assumed, from the reference's field name: the name of the loaded game). *Confirmed*: 18 bytes both times; it is text and carries no
-  structure the reader uses. *Assumed* (third-party capture): a non-ASCII character is written as `_`; the recording
+- Payload: the name of the player figure. *Confirmed* (all four recordings): the text is 6 or 18 bytes long and carries
+  no structure the reader uses; it is the same in every recording of one figure, also across two savegames of that
+  figure, so it is no savegame key (record 0041). Two figures send different texts. *Assumed* (third-party capture): a non-ASCII character is written as `_`; the recording
   has no non-ASCII byte in any string, so it confirms neither this nor the opposite.
 
 ### SessionEnd
@@ -98,7 +103,8 @@ One island per frame; the frames of one tick follow each other. *Confirmed*: 789
 
 ### Connect sequence
 
-*Confirmed*: the version comes first. A session end follows 13 s later with no session start before it (the reader's
+*Confirmed* (all four recordings): the version comes first, then the session start either comes at once or follows a
+session end, so both orders occur. In the recording of 2026-11-07 a session end follows 13 s later with no session start before it (the reader's
 *repeated session end*, [`areas/pipe.md`](areas/pipe.md), *Session events*); the session start follows 93 s after that, and
 the first island frame 4 s later. So a Companion can receive an end before it knows a start; whether the game sends it because of the connect or because of a player action is not visible.
 
