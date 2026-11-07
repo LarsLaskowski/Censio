@@ -43,12 +43,12 @@ The anonymiser prints one line `Error: <reason>` and exits with code 1; no file 
   `Version 2` or after another version — gives `frame cannot be anonymised in line <n>`: its bytes could hold a name,
   so it is never copied and never dropped silently (fail closed). An empty frame holds nothing and is copied.
 - E3: The output exists: `output file exists` (never overwritten); it is the input: `output is the input`.
-- E4: The output cannot be written: `write failed`.
+- E4: Output not writable: `write failed`.
 - E5: Not exactly two arguments: `Usage: <command> <recording> <output>` and exit code 2.
 - E6: An original name that equals an invented one still gets a different invented name: no invented name equals an
   original name of the file.
 - E7: An empty name stays empty. Bytes after the last field of a frame are not copied.
-- E8: Zero stays zero; NaN and infinities stay as they are. Map pairs are copied one by one as on the wire, a GUID
+- E8: Zero stays zero; NaN stays NaN (the standard NaN with its sign) and infinities stay. Map pairs are copied one by one as on the wire, a GUID
   that repeats included; only their amounts change (N3).
 - E9: The deny list names a fixture whose original is missing or unreadable: the deny-list test fails and names the
   fixture.
@@ -71,8 +71,8 @@ The anonymiser prints one line `Error: <reason>` and exits with code 1; no file 
   - Maintenance and every workforce amount change on their own, keeping their sign and never becoming 0: by exactly 1
     in magnitude when below 5, else by 1 % to 20 %, rounded, and at least 1.
   - Profit becomes its original plus the change of income minus maintenance, rounded, so it stays within 1 of income
-    minus maintenance as the original was; where that change rounds to 0, profit stays as it was, and its sign may
-    change.
+    minus maintenance as the original was; where that change rounds to 0, a non-zero profit moves 1
+    towards the new income minus maintenance; its sign may change.
 - N4: Kept unchanged: line count and order, frame types, `Version`, session end, session ID, island ID, area index,
   session GUID, game time, entry count and order, product GUIDs, building count, the building map, and the workforce
   map's GUIDs, pair count and order.
@@ -137,11 +137,11 @@ The anonymiser prints one line `Error: <reason>` and exits with code 1; no file 
 ## Challenge
 
 1. Major, N3 unmeetable — accepted: one factor per entry for the float amounts, delta, average productivity and
-   profit derived, a change of 1 for small integers, profit's own bounds waived; AC3 tests the factor.
+   profit derived, a change of 1 for small integers, profit's own bounds waived.
 2. E8 against N4 and AC7 — accepted: map pairs are copied as on the wire. Trailing bytes stay dropped: AC1 compares
    replayed items, not bytes.
 3. Time shift — accepted: 30 to 365 days plus a part below one day (N2, AC4); no original name or time in fixtures.
-4. Two passes — accepted (N5); a file changed in between is `read failed` (E1).
+4. Two passes — accepted (N5, E1).
 5. A refused reference recording — accepted: AC6 names the fixtures produced (open question 5).
 6. Name match — accepted with another rule: every non-empty fixture name must be an invented name and equal no deny
    entry (AC7), so no substring rule is needed and a short entry cannot fail on `Island <n>`.
