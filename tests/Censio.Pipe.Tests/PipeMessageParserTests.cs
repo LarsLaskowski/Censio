@@ -42,6 +42,31 @@ public sealed class PipeMessageParserTests
         }
     }
 
+    /// <summary>
+    /// Gets frames of each type, with and without trailing bytes, and refused frames, with the expected consumed length.
+    /// </summary>
+    public static IEnumerable<object[]> ConsumedLengthFrames
+    {
+        get
+        {
+            var statistics = CreateStatistics(2).Entry(10, [new(1, 2), new(1, 3)], [new(3, 4)]).Entry(11, _noPairs, _noPairs).Build();
+
+            yield return ["version", new PipeFrameBuilder().Byte(0).Int32(2).Build(), 5];
+            yield return ["version with trailing bytes", new PipeFrameBuilder().Byte(0).Int32(2).Raw(0xAA, 0xBB).Build(), 5];
+            yield return ["session start", new PipeFrameBuilder().Byte(1).String("abc").Build(), 5];
+            yield return ["session start with trailing bytes", new PipeFrameBuilder().Byte(1).String("abc").Raw(0xAA).Build(), 5];
+            yield return ["empty session start", new PipeFrameBuilder().Byte(1).String(string.Empty).Build(), 2];
+            yield return ["session end", new PipeFrameBuilder().Byte(2).Build(), 1];
+            yield return ["session end with trailing bytes", new PipeFrameBuilder().Byte(2).Raw(0xAA, 0xBB, 0xCC).Build(), 1];
+            yield return ["statistics", statistics, statistics.Length];
+            yield return ["statistics with trailing bytes", Concat(statistics, [0xAA, 0xBB]), statistics.Length];
+            yield return ["empty frame", Array.Empty<byte>(), 0];
+            yield return ["unknown type", new PipeFrameBuilder().Byte(9).Int32(2).Build(), 0];
+            yield return ["truncated version", new PipeFrameBuilder().Byte(0).Raw(2, 0).Build(), 0];
+            yield return ["truncated statistics", statistics[..^1], 0];
+        }
+    }
+
     #endregion // Properties
 
     #region Methods
@@ -503,6 +528,42 @@ public sealed class PipeMessageParserTests
 
         // Assert
         Assert.DoesNotContain("secret", error.ToString(), "The string form should not contain payload text");
+    }
+
+    /// <summary>
+    /// The overload with the consumed length reports the position behind the last field read, so trailing bytes are not
+    /// counted, gives the result of <see cref="PipeMessageParser.Parse(ReadOnlySpan{byte})" /> and reports 0 on an error.
+    /// </summary>
+    /// <param name="description">What the frame holds</param>
+    /// <param name="frame">The frame</param>
+    /// <param name="expected">The expected consumed length</param>
+    [TestMethod]
+    [TestCategory("AC1")]
+    [DynamicData(nameof(ConsumedLengthFrames))]
+    public void PipeMessageParserParseReportsConsumedLength(string description, byte[] frame, int expected)
+    {
+        // Arrange
+        var plain = PipeMessageParser.Parse(frame);
+
+        // Act
+        var result = PipeMessageParser.Parse(frame, out var consumed);
+
+        // Assert
+        Assert.AreEqual(expected, consumed, $"The consumed length should end after the last field read ({description})");
+        Assert.AreEqual(plain.Kind, result.Kind, $"The result should be the one of the plain parse ({description})");
+        Assert.AreEqual(plain.Message?.MessageType, result.Message?.MessageType, $"The message type should be the one of the plain parse ({description})");
+        Assert.AreEqual(plain.Error?.ToString(), result.Error?.ToString(), $"The error should be the one of the plain parse ({description})");
+    }
+
+    /// <summary>
+    /// Joins two byte arrays.
+    /// </summary>
+    /// <param name="first">The first array</param>
+    /// <param name="second">The second array</param>
+    /// <returns>The bytes of both</returns>
+    private static byte[] Concat(byte[] first, byte[] second)
+    {
+        return [.. first, .. second];
     }
 
     /// <summary>
