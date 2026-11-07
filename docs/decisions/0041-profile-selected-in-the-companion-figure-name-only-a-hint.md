@@ -1,6 +1,6 @@
 # 0041: The profile is selected in the Companion; the figure name of a session start is only a hint
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-07
 - **Area:** pipe
 - **Source:** Issue #19
