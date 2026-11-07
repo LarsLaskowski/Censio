@@ -109,7 +109,8 @@ afterwards (a partly written output is removed).
 
 ## Out of scope
 
-- Shipping the anonymiser in the Companion ZIP or as a Companion switch (open question 1).
+- Shipping the anonymiser in the Companion ZIP or as a Companion switch (open question 1); the user guide's advice to
+  keep a raw recording private until a maintainer asks for it stays as it is.
 - Anonymising game files, logs or screenshots, and cutting or merging recordings.
 - Recordings of a format version other than 1 and frames of a protocol version other than 2 (E2).
 - Producing the deny list automatically.
@@ -117,7 +118,9 @@ afterwards (a partly written output is removed).
 ## Open questions
 
 1. Who gets the anonymiser: a contributor tool in the repository only, also a program in the Companion ZIP, or a
-   Companion switch? Escalated to the Product Manager; this draft assumes the contributor tool.
+   Companion switch? Answered: by the Product Manager, a contributor tool only — a console project in the repository,
+   run with `dotnet run` and the .NET SDK, not in the release ZIP; testers keep handing raw recordings to a maintainer
+   privately, as the user guide says today.
 2. Is the game time a timestamp to shift? Answered: no. The issue's "timestamps shifted" are the receive times, which
    tell when the player played; the game time tells nothing about the player, and its values (19,000 after a load, the
    multiples of 100, the tick spacing) are what the fixtures should show ([`docs/protocol.md`](../../docs/protocol.md),
