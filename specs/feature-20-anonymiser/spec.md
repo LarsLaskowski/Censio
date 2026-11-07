@@ -111,7 +111,7 @@ The anonymiser prints one line `Error: <reason>` and exits with code 1; no file 
 - Shipping the anonymiser in the Companion ZIP or as a Companion switch (open question 1); the user guide's advice to
   keep a raw recording private until a maintainer asks for it stays.
 - Anonymising game files, logs or screenshots; cutting or merging recordings; producing the deny list automatically.
-- Recordings of a format version other than 1 and frames of a protocol version other than 2 (E2).
+- Recordings of a format version other than 1; frames other than `Version` after a protocol version other than 2 (E2).
 
 ## Open questions
 

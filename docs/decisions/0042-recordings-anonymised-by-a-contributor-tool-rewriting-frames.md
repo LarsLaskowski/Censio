@@ -62,5 +62,6 @@ shifted by one random offset. What is kept, changed and refused is in [`areas/pi
 - A fixture cannot be reproduced bit for bit; its README says how it was made, not with which values.
 - A local deny-list test compares each fixture with its original by place, because a set of values would match by
   chance; it runs only where the originals are, so CI shows it inconclusive.
-- A recording with a frame the reader skips, or of a protocol version other than 2, cannot be anonymised.
+- A recording with a frame the reader skips cannot be anonymised: any frame but `Version` before a `Version 2` or after
+  another version. A `Version` frame of any version is written anew (type byte and version).
 - Shipping the tool to testers later is a new decision (option 2 or 3) that has to add a reviewer-free privacy promise.

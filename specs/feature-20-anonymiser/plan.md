@@ -54,7 +54,7 @@ through it, so `PipeReplayStreamTests` stay as they are and guard the move. The 
 1. Draw the offset: `30 days + u × 335 days` in ticks, plus one tick if a whole number of days.
 2. Pass 1: every line through the reader; a problem returns it. Each frame: its shifted time below
    `DateTimeOffset.MinValue` → `invalid line <n>`; `PipeFrameAnonymiser.TryCollect` applies the version gate as the
-   reader does (only `Version` decoded until a `Version 2`) and `PipeMessageParser.Parse`; an error or a gated frame →
+   reader does (only `Version` decoded until a `Version 2`; a `Version` of any version is accepted and only sets the gate) and `PipeMessageParser.Parse`; an error or a gated frame →
    `FrameNotAnonymisable` with the line; else its names are collected. Pass 1 keeps the first receive time and the
    frame count.
 3. `PipeAnonymousNames.Complete`: islands `Island <n>`, figures `Player <n>` in order of first appearance, skipping
