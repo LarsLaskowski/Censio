@@ -707,31 +707,46 @@ public sealed class PipeRecordingAnonymiserTests
     }
 
     /// <summary>
-    /// A non-zero profit whose rounded change is 0 moves 1 towards the new income minus maintenance, or away from it at
-    /// the edge of the 32-bit range.
+    /// The profit becomes an integer within 1 of the new income minus maintenance (D'), on the original's side of it; a
+    /// non-zero profit never keeps its value, a zero one only while 0 is within 1 of D'; at the edge of the 32-bit range
+    /// it moves 1 inwards; with a non-finite income the integer rule applies.
     /// </summary>
-    /// <param name="income">The income</param>
+    /// <param name="income">The income; the maintenance is 0, so the original's income minus maintenance is the income</param>
     /// <param name="profit">The profit</param>
+    /// <param name="draw">The draw of every side and magnitude</param>
     /// <param name="expected">The expected profit</param>
+    /// <param name="maxDistance">The largest distance allowed between the profit and D'</param>
     /// <returns>The task</returns>
     [TestMethod]
     [TestCategory("AC3")]
-    [DataRow(0f, 5, 4)]
-    [DataRow(0f, -5, -4)]
-    [DataRow(0f, 1, 0)]
-    [DataRow(0.1f, -3, -2)]
-    [DataRow(3e9f, int.MaxValue, int.MaxValue - 1)]
-    [DataRow(-3e9f, int.MinValue, int.MinValue + 1)]
-    public async Task PipeRecordingAnonymiserProfitWhoseChangeRoundsToZeroMovesOne(float income, int profit, int expected)
+    [DataRow(-4.1f, -5, Up, -4, 1.0)]
+    [DataRow(4.1f, 5, Up, 4, 1.0)]
+    [DataRow(2.9f, 2, Up, 3, 1.0)]
+    [DataRow(-2.9f, -2, Up, -3, 1.0)]
+    [DataRow(1430.388f, 1429, Up, 1648, 1.0)]
+    [DataRow(1708.0629f, 1707, Up, 1968, 1.0)]
+    [DataRow(400f, 461, Up, 462, 1.0)]
+    [DataRow(400f, 339, Down, 338, 1.0)]
+    [DataRow(0.52f, 0, Up, 0, 1.0)]
+    [DataRow(0.95f, 0, Up, 1, 1.0)]
+    [DataRow(3e9f, int.MaxValue, Up, int.MaxValue - 1, double.PositiveInfinity)]
+    [DataRow(-3e9f, int.MinValue, Up, int.MinValue + 1, double.PositiveInfinity)]
+    [DataRow(float.PositiveInfinity, 400, Up, 461, double.PositiveInfinity)]
+    public async Task PipeRecordingAnonymiserProfitStaysWithinOneOfNewIncomeMinusMaintenance(float income, int profit, double draw, int expected, double maxDistance)
     {
         // Arrange
         var island = Island(1, "Ostia", 100, EntryBytes(Entry(10, 1000f, 0, income, profit), _noPairs, _noPairs));
 
         // Act
-        var (_, output) = await AnonymiseAsync(RecordingOf(_version2, island), new ScriptedPipeAnonymiserRandom(Up));
+        var (_, output) = await AnonymiseAsync(RecordingOf(_version2, island), new ScriptedPipeAnonymiserRandom(draw));
 
         // Assert
-        Assert.AreEqual(expected, ParseIsland(OutputFrames(output)[1].Frame).Entries[0].Profit, "The profit should move by 1 as the rule says");
+        var entry = ParseIsland(OutputFrames(output)[1].Frame).Entries[0];
+        var newDifference = (double)entry.Income - entry.Maintenance;
+
+        Assert.AreEqual(0, entry.Maintenance, "A maintenance of 0 should stay 0");
+        Assert.AreEqual(expected, entry.Profit, $"The profit should be the candidate the rule picks for D' = {newDifference}");
+        Assert.IsLessThanOrEqualTo(maxDistance, Math.Abs(entry.Profit - newDifference), "The profit should stay within 1 of the new income minus maintenance");
     }
 
     /// <summary>
