@@ -107,6 +107,14 @@ The solution is `Censio.slnx`; `docs/ARCHITECTURE.md` lists the projects and the
 - **Solution format** is `.slnx` (XML-based) at the repository root.
 <!-- stack:end configuration -->
 <!-- project:begin configuration -->
+- `Censio.Companion` targets `net10.0-windows` (WPF and Windows Forms) with `EnableWindowsTargeting` and the
+  `RuntimeIdentifier` `win-x64`, so it builds on Linux; every other project targets `net10.0` (record 0004,
+  *Known pitfalls* in `.squad/stack.md`).
+- The product version is the one build property `Version` in `Directory.Build.props` (`0.0.0` on `main`), set
+  only by the release build (record 0005); no project sets a version of its own.
+- `Censio.Server` requests the Blazor web assets itself with `RequiresAspNetWebAssets` (record 0007).
+- The runtime settings and the Companion's switches are listed in the configuration table of `README.md` and stated
+  in their area document under `docs/areas/`.
 <!-- project:end configuration -->
 
 ## Code style
@@ -120,6 +128,13 @@ region named after the interface, its description not ending in "implementation"
 members (English, no `<remarks>`); `.ConfigureAwait(false)` in library/service code.
 <!-- stack:end code-style -->
 <!-- project:begin code-style -->
+- Windows-only code lives in `Censio.Companion` alone; the Companion's logic stays platform-neutral in
+  `Censio.Companion.Core` and reaches Windows through an interface there (record 0004).
+- External input (pipe frames, recording lines) is read into typed results with a kind, never through exceptions,
+  and a reader fails closed (record 0033, `docs/areas/pipe.md`).
+- The Companion logs through `ILogger` with `[LoggerMessage]` methods in `CompanionLog`; what may be logged is in
+  `docs/areas/companion.md` (*Log*).
+- `#endregion` repeats the region's name (`#endregion // Methods`).
 <!-- project:end code-style -->
 
 ## Testing

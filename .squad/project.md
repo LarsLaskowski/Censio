@@ -18,24 +18,26 @@ protected, the concrete types, files or endpoints, and a link to the area docume
 (`- Session tokens: issued in src/Auth/, checked by every /api route — [Sessions](../docs/areas/sessions.md)`); no
 limits, patterns or sequences.
 
-- Ingest token: read from configuration or an environment variable, compared in constant time, never logged.
-- Authentication: the WebSocket ingest accepts a Companion only with a valid token; the web UI follows the deployment note in `SECURITY.md`.
-- File paths for the cache and for recordings: derived from configuration, never from data read from the pipe or a game file; reject traversal. The recordings folder is `%LOCALAPPDATA%\Censio\Recordings` from `PipeRecordingFiles.DefaultFolder`, fixed, the file name built from the receive time and a counter only (record 0036); the replay path is the user's own command-line argument, opened read-only. The Companion's log folder is `%LOCALAPPDATA%\Censio\Logs` from `CompanionFolders.Logs`, fixed; `LogFileLoggerProvider` writes and prunes only in a fully qualified folder and deletes only top-level files whose whole name `LogFileNames.TryParse` accepts (`companion-<yyyyMMdd>.log`, `companion-<yyyyMMdd>-<n>.log`; ASCII only, round trip), keeping the 10 newest (record 0037). `FolderOpener` creates the recordings or log folder and starts `<Windows folder>\explorer.exe` with that one folder as its single argument, only for a fully qualified path, never through the shell.
-- Parsing of external input: the Anno 117 statistics pipe stream and game files (Companion), recording files (`PipeReplayStream` with `PipeRecordingFormat`, bounded line, frame and queue sizes), and every WebSocket message (server) — bounded sizes, malformed input is rejected, never trusted.
-- Local pipe connection (Companion): `NamedPipeConnector` opens `\\.\pipe\anno117` read-only, asynchronously and at impersonation level `Identification` (`PipeEndpoint`), so the pipe's server cannot act with the user's Windows identity; nothing is written to it (record 0035).
-- Data-protection key ring: `<Censio:DataDirectory>/data-protection-keys` (`DataProtectionSetup`), created owner-only, unencrypted at rest; the server stops when it cannot write it.
-- Network exposure: the server's listener and its routes reachable without login (`/`, `/health`, the Blazor hub and static assets); plain HTTP, TLS at the reverse proxy (record 0006).
-- Release publishing: `.github/workflows/release.yml` — the Docker Hub credentials and the `contents: write` token only in jobs that run no build code; the Docker Hub credentials and `WEBSITE_DISPATCH_TOKEN` are secrets of the environment `release`, which admits only `v*` tags (record 0012); a run moves Docker Hub `latest` only for a tag that is the highest `v*` version, checked in `check` and `promote` (record 0012); GitHub's *Latest* mark is not protected.
-- Windows autostart: `CompanionAutostart` writes only `HKCU\Software\Microsoft\Windows\CurrentVersion\Run\Censio Companion` as the quoted `Environment.ProcessPath` without arguments (refused when the path holds `%` or `"` or is longer than 200 characters), counts only that exact command as its own, and deletes only that value (`RegistryStartupEntryStore`, record 0017).
-- Outbound calls: none planned; a new one is a security area.
-- Logging of external data: pipe, game-file and WebSocket content is logged only truncated and sanitized, never the token. The Companion's log writer (`LogLine`, `LogFileLoggerProvider`) replaces control and format characters, line and paragraph separators and unpaired surrogates by `?` code point by code point, cuts a message at 2,048 and an exception text at 16,384 characters and queues at most 1,048,576 characters; it logs file names only (a replay file name, a recording file name), no pipe content; exception texts are logged as given and may hold the profile path (record 0037). The diagnostics window shows pipe content on screen only, island names through `LogLine.Sanitize`; nothing of it is logged or written (record 0038).
+- Ingest token and Companion authentication: the WebSocket ingest of `src/Censio.Server` (not built yet, #28) — [record 0019](../docs/decisions/0019-websocket-transport-with-shared-token.md); its area document comes with #28.
+- Network exposure: the server's listener and its routes reachable without login (`/`, `/health`, the Blazor hub, static assets) in `src/Censio.Server/Program.cs` and `src/Censio.Server/Dockerfile` — [server](../docs/areas/server.md).
+- Data-protection key ring: `DataProtectionSetup` under the data directory — [server](../docs/areas/server.md), *Data directory and key ring*.
+- Local pipe connection: `NamedPipeConnector` and `PipeEndpoint` open the game's pipe read-only at identification level — [pipe-connection](../docs/areas/pipe-connection.md), *Opening*.
+- Parsing of external input: the pipe stream (`PipeFrameReader`, `PipeMessageParser`, `PipeTickAssembler`), recording files (`PipeReplayStream`, `PipeRecordingFormat`), later game files and WebSocket messages — [pipe](../docs/areas/pipe.md), [pipe-recording](../docs/areas/pipe-recording.md).
+- File paths the Companion writes, prunes or opens: the recordings folder (`PipeRecordingFiles`), the log folder (`CompanionFolders`, `LogFileLoggerProvider`, `LogFileNames`), Explorer (`FolderOpener`), the replay file from the command line, later the cache — [companion](../docs/areas/companion.md) (*Recording*, *Folders*, *Log*), [pipe-recording](../docs/areas/pipe-recording.md).
+- Windows autostart: `CompanionAutostart` over `RegistryStartupEntryStore`, the per-user Run value — [companion](../docs/areas/companion.md), *Start with Windows*.
+- Logging and showing external data: the Companion's log writer (`LogLine`, `LogFileLoggerProvider`, `CompanionLog`), the diagnostics window, the pipe's error results, the server's request logging — [companion](../docs/areas/companion.md) (*Log*, *Diagnostics window*), [pipe](../docs/areas/pipe.md), [server](../docs/areas/server.md).
+- Release publishing: `.github/workflows/release.yml` and `notify-website.yml`, their secrets in the environment `release`, Docker Hub `latest` — [record 0012](../docs/decisions/0012-release-pre-release-first-and-secret-free-builds.md), `docs/CONTRIBUTING.md` (*Versioning and releases*), [server](../docs/areas/server.md) (*Docker image*).
+- Outbound calls: none exist; the first one is a new security area.
 
 ## Guarantees
 
 Deliberate behavior that must not change without the Product Manager. One line each: the guarantee in a few words,
 a link to its decision record where it was a real choice, and a link to the area document that states it.
 
-- None recorded yet; a guarantee is added here with its decision record when the first one is made.
+- Plain HTTP with TLS at a reverse proxy; the start page and `/health` need no login, `/health` reveals only its status — [record 0006](../docs/decisions/0006-server-plain-http-and-open-health.md), [server](../docs/areas/server.md).
+- The server stores data from a Companion only with the shared ingest token, which only an explicit setting switches off — [record 0019](../docs/decisions/0019-websocket-transport-with-shared-token.md); its area document comes with #28.
+- History in SQLite in the data directory: full resolution for 7 days, then hourly averages kept without limit, deletable per profile — [record 0021](../docs/decisions/0021-sqlite-history-with-retention.md); its area document comes with #29 and #35.
+- Unsent ticks wait in a bounded local buffer and are delivered in order; beyond the bound the oldest are dropped and shown as a gap, never as zeros — [record 0031](../docs/decisions/0031-bounded-local-tick-buffer-gaps-accepted.md); its area document comes with #41.
 
 ## Integration surface
 
@@ -43,37 +45,51 @@ What the Reviewer checks when the diff introduces or changes a thing of this kin
 change with it.
 
 **A new or changed configuration option** touches:
-- the key and its validation: `Censio:DataDirectory` in `DataProtectionSetup`, the Companion's command-line options in `CompanionCommandLine`
-- registration and binding in the host: `src/Censio.Server/Program.cs`, `src/Censio.Companion/App.xaml.cs`
-- the default in `src/Censio.Server/appsettings.json` and the `ENV` lines of `src/Censio.Server/Dockerfile`
-- the configuration table in `README.md` (key, environment variable, default; English first, then German)
-- the test that pins it: `DataProtectionSetupTests`, `ProgramTests`, `CompanionCommandLineTests`
+- the key and its validation: `Censio:DataDirectory` in `DataProtectionSetup`; the Companion's switches in `CompanionCommandLine`
+- registration and binding: `src/Censio.Server/Program.cs`, `src/Censio.Companion/App.xaml.cs`
+- the defaults: `src/Censio.Server/appsettings.json` and the `ENV` lines of `src/Censio.Server/Dockerfile`
+- the configuration table in `README.md` (key, environment variable, default; English, then German) and the user guide
+- the area document that states the option: `docs/areas/server.md` or `docs/areas/companion.md` (*Command line*)
+- the tests that pin it: `DataProtectionSetupTests`, `ProgramTests`, `CompanionCommandLineTests`
 
 **A new or changed service / module** touches:
-- its interface, where the Companion's platform-neutral logic is separated from the Windows shell (`IPipeConnector`, `IStartupEntryStore`, `IDiagnosticsWindow` in `Censio.Companion.Core`)
-- registration and lifetime in `Program.cs` (server) or `App.xaml.cs` (Companion)
+- its interface where platform-neutral logic meets Windows: `IPipeConnector`, `IStartupEntryStore`, `IDiagnosticsWindow` in `Censio.Companion.Core`
+- registration and lifetime: `Program.cs` (server) or `App.xaml.cs` (Companion)
 - the fake or stub in the test project (*Test doubles* below)
 - the project table in `docs/ARCHITECTURE.md` and the area document in `docs/areas/`
 
 **A new external API call or DTO** touches:
-- the pipe/game-file reader or ingest message type and its DTOs (`Censio.Pipe`, `Censio.Contracts`) — the external shape must not leak past it
-- the fake or synthetic frames in the tests (decisions 0029, 0033)
+- the reader of the external shape and its types: `Censio.Pipe` for the pipe and recordings, later `Censio.GameData` and the ingest messages in `Censio.Contracts`; the external shape must not leak past it
+- `PipeFrameBuilder` or other synthetic input in the tests, never real recordings (records 0029, 0033)
+
+**A new pipe message type, field or tick rule** touches:
+- `PipeMessageType`, `PipeMessageParser` and the message class in `Censio.Pipe`; `PipeTickBuilder` and `PipeTickLimits` for a tick rule
+- the recording format version in `PipeRecordingFormat` when the recorded content changes
+- the diagnostics columns in `DiagnosticsView`
+- `docs/areas/pipe.md` (*Message types*, *Limits and errors*)
+
+**A new tray menu entry, tooltip text or icon look** touches:
+- `TrayMenu`, `TrayMenuEntryKind`, `TraySnapshot` or `TrayIconLook` in `Censio.Companion.Core`, and `TrayIcon` / `TrayIconImages` in `Censio.Companion`
+- `docs/areas/companion.md` (*Tray icon and menu*), the menu list in `README.md` and the tooltip table in the user guide (English and German)
+
+**A new log message** touches:
+- `CompanionLog` (a `LoggerMessage` method) and the list of what is logged in `docs/areas/companion.md` (*Log*)
 
 ## Test doubles
 
 The hand-written fakes and stubs the tests reuse (no mocking library unless `docs/UNIT_TESTS.md` says
 otherwise), one line each: the double, where it lives and what it stands in for; how it behaves is read in its code.
 
-- `RecordingLogger` (`tests/Censio.Server.Tests/RecordingLogger.cs`, linked into `tests/Censio.Companion.Core.Tests` as a `Compile` item like `PipeFrameBuilder`): an `ILogger` that is enabled for every level, begins no scope and keeps each entry's level, formatted message and exception in `Entries`, in the order written, for tests that assert what a component logs — `DataProtectionSetup` in the server tests, and `CompanionLog`, `FolderOpener`, `PipeConnection`, `PipeRecordingFiles`, `PipeRecordingSession` and `PipeReplayRunner` in the Companion tests. It models no real component.
-- `ChunkedStream` (`tests/Censio.Pipe.Tests/ChunkedStream.cs`): a read-only `Stream` that returns its bytes in chunks of a given size, can throw an `IOException` at an offset or cancel a `CancellationTokenSource` at an offset, can report `CanRead` as false, and throws `ObjectDisposedException` once disposed, for tests of the frame reader's partial reads, I/O errors and cancellation. It models no real component.
-- `PipeFrameBuilder` (`tests/Censio.Pipe.Tests/PipeFrameBuilder.cs`, linked into `tests/Censio.Companion.Core.Tests` as a `Compile` item): a fluent builder that writes the pipe's frame fields in little-endian order (type byte, payload, optional length prefix), for tests that need synthetic and corrupt frames.
-- `ScriptedPipeMessageSource` (`tests/Censio.Pipe.Tests/ScriptedPipeMessageSource.cs`, with its handle `HeldPipeRead`): an `IPipeMessageSource` that returns queued results, either completed at once (optionally running an action when the read is requested, for example to set a clock) or held until the test releases them, counts its reads, can wait until a number of reads was requested, and records whether the token of a read that had not completed was cancelled; a read without a script entry stays pending until cancelled. For tests of `PipeTickAssembler`. It models no real component.
-- `ScriptedPipeConnector` (`tests/Censio.Companion.Core.Tests/ScriptedPipeConnector.cs`): an `IPipeConnector` that returns queued results, either completed at once, failed at once with a given exception (against the interface's contract) or held until the test releases them, counts its attempts, stamps each with the time of the given clock and can wait until a number of attempts was made; an attempt without a script entry stays pending until its token is cancelled. A queued or released result completes on the test's thread. For tests of `PipeConnection`. It models no real component.
-- `ControlledPipeStream` (`tests/Censio.Companion.Core.Tests/ControlledPipeStream.cs`): a read-only `Stream` the test feeds with bytes, ends or fails; a read returns the bytes fed so far and waits while there are none, returns 0 once the stream was ended, throws the given exception (for example `IOException`, `UnauthorizedAccessException`, `OperationCanceledException`) once it failed, and a pending read ends with `OperationCanceledException` when its token is cancelled. Feeding, ending or failing completes a pending read on the test's thread. It counts the reads that had to wait (and can wait until a number of them was reached), counts every write call (`CanWrite` is false, each write throws `NotSupportedException`) and records its disposal. It models the end and the cancellation of an asynchronous pipe read (`NamedPipeClientStream` with `PipeOptions.Asynchronous`): a read failing with `ERROR_BROKEN_PIPE` or `ERROR_PIPE_NOT_CONNECTED` returns 0, a cancelled token ends the read with `OperationCanceledException`, other errors propagate as exceptions — checked by reading `dotnet/runtime` `release/10.0` `PipeStream.ValueTaskSource.cs` (`CompleteCore`, `RegisterForCancellation`) and `Win32Marshal.GetExceptionForWin32Error`.
-- `FakeTimeProvider` (`Microsoft.Extensions.TimeProvider.Testing`, referenced by `tests/Censio.Pipe.Tests` and `tests/Censio.Companion.Core.Tests`): the clock of timing tests, passed as the `TimeProvider` of the type under test and moved with `Advance` or `SetUtcNow`; its timers (`Task.Delay(delay, timeProvider, token)`) fire inside `Advance` exactly when the clock reaches their due time. It is a test library, not a mocking library.
-- `ControlledWriteStream` (`tests/Censio.Pipe.Tests/ControlledWriteStream.cs`, linked into `tests/Censio.Companion.Core.Tests` as a `Compile` item like `PipeFrameBuilder`): a write-only `Stream` that keeps the bytes written (`Text`, `ToArray()`), holds every write that starts after `HoldWrites()` until `ReleaseWrites()`, fails a write that would take the content over a given length (`FailWritesAfter`, none of its bytes kept) or a flush while the content is over a given length (`FailFlushesAfter`) with a given exception, counts writes and flushes, remembers the content length at each flush (`FlushedLengths`), can wait until a number of writes started or a number of bytes was flushed, and records its disposal; only `WriteAsync` and `FlushAsync` are supported, the synchronous members throw `NotSupportedException`. For tests of `PipeRecorder` and the recording session. It models the failures of a `FileStream` write and flush (a full disk as `IOException`, a deleted folder as `DirectoryNotFoundException`, a refused access as `UnauthorizedAccessException`) — checked by reading `dotnet/runtime` `release/10.0` `Win32Marshal.GetExceptionForWin32Error` (`ERROR_ACCESS_DENIED` gives `UnauthorizedAccessException`, `ERROR_PATH_NOT_FOUND` `DirectoryNotFoundException`, the other codes, `ERROR_DISK_FULL` included, `IOException`).
-- `BackwardsFakeTimeProvider` (`tests/Censio.Pipe.Tests/BackwardsFakeTimeProvider.cs`): a `FakeTimeProvider` whose reading can be set back with `MoveBack`, as a system clock set back by the user; its timers keep counting forward with `Advance` whatever the reading (`FakeTimeProvider.SetUtcNow` refuses to go back in time). For tests of the tick assembler's wait after a clock set back. It models the system clock set back — checked by a scratch run: after `MoveBack` of 60 days, `Task.Delay(1 day, provider)` completes after `Advance` of 1 day and `Task.Delay(60 days, provider)` throws `ArgumentOutOfRangeException`.
-- `ChunkedClockStream` (`tests/Censio.Pipe.Tests/ChunkedClockStream.cs`): a read-only `Stream` over bytes that returns at most a given number of bytes per read, runs a given action at the start of every read (for example to move a `FakeTimeProvider` while one frame arrives in chunks) and counts the reads that delivered bytes. For the record-and-replay round trips of `PipeReplayStream`. It models no real component.
-- `FakeDiagnosticsWindow` (`tests/Censio.Companion.Core.Tests/FakeDiagnosticsWindow.cs`): an `IDiagnosticsWindow` that records each view it is shown (`Views`, in order) and counts the requests to come to the front (`BringToFrontCount`), and raises `WindowClosed` when the test calls `Close()`, as the window's close button would. For tests of `DiagnosticsWindowSession`. It models no real component.
-- `RecordingTimeProvider` (`tests/Censio.Pipe.Tests/RecordingTimeProvider.cs`): a `FakeTimeProvider` that records the due time of every timer created on it (`Delays`), can wait until a number of timers exist or until a timer of a given due time exists (`WaitForDelayAsync`) and advances through the waits a pending task starts (`RunWaitsAsync`). For tests of the waits of `PipeReplayStream`, and of `PipeConnection` where a retry delay starts on the thread pool after a stream ended with an open tick. It models no real component.
-- `FakeStartupEntryStore` (`tests/Censio.Companion.Core.Tests/FakeStartupEntryStore.cs`): an `IStartupEntryStore` that keeps its commands in memory by name, case-insensitively, returns `null` for an absent name, throws a configurable exception per operation (`ReadException`, `WriteException`, `RemoveException`, for example `SecurityException`, `UnauthorizedAccessException`, `InvalidDataException` or `IOException`), and records the name of every read and removal and the name and command of every write (`Reads`, `Writes`, `Removals`, failed attempts included); `SetCommand` and `GetCommand` set and look at an entry without being recorded, as another program or the player would. For tests of `CompanionAutostart`. It models the store contract of `RegistryStartupEntryStore` (spec feature 15, plan *Approach*), not the registry; the `RegistryKey` behavior that contract rests on was checked by reading the .NET 10 `RegistryKey` source (plan, fact 12).
+- `RecordingLogger` (`tests/Censio.Server.Tests/RecordingLogger.cs`, linked into the Companion tests) — an `ILogger` that keeps every entry, for tests of what a component logs.
+- `ChunkedStream` (`tests/Censio.Pipe.Tests/ChunkedStream.cs`) — a read-only stream with chunked reads, I/O errors and cancellation at an offset, for the frame reader.
+- `ChunkedClockStream` (`tests/Censio.Pipe.Tests/ChunkedClockStream.cs`) — a chunked read-only stream that runs an action per read, for record-and-replay round trips.
+- `PipeFrameBuilder` (`tests/Censio.Pipe.Tests/PipeFrameBuilder.cs`, linked into the Companion tests) — builds synthetic and corrupt pipe frames.
+- `ScriptedPipeMessageSource` with `HeldPipeRead` (`tests/Censio.Pipe.Tests/`) — an `IPipeMessageSource` of queued or held results, for the tick assembler.
+- `ScriptedPipeConnector` (`tests/Censio.Companion.Core.Tests/ScriptedPipeConnector.cs`) — an `IPipeConnector` of queued or held results, for the pipe connection.
+- `ControlledPipeStream` (`tests/Censio.Companion.Core.Tests/ControlledPipeStream.cs`) — models an asynchronous pipe read's end and cancellation (checked against `dotnet/runtime` `release/10.0` `PipeStream.ValueTaskSource.cs`).
+- `ControlledWriteStream` (`tests/Censio.Pipe.Tests/ControlledWriteStream.cs`, linked into the Companion tests) — models a file stream's write and flush failures (checked against `dotnet/runtime` `release/10.0` `Win32Marshal`).
+- `FakeTimeProvider` (`Microsoft.Extensions.TimeProvider.Testing`) — the clock of every timing test; a test library, not a mocking library.
+- `BackwardsFakeTimeProvider` (`tests/Censio.Pipe.Tests/BackwardsFakeTimeProvider.cs`) — models a system clock set back (checked by a scratch run).
+- `RecordingTimeProvider` (`tests/Censio.Pipe.Tests/RecordingTimeProvider.cs`) — a `FakeTimeProvider` that records and awaits its timers, for replay and retry waits.
+- `FakeDiagnosticsWindow` (`tests/Censio.Companion.Core.Tests/FakeDiagnosticsWindow.cs`) — an `IDiagnosticsWindow` that records what it shows, for the diagnostics session.
+- `FakeStartupEntryStore` (`tests/Censio.Companion.Core.Tests/FakeStartupEntryStore.cs`) — models the store contract of `RegistryStartupEntryStore` (checked against the .NET 10 `RegistryKey` source), for the autostart.

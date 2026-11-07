@@ -11,16 +11,15 @@ from the menu, the optional start with Windows, the diagnostics window with the 
 ### Tray icon and menu
 
 - Started, the Companion shows one icon in the notification area. It opens no window until `Open diagnostics` is chosen, and shows a taskbar button only while the diagnostics window is open.
-- The *status text* is the state of the pipe connection ([`pipe.md`](pipe.md)): `Waiting for game`, `Connected`,
+- The *status text* is the state of the pipe connection ([`pipe-connection.md`](pipe-connection.md), *States*): `Waiting for game`, `Connected`,
   `Receiving`, `Pipe busy`, `Protocol mismatch` or `Error`; before the first attempt it reads `Waiting for game`. In a
   replay it is the replay's text (*Replay*), with an invalid command line `Invalid command line`.
 - The tooltip reads `Censio Companion: <status text>`. Once a tick has closed it has a second line,
   `Last tick: <time>, <n> islands` (`1 island` for one), where `<time>` is the receive time of the latest closed tick
   of this run, live or replayed: in local time as `HH:mm:ss` when its local date is today's, otherwise as
   `yyyy-MM-dd HH:mm:ss`; a time less than one day from the ends of the representable range (possible in a recording)
-  is shown in UTC as `yyyy-MM-dd HH:mm:ssZ`. Before the first tick there is no second line. A tick closes when the next
-  one starts or 30 seconds after its last island frame ([`pipe.md`](pipe.md), *Closing a tick*), so `Receiving` can
-  show before the first last tick. The last tick stays when the connection ends, until a new tick arrives. The tooltip
+  is shown in UTC as `yyyy-MM-dd HH:mm:ssZ`. Before the first tick there is no second line. A tick closes by the rules
+  of [`pipe.md`](pipe.md) (*Closing a tick*), so `Receiving` can show before the first last tick. The last tick stays when the connection ends, until a new tick arrives. The tooltip
   is cut to 127 characters, the limit of the tray icon; the longest text the Companion builds is 109.
 - The tooltip follows the state, the recording and the last tick without any action by the player, and the date of
   the last tick is re-evaluated at the next local midnight. At most one tooltip update waits for the tray at a time
@@ -72,32 +71,21 @@ described in the other sections.
   with an invalid command line nothing records.
 - While recording, the Companion reads the pipe as usual (the states are unchanged) and writes the frames of each
   connection to its own file in `%LOCALAPPDATA%\Censio\Recordings`. The folder is fixed; no part of it comes from
-  the pipe or the command line. The file format, the queue and the failure rules are in [`pipe.md`](pipe.md)
-  (*Recording and replay*).
-- Each start writes a new file, created with the first frame of the connection after the start (or of the open
-  connection): its name and its header carry that frame's receive time. A start while no connection is open (every
-  state but `Connected`, `Receiving` and `Protocol mismatch`) shows ` (recording)` at once and creates the file with
-  the first frame of the next connection. No folder or file is created while no recording runs or while no frame
-  arrives. When the game quits and is started again, the next connection writes a new file.
-- A recording started in the middle of a connection begins with the connection's last `Version` frame, so it replays
-  as `Replay: Receiving` (or `Replay: Protocol mismatch` when the live connection was in mismatch); one started before
-  any `Version` arrived writes nothing extra ([`pipe.md`](pipe.md)). It lacks the islands of a tick opened before the
-  start and a session start sent before it.
+  the pipe or the command line. What is recorded, when a file is created and named, the file format, the write queue
+  and its failures, a start in the middle of a connection and the privacy of a recording are in
+  [`pipe-recording.md`](pipe-recording.md).
+- A start while no connection is open (every state but `Connected`, `Receiving` and `Protocol mismatch`) shows
+  ` (recording)` at once; the file follows with the first frame of the next connection. No folder or file is created
+  while no recording runs or while no frame arrives.
 - `Stop recording` writes the frames still waiting in the background and closes the file; the tray never waits for the
   disk. A new start can run while the stopped recording still writes.
-- `Exit` ends the Companion as without a recording, within 2 seconds with exit code 0. On `Exit` the frames still
-  waiting to be written, of all recordings together, are written for at most 1 second. Whether Windows sign-out and
-  shutdown do the same is not verified (*Limits and errors*).
-- If the recording fails (the folder cannot be created, a write fails, the disk is too slow for the pipe), it stops
-  with the lines written so far complete, and the status text ends with ` (recording failed)` and the entry reads
-  `Start recording`. The connection is not affected. A new `Start recording` tries again with a new file and shows
-  ` (recording)`. A stopped recording that fails while it writes its remaining frames is only logged: it changes
-  neither the status text nor the entry.
-- Stopped recordings that still write are not capped in total: each holds up to 16 MiB of queue while its disk
-  stalls, and only a click on `Start recording` after a stop adds one. This is accepted as user-driven.
-- Recordings are never deleted by the Companion; the user deletes them. A recording holds the savegame headline,
-  island names and economic data as the game sent them and stays on the machine: it is never sent anywhere, and
-  only anonymised fixtures may be shared publicly.
+- `Exit` ends the Companion as without a recording, within 2 seconds with exit code 0; the frames still waiting get
+  the time [`pipe-recording.md`](pipe-recording.md) (*Writing*) states.
+- If the recording fails, the status text ends with ` (recording failed)` and the entry reads `Start recording`. The
+  connection is not affected. A new `Start recording` tries again with a new file and shows ` (recording)`. A stopped
+  recording that fails while it writes its remaining frames is only logged: it changes neither the status text nor
+  the entry.
+- Recordings are never deleted by the Companion; the user deletes them.
 
 ### Folders
 
@@ -135,8 +123,8 @@ sent it: GUIDs are raw numbers until names and icons exist.
   `Last tick:` changes from `HH:mm:ss` to the dated form). At most one update waits at a time; with ticks closing faster
   than the window shows them (a replay with `--speed max`) intermediate ticks may be skipped and the window always ends
   with the latest tick. The scroll position (vertical and horizontal) is kept as far as the new table reaches.
-- **Kept tick:** the Companion keeps the latest closed tick whole while the window is closed, across connections, until the
-  next tick replaces it. Opening the window shows it at once, also a tick that closed while no window was open.
+- **Kept tick:** opening the window shows the latest closed tick at once, also one that closed while no window was open
+  (the connection and the replay keep it, [`pipe-connection.md`](pipe-connection.md), *Latest tick*).
 - **Close and single window:** the close button and Alt+F4 close only the window; the icon, the connection, a running
   recording or replay, the tooltip and the menu go on. `Open diagnostics` with a window open brings that window to the
   front (restored when minimized) and opens no second one; after a close it opens a new one. `Exit` closes the window with
@@ -151,7 +139,7 @@ sent it: GUIDs are raw numbers until names and icons exist.
 
 ### Start with Windows
 
-- Off by default: the Companion writes nothing about autostart until the entry is clicked (not at start, not when the menu opens). The entry is the string value `Censio Companion` under `HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run`, in the user's own hive; no other key or user is touched and no administrator rights are needed (tried on Windows 11, *Limits and errors*).
+- Off by default: the Companion writes nothing about autostart until the entry is clicked (not at start, not when the menu opens). The entry is the string value `Censio Companion` under `HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run`, in the user's own hive; no other key or user is touched and no administrator rights are needed.
 - The menu entry `Start with Windows` is checked when the value is exactly the command the Companion writes: the full path of the running `Censio.Companion.exe` in double quotes, without arguments, compared ignoring case and unexpanded. The state is read from the registry each time the menu opens. Anything else counts as off: no value, another program's path, the same path unquoted, with arguments (for example `--record`), with spaces around it, or a value that is not a string. A click then writes the Companion's own quoted command, replacing what was there.
 - A click on an unchecked entry writes that command; a click on a checked entry deletes the value `Censio Companion`. The Companion starts with Windows the same way as when started by hand, without a command line argument, so it neither records nor replays.
 - The path of the exe is used only when it is a full path of at most 200 characters without `"` or `%`. For any other path (a folder with `%` in its name, a very long one) the click changes nothing and the change warning is logged; the entry stays unchecked.
@@ -189,15 +177,14 @@ sent it: GUIDs are raw numbers until names and icons exist.
 
 ### Replay
 
-- With `--replay <file>` the Companion reads the file instead of the pipe, at the recorded pace divided by the speed
-  of `--speed`. The file is only read.
+- With `--replay <file>` the Companion reads the file instead of the pipe, paced by `--speed`
+  ([`pipe-recording.md`](pipe-recording.md), *Replay*).
 - The status text reads `Replay: Connected` from the start until a replayed frame changes the state,
   then `Replay: Receiving` or `Replay: Protocol mismatch` by the same rules as the
-  live connection ([`pipe.md`](pipe.md), *States*), and after the last frame `Replay finished`
+  live connection ([`pipe-connection.md`](pipe-connection.md), *States*), and after the last frame `Replay finished`
   until `Exit`. A replay never shows `Error`. The tooltip is `Censio Companion: ` and the status text.
 - A problem with the file ends the replay with the status text `Replay error: <reason>` after the frames before it
-  were replayed. The reasons are `file not found`, `not a recording`, `unsupported version`, `invalid line <n>` and
-  `read failed` ([`pipe.md`](pipe.md), *Replay problems*).
+  were replayed, with a reason of [`pipe-recording.md`](pipe-recording.md) (*Limits and errors*).
 - The tooltip, the last tick and the icon show the progress, and the diagnostics window shows the replayed ticks and follows the replay tick by tick; after `Replay finished` it keeps the last tick of the file. The last tick is the recorded receive time of the latest replayed tick.
 
 ### Single instance
@@ -221,15 +208,12 @@ sent it: GUIDs are raw numbers until names and icons exist.
 - The Companion shows no error message or dialog; a connection problem shows only as a status text, a recording
   problem as `(recording failed)`, a replay problem as `Replay error`, and details go to the log (*Log*).
 - A folder that cannot be opened, or a log that cannot be written, changes nothing else and shows no message.
-- The 1 second for writing the recording queues is given on `Exit`. That Windows sign-out or shutdown gives it too is
-  not verified.
-- Stopped recordings are not capped in total (*Recording*).
 - A read failure (access denied, a policy, a value that is not a string): the entry is shown unchecked and stays clickable, and `Could not read the autostart setting` is logged once until a read succeeds again. If the value cannot be written or deleted, a click changes nothing, `Could not change the autostart setting` is logged and the player gets no message; the next opening shows the state read then. A policy that stops Windows from starting the user's startup programs while the value can still be written is not visible: the menu shows the state of the value only. A switch-off in Windows' startup apps list is not read: the entry stays checked while Windows does not start the Companion, and the player switches it on in that list; a click deletes the value, and a later click writes it again with Windows' switch-off still in place. An exe started from inside the ZIP runs from a temporary folder, so the entry registers that path and nothing starts at sign-in once Windows cleans the folder.
-- Tried on Windows 11 (the maintainer's manual run before the merge, issue #15): that Windows starts the Companion at sign-in after a restart with the entry on and not with it off, that no UAC prompt appears (under a standard account), folders with spaces, `&` or `,` in the path, that a second account is unaffected, and that turning the entry off removes the value. Not tried: whether SmartScreen asks at the first autostart, what name the startup apps list shows, and that a folder holding `%` stays unchecked.
-- Verified (the Product Manager's run on Windows 11 26H2 with the real game and a Companion built from source with the documented publish command): that the tooltips show correctly, so the line break shows as a second tooltip line. The Product Manager also reported that recording with its file, replay (started with `Exit` and the *Run* dialog) and the tray icon in the overflow area work; the report names no detail beyond that.
-- Not verified yet (the maintainer's manual run on Windows, issue #13): that the menu stays light with Windows in dark mode, that the three icon looks show, and that Explorer opens a
-  folder whose path holds a comma (Explorer splits its command line at commas).
-- Verified for the diagnostics window (the maintainer's manual run on Windows, issue #14): that `Exit` with the window open ends the Companion within 2 seconds with exit code 0; that the close button and Alt+F4 close only the window and leave the icon; that `Open diagnostics` brings an open window to the front, restored when minimized; that the window renders as described; that Ctrl+C in the table copies nothing; and, with a tick at the limits (256 islands, 524,288 entries), that the table scrolls, the tray menu opens and `Exit` keeps its bound while the tick is shown or replaced, a new tick keeps the scroll position, and the process memory falls back after the window closes.
+- Manual runs on Windows confirmed the behavior above (issues #13, #14 and #15, and the Product Manager's run on
+  Windows 11 26H2 with the real game). Not verified yet: that the menu stays light with Windows in dark mode, that the
+  three icon looks show, that Explorer opens a folder whose path holds a comma (Explorer splits its command line at
+  commas), whether SmartScreen asks at the first autostart, what name the startup apps list shows, and that a folder
+  holding `%` stays unchecked.
 
 ## Related decisions
 
@@ -244,5 +228,7 @@ sent it: GUIDs are raw numbers until names and icons exist.
 
 ## Not here
 
-- Opening and reading the statistics pipe, the connection states and the retry rules, the recording file format and the replay rules: see [`pipe.md`](pipe.md).
+- Reading the statistics pipe and assembling ticks: [`pipe.md`](pipe.md).
+- Opening the pipe, the connection states and the retry rules: [`pipe-connection.md`](pipe-connection.md).
+- The recording file, its writing and failures, and the replay rules: [`pipe-recording.md`](pipe-recording.md).
 - Reading the game files, the connection to the server, settings (later issues).
