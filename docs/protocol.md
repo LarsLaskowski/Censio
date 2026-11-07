@@ -28,7 +28,7 @@ no island frame has trailing bytes, and no float is NaN.
 
 ### SessionStart
 
-- Payload: a headline (assumed: the name of the loaded game). *Confirmed*: 18 bytes both times; it is text and carries no
+- Payload: a headline (assumed, from the reference's field name: the name of the loaded game). *Confirmed*: 18 bytes both times; it is text and carries no
   structure the reader uses. *Assumed* (third-party capture): a non-ASCII character is written as `_`; the recording
   has no non-ASCII byte in any string, so it confirms neither this nor the opposite.
 
@@ -42,26 +42,27 @@ One island per frame; the frames of one tick follow each other. *Confirmed*: 789
 
 | Field | Meaning | Unit | Status |
 | ----- | ------- | ---- | ------ |
-| Session ID, island ID, area index | Parts of the island identity (see *Island identity*) | none | confirmed |
-| Session GUID | Identifies a session of the game | none | confirmed |
+| Session ID | Number of the session; maps one-to-one to the session GUID, not part of the island key (see *Island identity*) | none | confirmed |
+| Island ID, area index | Parts of the island key (see *Island identity*) | none | confirmed |
+| Session GUID | Identifies a session of the game; part of the island key | none | confirmed |
 | Area name | Name of the island; it can change (see *Rename*) | text | confirmed |
-| Timestamp | Game time of the tick (see *Timestamp*) | milliseconds of game time | assumed |
+| Timestamp | Game time of the tick (see *Timestamp*) | milliseconds of game time | assumed (no source states the unit; consistent with the recording, see *Timestamp*) |
 | Entry count | Number of product entries of the island | count | confirmed: at most 69 |
 | Product GUID | The product of an entry; 125 distinct in the recording, none twice in an island | none | confirmed |
 | Generation, consumption | Produced and consumed amount | per minute | assumed (reference names; the unit is not visible) |
 | Delta | Generation minus consumption | as generation | confirmed: holds for all 21,091 entries |
-| Perfect generation, perfect consumption | Amount at full productivity | as generation | assumed; confirmed: perfect generation is at least generation in 20,980 of 21,091 entries, so it is not an upper bound |
+| Perfect generation, perfect consumption | Amount at full productivity | as generation | assumed (reference names; the unit is not visible); confirmed: perfect generation is at least generation in 20,980 of 21,091 entries, so it is not an upper bound |
 | Building count | Buildings of the product | count | confirmed |
-| Maintenance | Maintenance cost, never negative | per minute | assumed (unit); confirmed (sign) |
-| Income | Income of the product | per minute | assumed (unit) |
+| Maintenance | Maintenance cost, never negative | per minute | assumed (unit; no source states it); confirmed (sign) |
+| Income | Income of the product | per minute | assumed (reference name; no source states the unit) |
 | Profit | Income minus maintenance | as income | confirmed: within 1 of the difference for all entries (an integer) |
-| Summed productivity | Sum of the productivity of the buildings | none | assumed |
-| Average productivity | 100 times the summed productivity divided by the building count | percent | confirmed (the relation); assumed (percent) |
+| Summed productivity | Sum of the productivity of the buildings | none | assumed (reference name) |
+| Average productivity | 100 times the summed productivity divided by the building count | percent | confirmed (the relation); assumed (percent; no source states it, values reach 435) |
 | Workforce map | Workforce GUID to amount | count | confirmed: at most 3 pairs, amounts not negative, no GUID twice |
 | Building map | Building GUID to amount | count | confirmed: at most 8 pairs, no GUID twice; the amounts sum to the building count in all entries |
 
 - *Confirmed*: perfect generation per building (perfect generation divided by building count) ranges from 0 to about
-  9, mostly from 0.5 to 2.4; the unit (per minute) is *assumed*.
+  9, mostly from 0.5 to 2.4; the unit (per minute) is *assumed* (no source states it).
 - *Confirmed*: with a building count of 0 (3,587 entries) generation, perfect generation, summed and average
   productivity are 0 and the building map is empty; so is the workforce map.
 - *Confirmed*: no entry has a NaN, a duplicate map GUID or a non-ASCII name byte; the average productivity stays
@@ -72,7 +73,7 @@ One island per frame; the frames of one tick follow each other. *Confirmed*: 789
 - *Confirmed*: island frames of a tick arrive 1 s apart (a few 3 s apart, at most 11 s), so a tick of 24 islands
   spans about 23 s.
 - *Confirmed*: ticks start 120 to 121 s apart. Longer gaps: 169 s once, 1,099 s once (no cause is visible), and 554 s
-  across the session change; the first tick after a load starts 25 s after the load's zero-entry tick.
+  across the session change; the first tick after the first load starts 25 s after that load's zero-entry tick (the recording ends with the second load's zero-entry tick).
 - *Confirmed*: a regular tick reaches the consumer by the quiet period, 30 s after its last island frame
   ([`areas/pipe.md`](areas/pipe.md), *Closing a tick*), so about 53 s after its first.
 - *Assumed* (reference): the game sends no end-of-tick marker; the recording shows none.
@@ -82,7 +83,7 @@ One island per frame; the frames of one tick follow each other. *Confirmed*: 789
 - *Confirmed*: shared by all islands of a tick, never by two consecutive ticks, always a multiple of 100.
 - *Confirmed*: it rises by 71,700 to 280,700 per tick (and by about 1.75 × 10⁹ from the zero-entry tick of the first
   load, 19,000, to the next one); the second zero-entry tick continues the game time.
-- *Assumed*, consistent with the recording: milliseconds of game time, running with the game speed, so a paused game
+- *Assumed* (no source states the unit; consistent with the recording): milliseconds of game time, running with the game speed, so a paused game
   sends no ticks.
 
 ## Island identity
@@ -99,7 +100,7 @@ One island per frame; the frames of one tick follow each other. *Confirmed*: 789
 
 *Confirmed*: the version comes first. A session end follows 13 s later with no session start before it (the reader's
 *repeated session end*, [`areas/pipe.md`](areas/pipe.md), *Session events*); the session start follows 93 s after that, and
-the first island frame 4 s later. A Companion that connects mid-game therefore receives an end before it knows a start.
+the first island frame 4 s later. So a Companion can receive an end before it knows a start; whether the game sends it because of the connect or because of a player action is not visible.
 
 ### Zero-entry tick
 
