@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/Censio.Anonymiser/Censio.Anonymiser.csproj" />
     <Project Path="src/Censio.Companion.Core/Censio.Companion.Core.csproj" />
     <Project Path="src/Censio.Companion/Censio.Companion.csproj" />
     <Project Path="src/Censio.Contracts/Censio.Contracts.csproj" />
@@ -9,6 +10,7 @@
     <Project Path="src/Censio.Server/Censio.Server.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Censio.Anonymiser.Tests/Censio.Anonymiser.Tests.csproj" />
     <Project Path="tests/Censio.Companion.Core.Tests/Censio.Companion.Core.Tests.csproj" />
     <Project Path="tests/Censio.Contracts.Tests/Censio.Contracts.Tests.csproj" />
     <Project Path="tests/Censio.GameData.Tests/Censio.GameData.Tests.csproj" />
