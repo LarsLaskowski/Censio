@@ -1,7 +1,7 @@
 # Spec: Protocol documentation from our own recordings
 
 Source: Issue #18
-Status: Draft
+Status: Approved by Lead
 
 ## Problem
 
