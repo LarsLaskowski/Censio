@@ -70,9 +70,8 @@ The anonymiser prints one line `Error: <reason>` and exits with code 1; no file 
     building count, each from the perturbed values (0 with a building count of 0).
   - Maintenance and every workforce amount change on their own, keeping their sign and never becoming 0: by exactly 1
     in magnitude when below 5, else by 1 % to 20 %, rounded, and at least 1.
-  - Profit becomes its original plus the change of income minus maintenance, rounded, so it stays within 1 of income
-    minus maintenance as the original was; where that change rounds to 0, a non-zero profit moves 1
-    towards the new income minus maintenance; its sign may change.
+  - Profit becomes an integer within 1 of the new income minus maintenance, on the same side of it as the original
+    was; a non-zero profit never keeps its value, a zero one only while 0 is within 1; its sign may change.
 - N4: Kept unchanged: line count and order, frame types, `Version`, session end, session ID, island ID, area index,
   session GUID, game time, entry count and order, product GUIDs, building count, the building map, and the workforce
   map's GUIDs, pair count and order.
@@ -145,3 +144,9 @@ The anonymiser prints one line `Error: <reason>` and exits with code 1; no file 
 5. A refused reference recording — accepted: AC6 names the fixtures produced (open question 5).
 6. Name match — accepted with another rule: every non-empty fixture name must be an invented name and equal no deny
    entry (AC7), so no substring rule is needed and a short entry cannot fail on `Island <n>`.
+
+## Amendments
+
+| Criterion | Change | Reason | Step | Decided by |
+| --------- | ------ | ------ | ---- | ---------- |
+| AC3 | Profit's derivation in N3: an integer within 1 of the new income minus maintenance on the original's side, instead of the original plus the rounded change | The old rule reached 1.5 away on the Product Manager's real output (2 of 21,091 entries) | 6 (after the fixture pause) | Product Manager |

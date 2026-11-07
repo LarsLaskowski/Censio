@@ -57,8 +57,9 @@ shifted by one random offset. What is kept, changed and refused is in [`areas/pi
   standard NaN with its sign), and a written frame that the parser does not read back whole, to the same shape, is
   refused, so a mistake in the second
   walk refuses a file instead of leaking bytes.
-- A profit whose derived change rounds to 0 moves by 1 towards the new income minus maintenance, so no non-zero
-  amount stays exact.
+- Profit is derived as an integer within 1 of the new income minus maintenance, on the original's side where that
+  changes it, so the relation holds and no non-zero profit stays exact; adding the rounded change to the original was
+  tried first and reached 1.5 on real data.
 - A fixture cannot be reproduced bit for bit; its README says how it was made, not with which values.
 - A local deny-list test compares each fixture with its original by place, because a set of values would match by
   chance; it runs only where the originals are, so CI shows it inconclusive.
