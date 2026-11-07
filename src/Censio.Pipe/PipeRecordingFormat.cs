@@ -113,6 +113,19 @@ public static class PipeRecordingFormat
     }
 
     /// <summary>
+    /// Reads the start time of a header line.
+    /// </summary>
+    /// <param name="line">The line without its terminator</param>
+    /// <returns>The start time in UTC, or <see langword="null" /> when it is missing or unusable</returns>
+    // Skeleton: removed with the implementation
+#pragma warning disable RH2003
+    public static DateTimeOffset? ReadStarted(ReadOnlySpan<byte> line)
+    {
+        throw new NotImplementedException();
+    }
+#pragma warning restore RH2003
+
+    /// <summary>
     /// Parses a frame line.
     /// </summary>
     /// <param name="line">The line without its terminator</param>

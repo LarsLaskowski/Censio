@@ -8,7 +8,7 @@ documentation edit is in one row, owned by the Dev (test documentation: the Test
 
 | # | Group | Task | Files | Criteria | Depends on | Owner | Done |
 | - | ----- | ---- | ----- | -------- | ---------- | ----- | ---- |
-| 1 | G1 | Skeleton: `PipeRecordingLineKind`; `PipeRecordingLine` (Kind, LineNumber, ReceiveTime, Frame, Problem); `PipeRecordingReader` (Started, ReadAsync); `PipeRecordingFormat.ReadStarted` | `src/Censio.Pipe/` | AC1, AC5 | — | Dev | [ ] |
+| 1 | G1 | Skeleton: `PipeRecordingLineKind`; `PipeRecordingLine` (Kind, LineNumber, ReceiveTime, Frame, Problem); `PipeRecordingReader` (Started, ReadAsync); `PipeRecordingFormat.ReadStarted` | `src/Censio.Pipe/` | AC1, AC5 | — | Dev | [x] |
 | 2 | G1 | Tests first: `PipeRecordingReaderTests`, `PipeRecordingFormatTests` (`ReadStarted`); `PipeReplayStreamTests` unchanged | `tests/Censio.Pipe.Tests/` | AC1, AC5 | 1 | Tester | [ ] |
 | 3 | G1 | Move the line rules into `PipeRecordingReader`; `PipeReplayStream` reads through it | `src/Censio.Pipe/PipeRecordingReader.cs`, `PipeReplayStream.cs` | AC1, AC5 | 2 | Dev | [ ] |
 | 4 | G2 | Skeleton: `IPipeAnonymiserRandom` (NextDouble), `PipeAnonymiserRandom`; `PipeAnonymiseResultKind`; `PipeAnonymiseResult` (Kind, FrameCount, LineNumber, Problem); `PipeRecordingAnonymiser` (MinShiftDays, MaxShiftDays, AnonymiseAsync); `PipeMessageParser.Parse` overload with `consumed`; internal `PipeAnonymousNames` (AddIsland, AddFigure, Complete, TryGetIsland, TryGetFigure) and `PipeFrameAnonymiser` (TryCollect, Anonymise, Reset) | `src/Censio.Pipe/` | AC1–AC4 | 3 | Dev | [ ] |
