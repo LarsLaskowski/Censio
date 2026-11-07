@@ -102,7 +102,7 @@ A tick is delivered when it closes, once, and is never reopened. It closes when:
 - A session start is delivered with the figure's name unchanged (not trimmed, `_` kept). It names the player figure, not the savegame: two savegames of one figure send the same text (record 0041).
 - A session end is delivered as a session end when an island frame or a session start came since the last session
   end; otherwise, at the start of the stream or after another session end, it is delivered as a *repeated session
-  end*. The game sends a session end right after the connect, before any session start (seen in the recordings that began with an end, [`../protocol.md`](../protocol.md)); that one is a
+  end*. The game may send a session end right after the connect, before any session start (two of the four recordings in [`../protocol.md`](../protocol.md) began with one, the other two with a session start); that one is a
   repeated session end and carries no new information.
 - Ticks carry no session gate: islands are delivered whatever session events came before.
 
@@ -199,6 +199,6 @@ Until fixtures from real recordings (#20) test the reader:
 
 - Finding, opening and keeping the connection, its states and the retry: [`pipe-connection.md`](pipe-connection.md).
 - Recording the frames to a file and replaying it: [`pipe-recording.md`](pipe-recording.md).
-- Telling a resent or paused tick from a new one (#19, #35).
+- Telling a resent or paused tick from a new one (#35).
 - Assigning ticks to a profile: record 0041.
 - Anonymising recordings (#20).

@@ -15,7 +15,7 @@ Sources:
 
 None is published (#20); this document states derived facts only: no frame, name or path.
 
-Each statement is marked *confirmed* (the recording of 2026-11-07, or all four where stated) or *assumed* (with its source). What a single
+Each statement is marked *confirmed* (the 90-minute recording of 2026-11-07, or all four where stated) or *assumed* (with its source). What a single
 recording cannot show stays *assumed*.
 
 ## Framing
@@ -104,7 +104,7 @@ One island per frame; the frames of one tick follow each other. *Confirmed*: 789
 ### Connect sequence
 
 *Confirmed* (all four recordings): the version comes first, then the session start either comes at once or follows a
-session end, so both orders occur. In the recording of 2026-11-07 a session end follows 13 s later with no session start before it (the reader's
+session end, so both orders occur. In the 90-minute recording of 2026-11-07 a session end follows 13 s later with no session start before it (the reader's
 *repeated session end*, [`areas/pipe.md`](areas/pipe.md), *Session events*); the session start follows 93 s after that, and
 the first island frame 4 s later. So a Companion can receive an end before it knows a start; whether the game sends it because of the connect or because of a player action is not visible.
 

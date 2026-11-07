@@ -10,7 +10,8 @@
 
 Record [0020](0020-one-companion-per-server-with-savegame-profiles.md) keeps each savegame in its own profile and left
 to #19 how a tick finds its profile: the pipe carries no savegame ID ([`pipe.md`](../areas/pipe.md), *Message
-types*). A profile stands for one playthrough, whose save files share islands and goods.
+types*). A profile stands for one playthrough, whose save files share islands and goods: this reads 0020's "savegame"
+as a playthrough, since its reason, that islands and goods must not be mixed, holds per playthrough.
 
 The only candidate in the stream was the SessionStart text. Four local recordings of #17 (kept off the repository,
 record [0029](0029-anonymised-test-fixtures-only.md)) show that it is the name of the player figure: two different
