@@ -70,6 +70,22 @@ public static class PipeMessageParser
     }
 
     /// <summary>
+    /// Decodes a frame without applying the version gate and reports how far the decoding read.
+    /// </summary>
+    /// <param name="frame">The frame bytes (type byte and payload)</param>
+    /// <param name="consumed">The position behind the last field read; 0 on an error</param>
+    /// <returns>The decoded message, or the error that describes why the frame is rejected</returns>
+    // Skeleton: removed with the implementation
+#pragma warning disable RH2003
+    public static PipeReadResult Parse(ReadOnlySpan<byte> frame, out int consumed)
+    {
+        consumed = 0;
+
+        throw new NotImplementedException();
+    }
+#pragma warning restore RH2003
+
+    /// <summary>
     /// Parses a version payload.
     /// </summary>
     /// <param name="frame">The frame</param>
