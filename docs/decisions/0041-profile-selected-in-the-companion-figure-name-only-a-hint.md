@@ -17,8 +17,9 @@ The only candidate in the stream was the SessionStart text. Four local recording
 record [0029](0029-anonymised-test-fixtures-only.md)) show that it is the name of the player figure: two different
 saves of one figure send byte-identical text, a save of another figure sends another text, and every load is a session
 end and then a session start on one connection ([`../protocol.md`](../protocol.md), *SessionStart*). The island names
-of the two saves of one figure were identical as well, and the only field that differed, the timestamp, is the game
-time, which differs between save points of one playthrough too. The figure name can be the player's real name.
+of the two saves of one figure were identical as well; an 8-byte field of their first ticks differed, by the frame
+layout the timestamp (the only 8-byte field), which is the game time and differs between save points of one
+playthrough too. The figure name can be the player's real name.
 
 ## Options considered
 
@@ -39,7 +40,11 @@ time, which differs between save points of one playthrough too. The figure name 
 
 Option 5. Every tick goes to the profile the user selected in the Companion; the figure name of a session start only
 decides whether the Companion shows a notice that offers a switch, and the Companion remembers, locally, the profile
-each figure name was last used with. The figure name never crosses the contract to the server.
+each figure name was last used with. The figure name never crosses the contract to the server, and a new profile's
+name is what the user types, never prefilled with it. A name not seen before is linked silently to an active profile
+that has none yet. Names are compared ordinally as the reader delivers them, not trimmed; an empty name is a name like
+any other. Ticks before any session start go to the active profile and link no name, and a session end changes
+nothing until the next session start.
 
 ## Consequences
 
