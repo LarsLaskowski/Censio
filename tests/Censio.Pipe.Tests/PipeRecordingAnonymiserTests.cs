@@ -797,8 +797,9 @@ public sealed class PipeRecordingAnonymiserTests
     {
         // Arrange
         DateTimeOffset[] times = [_start, _start.AddSeconds(1.5), _start.AddSeconds(40).AddTicks(1), _start.AddSeconds(-10)];
-        var recording = Recording(times.Select(time => (time, _sessionEnd)).ToArray());
+        var recording = Recording([(_start, _version2), .. times.Select(time => (time, _sessionEnd))]);
         var expected = string.Concat(PipeRecordingFormat.FormatHeader(_start - _upOffset),
+                                     PipeRecordingFormat.FormatFrameLine(_start - _upOffset, _version2),
                                      string.Concat(times.Select(time => PipeRecordingFormat.FormatFrameLine(time - _upOffset, _sessionEnd))));
 
         // Act
@@ -823,7 +824,7 @@ public sealed class PipeRecordingAnonymiserTests
     public async Task PipeRecordingAnonymiserOffsetBoundsAreNotWholeDays(double draw, long expectedMinTicks, long expectedMaxTicks)
     {
         // Arrange
-        var recording = Recording((_start, _sessionEnd));
+        var recording = Recording((_start, _version2), (_start.AddSeconds(1), _sessionEnd));
 
         // Act
         var (_, output) = await AnonymiseAsync(recording, new ScriptedPipeAnonymiserRandom(draw));
@@ -833,6 +834,25 @@ public sealed class PipeRecordingAnonymiserTests
 
         Assert.IsInRange(expectedMinTicks, expectedMaxTicks, offset.Ticks, "The offset should follow the draw within 30 to 365 days");
         Assert.AreNotEqual(0L, offset.Ticks % TimeSpan.TicksPerDay, "The offset should not be a whole number of days");
+    }
+
+    /// <summary>
+    /// A session end before the first version cannot be anonymised: only a version frame is decoded until a version 2.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    [TestCategory("AC5")]
+    public async Task PipeRecordingAnonymiserSessionEndBeforeVersionIsNotAnonymisable()
+    {
+        // Arrange
+        var recording = RecordingOf(_sessionEnd, _version2);
+
+        // Act
+        var (result, _) = await AnonymiseAsync(recording, new ScriptedPipeAnonymiserRandom(Up));
+
+        // Assert
+        Assert.AreEqual(PipeAnonymiseResultKind.FrameNotAnonymisable, result.Kind, "A session end before the version should be refused");
+        Assert.AreEqual(2L, result.LineNumber, "The refusal should name the line of the session end");
     }
 
     /// <summary>
