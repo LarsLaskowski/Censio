@@ -5,8 +5,9 @@
 The statistics pipe as the Companion reads it: the frame layout, the message types of protocol version 2, the
 1 MiB limit, the error kinds, which errors skip a frame and which end the stream, the version gate, and the
 grouping of the messages into ticks and session events with the tick limits. The pipe is untrusted input: the format
-is known only from Ubisoft's example reader (`UbisoftMainzAnno/anno117_pipe_example`, read on 2026-11-01, "for
-documentation purposes only"), and a game update may change it without notice. The reader works on any readable byte
+is known from Ubisoft's example reader (`UbisoftMainzAnno/anno117_pipe_example`, read on 2026-11-01, "for
+documentation purposes only") and one recording of ours; [`../protocol.md`](../protocol.md) states what the recording
+confirms. A game update may change the format without notice. The reader works on any readable byte
 stream and does not depend on Windows or on the named pipe (implemented in `Censio.Pipe`). Ticks are assembled on an
 injected clock, so the same rules serve a live connection ([`pipe-connection.md`](pipe-connection.md)) and a replay
 ([`pipe-recording.md`](pipe-recording.md)).
@@ -101,7 +102,8 @@ A tick is delivered when it closes, once, and is never reopened. It closes when:
 - A session start is delivered with its headline unchanged (not trimmed, `_` kept).
 - A session end is delivered as a session end when an island frame or a session start came since the last session
   end; otherwise, at the start of the stream or after another session end, it is delivered as a *repeated session
-  end*. The game sends a second session end; the repeated one carries no new information.
+  end*. The game sends a session end right after the connect, before any session start (observed once); that one is a
+  repeated session end and carries no new information.
 - Ticks carry no session gate: islands are delivered whatever session events came before.
 
 #### Order and end
@@ -170,16 +172,17 @@ The reference reads leniently; this reader is strict and fails closed (record 00
 
 Until fixtures from real recordings (#20) test the reader:
 
-- The format is known only from the reference source as read on 2026-11-01.
+- The format is known from the reference source as read on 2026-11-01 and one recording of 2026-11-07
+  ([`../protocol.md`](../protocol.md)); a single recording cannot show a single reader or the units of the rates.
 - Strings are decoded as UTF-8 although the reference names no encoding; Windows-1252 would garble non-ASCII bytes.
-  That the game writes `_` for umlauts rests on a third-party capture (`Dealwatch/Tabularium117`,
-  `docs/protocol.md`), not on our own.
-- Whether the game ever sends duplicate map keys is unknown.
+  That the game writes `_` for umlauts rests on a third-party capture (`Dealwatch/Tabularium117`'s
+  `docs/protocol.md`, a file of that repository, not ours), not on our own; our recording has no non-ASCII byte.
+- Whether the game ever sends duplicate map keys is unknown; none was seen in one recording.
 - A game update that changes the format without a new protocol version is misread as long as every field still
   fits; one that bumps the version is refused with a protocol-mismatch error.
-- The timing (frames about one second apart, ticks about two minutes), the shared timestamp, the zero-entry tick after
-  a load, the double session end and the number of islands per tick (estimated well under 256, with fewer than
-  524,288 entries and pairs) are third-party observations until the recordings of #17 confirm them.
+- One recording confirms the timing (frames about one second apart, ticks about two minutes), the shared timestamp,
+  the zero-entry tick after a load and the number of islands per tick (at most 24, with at most 1,934 entries and
+  pairs); the double session end was not seen ([`../protocol.md`](../protocol.md)). Other games and updates may differ.
 - A stall of more than 30 seconds in the stream splits a tick into two ticks with one game time.
 - A game that sends one island twice in a tick splits it as *island repeated*.
 - A caller that pauses for more than 30 seconds between requests stamps frames late and may split ticks.

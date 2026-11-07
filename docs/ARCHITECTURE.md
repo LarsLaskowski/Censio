@@ -39,7 +39,8 @@ flowchart LR
 
 The Companion parses the pipe stream and the game files, extracts the game data and pushes it to the server.
 The pipe stream is parsed strictly: a frame the parser cannot read is reported as an error, never guessed
-([`decisions/0033`](decisions/0033-pipe-reader-strict-from-the-reference-source.md)).
+([`decisions/0033`](decisions/0033-pipe-reader-strict-from-the-reference-source.md)); the game's side of the pipe as
+observed is in [`protocol.md`](protocol.md).
 The Companion opens the pipe itself, reconnects when the game restarts and shows the connection state in its tray
 tooltip ([`decisions/0035`](decisions/0035-pipe-connection-states-retry-and-identification-level.md),
 [`areas/pipe-connection.md`](areas/pipe-connection.md)). The Companion groups the messages into ticks with an island identity and session events
