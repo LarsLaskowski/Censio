@@ -108,7 +108,7 @@ mismatch`: the version gate skips every frame of a file without it.
 
 ### Privacy
 
-A recording holds the savegame headline, island names and the economic data as the game sent them. It stays on the
+A recording holds the name of the player figure, island names and the economic data as the game sent them. It stays on the
 machine, is never sent anywhere and is never deleted automatically. Only anonymised fixtures (#20, record 0029) may be
 shared publicly.
 

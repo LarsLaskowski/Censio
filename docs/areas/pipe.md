@@ -38,7 +38,7 @@ injected clock, so the same rules serve a live connection ([`pipe-connection.md`
 | Type | Message | Payload |
 | ---- | ------- | ------- |
 | 0 | Version | int32 protocol version |
-| 1 | SessionStart | string (headline) |
+| 1 | SessionStart | string (player figure's name) |
 | 2 | SessionEnd | empty |
 | 3 | AreaProductionStatistics | session ID, island ID, area index (one unsigned byte each, 0 to 255); session GUID (int32); area name (string); timestamp (int64); entry count (int32); that many entries |
 
@@ -99,10 +99,10 @@ A tick is delivered when it closes, once, and is never reopened. It closes when:
 
 #### Session events
 
-- A session start is delivered with its headline unchanged (not trimmed, `_` kept).
+- A session start is delivered with the figure's name unchanged (not trimmed, `_` kept). It names the player figure, not the savegame: two savegames of one figure send the same text (record 0041).
 - A session end is delivered as a session end when an island frame or a session start came since the last session
   end; otherwise, at the start of the stream or after another session end, it is delivered as a *repeated session
-  end*. The game sends a session end right after the connect, before any session start (observed once); that one is a
+  end*. The game may send a session end right after the connect, before any session start (two of the four recordings in [`../protocol.md`](../protocol.md) began with one, the other two with a session start); that one is a
   repeated session end and carries no new information.
 - Ticks carry no session gate: islands are delivered whatever session events came before.
 
@@ -183,6 +183,7 @@ Until fixtures from real recordings (#20) test the reader:
 - One recording confirms the timing (frames about one second apart, ticks about two minutes), the shared timestamp,
   the zero-entry tick after a load and the number of islands per tick (at most 24, with at most 1,934 entries and
   pairs); the double session end was not seen ([`../protocol.md`](../protocol.md)). Other games and updates may differ.
+- The SessionStart text is the player figure's name and no savegame key: two savegames of one figure send byte-identical text, so it cannot tell them apart (record 0041).
 - A stall of more than 30 seconds in the stream splits a tick into two ticks with one game time.
 - A game that sends one island twice in a tick splits it as *island repeated*.
 - A caller that pauses for more than 30 seconds between requests stamps frames late and may split ticks.
@@ -191,11 +192,13 @@ Until fixtures from real recordings (#20) test the reader:
 
 - [`decisions/0033-pipe-reader-strict-from-the-reference-source.md`](../decisions/0033-pipe-reader-strict-from-the-reference-source.md) — the reader is strict, fails closed and is built from the reference source with synthetic frames.
 - [`decisions/0034-ticks-assembled-by-close-rules-on-an-injected-clock.md`](../decisions/0034-ticks-assembled-by-close-rules-on-an-injected-clock.md) — ticks close by five rules and a quiet period on an injected clock; a pure core with an async driver.
+- [`decisions/0041-profile-selected-in-the-companion-figure-name-only-a-hint.md`](../decisions/0041-profile-selected-in-the-companion-figure-name-only-a-hint.md) — the profile is selected in the Companion; the figure's name is only a hint.
 - [`decisions/0018-pipe-parsed-in-companion-versioned-json-contract.md`](../decisions/0018-pipe-parsed-in-companion-versioned-json-contract.md) — the Companion parses the pipe; the format is confined to `Censio.Pipe`.
 
 ## Not here
 
 - Finding, opening and keeping the connection, its states and the retry: [`pipe-connection.md`](pipe-connection.md).
 - Recording the frames to a file and replaying it: [`pipe-recording.md`](pipe-recording.md).
-- Telling a resent or paused tick from a new one (#19, #35).
+- Telling a resent or paused tick from a new one (#35).
+- Assigning ticks to a profile: record 0041.
 - Anonymising recordings (#20).
