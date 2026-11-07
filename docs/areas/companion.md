@@ -91,8 +91,8 @@ described in the other sections.
 
 - `Open recordings folder` opens `%LOCALAPPDATA%\Censio\Recordings` and `Open log folder` opens
   `%LOCALAPPDATA%\Censio\Logs` in Windows Explorer, creating a missing folder first. Both folders are fixed. Explorer
-  is started from the Windows folder by its full path with the folder as its one argument, and only for a fully
-  qualified folder path.
+  is started directly, never through the shell, from the Windows folder by its full path
+  (`<Windows folder>\explorer.exe`) with the folder as its one argument, and only for a fully qualified folder path.
 - The menu does not wait for the disk or for Explorer. If a folder cannot be created or opened, or is not a full path
   (local app data unresolved), a warning is logged and nothing else changes.
 

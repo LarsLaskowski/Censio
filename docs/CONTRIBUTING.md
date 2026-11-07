@@ -222,7 +222,8 @@ warning; it is marked *Latest* by GitHub at once and stays so if a job fails. Th
 `DOCKERHUB_TOKEN` (jobs `image-publish` and `promote`) and `WEBSITE_DISPATCH_TOKEN` (job `dispatch` of
 `notify-website.yml`) are secrets of the GitHub environment `release` and must not exist as repository secrets: a
 repository secret is readable by a workflow on any branch, an environment secret only by a job that names the
-environment and runs on a ref its deployment rule admits. The rule admits only tags `v*`.
+environment and runs on a ref its deployment rule admits. The rule admits only tags `v*`. The Docker Hub credentials
+and the `contents: write` token are held only by jobs that run no build code (record 0012).
 
 One-time setup by the administrator, in this order (GitHub, *Settings*):
 
