@@ -27,7 +27,7 @@ RUN ls /app/publish/wwwroot/_framework/blazor.web*.js > /dev/null 2>&1 \
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0.14-alpine3.24-amd64@sha256:fbad312ed75e0f10c4fcba4d48e0c0f133de07219bd0f78054e4a102501c0650
 LABEL org.opencontainers.image.base.name="mcr.microsoft.com/dotnet/aspnet:10.0.14-alpine3.24-amd64" \
-      org.opencontainers.image.base.digest="sha256:7e3205ef1189ab2b63a02040e02638a62bd70c67ac3a3a70a5a908be8e5da96c" \
+      org.opencontainers.image.base.digest="sha256:fbad312ed75e0f10c4fcba4d48e0c0f133de07219bd0f78054e4a102501c0650" \
       org.opencontainers.image.description="Censio server: live state and history of Anno 117 statistics" \
       org.opencontainers.image.licenses="MIT"
 ENV ASPNETCORE_HTTP_PORTS=8080 \
