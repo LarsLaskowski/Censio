@@ -1,7 +1,7 @@
 # Spec: Savegame profile detection from SessionStart
 
 Source: Issue #19
-Status: Draft
+Status: Approved by Lead
 
 ## Problem
 
