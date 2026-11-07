@@ -53,8 +53,9 @@ shifted by one random offset. What is kept, changed and refused is in [`areas/pi
 
 - The wire layout of an island frame is known in two places, the parser and the anonymiser; a new field or message type
   changes both (`.squad/project.md`, *Integration surface*).
-- Nothing of an input line or frame is copied: every line and frame is written anew (a NaN as the standard NaN with
-  its sign), and a written frame that does not parse back to the same shape is refused, so a mistake in the second
+- Nothing of an input line or frame is copied: every line and frame is written anew (a NaN in any float field as the
+  standard NaN with its sign), and a written frame that the parser does not read back whole, to the same shape, is
+  refused, so a mistake in the second
   walk refuses a file instead of leaking bytes.
 - A profit whose derived change rounds to 0 moves by 1 towards the new income minus maintenance, so no non-zero
   amount stays exact.

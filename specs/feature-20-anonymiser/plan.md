@@ -36,9 +36,9 @@ double `ScriptedPipeAnonymiserRandom` unless the test is about the system random
 | -- | ------- | --------- |
 | AC1 | `PipeRecordingAnonymiserReplayGivesSameItemsAsOriginal` (version, repeated session end, session start, two ticks, a rename, a tick closed by the stream end; compares ticks, keys, game times, close reasons, events, receive times minus the offset); `PipeRecordingAnonymiserKeepsLinesAndStructure`; `PipeRecordingAnonymiserRepeatedMapGuidKeepsEveryPair`; `PipeRecordingAnonymiserTrailingBytesAreDropped` (version, session start, session end, island frame); `PipeRecordingAnonymiserEmptyFrameIsCopied`; `PipeRecordingAnonymiserHeaderOnlyGivesHeaderOnly` (valid `started` shifted; unusable `started` gives the default shifted); `PipeRecordingAnonymiserOutputLinesAreFormattedAnew` (unknown JSON fields, escapes, a `+02:00` offset, BOM, CRLF in the input) | `tests/Censio.Pipe.Tests/PipeRecordingAnonymiserTests.cs` |
 | AC2 | `PipeRecordingAnonymiserSameNameGetsSameInventedName`; `PipeRecordingAnonymiserTwoNamesGetTwoInventedNames` (island rename, two figures); `PipeRecordingAnonymiserOriginalEqualToInventedNameIsSkipped` (`Island 1`, `island 2`, `PLAYER 1`); `PipeRecordingAnonymiserEmptyNameStaysEmpty` | as above |
-| AC3 | `PipeRecordingAnonymiserFloatAmountsShareOneEntryFactor`; `PipeRecordingAnonymiserDerivedValuesFollowRelations`; `PipeRecordingAnonymiserSmallIntegersChangeByOne` (1, 2, 4, -3); `PipeRecordingAnonymiserLargeIntegersChangeWithinBounds` (5, 1000, `int.MaxValue`, `int.MinValue`); `PipeRecordingAnonymiserZeroNaNAndInfinityAreKept` (a NaN with payload bits becomes the standard NaN with its sign); `PipeRecordingAnonymiserProfitWhoseChangeRoundsToZeroMovesOne` (both directions, profit 1 to 0); `PipeRecordingAnonymiserRepeatedWorkforceGuidSumStaysInRange`; `PipeRecordingAnonymiserOverflowingFactorUsesLowerRange`; `PipeAnonymiserRandomNextDoubleStaysInUnitRange` | `PipeRecordingAnonymiserTests.cs`, `tests/Censio.Pipe.Tests/PipeAnonymiserRandomTests.cs` |
+| AC3 | `PipeRecordingAnonymiserFloatAmountsShareOneEntryFactor`; `PipeRecordingAnonymiserDerivedValuesFollowRelations`; `PipeRecordingAnonymiserSmallIntegersChangeByOne` (1, 2, 4, -3); `PipeRecordingAnonymiserLargeIntegersChangeWithinBounds` (5, 1000, `int.MaxValue`, `int.MinValue`); `PipeRecordingAnonymiserZeroNaNAndInfinityAreKept` (payload NaNs of both signs in generation, delta and average productivity become `0x7FC00000` / `0xFFC00000`, asserted as bits; infinities stay); `PipeRecordingAnonymiserProfitWhoseChangeRoundsToZeroMovesOne` (both directions, profit 1 to 0, `int.MaxValue` and `int.MinValue` move away); `PipeRecordingAnonymiserRepeatedWorkforceGuidSumStaysInRange`; `PipeRecordingAnonymiserOverflowingFactorUsesLowerRange`; `PipeAnonymiserRandomNextDoubleStaysInUnitRange` | `PipeRecordingAnonymiserTests.cs`, `tests/Censio.Pipe.Tests/PipeAnonymiserRandomTests.cs` |
 | AC4 | `PipeRecordingAnonymiserReceiveTimesShiftByOneOffset` (header `started` equal to the first frame's time, as the recorder writes it); `PipeRecordingAnonymiserOffsetBoundsAreNotWholeDays` (random 0, 0.5, just below 1); `PipeRecordingAnonymiserTwoRunsWithSystemRandomDiffer`; `PipeRecordingAnonymiserShiftBeforeEarliestTimeIsInvalidLine`; `AnonymiserCommandSuccessPrintsOnlyCountAndOutput` | `PipeRecordingAnonymiserTests.cs`, `tests/Censio.Anonymiser.Tests/AnonymiserCommandTests.cs` |
-| AC5 | `AnonymiserCommandMissingInputPrintsFileNotFound`; `AnonymiserCommandRefusedRecordingPrintsReplayReason` (not a recording, unsupported version, invalid line 3); `AnonymiserCommandUndecodableFramePrintsLine` (unknown type, malformed, island before `Version`, island after `Version 3`); `AnonymiserCommandExistingOutputIsNotOverwritten`; `AnonymiserCommandOutputIsInputIsRefused`; `AnonymiserCommandMissingOutputFolderPrintsWriteFailed`; `AnonymiserCommandNonSeekableInputPrintsReadFailed` (a FIFO on Linux); `AnonymiserCommandWrongArgumentCountPrintsUsage` (0, 1, 3); `AnonymiserCommandLeavesInputUnchanged`; `AnonymiserCommandCancelledLeavesNoOutput`; `ProgramMainWithoutArgumentsReturnsUsageCode`; `PipeRecordingAnonymiserReadErrorIsReadFailed` (`ChunkedStream`); `PipeRecordingAnonymiserFileChangedBetweenPassesIsReadFailed`; `PipeRecordingAnonymiserNonSeekableRecordingIsReadFailed`; `PipeRecordingAnonymiserStartedNearEarliestTimeUsesDefault` | `AnonymiserCommandTests.cs`, `tests/Censio.Anonymiser.Tests/ProgramTests.cs`, `PipeRecordingAnonymiserTests.cs` |
+| AC5 | `AnonymiserCommandMissingInputPrintsFileNotFound`; `AnonymiserCommandRefusedRecordingPrintsReplayReason` (not a recording, unsupported version, invalid line 3); `AnonymiserCommandUndecodableFramePrintsLine` (unknown type, malformed, island before `Version`, island after `Version 3`); `AnonymiserCommandExistingOutputIsNotOverwritten`; `AnonymiserCommandOutputIsInputIsRefused`; `AnonymiserCommandMissingOutputFolderPrintsWriteFailed`; `AnonymiserCommandNonSeekableInputPrintsReadFailed` (a FIFO on Linux, its writer end opened before the command runs); `AnonymiserCommandWrongArgumentCountPrintsUsage` (0, 1, 3); `AnonymiserCommandLeavesInputUnchanged`; `AnonymiserCommandCancelledLeavesNoOutput`; `ProgramMainWithoutArgumentsReturnsUsageCode`; `PipeRecordingAnonymiserReadErrorIsReadFailed` (`ChunkedStream`); `PipeRecordingAnonymiserFileChangedBetweenPassesIsReadFailed`; `PipeRecordingAnonymiserNonSeekableRecordingIsReadFailed`; `PipeRecordingAnonymiserStartedNearEarliestTimeUsesDefault` | `AnonymiserCommandTests.cs`, `tests/Censio.Anonymiser.Tests/ProgramTests.cs`, `PipeRecordingAnonymiserTests.cs` |
 | AC6 | `PipeMessageReaderFixturesGiveReadmeFrameCounts`; `PipeTickAssemblerFixturesGiveReadmeTicksAndEvents` (deferred to step 6 of G4: they test existing code against new data) | `tests/Censio.Pipe.Tests/PipeMessageReaderTests.cs`, `tests/Censio.Pipe.Tests/PipeTickAssemblerTests.cs` |
 | AC7 | `FixtureDenyListFixturesAgainstLocalDenyList` (inconclusive without `CENSIO_FIXTURE_DENY_LIST`); `FixtureDenyListAnonymisedRecordingPasses`; `FixtureDenyListDeniedNameFails` (case differs); `FixtureDenyListNonInventedNameFails`; `FixtureDenyListUnchangedAmountFails`; `FixtureDenyListMissingOriginalFails`; `FixtureDenyListReportHoldsNoDeniedValue`; manual: Product Manager, branch head after G4, runs *Test* with the variable set | `tests/Censio.Pipe.Tests/FixtureDenyListTests.cs` |
 | AC8 | manual: Reviewer, step 8, reads `README.md` and `docs/USER_GUIDE.md` (English and German) against the command as built | — |
@@ -71,21 +71,26 @@ through it, so `PipeReplayStreamTests` stay as they are and guard the move. The 
 **Rewriting** (`PipeFrameAnonymiser.Anonymise`), after `Parse` accepted the frame: every frame is written anew and ends
 after its last field (trailing bytes dropped): `Version` as type byte and int32, session end as its type byte alone,
 session start as type byte, length byte and invented name; only an empty frame is copied. An island frame is walked by
-the layout of fact 4 and written field by field. The written frame is then parsed back with `PipeMessageParser.Parse`;
-unless it gives the same type, the same entry count and the same number of pairs per map, read in full, the frame is
-refused (`frame cannot be anonymised in line <n>`), so a walker mismatch can never copy bytes. Every map pair is written in
+the layout of fact 4 and written field by field. The written frame is then parsed back with a new overload
+`PipeMessageParser.Parse(frame, out consumed)` (the parser's position after the last field it read; the existing
+`Parse` calls it); unless `consumed` equals the written length and the result has the type, entry count, product
+GUIDs and map GUID sets of the original's parse, the frame is refused (`frame cannot be anonymised in line <n>`), so a
+walker mismatch can never copy bytes. Every map pair is written in
 wire order; workforce amounts follow the integer rule (a pair is drawn downwards when the sum of its GUID's amounts in that map would leave int32), building pairs are copied. Random draws come in this order (the
 scripted double relies on it): the offset; per entry the factor (side, then magnitude), maintenance (side,
 magnitude), each workforce amount (side, magnitude). A side draw below 0.5 is downwards.
 - Factor `f`: `0.80 + 0.19u` or `1.01 + 0.19u`; if a multiplied finite value would become infinite, the lower range is
   used for that entry. Multiplied: generation, consumption, perfect generation, perfect consumption, income, summed
-  productivity, each `(float)(v × f)` when finite; a NaN is written as `float.NaN` with its original sign bit (its payload bits could carry data), infinities stay.
-- Delta: `gen' − cons'` when generation, consumption and delta are finite; a non-finite delta is copied; otherwise
-  `(float)(delta × f)`. Average productivity: copied when not finite; `0` with building count 0; else
+  productivity, each `(float)(v × f)` when finite.
+- Non-finite floats, in every float field (the multiplied ones, delta, average productivity): an infinity stays; a NaN
+  is written as the standard NaN with its original sign, bits `0x7FC00000` (positive) or `0xFFC00000` (negative;
+  .NET's `float.NaN`), so its payload bits cannot carry data.
+- Delta: `gen' − cons'` when generation, consumption and delta are finite; a non-finite delta follows the non-finite rule; otherwise
+  `(float)(delta × f)`. Average productivity: the non-finite rule when not finite; `0` with building count 0; else
   `(float)(100 × summed' / buildingCount)`, or `(float)(avg × f)` when `summed'` is not finite.
 - Profit: when income is finite, `profit + round((income' − maint') − (income − maint))`, away from zero, clamped to
-  the int32 range; when that equals a non-zero profit, it moves 1 towards `income' − maint'` (upwards on a tie), which
-  keeps it within 1 of `income' − maint'`; with a non-finite income the integer rule applies.
+  the int32 range; when that equals a non-zero profit, it moves 1 towards `income' − maint'` (upwards on a tie), or away
+  from it when that would leave int32, which keeps it within 1 of `income' − maint'` except at that edge; with a non-finite income the integer rule applies.
 - Integer rule (on 64-bit magnitudes): 0 stays; magnitude 1 → 2; 2 to 4 → ±1 by side; from 5 on
   `round(m × (1 ± (0.01 + 0.19u)))`, at least 1 apart, downwards when upwards leaves int32; the sign is kept.
 - A subnormal float can round back to itself (accepted).
@@ -97,7 +102,8 @@ file exists`; create `<output>.<Path.GetRandomFileName()>.tmp` with `CreateNew` 
 it, flush, close, `File.Move` without overwrite (`IOException` while the output now exists → `output file exists`).
 Every failure deletes the temporary file (a delete failure is ignored). `IOException`, `UnauthorizedAccessException`,
 `ArgumentException`, `NotSupportedException` on the output → `write failed`; no exception text is printed. An
-input that cannot seek (a FIFO or device) → `read failed`, checked after opening, before any output exists
+input that cannot seek (a FIFO or device) → `read failed`, checked after opening (a FIFO without a writer blocks the
+open until Ctrl+C), before any output exists
 (`PipeRecordingAnonymiser` returns `ReadFailed` for such a stream too). A recording the Companion is still writing
 cannot be opened (`file not found`); the user guide says to stop the recording first.
 `Program.Main` cancels on Ctrl+C (`Console.CancelKeyPress`, `e.Cancel = true`): `Error: cancelled`, code 1.
@@ -150,6 +156,7 @@ only.
 | Censio.Pipe | `PipeReplayStream` | reads through `PipeRecordingReader`; no public change |
 | Censio.Pipe | `PipeReplayLineStatus` | used by `PipeRecordingReader` (stays internal) |
 | Censio.Pipe | `PipeRecordingFormat` | new `ReadStarted` |
+| Censio.Pipe | `PipeMessageParser` | new `Parse` overload with the consumed length; the existing `Parse` calls it |
 | Censio.Pipe | `PipeRecordingAnonymiser`, `PipeAnonymiseResult`, `PipeAnonymiseResultKind`, `IPipeAnonymiserRandom`, `PipeAnonymiserRandom` | new |
 | Censio.Pipe | `PipeFrameAnonymiser`, `PipeAnonymousNames` | new, internal |
 | Censio.Anonymiser (new, `src/`) | `Censio.Anonymiser.csproj` (`Exe`, `net10.0`, references Censio.Pipe), `Program`, `AnonymiserCommand` | new |
@@ -164,6 +171,7 @@ Censio.Pipe:
 - `public class PipeRecordingLine` (sealed); `PipeRecordingLine.Kind: required PipeRecordingLineKind`, `PipeRecordingLine.LineNumber: long`, `PipeRecordingLine.ReceiveTime: DateTimeOffset`, `PipeRecordingLine.Frame: byte[] = []`, `PipeRecordingLine.Problem: PipeReplayProblem?`
 - `public class PipeRecordingReader` (sealed); `public PipeRecordingReader(Stream recording)`; `PipeRecordingReader.Started: DateTimeOffset? { get; }`; `public ValueTask<PipeRecordingLine> ReadAsync(CancellationToken cancellationToken)`
 - `public static DateTimeOffset? ReadStarted(ReadOnlySpan<byte> line)` (in PipeRecordingFormat)
+- `public static PipeReadResult Parse(ReadOnlySpan<byte> frame, out int consumed)` (in PipeMessageParser; `consumed` is 0 on an error)
 - `public interface IPipeAnonymiserRandom`; `double NextDouble()` (in `[0, 1)`); `public class PipeAnonymiserRandom : IPipeAnonymiserRandom` (sealed)
 - `public enum PipeAnonymiseResultKind { Anonymised, RecordingProblem, FrameNotAnonymisable }`
 - `public class PipeAnonymiseResult` (sealed); `PipeAnonymiseResult.Kind: required PipeAnonymiseResultKind`, `PipeAnonymiseResult.FrameCount: long`, `PipeAnonymiseResult.LineNumber: long?`, `PipeAnonymiseResult.Problem: PipeReplayProblem?`
@@ -183,12 +191,13 @@ New: `tests/Censio.Pipe.Tests/PipeRecordingReaderTests.cs` (the reader's own API
 `PipeRecordingAnonymiserTests.cs`, `PipeAnonymiserRandomTests.cs`, `FixtureDenyListTests.cs`, the helper
 `FixtureDenyList.cs` and the double `ScriptedPipeAnonymiserRandom.cs` (linked into the Anonymiser tests); new project
 `tests/Censio.Anonymiser.Tests/` with `Censio.Anonymiser.Tests.csproj`, `AnonymiserCommandTests.cs`, `ProgramTests.cs`;
-`PipeRecordingFormatTests.cs` gains `PipeRecordingFormatReadStarted…` cases; `PipeMessageReaderTests.cs` and
+`PipeRecordingFormatTests.cs` gains `PipeRecordingFormatReadStarted…` cases; `PipeMessageParserTests.cs` gains `PipeMessageParserParseReportsConsumedLength` (each type, trailing bytes, error gives 0); `PipeMessageReaderTests.cs` and
 `PipeTickAssemblerTests.cs` gain the AC6 tests; `Censio.Pipe.Tests.csproj` copies `Fixtures/**` to the output (Tester).
 
 Existing call sites of a changed signature: none (`PipeReplayStream` keeps its API).
 
-Files no unit test can cover: none (`Program.Main` is called by `ProgramTests`; only its Ctrl+C handler body is not).
+Files no unit test can cover: none (`Program.Main` is called by `ProgramTests`; only its Ctrl+C handler body and the
+defensive parse-back refusal in `PipeFrameAnonymiser` are not).
 
 ## Areas
 
@@ -251,7 +260,15 @@ No guarantee of `.squad/project.md` is touched: nothing is sent, stored or relea
 
 - B1 (= M1) — resolved as Challenge 1; a session start is type byte, length byte and invented name.
 - B2 (= M3) — resolved: tier `security`.
-- N1, NaN payload as a channel — taken: a NaN is written as `float.NaN` with its sign; spec E8 aligned.
+- N1, NaN payload as a channel — taken: a NaN is written as the standard NaN with its sign; spec E8 aligned.
+- B3, delta and average productivity still copied a NaN — resolved: one non-finite rule for every float field; the
+  NaN test covers a multiplied field, delta and average productivity.
+- N6, `Parse` returns no consumed length — taken: new overload `Parse(frame, out consumed)`, compared with the
+  written length (tested in `PipeMessageParserTests`); the refusal branch cannot be reached with a correct walker,
+  so its few lines stay uncovered (no file is excluded).
+- N7, a FIFO without a writer blocks — taken: stated; the test opens the writer end first.
+- N8, profit at the int32 edge — taken: it moves away from `income' − maint'` there; tested at both edges.
+- N9, NaN bit patterns — taken: `0x7FC00000` and `0xFFC00000`, asserted as bits.
 - N2, input bytes copied into lines — taken: lines are made only by the two format methods (*Two passes*, step 4) and
   tested with hostile line forms.
 - N3, `started` underflow — taken: `ReadStarted` treats such a time as unusable; test added.
