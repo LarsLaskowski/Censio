@@ -750,6 +750,37 @@ public sealed class PipeRecordingAnonymiserTests
     }
 
     /// <summary>
+    /// A profit at the edge of the 32-bit range whose new income minus maintenance (D') is that edge exactly never keeps
+    /// its value: it moves 1 inwards and stays within 1 of D'.
+    /// </summary>
+    /// <param name="income">The income</param>
+    /// <param name="maintenance">The maintenance</param>
+    /// <param name="profit">The profit</param>
+    /// <param name="expected">The expected profit</param>
+    /// <returns>The task</returns>
+    [TestMethod]
+    [TestCategory("AC3")]
+    [DataRow(1863326208f, -221, int.MaxValue, int.MaxValue - 1)]
+    [DataRow(-1863326208f, 222, int.MinValue, int.MinValue + 1)]
+    public async Task PipeRecordingAnonymiserProfitAtInt32EdgeNeverKeepsItsValue(float income, int maintenance, int profit, int expected)
+    {
+        // Arrange
+        var island = Island(1, "Ostia", 100, EntryBytes(Entry(10, 1000f, maintenance, income, profit), _noPairs, _noPairs));
+
+        // Act
+        var (_, output) = await AnonymiseAsync(RecordingOf(_version2, island), new ScriptedPipeAnonymiserRandom(Up));
+
+        // Assert
+        var entry = ParseIsland(OutputFrames(output)[1].Frame).Entries[0];
+        var newDifference = (double)entry.Income - entry.Maintenance;
+
+        Assert.AreEqual((double)profit, newDifference, $"The case needs D' at the edge of the 32-bit range (D' = {newDifference})");
+        Assert.AreNotEqual(profit, entry.Profit, "A non-zero profit should never keep its value");
+        Assert.AreEqual(expected, entry.Profit, "The profit should move 1 inwards from the edge");
+        Assert.IsLessThanOrEqualTo(1.0, Math.Abs(entry.Profit - newDifference), "The profit should stay within 1 of the new income minus maintenance");
+    }
+
+    /// <summary>
     /// The amounts of a workforce GUID that repeats are drawn so that their sum stays in the 32-bit range, and every pair
     /// stays in wire order.
     /// </summary>
