@@ -1,6 +1,6 @@
 # 0003: Squash-merge pull requests
 
-- **Status:** Accepted
+- **Status:** Superseded by 0040
 - **Date:** 2026-10-30
 - **Area:** —
 - **Source:** Squad adopted from Squad-Spec-Repository-Template
