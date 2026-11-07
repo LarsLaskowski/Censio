@@ -359,6 +359,89 @@ internal sealed class PipeFrameAnonymiser
     }
 
     /// <summary>
+    /// Picks the profit among the integers next to the new income minus maintenance.
+    /// </summary>
+    /// <param name="profit">The original profit</param>
+    /// <param name="lower">The new income minus maintenance rounded down</param>
+    /// <param name="upper">The new income minus maintenance rounded up</param>
+    /// <param name="below">Whether the original profit was at or below its income minus maintenance</param>
+    /// <returns>The profit</returns>
+    private static int PickProfit(int profit, long lower, long upper, bool below)
+    {
+        var candidate = PreferredProfit(profit, lower, upper, below);
+
+        if (candidate == profit && profit != 0)
+        {
+            candidate = AlternativeProfit(lower, upper, below);
+        }
+
+        if (candidate is < int.MinValue or > int.MaxValue)
+        {
+            candidate = candidate == lower ? upper : lower;
+        }
+
+        if (candidate is >= int.MinValue and <= int.MaxValue)
+        {
+            return (int)candidate;
+        }
+
+        var edge = (int)Math.Clamp(candidate, int.MinValue, int.MaxValue);
+
+        if (edge != profit)
+        {
+            return edge;
+        }
+
+        return edge > 0 ? edge - 1 : edge + 1;
+    }
+
+    /// <summary>
+    /// Gives the profit to try first: 0 for a zero profit while 0 is within 1 of the new difference, else the neighbour
+    /// on the original's side.
+    /// </summary>
+    /// <param name="profit">The original profit</param>
+    /// <param name="lower">The new income minus maintenance rounded down</param>
+    /// <param name="upper">The new income minus maintenance rounded up</param>
+    /// <param name="below">Whether the original profit was at or below its income minus maintenance</param>
+    /// <returns>The profit to try first</returns>
+    private static long PreferredProfit(int profit, long lower, long upper, bool below)
+    {
+        if (profit == 0 && lower >= -1 && upper <= 1)
+        {
+            return 0;
+        }
+
+        return below ? lower : upper;
+    }
+
+    /// <summary>
+    /// Gives the other profit next to the new difference than the preferred one.
+    /// </summary>
+    /// <param name="lower">The new income minus maintenance rounded down</param>
+    /// <param name="upper">The new income minus maintenance rounded up</param>
+    /// <param name="below">Whether the original profit was at or below its income minus maintenance</param>
+    /// <returns>The profit</returns>
+    private static long AlternativeProfit(long lower, long upper, bool below)
+    {
+        if (lower != upper)
+        {
+            return below ? upper : lower;
+        }
+
+        return below ? lower - 1 : upper + 1;
+    }
+
+    /// <summary>
+    /// Converts an integral double to a long, limited to a range that cannot overflow.
+    /// </summary>
+    /// <param name="value">The value</param>
+    /// <returns>The long</returns>
+    private static long ToLong(double value)
+    {
+        return (long)Math.Clamp(value, -4e18, 4e18);
+    }
+
+    /// <summary>
     /// Decodes a frame and applies the version gate as the message reader does.
     /// </summary>
     /// <param name="frame">The frame</param>
@@ -489,7 +572,8 @@ internal sealed class PipeFrameAnonymiser
     }
 
     /// <summary>
-    /// Derives the profit of an entry so that its relation to income minus maintenance is kept, and so that it changes.
+    /// Derives the profit of an entry: an integer within 1 of the new income minus maintenance, on the original's side of it,
+    /// that differs from a non-zero original; at the edge of the 32-bit range it moves 1 inwards.
     /// </summary>
     /// <param name="entry">The original entry</param>
     /// <param name="income">The perturbed income</param>
@@ -497,23 +581,15 @@ internal sealed class PipeFrameAnonymiser
     /// <returns>The profit</returns>
     private int DeriveProfit(ProductionEntry entry, float income, int maintenance)
     {
-        if (float.IsFinite(entry.Income) == false)
+        if (float.IsFinite(income) == false)
         {
             return PerturbInteger(entry.Profit);
         }
 
-        var change = Math.Round(((double)income - maintenance) - ((double)entry.Income - entry.Maintenance), MidpointRounding.AwayFromZero);
-        var profit = (int)Math.Clamp(entry.Profit + change, int.MinValue, int.MaxValue);
+        var difference = (double)income - maintenance;
+        var below = (double)entry.Income - entry.Maintenance - entry.Profit >= 0;
 
-        if (profit != entry.Profit || entry.Profit == 0)
-        {
-            return profit;
-        }
-
-        var step = (double)income - maintenance < entry.Profit ? -1L : 1L;
-        var moved = entry.Profit + step;
-
-        return (int)(moved is < int.MinValue or > int.MaxValue ? entry.Profit - step : moved);
+        return PickProfit(entry.Profit, ToLong(Math.Floor(difference)), ToLong(Math.Ceiling(difference)), below);
     }
 
     /// <summary>
