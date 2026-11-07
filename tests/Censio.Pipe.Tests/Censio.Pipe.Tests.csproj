@@ -9,4 +9,7 @@
     <ProjectReference Include="..\..\src\Censio.Pipe\Censio.Pipe.csproj" />
     <ProjectReference Include="..\..\src\Censio.Contracts\Censio.Contracts.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <None Update="Fixtures\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

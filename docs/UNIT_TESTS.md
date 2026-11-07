@@ -22,6 +22,10 @@ neighboring test file before inventing a new pattern.
 <!-- project:begin layout -->
 - Test project: `tests/<Project>.Tests/`, test classes placed flat in it (no subfolders).
 - One test class per type under test, in `{TypeUnderTest}Tests.cs`.
+- Test fixtures: `tests/<Project>.Tests/Fixtures/`, copied to the test output, each described with its facts in the
+  folder's `README.md`. Only anonymised recordings, never a raw one (record 0029).
+- `CENSIO_FIXTURE_DENY_LIST`: the path of the local deny list the fixtures are checked against
+  (`FixtureDenyListTests`, `tests/Censio.Pipe.Tests/Fixtures/README.md`); unset, that test is reported inconclusive.
 <!-- project:end layout -->
 
 ## Naming

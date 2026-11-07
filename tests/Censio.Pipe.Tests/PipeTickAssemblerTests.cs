@@ -486,6 +486,75 @@ public sealed class PipeTickAssemblerTests
     }
 
     /// <summary>
+    /// Each fixture, replayed through the message reader and the tick assembler, gives the ticks with their close
+    /// reasons, the session events and the rename its README states.
+    /// </summary>
+    /// <param name="fixture">The fixture file name</param>
+    /// <param name="expected">The facts the README states</param>
+    /// <returns>The task</returns>
+    [TestMethod]
+    [TestCategory("AC6")]
+    [DataRow("long-session.jsonl",
+             "items=Version,RepeatedSessionEnd,SessionStart,Tick x32,SessionEnd,SessionStart,Tick x1,EndOfStream ticks=33 GameTimeChanged=1 QuietPeriod=31 StreamEnded=1 noData=2 islands=24 renamed=1 figures=Player 1")]
+    public async Task PipeTickAssemblerFixturesGiveReadmeTicksAndEvents(string fixture, string expected)
+    {
+        // Arrange
+        var clock = new PipeReplayClock(DateTimeOffset.UnixEpoch);
+        using var replay = new PipeReplayStream(File.OpenRead(Path.Combine(FixtureDenyList.FixturesFolder, fixture)), PipeReplaySpeed.Maximum, clock, TimeProvider.System);
+        using var assembler = new PipeTickAssembler(new PipeMessageReader(replay), clock);
+
+        // Act
+        var results = await DrainAsync(assembler);
+
+        // Assert
+        Assert.AreEqual(expected, DescribeFixture(results), $"The fixture {fixture} should give the ticks and events of its README");
+        Assert.IsNull(replay.Problem, "The fixture should be a valid recording");
+    }
+
+    /// <summary>
+    /// Describes the results of a fixture: the item sequence with consecutive ticks counted, the close reasons, the ticks
+    /// without data, the island keys, the keys that carry more than one name, and the figures' names.
+    /// </summary>
+    /// <param name="results">The results</param>
+    /// <returns>The description</returns>
+    private static string DescribeFixture(List<PipeTickResult> results)
+    {
+        var items = new List<string>();
+        var ticksInRow = 0;
+
+        foreach (var result in results)
+        {
+            if (result.Tick is not null)
+            {
+                ticksInRow++;
+
+                continue;
+            }
+
+            if (ticksInRow > 0)
+            {
+                items.Add(string.Create(CultureInfo.InvariantCulture, $"Tick x{ticksInRow}"));
+                ticksInRow = 0;
+            }
+
+            items.Add(result.Kind.ToString());
+        }
+
+        var ticks = results.Where(result => result.Tick is not null).Select(result => result.Tick!).ToList();
+        int Closed(PipeTickCloseReason reason)
+        {
+            return ticks.Count(tick => tick.CloseReason == reason);
+        }
+
+        var islands = ticks.SelectMany(tick => tick.Islands).GroupBy(island => island.Key).ToList();
+        var renamed = islands.Count(group => group.Select(island => island.Name).Distinct(StringComparer.Ordinal).Count() > 1);
+        var figures = string.Join(",", results.Where(result => result.Kind == PipeTickResultKind.SessionStart).Select(result => result.Headline).Distinct(StringComparer.Ordinal));
+
+        return string.Create(CultureInfo.InvariantCulture,
+                             $"items={string.Join(",", items)} ticks={ticks.Count} GameTimeChanged={Closed(PipeTickCloseReason.GameTimeChanged)} QuietPeriod={Closed(PipeTickCloseReason.QuietPeriod)} StreamEnded={Closed(PipeTickCloseReason.StreamEnded)} noData={ticks.Count(tick => tick.IsNoDataYet)} islands={islands.Count} renamed={renamed} figures={figures}");
+    }
+
+    /// <summary>
     /// Summarizes a result by its kind, close reason, game time, receive time and island keys.
     /// </summary>
     /// <param name="result">The result</param>
