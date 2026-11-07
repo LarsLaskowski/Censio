@@ -1,3 +1,6 @@
+using System.Buffers.Binary;
+using System.Security.Cryptography;
+
 namespace Censio.Pipe;
 
 /// <summary>
@@ -5,17 +8,28 @@ namespace Censio.Pipe;
 /// </summary>
 public sealed class PipeAnonymiserRandom : IPipeAnonymiserRandom
 {
+    #region Constants
+
+    /// <summary>
+    /// The number of random bits of a draw: the precision of a double.
+    /// </summary>
+    private const int DrawBits = 53;
+
+    #endregion // Constants
+
     #region IPipeAnonymiserRandom
 
-    // Skeleton: removed with the implementation
-#pragma warning disable RH2003, S2325
     /// <inheritdoc />
     public double NextDouble()
     {
-        throw new NotImplementedException();
-    }
+        Span<byte> bytes = stackalloc byte[sizeof(ulong)];
 
-#pragma warning restore RH2003, S2325
+        RandomNumberGenerator.Fill(bytes);
+
+        var bits = BinaryPrimitives.ReadUInt64LittleEndian(bytes) >> (64 - DrawBits);
+
+        return bits / (double)(1UL << DrawBits);
+    }
 
     #endregion // IPipeAnonymiserRandom
 }
