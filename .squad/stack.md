@@ -20,10 +20,12 @@ profile and owned by this repository: keep it true when the build changes.
 ## Layout
 
 - Production code: `src/` — `Censio.Contracts`, `Censio.Pipe`, `Censio.GameData`, `Censio.Server.Data`,
-  `Censio.Server` (Blazor Server), `Censio.Companion.Core` (the Companion's platform-neutral logic) and
-  `Censio.Companion` (the Windows tray shell, `net10.0-windows`, no test project).
+  `Censio.Server` (Blazor Server), `Censio.Companion.Core` (the Companion's platform-neutral logic),
+  `Censio.Anonymiser` (a contributor console tool, not released) and `Censio.Companion` (the Windows tray shell,
+  `net10.0-windows`, no test project).
 - Tests: `tests/<Project>.Tests/`, one test class per type under test in `{TypeUnderTest}Tests.cs`,
-  placed flat in the test project.
+  placed flat in the test project. Anonymised recordings used as fixtures lie in `tests/<Project>.Tests/Fixtures/`
+  with a `README.md`.
 
 ## Commands
 

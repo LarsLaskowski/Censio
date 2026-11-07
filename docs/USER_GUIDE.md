@@ -167,7 +167,21 @@ For testing and bug reports the Companion can keep what the game sends and play 
   Tried by the Product Manager on Windows 11 (26H2) with a Companion built from source with the documented publish command: this procedure with `Exit` first and the *Run* dialog, which works. Not reported separately: the exact quoting and path details of the line, and a replay started while the tray Companion still runs.
 - **Invalid command line:** an unknown argument, `--speed` without `--replay`, a speed outside the range, `--replay` without a file, or `--record` together with `--replay` show `Censio Companion: Invalid command line`; the Companion then neither records nor replays, and `Exit` works.
 
-**A recording is private.** It holds the name of the player figure (which can be your real name), island names and economic data exactly as the game sent them. It stays in the folder on your computer, the Companion never sends it anywhere and never deletes it. Do not attach or post a raw recording publicly (not in an issue either); only anonymised fixtures are meant to be shared. Keep a recording until a maintainer asks how to hand it in (*Reporting problems*). Delete the files yourself when you no longer need them.
+**A recording is private.** It holds the name of the player figure (which can be your real name), island names and economic data exactly as the game sent them. It stays in the folder on your computer, the Companion never sends it anywhere and never deletes it. Do not attach or post a raw recording publicly (not in an issue either); only anonymised fixtures are meant to be shared (*Anonymising a recording (contributors)*). Keep a recording until a maintainer asks how to hand it in (*Reporting problems*). Delete the files yourself when you no longer need them.
+
+##### Anonymising a recording (contributors)
+
+A contributor who wants to commit a recording as a test fixture anonymises it first. The tool is a console program of the repository, not part of the release or of the Companion ZIP, so it needs a checkout of the repository and the .NET SDK (as in *Build from source*). Testers who are not contributors do not need it: they keep their raw recordings and hand them in privately when a maintainer asks.
+
+1. Stop the recording (`Stop recording` or `Exit`). A file the Companion still writes cannot be opened and gives `file not found`.
+2. In the root directory of the repository run `dotnet run --project src/Censio.Anonymiser -c Release -- <recording> <output>` with the recording file and a new output file name. The output must not exist; it is never overwritten.
+3. On success the tool prints `Anonymised <n> frames to <output>` and exits with code 0. The original is not changed.
+
+What changes: every island and figure name becomes `Island <n>` or `Player <n>` (one original name always the same invented one), the amounts of every entry change by 1 % to 20 % (generation, consumption, income, productivity, maintenance, workforce amounts; delta, profit and average productivity follow), and every time moves earlier by a random offset of 30 to 365 days. What stays: the frame types and order, the game times, the pauses, the island and product GUIDs, the building counts and the workforce and building GUIDs. A replay of the output shows the same ticks as the original.
+
+Errors are one line on standard error, `Error: <reason>`, with exit code 1: `file not found`, `not a recording`, `unsupported version`, `invalid line <n>`, `read failed`, `frame cannot be anonymised in line <n>` (a frame the tool does not decode, or any frame before a `Version 2` frame or after another version), `output file exists`, `output is the input`, `write failed` (for example a folder that does not exist) and `cancelled` (Ctrl+C). Without exactly two arguments the tool prints `Usage: Censio.Anonymiser <recording> <output>` and exits with code 2. After an error no output file is left.
+
+Check the output before you commit it: a name or a number you know from the game must not appear in it. Do not commit or post the original recording.
 
 ### Build from source
 
@@ -416,7 +430,21 @@ Für Tests und Fehlermeldungen kann der Companion aufzeichnen, was das Spiel sen
   Vom Product Manager unter Windows 11 (26H2) mit einem Companion ausprobiert, aus dem Quellcode mit dem dokumentierten Publish-Befehl gebaut: dieses Verfahren mit `Exit` zuerst und dem Dialog *Ausführen*, es funktioniert. Nicht gesondert gemeldet: die Einzelheiten der Zeile zu Anführungszeichen und Pfaden und ein Abspielen, das gestartet wird, während der Tray-Companion noch läuft.
 - **Ungültige Kommandozeile:** ein unbekanntes Argument, `--speed` ohne `--replay`, eine Geschwindigkeit außerhalb des Bereichs, `--replay` ohne Datei oder `--record` zusammen mit `--replay` zeigen `Censio Companion: Invalid command line`; der Companion zeichnet dann weder auf noch spielt er ab, und `Exit` funktioniert.
 
-**Eine Aufzeichnung ist privat.** Sie enthält den Namen der Spielfigur (der Ihr echter Name sein kann), Inselnamen und Wirtschaftsdaten genau so, wie das Spiel sie gesendet hat. Sie bleibt im Ordner auf dem eigenen Rechner, der Companion sendet sie nirgendwohin und löscht sie nie. Eine unbearbeitete Aufzeichnung nie öffentlich anhängen oder posten (auch nicht in einem Issue); geteilt werden sollen nur anonymisierte Testdaten. Eine Aufzeichnung aufheben, bis ein Maintainer fragt, wie sie übergeben werden soll (*Probleme melden*). Die Dateien selbst löschen, wenn sie nicht mehr gebraucht werden.
+**Eine Aufzeichnung ist privat.** Sie enthält den Namen der Spielfigur (der Ihr echter Name sein kann), Inselnamen und Wirtschaftsdaten genau so, wie das Spiel sie gesendet hat. Sie bleibt im Ordner auf dem eigenen Rechner, der Companion sendet sie nirgendwohin und löscht sie nie. Eine unbearbeitete Aufzeichnung nie öffentlich anhängen oder posten (auch nicht in einem Issue); geteilt werden sollen nur anonymisierte Testdaten (*Eine Aufzeichnung anonymisieren (für Mitwirkende)*). Eine Aufzeichnung aufheben, bis ein Maintainer fragt, wie sie übergeben werden soll (*Probleme melden*). Die Dateien selbst löschen, wenn sie nicht mehr gebraucht werden.
+
+##### Eine Aufzeichnung anonymisieren (für Mitwirkende)
+
+Wer eine Aufzeichnung als Testdatei einchecken möchte, anonymisiert sie vorher. Das Werkzeug ist ein Konsolenprogramm des Repositorys, nicht Teil des Releases oder des Companion-ZIPs; es braucht einen Checkout des Repositorys und das .NET SDK (wie in *Aus dem Quellcode bauen*). Tester, die nicht mitwirken, brauchen es nicht: Sie behalten ihre unbearbeiteten Aufzeichnungen und geben sie privat weiter, wenn ein Maintainer fragt.
+
+1. Die Aufzeichnung beenden (`Stop recording` oder `Exit`). Eine Datei, die der Companion noch schreibt, lässt sich nicht öffnen und ergibt `file not found`.
+2. Im Hauptverzeichnis des Repositorys `dotnet run --project src/Censio.Anonymiser -c Release -- <Aufzeichnung> <Ausgabe>` mit der Aufzeichnungsdatei und einem neuen Namen für die Ausgabedatei ausführen. Die Ausgabe darf nicht existieren; sie wird nie überschrieben.
+3. Bei Erfolg gibt das Werkzeug `Anonymised <n> frames to <Ausgabe>` aus und endet mit Code 0. Das Original bleibt unverändert.
+
+Was sich ändert: Jeder Insel- und Figurenname wird zu `Island <n>` oder `Player <n>` (derselbe Originalname immer derselbe erfundene), die Beträge jedes Eintrags ändern sich um 1 % bis 20 % (Erzeugung, Verbrauch, Einkommen, Produktivität, Unterhalt, Arbeitskräftemengen; Delta, Gewinn und durchschnittliche Produktivität folgen), und jede Zeit wird um einen zufälligen Versatz von 30 bis 365 Tagen nach früher verschoben. Was bleibt: Frame-Typen und Reihenfolge, Spielzeiten, Pausen, die GUIDs von Inseln und Produkten, die Gebäudezahlen und die GUIDs der Arbeitskräfte und Gebäude. Ein Abspielen der Ausgabe zeigt dieselben Ticks wie das Original.
+
+Fehler sind eine Zeile auf der Standardfehlerausgabe, `Error: <Grund>`, mit Code 1: `file not found`, `not a recording`, `unsupported version`, `invalid line <n>`, `read failed`, `frame cannot be anonymised in line <n>` (ein Frame, den das Werkzeug nicht dekodiert, oder jeder Frame vor einem `Version 2`-Frame oder nach einer anderen Version), `output file exists`, `output is the input`, `write failed` (zum Beispiel ein Ordner, der nicht existiert) und `cancelled` (Strg+C). Ohne genau zwei Argumente gibt das Werkzeug `Usage: Censio.Anonymiser <recording> <output>` aus und endet mit Code 2. Nach einem Fehler bleibt keine Ausgabedatei zurück.
+
+Die Ausgabe vor dem Einchecken prüfen: Ein Name oder eine Zahl, die Sie aus dem Spiel kennen, darf darin nicht vorkommen. Die ursprüngliche Aufzeichnung nie einchecken oder posten.
 
 ### Aus dem Quellcode bauen
 

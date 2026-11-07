@@ -170,7 +170,7 @@ The reference reads leniently; this reader is strict and fails closed (record 00
 
 ### Residual risks
 
-Until fixtures from real recordings (#20) test the reader:
+Until more fixtures from real recordings test the reader (one anonymised fixture exists, [`pipe-recording.md`](pipe-recording.md), *Fixtures*):
 
 - The format is known from the reference source as read on 2026-11-01 and one recording of 2026-11-07
   ([`../protocol.md`](../protocol.md)); a single recording cannot show a single reader or the units of the rates.
@@ -201,4 +201,4 @@ Until fixtures from real recordings (#20) test the reader:
 - Recording the frames to a file and replaying it: [`pipe-recording.md`](pipe-recording.md).
 - Telling a resent or paused tick from a new one (#35).
 - Assigning ticks to a profile: record 0041.
-- Anonymising recordings (#20).
+- Anonymising recordings: [`pipe-recording.md`](pipe-recording.md), *Anonymising*.

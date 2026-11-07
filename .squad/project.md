@@ -22,8 +22,8 @@ limits, patterns or sequences.
 - Network exposure: the server's listener and its routes reachable without login (`/`, `/health`, the Blazor hub, static assets) in `src/Censio.Server/Program.cs` and `src/Censio.Server/Dockerfile` — [server](../docs/areas/server.md).
 - Data-protection key ring: `DataProtectionSetup` under the data directory — [server](../docs/areas/server.md), *Data directory and key ring*.
 - Local pipe connection: `NamedPipeConnector` and `PipeEndpoint` open the game's pipe read-only at identification level — [pipe-connection](../docs/areas/pipe-connection.md), *Opening*.
-- Parsing of external input: the pipe stream (`PipeFrameReader`, `PipeMessageParser`, `PipeTickAssembler`), recording files (`PipeReplayStream`, `PipeRecordingFormat`), later game files and WebSocket messages — [pipe](../docs/areas/pipe.md), [pipe-recording](../docs/areas/pipe-recording.md).
-- File paths the Companion writes, prunes or opens: the recordings folder (`PipeRecordingFiles`), the log folder (`CompanionFolders`, `LogFileLoggerProvider`, `LogFileNames`), Explorer (`FolderOpener`), the replay file from the command line, later the cache — [companion](../docs/areas/companion.md) (*Recording*, *Folders*, *Log*), [pipe-recording](../docs/areas/pipe-recording.md).
+- Parsing of external input: the pipe stream (`PipeFrameReader`, `PipeMessageParser`, `PipeTickAssembler`), recording files (`PipeReplayStream`, `PipeRecordingReader`, `PipeRecordingFormat`, `PipeRecordingAnonymiser`), later game files and WebSocket messages — [pipe](../docs/areas/pipe.md), [pipe-recording](../docs/areas/pipe-recording.md).
+- File paths the Companion writes, prunes or opens: the recordings folder (`PipeRecordingFiles`), the log folder (`CompanionFolders`, `LogFileLoggerProvider`, `LogFileNames`), Explorer (`FolderOpener`), the replay file from the command line, the anonymiser's output and temporary file from its command line (`AnonymiserCommand`), later the cache — [companion](../docs/areas/companion.md) (*Recording*, *Folders*, *Log*), [pipe-recording](../docs/areas/pipe-recording.md) (*Anonymising*).
 - Windows autostart: `CompanionAutostart` over `RegistryStartupEntryStore`, the per-user Run value — [companion](../docs/areas/companion.md), *Start with Windows*.
 - Logging and showing external data: the Companion's log writer (`LogLine`, `LogFileLoggerProvider`, `CompanionLog`), the diagnostics window, the pipe's error results, the server's request logging — [companion](../docs/areas/companion.md) (*Log*, *Diagnostics window*), [pipe](../docs/areas/pipe.md), [server](../docs/areas/server.md).
 - Release publishing: `.github/workflows/release.yml` and `notify-website.yml`, their secrets in the environment `release`, Docker Hub `latest` — [record 0012](../docs/decisions/0012-release-pre-release-first-and-secret-free-builds.md), `docs/CONTRIBUTING.md` (*Versioning and releases*), [server](../docs/areas/server.md) (*Docker image*).
@@ -60,10 +60,10 @@ change with it.
 
 **A new external API call or DTO** touches:
 - the reader of the external shape and its types: `Censio.Pipe` for the pipe and recordings, later `Censio.GameData` and the ingest messages in `Censio.Contracts`; the external shape must not leak past it
-- `PipeFrameBuilder` or other synthetic input in the tests, never real recordings (records 0029, 0033)
+- `PipeFrameBuilder` or other synthetic input in the tests, never real recordings, except the anonymised fixtures under `tests/Censio.Pipe.Tests/Fixtures/` (records 0029, 0033, 0042)
 
 **A new pipe message type, field or tick rule** touches:
-- `PipeMessageType`, `PipeMessageParser` and the message class in `Censio.Pipe`; `PipeTickBuilder` and `PipeTickLimits` for a tick rule
+- `PipeMessageType`, `PipeMessageParser` and the message class in `Censio.Pipe`; `PipeFrameAnonymiser`, which walks the wire layout a second time (record 0042); `PipeTickBuilder` and `PipeTickLimits` for a tick rule
 - the recording format version in `PipeRecordingFormat` when the recorded content changes
 - the diagnostics columns in `DiagnosticsView`
 - `docs/areas/pipe.md` (*Message types*, *Limits and errors*)
@@ -88,6 +88,8 @@ otherwise), one line each: the double, where it lives and what it stands in for;
 - `ScriptedPipeConnector` (`tests/Censio.Companion.Core.Tests/ScriptedPipeConnector.cs`) — an `IPipeConnector` of queued or held results, for the pipe connection.
 - `ControlledPipeStream` (`tests/Censio.Companion.Core.Tests/ControlledPipeStream.cs`) — models an asynchronous pipe read's end and cancellation (checked against `dotnet/runtime` `release/10.0` `PipeStream.ValueTaskSource.cs`).
 - `ControlledWriteStream` (`tests/Censio.Pipe.Tests/ControlledWriteStream.cs`, linked into the Companion tests) — models a file stream's write and flush failures (checked against `dotnet/runtime` `release/10.0` `Win32Marshal`).
+- `ScriptedPipeAnonymiserRandom` (`tests/Censio.Pipe.Tests/ScriptedPipeAnonymiserRandom.cs`, linked into the Anonymiser tests) — an `IPipeAnonymiserRandom` of queued draws, for the anonymiser's offset and factors.
+- `TwoPassRecordingStream` (`tests/Censio.Pipe.Tests/TwoPassRecordingStream.cs`) — a seekable stream whose content or read errors differ per pass, for the anonymiser's two reads.
 - `FakeTimeProvider` (`Microsoft.Extensions.TimeProvider.Testing`) — the clock of every timing test; a test library, not a mocking library.
 - `BackwardsFakeTimeProvider` (`tests/Censio.Pipe.Tests/BackwardsFakeTimeProvider.cs`) — models a system clock set back (checked by a scratch run).
 - `RecordingTimeProvider` (`tests/Censio.Pipe.Tests/RecordingTimeProvider.cs`) — a `FakeTimeProvider` that records and awaits its timers, for replay and retry waits.

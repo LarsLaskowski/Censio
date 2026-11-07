@@ -11,6 +11,7 @@ Censio is in milestone M1. The release `v0.1.0` completes the milestone; it is o
 What `v0.1.0` can do:
 
 - The Companion runs on Windows as a tray icon. Its tooltip and icon show the state of the connection to the game's statistics pipe (the game needs the launch argument `/pipe`), and its menu shows the status and the last tick. It records what the game sends to a local file, from the menu or with the switch `--record` (*First recording*), and plays such a file back with `--replay <file>` ([user guide](docs/USER_GUIDE.md#first-recording-step-by-step)). `Open diagnostics` opens a window with the last tick, with regions, islands and goods as raw numbers (GUIDs). It writes a log file to `%LOCALAPPDATA%\Censio\Logs`, and `Start with Windows` (off by default) starts it at sign-in.
+- Contributors can anonymise a recording with a console tool of the repository, `dotnet run --project src/Censio.Anonymiser -c Release -- <recording> <output>`, which invents the names, perturbs the amounts and shifts the times; stop the recording first, and keep raw recordings private ([user guide](docs/USER_GUIDE.md#anonymising-a-recording-contributors)).
 - The server runs as a Docker image. Its start page shows `Version <version>`, and `GET /health` answers `Healthy`.
 
 What `v0.1.0` cannot do:
@@ -19,7 +20,6 @@ What `v0.1.0` cannot do:
 - Nothing is sent from the Companion to the server.
 - The web application shows no game data and there is no history.
 - The Companion has no settings, such as a server address or a token.
-- There is no tool to anonymise a recording; a recording stays private.
 
 ## Getting Censio
 
@@ -164,6 +164,7 @@ Censio befindet sich im Meilenstein M1. Das Release `v0.1.0` schließt den Meile
 Das kann `v0.1.0`:
 
 - Der Companion läuft unter Windows als Tray-Symbol. Sein Tooltip und Symbol zeigen den Zustand der Verbindung zur Statistik-Pipe des Spiels (das Spiel braucht das Startargument `/pipe`), und sein Menü zeigt den Status und den letzten Tick. Er zeichnet auf, was das Spiel sendet, in eine lokale Datei, über das Menü oder mit dem Schalter `--record` (*Erste Aufzeichnung*), und spielt eine solche Datei mit `--replay <Datei>` ab ([Benutzerhandbuch](docs/USER_GUIDE.md#erste-aufzeichnung-schritt-für-schritt)). `Open diagnostics` öffnet ein Fenster mit dem letzten Tick, mit Regionen, Inseln und Waren als rohen Zahlen (GUIDs). Er schreibt eine Logdatei nach `%LOCALAPPDATA%\Censio\Logs`, und `Start with Windows` (standardmäßig aus) startet ihn bei der Anmeldung.
+- Mitwirkende können eine Aufzeichnung mit einem Konsolenwerkzeug des Repositorys anonymisieren, `dotnet run --project src/Censio.Anonymiser -c Release -- <Aufzeichnung> <Ausgabe>`; es erfindet die Namen, verändert die Beträge und verschiebt die Zeiten. Die Aufzeichnung vorher beenden, unbearbeitete Aufzeichnungen bleiben privat ([Benutzerhandbuch](docs/USER_GUIDE.md#eine-aufzeichnung-anonymisieren-für-mitwirkende)).
 - Der Server läuft als Docker-Image. Seine Startseite zeigt `Version <version>`, und `GET /health` antwortet mit `Healthy`.
 
 Das kann `v0.1.0` nicht:
@@ -172,7 +173,6 @@ Das kann `v0.1.0` nicht:
 - Der Companion sendet nichts an den Server.
 - Die Webanwendung zeigt keine Spieldaten, und es gibt keinen Verlauf.
 - Der Companion hat keine Einstellungen, etwa eine Serveradresse oder ein Token.
-- Es gibt kein Werkzeug, um eine Aufzeichnung zu anonymisieren; eine Aufzeichnung bleibt privat.
 
 ## Censio beziehen
 
