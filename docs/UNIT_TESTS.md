@@ -26,6 +26,9 @@ neighboring test file before inventing a new pattern.
   folder's `README.md`. Only anonymised recordings, never a raw one (record 0029).
 - `CENSIO_FIXTURE_DENY_LIST`: the path of the local deny list the fixtures are checked against
   (`FixtureDenyListTests`, `tests/Censio.Pipe.Tests/Fixtures/README.md`); unset, that test is reported inconclusive.
+- `CENSIO_ANNO_INSTALL`: the Anno 117 installation folder, set on Windows for the survey test
+  `RdaInstallationSurveyRealInstallationReadsAssetAndIcon` (`tests/Censio.GameData.Tests`); unset, that test is reported
+  inconclusive.
 <!-- project:end layout -->
 
 ## Naming
