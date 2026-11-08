@@ -41,3 +41,4 @@ are quoted in full.
 | 2026-11-08 16:03 | 6 Coverage skipped (G2) | Orchestrator | Skipped: Dev's gate output shows PASS (new code 94.8 %); uncovered lines are UTF-16BE and error branches; test documentation (task 14) is open and runs with G3 |
 | 2026-11-08 16:03 | 4 Skeleton skipped (G3) | Orchestrator | skipped — plan: G3 has no new API (tasks.md note) |
 | 2026-11-08 16:03 | 5 Tests first skipped (G3) | Orchestrator | skipped — G3 holds the PM's survey run, a limit change and documentation only; no new production behaviour to test first |
+| 2026-11-08 16:03 | 6 Coverage (G3) test docs | Tester | Task 14 done: .squad/project.md Test doubles (SparseStream, RdaArchiveBuilder) and docs/UNIT_TESTS.md (CENSIO_ANNO_INSTALL) edited (sonnet/medium · 79,316 tokens · 4 tool uses · 20 s · 6 in · 1,428 out · 196,540 cache read · 28,348 cache write · 62,235 weighted) |

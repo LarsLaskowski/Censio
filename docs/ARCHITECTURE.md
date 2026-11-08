@@ -18,7 +18,7 @@ except the Windows shell:
 | ------- | -------------- | ---------- |
 | `Censio.Contracts` | The types shared by Companion and server, and the product version | — |
 | `Censio.Pipe` | Framing and parsing the statistics pipe into typed messages and assembling them into ticks, recording frames to a file and replaying it, and anonymising a recording ([`areas/pipe.md`](areas/pipe.md), [`areas/pipe-recording.md`](areas/pipe-recording.md)) | — |
-| `Censio.GameData` | Reading the game files and the catalog | — |
+| `Censio.GameData` | Reading the game files (the RDA archives) and the catalog ([`areas/game-files.md`](areas/game-files.md)) | — |
 | `Censio.Server.Data` | Persistence of the server | — |
 | `Censio.Server` | Web host, UI, later the ingest | Contracts, Server.Data |
 | `Censio.Companion.Core` | The Companion's platform-neutral logic (tray menu and snapshot, single-instance rule, pipe connection state machine, command line, recording session and replay runner, tooltip texts, diagnostics window content and session, the log file writer, the autostart rules) | Contracts, Pipe, GameData |
@@ -72,6 +72,11 @@ Companion; cache and recording paths are never derived from external input unche
 The Companion opens the pipe `\\.\pipe\anno117` read-only and at impersonation level identification, so the pipe's
 server cannot act with the player's Windows identity; a pipe created by another program is read within the reader's
 limits ([`areas/pipe-connection.md`](areas/pipe-connection.md), record 0035).
+
+The game's RDA archives, found under a caller-named installation folder, are opened read-only and shared with the game,
+and read within the reader's limits on blocks, entries and sizes; what the reader finds comes back as typed results,
+never as exceptions, and no archive content leaves the machine ([`areas/game-files.md`](areas/game-files.md),
+record 0043).
 
 The server speaks plain HTTP only; TLS is the reverse proxy's job. Its start page and `/health` need no login, and
 `/health` reveals only its status ([`decisions/0006`](decisions/0006-server-plain-http-and-open-health.md),
