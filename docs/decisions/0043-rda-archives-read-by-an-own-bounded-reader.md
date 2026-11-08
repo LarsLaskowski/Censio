@@ -20,8 +20,10 @@ Search: the nuget.org website (its search API is refused to the session) for `rd
 `anno 1800`, `anno 2205`, `anno117`, `rda archive`, `rda reader`, `rdareader`, `rdaexplorer`, `anno mod`,
 `resource file`, `ubisoft archive` on 2026-11-08: no package reads Anno archives (`rda` finds only unrelated
 packages such as `rda.SocketHelpers`, `RDapter`). The community's readers (RDAExplorer, RdaConsole) are not on
-NuGet; their repositories could not be opened from the session. The Product Manager repeats the search before PR
-approval.
+NuGet; their repositories could not be opened from the session. The Product Manager repeated the search before PR
+approval with the same result: no NuGet package; the only readers are RDAExplorer and RdaConsole on GitHub.
+RdaConsole worked for Anno 1800, the direct predecessor, and RDAExplorer reads the current files (Product Manager's
+statement, the repositories not opened by the session).
 
 The community tool RDA Explorer 1.4.0.0, a reader for Anno 2205's V2.2, lists `config.rda` and the
 `zz_patchfiles_200` and `_300` archives of Anno 117 (the only ones tried), so their layout is at least close to V2.2
@@ -50,13 +52,16 @@ are in the [game-files](../areas/game-files.md) area document.
 
 - No dependency; the format is Censio's to maintain when the game changes it.
 - Residual risk: the layout is built from the community's description, not from a sample in the repository. The
-  Product Manager's layout probe and the installation check of 2026-11-08 confirmed it on all 40 archives: header,
+  Product Manager's layout probe and the installation checks of 2026-11-08 (the last on the final head, game version
+  3.0.1733841, store not stated) confirmed it on all 40 archives: header,
   block chain, block header, stored directory and 560-byte entry; every block's directory passes the reader's checks
   and no archive comes near the default bounds (at most 52,878 entries). Every listed entry is plain: no block that is
   not deleted is compressed, encrypted or memory-resident, so those three layouts rest on the community's description
   and synthetic tests alone, and a game update that brings such a block is read by code no real archive has
-  exercised. Not yet confirmed: reading while the game runs (the Product Manager's run on the final head before PR
-  approval, with the game version); a mismatch then sends the reader back to its plan.
+  exercised. Reading while the game runs is not confirmed: the run on the final head was requested with the game
+  running, but the Product Manager's report does not state the game's state, and the unit test of the shared open
+  discriminates on Windows only. Should the game block the reader or be disturbed by it, #22 or #23 changes the
+  open mode.
 - Patch archives carry many blocks with flag 8 (20,405 of 20,478 in `zz_patchfiles_200`) whose entries have no
   content. The reader skips them as deleted; whether flag 8 means that, and whether such entries remove files of
   earlier archives, is part of the load order #23 settles.
