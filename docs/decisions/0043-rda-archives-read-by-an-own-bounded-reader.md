@@ -12,7 +12,7 @@
 
 [0024](0024-rda-reading-with-an-existing-nuget-library.md) chose a NuGet library for the game's RDA archives if the
 spike of #21 found one with a permissive licence ([0028](0028-mit-licence.md)), maintenance and Anno 117 support. The
-Product Manager's listing of an installation found 36 archives under `maindata`, all with the header
+Product Manager's listing of an installation found 40 archives under `maindata`, all with the header
 `Resource File V2.2`, from about 2 MB to 28 GB, so offsets and sizes above 4 GiB occur. No Anno 117 archive may enter
 the repository ([0023](0023-game-names-and-icons-extracted-locally.md), [0029](0029-anonymised-test-fixtures-only.md)).
 
@@ -22,6 +22,11 @@ Search: the nuget.org website (its search API is refused to the session) for `rd
 packages such as `rda.SocketHelpers`, `RDapter`). The community's readers (RDAExplorer, RdaConsole) are not on
 NuGet; their repositories could not be opened from the session. The Product Manager confirms the search before PR
 approval.
+
+The community tool RDA Explorer 1.4.0.0, a reader for Anno 2205's V2.2, lists `config.rda` and the
+`zz_patchfiles_200` and `_300` archives of Anno 117, so their layout is at least close to V2.2 as known; the same
+icon paths occur in both patch archives. The Product Manager confirmed building the reader without a real sample in
+the repository (issue #21's working record, option a).
 
 ## Options considered
 
@@ -41,10 +46,10 @@ are in the [game-files](../areas/game-files.md) area document.
 ## Consequences
 
 - No dependency; the format is Censio's to maintain when the game changes it.
-- Residual risk: the layout is built from the community's description, not from a sample in the repository; it is
-  confirmed only by the Product Manager's run of the installation check on the final head before PR approval. A
-  mismatch found there sends the reader back to its plan.
-- Which archive wins when several hold the same path (e.g. the `zz_patchfiles_*` archives) is not known from the
-  spike; #23 must settle it before it builds the catalog.
+- Residual risk: the layout is built from the community's description, not from a sample in the repository; the
+  Product Manager's layout probe before the tests and the run of the installation check on the final head before PR
+  approval confirm it. A mismatch sends the reader back to its plan.
+- Which archive wins when several hold the same path (the `zz_patchfiles_*` archives repeat icon paths) is not
+  known from the spike; #23 must settle it before the catalog is built, and #24 depends on it for icons.
 - An entry larger than the per-entry bound cannot be read; #23 revisits the bound or reads entries as streams if a
   needed file exceeds it.
