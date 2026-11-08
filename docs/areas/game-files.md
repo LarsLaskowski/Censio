@@ -99,18 +99,19 @@ it without notice.
 ## Locations
 
 From the Product Manager's survey run of 2026-11-08 on the installation of the branch head (Windows, 40 archives
-under `maindata`, no archive hit a bound, no open error; the game's version is not recorded in the run). Every
+under `maindata`, no archive hit a bound, no open error; the game's version is not recorded). Every
 archive is of the format above; all entries have the flags `0`, with no encrypted block and no duplicate path inside
 an archive. The largest entry counts are 21,028 (`zz_patchfiles_300`), 46,110 (`shared_configs`), 52,878
 (`dlc03_provinces_02`) and 50,081 (`dlc03_provinces_01`).
 
 | Data kind | What the run confirms | What it does not |
 | --------- | --------------------- | ---------------- |
-| Goods, buildings, workforce | Their definitions are expected in the configuration files below, which are present: `data/base/config/export/assets.xml` (46,440,056 bytes) and `data/base/config/game/datasets.xml` (615,716 bytes), both in `config.rda` (194 entries, folder `data/base`) | Which XML nodes hold goods, buildings or workforce: not yet confirmed, for #23 |
-| Regions | The province data archives exist (`provinces_roman`, `provinces_celtic`, `dlc01_provinces`, `dlc03_provinces_01`, `dlc03_provinces_02`; entries of the kinds `.ctt`, `.tmc`, `.dds`, `.png`, `.a7m`, `.a7t`); no entry path outside `config.rda`'s assets, datasets and texts matched `province` | Where the region names and identifiers are; `provinces` in `assets.xml` or `datasets.xml` is a candidate, unverified: not yet confirmed, for #23 |
+| Goods, buildings, workforce | Two configuration files exist in `config.rda` (194 entries, folder `data/base`): `data/base/config/export/assets.xml` (46,440,056 bytes) and `data/base/config/game/datasets.xml` (615,716 bytes) | **Unknown: which file and which nodes hold goods, buildings and workforce.** Not yet confirmed, left to #23 |
+| Regions | The province data archives exist (`provinces_roman`, `provinces_celtic`, `dlc01_provinces`, `dlc03_provinces_01`, `dlc03_provinces_02`; entries of the kinds `.ctt`, `.tmc`, `.dds`, `.png`, `.a7m`, `.a7t`); no entry path outside `config.rda`'s assets, datasets and texts matched `province` | **Unknown: which file and which nodes hold the regions.** `provinces` in `assets.xml` or `datasets.xml` is a candidate only, unverified; left to #23 |
 | Texts (German, English) | `data/base/config/gui/texts_<language>.xml` in `config.rda`, for brazilian, english (6,784,986 bytes), french, german (7,071,912 bytes), italian, japanese, korean, metadata, polish, russian, simplified_chinese, spanish and traditional_chinese | Which nodes map an identifier to a text: not yet confirmed, for #23. The language archives `de_de0.rda` and `en_us0.rda` hold only sound (`data/sound/generatedsoundbanks/windows/<de_de or en_us>/` with `.json`, `.txt`, `.xml`, `.wem` and `.bnk` entries), no texts |
 | Icons | `.dds` files under `data/ui/` in `ui.rda` (19,027 entries) and in the patch archives `zz_patchfiles_*`; one icon was read (a DDS file of 260 bytes from `ui.rda`). Folders, by group: `data/ui/4k/base/icon_content/<group>` (`production_goods`, `building`, `workforce`, `generic`, `items_specialist`, `ornaments`, `trade_route`, ship icons and others), `data/ui/4k/dlc01`, `dlc02` and `dlc03` with the same `icon_content/<group>` layout, `data/ui/2kimages/main/3dicons/<group>`, `data/ui/2kimages/main/icons/` (`workforce`, `limestone_workforce`) and `data/ui/2kimages/fpp/icons/` (`provinces`, `workforce_tiers`, `tech_tree`) | Which icon belongs to which good, building or workforce tier: the file names are not matched to identifiers; for #23 and #24 |
 
+- The game version was not recorded by the discovery listing or the survey run; it is added when the Product Manager reports it with the run on the final head.
 - The asset file was read from `config.rda`: `data/base/config/export/assets.xml`, 46,440,056 bytes, XML.
 - The same icon folder occurs in several archives (`ui.rda` and `zz_patchfiles_150`, `_160`, `_200`, `_210`, `_300`;
   for example the group `production_goods` of the base folder in `ui.rda`, `zz_patchfiles_150` and

@@ -20,12 +20,12 @@ Search: the nuget.org website (its search API is refused to the session) for `rd
 `anno 1800`, `anno 2205`, `anno117`, `rda archive`, `rda reader`, `rdareader`, `rdaexplorer`, `anno mod`,
 `resource file`, `ubisoft archive` on 2026-11-08: no package reads Anno archives (`rda` finds only unrelated
 packages such as `rda.SocketHelpers`, `RDapter`). The community's readers (RDAExplorer, RdaConsole) are not on
-NuGet; their repositories could not be opened from the session. The Product Manager confirms the search before PR
+NuGet; their repositories could not be opened from the session. The Product Manager repeats the search before PR
 approval.
 
 The community tool RDA Explorer 1.4.0.0, a reader for Anno 2205's V2.2, lists `config.rda` and the
-`zz_patchfiles_200` and `_300` archives of Anno 117, so their layout is at least close to V2.2 as known; the same
-icon paths occur in both patch archives. The Product Manager confirmed building the reader without a real sample in
+`zz_patchfiles_200` and `_300` archives of Anno 117 (the only ones tried), so their layout is at least close to V2.2
+as known. The Product Manager confirmed building the reader without a real sample in
 the repository (issue #21's working record, option a).
 
 ## Options considered
@@ -47,16 +47,20 @@ are in the [game-files](../areas/game-files.md) area document.
 
 - No dependency; the format is Censio's to maintain when the game changes it.
 - Residual risk: the layout is built from the community's description, not from a sample in the repository. The
-  Product Manager's layout probe of 2026-11-08 confirmed it on all 40 archives for the header, the block chain, the
-  block header, the stored directory and the 560-byte entry; it found only plain blocks and blocks flagged deleted
-  (entries with offset and sizes 0), no compressed, encrypted or memory-resident block, so those three layouts rest
-  on the community's description and synthetic tests alone. The run of the installation check on the final head
-  before PR approval opens every block; a mismatch sends the reader back to its plan, and a game update that brings
-  a compressed block is read by code no real archive has exercised.
-- Patch archives carry many blocks flagged deleted (20,405 of 20,478 in `zz_patchfiles_200`) naming paths with no
-  content. The reader skips them; whether they remove files of earlier archives is part of the load order #23
-  settles.
-- Which archive wins when several hold the same path (the `zz_patchfiles_*` archives repeat icon paths) is not
-  known from the spike; #23 must settle it before the catalog is built, and #24 depends on it for icons.
+  Product Manager's layout probe and the installation check of 2026-11-08 confirmed it on all 40 archives: header,
+  block chain, block header, stored directory and 560-byte entry; every block's directory passes the reader's checks
+  and no archive comes near the default bounds (at most 52,878 entries). Every listed entry is plain: no block that is
+  not deleted is compressed, encrypted or memory-resident, so those three layouts rest on the community's description
+  and synthetic tests alone, and a game update that brings such a block is read by code no real archive has
+  exercised. Not yet confirmed: reading while the game runs (the Product Manager's run on the final head before PR
+  approval, with the game version); a mismatch then sends the reader back to its plan.
+- Patch archives carry many blocks with flag 8 (20,405 of 20,478 in `zz_patchfiles_200`) whose entries have no
+  content. The reader skips them as deleted; whether flag 8 means that, and whether such entries remove files of
+  earlier archives, is part of the load order #23 settles.
+- Which archive wins when several hold the same path (`ui.rda` and the `zz_patchfiles_*` archives repeat icon
+  folders) is not known from the spike; #23 must settle it before the catalog is built, and #24 depends on it for
+  icons.
+- The spike locates files, not data: the asset, data set and text files and the icon folders are known, but which
+  file and which nodes hold goods, buildings, workforce and regions is left to #23, since the check reads no content.
 - An entry larger than the per-entry bound cannot be read; #23 revisits the bound or reads entries as streams if a
   needed file exceeds it.
