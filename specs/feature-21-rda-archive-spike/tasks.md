@@ -20,6 +20,7 @@ Plan: [plan.md](plan.md)
 | 13 | G3 | `.squad/project.md` *Security areas* | `.squad/project.md` | AC3 | 8 | Dev | [x] |
 | 14 | G3 | `.squad/project.md` *Test doubles* (`SparseStream`); `docs/UNIT_TESTS.md` (`CENSIO_ANNO_INSTALL`) | `.squad/project.md`, `docs/UNIT_TESTS.md` | AC5 | 7 | Tester | [x] |
 | 15 | G3 | Record 0043 updated from tasks 1 and 9 where a consequence changes | `docs/decisions/0043-rda-archives-read-by-an-own-bounded-reader.md` | AC1 | 9 | Lead | [x] |
+| 16 | G3 | Product Manager's run on the final head (survey, game version, NuGet search repeated); record 0043 and the plan updated; the game was running (E7) | `specs/feature-21-rda-archive-spike/log.md`, `docs/decisions/0043-rda-archives-read-by-an-own-bounded-reader.md` | AC1, AC2, AC5 | 15 | Product Manager, Lead | [x] |
 
 Tasks 0–2 (Product Manager and Lead, no production or test code) belong to G1 only because every row needs a group:
 they finish before G1's step 4, and task 3's skeleton waits for task 2. G3 has no new API.

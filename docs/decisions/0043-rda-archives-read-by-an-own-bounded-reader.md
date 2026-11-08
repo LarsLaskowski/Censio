@@ -58,10 +58,8 @@ are in the [game-files](../areas/game-files.md) area document.
   and no archive comes near the default bounds (at most 52,878 entries). Every listed entry is plain: no block that is
   not deleted is compressed, encrypted or memory-resident, so those three layouts rest on the community's description
   and synthetic tests alone, and a game update that brings such a block is read by code no real archive has
-  exercised. Reading while the game runs is not confirmed: the run on the final head was requested with the game
-  running, but the Product Manager's report does not state the game's state, and the unit test of the shared open
-  discriminates on Windows only. Should the game block the reader or be disturbed by it, #22 or #23 changes the
-  open mode.
+  exercised. Reading while the game runs is confirmed by that last run: the game was running and all 40 archives
+  opened (the unit test of the shared open discriminates on Windows only, so this run is its real check).
 - Patch archives carry many blocks with flag 8 (20,405 of 20,478 in `zz_patchfiles_200`) whose entries have no
   content. The reader skips them as deleted; whether flag 8 means that, and whether such entries remove files of
   earlier archives, is part of the load order #23 settles.
