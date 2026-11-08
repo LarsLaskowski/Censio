@@ -1,6 +1,6 @@
 # 0042: Recordings are anonymised by a contributor console tool that rewrites each frame at wire level, with fresh randomness per run
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-07
 - **Area:** pipe-recording
 - **Source:** Issue #20
