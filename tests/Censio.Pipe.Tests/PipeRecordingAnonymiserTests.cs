@@ -561,8 +561,8 @@ public sealed class PipeRecordingAnonymiserTests
         var entries = ParseIsland(OutputFrames(output)[1].Frame).Entries;
         var standard = entries[0];
 
-        Assert.AreEqual(standard.Generation - standard.Consumption, standard.Delta, 1e-3f, "The delta should be the perturbed generation minus the perturbed consumption");
-        Assert.AreEqual((float)(100.0 * standard.SummedProductivity / 4), standard.AverageProductivity, 1e-3f, "The average should be 100 times the perturbed summed productivity over the building count");
+        Assert.IsLessThanOrEqualTo(DeltaTolerance(standard), DeltaDeviation(standard), "The delta should be the perturbed generation minus the perturbed consumption");
+        Assert.IsLessThanOrEqualTo(AverageTolerance(standard), AverageDeviation(standard), "The average should be 100 times the perturbed summed productivity over the building count");
         Assert.AreEqual(115, standard.Maintenance, "The maintenance of 100 should change by the factor of 1.1525, rounded");
         Assert.AreEqual(461, standard.Profit, "The profit should be 400 plus the change of income minus maintenance (461.25 - 400), rounded");
         Assert.IsLessThanOrEqualTo(1.0, Math.Abs(standard.Profit - (standard.Income - standard.Maintenance)), "The profit should stay within 1 of income minus maintenance");
@@ -570,6 +570,43 @@ public sealed class PipeRecordingAnonymiserTests
         Assert.AreEqual(float.PositiveInfinity, entries[2].Generation, "An infinite generation should stay infinite");
         Assert.AreEqual((float)(7 * UpFactor), entries[2].Delta, 1e-5f, "The delta should be multiplied when the generation is not finite");
         Assert.AreEqual((float)(50 * UpFactor), entries[2].AverageProductivity, 1e-4f, "The average should be multiplied when the perturbed summed productivity is not finite");
+    }
+
+    /// <summary>
+    /// A finite, non-zero float that a rule would write equal to its original moves to the adjacent float: away from zero
+    /// with a factor above 1, towards zero with a factor below 1, the other way when that step would give 0 or an
+    /// infinity; the delta and the average stay related to the written values within 2^-22.
+    /// </summary>
+    /// <param name="description">The case</param>
+    /// <param name="values">Generation, consumption, delta, summed and average productivity of the original entry</param>
+    /// <param name="draw">The draw of every side and magnitude</param>
+    /// <param name="field">The field that would keep its original value</param>
+    /// <param name="awayFromZero">Whether the field should step away from zero</param>
+    /// <returns>The task</returns>
+    [TestMethod]
+    [TestCategory("AC3")]
+    [DataRow("delta rounding to its original, factor above 1", new[] { 1e6f, 999999.875f, 0.125f, 300f, 75f }, Up, "Delta", true)]
+    [DataRow("delta rounding to its original, factor below 1", new[] { 1e6f, 999999.9375f, 0.0625f, 300f, 75f }, Down, "Delta", false)]
+    [DataRow("average equal to its original", new[] { 1000f, 800f, 200f, 300f, 8643.75f }, Up, "AverageProductivity", true)]
+    [DataRow("delta of float.MaxValue, factor above 1", new[] { 2.9525582e38f, -1.04e31f, float.MaxValue, 300f, 75f }, Up, "Delta", false)]
+    [DataRow("subnormal generation, factor above 1", new[] { float.Epsilon, 0f, 0f, 300f, 75f }, Up, "Generation", true)]
+    [DataRow("subnormal generation, factor below 1", new[] { float.Epsilon, 0f, 0f, 300f, 75f }, Down, "Generation", true)]
+    public async Task PipeRecordingAnonymiserDerivedValueEqualToOriginalIsStepped(string description, float[] values, double draw, string field, bool awayFromZero)
+    {
+        // Arrange
+        var original = SteppedEntry(values);
+        var island = Island(1, "Ostia", 100, EntryBytes(original, _noPairs, _noPairs));
+        var originalValue = FieldValue(original, field);
+
+        // Act
+        var (_, output) = await AnonymiseAsync(RecordingOf(_version2, island), new ScriptedPipeAnonymiserRandom(draw));
+
+        // Assert
+        var entry = ParseIsland(OutputFrames(output)[1].Frame).Entries[0];
+
+        Assert.AreEqual(BitConverter.SingleToUInt32Bits(Step(originalValue, awayFromZero)), BitConverter.SingleToUInt32Bits(FieldValue(entry, field)), $"The {field} should be the adjacent float of its original ({description})");
+        Assert.IsLessThanOrEqualTo(DeltaTolerance(entry), DeltaDeviation(entry), $"The delta should stay related to the written generation and consumption ({description})");
+        Assert.IsLessThanOrEqualTo(AverageTolerance(entry), AverageDeviation(entry), $"The average should stay related to the written summed productivity ({description})");
     }
 
     /// <summary>
@@ -1029,6 +1066,101 @@ public sealed class PipeRecordingAnonymiserTests
         // Assert
         Assert.AreEqual(PipeAnonymiseResultKind.Anonymised, result.Kind, "The recording should be anonymised");
         Assert.AreEqual(PipeRecordingFormat.FormatHeader(_defaultStarted - _upOffset), Encoding.UTF8.GetString(output), "The default start should be shifted instead");
+    }
+
+    /// <summary>
+    /// Creates an entry with the given generation, consumption, delta, summed and average productivity, a building count
+    /// of 4 and fixed other values.
+    /// </summary>
+    /// <param name="values">Generation, consumption, delta, summed and average productivity</param>
+    /// <returns>The entry</returns>
+    private static ProductionEntry SteppedEntry(float[] values)
+    {
+        return new ProductionEntry
+               {
+                   ProductGuid = 10,
+                   Generation = values[0],
+                   Consumption = values[1],
+                   Delta = values[2],
+                   PerfectGeneration = 1200f,
+                   PerfectConsumption = 900f,
+                   BuildingCount = 4,
+                   Maintenance = 100,
+                   Income = 500f,
+                   Profit = 400,
+                   SummedProductivity = values[3],
+                   AverageProductivity = values[4],
+                   WorkforceAmounts = _noAmounts,
+                   BuildingAmounts = _noAmounts
+               };
+    }
+
+    /// <summary>
+    /// Gives a float field of an entry by its name.
+    /// </summary>
+    /// <param name="entry">The entry</param>
+    /// <param name="field">The field name</param>
+    /// <returns>The value</returns>
+    private static float FieldValue(ProductionEntry entry, string field)
+    {
+        return field switch
+               {
+                   nameof(ProductionEntry.Generation) => entry.Generation,
+                   nameof(ProductionEntry.Delta) => entry.Delta,
+                   nameof(ProductionEntry.AverageProductivity) => entry.AverageProductivity,
+                   _ => throw new ArgumentOutOfRangeException(nameof(field), field, "The field is not covered")
+               };
+    }
+
+    /// <summary>
+    /// Gives the adjacent float of a value, away from zero or towards it.
+    /// </summary>
+    /// <param name="value">The non-zero value</param>
+    /// <param name="awayFromZero">Whether to step away from zero</param>
+    /// <returns>The adjacent float</returns>
+    private static float Step(float value, bool awayFromZero)
+    {
+        return awayFromZero == (value > 0) ? MathF.BitIncrement(value) : MathF.BitDecrement(value);
+    }
+
+    /// <summary>
+    /// Gives the distance of the delta from the generation minus the consumption, in double.
+    /// </summary>
+    /// <param name="entry">The written entry</param>
+    /// <returns>The distance</returns>
+    private static double DeltaDeviation(ProductionEntry entry)
+    {
+        return Math.Abs(entry.Delta - ((double)entry.Generation - entry.Consumption));
+    }
+
+    /// <summary>
+    /// Gives the allowed distance of the delta: 2^-22 times the largest of the three magnitudes.
+    /// </summary>
+    /// <param name="entry">The written entry</param>
+    /// <returns>The tolerance</returns>
+    private static double DeltaTolerance(ProductionEntry entry)
+    {
+        return Math.ScaleB(Math.Max(Math.Abs((double)entry.Generation), Math.Max(Math.Abs((double)entry.Consumption), Math.Abs((double)entry.Delta))), -22);
+    }
+
+    /// <summary>
+    /// Gives the distance of the average from 100 times the summed productivity over the building count, in double.
+    /// </summary>
+    /// <param name="entry">The written entry</param>
+    /// <returns>The distance</returns>
+    private static double AverageDeviation(ProductionEntry entry)
+    {
+        return Math.Abs(entry.AverageProductivity - (100.0 * entry.SummedProductivity / entry.BuildingCount));
+    }
+
+    /// <summary>
+    /// Gives the allowed distance of the average: 2^-22 times the larger of the two magnitudes.
+    /// </summary>
+    /// <param name="entry">The written entry</param>
+    /// <returns>The tolerance</returns>
+    private static double AverageTolerance(ProductionEntry entry)
+    {
+        return Math.ScaleB(Math.Max(Math.Abs((double)entry.AverageProductivity), Math.Abs(100.0 * entry.SummedProductivity / entry.BuildingCount)), -22);
     }
 
     /// <summary>
