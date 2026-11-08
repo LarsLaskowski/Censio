@@ -104,5 +104,5 @@ once in the [area document](../areas/README.md) of the record's area, and the re
 | [0040](0040-the-squads-process-decisions-live-in-process-md.md) | The squad's process decisions live in process.md | Accepted | 2026-11-06 |
 | [0041](0041-profile-selected-in-the-companion-figure-name-only-a-hint.md) | The profile is selected in the Companion; the figure name of a session start is only a hint | Accepted | 2026-11-07 |
 | [0042](0042-recordings-anonymised-by-a-contributor-tool-rewriting-frames.md) | Recordings are anonymised by a contributor console tool that rewrites each frame at wire level, with fresh randomness per run | Accepted | 2026-11-07 |
-| [0043](0043-rda-archives-read-by-an-own-bounded-reader.md) | RDA archives are read by an own bounded reader for format V2.2 | Proposed | 2026-11-08 |
+| [0043](0043-rda-archives-read-by-an-own-bounded-reader.md) | RDA archives are read by an own bounded reader for format V2.2 | Accepted | 2026-11-08 |
 <!-- project:end index -->

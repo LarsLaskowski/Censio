@@ -1,6 +1,6 @@
 # 0043: RDA archives are read by an own bounded reader for format V2.2
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-08
 - **Area:** game-files
 - **Source:** Issue #21
