@@ -18,9 +18,10 @@ function Get-Hex2([System.IO.BinaryReader] $r, [long] $pos) {
     Get-ChildItem -LiteralPath (Join-Path $root 'maindata') -File -Filter '*.rda' | Sort-Object Name | ForEach-Object {
         $name = $_.Name
         $len = $_.Length
-        $fs = [System.IO.File]::Open($_.FullName, 'Open', 'Read', 'ReadWrite, Delete')
-        $r = New-Object System.IO.BinaryReader($fs)
+        $fs = $null; $r = $null
         try {
+            $fs = [System.IO.File]::Open($_.FullName, 'Open', 'Read', 'ReadWrite, Delete')
+            $r = New-Object System.IO.BinaryReader($fs)
             $fs.Position = 784
             $first = $r.ReadUInt64()
             $pos = $first; $blocks = 0; $flags = @{}; $firstOf = @{}; $seen = @{}
@@ -73,7 +74,7 @@ function Get-Hex2([System.IO.BinaryReader] $r, [long] $pos) {
             }
         }
         catch { "$name | probe error: $($_.Exception.GetType().Name)" }
-        finally { $r.Dispose() }
+        finally { if ($null -ne $r) { $r.Dispose() } elseif ($null -ne $fs) { $fs.Dispose() } }
     }
 } | Out-File -LiteralPath $out -Encoding utf8
 "Written to $out"
