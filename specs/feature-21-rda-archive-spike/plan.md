@@ -149,7 +149,7 @@ created.
 
 | Project | Type / file | Change |
 | ------- | ----------- | ------ |
-| Censio.GameData | `RdaArchive`, `RdaEntry`, `RdaBlockFlags`, `RdaLimits`, `RdaOpenResult`, `RdaReadResult`, `RdaError`, `RdaErrorKind`, `RdaInstallationSurvey`, `RdaSurveyReport` | new |
+| Censio.GameData | `RdaArchive`, `RdaEntry`, `RdaBlockAttributes`, `RdaLimits`, `RdaOpenResult`, `RdaReadResult`, `RdaError`, `RdaErrorKind`, `RdaInstallationSurvey`, `RdaSurveyReport` | new |
 | Censio.GameData.Tests | `RdaArchiveTests`, `RdaLimitsTests`, `RdaInstallationSurveyTests`, `RdaArchiveBuilder`, `SparseStream` | new |
 
 ## Signatures (for the Dev's skeleton)
@@ -157,11 +157,11 @@ created.
 Namespace `Censio.GameData`. `RdaEntry` gets an internal constructor with path, size and flags plus the internal
 location fields the reader needs (offset, stored size, block index); it is no API.
 
-- `[Flags] public enum RdaBlockFlags { None = 0, Compressed = 1, Encrypted = 2, MemoryResident = 4, Deleted = 8 }`
+- `[Flags] public enum RdaBlockAttributes { None = 0, Compressed = 1, Encrypted = 2, MemoryResident = 4, Deleted = 8 }`
 - `public enum RdaErrorKind { UnsupportedArchive, CorruptArchive, CorruptEntry, UnsupportedEntry, NotFound, DuplicateEntry, Unreadable }`
 - `public sealed class RdaError` with `public RdaError(RdaErrorKind kind, string message)`, `public RdaErrorKind Kind { get; }`, `public string Message { get; }`
 - `public sealed class RdaLimits` with `public RdaLimits(int maxBlocks, int maxEntries, int maxDirectoryBytes, int maxEntryBytes)`, `public int MaxBlocks { get; }`, `public int MaxEntries { get; }`, `public int MaxDirectoryBytes { get; }`, `public int MaxEntryBytes { get; }`, `public static RdaLimits Default { get; }`
-- `public sealed class RdaEntry` with `public string Path { get; }`, `public long Size { get; }`, `public RdaBlockFlags Flags { get; }`
+- `public sealed class RdaEntry` with `public string Path { get; }`, `public long Size { get; }`, `public RdaBlockAttributes Flags { get; }` (the enum avoids the `Flags` suffix of S2344; the property keeps the format's term)
 - `public sealed class RdaArchive : IDisposable` with `public static RdaOpenResult Open(string path, RdaLimits limits)`, `public static RdaOpenResult Open(Stream stream, RdaLimits limits)`, `public IReadOnlyList<RdaEntry> Entries { get; }`, `public int EncryptedBlockCount { get; }`, `public RdaReadResult Read(string path)`, `public void Dispose()`
 - `public sealed class RdaOpenResult` with `public RdaArchive? Archive { get; }`, `public RdaError? Error { get; }`, `public static RdaOpenResult FromArchive(RdaArchive archive)`, `public static RdaOpenResult FromError(RdaError error)`
 - `public sealed class RdaReadResult` with `public ReadOnlyMemory<byte> Content { get; }`, `public RdaError? Error { get; }`, `public static RdaReadResult FromContent(ReadOnlyMemory<byte> content)`, `public static RdaReadResult FromError(RdaError error)`

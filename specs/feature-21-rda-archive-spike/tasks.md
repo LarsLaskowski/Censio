@@ -7,7 +7,7 @@ Plan: [plan.md](plan.md)
 | 0 | G1 | Discovery listing logged (`log.md` rows 2a, 2b) | `specs/feature-21-rda-archive-spike/log.md` | AC6 | — | Product Manager | [x] |
 | 1 | G1 | Layout probe run (plan, *Layout probe*); output logged in a fenced block | `specs/feature-21-rda-archive-spike/log.md` | AC3, AC4 | 0 | Product Manager | [x] |
 | 2 | G1 | Fact 7 and *Approach* corrected from the probe | `specs/feature-21-rda-archive-spike/plan.md` | AC3, AC4 | 1 | Lead | [x] |
-| 3 | G1 | Skeleton: `RdaBlockFlags`, `RdaErrorKind`, `RdaError`, `RdaLimits`, `RdaEntry`, `RdaArchive`, `RdaOpenResult`, `RdaReadResult` (plan, *Signatures*) | `src/Censio.GameData/Rda*.cs` | AC3, AC4 | 2 | Dev | [ ] |
+| 3 | G1 | Skeleton: `RdaBlockAttributes`, `RdaErrorKind`, `RdaError`, `RdaLimits`, `RdaEntry`, `RdaArchive`, `RdaOpenResult`, `RdaReadResult` (plan, *Signatures*) | `src/Censio.GameData/Rda*.cs` | AC3, AC4 | 2 | Dev | [ ] |
 | 4 | G1 | Helpers `RdaArchiveBuilder`, `SparseStream`; failing tests of AC3, AC4 and E7 | `tests/Censio.GameData.Tests/RdaArchiveTests.cs`, `RdaLimitsTests.cs`, `RdaArchiveBuilder.cs`, `SparseStream.cs` | AC3, AC4, AC5 | 3 | Tester | [ ] |
 | 5 | G1 | Implement the reader (plan, *Approach*, Reader) | `src/Censio.GameData/Rda*.cs` | AC3, AC4 | 4 | Dev | [ ] |
 | 6 | G2 | Skeleton: `RdaInstallationSurvey`, `RdaSurveyReport` | `src/Censio.GameData/RdaInstallationSurvey.cs`, `RdaSurveyReport.cs` | AC5 | 5 | Dev | [ ] |
