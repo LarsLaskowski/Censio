@@ -66,3 +66,4 @@ are quoted in full.
 | 2026-11-08 13:03 | 12 Wait | Orchestrator | Reviews approved on 9de7b1b; waiting for the Product Manager to remake long-session.jsonl with this code and rerun the deny-list test (task 12) |
 | 2026-11-08 13:08 | 12 Fixture remade | Product Manager | Remade long-session.jsonl with the code of 9de7b1b+ (deny-list rerun result follows); the first rerun failed with the same finding because the old fixture was still in use |
 | 2026-11-08 13:08 | 12 Fixture remade | Orchestrator | Remade fixture committed; checked with PipeRecordingReader: 794 frames, 21,091 entries, no problem, no NaN, delta/average within the tolerance, profit within 1, names Player 1 / Island 1-25; the delta at line 661 entry 55 is stepped by one float; fixture tests green |
+| 2026-11-08 13:09 | 12 Deny-list run | Product Manager | PASS: 1081 succeeded, 0 failed, 0 skipped with CENSIO_FIXTURE_DENY_LIST set, on the remade long-session.jsonl |
