@@ -234,7 +234,7 @@ public sealed class AnonymiserCommand
 
             File.Move(temporaryPath, outputPath);
 
-            await _output.WriteLineAsync(string.Create(CultureInfo.InvariantCulture, $"Anonymised {result.FrameCount} frames to {outputPath}")).ConfigureAwait(false);
+            await ReportSuccessAsync(result.FrameCount, outputPath).ConfigureAwait(false);
 
             return SuccessCode;
         }
@@ -270,6 +270,24 @@ public sealed class AnonymiserCommand
             await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
 
             return result;
+        }
+    }
+
+    /// <summary>
+    /// Writes the success line; a failing standard output is ignored, as the output file is complete.
+    /// </summary>
+    /// <param name="frameCount">The number of frames written</param>
+    /// <param name="outputPath">The output as typed</param>
+    /// <returns>The task</returns>
+    private async Task ReportSuccessAsync(long frameCount, string outputPath)
+    {
+        try
+        {
+            await _output.WriteLineAsync(string.Create(CultureInfo.InvariantCulture, $"Anonymised {frameCount} frames to {outputPath}")).ConfigureAwait(false);
+        }
+        catch (IOException)
+        {
+            // The output file is complete; a standard output that cannot be written does not fail the run.
         }
     }
 
