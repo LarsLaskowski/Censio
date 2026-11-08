@@ -575,7 +575,7 @@ public sealed class PipeRecordingAnonymiserTests
     /// <summary>
     /// A finite, non-zero float that a rule would write equal to its original moves to the adjacent float: away from zero
     /// with a factor above 1, towards zero with a factor below 1, the other way when that step would give 0 or an
-    /// infinity; the delta and the average stay related to the written values within 2^-22.
+    /// infinity; the delta and the average stay related to the written values within 2^-22 plus 2^-148.
     /// </summary>
     /// <param name="description">The case</param>
     /// <param name="values">Generation, consumption, delta, summed and average productivity of the original entry</param>
@@ -591,6 +591,7 @@ public sealed class PipeRecordingAnonymiserTests
     [DataRow("delta of float.MaxValue, factor above 1", new[] { 2.9525582e38f, -1.04e31f, float.MaxValue, 300f, 75f }, Up, "Delta", false)]
     [DataRow("subnormal generation, factor above 1", new[] { float.Epsilon, 0f, 0f, 300f, 75f }, Up, "Generation", true)]
     [DataRow("subnormal generation, factor below 1", new[] { float.Epsilon, 0f, 0f, 300f, 75f }, Down, "Generation", true)]
+    [DataRow("subnormal delta, factor above 1", new[] { 2.8e-45f, 1.4e-45f, 1.4e-45f, 300f, 75f }, Up, "Delta", true)]
     public async Task PipeRecordingAnonymiserDerivedValueEqualToOriginalIsStepped(string description, float[] values, double draw, string field, bool awayFromZero)
     {
         // Arrange
@@ -1134,13 +1135,14 @@ public sealed class PipeRecordingAnonymiserTests
     }
 
     /// <summary>
-    /// Gives the allowed distance of the delta: 2^-22 times the largest of the three magnitudes.
+    /// Gives the allowed distance of the delta: 2^-22 times the largest of the three magnitudes, plus 2^-148 (two subnormal
+    /// float32 steps).
     /// </summary>
     /// <param name="entry">The written entry</param>
     /// <returns>The tolerance</returns>
     private static double DeltaTolerance(ProductionEntry entry)
     {
-        return Math.ScaleB(Math.Max(Math.Abs((double)entry.Generation), Math.Max(Math.Abs((double)entry.Consumption), Math.Abs((double)entry.Delta))), -22);
+        return Math.ScaleB(Math.Max(Math.Abs((double)entry.Generation), Math.Max(Math.Abs((double)entry.Consumption), Math.Abs((double)entry.Delta))), -22) + Math.ScaleB(1.0, -148);
     }
 
     /// <summary>
@@ -1154,13 +1156,14 @@ public sealed class PipeRecordingAnonymiserTests
     }
 
     /// <summary>
-    /// Gives the allowed distance of the average: 2^-22 times the larger of the two magnitudes.
+    /// Gives the allowed distance of the average: 2^-22 times the larger of the two magnitudes, plus 2^-148 (two subnormal
+    /// float32 steps).
     /// </summary>
     /// <param name="entry">The written entry</param>
     /// <returns>The tolerance</returns>
     private static double AverageTolerance(ProductionEntry entry)
     {
-        return Math.ScaleB(Math.Max(Math.Abs((double)entry.AverageProductivity), Math.Abs(100.0 * entry.SummedProductivity / entry.BuildingCount)), -22);
+        return Math.ScaleB(Math.Max(Math.Abs((double)entry.AverageProductivity), Math.Abs(100.0 * entry.SummedProductivity / entry.BuildingCount)), -22) + Math.ScaleB(1.0, -148);
     }
 
     /// <summary>
