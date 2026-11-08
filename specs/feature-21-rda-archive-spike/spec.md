@@ -88,10 +88,10 @@ Each failure is a typed result with a kind, never an exception that escapes the 
 
 - Who runs the real-installation part (the check of AC5, which also yields the locations of AC2 and confirms Anno 117
   support for AC1), and when — and may the reader be built from the format's public descriptions without a real
-  sample archive in the repository (`.squad/routing.md`, *Escalation to the Product Manager*)? Not answered:
-  escalated. Recommended: the Product Manager runs it on a local build of the branch head before PR approval (step
-  9); the run is the real-sample check, only its counts and paths are reported, and the residual risk is recorded
-  in the record.
+  sample archive in the repository (`.squad/routing.md`, *Escalation to the Product Manager*)? Answered (Product
+  Manager, option a): yes — the Product Manager runs the check on a local build of the branch head before PR
+  approval (step 9); the run is the real-sample check, only paths, sizes, counts and format markers are reported, and
+  the residual risk is recorded in the record.
 - Where do the file locations go, given the issue asks for them "in the ADR"? Answered: in the area document,
   linked from the record — they describe the installed game version and change with game updates, while a released
   record is append-only (`docs/decisions/README.md`).
