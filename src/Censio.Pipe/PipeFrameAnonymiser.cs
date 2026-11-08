@@ -167,14 +167,43 @@ internal sealed class PipeFrameAnonymiser
     }
 
     /// <summary>
-    /// Multiplies a float by the factor; an infinity stays and a NaN becomes the standard NaN of its sign.
+    /// Multiplies a float by the factor; an infinity stays, a NaN becomes the standard NaN of its sign and a finite value
+    /// never keeps its original (<see cref="KeepChanged" />).
     /// </summary>
     /// <param name="value">The value</param>
     /// <param name="factor">The factor</param>
     /// <returns>The scaled value</returns>
     private static float Scale(float value, double factor)
     {
-        return float.IsFinite(value) ? (float)(value * factor) : KeepNonFinite(value);
+        return float.IsFinite(value) ? KeepChanged((float)(value * factor), value, factor) : KeepNonFinite(value);
+    }
+
+    /// <summary>
+    /// Moves a finite, non-zero float that equals its original to the adjacent float: away from zero for a factor above 1,
+    /// towards zero for a factor below 1, the other way when that would give 0 or an infinity. No random draw is made.
+    /// </summary>
+    /// <param name="written">The value a rule gave</param>
+    /// <param name="original">The original value</param>
+    /// <param name="factor">The factor of the entry</param>
+    /// <returns>The value to write</returns>
+    private static float KeepChanged(float written, float original, double factor)
+    {
+        if (float.IsFinite(written) == false || original == 0 || BitConverter.SingleToUInt32Bits(written) != BitConverter.SingleToUInt32Bits(original))
+        {
+            return written;
+        }
+
+        var away = written > 0 ? MathF.BitIncrement(written) : MathF.BitDecrement(written);
+        var towards = written > 0 ? MathF.BitDecrement(written) : MathF.BitIncrement(written);
+        var preferred = factor > 1 ? away : towards;
+        var other = factor > 1 ? towards : away;
+
+        if (preferred == 0 || float.IsFinite(preferred) == false)
+        {
+            return other;
+        }
+
+        return preferred;
     }
 
     /// <summary>
@@ -217,7 +246,9 @@ internal sealed class PipeFrameAnonymiser
             return KeepNonFinite(entry.Delta);
         }
 
-        return float.IsFinite(entry.Generation) && float.IsFinite(entry.Consumption) ? generation - consumption : (float)(entry.Delta * factor);
+        var derived = float.IsFinite(entry.Generation) && float.IsFinite(entry.Consumption) ? generation - consumption : (float)(entry.Delta * factor);
+
+        return KeepChanged(derived, entry.Delta, factor);
     }
 
     /// <summary>
@@ -239,7 +270,9 @@ internal sealed class PipeFrameAnonymiser
             return 0f;
         }
 
-        return float.IsFinite(summed) ? (float)(100.0 * summed / entry.BuildingCount) : (float)(entry.AverageProductivity * factor);
+        var derived = float.IsFinite(summed) ? (float)(100.0 * summed / entry.BuildingCount) : (float)(entry.AverageProductivity * factor);
+
+        return KeepChanged(derived, entry.AverageProductivity, factor);
     }
 
     /// <summary>
