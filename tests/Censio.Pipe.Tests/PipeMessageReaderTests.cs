@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace Censio.Pipe.Tests;
 
 /// <summary>
@@ -518,6 +520,50 @@ public sealed class PipeMessageReaderTests
     }
 
     /// <summary>
+    /// Each fixture, replayed through the message reader, gives the frame counts its README states, without an error or a
+    /// problem of the file.
+    /// </summary>
+    /// <param name="fixture">The fixture file name</param>
+    /// <param name="expected">The counts the README states</param>
+    /// <returns>The task</returns>
+    [TestMethod]
+    [TestCategory("AC6")]
+    [DataRow("long-session.jsonl", "Version=1 SessionStart=2 SessionEnd=2 AreaProductionStatistics=789 Error=0 entries=21091")]
+    public async Task PipeMessageReaderFixturesGiveReadmeFrameCounts(string fixture, string expected)
+    {
+        // Arrange
+        using var replay = new PipeReplayStream(File.OpenRead(Path.Combine(FixtureDenyList.FixturesFolder, fixture)), PipeReplaySpeed.Maximum, new PipeReplayClock(DateTimeOffset.UnixEpoch), TimeProvider.System);
+        var reader = new PipeMessageReader(replay);
+
+        // Act
+        var results = await ReadFixtureToEndAsync(reader);
+
+        // Assert
+        Assert.AreEqual(expected, CountKinds(results), $"The fixture {fixture} should give the frame counts of its README");
+        Assert.AreEqual(PipeReadResultKind.EndOfStream, results[^1].Kind, "The replay should end with the end of the stream");
+        Assert.IsNull(replay.Problem, "The fixture should be a valid recording");
+    }
+
+    /// <summary>
+    /// Counts the read results by message type, the errors and the production entries.
+    /// </summary>
+    /// <param name="results">The results</param>
+    /// <returns>The counts as text</returns>
+    private static string CountKinds(List<PipeReadResult> results)
+    {
+        int Count(PipeMessageType type)
+        {
+            return results.Count(result => result.Message?.MessageType == type);
+        }
+
+        var errors = results.Count(result => result.Kind == PipeReadResultKind.Error);
+        var entries = results.Select(result => result.Message).OfType<AreaProductionStatisticsMessage>().Sum(message => message.Entries.Count);
+
+        return string.Create(CultureInfo.InvariantCulture,
+                             $"Version={Count(PipeMessageType.Version)} SessionStart={Count(PipeMessageType.SessionStart)} SessionEnd={Count(PipeMessageType.SessionEnd)} AreaProductionStatistics={Count(PipeMessageType.AreaProductionStatistics)} Error={errors} entries={entries}");
+    }
+
+    /// <summary>
     /// Creates a version frame with its length prefix.
     /// </summary>
     /// <param name="version">The version</param>
@@ -598,6 +644,28 @@ public sealed class PipeMessageReaderTests
         {
             await reader.ReadAsync(TestContext.CancellationToken);
         }
+    }
+
+    /// <summary>
+    /// Reads a message reader to its end, for a fixture of up to 100,000 frames.
+    /// </summary>
+    /// <param name="reader">The reader</param>
+    /// <returns>All results, the end last</returns>
+    private async Task<List<PipeReadResult>> ReadFixtureToEndAsync(PipeMessageReader reader)
+    {
+        var results = new List<PipeReadResult>();
+        var result = await reader.ReadAsync(TestContext.CancellationToken);
+
+        results.Add(result);
+
+        while (result.Kind != PipeReadResultKind.EndOfStream && results.Count < 100000)
+        {
+            result = await reader.ReadAsync(TestContext.CancellationToken);
+
+            results.Add(result);
+        }
+
+        return results;
     }
 
     #endregion // Methods

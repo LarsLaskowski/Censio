@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Censio.Anonymiser\Censio.Anonymiser.csproj" />
+    <ProjectReference Include="..\..\src\Censio.Pipe\Censio.Pipe.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\Censio.Pipe.Tests\ScriptedPipeAnonymiserRandom.cs" Link="ScriptedPipeAnonymiserRandom.cs" />
+    <Compile Include="..\Censio.Pipe.Tests\PipeFrameBuilder.cs" Link="PipeFrameBuilder.cs" />
+  </ItemGroup>
+</Project>

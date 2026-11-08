@@ -11,17 +11,18 @@ web application. A Windows Companion extracts the data; a Blazor Server applicat
   shell around it ([`decisions/0004`](decisions/0004-companion-shell-and-linux-build.md)).
 - **Server** (Blazor Server): receives the data over a WebSocket (token-authenticated), keeps the live state and the history, and renders them.
 
-The solution `Censio.slnx` holds seven production projects under `src/`, each with a test project under `tests/`
+The solution `Censio.slnx` holds eight production projects under `src/`, each with a test project under `tests/`
 except the Windows shell:
 
 | Project | Responsibility | References |
 | ------- | -------------- | ---------- |
 | `Censio.Contracts` | The types shared by Companion and server, and the product version | — |
-| `Censio.Pipe` | Framing and parsing the statistics pipe into typed messages and assembling them into ticks, recording frames to a file and replaying it ([`areas/pipe.md`](areas/pipe.md), [`areas/pipe-recording.md`](areas/pipe-recording.md)) | — |
+| `Censio.Pipe` | Framing and parsing the statistics pipe into typed messages and assembling them into ticks, recording frames to a file and replaying it, and anonymising a recording ([`areas/pipe.md`](areas/pipe.md), [`areas/pipe-recording.md`](areas/pipe-recording.md)) | — |
 | `Censio.GameData` | Reading the game files and the catalog | — |
 | `Censio.Server.Data` | Persistence of the server | — |
 | `Censio.Server` | Web host, UI, later the ingest | Contracts, Server.Data |
 | `Censio.Companion.Core` | The Companion's platform-neutral logic (tray menu and snapshot, single-instance rule, pipe connection state machine, command line, recording session and replay runner, tooltip texts, diagnostics window content and session, the log file writer, the autostart rules) | Contracts, Pipe, GameData |
+| `Censio.Anonymiser` | Contributor console tool that anonymises a recording; not released ([`areas/pipe-recording.md`](areas/pipe-recording.md), *Anonymising*) | Pipe |
 | `Censio.Companion` | The Windows tray shell (WPF application, Windows Forms tray icon, the diagnostics window, the registry store of the autostart value); no test project | Companion.Core |
 
 All assemblies carry the version of the build property `Version` (default `0.0.0`) as informational version
@@ -49,6 +50,8 @@ From the tray menu (or from the start with `--record`) the Companion writes the 
 such a file through the same message reader and tick assembler instead of the pipe
 ([`decisions/0036`](decisions/0036-pipe-recording-raw-frames-and-replay-on-a-recorded-clock.md),
 [`areas/pipe-recording.md`](areas/pipe-recording.md)).
+A contributor can turn such a file into an anonymised copy with `Censio.Anonymiser`, the only way a recording may be committed as a test fixture
+([`decisions/0042`](decisions/0042-recordings-anonymised-by-a-contributor-tool-rewriting-frames.md)).
 The Companion logs through .NET's logging abstraction into its own rotating text file in the local app data folder
 ([`decisions/0037`](decisions/0037-companion-log-through-the-logging-abstraction-to-own-rotating-file.md),
 [`areas/companion.md`](areas/companion.md)).

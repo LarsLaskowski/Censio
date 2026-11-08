@@ -31,6 +31,19 @@ public static class PipeMessageParser
     /// <returns>The decoded message, or the error that describes why the frame is rejected</returns>
     public static PipeReadResult Parse(ReadOnlySpan<byte> frame)
     {
+        return Parse(frame, out _);
+    }
+
+    /// <summary>
+    /// Decodes a frame without applying the version gate and reports how far the decoding read.
+    /// </summary>
+    /// <param name="frame">The frame bytes (type byte and payload)</param>
+    /// <param name="consumed">The position behind the last field read; 0 on an error</param>
+    /// <returns>The decoded message, or the error that describes why the frame is rejected</returns>
+    public static PipeReadResult Parse(ReadOnlySpan<byte> frame, out int consumed)
+    {
+        consumed = 0;
+
         if (frame.IsEmpty)
         {
             return PipeReadResult.FromError(new PipeError
@@ -58,6 +71,8 @@ public static class PipeMessageParser
                                    PipeMessageType.SessionEnd => new SessionEndMessage(),
                                    _ => ParseStatistics(frame, ref position)
                                };
+
+        consumed = message is null ? 0 : position;
 
         return message is null
                    ? PipeReadResult.FromError(new PipeError

@@ -429,6 +429,108 @@ public sealed class PipeRecordingFormatTests
     }
 
     /// <summary>
+    /// The start of a header is read in UTC, whatever its offset, its field order and the fields beside it.
+    /// </summary>
+    /// <param name="header">The header line</param>
+    /// <param name="expected">The expected start</param>
+    [TestMethod]
+    [TestCategory("AC1")]
+    [DataRow(ValidHeader, "2026-11-01T17:09:00.1234567Z")]
+    [DataRow("""{"format":"censio-pipe-recording","version":1,"started":"2026-11-01T19:09:00.1234567+02:00"}""", "2026-11-01T17:09:00.1234567Z")]
+    [DataRow("""{"started":"2026-11-01T17:09:00Z","version":1,"format":"censio-pipe-recording"}""", "2026-11-01T17:09:00Z")]
+    [DataRow("""{"x":{"a":[1,{"b":null}]},"format":"censio-pipe-recording","version":1,"started":"2026-11-01T17:09:00.5Z","y":true}""", "2026-11-01T17:09:00.5Z")]
+    public void PipeRecordingFormatReadStartedGivesStartInUtc(string header, string expected)
+    {
+        // Arrange
+        var line = Encoding.UTF8.GetBytes(header);
+
+        // Act
+        var started = PipeRecordingFormat.ReadStarted(line);
+
+        // Assert
+        Assert.IsNotNull(started, "A header with a valid start should give it");
+        Assert.AreEqual(DateTimeOffset.Parse(expected, CultureInfo.InvariantCulture), started.Value, "The start should be the recorded instant");
+        Assert.AreEqual(TimeSpan.Zero, started.Value.Offset, "The start should be in UTC");
+    }
+
+    /// <summary>
+    /// A start that is missing, of the wrong JSON type, no time, or in a line that is no JSON object gives
+    /// <see langword="null" /> without an exception.
+    /// </summary>
+    /// <param name="header">The header line</param>
+    [TestMethod]
+    [TestCategory("AC1")]
+    [DataRow("""{"format":"censio-pipe-recording","version":1}""")]
+    [DataRow("""{"format":"censio-pipe-recording","version":1,"started":5}""")]
+    [DataRow("""{"format":"censio-pipe-recording","version":1,"started":null}""")]
+    [DataRow("""{"format":"censio-pipe-recording","version":1,"started":true}""")]
+    [DataRow("""{"format":"censio-pipe-recording","version":1,"started":{}}""")]
+    [DataRow("""{"format":"censio-pipe-recording","version":1,"started":["2026-11-01T17:09:00Z"]}""")]
+    [DataRow("""{"format":"censio-pipe-recording","version":1,"started":""}""")]
+    [DataRow("""{"format":"censio-pipe-recording","version":1,"started":"x"}""")]
+    [DataRow("""{"format":"censio-pipe-recording","version":1,"started":"yesterday"}""")]
+    [DataRow("""{"format":"censio-pipe-recording","version":1,"started":"0001-01-01T00:00:00+01:00"}""")]
+    [DataRow("")]
+    [DataRow("not json")]
+    [DataRow("[]")]
+    [DataRow("\"2026-11-01T17:09:00Z\"")]
+    [DataRow("""{"format":"censio-pipe-recording","version":1,"started":"2026-11-01T17:09""")]
+    public void PipeRecordingFormatReadStartedMissingOrUnusableGivesNull(string header)
+    {
+        // Arrange
+        var line = Encoding.UTF8.GetBytes(header);
+
+        // Act
+        var started = PipeRecordingFormat.ReadStarted(line);
+
+        // Assert
+        Assert.IsNull(started, "A missing or unusable start should give null");
+    }
+
+    /// <summary>
+    /// A start with a byte that is no UTF-8 gives <see langword="null" /> without an exception.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC1")]
+    public void PipeRecordingFormatReadStartedInvalidUtf8GivesNull()
+    {
+        // Arrange
+        byte[] line = [.. "{\"format\":\"censio-pipe-recording\",\"version\":1,\"started\":\"2026-11-01"u8, 0xFF, .. "T17:09:00Z\"}"u8];
+
+        // Act
+        var started = PipeRecordingFormat.ReadStarted(line);
+
+        // Assert
+        Assert.IsNull(started, "A start with a raw 0xFF byte should give null");
+    }
+
+    /// <summary>
+    /// A start less than the longest shift plus one day (366 days) after the earliest time is unusable, so that shifting
+    /// it cannot pass the earliest time; from that bound on it is read.
+    /// </summary>
+    /// <param name="ticksFromBound">The start in ticks after the bound, negative before it</param>
+    /// <param name="usable">Whether the start is read</param>
+    [TestMethod]
+    [TestCategory("AC5")]
+    [DataRow(-366L * TimeSpan.TicksPerDay, false)]
+    [DataRow(-1L, false)]
+    [DataRow(0L, true)]
+    [DataRow(1L, true)]
+    public void PipeRecordingFormatReadStartedNearEarliestTimeIsUnusable(long ticksFromBound, bool usable)
+    {
+        // Arrange
+        var time = DateTimeOffset.MinValue.AddDays(366).AddTicks(ticksFromBound);
+        var line = Encoding.UTF8.GetBytes(PipeRecordingFormat.FormatHeader(time).TrimEnd('\n'));
+        DateTimeOffset? expected = usable ? time : null;
+
+        // Act
+        var started = PipeRecordingFormat.ReadStarted(line);
+
+        // Assert
+        Assert.AreEqual(expected, started, "A start before the bound should give null and one from the bound on its time");
+    }
+
+    /// <summary>
     /// Creates a frame line.
     /// </summary>
     /// <param name="time">The time text</param>

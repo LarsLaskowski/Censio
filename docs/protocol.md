@@ -13,7 +13,7 @@ Sources:
 - Three more recordings of #17 (2026-11-03, 2026-11-04 and 2026-11-07), about 1,360 frames in all four. Only the
   statements on the session start text and the connect sequence rest on all four.
 
-None is published (#20); this document states derived facts only: no frame, name or path.
+None is published; one anonymised fixture made from them lies under `tests/Censio.Pipe.Tests/Fixtures/` (`Censio.Anonymiser`, [`areas/pipe-recording.md`](areas/pipe-recording.md), *Anonymising*). This document states derived facts only: no frame, name or path.
 
 Each statement is marked *confirmed* (the 90-minute recording of 2026-11-07, or all four where stated) or *assumed* (with its source). What a single
 recording cannot show stays *assumed*.

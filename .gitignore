@@ -5,3 +5,5 @@ TestResults/
 .vs/
 *.user
 publish/
+recording-*.jsonl
+censio-fixture-deny-list*
