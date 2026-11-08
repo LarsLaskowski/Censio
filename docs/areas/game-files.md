@@ -50,7 +50,7 @@ it without notice.
 - No offset or size above the largest signed 64-bit number reaches arithmetic or an allocation: it is refused as
   corrupt first.
 - An archive that is opened retains at most the bound on entries, each with a path of at most 260 characters, plus
-  the open file; directory buffers are freed per block. A read holds one entry's decompressed content on top.
+  the open file; directory buffers are freed per block. A read holds one entry's decompressed content on top, and for an entry of a memory-resident block also that block's decompressed data while it is read.
 - An entry above the entry bound cannot be read. Whether a needed file exceeds it, and whether the bound is raised or
   entries are read as streams, is for #23.
 
@@ -63,7 +63,7 @@ it without notice.
 | Kind | When |
 | ---- | ---- |
 | Unsupported archive | The file does not start with the version text above, or is too short to do so |
-| Corrupt archive | The file is shorter than its header region, a block or directory lies outside the file, the chain reaches a block twice, or a bound on blocks, entries or directory size is exceeded |
+| Corrupt archive | The file is shorter than its header region, a block or directory lies outside the file, the chain reaches a block twice, a directory's sizes contradict its entry count or each other, a compressed directory is damaged or decompresses to another size, or a bound on blocks, entries or directory size is exceeded |
 | Corrupt entry | An entry's location, stored size or declared size contradicts the file or exceeds the entry bound, or the decompressed size differs from the declared one |
 | Unsupported entry | The entry's block carries a flag the reader does not know; the other entries stay readable (encrypted blocks list no entries at all) |
 | Not found | No entry has the requested path |
@@ -117,7 +117,10 @@ an archive. The largest entry counts are 21,028 (`zz_patchfiles_300`), 46,110 (`
   for example the group `production_goods` of the base folder in `ui.rda`, `zz_patchfiles_150` and
   `zz_patchfiles_300`). **Load order and which copy wins: unknown** (record
   [0043](../decisions/0043-rda-archives-read-by-an-own-bounded-reader.md)); #23 settles it before the catalog is
-  built, and #24 depends on it for icons. It is no reader error: a path in several archives is returned by each.
+  built, and #24 depends on it for icons. The Product Manager says the number in `zz_patchfiles_<n>` is the game
+  version (higher is newer), but that probably all of these archives are loaded because a newer one does not contain
+  the contents of the older ones; no evidence was found (Product Manager's statement, unverified), input for #23's
+  load-order question. It is no reader error: a path in several archives is returned by each.
 - The run confirms these locations on one installation; the run on the final head confirms them again before the
   change is approved.
 

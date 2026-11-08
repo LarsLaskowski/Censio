@@ -35,12 +35,15 @@ the repository (issue #21's working record, option a).
    not be checked, it would still need Censio's bounds and typed results, and it would carry other games' variants.
 3. **An own slim reader for V2.2** — only the needed features (listing, stored, compressed and packed entries),
    bounded and failing closed like the pipe reader ([0033](0033-pipe-reader-strict-from-the-reference-source.md));
-   built from the community's description of the format without a real sample in the repository.
+   built from the community's description of the format without a real sample in the repository; effort: about
+   1,700 lines of reader and survey code and 2,300 lines of tests on synthetic archives, written within this spike,
+   plus the upkeep when a game update changes the format.
 
 ## Decision
 
 Option 3: `Censio.GameData` reads V2.2 archives itself, read-only and shared with the running game, within fixed
-bounds, returning typed results; other versions and encrypted entries are refused. Format, bounds and failure kinds
+bounds, returning typed results; other versions are refused, and encrypted blocks are skipped and
+counted, their entries not listed. Format, bounds and failure kinds
 are in the [game-files](../areas/game-files.md) area document.
 
 ## Consequences
@@ -59,7 +62,9 @@ are in the [game-files](../areas/game-files.md) area document.
   earlier archives, is part of the load order #23 settles.
 - Which archive wins when several hold the same path (`ui.rda` and the `zz_patchfiles_*` archives repeat icon
   folders) is not known from the spike; #23 must settle it before the catalog is built, and #24 depends on it for
-  icons.
+  icons. An unverified hint from the Product Manager, without evidence: the number in `zz_patchfiles_<n>` is
+  the game version (higher is newer), and probably all of them are loaded, since a newer one does not hold the
+  contents of the earlier ones.
 - The spike locates files, not data: the asset, data set and text files and the icon folders are known, but which
   file and which nodes hold goods, buildings, workforce and regions is left to #23, since the check reads no content.
 - An entry larger than the per-entry bound cannot be read; #23 revisits the bound or reads entries as streams if a

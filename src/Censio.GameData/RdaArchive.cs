@@ -591,7 +591,7 @@ public sealed class RdaArchive : IDisposable
             return CorruptEntry("The stored size of the entry differs from its size.");
         }
 
-        var data = new byte[(int)entry.Size];
+        byte[] data;
 
         if (compressed)
         {
@@ -602,6 +602,7 @@ public sealed class RdaArchive : IDisposable
         }
         else
         {
+            data = new byte[(int)entry.Size];
             _stream.Position = offset;
             _stream.ReadExactly(data);
         }
@@ -656,7 +657,7 @@ public sealed class RdaArchive : IDisposable
             return CorruptEntry("The entry lies outside the data of its block.");
         }
 
-        var data = new byte[(int)decompressed];
+        byte[] data;
 
         if (compressed)
         {
@@ -667,6 +668,7 @@ public sealed class RdaArchive : IDisposable
         }
         else
         {
+            data = new byte[(int)decompressed];
             _stream.Position = dataStart;
             _stream.ReadExactly(data);
         }

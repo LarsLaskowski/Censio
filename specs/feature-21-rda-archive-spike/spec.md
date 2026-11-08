@@ -43,8 +43,9 @@ Each failure is a typed result with a kind, never an exception that escapes the 
   offset; more entries or a larger directory than the reader's bounds → "corrupt archive", returned without hanging.
 - E3: A declared size above the reader's bound, or a decompressed block or entry larger or smaller than declared →
   "corrupt entry"; the reader never allocates beyond the bound.
-- E4: An entry with a feature the reader does not support (e.g. encryption) → "unsupported entry" for that entry;
-  the other entries stay readable.
+- E4: An entry of a block with a flag the reader does not know → "unsupported entry" for that entry; an encrypted
+  block is skipped and counted, its entries are not listed (a read of one returns "not found"); the other entries
+  stay readable.
 - E5: The requested path is not in the archive → "not found".
 - E6: The archive file is missing or cannot be opened → "unreadable", naming the I/O problem, not the content.
 - E7: The game is running and holds the archive open → the read succeeds and the game is not disturbed.
@@ -132,3 +133,4 @@ Each failure is a typed result with a kind, never an exception that escapes the 
 | Criterion | Change | Reason | Step | Decided by |
 | --------- | ------ | ------ | ---- | ---------- |
 | AC2 | Locations at file and icon-folder level; which file and node holds goods, buildings, workforce and regions stays "unknown" for #23, like load order | The survey reports no content (N3), so it shows where the asset, data set and text files and icon folders are (`log.md` row "G3 task 9 PM survey run"), not which nodes hold each data kind; S2 and *Out of scope* changed with it | G3 task 15 | Lead |
+| AC4 | E4: "unsupported entry" applies to an entry of a block with an unknown flag; an encrypted block is skipped and counted, its entries not listed, so a read returns "not found" | An encrypted block's directory cannot be read, so its entries are unknown, as for the encrypted and deleted directories of `plan.md` B3; the reader does so (`RdaArchive` block reading) | Review round 1 | Lead |
