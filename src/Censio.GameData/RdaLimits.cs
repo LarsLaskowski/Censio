@@ -16,6 +16,11 @@ public sealed class RdaLimits
     /// <param name="maxEntryBytes">The most bytes an entry's content may take, stored or decompressed</param>
     public RdaLimits(int maxBlocks, int maxEntries, int maxDirectoryBytes, int maxEntryBytes)
     {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxBlocks);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxEntries);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxDirectoryBytes);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxEntryBytes);
+
         MaxBlocks = maxBlocks;
         MaxEntries = maxEntries;
         MaxDirectoryBytes = maxDirectoryBytes;
