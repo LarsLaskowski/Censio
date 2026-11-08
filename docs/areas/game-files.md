@@ -112,7 +112,7 @@ an archive. The largest entry counts are 21,028 (`zz_patchfiles_300`), 46,110 (`
 | Icons | `.dds` files under `data/ui/` in `ui.rda` (19,027 entries) and in the patch archives `zz_patchfiles_*`; one icon was read (a DDS file of 260 bytes from `ui.rda`). Folders, by group: `data/ui/4k/base/icon_content/<group>` (`production_goods`, `building`, `workforce`, `generic`, `items_specialist`, `ornaments`, `trade_route`, ship icons and others), `data/ui/4k/dlc01`, `dlc02` and `dlc03` with the same `icon_content/<group>` layout, `data/ui/2kimages/main/3dicons/<group>`, `data/ui/2kimages/main/icons/` (`workforce`, `limestone_workforce`) and `data/ui/2kimages/fpp/icons/` (`provinces`, `workforce_tiers`, `tech_tree`) | Which icon belongs to which good, building or workforce tier: the file names are not matched to identifiers; for #23 and #24 |
 
 - The survey run was made on game version 3.0.1733841 (reported by the Product Manager; store not stated).
-- The survey was repeated on the final head with the same result: 40 archives opened without an error line, with the same entry counts and folders.
+- The survey was repeated on the final head while the game was running, with the same result: 40 archives opened without an error line, with the same entry counts and folders.
 - The asset file was read from `config.rda`: `data/base/config/export/assets.xml`, 46,440,056 bytes, XML.
 - The same icon folder occurs in several archives (`ui.rda` and `zz_patchfiles_150`, `_160`, `_200`, `_210`, `_300`;
   for example the group `production_goods` of the base folder in `ui.rda`, `zz_patchfiles_150` and
