@@ -98,9 +98,8 @@ Each failure is a typed result with a kind, never an exception that escapes the 
 
 - Who runs the AC5 check, and when? Answered: the Product Manager (option a), on a local build of the branch head
   before step 9; it is the real-sample check, and the residual risk goes into the record.
-- Will the Product Manager also run the discovery listing of S6 before the plan, with a command the Lead supplies
-  (every `.rda` file with size and header marker) and a community RDA tool for entry paths and flags? Escalated;
-  not yet answered.
+- Does the Product Manager also run the discovery listing of S6 before the plan? Answered: yes (option a), with a
+  command the Lead supplies and a community RDA tool where it opens the archives.
 - Where do the file locations go (the issue says "in the ADR")? Answered: in the area document, linked from the
   record — they change with game updates, a released record does not.
 
@@ -114,7 +113,7 @@ Each failure is a typed result with a kind, never an exception that escapes the 
 ## Challenge
 
 - M1 (facts arrive only at step 9): accepted — S6/AC6 add a discovery listing before the plan; AC1–AC3 rest on it,
-  AC5 confirms on the final head. The extra run is escalated.
+  AC5 confirms on the final head. The Product Manager agreed to the extra run (option a).
 - M2 (one archive per data kind assumed): accepted — S2/AC2 give every archive, the load order and the winning copy;
   S4 reports every archive; E8 defines a duplicate within one archive.
 - m1: accepted — N1 and E3 per decompressed block; AC3 covers a packed block.
