@@ -1,7 +1,7 @@
 # Spec: Spike — reading RDA archives (NuGet library or own reader)
 
 Source: Issue #21
-Status: Draft
+Status: Approved by Lead
 
 ## Problem
 
@@ -47,8 +47,7 @@ Each failure is a typed result with a kind, never an exception that escapes the 
 - E6: The archive file is missing or cannot be opened → "unreadable", naming the I/O problem, not the content.
 - E7: The game is running and holds the archive open → the read succeeds and the game is not disturbed.
 - E8: The same entry path twice in one archive → listing shows both; a read by that path returns "duplicate entry",
-  neither copy. The same path in several archives is no error for the reader, which reads one archive; S2 and S4
-  report each archive.
+  neither copy. The same path in several archives is no reader error; S2 and S4 report each archive.
 
 ## Non-functional requirements
 
@@ -64,18 +63,19 @@ Each failure is a typed result with a kind, never an exception that escapes the 
   `net10.0` on Linux, where `Censio.GameData` is tested ([0004](../../docs/decisions/0004-companion-shell-and-linux-build.md)).
 - N5: Security: the reader parses external input (`.squad/project.md`, *Security areas*, "later game files"); a new
   dependency is a security area too.
-- N6: Not wired into the Companion: users see no change.
-- N7: The session cannot search NuGet (its search hosts answer 403) nor open the community's GitHub repositories;
-  nuget.org package pages and `api.nuget.org` open. A person confirms the search (that it finds no candidate the
-  record misses) and every page the session could not open (`.squad/routing.md`, *Pages the session cannot open*).
+- N6: Users see no change (not wired in).
+- N7: The session searches NuGet only through the nuget.org website (the search API answers 403) and cannot open
+  the community's GitHub repositories; a person confirms the search and every page the session could not open
+  (`.squad/routing.md`, *Pages the session cannot open*).
 
 ## Acceptance criteria
 
 - AC1: A new decision record amends 0024 (released in v0.1.0, so not edited) with the search and evaluation of S1
   and the choice, resting on the discovery listing; each claim names its source, and the search and each source the
   session could not open are confirmed by a person (S1, N4, N7).
-- AC2: The game-files area document states the locations of S2 from the discovery listing, confirmed on the final
-  head by the run of AC5, with the game version (S2).
+- AC2: The game-files area document states the locations of S2 from the Product Manager's run of the S4 check
+  (the listing named only archives), confirmed on the final head by the run of AC5, with the game
+  version; load order and winning copy stay "unknown" unless sourced (S2).
 - AC3: On synthetic archives, the reader lists the entries and reads a stored and a compressed entry, and an entry
   of a block packing several files, of every archive variant the discovery listing found (S3, S6, N1, N3).
 - AC4: On synthetic malformed archives, the reader returns the kinds of E1–E6 and E8 — for E2 one test each for a
@@ -118,6 +118,6 @@ Each failure is a typed result with a kind, never an exception that escapes the 
   S4 reports every archive; E8 defines a duplicate within one archive.
 - m1: accepted — N1 and E3 per decompressed block; AC3 covers a packed block.
 - m2: accepted — E2 bounds entry count and directory size and catches a revisited offset; AC4 tests each.
-- m3: accepted — S1/AC1 state the search; N7 has a person confirm it.
+- m3: accepted — S1/AC1 state the search; N7 a person confirms it.
 - m4: accepted — the new record's *Supersedes* line also amends 0024's "in this record": locations live in the
   area document it links.

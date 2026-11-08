@@ -1,0 +1,50 @@
+# 0043: RDA archives are read by an own bounded reader for format V2.2
+
+- **Status:** Proposed
+- **Date:** 2026-11-08
+- **Area:** game-files
+- **Source:** Issue #21
+- **Supersedes:** 0024 — amends it: the spike found no library that fits, so its option 2 applies; and the spike's
+  result stands here and the file locations in the [game-files](../areas/game-files.md) area document, not in 0024
+  itself as 0024 says (0024 is released and stays unedited).
+
+## Context
+
+[0024](0024-rda-reading-with-an-existing-nuget-library.md) chose a NuGet library for the game's RDA archives if the
+spike of #21 found one with a permissive licence ([0028](0028-mit-licence.md)), maintenance and Anno 117 support. The
+Product Manager's listing of an installation found 36 archives under `maindata`, all with the header
+`Resource File V2.2`, from about 2 MB to 28 GB, so offsets and sizes above 4 GiB occur. No Anno 117 archive may enter
+the repository ([0023](0023-game-names-and-icons-extracted-locally.md), [0029](0029-anonymised-test-fixtures-only.md)).
+
+Search: the nuget.org website (its search API is refused to the session) for `rda`, `anno`, `anno rda`,
+`anno 1800`, `anno 2205`, `anno117`, `rda archive`, `rda reader`, `rdareader`, `rdaexplorer`, `anno mod`,
+`resource file`, `ubisoft archive` on 2026-11-08: no package reads Anno archives (`rda` finds only unrelated
+packages such as `rda.SocketHelpers`, `RDapter`). The community's readers (RDAExplorer, RdaConsole) are not on
+NuGet; their repositories could not be opened from the session. The Product Manager confirms the search before PR
+approval.
+
+## Options considered
+
+1. **A NuGet library** — none exists (search above).
+2. **Vendor a community reader's source** — less format work; its licence, maintenance and Anno 117 support could
+   not be checked, it would still need Censio's bounds and typed results, and it would carry other games' variants.
+3. **An own slim reader for V2.2** — only the needed features (listing, stored, compressed and packed entries),
+   bounded and failing closed like the pipe reader ([0033](0033-pipe-reader-strict-from-the-reference-source.md));
+   built from the community's description of the format without a real sample in the repository.
+
+## Decision
+
+Option 3: `Censio.GameData` reads V2.2 archives itself, read-only and shared with the running game, within fixed
+bounds, returning typed results; other versions and encrypted entries are refused. Format, bounds and failure kinds
+are in the [game-files](../areas/game-files.md) area document.
+
+## Consequences
+
+- No dependency; the format is Censio's to maintain when the game changes it.
+- Residual risk: the layout is built from the community's description, not from a sample in the repository; it is
+  confirmed only by the Product Manager's run of the installation check on the final head before PR approval. A
+  mismatch found there sends the reader back to its plan.
+- Which archive wins when several hold the same path (e.g. the `zz_patchfiles_*` archives) is not known from the
+  spike; #23 must settle it before it builds the catalog.
+- An entry larger than the per-entry bound cannot be read; #23 revisits the bound or reads entries as streams if a
+  needed file exceeds it.
