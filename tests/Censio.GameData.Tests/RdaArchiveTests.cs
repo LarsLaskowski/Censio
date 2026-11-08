@@ -915,6 +915,173 @@ public sealed class RdaArchiveTests
         AssertReadError(RdaErrorKind.Unreadable, result);
     }
 
+    /// <summary>
+    /// An uncompressed directory whose stored size differs from its declared size, which fits the file count, is corrupt.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC4")]
+    public void RdaArchiveOpenUncompressedDirectoryStoredSizeMismatchReturnsCorruptArchive()
+    {
+        // Arrange
+        var built = StoredArchive();
+
+        RdaArchiveBuilder.WriteUInt64(built.Bytes, built.Blocks[0].HeaderOffset + RdaArchiveBuilder.BlockStoredSizePosition, RdaArchiveBuilder.EntrySize + 10);
+
+        // Act
+        var result = RdaArchive.Open(new MemoryStream(built.Bytes), RdaLimits.Default);
+
+        // Assert
+        AssertOpenError(RdaErrorKind.CorruptArchive, result);
+    }
+
+    /// <summary>
+    /// A stream that fails inside the header region or inside the block chain makes the open unreadable.
+    /// </summary>
+    /// <param name="inChain">0 to fail inside the header region, 1 to fail inside the first block header</param>
+    [TestMethod]
+    [TestCategory("AC4")]
+    [DataRow(0)]
+    [DataRow(1)]
+    public void RdaArchiveOpenStreamFailureReturnsUnreadable(int inChain)
+    {
+        // Arrange
+        var built = StoredArchive();
+        var failAt = new[] { 10L, built.Blocks[0].HeaderOffset + 4 }[inChain];
+        var stream = new SparseStream(built.Bytes.Length).WithRegion(0, built.Bytes).ThrowingAt(failAt);
+
+        // Act
+        var result = RdaArchive.Open(stream, RdaLimits.Default);
+
+        // Assert
+        AssertOpenError(RdaErrorKind.Unreadable, result);
+    }
+
+    /// <summary>
+    /// A stream that cannot be read or sought is unreadable.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC4")]
+    public void RdaArchiveOpenNonSeekableStreamReturnsUnreadable()
+    {
+        // Arrange
+        var stream = new System.IO.Compression.GZipStream(new MemoryStream(), System.IO.Compression.CompressionMode.Compress);
+
+        // Act
+        var result = RdaArchive.Open(stream, RdaLimits.Default);
+
+        // Assert
+        AssertOpenError(RdaErrorKind.Unreadable, result);
+    }
+
+    /// <summary>
+    /// A stored entry whose stored size differs from its size is corrupt.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC4")]
+    public void RdaArchiveReadStoredEntrySizeMismatchReturnsCorruptEntry()
+    {
+        // Arrange
+        var built = StoredArchive();
+
+        RdaArchiveBuilder.WriteUInt64(built.Bytes, built.Blocks[0].EntryPosition(0) + RdaArchiveBuilder.EntryStoredSizePosition, 30);
+
+        using var archive = OpenArchive(built.Bytes);
+
+        // Act
+        var result = archive.Read("data/a.txt");
+
+        // Assert
+        AssertReadError(RdaErrorKind.CorruptEntry, result);
+    }
+
+    /// <summary>
+    /// A memory-resident block whose directory lies too close to the header region for its two size fields is corrupt.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC4")]
+    public void RdaArchiveReadMemoryResidentDirectoryTooCloseToHeaderReturnsCorruptEntry()
+    {
+        // Arrange
+        var headerOffset = RdaArchiveBuilder.HeaderSize + RdaArchiveBuilder.EntrySize;
+        var bytes = new[]
+                    {
+                        RdaArchiveBuilder.Header((ulong)headerOffset),
+                        RdaArchiveBuilder.DirectoryEntry("data/a.txt", 0, 5, 5),
+                        RdaArchiveBuilder.BlockHeader(RdaArchiveBuilder.MemoryResident, 1, RdaArchiveBuilder.EntrySize, RdaArchiveBuilder.EntrySize, (ulong)(headerOffset + RdaArchiveBuilder.BlockHeaderSize))
+                    }.SelectMany(part => part)
+                     .ToArray();
+        using var archive = OpenArchive(bytes);
+
+        // Act
+        var result = archive.Read("data/a.txt");
+
+        // Assert
+        AssertReadError(RdaErrorKind.CorruptEntry, result);
+    }
+
+    /// <summary>
+    /// A memory-resident block whose data would start before the end of the header region is corrupt.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC4")]
+    public void RdaArchiveReadMemoryResidentDataBeforeHeaderRegionReturnsCorruptEntry()
+    {
+        // Arrange
+        var built = new RdaArchiveBuilder().AddBlock(RdaArchiveBuilder.MemoryResident, ("data/a.txt", Text("x", 20))).Build();
+
+        RdaArchiveBuilder.WriteUInt64(built.Bytes, built.Blocks[0].DirectoryOffset - 16, 100);
+
+        using var archive = OpenArchive(built.Bytes);
+
+        // Act
+        var result = archive.Read("data/a.txt");
+
+        // Assert
+        AssertReadError(RdaErrorKind.CorruptEntry, result);
+    }
+
+    /// <summary>
+    /// An uncompressed memory-resident block whose stored and decompressed data sizes differ is corrupt.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC4")]
+    public void RdaArchiveReadMemoryResidentSizesDifferWithoutCompressionReturnsCorruptEntry()
+    {
+        // Arrange
+        var built = new RdaArchiveBuilder().AddBlock(RdaArchiveBuilder.MemoryResident, ("data/a.txt", Text("x", 20))).Build();
+
+        RdaArchiveBuilder.WriteUInt64(built.Bytes, built.Blocks[0].DirectoryOffset - 8, 21);
+
+        using var archive = OpenArchive(built.Bytes);
+
+        // Act
+        var result = archive.Read("data/a.txt");
+
+        // Assert
+        AssertReadError(RdaErrorKind.CorruptEntry, result);
+    }
+
+    /// <summary>
+    /// A compressed memory-resident block whose data is no valid zlib stream is corrupt.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC4")]
+    public void RdaArchiveReadCorruptCompressedMemoryResidentDataReturnsCorruptEntry()
+    {
+        // Arrange
+        var built = new RdaArchiveBuilder().AddBlock(RdaArchiveBuilder.MemoryResident | RdaArchiveBuilder.Compressed, ("data/a.txt", Text("x", 50))).Build();
+
+        Array.Fill(built.Bytes, (byte)0xFF, (int)built.Blocks[0].DataOffsets[0], 4);
+
+        using var archive = OpenArchive(built.Bytes);
+
+        // Act
+        var result = archive.Read("data/a.txt");
+
+        // Assert
+        AssertReadError(RdaErrorKind.CorruptEntry, result);
+    }
+
     #endregion // AC4 Read
 
     #region AC5
