@@ -150,6 +150,35 @@ public sealed class AnonymiserCommandTests
     }
 
     /// <summary>
+    /// A standard output that fails after the output is in place does not turn the run into an error: the run succeeds,
+    /// the complete output stays, nothing is printed on standard error and no temporary file is left.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    [TestCategory("AC5")]
+    public async Task AnonymiserCommandFailingStandardOutputStillSucceeds()
+    {
+        // Arrange
+        var input = WriteInput(RecordingOf(_version2, SessionStart("Alice"), Island()));
+        var output = Path.Combine(_root, OutputName);
+        var standardOutput = new FailingTextWriter();
+
+        // Act
+        var run = await RunWithOutputAsync([input, output], standardOutput);
+
+        // Assert
+        var lines = (await File.ReadAllTextAsync(output, TestContext.CancellationToken)).Split('\n', StringSplitOptions.RemoveEmptyEntries);
+
+        Assert.AreEqual(AnonymiserCommand.SuccessCode, run.Code, "A failing standard output should not fail the run");
+        Assert.AreEqual(string.Empty, run.Error, "Nothing should be printed on standard error");
+        Assert.AreEqual(1, standardOutput.WriteCount, "The success line should have been tried once");
+        Assert.AreSequenceEqual(new[] { OutputName, InputName }, FolderEntries(), "The output should stay and no temporary file should be left");
+        Assert.HasCount(4, lines, "The output should hold the header and the three frame lines");
+        Assert.IsNull(PipeRecordingFormat.CheckHeader(Encoding.UTF8.GetBytes(lines[0])), "The output should start with a valid header");
+        Assert.AreEqual(3, lines.Skip(1).Count(line => PipeRecordingFormat.TryParseFrameLine(Encoding.UTF8.GetBytes(line), out _, out _)), "Every frame line of the output should be valid");
+    }
+
+    /// <summary>
     /// The input is never changed by a run.
     /// </summary>
     /// <returns>The task</returns>
@@ -523,6 +552,22 @@ public sealed class AnonymiserCommandTests
         var code = await Task.Run(() => command.RunAsync(arguments, cancellationToken), TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
 
         return (code, output.ToString(), error.ToString());
+    }
+
+    /// <summary>
+    /// Runs the command with a given standard output, on a worker thread.
+    /// </summary>
+    /// <param name="arguments">The arguments</param>
+    /// <param name="output">The standard output</param>
+    /// <returns>The exit code and what was printed on standard error</returns>
+    private async Task<(int Code, string Error)> RunWithOutputAsync(string[] arguments, TextWriter output)
+    {
+        using var error = new StringWriter();
+
+        var command = new AnonymiserCommand(output, error, new ScriptedPipeAnonymiserRandom(0.75));
+        var code = await Task.Run(() => command.RunAsync(arguments, TestContext.CancellationToken), TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+
+        return (code, error.ToString());
     }
 
     #endregion // Methods
