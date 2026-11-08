@@ -49,12 +49,14 @@ inside a fenced code block: entry paths are untrusted archive strings.
 
 ## Approach
 
-**Layout probe (task 1).** A PowerShell script the orchestrator hands to the Product Manager (the Lead's result of
-this revision) prints, for every archive, the first block offset, the block count, the flag values met and whether
+**Layout probe (task 1).** A PowerShell script the orchestrator hands to the Product Manager prints, for every archive, the first block offset, the block count, the flag values met and whether
 the chain ends at the file length; for `config.rda`, `en_us0.rda` and `zz_patchfiles_200.rda`, per flag value met,
 the first such block's header fields, the first two bytes of its directory and, for a memory-resident block, its
 size pair and the first two bytes of its data, and its first entry's path, offset, sizes and first two data bytes —
-numbers and markers only. The Lead corrects fact 7 and this *Approach* from it before task 3; a layout that
+numbers and markers only. The script, `probe.ps1` in this folder, opens each archive with
+`[System.IO.File]::Open($path, 'Open', 'Read', 'ReadWrite, Delete')` and writes nothing; it stops a chain after
+1,048,576 blocks, at an offset seen before or one outside the file, and reports that as `chain error`; it prints
+entry paths, numbers and at most two bytes per marker, nothing else. The Lead corrects fact 7 and this *Approach* from it before task 3; a layout that
 contradicts the plan beyond field values sends it back to the plan.
 
 **Reader (`RdaArchive`).** `Open` reads the header and walks the block chain from the first block offset (fact 7),
