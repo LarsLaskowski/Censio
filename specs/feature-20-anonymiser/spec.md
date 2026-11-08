@@ -67,7 +67,8 @@ The anonymiser prints one line `Error: <reason>` and exits with code 1; no file 
   - Generation, consumption, perfect generation, perfect consumption, income and summed productivity are multiplied
     by one factor per entry, drawn at random from 0.80 to 0.99 or 1.01 to 1.20.
   - Delta becomes generation minus consumption and average productivity 100 times summed productivity divided by the
-    building count, each from the perturbed values (0 with a building count of 0).
+    building count, each from the perturbed values (0 with a building count of 0); a non-zero one that would equal
+    its original moves to the adjacent float.
   - Maintenance and every workforce amount change on their own, keeping their sign and never becoming 0: by exactly 1
     in magnitude when below 5, else by 1 % to 20 %, rounded, and at least 1.
   - Profit becomes an integer within 1 of the new income minus maintenance, on the same side of it as the original
@@ -150,3 +151,4 @@ The anonymiser prints one line `Error: <reason>` and exits with code 1; no file 
 | Criterion | Change | Reason | Step | Decided by |
 | --------- | ------ | ------ | ---- | ---------- |
 | AC3 | Profit's derivation in N3: an integer within 1 of the new income minus maintenance on the original's side, instead of the original plus the rounded change | The old rule reached 1.5 away on the Product Manager's real output (2 of 21,091 entries) | 6 (after the fixture pause) | Product Manager |
+| AC3 | N3: a derived delta or average productivity, and any perturbed float, never keeps a non-zero original value (the adjacent float instead) | The Product Manager's deny-list run found one delta equal to its original (rounding of `gen' − cons'`) | 6 (after task 12) | Lead |
