@@ -198,9 +198,9 @@ still go to a maintainer privately; the tool is for the fixtures that are commit
     to itself, a subnormal one, a delta or average that comes out as before) is written as the adjacent float32
     instead: away from zero for a factor above 1, towards zero for a factor below 1, the other way where that step
     would give 0 or an infinity. No further random draw is made. Delta and average productivity follow the written
-    (stepped) generation, consumption and summed productivity, so the relations hold to within 2^-22 of the largest
-    operand: `|delta - (generation - consumption)| <= 2^-22 * max(|generation|, |consumption|, |delta|)` and
-    `|average - 100 * summed / count| <= 2^-22 * max(|average|, 100 * |summed| / count)`.
+    (stepped) generation, consumption and summed productivity, so the relations hold to within 2^-22 of the largest operand plus 2^-148 (two steps of the smallest float, which
+    matters only for subnormal values): `|delta - (generation - consumption)| <= 2^-22 * max(|generation|, |consumption|,
+    |delta|) + 2^-148` and `|average - 100 * summed / count| <= 2^-22 * max(|average|, 100 * |summed| / count) + 2^-148`.
   - Zero stays zero and an infinity stays; a NaN in any float field is written as the standard NaN with its sign
     (`0x7FC00000` or `0xFFC00000`), so its payload bits cannot carry data.
 - **Randomness.** Offset and factors come from the operating system's cryptographic random source, fresh for every
