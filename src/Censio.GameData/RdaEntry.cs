@@ -16,7 +16,7 @@ public sealed class RdaEntry
     /// <param name="offset">The offset of the entry's data in the archive</param>
     /// <param name="storedSize">The stored size in bytes</param>
     /// <param name="blockIndex">The index of the entry's block in the chain</param>
-    internal RdaEntry(string path, long size, RdaBlockFlags flags, ulong offset, ulong storedSize, int blockIndex)
+    internal RdaEntry(string path, long size, RdaBlockAttributes flags, ulong offset, ulong storedSize, int blockIndex)
     {
         Path = path;
         Size = size;
@@ -43,7 +43,7 @@ public sealed class RdaEntry
     /// <summary>
     /// Gets the flags of the entry's block.
     /// </summary>
-    public RdaBlockFlags Flags { get; }
+    public RdaBlockAttributes Flags { get; }
 
     /// <summary>
     /// Gets the offset of the entry's data in the archive.

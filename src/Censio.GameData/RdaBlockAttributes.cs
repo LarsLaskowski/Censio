@@ -4,7 +4,7 @@ namespace Censio.GameData;
 /// Names the flags of a block of an RDA archive.
 /// </summary>
 [Flags]
-public enum RdaBlockFlags
+public enum RdaBlockAttributes
 {
     /// <summary>
     /// The block has no flag.
