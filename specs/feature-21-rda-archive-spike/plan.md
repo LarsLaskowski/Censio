@@ -18,13 +18,14 @@ The feature of [spec.md](spec.md): no library reads Anno 117 archives, so `Censi
 | 2 | The NuGet search API is refused; the website search and `api.nuget.org` open | `curl`: `azuresearch-usnc.nuget.org` → proxy 403; `www.nuget.org/packages?q=rda` → 200 | confirmed |
 | 3 | All 40 archives under `maindata` start with `Resource File V2.2`, bytes 18–63 zero | `log.md` row "2a Discovery listing (AC6)" (40 name–size pairs) | confirmed |
 | 4 | Archives reach 28 GB, many exceed 4 GiB: offsets need 64 bits | same row (`graphics_roman` 28078532503 bytes) | confirmed |
-| 5 | The game executables carry no file version | same row; the Product Manager reads the version in the game or launcher | confirmed |
+| 5 | The game executables carry no file version | same row; the Product Manager reads the version in the game or launcher — not reported in task 9, due with the run before step 9 (AC2) | confirmed |
 | 6 | Record 0024 is released | `git tag --contains` of its adding commit → `v0.1.0` | confirmed |
 | 7 | V2.2 layout, as far as real archives show it: first block offset `uint64` at byte 784, header region 792 bytes; 32-byte block header (`uint32` flags, `uint32` file count, `uint64` stored and decompressed directory size, `uint64` next block offset), directory right before it; 560-byte entries (UTF-16LE path in 520 bytes, NUL-padded; `uint64` offset, stored size, size; then timestamp and an unknown field, unread); the chain ends at a next offset equal to the file length; block flags met only 0 and 8, a flag-8 directory plain and its entries with offset, stored size and size 0; at most 20,478 blocks per archive | task 1, [probe-output.txt](probe-output.txt) (`log.md` row "G1 task 1 PM layout probe"): chain to the file length in all 40 archives, no error; flags only 0 and 8 (`zz_patchfiles_200` 20,405 of 20,478 blocks, `_300` 2,603 of 2,698); header, directory (stored = decompressed = files × 560, path bytes `64 00`) and first entry (stored = size, data `3C 47`, `42 4B`, `4F 54`) of the first flag-0 block of `config.rda`, `en_us0.rda`, `zz_patchfiles_200.rda` and that archive's first flag-8 block | confirmed |
-| 13 | Flags 1 compressed (zlib), 2 encrypted, 4 memory-resident (`uint64` stored and decompressed data size in the 16 bytes before the directory, the data before that, entry offsets relative to the decompressed data) as the community describes them; flag 8 means deleted; every block's directory, not only the sampled ones, passes the reader's checks within `RdaLimits.Default`; a block whose header follows the previous one directly (`zz_patchfiles_200` 56,432 → 56,464) has file count 0 | to verify: the Product Manager's survey run (task 9) and the run before step 9 open every archive with every check — an error line or a limit hit goes to task 10 or back to the plan. No block of the installation carries flag 1, 2 or 4 (fact 7), so those layouts stay tested on synthetic archives only, and the area document says so | unverified |
+| 13 | Every block of all 40 archives passes the reader's checks within `RdaLimits.Default` (largest entry count 52,878); no block that is not deleted carries flag 1, 2 or 4, so every listed entry is plain; the block of file count 0 in `zz_patchfiles_200` passes | task 9, `log.md` row "G3 task 9 PM survey run": every archive opened, no error line, entry flags only `None`, encrypted blocks 0 | confirmed |
+| 14 | Flags 1 compressed (zlib), 2 encrypted, 4 memory-resident (`uint64` stored and decompressed data size in the 16 bytes before the directory, the data before that, entry offsets relative to the decompressed data) as the community describes them; flag 8 means deleted | no real block carries flag 1, 2 or 4 (fact 13): those layouts stay tested on synthetic archives only, and the area document says so; what flag 8 means for load order is #23's (record 0043) | unverified |
 | 8 | `Censio.GameData` holds only `GameDataAssembly`; `Censio.Companion.Core` references it | `src/Censio.GameData/`; `docs/ARCHITECTURE.md` l. 24 | confirmed |
-| 9 | Candidate locations: texts `data/base/config/gui/texts_<language>.xml` and `data/base/config/game/datasets.xml` in `config.rda`; regions as provinces `data/base/provinces/{celtic,roman}/` and icons `data/ui/4k/<base,dlc01,dlc02,dlc03>/icon_content/<group>/icon_{2d,3d}_*_0.dds` (groups incl. `production_goods`, `workforce`, `building`) in `zz_patchfiles_200.rda` and `zz_patchfiles_300.rda` | `log.md` rows 2b (RDA Explorer screenshots) | confirmed |
-| 10 | Icon paths recur in several archives; no source says which copy wins | `log.md` rows 2b; load order not reported | confirmed |
+| 9 | Locations: in `config.rda` `data/base/config/export/assets.xml`, `data/base/config/game/datasets.xml`, `data/base/config/gui/texts_<language>.xml` (German and English among 13); `de_de0.rda` and `en_us0.rda` hold sound only; `.dds` icons under `data/ui/4k/<base,dlc01,dlc02,dlc03>/icon_content/<group>/` (`production_goods`, `building`, `workforce`, …) and `data/ui/2kimages/…` in `ui.rda` and `zz_patchfiles_*`; province data in `provinces_roman`, `provinces_celtic`, `dlc01_provinces`, `dlc03_provinces_01/02`. Which file and node holds goods, buildings, workforce and regions is not shown (no content read) | task 9, `log.md` row "G3 task 9 PM survey run" (survey lines; corrects rows 2b: icons also in `ui.rda`, provinces in their own archives) | confirmed |
+| 10 | Icon folders recur in several archives (`ui.rda`, `zz_patchfiles_150/160/200/210/300`); no source says which copy wins | `log.md` rows 2b and "G3 task 9 PM survey run"; load order not reported | confirmed |
 | 11 | On Linux, .NET's `FileShare` does not tell a shared-write open from a shared-read one, so the E7 unit test discriminates on Windows only | to verify: E7 by the Product Manager's run with the game running (source: the Lead's knowledge of .NET's advisory locking on Unix) | unverified |
 | 12 | The decision check fails until `game-files` is in the areas index | `decision-check.py`: "area 'game-files' is not listed"; task 11 adds the row | confirmed |
 
@@ -52,9 +53,9 @@ inside a fenced code block: entry paths are untrusted archive strings.
 
 **Layout probe (task 1, done).** `probe.ps1` in this folder walked every archive's block chain read-only and
 sampled the first block per flag value of three archives; its output, [probe-output.txt](probe-output.txt), confirmed
-the layout of fact 7 without change to the reader's design and left fact 13 open. What the step-9 run must still
-show: every archive opens without an error line (every block's directory checked, the limits fit), and whether a
-compressed or memory-resident entry exists at all.
+the layout of fact 7 without change to the reader's design. The survey run of task 9 opened every archive without
+an error line and found no compressed, encrypted or memory-resident block (fact 13). What the run before step 9 must
+still show: the same with the game running (E7, fact 11), and the game version (AC2).
 
 **Reader (`RdaArchive`).** `Open` reads the header and walks the block chain from the first block offset (fact 7),
 reading each block's directory into `RdaEntry` items in archive order; it keeps the stream open for `Read` until
@@ -103,9 +104,8 @@ the bound — never archive bytes, a path inside the archive or an exception mes
 `RdaLimits` throws `ArgumentOutOfRangeException` for a value ≤ 0. `RdaLimits.Default`: `MaxBlocks` 1,048,576;
 `MaxEntries` 1,048,576; `MaxDirectoryBytes` 64 MiB; `MaxEntryBytes` 512 MiB. Against the probe: `MaxBlocks` is
 51 times the largest count (20,478); the sampled directories (at most 194 files, 108,640 bytes) and entries (at most
-17 MB) are far below their bounds, but the other blocks' file counts are unknown — a single-block archive of 5 GB or
-more (`provinces_roman`) may hold more than the 119,837 files 64 MiB allows. If task 9 shows a limit hit on a real
-archive, the Dev raises that default (task 10).
+17 MB) are far below their bounds, and task 9 hit no limit on any archive (largest entry count 52,878, fact 13), so
+task 10 raised nothing.
 
 **Survey (`RdaInstallationSurvey.Run`).** Enumerates `*.rda` under `<installation>/maindata` with
 `EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true, AttributesToSkip = ReparsePoint }`,
@@ -127,7 +127,7 @@ asserts both reads.
 
 **Test helpers.** `RdaArchiveBuilder` writes synthetic V2.2 archives with invented content (blocks stored,
 compressed, memory-resident, encrypted, deleted, empty, with an unknown flag, and every malformation of AC4) from
-fact 7, the layouts of flags 1, 2 and 4 from fact 13; deleted blocks hold entries with offset and sizes 0, as on the
+fact 7, the layouts of flags 1, 2 and 4 from fact 14; deleted blocks hold entries with offset and sizes 0, as on the
 installation. `SparseStream` is a seekable read-only stream of a given length, zeros outside the regions
 written into it, optionally throwing `IOException` at an offset — for the 4 GiB, `long.MaxValue` and overlap tests.
 Survey tests use a temporary folder they delete; the linked-folder test skips itself where symbolic links cannot be
@@ -192,12 +192,13 @@ icons, the installation survey* — not here: finding the installation (#22), th
 Owned by the Dev unless named, written once the code is green:
 
 - `docs/areas/game-files.md` (new, from `_template.md`): format V2.2 as read (fact 7, the reader's
-  contract), flags (1, 2 and 4 met on no real archive, fact 13, unless task 9 finds them), the `RdaLimits.Default` values, when they apply and the memory `Open` retains, the failure kinds
+  contract), flags (1, 2 and 4 met on no real archive, fact 13; their layouts unverified, fact 14), the `RdaLimits.Default` values, when they apply and the memory `Open` retains, the failure kinds
   of E1–E6 and E8 with the encrypted-block count, read-only shared access, no content leaves the machine (link 0023);
   entry paths are untrusted strings: a consumer that logs them follows `companion.md`
   (*Log*), one that derives a file system path from them (#24, #25) confines it. *Locations* from task 9 — per data
   kind of S2 the entry paths and every archive holding them, the game version; fact 9's candidates only where the run
-  confirms them; "load order and winning copy: unknown (record 0043)". The survey and `CENSIO_ANNO_INSTALL`.
+  confirms them (fact 9 as task 9 corrected it); "which file and node holds goods, buildings, workforce and regions,
+load order and winning copy: unknown (record 0043)". The survey and `CENSIO_ANNO_INSTALL`.
 - `docs/areas/README.md`: the index row of `game-files` (fact 12).
 - `docs/ARCHITECTURE.md`: the `Censio.GameData` row links `areas/game-files.md`; *Security model*: game archives are
   opened read-only, shared with the game, and read within the reader's limits (record 0043).
@@ -205,7 +206,7 @@ Owned by the Dev unless named, written once the code is green:
   `RdaInstallationSurvey`) instead of "later game files", linking `game-files`; "File paths the Companion … opens":
   the game archives under the installation folder. *Test doubles* (Tester): `SparseStream`.
 - `docs/UNIT_TESTS.md` (Tester), *Where tests live*: `CENSIO_ANNO_INSTALL`; unset, the survey test is inconclusive.
-- Record 0043 (Lead): the probe's findings (done in task 2) and the survey's where they change a consequence.
+- Record 0043 (Lead): the probe's findings (task 2) and the survey's (task 15), done.
 - `README.md`, `docs/USER_GUIDE.md`, `SECURITY.md` (already lists game-file parsing): unchanged (N6).
 
 ## Architecture check
@@ -233,7 +234,7 @@ content in the survey or the probe. `Censio.GameData` stays platform-neutral `ne
 
 - M1 (reader and builder from memory, no real sample): accepted in part — the Product Manager's confirmation to
   build without a sample exists (spec *Open questions*, `log.md` 14:00–14:01, option a), so no escalation; still,
-  task 1 adds a layout probe before the builder (it confirmed fact 7; fact 13 stays open), and option 6 records why.
+  task 1 adds a layout probe before the builder (it confirmed fact 7; task 9 fact 13; fact 14 stays open), and option 6 records why.
 - M2 (survey filter a guess): accepted — extension and folder counts per archive, `province` and `dataset` added,
   the language archives' non-media entries listed, the asset fallback to any `config.rda` XML, icons of every kind
   (fact 9).

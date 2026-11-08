@@ -15,10 +15,12 @@ goods, buildings, workforce, regions, their German and English texts, and icons.
 - S1: Given the spike is done, when a maintainer reads the new decision record, then it says how candidate libraries
   were searched (terms, where) and lists each candidate with its licence, maintenance (last release, activity), Anno
   117 support and API fit, and the choice: a library, or an own reader with its effort estimate.
-- S2: Given a developer starting #23 or #24, when they read the game-files area document, then for each of goods,
-  buildings, workforce, regions, German texts, English texts and icons they find the entry path and every archive
-  (relative to the installation folder) that holds it, the order the game loads those archives in and which copy
-  wins (with its source, or "unknown" as a stated risk for #23), and the game version this was found on.
+- S2: Given a developer starting #23 or #24, when they read the game-files area document, then they find the entry
+  paths and every archive (relative to the installation folder) of the asset, data set and German and English text
+  files and of the icon folders by kind (goods, buildings, workforce, regions where present); which of those files
+  and which nodes in them hold goods, buildings, workforce and regions, the order the game loads the archives in and
+  which copy wins (each with its source, or "unknown" as a stated risk for #23); and the game version this was found
+  on.
 - S3: Given an archive, when the reader lists it, then it returns each entry's path and size; when it reads one entry
   by path, then it returns that entry's content, decompressed.
 - S4: Given a contributor with Anno 117 installed, when they point the prototype check at the installation folder and
@@ -73,9 +75,10 @@ Each failure is a typed result with a kind, never an exception that escapes the 
 - AC1: A new decision record amends 0024 (released in v0.1.0, so not edited) with the search and evaluation of S1
   and the choice, resting on the discovery listing; each claim names its source, and the search and each source the
   session could not open are confirmed by a person (S1, N4, N7).
-- AC2: The game-files area document states the locations of S2 from the Product Manager's run of the S4 check
-  (the listing named only archives), confirmed on the final head by the run of AC5, with the game
-  version; load order and winning copy stay "unknown" unless sourced (S2).
+- AC2: The game-files area document states the file and icon-folder locations of S2 from the Product Manager's run
+  of the S4 check (the listing named only archives), confirmed on the final head by the run of AC5, with the game
+  version; which file and node holds goods, buildings, workforce and regions, load order and winning copy stay
+  "unknown" (for #23) unless sourced (S2).
 - AC3: On synthetic archives, the reader lists the entries and reads a stored and a compressed entry, and an entry
   of a block packing several files, of every archive variant the discovery listing found (S3, S6, N1, N3).
 - AC4: On synthetic malformed archives, the reader returns the kinds of E1–E6 and E8 — for E2 one test each for a
@@ -91,6 +94,8 @@ Each failure is a typed result with a kind, never an exception that escapes the 
 - Finding the installation (#22): the check takes the folder as given.
 - Building the catalog (#23), converting DDS icons (#24), the cache (#25), the catalog format (#26).
 - Resolving a path across archives by load order: that is #23's, from the order S2 states.
+- Locating goods, buildings, workforce and regions inside the asset and data set files (which file, which nodes):
+  the survey reads no content (N3), so that is #23's.
 - Wiring the reader into the Companion (N6); README and user guide stay unchanged.
 - Writing or modifying archives; archive versions of other Anno games unless Anno 117 uses them.
 
@@ -121,3 +126,9 @@ Each failure is a typed result with a kind, never an exception that escapes the 
 - m3: accepted — S1/AC1 state the search; N7 a person confirms it.
 - m4: accepted — the new record's *Supersedes* line also amends 0024's "in this record": locations live in the
   area document it links.
+
+## Amendments
+
+| Criterion | Change | Reason | Step | Decided by |
+| --------- | ------ | ------ | ---- | ---------- |
+| AC2 | Locations at file and icon-folder level; which file and node holds goods, buildings, workforce and regions stays "unknown" for #23, like load order | The survey reports no content (N3), so it shows where the asset, data set and text files and icon folders are (`log.md` row "G3 task 9 PM survey run"), not which nodes hold each data kind; S2 and *Out of scope* changed with it | G3 task 15 | Lead |
