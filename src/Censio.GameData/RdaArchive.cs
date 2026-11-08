@@ -399,16 +399,17 @@ public sealed class RdaArchive : IDisposable
             return null;
         }
 
-        var error = CheckDirectory(limits, state, index, headerOffset, flags, count, (long)stored, (long)declared);
+        var block = new RdaBlockHeader(index, headerOffset, flags, count, (long)stored, (long)declared);
+        var error = CheckDirectory(limits, state, block);
 
         if (error is not null || count == 0)
         {
             return error;
         }
 
-        state.DirectoryOffsets[index] = headerOffset - (long)stored;
+        state.DirectoryOffsets[index] = block.DirectoryOffset;
 
-        return ReadDirectory(stream, state, index, flags, (int)count, headerOffset - (long)stored, (int)stored, (int)declared);
+        return ReadDirectory(stream, state, block);
     }
 
     /// <summary>
@@ -416,15 +417,15 @@ public sealed class RdaArchive : IDisposable
     /// </summary>
     /// <param name="limits">The limits to read within</param>
     /// <param name="state">The state of the walk</param>
-    /// <param name="index">The index of the block</param>
-    /// <param name="headerOffset">The offset of the block header</param>
-    /// <param name="flags">The flags of the block</param>
-    /// <param name="count">The file count of the block</param>
-    /// <param name="stored">The stored size of the directory</param>
-    /// <param name="declared">The declared decompressed size of the directory</param>
+    /// <param name="block">The header of the block</param>
     /// <returns>The error, or null</returns>
-    private static RdaError? CheckDirectory(RdaLimits limits, RdaChainState state, int index, long headerOffset, uint flags, uint count, long stored, long declared)
+    private static RdaError? CheckDirectory(RdaLimits limits, RdaChainState state, RdaBlockHeader block)
     {
+        var index = block.Index;
+        var count = block.Count;
+        var stored = block.Stored;
+        var declared = block.Declared;
+
         if (state.Entries.Count + (long)count > limits.MaxEntries)
         {
             return CorruptArchive($"The archive has more than {limits.MaxEntries} entries.");
@@ -435,12 +436,12 @@ public sealed class RdaArchive : IDisposable
             return CorruptArchive($"The directory of block {index} has a size that does not fit its file count or exceeds {limits.MaxDirectoryBytes} bytes.");
         }
 
-        if (stored > limits.MaxDirectoryBytes || stored > headerOffset - HeaderSize)
+        if (stored > limits.MaxDirectoryBytes || stored > block.HeaderOffset - HeaderSize)
         {
             return CorruptArchive($"The stored directory of block {index} exceeds {limits.MaxDirectoryBytes} bytes or lies outside the archive.");
         }
 
-        if ((flags & (uint)RdaBlockAttributes.Compressed) == 0 && stored != declared)
+        if ((block.Flags & (uint)RdaBlockAttributes.Compressed) == 0 && stored != declared)
         {
             return CorruptArchive($"The stored directory of block {index} differs in size from the declared one.");
         }
@@ -455,15 +456,16 @@ public sealed class RdaArchive : IDisposable
     /// </summary>
     /// <param name="stream">The stream of the archive</param>
     /// <param name="state">The state of the walk</param>
-    /// <param name="index">The index of the block</param>
-    /// <param name="flags">The flags of the block</param>
-    /// <param name="count">The file count of the block</param>
-    /// <param name="directoryOffset">The position of the directory</param>
-    /// <param name="stored">The stored size of the directory</param>
-    /// <param name="declared">The declared decompressed size of the directory</param>
+    /// <param name="block">The header of the block</param>
     /// <returns>The error, or null</returns>
-    private static RdaError? ReadDirectory(Stream stream, RdaChainState state, int index, uint flags, int count, long directoryOffset, int stored, int declared)
+    private static RdaError? ReadDirectory(Stream stream, RdaChainState state, RdaBlockHeader block)
     {
+        var index = block.Index;
+        var flags = block.Flags;
+        var count = (int)block.Count;
+        var directoryOffset = block.DirectoryOffset;
+        var stored = (int)block.Stored;
+        var declared = (int)block.Declared;
         byte[] directory;
 
         if ((flags & (uint)RdaBlockAttributes.Compressed) != 0)
