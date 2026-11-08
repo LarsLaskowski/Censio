@@ -20,7 +20,8 @@ The feature of [spec.md](spec.md): no library reads Anno 117 archives, so `Censi
 | 4 | Archives reach 28 GB, many exceed 4 GiB: offsets need 64 bits | same row (`graphics_roman` 28078532503 bytes) | confirmed |
 | 5 | The game executables carry no file version | same row; the Product Manager reads the version in the game or launcher | confirmed |
 | 6 | Record 0024 is released | `git tag --contains` of its adding commit → `v0.1.0` | confirmed |
-| 7 | V2.2 layout: first block offset `uint64` at byte 784; 32-byte block header (`uint32` flags, `uint32` file count, `uint64` stored and decompressed directory size, `uint64` next block offset), directory right before it; 560-byte entries (UTF-16LE path in 520 bytes, NUL-padded; `uint64` offset, stored size, size, timestamp, unknown); flags 1 compressed (zlib), 2 encrypted, 4 memory-resident, 8 deleted; a memory-resident block has `uint64` stored and decompressed data size in the 16 bytes before its directory, its data before that, entry offsets relative to the decompressed data; the chain ends at a next offset equal to the file length | to verify: the layout probe (task 1, G0) before the Tester writes `RdaArchiveBuilder`; the Lead corrects this row and *Approach* from it. Consistent so far: RDA Explorer 1.4.0.0, a V2.2 reader for Anno 2205, lists `config.rda`, `zz_patchfiles_200.rda` and `zz_patchfiles_300.rda` (`log.md` rows 2b) | unverified |
+| 7 | V2.2 layout, as far as real archives show it: first block offset `uint64` at byte 784, header region 792 bytes; 32-byte block header (`uint32` flags, `uint32` file count, `uint64` stored and decompressed directory size, `uint64` next block offset), directory right before it; 560-byte entries (UTF-16LE path in 520 bytes, NUL-padded; `uint64` offset, stored size, size; then timestamp and an unknown field, unread); the chain ends at a next offset equal to the file length; block flags met only 0 and 8, a flag-8 directory plain and its entries with offset, stored size and size 0; at most 20,478 blocks per archive | task 1, [probe-output.txt](probe-output.txt) (`log.md` row "G1 task 1 PM layout probe"): chain to the file length in all 40 archives, no error; flags only 0 and 8 (`zz_patchfiles_200` 20,405 of 20,478 blocks, `_300` 2,603 of 2,698); header, directory (stored = decompressed = files × 560, path bytes `64 00`) and first entry (stored = size, data `3C 47`, `42 4B`, `4F 54`) of the first flag-0 block of `config.rda`, `en_us0.rda`, `zz_patchfiles_200.rda` and that archive's first flag-8 block | confirmed |
+| 13 | Flags 1 compressed (zlib), 2 encrypted, 4 memory-resident (`uint64` stored and decompressed data size in the 16 bytes before the directory, the data before that, entry offsets relative to the decompressed data) as the community describes them; flag 8 means deleted; every block's directory, not only the sampled ones, passes the reader's checks within `RdaLimits.Default`; a block whose header follows the previous one directly (`zz_patchfiles_200` 56,432 → 56,464) has file count 0 | to verify: the Product Manager's survey run (task 9) and the run before step 9 open every archive with every check — an error line or a limit hit goes to task 10 or back to the plan. No block of the installation carries flag 1, 2 or 4 (fact 7), so those layouts stay tested on synthetic archives only, and the area document says so | unverified |
 | 8 | `Censio.GameData` holds only `GameDataAssembly`; `Censio.Companion.Core` references it | `src/Censio.GameData/`; `docs/ARCHITECTURE.md` l. 24 | confirmed |
 | 9 | Candidate locations: texts `data/base/config/gui/texts_<language>.xml` and `data/base/config/game/datasets.xml` in `config.rda`; regions as provinces `data/base/provinces/{celtic,roman}/` and icons `data/ui/4k/<base,dlc01,dlc02,dlc03>/icon_content/<group>/icon_{2d,3d}_*_0.dds` (groups incl. `production_goods`, `workforce`, `building`) in `zz_patchfiles_200.rda` and `zz_patchfiles_300.rda` | `log.md` rows 2b (RDA Explorer screenshots) | confirmed |
 | 10 | Icon paths recur in several archives; no source says which copy wins | `log.md` rows 2b; load order not reported | confirmed |
@@ -37,7 +38,7 @@ AC1–AC6 of [spec.md](spec.md).
 | -- | ------- | --------- |
 | AC1 | manual: the Product Manager repeats the record's search and confirms the pages the session could not open, before step 9; the Reviewer checks record 0043 against S1 in step 8 | `docs/decisions/0043-rda-archives-read-by-an-own-bounded-reader.md` |
 | AC2 | manual: the Product Manager's survey run (task 9) once step 7 is green; the Dev writes the locations from it; the run on the final head before step 9 confirms them | `docs/areas/game-files.md` |
-| AC3 | `RdaArchiveOpenListsEntriesWithPathsSizesAndFlags`, `RdaArchiveReadStoredEntryReturnsContent`, `RdaArchiveReadCompressedEntryReturnsDecompressedContent`, `RdaArchiveReadEntryOfMemoryResidentBlockReturnsContent`, `RdaArchiveReadEntriesAcrossSeveralBlocksReturnsEach`, `RdaArchiveReadEntryBeyondFourGibibytesReturnsContent`, `RdaArchiveOpenSkipsDeletedBlock`, `RdaArchiveOpenPathOpensFileOnDisk` | `RdaArchiveTests.cs` |
+| AC3 | `RdaArchiveOpenListsEntriesWithPathsSizesAndFlags`, `RdaArchiveReadStoredEntryReturnsContent`, `RdaArchiveReadCompressedEntryReturnsDecompressedContent`, `RdaArchiveReadEntryOfMemoryResidentBlockReturnsContent`, `RdaArchiveReadEntriesAcrossSeveralBlocksReturnsEach`, `RdaArchiveReadEntryBeyondFourGibibytesReturnsContent`, `RdaArchiveOpenSkipsDeletedBlock`, `RdaArchiveOpenBlockWithoutFilesAddsNoEntries`, `RdaArchiveOpenPathOpensFileOnDisk` | `RdaArchiveTests.cs` |
 | AC4 | `RdaArchiveOpenWrongMagicReturnsUnsupportedArchive`, `RdaArchiveOpenOtherVersionReturnsUnsupportedArchive`, `RdaArchiveOpenTruncatedHeaderReturnsCorruptArchive`, `RdaArchiveOpenBlockOutsideFileReturnsCorruptArchive`, `RdaArchiveOpenBlockHeaderValueAboveInt64MaxReturnsCorruptArchive`, `RdaArchiveOpenDirectoryOutsideFileReturnsCorruptArchive`, `RdaArchiveOpenRevisitedBlockOffsetReturnsCorruptArchive`, `RdaArchiveOpenTooManyBlocksReturnsCorruptArchive`, `RdaArchiveOpenTooManyEntriesReturnsCorruptArchive`, `RdaArchiveOpenFileCountOverflowReturnsCorruptArchive`, `RdaArchiveOpenDirectoryAboveBoundReturnsCorruptArchive`, `RdaArchiveOpenDirectorySizeMismatchReturnsCorruptArchive`, `RdaArchiveOpenTruncatedCompressedDirectoryReturnsCorruptArchive`, `RdaArchiveOpenCorruptCompressedDirectoryReturnsCorruptArchive`, `RdaArchiveOpenOverlappingDirectoriesAboveTotalBoundReturnsCorruptArchive`, `RdaArchiveReadEntryOutsideFileReturnsCorruptEntry`, `RdaArchiveReadEntrySizeAboveInt64MaxReturnsCorruptEntry`, `RdaArchiveReadEntryOffsetPlusSizeOverflowReturnsCorruptEntry`, `RdaArchiveReadEntryAboveBoundReturnsCorruptEntry`, `RdaArchiveReadCompressedStoredSizeAboveBoundReturnsCorruptEntry`, `RdaArchiveReadDecompressedShorterThanDeclaredReturnsCorruptEntry`, `RdaArchiveReadDecompressedLongerThanDeclaredReturnsCorruptEntry`, `RdaArchiveReadCorruptCompressedEntryReturnsCorruptEntry`, `RdaArchiveReadMemoryResidentDataAboveBoundReturnsCorruptEntry`, `RdaArchiveReadMemoryResidentStoredSizeAboveBoundReturnsCorruptEntry`, `RdaArchiveReadMemoryResidentSliceOverflowReturnsCorruptEntry`, `RdaArchiveReadUnknownFlagReturnsUnsupportedEntryAndOthersRead`, `RdaArchiveOpenEncryptedBlockCountsItAndOthersRead`, `RdaArchiveReadMissingPathReturnsNotFound`, `RdaArchiveReadDuplicatePathReturnsDuplicateEntry`, `RdaArchiveOpenMissingFileReturnsUnreadable`, `RdaArchiveReadStreamFailureReturnsUnreadable`; `RdaLimitsConstructorNonPositiveValueThrows` | `RdaArchiveTests.cs`, `RdaLimitsTests.cs` |
 | AC5 | `RdaInstallationSurveyRunReadsAssetAndIconWithMarkers`, `RdaInstallationSurveyRunPrefersConfigAndUiArchives`, `RdaInstallationSurveyRunFallsBackToAnyConfigXml`, `RdaInstallationSurveyRunReportsPathInEveryArchive`, `RdaInstallationSurveyRunReportsExtensionAndFolderCounts`, `RdaInstallationSurveyRunListsLanguageArchiveEntriesWithoutMedia`, `RdaInstallationSurveyRunReportsArchiveErrorWithMessageAndContinues`, `RdaInstallationSurveyRunSkipsLinkedFolder`, `RdaInstallationSurveyRunReportsNoContent`, `RdaInstallationSurveyRunWithoutArchivesReportsNone`, `RdaInstallationSurveyRunWrongMarkerIsNotRead`, `RdaArchiveOpenWhileFileHeldOpenForWritingSucceeds` (E7, fact 11); `RdaInstallationSurveyRealInstallationReadsAssetAndIcon` (inconclusive without `CENSIO_ANNO_INSTALL`); manual: the Product Manager runs that test on a local build of the branch head, once with the game running, before step 9 | `RdaInstallationSurveyTests.cs`, `RdaArchiveTests.cs` |
 | AC6 | check: `log.md` rows "2a Discovery listing (AC6)" and "2b" hold only paths, sizes and header markers | `specs/feature-21-rda-archive-spike/log.md` |
@@ -49,15 +50,11 @@ inside a fenced code block: entry paths are untrusted archive strings.
 
 ## Approach
 
-**Layout probe (task 1).** A PowerShell script the orchestrator hands to the Product Manager prints, for every archive, the first block offset, the block count, the flag values met and whether
-the chain ends at the file length; for `config.rda`, `en_us0.rda` and `zz_patchfiles_200.rda`, per flag value met,
-the first such block's header fields, the first two bytes of its directory and, for a memory-resident block, its
-size pair and the first two bytes of its data, and its first entry's path, offset, sizes and first two data bytes —
-numbers and markers only. The script, `probe.ps1` in this folder, opens each archive with
-`[System.IO.File]::Open($path, 'Open', 'Read', 'ReadWrite, Delete')` and writes nothing; it stops a chain after
-1,048,576 blocks, at an offset seen before or one outside the file, and reports that as `chain error`; it prints
-entry paths, numbers and at most two bytes per marker, nothing else. The Lead corrects fact 7 and this *Approach* from it before task 3; a layout that
-contradicts the plan beyond field values sends it back to the plan.
+**Layout probe (task 1, done).** `probe.ps1` in this folder walked every archive's block chain read-only and
+sampled the first block per flag value of three archives; its output, [probe-output.txt](probe-output.txt), confirmed
+the layout of fact 7 without change to the reader's design and left fact 13 open. What the step-9 run must still
+show: every archive opens without an error line (every block's directory checked, the limits fit), and whether a
+compressed or memory-resident entry exists at all.
 
 **Reader (`RdaArchive`).** `Open` reads the header and walks the block chain from the first block offset (fact 7),
 reading each block's directory into `RdaEntry` items in archive order; it keeps the stream open for `Read` until
@@ -73,8 +70,10 @@ computed in 64 bits. Checks, failing closed with the first kind that applies:
   block counts, encrypted and deleted ones too); a next offset that is neither the file length nor a valid block
   offset → `CorruptArchive`;
 - a block with flag 2 adds no entries and raises `EncryptedBlockCount`; a block with flag 8 adds none; neither
-  directory is read. Flags beyond 1, 2, 4 and 8 are kept on the block's entries, which `Read` refuses as
-  `UnsupportedEntry`;
+  directory is read. A flag-8 entry has no content whether flag 8 means deleted or placeholder (fact 7), so skipping
+  loses nothing to read; what it means for load order is #23's (record 0043). Flags beyond 1, 2, 4 and 8 are kept on
+  the block's entries, which `Read` refuses as `UnsupportedEntry`;
+- a block with file count 0 passes the checks below with directory sizes 0 and adds no entries (fact 13);
 - for every other block, before reading its directory: running entry total plus file count above `MaxEntries`;
   declared decompressed size other than file count × 560 or above `MaxDirectoryBytes`; stored size above
   `MaxDirectoryBytes`, the directory not inside the file, or the running total of stored directory bytes read above
@@ -102,7 +101,10 @@ the bound — never archive bytes, a path inside the archive or an exception mes
 `Unreadable`). Wording free for the Dev; tests compare kinds.
 
 `RdaLimits` throws `ArgumentOutOfRangeException` for a value ≤ 0. `RdaLimits.Default`: `MaxBlocks` 1,048,576;
-`MaxEntries` 1,048,576; `MaxDirectoryBytes` 64 MiB; `MaxEntryBytes` 512 MiB. If task 9 shows a limit hit on a real
+`MaxEntries` 1,048,576; `MaxDirectoryBytes` 64 MiB; `MaxEntryBytes` 512 MiB. Against the probe: `MaxBlocks` is
+51 times the largest count (20,478); the sampled directories (at most 194 files, 108,640 bytes) and entries (at most
+17 MB) are far below their bounds, but the other blocks' file counts are unknown — a single-block archive of 5 GB or
+more (`provinces_roman`) may hold more than the 119,837 files 64 MiB allows. If task 9 shows a limit hit on a real
 archive, the Dev raises that default (task 10).
 
 **Survey (`RdaInstallationSurvey.Run`).** Enumerates `*.rda` under `<installation>/maindata` with
@@ -124,8 +126,9 @@ ordered by relative path (ordinal, ignoring case), one archive open at a time. O
 asserts both reads.
 
 **Test helpers.** `RdaArchiveBuilder` writes synthetic V2.2 archives with invented content (blocks stored,
-compressed, memory-resident, encrypted, deleted, with an unknown flag, and every malformation of AC4), from fact 7 as
-corrected by the probe. `SparseStream` is a seekable read-only stream of a given length, zeros outside the regions
+compressed, memory-resident, encrypted, deleted, empty, with an unknown flag, and every malformation of AC4) from
+fact 7, the layouts of flags 1, 2 and 4 from fact 13; deleted blocks hold entries with offset and sizes 0, as on the
+installation. `SparseStream` is a seekable read-only stream of a given length, zeros outside the regions
 written into it, optionally throwing `IOException` at an offset — for the 4 GiB, `long.MaxValue` and overlap tests.
 Survey tests use a temporary folder they delete; the linked-folder test skips itself where symbolic links cannot be
 created.
@@ -188,8 +191,8 @@ icons, the installation survey* — not here: finding the installation (#22), th
 
 Owned by the Dev unless named, written once the code is green:
 
-- `docs/areas/game-files.md` (new, from `_template.md`): format V2.2 as read (fact 7 as corrected, the reader's
-  contract), flags, the `RdaLimits.Default` values, when they apply and the memory `Open` retains, the failure kinds
+- `docs/areas/game-files.md` (new, from `_template.md`): format V2.2 as read (fact 7, the reader's
+  contract), flags (1, 2 and 4 met on no real archive, fact 13, unless task 9 finds them), the `RdaLimits.Default` values, when they apply and the memory `Open` retains, the failure kinds
   of E1–E6 and E8 with the encrypted-block count, read-only shared access, no content leaves the machine (link 0023);
   entry paths are untrusted strings: a consumer that logs them follows `companion.md`
   (*Log*), one that derives a file system path from them (#24, #25) confines it. *Locations* from task 9 — per data
@@ -202,7 +205,7 @@ Owned by the Dev unless named, written once the code is green:
   `RdaInstallationSurvey`) instead of "later game files", linking `game-files`; "File paths the Companion … opens":
   the game archives under the installation folder. *Test doubles* (Tester): `SparseStream`.
 - `docs/UNIT_TESTS.md` (Tester), *Where tests live*: `CENSIO_ANNO_INSTALL`; unset, the survey test is inconclusive.
-- Record 0043 (Lead): the probe's and the survey's findings where they change a consequence.
+- Record 0043 (Lead): the probe's findings (done in task 2) and the survey's where they change a consequence.
 - `README.md`, `docs/USER_GUIDE.md`, `SECURITY.md` (already lists game-file parsing): unchanged (N6).
 
 ## Architecture check
@@ -230,7 +233,7 @@ content in the survey or the probe. `Censio.GameData` stays platform-neutral `ne
 
 - M1 (reader and builder from memory, no real sample): accepted in part — the Product Manager's confirmation to
   build without a sample exists (spec *Open questions*, `log.md` 14:00–14:01, option a), so no escalation; still,
-  task 1 adds a layout probe before the builder, fact 7 notes RDA Explorer's consistency, and option 6 records why.
+  task 1 adds a layout probe before the builder (it confirmed fact 7; fact 13 stays open), and option 6 records why.
 - M2 (survey filter a guess): accepted — extension and folder counts per archive, `province` and `dataset` added,
   the language archives' non-media entries listed, the asset fallback to any `config.rda` XML, icons of every kind
   (fact 9).

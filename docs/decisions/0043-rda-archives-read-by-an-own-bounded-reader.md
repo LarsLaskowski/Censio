@@ -46,9 +46,16 @@ are in the [game-files](../areas/game-files.md) area document.
 ## Consequences
 
 - No dependency; the format is Censio's to maintain when the game changes it.
-- Residual risk: the layout is built from the community's description, not from a sample in the repository; the
-  Product Manager's layout probe before the tests and the run of the installation check on the final head before PR
-  approval confirm it. A mismatch sends the reader back to its plan.
+- Residual risk: the layout is built from the community's description, not from a sample in the repository. The
+  Product Manager's layout probe of 2026-11-08 confirmed it on all 40 archives for the header, the block chain, the
+  block header, the stored directory and the 560-byte entry; it found only plain blocks and blocks flagged deleted
+  (entries with offset and sizes 0), no compressed, encrypted or memory-resident block, so those three layouts rest
+  on the community's description and synthetic tests alone. The run of the installation check on the final head
+  before PR approval opens every block; a mismatch sends the reader back to its plan, and a game update that brings
+  a compressed block is read by code no real archive has exercised.
+- Patch archives carry many blocks flagged deleted (20,405 of 20,478 in `zz_patchfiles_200`) naming paths with no
+  content. The reader skips them; whether they remove files of earlier archives is part of the load order #23
+  settles.
 - Which archive wins when several hold the same path (the `zz_patchfiles_*` archives repeat icon paths) is not
   known from the spike; #23 must settle it before the catalog is built, and #24 depends on it for icons.
 - An entry larger than the per-entry bound cannot be read; #23 revisits the bound or reads entries as streams if a
