@@ -59,7 +59,9 @@ shifted by one random offset. What is kept, changed and refused is in [`areas/pi
   walk refuses a file instead of leaking bytes.
 - A derived delta or average productivity, or any perturbed float, that rounds back to its non-zero original is
   moved to the adjacent float, which costs at most two float32 ulps of the largest operand of the relation plus two steps of the smallest float
-  (2^-148, only for subnormal values); the real deny-list run found one
+  (2^-148, only for subnormal values); a reader who recomputes such a value can tell that it was stepped and so learn
+  that original (accepted: it happened once in 183,079 values of the real recording, and a fresh draw would change the fixed draw
+  order); the real deny-list run found one
   such delta.
 - Profit is derived as an integer within 1 of the new income minus maintenance, on the original's side where that
   changes it, so the relation holds and no non-zero profit stays exact; adding the rounded change to the original was
