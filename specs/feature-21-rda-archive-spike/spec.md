@@ -13,8 +13,9 @@ goods, buildings, workforce, regions, their German and English texts, and icons.
 ## Scenarios
 
 - S1: Given the spike is done, when a maintainer reads the new decision record, then it says how candidate libraries
-  were searched (terms, where) and lists each candidate with its licence, maintenance (last release, activity), Anno
-  117 support and API fit, and the choice: a library, or an own reader with its effort estimate.
+  were searched (terms, where) and lists each NuGet candidate with its licence, maintenance (last release, activity),
+  Anno 117 support and API fit, names each community reader found outside NuGet with its source, and gives the
+  choice: a library, or an own reader with its effort estimate.
 - S2: Given a developer starting #23 or #24, when they read the game-files area document, then they find the entry
   paths and every archive (relative to the installation folder) of the asset, data set and German and English text
   files and of the icon folders by kind (goods, buildings, workforce, regions where present); which of those files
@@ -74,8 +75,9 @@ Each failure is a typed result with a kind, never an exception that escapes the 
 ## Acceptance criteria
 
 - AC1: A new decision record amends 0024 (released in v0.1.0, so not edited) with the search and evaluation of S1
-  and the choice, resting on the discovery listing; each claim names its source, and the search and each source the
-  session could not open are confirmed by a person (S1, N4, N7).
+  and the choice, resting on the discovery listing; each claim names its source, the search is repeated by a person,
+  and a community reader the session could not open is named with that person's finding, its licence and
+  maintenance not evaluated (S1, N4, N7).
 - AC2: The game-files area document states the file and icon-folder locations of S2 from the Product Manager's run
   of the S4 check (the listing named only archives), confirmed on the final head by the run of AC5, with the game
   version; which file and node holds goods, buildings, workforce and regions, load order and winning copy stay
@@ -133,4 +135,5 @@ Each failure is a typed result with a kind, never an exception that escapes the 
 | Criterion | Change | Reason | Step | Decided by |
 | --------- | ------ | ------ | ---- | ---------- |
 | AC2 | Locations at file and icon-folder level; which file and node holds goods, buildings, workforce and regions stays "unknown" for #23, like load order | The survey reports no content (N3), so it shows where the asset, data set and text files and icon folders are (`log.md` row "G3 task 9 PM survey run"), not which nodes hold each data kind; S2 and *Out of scope* changed with it | G3 task 15 | Lead |
+| AC1 | S1's licence and maintenance are evaluated only for a NuGet package; the community readers RDAExplorer and RdaConsole are named with the Product Manager's finding (GitHub tools, Anno 1800 and current files read), their licence and maintenance not evaluated, and the record says so | No NuGet package exists (session search and the Product Manager's repeat, `log.md` row "9 PM confirmation run on the final head"), so no licence-gated library (N4) can be used; the GitHub tools would matter only if their source were vendored (record 0043, option 2, not taken), and the decision rests on the own reader | Review round 3 | Lead |
 | AC4 | E4: "unsupported entry" applies to an entry of a block with an unknown flag; an encrypted block is skipped and counted, its entries not listed, so a read returns "not found" | An encrypted block's directory cannot be read, so its entries are unknown, as for the encrypted and deleted directories of `plan.md` B3; the reader does so (`RdaArchive` block reading) | Review round 1 | Lead |

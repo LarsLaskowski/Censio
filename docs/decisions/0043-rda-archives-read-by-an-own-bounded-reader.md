@@ -23,7 +23,8 @@ packages such as `rda.SocketHelpers`, `RDapter`). The community's readers (RDAEx
 NuGet; their repositories could not be opened from the session. The Product Manager repeated the search before PR
 approval with the same result: no NuGet package; the only readers are RDAExplorer and RdaConsole on GitHub.
 RdaConsole worked for Anno 1800, the direct predecessor, and RDAExplorer reads the current files (Product Manager's
-statement, the repositories not opened by the session).
+statement, the repositories not opened by the session). Their licence and maintenance are not evaluated: no
+library of them can be referenced, and they would matter only if their source were vendored (option 2, not taken).
 
 The community tool RDA Explorer 1.4.0.0, a reader for Anno 2205's V2.2, lists `config.rda` and the
 `zz_patchfiles_200` and `_300` archives of Anno 117 (the only ones tried), so their layout is at least close to V2.2
@@ -33,8 +34,9 @@ the repository (issue #21's working record, option a).
 ## Options considered
 
 1. **A NuGet library** — none exists (search above).
-2. **Vendor a community reader's source** — less format work; its licence, maintenance and Anno 117 support could
-   not be checked, it would still need Censio's bounds and typed results, and it would carry other games' variants.
+2. **Vendor a community reader's source** — less format work; its licence and maintenance could not be checked, its
+   Anno 117 support rests on the Product Manager's statement above, it would still need Censio's bounds and typed
+   results, and it would carry other games' variants.
 3. **An own slim reader for V2.2** — only the needed features (listing, stored, compressed and packed entries),
    bounded and failing closed like the pipe reader ([0033](0033-pipe-reader-strict-from-the-reference-source.md));
    built from the community's description of the format without a real sample in the repository; effort: about
