@@ -97,7 +97,8 @@ escapes the steps is caught at the top, logged with `GameInstallationNotFound` a
 `search.Run(CompanionFolders.Settings(localAppData))` through `Run`; `TrayIcon` reads `search.Status` each time the
 menu opens. `RegistryUbisoftInstallRecords` opens `HKLM` in the 32-bit view at `SOFTWARE\Ubisoft\Launcher\Installs`
 (the same key as fact 3 from a 64-bit process), read-only, and returns each subkey's name with `InstallDir` when it is
-a string or expandable string (not expanded), else null; a subkey that throws gives null. `WindowsFileVersionReader`
+a plain string (`REG_SZ`, as in the sample; read unexpanded), else null — an expandable string included (Lead decision,
+step 8: fail closed as built and approved by Security); a subkey that throws gives null. `WindowsFileVersionReader`
 returns `new Version(FileMajorPart, FileMinorPart, FileBuildPart, FilePrivatePart)` of `FileVersionInfo`.
 
 **Menu layout**: one disabled entry of kind `Game` directly after `LastTick`, before the first separator. Texts:
