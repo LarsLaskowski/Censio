@@ -1,7 +1,7 @@
 # Plan: Locate the game installation
 
 Source: [spec.md](spec.md)
-Tier: standard — a new behavior (search, settings file, menu line) that creates no security control; its bounds and validation are input handling.
+Tier: security — besides input handling (bounds, parser validation), skipping network and device paths from Ubisoft Connect's records confines what a path reaches, a guard (raised from `standard` in the revision for Security's N1).
 Security areas touched: Parsing of external input (the settings file, Ubisoft Connect's install records); File paths the Companion opens (the settings file, the probed installation files); Logging external data (the game folder in the log); `.squad/project.md` *Security areas* extended (not narrowed)
 
 ## Problem / root cause
@@ -22,7 +22,7 @@ See [spec.md](spec.md), *Problem*.
 | 8 | An installation holds `maindata\config.rda` (lower case) | `docs/areas/game-files.md`, *Locations* (survey run) | confirmed |
 | 9 | The log writer sanitizes and cuts every message, so a logged folder needs no own sanitizing | `src/Censio.Companion.Core/LogLine.cs:50` (`Sanitize(message, MaxMessageLength)`) | confirmed |
 | 10 | The Companion has no settings file today | `README.md:144` "The Companion has no settings yet."; no JSON read in `src/Censio.Companion*` | confirmed |
-| 11 | `TrayMenu.Create` builds the menu; the shell calls it once, the tests ten times | `src/Censio.Companion.Core/TrayMenu.cs` `Create`; `src/Censio.Companion/TrayIcon.cs:133`; `tests/Censio.Companion.Core.Tests/TrayMenuTests.cs:97…299` | confirmed |
+| 11 | `TrayMenu.Create` builds the menu; the shell calls it once, the tests twelve times | `src/Censio.Companion.Core/TrayMenu.cs` `Create`; `src/Censio.Companion/TrayIcon.cs:133`; `tests/Censio.Companion.Core.Tests/TrayMenuTests.cs` lines 97, 122, 143, 162, 188, 209, 228, 251, 280, 299, 315, 331 | confirmed |
 | 12 | The shell builds a disabled menu item for every entry with `IsEnabled == false` and wires clicks by kind only | `src/Censio.Companion/TrayIcon.cs:139-150` | confirmed |
 | 13 | `App.OnStartup` runs before the mode switch in every mode, and `Run` starts a background task on the exit token without awaiting it | `src/Censio.Companion/App.xaml.cs:326-332`, `:339-385` | confirmed |
 | 14 | The autostart command has no arguments, so a command-line switch would be lost | `docs/areas/companion.md`, *Start with Windows* | confirmed |
@@ -31,25 +31,25 @@ See [spec.md](spec.md), *Problem*.
 
 | AC | Test(s) | Test file |
 | -- | ------- | --------- |
-| AC1 | `GameInstallationSearchUbisoftRecordReturnsFound` (record `InstallDir` in the sample's form: forward slashes, trailing separator), `GameInstallationSearchSeveralRecordsTakesFirstValidByNumber` (names `9`, `10`, `abc`, `2` with `2` invalid), `GameInstallationSearchNoValidRecordFindsDefaultGamesFolder`, `GameInstallationSearchNoGameFolderRunsSearch` (DataRow: no file, `""`, `"  "`, no key) | `tests/Censio.Companion.Core.Tests/GameInstallationSearchTests.cs` |
+| AC1 | `GameInstallationSearchUbisoftRecordReturnsFound` (a temporary path with a trailing separator, the part of the sample's form Linux can show; the `E:/…/` form stays with AC8), `GameInstallationSearchSeveralRecordsTakesFirstValidByNumber` (names `9`, `10`, `abc`, `2` with `2` invalid), `GameInstallationSearchNoValidRecordFindsDefaultGamesFolder`, `GameInstallationSearchNoGameFolderRunsSearch` (DataRow: no file, `""`, `"  "`, no key) | `tests/Censio.Companion.Core.Tests/GameInstallationSearchTests.cs` |
 | AC1 | `TrayMenuCreateGameLineBelowLastTick`, `TrayMenuFormatGameFoundShowsBuildAndSource` (both sources) | `tests/Censio.Companion.Core.Tests/TrayMenuTests.cs` |
 | AC1 | `GameInstallationIsInstallationNeedsConfigAndProgramFile` (DataRow: both, only one, none), `GameInstallationDefaultUbisoftGamesFolderIsUnderProgramFiles` | `tests/Censio.Companion.Core.Tests/GameInstallationTests.cs` |
 | AC2 | `GameInstallationSearchSettingsFolderSkipsRecords` (records double counts no read) | `GameInstallationSearchTests.cs` |
 | AC2 | `CompanionSettingsReadReturnsGameFolder`, `CompanionSettingsReadAcceptsBomCommentsAndTrailingCommas`, `CompanionSettingsReadKeyIgnoresCase`, `CompanionSettingsReadIgnoresOtherKeys` | `tests/Censio.Companion.Core.Tests/CompanionSettingsTests.cs` |
 | AC2 | `CompanionFoldersSettingsIsUnderCensio` | `tests/Censio.Companion.Core.Tests/CompanionFoldersTests.cs` |
 | AC3 | `GameInstallationSearchSettingsFolderProblemReturnsKind` (DataRow: missing folder, relative, `C:`-style drive only, `%USERPROFILE%\x`, folder without the two files), `GameInstallationSearchSettingsProblemLogsWarningAndReadsNoRecord`, `GameInstallationSearchInvalidSettingsFileReturnsInvalid` | `GameInstallationSearchTests.cs` |
-| AC3 | `CompanionSettingsReadInvalidReturnsInvalid` (DataRow: broken JSON, root array, number, `null`, key twice, key twice in other case, invalid UTF-8 bytes `\xFF`), `CompanionSettingsReadTooLargeReturnsInvalid` (1,048,577 bytes; 1,048,576 accepted), `CompanionSettingsReadUnreadableReturnsInvalid` (a folder named `settings.json`), `CompanionSettingsReadMissingFileReturnsNoGameFolder` | `CompanionSettingsTests.cs` |
+| AC3 | `CompanionSettingsReadInvalidReturnsInvalid` (DataRow: broken JSON, root array, number, `null`, key twice, key twice in other case, byte `0xFF` inside the `gameFolder` value, inside the `gameFolder` key, inside another key, `"\uD800"` as the value), `CompanionSettingsReadAcceptsInvalidBytesOutsideNames` (`0xFF` inside a comment and inside another key's value), `CompanionSettingsReadTooLargeReturnsInvalid` (DataRow: 1,048,577 bytes, a sparse file of 3 GiB made with `FileStream.SetLength`; 1,048,576 accepted), `CompanionSettingsReadUnreadableReturnsInvalid` (a folder named `settings.json`), `CompanionSettingsReadMissingFileReturnsNoGameFolder` | `CompanionSettingsTests.cs` |
 | AC3 | `TrayMenuFormatGameProblemShowsText` (DataRow per problem kind, exact texts of spec E1–E4) | `TrayMenuTests.cs` |
-| AC4 | `GameInstallationSearchRecordsThrowSkipsToDefaultFolder`, `GameInstallationSearchUnusableRecordIsSkipped` (DataRow: `InstallDir` null, relative, missing folder, no installation), `GameInstallationSearchNothingFoundReturnsNotFoundAndLogsWarning`, `GameInstallationSearchDefaultFolderUnreadableReturnsNotFound` | `GameInstallationSearchTests.cs` |
+| AC4 | `GameInstallationSearchRecordsThrowSkipsToDefaultFolder`, `GameInstallationSearchUnusableRecordIsSkipped` (DataRow: `InstallDir` null, relative, missing folder, no installation, starting with `\\` or `//`), `GameInstallationSearchNothingFoundReturnsNotFoundAndLogsWarning`, `GameInstallationSearchDefaultFolderUnreadableReturnsNotFound` | `GameInstallationSearchTests.cs` |
 | AC4 | `TrayMenuFormatGameNotFoundShowsText` | `TrayMenuTests.cs` |
 | AC5 | `GameInstallationSearchBuildIsFileVersion` (two versions give two texts, the same version the same text), `GameInstallationSearchUnusableVersionIsUnknown` (DataRow: null, `0.0.0.0`, reader throws) | `GameInstallationSearchTests.cs` |
 | AC5 | `GameInstallationFormatBuildWritesFourNumbers` | `GameInstallationTests.cs` |
 | AC5 | `TrayMenuFormatGameUnknownBuildShowsText` | `TrayMenuTests.cs` |
-| AC6 | `GameInstallationSearchStatusIsSearchingBeforeRun`, `GameInstallationSearchRunWritesNothing` (file listing and timestamps of the temporary installation and settings file unchanged) | `GameInstallationSearchTests.cs` |
+| AC6 | `GameInstallationSearchStatusIsSearchingBeforeRun`, `GameInstallationSearchRunWritesNothing` (file listing, lengths, contents and `LastWriteTimeUtc` of the temporary installation and settings file unchanged; never the access time), `GameInstallationSearchUnexpectedExceptionEndsNotFound` (the records double throws `NotSupportedException`, the default folder is missing: final status `NotFound`, never `Searching`) | `GameInstallationSearchTests.cs` |
 | AC6 | `TrayMenuFormatGameSearchingShowsText` | `TrayMenuTests.cs` |
 | AC6 | manual: the Product Manager, within AC8's run — menu usable and `Exit` at once while `Game: searching` would show, every mode starts the search (a start with `--replay` and with an invalid switch show a `Game:` line) | — |
 | AC7 | `GameInstallationSearchFoundLogLineIsSanitized` (folder name with `\u0007`, the logged message passed through `LogLine.Format` holds `?`), `GameInstallationSearchLogHoldsNoFileContent` | `GameInstallationSearchTests.cs` |
-| AC8 | manual: the Product Manager on Windows, local publish of the branch head with the command of `README.md` (*Build the Companion from source*): without a settings file the menu shows `Game: build 26.29905.4.51797 (Ubisoft Connect)` (or the build of the day) and the log names `E:/Anno 117 - Pax Romana/`; with `{"gameFolder": "E:\\missing"}` it shows `Game: folder in settings not found` | — |
+| AC8 | manual: the Product Manager on Windows, local publish of the branch head with the command of `README.md` (*Build the Companion from source*): without a settings file the menu shows `Game: build 26.29905.4.51797 (Ubisoft Connect)` (or the build of the day) and the log names `E:/Anno 117 - Pax Romana/`; with `{"gameFolder": "E:\\missing"}` it shows `Game: folder in settings not found`, with `"C:"` and with `"%USERPROFILE%\\x"` `Game: folder in settings is not a full path`; and `Get-Acl 'HKLM:\SOFTWARE\WOW6432Node\Ubisoft\Launcher\Installs'` is run and its owners and write rights reported | — |
 | AC9 | manual: the Reviewer, step 8 — README and user guide, English then German, hold every item of spec N7 | — |
 
 ## Approach
@@ -57,9 +57,12 @@ See [spec.md](spec.md), *Problem*.
 **Settings file** (`CompanionSettings.Read`): a path that is not fully qualified (local app data unresolved), a
 missing file or folder: no game folder. Opened read-only, sharing read, write and delete; at most 1,048,577 bytes are
 read, more than 1,048,576 is invalid (raw bytes, before decoding). A leading `EF BB BF` is stripped by the code (not
-left to the parser). `JsonDocument` with comments skipped and trailing commas allowed; `JsonException` and
-`ArgumentException` (invalid UTF-8) are invalid. Root not an object: invalid. Properties named `gameFolder` ignoring
-case (ordinal): more than one invalid, a non-string invalid (`null` included), a blank string no game folder,
+left to the parser). `JsonDocument` with comments skipped and trailing commas allowed. It decodes names and strings
+only when they are read, and then throws `InvalidOperationException` for invalid UTF-8 or a lone surrogate (measured by
+the Devil's Advocate on .NET 10): parsing, reading every property name and reading the `gameFolder` value happen in one
+`try` that turns `JsonException` and `InvalidOperationException` into `not valid JSON`. So a name that cannot be
+decoded makes the file invalid under any key, while invalid bytes in a comment or in another key's value are
+accepted. Root not an object: invalid. Properties named `gameFolder` ignoring case (ordinal): more than one invalid, a non-string invalid (`null` included), a blank string no game folder,
 otherwise the value as written. Other I/O failures: invalid, with the exception. The problem texts are fixed:
 `not valid JSON`, `not a JSON object`, `gameFolder is not a text`, `gameFolder occurs more than once`, `larger than
 1 MiB`, `cannot be read`.
@@ -74,12 +77,14 @@ otherwise the value as written. Other I/O failures: invalid, with the exception.
    each with a warning and no further step. Otherwise found, source `SettingsFile`.
 2. Records: `IUbisoftInstallRecords.Read()`; any exception counts as no records. Order: names of ASCII digits only
    first, by length then ordinal (no overflow), the others after them, ordinal. The first record whose `InstallDir` is
-   fully qualified and an installation is found.
+   fully qualified, does not start with `\\` or `//` (no network or device path from a record), and is an
+   installation is found.
 3. Default games folder (fully qualified only): its top-level folders, ordinal ignoring case; `IOException`,
    `UnauthorizedAccessException` and `SecurityException` count as none. The first installation is found.
 4. Otherwise `NotFound`, warning.
 On found, the version reader is asked for the program file (any exception → unknown) and the information line is
-logged. The status is published through a `volatile` field.
+logged. The status is published through a `volatile` field. `Run` always ends in a final status: any exception that
+escapes the steps is caught at the top, logged with `GameInstallationNotFound` and its exception, and gives `NotFound`.
 
 **Wiring** (shell): `App.OnStartup`, before the mode switch, creates the search with `RegistryUbisoftInstallRecords`,
 `WindowsFileVersionReader`, `GameInstallation.DefaultUbisoftGamesFolder(ProgramFilesX86)` and the logger, and starts
@@ -150,7 +155,7 @@ Types in plain words, one declaration per code span; all public unless marked.
 - `TrayMenuEntryKind.Game` (new member); `TrayMenu.FormatGame(GameInstallationStatus status)` (string); the
   replacement of the current `Create`: `TrayMenu.Create(string version, TraySnapshot snapshot, GameInstallationStatus game, bool isAutostartEnabled, TimeProvider clock)`.
 - `CompanionLog` partial methods (logger first): `CompanionLog.GameInstallationFound(ILogger logger, string source, string build, string folder)`,
-  `CompanionLog.GameInstallationNotFound(ILogger logger)`, `CompanionLog.GameSettingsFolderMissing(ILogger logger, string folder)`,
+  `CompanionLog.GameInstallationNotFound(ILogger logger, Exception? exception)`, `CompanionLog.GameSettingsFolderMissing(ILogger logger, string folder)`,
   `CompanionLog.GameSettingsFolderNotFullPath(ILogger logger, string folder)`,
   `CompanionLog.GameSettingsFolderNotInstallation(ILogger logger, string folder)`,
   `CompanionLog.GameSettingsFileInvalid(ILogger logger, string file, string problem, Exception? exception)`.
@@ -164,7 +169,7 @@ Files the skeleton rewrites: `src/Censio.Companion.Core/TrayMenu.cs`, `TrayMenuE
 
 `tests/Censio.Companion.Core.Tests/CompanionSettingsTests.cs`, `GameInstallationTests.cs`, `GameInstallationSearchTests.cs` (new); `TrayMenuTests.cs`, `CompanionFoldersTests.cs` (extended). New doubles: `FakeUbisoftInstallRecords.cs` (queued records or an exception, counts reads) and `FakeFileVersionReader.cs` (a version per path or an exception), both in `tests/Censio.Companion.Core.Tests/`. Installations are built in a temporary folder and deleted afterwards.
 
-Existing call sites of a changed signature: the ten `TrayMenu.Create` calls in `TrayMenuTests.cs` — the Tester adapts them (pass `GameInstallationStatus.Searching`), and the entry-order assertions gain the `Game` line; `TrayIcon.cs:133` — the Dev.
+Existing call sites of a changed signature: the twelve `TrayMenu.Create` calls in `TrayMenuTests.cs` — the Tester adapts them (pass `GameInstallationStatus.Searching`), and the entry-order assertions gain the `Game` line; `TrayIcon.cs:133` — the Dev.
 
 Code a unit test cannot cover: `RegistryUbisoftInstallRecords.cs`, `WindowsFileVersionReader.cs` and the changes to `App.xaml.cs` and `TrayIcon.cs` — Windows shell without a test project, already outside the coverage measure (`.github/workflows/ci.yml:71`); covered by AC8. No new exclusion.
 
@@ -172,10 +177,12 @@ Code a unit test cannot cover: `RegistryUbisoftInstallRecords.cs`, `WindowsFileV
 
 - New area `game-installation` (`docs/areas/game-installation.md`, Lead decision): scope "Finding the Anno 117
   installation folder and its build: the sources and their order, what counts as an installation, the build, the
-  failures; not the settings file itself (companion) or the archives (game-files)". Content: *Approach* above, the
+  failures; not the settings file itself (companion) or the archives (game-files)". Content: *Approach* above, UNC
+  folders from the settings file probed over the network, records limited to local paths, the
   facts 3 and 7 as not verified, records 0044 and 0046.
 - `docs/areas/companion.md`: *Tray icon and menu* (the `Game:` entry, position, texts), new *Settings file* section
-  (path, format, tolerated forms, bound, invalid cases, never written; record 0045), *Log* (the new lines, the
+  (path, format, tolerated forms, bound, invalid cases — a name that cannot be decoded makes the whole file invalid
+  under any key, invalid bytes in a comment or another key's value are accepted —, never written; record 0045), *Log* (the new lines, the
   folder at every start), *Limits and errors* (the menu line is the only message), *Related decisions* 0044–0046,
   *Not here* (settings no longer "later"; link game-installation).
 - `docs/areas/game-files.md`: *Scope* and *Not here* link `game-installation.md` instead of "#22".
@@ -197,8 +204,13 @@ Dev, once the code is green:
   Companion's settings file (record 0045); *Security model*: the settings file and the records are untrusted input,
   read-only (record 0044).
 - `SECURITY.md`: the scope list gains the settings file and Ubisoft Connect's install records (read only).
-- `.squad/project.md`: *Security areas* — parsing gains `CompanionSettings` and `GameInstallationSearch`, file paths
-  gain the settings file and the probed installation files, logging gains the game folder; *Integration surface* —
+- `.squad/project.md`: *Security areas* — *Parsing of external input* gains the settings file (`CompanionSettings`)
+  and Ubisoft Connect's records (`RegistryUbisoftInstallRecords`, `GameInstallationSearch`) with links to
+  `game-installation.md` and `companion.md` (*Settings file*); *File paths the Companion writes, prunes or opens*
+  gains the settings file (`CompanionFolders.Settings`, `CompanionSettings`) and the installation probes and program
+  file (`GameInstallation`, `WindowsFileVersionReader`, read-only) with a link; *Logging and showing external data*
+  gains the game folder in `CompanionLog`; *Outbound calls* says that a UNC folder the player names in the settings
+  file is probed over the network; *Integration surface* —
   the option `gameFolder` in `CompanionSettings` with `CompanionSettingsTests`, the interfaces `IUbisoftInstallRecords`
   and `IFileVersionReader`.
 
@@ -217,9 +229,11 @@ sentences above are updated by the Dev.
 - [x] The 1 MiB bound applies to the raw bytes before decoding; `JsonDocument`'s default depth of 64 applies.
 - [x] No exception text reaches the menu: every menu text is fixed. The settings file's read failure is logged with its
   exception (may name a path, as `companion.md` *Log* already accepts).
-- Accepted forms: the settings folder is the player's own; UNC and `\\?\` paths pass as fully qualified and are only probed
-  with `File.Exists`/`Directory.Exists`. Records come from `HKLM` (administrator-writable). Nothing found is
-  opened, written or executed by this feature.
+- Accepted forms: from the settings file every fully qualified path, the player's own choice; a UNC path there is
+  probed as written over the network (SMB), which `game-installation.md` and `.squad/project.md` (*Outbound calls*)
+  state. From a record only local paths: one starting with `\\` or `//` (UNC, `\\?\`, `\\.\`) is skipped. Who can
+  write the records key is checked in AC8 (`Get-Acl`). Nothing found is written or executed; only `anno117.exe` is
+  opened, by Windows' version reader, to read its version resource.
 
 ## Decision records
 
@@ -233,3 +247,28 @@ sentences above are updated by the Dev.
 
 - After merge: the Product Manager compares the `Game:` line before and after the next game update (fact 7, record
   0046); a verification issue in step 10.
+
+## Challenge
+
+Devil's Advocate (1 major, 4 minor):
+- M1 (wrong exception for undecodable names and values): accepted. *Approach* catches `InvalidOperationException`
+  with `JsonException` in one `try` over parsing, names and value; `Run` always ends in a final status; DataRows and
+  `GameInstallationSearchUnexpectedExceptionEndsNotFound` added; `GameInstallationNotFound` takes the exception.
+- m1 (access time): accepted; `GameInstallationSearchRunWritesNothing` compares contents and `LastWriteTimeUtc` only.
+- m2 (`%NAME%` inside a fully qualified path): narrowed spec E2 — a variable is never expanded; a path that starts with
+  one is not fully qualified (E2), one elsewhere is taken literally and is usually not found (E1); the user guide
+  says variables are not expanded. No new rule.
+- m3 (twelve calls): accepted; fact 11, *Test files* and task 8.
+- m4 (drive-letter form on Linux): accepted; the AC1 test shows the trailing separator, the `E:/…/` form stays with AC8.
+
+## Security review
+
+- B1: accepted, as M1, plus the `companion.md` wording on undecodable names and accepted bytes in comments and other
+  values, and the DataRows for another key.
+- B2: accepted; *Documentation updates* names the concrete types per security area, and *Security considerations*
+  says that only `anno117.exe` is opened, by Windows' version reader.
+- N1: taken. Records: paths starting with `\\` or `//` are skipped (test DataRow). Settings file: UNC accepted as the
+  player's choice and documented as a network probe in `game-installation.md` and `.squad/project.md`. The unevidenced
+  "administrator-writable" is dropped; AC8 runs `Get-Acl` on the key.
+- N2: taken; a 3 GiB sparse-file DataRow.
+- N3: taken; AC8 tries `"C:"` and `"%USERPROFILE%\\x"`.

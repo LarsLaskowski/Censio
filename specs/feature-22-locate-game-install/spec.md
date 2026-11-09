@@ -36,8 +36,9 @@ The menu line is greyed out like `Last tick:`. Each case below also logs one war
 settings file the folder or the file as written there.
 
 - E1: The folder in the settings file does not exist: `Game: folder in settings not found`.
-- E2: The folder in the settings file is not a full path (relative, a bare drive letter, or with environment variables
-  such as `%USERPROFILE%`, which are not expanded): `Game: folder in settings is not a full path`.
+- E2: The folder in the settings file is not a full path (relative, a bare drive letter, or starting with an
+  environment variable such as `%USERPROFILE%`): `Game: folder in settings is not a full path`. Variables are never
+  expanded; one inside a full path is taken literally (usually E1).
 - E3: The folder in the settings file exists but is not an installation (for example the player named `maindata`
   itself or the folder of the game's program file): `Game: folder in settings is not an Anno 117 installation`. The
   warning names what is expected: the folder that holds `maindata\config.rda` and `bin\win64\anno117.exe`.
