@@ -29,9 +29,9 @@ Companion runs counts only after a restart.
      searched one. An invalid settings file is reported in the same way (`SettingsFileInvalid`). No file, a blank
      value or no `gameFolder` key means no folder, and the search goes on.
 2. **Ubisoft Connect's records.** The subkeys of `HKLM\SOFTWARE\WOW6432Node\Ubisoft\Launcher\Installs` (read in the
-   32-bit view, read-only), one per Ubisoft game, each named by a number with a string value `InstallDir` (for
+   32-bit view, read-only), one per Ubisoft game, each named by a number with a plain string value (`REG_SZ`) `InstallDir` (for
    example `E:/Anno 117 - Pax Romana/`, forward slashes and a trailing slash as Ubisoft Connect writes it). A value
-   that is not a string, is missing or cannot be read counts as no folder; the value is not expanded. The records are
+   of any other kind (an expandable string included), a missing value or one that cannot be read counts as no folder. The records are
    tried in the order of their numbers compared as numbers (`921` before `4553`), names that are not only ASCII digits
    after them in ordinal order. The first record whose `InstallDir` is a full path, is no UNC or device path and is an
    installation is found, with the source *Ubisoft Connect*; any other record is skipped. A registry that cannot be
