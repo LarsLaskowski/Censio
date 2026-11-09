@@ -107,9 +107,10 @@ upload) needs a catalog to start from.
   fixture: all 284 non-zero GUIDs are assets of `assets.xml` — the 3 regions are session assets that point to a
   region asset, the goods and workforce are product assets (workforce marked as such), the buildings are assets with a
   building section — and every one has a text identifier with a non-empty English and German text. No asset GUID is
-  defined twice and no file has a document type declaration. The patch-archive question the Product Manager left
-  open; the Lead decided E8 (build from `config.rda`, report other copies), and the plan records the residual risk
-  and the remaining unverified layout points in its decision record.
+  defined twice and no file has a document type declaration. Patch archives: the Product Manager saw no asset or
+  `texts_*.xml` file in them, everything seems to be in `config.rda`. Should a later installation carry a copy, the
+  Lead's documented precedence is E8 (build from `config.rda`, report the other copy); the plan records this and the
+  remaining unverified layout points as residual risk in its decision record.
 - Q3: May AC1 exclude GUID `0`? Answered: yes, by the Product Manager — `0` means "none", is never looked up and never
   reported as unknown.
 - Q4: Where is the catalog built? Answered: in the Companion from the local installation (record 0023), with the
