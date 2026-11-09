@@ -39,7 +39,7 @@ hosts that run a Companion. The server speaks plain HTTP only: terminate TLS at 
 
 The following are considered in scope for vulnerability reports:
 
-- Parsing of the Anno 117 statistics pipe and of game files (Companion)
+- Parsing of the Anno 117 statistics pipe and of game files (Companion), of the Companion's settings file `%LOCALAPPDATA%\Censio\settings.json` and of Ubisoft Connect's install records in the registry (both read only; a UNC game folder the player names in the settings file is probed over the network)
 - The Companion's local connection to the statistics pipe `\\.\pipe\anno117` (read-only, impersonation level identification)
 - The WebSocket ingest and its token (server)
 - The server's HTTP endpoints (start page, `/health`, the Blazor hub)

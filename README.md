@@ -102,7 +102,7 @@ Then check `http://localhost:8080/health` (`Healthy`) and `http://localhost:8080
 The Companion is the Windows program that reads the statistics of the running game. Download `Censio-<version>-win-x64.zip` from the release page `https://github.com/LarsLaskowski/Censio/releases` (under *Assets* of the release). It needs Windows 10 22H2 or Windows 11, 64-bit; it needs no installed .NET, no installer and no administrator rights. Not yet tried: the ZIP of `v0.1.0` on a machine without .NET.
 
 1. Extract the ZIP to a folder of your choice. It holds one file, `Censio.Companion.exe`.
-2. Start `Censio.Companion.exe`. A tray icon appears; its menu shows the status, the last tick, `Open diagnostics`, `Start recording`, `Open recordings folder`, `Open log folder`, `Start with Windows`, `Version <version>` and `Exit`.
+2. Start `Censio.Companion.exe`. A tray icon appears; its menu shows the status, the last tick, the game installation (`Game: build <build> (Ubisoft Connect)`, found without any setting), `Open diagnostics`, `Start recording`, `Open recordings folder`, `Open log folder`, `Start with Windows`, `Version <version>` and `Exit`.
 
 The program is not signed, so Windows SmartScreen may show "Windows protected your PC" the first time. Choose "More info", then "Run anyway" (on a German Windows: "Weitere Informationen", then "Trotzdem ausführen"). Tip reported by the Product Manager from a German Windows, not tried against a real release download: open the properties of the extracted `Censio.Companion.exe` (or of the ZIP itself), tick *Zulassen* (on an English Windows probably *Unblock*; not yet tried) and apply; SmartScreen then does not ask.
 
@@ -141,7 +141,19 @@ The folder `publish` then holds only `Censio.Companion.exe`. Start it on Windows
 | `Censio:DataDirectory` | `CENSIO__DATADIRECTORY` | unset outside the Docker image, `/config` in the image | Absolute path of the server's data directory; it holds the data-protection keys in `data-protection-keys`. |
 | `ASPNETCORE_HTTP_PORTS` | `ASPNETCORE_HTTP_PORTS` | `8080` in the Docker image; outside it the server listens on `http://localhost:5000` | Port the server listens on inside the Docker image. |
 
-The Companion has no settings yet.
+The Companion has one optional setting, in the file `%LOCALAPPDATA%\Censio\settings.json`. It is read once at start and never written by the Companion; create it by hand only if the menu does not show your game (`Game: not found`), for example for a Steam copy:
+
+```json
+{
+  "gameFolder": "C:\\Games\\Anno 117"
+}
+```
+
+| Setting | Meaning |
+| ------- | ------- |
+| `gameFolder` | The folder of your Anno 117 installation: the one that holds `maindata\config.rda` and `bin\win64\anno117.exe`. Write a full path and double every backslash (`C:\\Games\\Anno 117`), or use forward slashes. Variables such as `%USERPROFILE%` are not expanded. Without the setting the Companion looks in Ubisoft Connect's records and its default games folder. |
+
+The key is read ignoring case, comments and trailing commas are accepted. A wrong folder or a file that cannot be read shows its reason in the menu line `Game: …` and in the log; the [user guide](docs/USER_GUIDE.md#game-installation) lists every text.
 
 ## User guide
 
@@ -255,7 +267,7 @@ Dann `http://localhost:8080/health` (`Healthy`) und `http://localhost:8080/` wie
 Der Companion ist das Windows-Programm, das die Statistik des laufenden Spiels liest. `Censio-<version>-win-x64.zip` von der Release-Seite `https://github.com/LarsLaskowski/Censio/releases` herunterladen (beim Release unter *Assets*). Er braucht Windows 10 22H2 oder Windows 11, 64 Bit; er braucht kein installiertes .NET, keinen Installer und keine Administratorrechte. Noch nicht ausprobiert: das ZIP von `v0.1.0` auf einem Rechner ohne .NET.
 
 1. Das ZIP in einen beliebigen Ordner entpacken. Es enthält eine Datei, `Censio.Companion.exe`.
-2. `Censio.Companion.exe` starten. Ein Tray-Symbol erscheint; sein Menü zeigt den Status, den letzten Tick, `Open diagnostics`, `Start recording`, `Open recordings folder`, `Open log folder`, `Start with Windows`, `Version <version>` und `Exit`.
+2. `Censio.Companion.exe` starten. Ein Tray-Symbol erscheint; sein Menü zeigt den Status, den letzten Tick, die Spielinstallation (`Game: build <build> (Ubisoft Connect)`, ohne jede Einstellung gefunden), `Open diagnostics`, `Start recording`, `Open recordings folder`, `Open log folder`, `Start with Windows`, `Version <version>` und `Exit`.
 
 Das Programm ist nicht signiert, deshalb zeigt Windows SmartScreen beim ersten Start unter Umständen „Der Computer wurde durch Windows geschützt“. „Weitere Informationen“ wählen, dann „Trotzdem ausführen“ (unter englischem Windows: "More info", "Run anyway"). Tipp, vom Product Manager unter deutschem Windows gemeldet und noch nicht an einem echten Release-Download ausprobiert: die Eigenschaften der entpackten `Censio.Companion.exe` (oder des ZIP selbst) öffnen, *Zulassen* ankreuzen (unter englischem Windows vermutlich *Unblock*; noch nicht ausprobiert) und übernehmen; SmartScreen fragt dann nicht.
 
@@ -294,7 +306,19 @@ Der Ordner `publish` enthält danach nur `Censio.Companion.exe`. Unter Windows s
 | `Censio:DataDirectory` | `CENSIO__DATADIRECTORY` | außerhalb des Docker-Images nicht gesetzt, im Image `/config` | Absoluter Pfad des Datenverzeichnisses des Servers; es enthält die Data-Protection-Schlüssel in `data-protection-keys`. |
 | `ASPNETCORE_HTTP_PORTS` | `ASPNETCORE_HTTP_PORTS` | `8080` im Docker-Image; außerhalb lauscht der Server auf `http://localhost:5000` | Port, auf dem der Server im Docker-Image lauscht. |
 
-Der Companion hat noch keine Einstellungen.
+Der Companion hat eine optionale Einstellung, in der Datei `%LOCALAPPDATA%\Censio\settings.json`. Sie wird einmal beim Start gelesen und vom Companion nie geschrieben; von Hand nur anlegen, wenn das Menü Ihr Spiel nicht zeigt (`Game: not found`), zum Beispiel bei einer Steam-Kopie:
+
+```json
+{
+  "gameFolder": "C:\\Games\\Anno 117"
+}
+```
+
+| Einstellung | Bedeutung |
+| ----------- | --------- |
+| `gameFolder` | Der Ordner Ihrer Anno-117-Installation: der, der `maindata\config.rda` und `bin\win64\anno117.exe` enthält. Einen vollständigen Pfad schreiben und jeden Backslash verdoppeln (`C:\\Games\\Anno 117`) oder Schrägstriche verwenden. Variablen wie `%USERPROFILE%` werden nicht aufgelöst. Ohne die Einstellung sucht der Companion in den Einträgen von Ubisoft Connect und in dessen Standard-Spieleordner. |
+
+Der Schlüssel wird ohne Beachtung der Groß- und Kleinschreibung gelesen, Kommentare und nachgestellte Kommas sind erlaubt. Ein falscher Ordner oder eine nicht lesbare Datei zeigt ihren Grund in der Menüzeile `Game: …` und im Log; das [Benutzerhandbuch](docs/USER_GUIDE.md#spielinstallation) listet jeden Text.
 
 ## Benutzerhandbuch
 

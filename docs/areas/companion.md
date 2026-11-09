@@ -4,7 +4,7 @@
 
 The Companion process on Windows: its tray icon, tooltip and menu, how it exits, how many instances run, the
 version it shows, its command line (recording the pipe and replaying a recording), starting and stopping a recording
-from the menu, the optional start with Windows, the diagnostics window with the last tick, the folders it opens, its log file, and the release ZIP it ships in. The user who starts the Companion relies on it.
+from the menu, the optional start with Windows, the diagnostics window with the last tick, the game installation line, the folders it opens, its settings file, its log file, and the release ZIP it ships in. The user who starts the Companion relies on it.
 
 ## Behavior
 
@@ -31,10 +31,15 @@ from the menu, the optional start with Windows, the diagnostics window with the 
   (*problem*) for `Protocol mismatch`, `Error` and an invalid command line. In a replay the icon follows the replayed
   state, shows *waiting* after `Replay finished` and *problem* after `Replay error`.
 - The context menu holds, top to bottom: `Status: <status text>` (greyed out), `Last tick: <time>, <n> islands` or
-  `Last tick: none` (greyed out), a separator, `Open diagnostics`, `Start recording` or `Stop recording`, `Open recordings folder`, `Open
+  `Last tick: none` (greyed out), `Game: <state>` (greyed out), a separator, `Open diagnostics`, `Start recording` or `Stop recording`, `Open recordings folder`, `Open
   log folder`, a separator, `Start with Windows` (checked while the autostart is on, enabled in every mode), a separator, `Version <version>` (greyed out, nothing happens on click), a separator and `Exit`. The
   values are current each time the menu opens. `Open diagnostics` is enabled in every mode (live, `--record`, replay and an invalid command line); `Start recording` is greyed out in a replay and with an invalid command
   line. The menu is light, also with Windows in dark mode.
+- The `Game:` entry shows the state of the search for the game installation: `Game: searching`, `Game: build <build>
+  (Ubisoft Connect)` or `(settings file)`, `Game: not found`, `Game: folder in settings not found`, `Game: folder in
+  settings is not a full path`, `Game: folder in settings is not an Anno 117 installation` or `Game: settings file
+  invalid`. The search, its order and the texts are in [`game-installation.md`](game-installation.md); it runs in the
+  background in every mode and the menu never waits for it. The diagnostics window does not show the line.
 - `<version>` is the informational version the Companion was built with: `0.0.0` without a version, otherwise
   the build property `Version` exactly as passed.
 - `Exit` removes the icon at once and ends the process with exit code 0 within 2 seconds in every connection state;
@@ -146,6 +151,24 @@ sent it: GUIDs are raw numbers until names and icons exist.
 - Moving the exe, or starting a new version from another folder, leaves the old command behind; the entry then shows unchecked. To remove it, start any copy of the exe and click the entry (it replaces the stale command with this exe's), then click it again (it deletes the value), or delete the value under the key above in the Registry Editor; switching it off in Windows' startup apps list does not delete it.
 - Turning it on and off is logged (*Log*). The Companion does not read or change the switch of Windows' startup apps list (`Settings > Apps > Startup`): a value switched off there is still checked in the menu, and the player switches it on again in that list.
 
+### Settings file
+
+- The Companion reads the optional file `%LOCALAPPDATA%\Censio\settings.json` once per start, for the game folder
+  ([`game-installation.md`](game-installation.md)). The path is fixed and the file is never written, created or
+  repaired by the Companion; a missing file, or a path that is not a full path, is no error. A change counts after a
+  restart.
+- The file is UTF-8 JSON whose root is an object. A leading byte order mark, `//` and `/* */` comments and trailing
+  commas are accepted. The key `gameFolder` is matched ignoring case (`GameFolder`); every other key, and a
+  `gameFolder` nested in another object, is ignored so that later settings can share the file. The value is used as
+  written, without expanding variables; a blank text counts as no game folder.
+- It is invalid, with the menu text `Game: settings file invalid`, when it is larger than 1 MiB (1,048,576 bytes,
+  judged on the raw bytes, and only that many plus one are read), is not valid JSON or not an object, when
+  `gameFolder` is not a text (a number, `null`, a boolean, an object, an array), when the key occurs more than once
+  (also in different case), or when it cannot be read (locked, access denied, a folder of that name). A name that
+  cannot be decoded (invalid UTF-8 or a lone surrogate) makes the whole file invalid, even under an unknown key;
+  invalid bytes in a comment or in another key's value are accepted.
+- The reason is logged as a warning (*Log*); no automatic search follows an invalid file.
+
 ### Log
 
 - The Companion writes a log to `%LOCALAPPDATA%\Censio\Logs\companion-<yyyyMMdd>.log` (the local date). The folder
@@ -162,7 +185,7 @@ sent it: GUIDs are raw numbers until names and icons exist.
 - It logs: the start with the version and the mode (`Normal`, `Record`, `Replay`, `Invalid`); each change of the
   connection state with the error kind, the Windows error code and the received version (only changes, never a line
   per skipped frame); recording started and stopped at the click, its file name (the name only) when the file is
-  created, a recording failure and the failure of a stopped recording; a replay's start (the file name only), its
+  created, a recording failure and the failure of a stopped recording; the result of the game installation search at every start (found with its source, build and folder, or the warning of its failure; [`game-installation.md`](game-installation.md), *Log*), where the folder and the settings file path are logged as written and may hold the Windows user name; a replay's start (the file name only), its
   end and its problem reason; a folder that could not be opened; the autostart turned on (`Autostart enabled`) or off (`Autostart disabled`) and, as warnings, `Could not read the autostart setting` (once until a read succeeds again, so a blocked registry does not log at every menu opening) and `Could not change the autostart setting`, with the exception where there is one and never the exe path; an unexpected error of a background task; and `Exit`.
 - The log holds no pipe content (figure name, island names, values): recording files and folders are logged by name only.
 - Text that came from outside (a replay file name, exception texts) is sanitized: each control character, format
@@ -208,6 +231,7 @@ sent it: GUIDs are raw numbers until names and icons exist.
 - The Companion shows no error message or dialog; a connection problem shows only as a status text, a recording
   problem as `(recording failed)`, a replay problem as `Replay error`, and details go to the log (*Log*).
 - A folder that cannot be opened, or a log that cannot be written, changes nothing else and shows no message.
+- A game folder that is missing or wrong, or a settings file that cannot be used, shows only as the `Game:` line of the menu, with the detail in the log.
 - A read failure (access denied, a policy, a value that is not a string): the entry is shown unchecked and stays clickable, and `Could not read the autostart setting` is logged once until a read succeeds again. If the value cannot be written or deleted, a click changes nothing, `Could not change the autostart setting` is logged and the player gets no message; the next opening shows the state read then. A policy that stops Windows from starting the user's startup programs while the value can still be written is not visible: the menu shows the state of the value only. A switch-off in Windows' startup apps list is not read: the entry stays checked while Windows does not start the Companion, and the player switches it on in that list; a click deletes the value, and a later click writes it again with Windows' switch-off still in place. An exe started from inside the ZIP runs from a temporary folder, so the entry registers that path and nothing starts at sign-in once Windows cleans the folder.
 - Manual runs on Windows confirmed the behavior above (issues #13, #14 and #15, and the Product Manager's run on
   Windows 11 26H2 with the real game). Not verified yet: that the menu stays light with Windows in dark mode, that the
@@ -226,9 +250,14 @@ sent it: GUIDs are raw numbers until names and icons exist.
 - [`decisions/0037-companion-log-through-the-logging-abstraction-to-own-rotating-file.md`](../decisions/0037-companion-log-through-the-logging-abstraction-to-own-rotating-file.md) — the Companion logs through .NET's logging abstraction into its own rotating text file.
 - [`decisions/0038-diagnostics-window-flat-table-of-rows-made-on-demand.md`](../decisions/0038-diagnostics-window-flat-table-of-rows-made-on-demand.md) — the diagnostics window is a flat table whose rows are made on demand from the latest tick, kept whole.
 
+- [`decisions/0044-game-installation-found-through-ubisoft-connect-or-the-settings-file.md`](../decisions/0044-game-installation-found-through-ubisoft-connect-or-the-settings-file.md) — the installation comes from Ubisoft Connect or the settings file.
+- [`decisions/0045-companion-settings-in-a-json-file-under-local-app-data.md`](../decisions/0045-companion-settings-in-a-json-file-under-local-app-data.md) — the settings are a hand-edited JSON file, never written by the Companion.
+- [`decisions/0046-game-build-is-the-program-files-version.md`](../decisions/0046-game-build-is-the-program-files-version.md) — the build is the program file's version.
+
 ## Not here
 
 - Reading the statistics pipe and assembling ticks: [`pipe.md`](pipe.md).
 - Opening the pipe, the connection states and the retry rules: [`pipe-connection.md`](pipe-connection.md).
 - The recording file, its writing and failures, and the replay rules: [`pipe-recording.md`](pipe-recording.md).
-- Reading the game files, the connection to the server, settings (later issues).
+- Finding the game installation: [`game-installation.md`](game-installation.md).
+- Reading the game files, the connection to the server, a settings window (later issues).

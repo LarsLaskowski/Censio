@@ -21,9 +21,9 @@ except the Windows shell:
 | `Censio.GameData` | Reading the game files (the RDA archives) and the catalog ([`areas/game-files.md`](areas/game-files.md)) | — |
 | `Censio.Server.Data` | Persistence of the server | — |
 | `Censio.Server` | Web host, UI, later the ingest | Contracts, Server.Data |
-| `Censio.Companion.Core` | The Companion's platform-neutral logic (tray menu and snapshot, single-instance rule, pipe connection state machine, command line, recording session and replay runner, tooltip texts, diagnostics window content and session, the log file writer, the autostart rules) | Contracts, Pipe, GameData |
+| `Censio.Companion.Core` | The Companion's platform-neutral logic (tray menu and snapshot, single-instance rule, pipe connection state machine, command line, recording session and replay runner, tooltip texts, diagnostics window content and session, the log file writer, the autostart rules, the game installation search and the settings file) | Contracts, Pipe, GameData |
 | `Censio.Anonymiser` | Contributor console tool that anonymises a recording; not released ([`areas/pipe-recording.md`](areas/pipe-recording.md), *Anonymising*) | Pipe |
-| `Censio.Companion` | The Windows tray shell (WPF application, Windows Forms tray icon, the diagnostics window, the registry store of the autostart value); no test project | Companion.Core |
+| `Censio.Companion` | The Windows tray shell (WPF application, Windows Forms tray icon, the diagnostics window, the registry store of the autostart value, the registry reader of Ubisoft Connect's install records and the file version reader); no test project | Companion.Core |
 
 All assemblies carry the version of the build property `Version` (default `0.0.0`) as informational version
 ([`decisions/0005`](decisions/0005-product-version-from-one-build-property.md)). What each component does is in
@@ -55,17 +55,18 @@ A contributor can turn such a file into an anonymised copy with `Censio.Anonymis
 The Companion logs through .NET's logging abstraction into its own rotating text file in the local app data folder
 ([`decisions/0037`](decisions/0037-companion-log-through-the-logging-abstraction-to-own-rotating-file.md),
 [`areas/companion.md`](areas/companion.md)).
+Once per start the Companion looks for the game installation in the background: the folder named in its settings file, else Ubisoft Connect's install records and default games folder, and shows the result and the program file's version as the build in the tray menu ([`decisions/0044`](decisions/0044-game-installation-found-through-ubisoft-connect-or-the-settings-file.md), [`decisions/0046`](decisions/0046-game-build-is-the-program-files-version.md), [`areas/game-installation.md`](areas/game-installation.md)).
 The server accepts data only from a client that presents the ingest token. Guarantees are listed in
 `.squad/project.md` (*Guarantees*) and linked to their decision record as they are made.
 
 ## Configuration
 
 Configuration (server address, data directory, ingest token, cache and recording paths) comes from files and environment
-variables and is validated at startup. The rules per area are in [`areas/`](areas/README.md).
+variables and is validated at startup. The Companion's one setting, the game folder, is the optional file `%LOCALAPPDATA%\Censio\settings.json`, hand-edited and never written by the Companion ([`decisions/0045`](decisions/0045-companion-settings-in-a-json-file-under-local-app-data.md), [`areas/companion.md`](areas/companion.md), *Settings file*). The rules per area are in [`areas/`](areas/README.md).
 
 ## Security model
 
-Untrusted input: the statistics pipe, the game files and the WebSocket ingest. The ingest token authenticates the
+Untrusted input: the statistics pipe, the game files, the Companion's settings file, Ubisoft Connect's install records and the WebSocket ingest. The ingest token authenticates the
 Companion; cache and recording paths are never derived from external input unchecked. Kept in sync with
 `SECURITY.md` and the *Security areas* in `.squad/project.md`.
 
@@ -77,6 +78,8 @@ The game's RDA archives, found under a caller-named installation folder, are ope
 and read within the reader's limits on blocks, entries and sizes; what the reader finds comes back as typed results,
 never as exceptions, and no archive content leaves the machine ([`areas/game-files.md`](areas/game-files.md),
 record 0043).
+
+The settings file and Ubisoft Connect's install records are read only, within a 1 MiB bound for the file, into typed results that fail closed; no UNC or device path written in a record is followed, and a UNC folder the player writes in the settings file is probed over the network as the player's own choice ([`areas/game-installation.md`](areas/game-installation.md), record 0044).
 
 The server speaks plain HTTP only; TLS is the reverse proxy's job. Its start page and `/health` need no login, and
 `/health` reveals only its status ([`decisions/0006`](decisions/0006-server-plain-http-and-open-health.md),

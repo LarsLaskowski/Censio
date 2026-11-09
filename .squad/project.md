@@ -22,12 +22,12 @@ limits, patterns or sequences.
 - Network exposure: the server's listener and its routes reachable without login (`/`, `/health`, the Blazor hub, static assets) in `src/Censio.Server/Program.cs` and `src/Censio.Server/Dockerfile` — [server](../docs/areas/server.md).
 - Data-protection key ring: `DataProtectionSetup` under the data directory — [server](../docs/areas/server.md), *Data directory and key ring*.
 - Local pipe connection: `NamedPipeConnector` and `PipeEndpoint` open the game's pipe read-only at identification level — [pipe-connection](../docs/areas/pipe-connection.md), *Opening*.
-- Parsing of external input: the pipe stream (`PipeFrameReader`, `PipeMessageParser`, `PipeTickAssembler`), recording files (`PipeReplayStream`, `PipeRecordingReader`, `PipeRecordingFormat`, `PipeRecordingAnonymiser`), the game archives (`RdaArchive`, `RdaInstallationSurvey`), later WebSocket messages — [pipe](../docs/areas/pipe.md), [pipe-recording](../docs/areas/pipe-recording.md), [game-files](../docs/areas/game-files.md).
-- File paths the Companion writes, prunes or opens: the recordings folder (`PipeRecordingFiles`), the log folder (`CompanionFolders`, `LogFileLoggerProvider`, `LogFileNames`), Explorer (`FolderOpener`), the replay file from the command line, the anonymiser's output and temporary file from its command line (`AnonymiserCommand`), the game archives under the installation folder (`RdaArchive`, `RdaInstallationSurvey`, opened read-only), later the cache — [companion](../docs/areas/companion.md) (*Recording*, *Folders*, *Log*), [pipe-recording](../docs/areas/pipe-recording.md) (*Anonymising*), [game-files](../docs/areas/game-files.md).
+- Parsing of external input: the pipe stream (`PipeFrameReader`, `PipeMessageParser`, `PipeTickAssembler`), recording files (`PipeReplayStream`, `PipeRecordingReader`, `PipeRecordingFormat`, `PipeRecordingAnonymiser`), the game archives (`RdaArchive`, `RdaInstallationSurvey`), the Companion's settings file (`CompanionSettings`), Ubisoft Connect's install records (`RegistryUbisoftInstallRecords`, `GameInstallationSearch`), later WebSocket messages — [pipe](../docs/areas/pipe.md), [pipe-recording](../docs/areas/pipe-recording.md), [game-files](../docs/areas/game-files.md), [game-installation](../docs/areas/game-installation.md), [companion](../docs/areas/companion.md) (*Settings file*).
+- File paths the Companion writes, prunes or opens: the recordings folder (`PipeRecordingFiles`), the log folder (`CompanionFolders`, `LogFileLoggerProvider`, `LogFileNames`), Explorer (`FolderOpener`), the replay file from the command line, the anonymiser's output and temporary file from its command line (`AnonymiserCommand`), the game archives under the installation folder (`RdaArchive`, `RdaInstallationSurvey`, opened read-only), the settings file (`CompanionFolders.Settings`, `CompanionSettings`, read-only) and the installation probes and program file (`GameInstallation`, `WindowsFileVersionReader`, read-only), later the cache — [companion](../docs/areas/companion.md) (*Recording*, *Folders*, *Log*, *Settings file*), [pipe-recording](../docs/areas/pipe-recording.md) (*Anonymising*), [game-files](../docs/areas/game-files.md), [game-installation](../docs/areas/game-installation.md).
 - Windows autostart: `CompanionAutostart` over `RegistryStartupEntryStore`, the per-user Run value — [companion](../docs/areas/companion.md), *Start with Windows*.
-- Logging and showing external data: the Companion's log writer (`LogLine`, `LogFileLoggerProvider`, `CompanionLog`), the diagnostics window, the pipe's error results, the server's request logging — [companion](../docs/areas/companion.md) (*Log*, *Diagnostics window*), [pipe](../docs/areas/pipe.md), [server](../docs/areas/server.md).
+- Logging and showing external data: the Companion's log writer (`LogLine`, `LogFileLoggerProvider`, `CompanionLog`), the diagnostics window, the pipe's error results, the game folder in `CompanionLog`, the server's request logging — [companion](../docs/areas/companion.md) (*Log*, *Diagnostics window*), [pipe](../docs/areas/pipe.md), [server](../docs/areas/server.md).
 - Release publishing: `.github/workflows/release.yml` and `notify-website.yml`, their secrets in the environment `release`, Docker Hub `latest` — [record 0012](../docs/decisions/0012-release-pre-release-first-and-secret-free-builds.md), `docs/CONTRIBUTING.md` (*Versioning and releases*), [server](../docs/areas/server.md) (*Docker image*).
-- Outbound calls: none exist; the first one is a new security area.
+- Outbound calls: no call to a server exists; the first one is a new security area. A UNC folder the player names in the settings file is probed over the network (SMB) as written — [game-installation](../docs/areas/game-installation.md), *Folders from outside*.
 
 ## Guarantees
 
@@ -45,15 +45,15 @@ What the Reviewer checks when the diff introduces or changes a thing of this kin
 change with it.
 
 **A new or changed configuration option** touches:
-- the key and its validation: `Censio:DataDirectory` in `DataProtectionSetup`; the Companion's switches in `CompanionCommandLine`
+- the key and its validation: `Censio:DataDirectory` in `DataProtectionSetup`; the Companion's switches in `CompanionCommandLine`; the option `gameFolder` in `CompanionSettings`
 - registration and binding: `src/Censio.Server/Program.cs`, `src/Censio.Companion/App.xaml.cs`
 - the defaults: `src/Censio.Server/appsettings.json` and the `ENV` lines of `src/Censio.Server/Dockerfile`
 - the configuration table in `README.md` (key, environment variable, default; English, then German) and the user guide
 - the area document that states the option: `docs/areas/server.md` or `docs/areas/companion.md` (*Command line*)
-- the tests that pin it: `DataProtectionSetupTests`, `ProgramTests`, `CompanionCommandLineTests`
+- the tests that pin it: `DataProtectionSetupTests`, `ProgramTests`, `CompanionCommandLineTests`, `CompanionSettingsTests`
 
 **A new or changed service / module** touches:
-- its interface where platform-neutral logic meets Windows: `IPipeConnector`, `IStartupEntryStore`, `IDiagnosticsWindow` in `Censio.Companion.Core`
+- its interface where platform-neutral logic meets Windows: `IPipeConnector`, `IStartupEntryStore`, `IDiagnosticsWindow`, `IUbisoftInstallRecords`, `IFileVersionReader` in `Censio.Companion.Core`
 - registration and lifetime: `Program.cs` (server) or `App.xaml.cs` (Companion)
 - the fake or stub in the test project (*Test doubles* below)
 - the project table in `docs/ARCHITECTURE.md` and the area document in `docs/areas/`
