@@ -1528,6 +1528,65 @@ public sealed class GameCatalogReaderTests
     }
 
     /// <summary>
+    /// Empty <c>DefaultValues</c> and <c>DefaultContainerValues</c> elements state no default.
+    /// </summary>
+    /// <param name="properties">The property file</param>
+    [TestMethod]
+    [TestCategory("AC1")]
+    [DataRow("<Properties><Groups><Group><DefaultValues /><Name>Session</Name></Group></Groups></Properties>")]
+    [DataRow("<Properties><Groups><Group><DefaultContainerValues /><Name>Session</Name></Group></Groups></Properties>")]
+    [DataRow("<Properties><Groups><Group><DefaultValues /><DefaultContainerValues /></Group></Groups></Properties>")]
+    public void GameCatalogReaderReadLeavesRegionTypeUnstatedForEmptyDefaultElements(string properties)
+    {
+        // Arrange
+        var assets = Assets(RegionAssetWithoutRegionId(5, 1000, "Region"), Session(6, "SessionModerate", 5, 1000));
+
+        // Act
+        var catalog = ReadCatalogWithDefaults(DataSets("Zorlan"), assets, properties, Templates(Template("Region", "<Region><Kontor>1</Kontor></Region>")));
+
+        // Assert
+        var entry = catalog.Find(6);
+
+        Assert.IsNotNull(entry, "The session should be an entry");
+        Assert.IsNull(entry.RegionTypes, "An empty default element should state no region type");
+    }
+
+    /// <summary>
+    /// A text node and an empty part next to the <c>Region</c> default in <c>DefaultValues</c> change nothing.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC1")]
+    public void GameCatalogReaderReadSkipsTextAndEmptyPartsInDefaultValues()
+    {
+        // Arrange
+        var assets = Assets(RegionAssetWithoutRegionId(5, 1000, "Region"), Session(6, "SessionModerate", 5, 1000));
+        var properties = "<Properties><Groups><Group><DefaultValues>text<Other /><Region><RegionID>Zorlan</RegionID></Region></DefaultValues><Name>Session</Name></Group></Groups></Properties>";
+
+        // Act
+        var catalog = ReadCatalogWithDefaults(DataSets("Zorlan"), assets, properties, Templates(Template("Region", "<Region />")));
+
+        // Assert
+        Assert.AreSequenceEqual(["Zorlan"], catalog.Find(6)?.RegionTypes, "The Region default should still be read next to a text node and an empty part");
+    }
+
+    /// <summary>
+    /// An empty <c>Template</c> element is ignored and does not hide the templates next to it.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC1")]
+    public void GameCatalogReaderReadIgnoresEmptyTemplateElement()
+    {
+        // Arrange
+        var assets = Assets(RegionAssetWithoutRegionId(5, 1000, "Region"), Session(6, "SessionModerate", 5, 1000));
+
+        // Act
+        var catalog = ReadCatalogWithDefaults(DataSets("Zorlan", "Yultic"), assets, Properties(RegionDefault("Zorlan")), Templates("<Template />", Template("Region", RegionDefault("Yultic"))));
+
+        // Assert
+        Assert.AreSequenceEqual(["Yultic"], catalog.Find(6)?.RegionTypes, "The template after an empty Template element should still be read");
+    }
+
+    /// <summary>
     /// A region asset whose template has no <c>Region</c> property, or is not listed, takes no default.
     /// </summary>
     /// <param name="listed">Whether the template is listed without a <c>Region</c> property</param>
