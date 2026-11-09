@@ -142,8 +142,8 @@ construction: no test project loads that assembly, so the *Coverage gate* counts
 - Guards an analyzer asks for (e.g. `if (_logger.IsEnabled(...))` for CA1873) are written by the Dev,
   not added later by the Code Officer.
 - Names the analyzers refuse, checked by the Lead before a name goes into the plan's *Signatures*: an enum
-  whose name ends in `Flags` or `Enum` (S2344), a visible nested type (CA1034), a type named like its
-  namespace (CA1724).
+  whose name ends in `Flags` or `Enum` (S2344), and a nested type of any
+  visibility (RH2101 class, RH2104 struct, RH2105 interface, RH2106 record, RH2107 enum, RH2108 delegate).
 
 ## Logger arguments
 
