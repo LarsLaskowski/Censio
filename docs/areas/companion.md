@@ -31,7 +31,7 @@ from the menu, the optional start with Windows, the diagnostics window with the 
   (*problem*) for `Protocol mismatch`, `Error` and an invalid command line. In a replay the icon follows the replayed
   state, shows *waiting* after `Replay finished` and *problem* after `Replay error`.
 - The context menu holds, top to bottom: `Status: <status text>` (greyed out), `Last tick: <time>, <n> islands` or
-  `Last tick: none` (greyed out), `Game: <state>` (greyed out), a separator, `Open diagnostics`, `Start recording` or `Stop recording`, `Open recordings folder`, `Open
+  `Last tick: none` (greyed out), `Game: <state>` (greyed out), `Catalog: <state>` (greyed out), a separator, `Open diagnostics`, `Start recording` or `Stop recording`, `Open recordings folder`, `Open
   log folder`, a separator, `Start with Windows` (checked while the autostart is on, enabled in every mode), a separator, `Version <version>` (greyed out, nothing happens on click), a separator and `Exit`. The
   values are current each time the menu opens. `Open diagnostics` is enabled in every mode (live, `--record`, replay and an invalid command line); `Start recording` is greyed out in a replay and with an invalid command
   line. The menu is light, also with Windows in dark mode.
@@ -40,6 +40,11 @@ from the menu, the optional start with Windows, the diagnostics window with the 
   settings is not a full path`, `Game: folder in settings is not an Anno 117 installation` or `Game: settings file
   invalid`. The search, its order and the texts are in [`game-installation.md`](game-installation.md); it runs in the
   background in every mode and the menu never waits for it. The diagnostics window does not show the line.
+- The `Catalog:` entry, directly below `Game:`, shows the build of the game catalog ([`game-catalog.md`](game-catalog.md)):
+  `Catalog: reading` (also while the game search runs), `Catalog: <n> entries` (`n` in decimal digits without grouping,
+  also `1 entries`), `Catalog: no game` (the search found no installation, or ended in a settings error) or `Catalog:
+  failed`. The catalog is built in the background at every start in every mode, the invalid command line included,
+  and neither the menu, the connection, the diagnostics window nor `Exit` waits for it.
 - `<version>` is the informational version the Companion was built with: `0.0.0` without a version, otherwise
   the build property `Version` exactly as passed.
 - `Exit` removes the icon at once and ends the process with exit code 0 within 2 seconds in every connection state;
@@ -105,7 +110,7 @@ described in the other sections.
 
 `Open diagnostics` opens one window, titled `Censio Companion: Diagnostics`, with the latest closed tick (record
 [0038](../decisions/0038-diagnostics-window-flat-table-of-rows-made-on-demand.md)). It shows every value as the game
-sent it: GUIDs are raw numbers until names and icons exist.
+sent it: GUIDs are raw numbers where the catalog has no name for them, and icons do not exist yet.
 
 - **Header**, top to bottom: `Status: <status text>`; `Last tick: <time>, <n> islands` or `Last tick: none`, exactly the
   text of the menu entry of the same name (*Tray icon and menu*); and, once a tick exists, `Game time: <game time>`, with
@@ -120,6 +125,11 @@ sent it: GUIDs are raw numbers until names and icons exist.
 - **Numbers** are culture-independent, also on a German Windows: integers in decimal with a leading `-` when negative,
   floats with the decimal point `.`, no digit grouping, as the shortest text that reads back as the same 32-bit value
   (`0.1`, `-2.5`, `1E+38`), negative zero as `-0`, and `NaN`, `Infinity`, `-Infinity`.
+- **Catalog names:** once the catalog is ready, the `Region` and `Good` cells of a GUID the catalog names read `<English
+  name> / <German name> (<GUID>)`; with one name only (an incomplete entry) `<name> (<GUID>)`. A GUID the catalog cannot
+  name (unknown, nameless, ambiguous), GUID `0` and every cell while no catalog is ready show the bare number. The names
+  pass the rule of the log (*Log*) and a name over 4,096 UTF-16 characters is cut there, ending in `…`; a name of
+  exactly 4,096 is kept whole. Buildings and workforce have no column.
 - **Names** pass the rule of the log (*Log*): each control character, format character, line separator, paragraph
   separator (the categories Cc, Cf, Zl, Zp) and unpaired surrogate is shown as one `?`, nothing else is changed (combining
   marks, right-to-left letters and spaces stay as sent), and a name is never cut, also at the longest pipe string of 255
@@ -185,8 +195,20 @@ sent it: GUIDs are raw numbers until names and icons exist.
 - It logs: the start with the version and the mode (`Normal`, `Record`, `Replay`, `Invalid`); each change of the
   connection state with the error kind, the Windows error code and the received version (only changes, never a line
   per skipped frame); recording started and stopped at the click, its file name (the name only) when the file is
-  created, a recording failure and the failure of a stopped recording; the result of the game installation search at every start (found with its source, build and folder, or the warning of its failure; [`game-installation.md`](game-installation.md), *Log*), where the folder and the settings file path are logged as written and may hold the Windows user name; a replay's start (the file name only), its
+  created, a recording failure and the failure of a stopped recording; the result of the game installation search at every start (found with its source, build and folder, or the warning of its failure; [`game-installation.md`](game-installation.md), *Log*), where the folder and the settings file path are logged as written and may hold the Windows user name; the catalog (below); a replay's start (the file name only), its
   end and its problem reason; a folder that could not be opened; the autostart turned on (`Autostart enabled`) or off (`Autostart disabled`) and, as warnings, `Could not read the autostart setting` (once until a read succeeds again, so a blocked registry does not log at every menu opening) and `Could not change the autostart setting`, with the exception where there is one and never the exe path; an unexpected error of a background task; and `Exit`.
+- **Catalog lines** ([`game-catalog.md`](game-catalog.md)), none with a name or text, only GUIDs, kinds, archive paths and
+  counts: `Catalog built: <n> entries; <i> inherited assets left out; <d> unknown region types dropped`
+  (Information); `Catalog failed: <kind>` (Warning; the kinds `ArchiveUnreadable`, `FileMissing`, `FileUnreadable`,
+  `MalformedFile`); for each catalog file that another archive also lists, `Catalog: <archive> also lists <path>; the
+  copy in config.rda is used` (Warning), and `Catalog: <c> other archives could not be checked for copies` (Warning,
+  only when `c` is above 0); and for every closed tick once the catalog is ready, `Catalog cannot name <role> <GUID>:
+  <problem>` (Information) with the role `Region` (the session GUID), `Good`, `Workforce` or `Building` and the problem
+  `Unknown`, `Incomplete`, `Nameless` or `Ambiguous`. Each (role, GUID) is logged once per run, GUID `0` never, live or
+  replayed, whether or not the diagnostics window is open; after 1,000 such lines one line, `Catalog: more than 1000
+  GUIDs cannot be named; further ones are not logged in this run`, ends them. Ticks closed before the catalog is ready
+  are not checked, except the latest one at that moment, which is checked unless no connection or replay has started
+  yet.
 - The log holds no pipe content (figure name, island names, values): recording files and folders are logged by name only.
 - Text that came from outside (a replay file name, exception texts) is sanitized: each control character, format
   character, line or paragraph separator and unpaired surrogate becomes one `?`, so a text cannot add a line or hide
@@ -250,6 +272,7 @@ sent it: GUIDs are raw numbers until names and icons exist.
 - [`decisions/0037-companion-log-through-the-logging-abstraction-to-own-rotating-file.md`](../decisions/0037-companion-log-through-the-logging-abstraction-to-own-rotating-file.md) — the Companion logs through .NET's logging abstraction into its own rotating text file.
 - [`decisions/0038-diagnostics-window-flat-table-of-rows-made-on-demand.md`](../decisions/0038-diagnostics-window-flat-table-of-rows-made-on-demand.md) — the diagnostics window is a flat table whose rows are made on demand from the latest tick, kept whole.
 
+- [`decisions/0048-catalog-names-shown-in-the-diagnostics-window-unresolved-guids-logged-once.md`](../decisions/0048-catalog-names-shown-in-the-diagnostics-window-unresolved-guids-logged-once.md) — names in the diagnostics window, unresolved GUIDs logged once.
 - [`decisions/0044-game-installation-found-through-ubisoft-connect-or-the-settings-file.md`](../decisions/0044-game-installation-found-through-ubisoft-connect-or-the-settings-file.md) — the installation comes from Ubisoft Connect or the settings file.
 - [`decisions/0045-companion-settings-in-a-json-file-under-local-app-data.md`](../decisions/0045-companion-settings-in-a-json-file-under-local-app-data.md) — the settings are a hand-edited JSON file, never written by the Companion.
 - [`decisions/0046-game-build-is-the-program-files-version.md`](../decisions/0046-game-build-is-the-program-files-version.md) — the build is the program file's version.
@@ -260,4 +283,5 @@ sent it: GUIDs are raw numbers until names and icons exist.
 - Opening the pipe, the connection states and the retry rules: [`pipe-connection.md`](pipe-connection.md).
 - The recording file, its writing and failures, and the replay rules: [`pipe-recording.md`](pipe-recording.md).
 - Finding the game installation: [`game-installation.md`](game-installation.md).
-- Reading the game files, the connection to the server, a settings window (later issues).
+- Building the catalog: [`game-catalog.md`](game-catalog.md).
+- Reading the game files: [`game-files.md`](game-files.md); the connection to the server, a settings window (later issues).

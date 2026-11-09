@@ -48,7 +48,9 @@ Steam is not searched. A player with another copy (Steam) names the folder in th
 - **UNC and device paths:** no UNC or device path written in a record is followed (a path whose first character is `\`
   or `/` and whose second is `\`, `/` or `?`, both counted as separators); a mapped drive letter and a directory
   symlink are still followed. A UNC folder the player writes in the settings file is the player's own choice and is
-  probed as written, over the network.
+  probed as written, over the network. With such a folder found, the catalog then reads `config.rda` and lists and
+  opens every archive below `maindata` over the network (SMB) at every start ([`game-catalog.md`](game-catalog.md),
+  *Limits and errors*).
 - The Companion only reads: it checks that the two files exist, asks Windows for the file version of the program file,
   and writes nothing to the installation, the registry or the settings file. It reads no whole drive.
 
@@ -105,4 +107,4 @@ line ([`companion.md`](companion.md), *Log*); no game content is logged.
 
 - The settings file's format and reading rules: [`companion.md`](companion.md) (*Settings file*).
 - The archives below the installation and their reading: [`game-files.md`](game-files.md).
-- The catalog and the cache keyed by the build (#23 to #25).
+- The catalog built from the installation: [`game-catalog.md`](game-catalog.md); the cache keyed by the build (#25).

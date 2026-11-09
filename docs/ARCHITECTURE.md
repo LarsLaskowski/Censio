@@ -18,10 +18,10 @@ except the Windows shell:
 | ------- | -------------- | ---------- |
 | `Censio.Contracts` | The types shared by Companion and server, and the product version | — |
 | `Censio.Pipe` | Framing and parsing the statistics pipe into typed messages and assembling them into ticks, recording frames to a file and replaying it, and anonymising a recording ([`areas/pipe.md`](areas/pipe.md), [`areas/pipe-recording.md`](areas/pipe-recording.md)) | — |
-| `Censio.GameData` | Reading the game files (the RDA archives) and the catalog ([`areas/game-files.md`](areas/game-files.md)) | — |
+| `Censio.GameData` | Reading the game files (the RDA archives) and building the catalog of names from them ([`areas/game-files.md`](areas/game-files.md), [`areas/game-catalog.md`](areas/game-catalog.md)) | — |
 | `Censio.Server.Data` | Persistence of the server | — |
 | `Censio.Server` | Web host, UI, later the ingest | Contracts, Server.Data |
-| `Censio.Companion.Core` | The Companion's platform-neutral logic (tray menu and snapshot, single-instance rule, pipe connection state machine, command line, recording session and replay runner, tooltip texts, diagnostics window content and session, the log file writer, the autostart rules, the game installation search and the settings file) | Contracts, Pipe, GameData |
+| `Censio.Companion.Core` | The Companion's platform-neutral logic (tray menu and snapshot, single-instance rule, pipe connection state machine, command line, recording session and replay runner, tooltip texts, diagnostics window content and session, the log file writer, the autostart rules, the game installation search and the settings file, the catalog loading and the check of tick GUIDs) | Contracts, Pipe, GameData |
 | `Censio.Anonymiser` | Contributor console tool that anonymises a recording; not released ([`areas/pipe-recording.md`](areas/pipe-recording.md), *Anonymising*) | Pipe |
 | `Censio.Companion` | The Windows tray shell (WPF application, Windows Forms tray icon, the diagnostics window, the registry store of the autostart value, the registry reader of Ubisoft Connect's install records and the file version reader); no test project | Companion.Core |
 
@@ -56,6 +56,7 @@ The Companion logs through .NET's logging abstraction into its own rotating text
 ([`decisions/0037`](decisions/0037-companion-log-through-the-logging-abstraction-to-own-rotating-file.md),
 [`areas/companion.md`](areas/companion.md)).
 Once per start the Companion looks for the game installation in the background: the folder named in its settings file, else Ubisoft Connect's install records and default games folder, and shows the result and the program file's version as the build in the tray menu ([`decisions/0044`](decisions/0044-game-installation-found-through-ubisoft-connect-or-the-settings-file.md), [`decisions/0046`](decisions/0046-game-build-is-the-program-files-version.md), [`areas/game-installation.md`](areas/game-installation.md)).
+At every start the Companion also builds a catalog of regions, goods, workforce and buildings with their English and German names from the installation's `config.rda` in the background, shows them in the diagnostics window and logs the GUIDs it cannot name once ([`decisions/0047`](decisions/0047-game-catalog-read-forward-only-from-config-rda-kinds-and-regions-from-the-data.md), [`decisions/0048`](decisions/0048-catalog-names-shown-in-the-diagnostics-window-unresolved-guids-logged-once.md), [`areas/game-catalog.md`](areas/game-catalog.md)).
 The server accepts data only from a client that presents the ingest token. Guarantees are listed in
 `.squad/project.md` (*Guarantees*) and linked to their decision record as they are made.
 
