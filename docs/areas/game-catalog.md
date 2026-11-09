@@ -3,7 +3,7 @@
 ## Scope
 
 Building the catalog of regions, goods, workforce and buildings, each GUID with its kind, its English and German name
-and its region types, from the asset, data set and text files in the game's `config.rda`: the files and nodes read,
+and its region types, from the asset, data set, text, template and property default files in the game's `config.rda`: the files and nodes read,
 the kinds, the names, the reported cases, the copies in other archives, the bounds, the failure kinds and the privacy
 rules. The Companion builds it in the background at every start; the diagnostics window and the log use it. The
 player relies on the names it shows; the later web UI relies on the same catalog. The files are untrusted input.
@@ -141,10 +141,9 @@ Rules apply in this order to every defining asset; the first that fits decides.
 - **Per file:** the archive's per-entry bound ([`game-files.md`](game-files.md), *Limits*, 512 MiB by default),
   checked before the entry is decompressed; the entry is read from memory through a read-only stream, not copied.
 - **Per asset:** at most 256 levels of nesting and at most 65,536 elements, counted on the elements as the reader meets
-  them, before each one. The same two bounds apply to each `Text` element of the text files and to each `DataSet`; and
-  the structure above the assets, texts and data sets may be at most 256 levels deep. A file above any of them is a
+  them, before each one. The same two bounds apply to each `Text` element of the text files and to each `DataSet`; and the structure above the assets, texts, data sets, property parts and defining templates may be at most 256 levels deep. A file above any of them is a
   malformed file. The same two bounds apply to each part of `properties.xml` (a child of a `DefaultValues` or
-  `DefaultContainerValues` element) and to each defining template of `templates.xml`. (On the four files of the Product Manager's installation measured for #23 the deepest asset has 46 levels and the largest 3,740 elements.)
+  `DefaultContainerValues` element) and to each defining template of `templates.xml`. (On the four files of the Product Manager's installation measured for #23 the deepest asset has 46 levels and the largest 3,740 elements; in his `properties.xml` and `templates.xml` of game version 3.0.1733841 the largest property has 588 elements and 13 levels, the largest template 1,352 elements and 16 levels.)
 - **Memory:** at one time the catalog build holds one file's entry content, the open `config.rda` with its entry
   list, the candidate assets (the few hundred to some thousand goods, buildings, workforce and sessions), the texts they
   use and the facts of the asset being read; while the other archives are listed, one archive's entry list on top. A
