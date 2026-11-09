@@ -23,9 +23,7 @@ public sealed class DiagnosticsWindowSession
     /// <summary>
     /// Reads the game catalog.
     /// </summary>
-#pragma warning disable S1144, S4487 // Skeleton: removed with the implementation
     private readonly Func<GameCatalog?> _readCatalog;
-#pragma warning restore S1144, S4487
 
     /// <summary>
     /// The clock.
