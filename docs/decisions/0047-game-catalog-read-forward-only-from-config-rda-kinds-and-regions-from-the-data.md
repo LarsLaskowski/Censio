@@ -54,6 +54,9 @@ in the [game-catalog](../areas/game-catalog.md) area document.
 - That the XML parser refuses every document type form and resolves no entity is a property of .NET's `XmlReader`
   with document type processing prohibited and no resolver, measured by Security's probe and pinned by a unit test.
   Exception messages quote content, so no exception text reaches a result or the log.
+- The boundary catches of the archive opening and of the copy listing stay although today's archive reader reports
+  every failure it knows as a result, so no unit test reaches them: they keep an exception of a later reader change
+  from ending the Companion's catalog task untyped.
 - With a UNC installation folder from the settings file, `config.rda` is read and the `maindata` archives listed over
   the network at every start.
 - Building at every start costs the listing of every archive under `maindata` (for the copy report) and one pass over
