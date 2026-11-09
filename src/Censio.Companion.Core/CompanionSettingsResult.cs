@@ -1,7 +1,5 @@
 namespace Censio.Companion.Core;
 
-// Skeleton: removed with the implementation
-#pragma warning disable S3453
 /// <summary>
 /// The result of reading the settings file of the Companion.
 /// </summary>
@@ -9,8 +7,6 @@ public sealed class CompanionSettingsResult
 {
     #region Constructor
 
-    // Skeleton: removed with the implementation
-#pragma warning disable S1144
     /// <summary>
     /// Initializes a new instance of the <see cref="CompanionSettingsResult" /> class.
     /// </summary>
@@ -25,7 +21,6 @@ public sealed class CompanionSettingsResult
         Problem = problem;
         Exception = exception;
     }
-#pragma warning restore S1144
 
     #endregion // Constructor
 
@@ -61,7 +56,7 @@ public sealed class CompanionSettingsResult
     /// <returns>The result</returns>
     public static CompanionSettingsResult NoGameFolder()
     {
-        throw new NotImplementedException();
+        return new CompanionSettingsResult(CompanionSettingsResultKind.NoGameFolder, null, null, null);
     }
 
     /// <summary>
@@ -71,7 +66,7 @@ public sealed class CompanionSettingsResult
     /// <returns>The result</returns>
     public static CompanionSettingsResult FromGameFolder(string folder)
     {
-        throw new NotImplementedException();
+        return new CompanionSettingsResult(CompanionSettingsResultKind.GameFolder, folder, null, null);
     }
 
     /// <summary>
@@ -82,9 +77,8 @@ public sealed class CompanionSettingsResult
     /// <returns>The result</returns>
     public static CompanionSettingsResult FromProblem(string problem, Exception? exception)
     {
-        throw new NotImplementedException();
+        return new CompanionSettingsResult(CompanionSettingsResultKind.Invalid, null, problem, exception);
     }
 
     #endregion // Methods
 }
-#pragma warning restore S3453

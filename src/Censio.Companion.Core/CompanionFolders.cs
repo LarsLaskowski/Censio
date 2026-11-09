@@ -24,7 +24,7 @@ public static class CompanionFolders
     /// <returns>The path of the settings file</returns>
     public static string Settings(string localApplicationData)
     {
-        throw new NotImplementedException();
+        return Path.Combine(localApplicationData, "Censio", "settings.json");
     }
 
     #endregion // Methods
