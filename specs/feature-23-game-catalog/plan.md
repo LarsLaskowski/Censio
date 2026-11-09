@@ -29,7 +29,7 @@ Sample = the Product Manager's four files of `config.rda` (outside the repositor
 | 12 | Closed ticks arrive through `PipeConnection.TickReceived` and `PipeReplayRunner.TickReceived` (`EventHandler<PipeTick>`), one source per run | `PipeConnection.cs:120`, `PipeReplayRunner.cs:100`, `App.xaml.cs` | confirmed |
 | 13 | `XmlReader` with `DtdProcessing.Prohibit` and no resolver throws `XmlException` on every document type form and on undeclared entities, invalid characters and bad encodings; `XmlException` and `int.Parse` messages quote content | Security's probe M1 (scratchpad `xmlprobe/`) | confirmed |
 | 16 | `XNode.ReadFrom` is quadratic in depth (20,000 levels 1.04 s, 160,000 levels 101.8 s); a plain `XmlReader.Read` loop is linear (8 ms, 13 ms); a materialized wide asset costs 10–15 times its input | Security's probes M2, M3 | confirmed |
-| 14 | A build on a real installation (40 archives listed, ~60 MB XML) takes seconds and peaks well below 512 MiB | to verify: the AC1 opt-in runs report elapsed time and peak working set — the Product Manager's installation run before step 9, the orchestrator's sample run after step 6 | unverified |
+| 14 | A build on a real installation (40 archives listed, ~60 MB XML) takes seconds and peaks well below 512 MiB | the AC1 opt-in runs: the Product Manager's installation run on Windows 2089 ms, peak working set 335 MiB (1038 entries, 0 copies, 0 unchecked archives, all 284 fixture GUIDs resolve); the orchestrator's sample run 1.5 s, 109 MiB | confirmed |
 | 15 | A region asset without `RegionID` is the base game's region | to verify: the template default in the game data, by #130 after this change; the code assumes nothing | unverified |
 
 ## Tests per criterion
