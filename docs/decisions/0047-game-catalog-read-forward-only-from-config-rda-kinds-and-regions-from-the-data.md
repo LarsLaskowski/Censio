@@ -22,7 +22,7 @@ catalog at every start until the cache of #25.
    application at every start.
 2. **Generated serialisation types for the game's schema** — typed access; ties the code to hundreds of templates a
    game update may change, and still loads whole documents.
-3. **Forward-only reading of `config.rda`'s four files, one file at a time, walking each asset with the reader
+3. **Forward-only reading of the catalog's files in `config.rda`, one file at a time, walking each asset with the reader
    itself** — memory holds one archive entry, the catalog candidates, the texts they use and the nodes of one asset;
    only the few nodes the catalog needs are interpreted. Building each asset as a subtree (`XNode.ReadFrom`) lost: its
    cost grows with the square of the depth and is paid before any bound can be checked, so one asset within the
@@ -37,8 +37,8 @@ catalog at every start until the cache of #25.
 ## Decision
 
 Option 3 with fail-closed reading: the catalog is built from `config.rda` alone; a defining asset's kind, names and
-regions are taken only from nodes the data states, an inherited asset is left out, a missing `RegionID` stays "not
-stated" (#130), each asset is bounded in depth and elements, and the first malformed file or value, or an asset over
+regions are taken only from nodes the data states, an inherited asset is left out, a missing `RegionID` is taken from the game's template and
+property defaults ([0049](0049-region-type-of-a-region-asset-from-its-template-and-the-property-defaults.md)), each asset is bounded in depth and elements, and the first malformed file or value, or an asset over
 a bound, fails the whole catalog. The nodes, rules and failure kinds are
 in the [game-catalog](../areas/game-catalog.md) area document.
 
@@ -47,8 +47,7 @@ in the [game-catalog](../areas/game-catalog.md) area document.
 - Residual risks, each visible to the player and none hidden: the layout rests on one installation's files (game
   version 3.0.1733841); a game update that changes a node name or adds an odd value turns the catalog into
   `Catalog: failed` until the reader is changed; a patch archive that one day carries its own copy is reported in the
-  log but not read; inherited assets are left out and counted; the base game's sessions carry no region type until
-  #130.
+  log but not read; inherited assets are left out and counted.
 - Text identifiers shared by several assets are normal (a session shares one with its region asset); only a GUID
   defined twice, or one text identifier with two different texts in one language, makes a GUID ambiguous.
 - That the XML parser refuses every document type form and resolves no entity is a property of .NET's `XmlReader`
