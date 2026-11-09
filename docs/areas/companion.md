@@ -130,10 +130,10 @@ sent it: GUIDs are raw numbers where the catalog has no name for them, and icons
   name (unknown, nameless, ambiguous), GUID `0` and every cell while no catalog is ready show the bare number. The names
   pass the rule of the log (*Log*) and a name over 4,096 UTF-16 characters is cut there, ending in `…`; a name of
   exactly 4,096 is kept whole. Buildings and workforce have no column.
-- **Names** pass the rule of the log (*Log*): each control character, format character, line separator, paragraph
-  separator (the categories Cc, Cf, Zl, Zp) and unpaired surrogate is shown as one `?`, nothing else is changed (combining
-  marks, right-to-left letters and spaces stay as sent), and a name is never cut, also at the longest pipe string of 255
-  bytes. Each cell is its own text, so a name cannot reorder another cell.
+- **Area names** (the `Name` column) pass the rule of the log (*Log*): each control character, format character, line
+  separator, paragraph separator (the categories Cc, Cf, Zl, Zp) and unpaired surrogate is shown as one `?`, nothing
+  else is changed (combining marks, right-to-left letters and spaces stay as sent), and an area name is never cut, also
+  at the longest pipe string of 255 bytes. Each cell is its own text, so a name cannot reorder another cell.
 - **Update:** the window follows each closed tick, each change of the status text, and the next local midnight (when
   `Last tick:` changes from `HH:mm:ss` to the dated form). At most one update waits at a time; with ticks closing faster
   than the window shows them (a replay with `--speed max`) intermediate ticks may be skipped and the window always ends
