@@ -1503,6 +1503,33 @@ public sealed class GameCatalogReaderTests
     }
 
     /// <summary>
+    /// An empty <c>RegionID</c> in the template or in the default is a stated value: it is dropped and counted, and the
+    /// session has an empty list of region types, not the default and not "not stated".
+    /// </summary>
+    /// <param name="templateRegion">The content of the template's <c>Properties</c> element</param>
+    /// <param name="defaultRegion">The content of the <c>DefaultValues</c> element</param>
+    [TestMethod]
+    [TestCategory("AC1")]
+    [DataRow("<Region><RegionID /></Region>", "<Region><RegionID>Zorlan</RegionID></Region>")]
+    [DataRow("<Region><Kontor>1</Kontor></Region>", "<Region><RegionID /></Region>")]
+    public void GameCatalogReaderReadCountsEmptyRegionIdAsStated(string templateRegion, string defaultRegion)
+    {
+        // Arrange
+        var assets = Assets(RegionAssetWithoutRegionId(5, 1000, "Region"), Session(6, "SessionModerate", 5, 1000));
+
+        // Act
+        var catalog = ReadCatalogWithDefaults(DataSets("Zorlan"), assets, Properties(defaultRegion), Templates(Template("Region", templateRegion)));
+
+        // Assert
+        var entry = catalog.Find(6);
+
+        Assert.IsNotNull(entry, "The session should be an entry");
+        Assert.IsNotNull(entry.RegionTypes, "An empty RegionID is stated, so the list should not be null");
+        Assert.IsEmpty(entry.RegionTypes, "The empty RegionID should win over the default and leave an empty list");
+        Assert.AreEqual(1, catalog.DroppedRegionTypeCount, "The empty RegionID should be counted as dropped");
+    }
+
+    /// <summary>
     /// A region asset whose asset, template and default state no <c>RegionID</c> stays "not stated" (null).
     /// </summary>
     /// <param name="defaultValues">The content of the <c>DefaultValues</c> element</param>
