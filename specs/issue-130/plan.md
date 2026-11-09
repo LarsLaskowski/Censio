@@ -2,7 +2,7 @@
 
 Source: Issue #130
 Tier: standard — a behavior change of the catalog reader (two more files read, a region type resolved through defaults) that creates, changes or removes no security control.
-Security areas touched: Parsing of external input (`GameCatalogReader`: two more XML files read from `config.rda`, `.squad/project.md`)
+Security areas touched: Parsing of external input (`GameCatalogReader`: two more XML files read from `config.rda`, `.squad/project.md`); File paths the Companion opens (`GameCatalogReader.Load`: two more entries of `config.rda`, two more paths in `FindCopies`; read-only, over SMB for a UNC folder as today)
 
 ## Problem / root cause
 
@@ -183,3 +183,24 @@ one entry.
   default lists region types, building templates state their own `AssociatedRegions`, `SessionModerate` names a region
   asset). Resolve them the way #130 resolves `RegionID`, and check the change of kinds and region lists against the
   installation. Follow-up of #130."
+
+## Challenge notes
+
+Minor objections of the Devil's Advocate, verbatim; the Dev and the Tester follow them or report a deviation.
+
+1. minor — Dev: some "four files" texts are missing from the plan's documentation list. Update them to six as well:
+   - `docs/areas/game-catalog.md:144` (*Tests with the real files*: "a folder with the four loose files")
+   - `docs/areas/game-catalog.md:130` and `:135` (the measurements "on the Product Manager's four files"): mark them as measured on the four files of #23, or measure again.
+   - the summary of `src/Censio.GameData/GameCatalogFiles.cs:6` ("Reads the four catalog files")
+   - the summary of `src/Censio.GameData/GameCatalogBuilder.cs:4` ("what the four passes collected")
+   - for the Tester: the summary of `GameCatalogReaderSampleResolvesFixtureGuids` (`GameCatalogReaderTests.cs:153`, "With the four loose sample files").
+2. minor — Tester: AC3 says a wrong root is a malformed file, but no planned test checks that for the two new files. The only wrong-root test, `GameCatalogReaderReadFailsForMalformedXml` (`GameCatalogReaderTests.cs:878-885`), uses file index 1 only. Add a test or `DataRow` cases for indices 4 and 5 that assert *Malformed file*, for example `properties.xml` given the root `Templates` and `templates.xml` given the root `Properties`.
+3. minor — Tester: add a decoy to `Fixtures/GameCatalog/properties.xml` that matches the decoy planned for `templates.xml`. Inside another property's `DefaultValues` child, nest a `Group/DefaultValues/Region/RegionID` with an invented name, and keep the assertion that region asset 102 resolves to `Xanthi`. Reason: the real file has a `Group` inside a property part (`DefaultContainerValues/BenchmarkScene/Groups/ContainerValues/Group`, properties.xml lines 5532-5548). A walker that checks only "parent is `Group`" through the name array, instead of reading each `DefaultValues` child as one part, would pick up a nested `Region` default.
+
+## Security notes
+
+Non-blocking findings of Security's plan review (APPROVED), verbatim.
+
+1. non-blocking: a duplicate defining template is accepted or rejected depending on order (fail-closed gap). The Approach says "a second one with a name already in the dictionary is malformed", and the dictionary only holds templates that have a `Region` property. `Region` without a `Region` property followed by `Region` with one is accepted silently; the reverse order is malformed. AC3's wording, "a second defining template of a name that has a Region property", leaves the first order open. Smallest fix: keep a `HashSet<string>` of all defining-template names and treat any repeated name as a malformed file (the sample has 1,046 unique names, so the real file still passes). Reword AC3 to "a second defining template of the same name is a malformed file", and add the reverse order as a `DataRow` to `GameCatalogReaderReadFailsForSecondRegionTemplate`.
+2. non-blocking: one security area is touched but not listed. `.squad/project.md` *Security areas*, "File paths the Companion writes, prunes or opens", names `GameCatalogReader.Load`; the plan changes `Load` (two more entries of `config.rda`, two more paths in `FindCopies`, read-only, over SMB for a UNC folder as today). Add to *Security areas touched*: "File paths the Companion opens (`GameCatalogReader.Load`: two more entries of `config.rda`, two more paths in `FindCopies`; read-only, over SMB for a UNC folder as today)".
+3. Note, no change asked: a second `RegionID` inside one `DefaultValues/Region`, or inside one template's `Region` section, is resolved as the last one, as `ReadValue` already does for an asset's own `RegionID`.
