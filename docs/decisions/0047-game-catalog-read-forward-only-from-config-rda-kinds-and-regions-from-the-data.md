@@ -1,6 +1,6 @@
 # 0047: The game catalog is read forward-only from `config.rda`; kinds and regions come from the data, and the reader fails closed
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-09
 - **Area:** game-catalog
 - **Source:** Issue #23

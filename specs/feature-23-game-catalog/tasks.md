@@ -14,6 +14,6 @@ Plan: [plan.md](plan.md)
 | 8 | G3 | (no new API) Area documents (`game-catalog` new with index row, `game-files`, `companion`, `game-installation`), `docs/ARCHITECTURE.md`, `README.md` and `docs/USER_GUIDE.md` (English and German), the text for `.squad/project.md` | `docs/`, `README.md` | AC1–AC7 | 7 | Dev | [x] |
 | 9 | G3 | `docs/UNIT_TESTS.md`: `CENSIO_CATALOG_SAMPLE` and the catalog run of `CENSIO_ANNO_INSTALL` | `docs/UNIT_TESTS.md` | AC1, AC7 | 7 | Tester | [x] |
 | 10 | G3 | Report the exact `.squad/project.md` text (security areas; the Tester's *Test doubles* line), written as `.squad/team.md` *Files* says | `.squad/project.md` | — | 8 | Dev | [x] |
-| 11 | PM | Run `GameCatalogReaderInstallationResolvesFixtureGuids` on Windows on the branch head with `CENSIO_ANNO_INSTALL`; post counts, copies, elapsed time and peak working set only (plan facts 13, 14) | — | AC1 | 7 | Product Manager | [ ] |
+| 11 | PM | Run `GameCatalogReaderInstallationResolvesFixtureGuids` on Windows on the branch head with `CENSIO_ANNO_INSTALL`; post counts, copies, elapsed time and peak working set only (plan facts 13, 14) | — | AC1 | 7 | Product Manager | [x] |
 | 12 | G3 | Run the `CENSIO_CATALOG_SAMPLE` tests on the scratchpad sample and log the counts | — | AC1, AC7 | 7 | Orchestrator | [x] |
 

@@ -1,6 +1,6 @@
 # 0048: Catalog names are shown in the diagnostics window; GUIDs the catalog cannot name are logged once per run
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-09
 - **Area:** companion
 - **Source:** Issue #23
