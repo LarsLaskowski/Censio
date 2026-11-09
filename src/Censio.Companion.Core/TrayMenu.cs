@@ -246,8 +246,6 @@ public static class TrayMenu
         return delay < TimeSpan.FromSeconds(1) ? TimeSpan.FromSeconds(1) : delay;
     }
 
-    // Skeleton: removed with the implementation
-#pragma warning disable S1172
     /// <summary>
     /// Creates the entries of the tray menu.
     /// </summary>
@@ -262,6 +260,7 @@ public static class TrayMenu
         return [
                    new TrayMenuEntry(TrayMenuEntryKind.Status, $"Status: {snapshot.StatusText}", false),
                    new TrayMenuEntry(TrayMenuEntryKind.LastTick, FormatLastTick(snapshot.LastTick, clock), false),
+                   new TrayMenuEntry(TrayMenuEntryKind.Game, FormatGame(game), false),
                    new TrayMenuEntry(TrayMenuEntryKind.Separator, string.Empty, false),
                    new TrayMenuEntry(TrayMenuEntryKind.OpenDiagnostics, OpenDiagnosticsText, true),
                    new TrayMenuEntry(TrayMenuEntryKind.ToggleRecording, snapshot.IsRecording ? StopRecordingText : StartRecordingText, snapshot.CanRecord),
@@ -275,7 +274,6 @@ public static class TrayMenu
                    new TrayMenuEntry(TrayMenuEntryKind.Exit, ExitText, true)
                ];
     }
-#pragma warning restore S1172
 
     /// <summary>
     /// Formats the text of the game entry.
@@ -284,7 +282,19 @@ public static class TrayMenu
     /// <returns>The text</returns>
     public static string FormatGame(GameInstallationStatus status)
     {
-        throw new NotImplementedException();
+        var source = status.Source == GameInstallationSource.UbisoftConnect ? "Ubisoft Connect" : "settings file";
+
+        return status.Kind switch
+               {
+                   GameInstallationStatusKind.Searching => "Game: searching",
+                   GameInstallationStatusKind.Found => $"Game: build {status.Build ?? "unknown"} ({source})",
+                   GameInstallationStatusKind.NotFound => "Game: not found",
+                   GameInstallationStatusKind.SettingsFolderNotFound => "Game: folder in settings not found",
+                   GameInstallationStatusKind.SettingsFolderNotFullPath => "Game: folder in settings is not a full path",
+                   GameInstallationStatusKind.SettingsFolderNotInstallation => "Game: folder in settings is not an Anno 117 installation",
+                   GameInstallationStatusKind.SettingsFileInvalid => "Game: settings file invalid",
+                   _ => throw new ArgumentOutOfRangeException(nameof(status), status.Kind, "The status kind is not defined")
+               };
     }
 
     /// <summary>

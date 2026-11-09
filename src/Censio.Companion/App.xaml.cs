@@ -39,6 +39,11 @@ public partial class App : Application
     private CancellationTokenSource? _connectionCancellation;
 
     /// <summary>
+    /// The search of the game installation.
+    /// </summary>
+    private GameInstallationSearch? _gameSearch;
+
+    /// <summary>
     /// The recording session, <c>null</c> in a replay or with an invalid command line
     /// </summary>
     private PipeRecordingSession? _recording;
@@ -246,7 +251,7 @@ public partial class App : Application
     private TrayIcon CreateTrayIcon()
     {
         _images = new TrayIconImages();
-        _trayIcon = new TrayIcon(ProductVersion.Read(typeof(App).Assembly), _images, () => _snapshot(), () => GameInstallationStatus.Searching, () => _autostart?.Refresh() ?? false, Dispatch);
+        _trayIcon = new TrayIcon(ProductVersion.Read(typeof(App).Assembly), _images, () => _snapshot(), () => _gameSearch?.Status ?? GameInstallationStatus.Searching, () => _autostart?.Refresh() ?? false, Dispatch);
 
         return _trayIcon;
     }
@@ -358,6 +363,18 @@ public partial class App : Application
             var version = ProductVersion.Read(typeof(App).Assembly);
 
             CompanionLog.Started(_logger, version, commandLine.Mode);
+
+            var gameSearch = new GameInstallationSearch(new RegistryUbisoftInstallRecords(), new WindowsFileVersionReader(), GameInstallation.DefaultUbisoftGamesFolder(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86)), _logger);
+            var settingsFile = CompanionFolders.Settings(localAppData);
+
+            _gameSearch = gameSearch;
+
+            Run(_ =>
+                {
+                    gameSearch.Run(settingsFile);
+
+                    return Task.CompletedTask;
+                });
 
             switch (commandLine.Mode)
             {
