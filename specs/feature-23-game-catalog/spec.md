@@ -1,7 +1,7 @@
 # Spec: Game catalog of goods, buildings, workforce and regions with German and English names
 
 Source: Issue #23
-Status: Draft
+Status: Approved by Lead
 
 ## Problem
 
@@ -57,7 +57,7 @@ Regions, as the data states them:
 - E10: An asset that inherits from a base asset (`BaseAssetGUID`, no `Template` of its own): left out of the catalog
   and counted in the log; seen in a tick, it is reported as unknown. None is in the fixture.
 - E11: A region type name not in the `Region` data set: dropped from the entry and counted in the log; a region asset
-  without a `RegionID` gives its region entries no region type (today the base game's first region).
+  without a `RegionID` gives its region entries no region type (today the base game's first region; #130).
 
 ## Non-functional requirements
 
@@ -104,7 +104,7 @@ Regions, as the data states them:
   any web UI, languages other than German and English.
 - Building and workforce names in the diagnostics window: its table has no such column.
 - Reading a patch archive's copy of the files (E8 only reports one); resolving inherited assets (E10); a region type
-  for a region asset without a `RegionID` (E11).
+  for a region asset without a `RegionID` (E11, #130).
 
 ## Open questions
 
@@ -130,7 +130,7 @@ Regions, as the data states them:
 1. Regions undefined (major) — accepted: defined under *Scenarios* (sessions with `Session/Region`, the association
    lists, the `Region` data set, "not stated" against "none"; not `ProductionRegions`, which says where a good is
    produced). No default is written in: region asset 3225 states no `RegionID`, so its sessions get no type (E11);
-   proposed follow-up: find the template default in the data. AC2 tests it.
+   follow-up #130 finds the template default in the data. AC2 tests it.
 2. Building and workforce GUIDs never reported (major) — accepted: S3 and AC3 cover every role of every closed tick,
    window open or not.
 3. Asset without names — accepted: E9.
