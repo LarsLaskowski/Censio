@@ -1,25 +1,29 @@
 # Spec: Locate the game installation
 
 Source: Issue #22
-Status: Draft
+Status: Approved by Lead
 
 ## Problem
 
 The catalog (#23 to #26) is built from the archives below the installation folder
 ([`game-files.md`](../../docs/areas/game-files.md)), but nothing finds that folder: only the survey test reads it from
-`CENSIO_ANNO_INSTALL`. The player should not have to type it, #25 needs the game version, and a missing or wrong folder
+`CENSIO_ANNO_INSTALL`. The player should not have to type it, #25 needs to tell game builds apart, and a missing or wrong folder
 must be visible with its reason, while the Companion today shows no error message at all.
 
 ## Scenarios
 
 - S1: Given Anno 117 installed through Ubisoft Connect and no game folder in the settings file, when the Companion
   starts, then the tray menu shows, greyed out and directly below `Last tick:` (above the first separator), `Game:
-  <version> (Ubisoft Connect)`, for example `Game: 3.0.1733841 (Ubisoft Connect)`, and the log has an information
-  line with the source, the version and the folder. The diagnostics window does not show the line.
-- S2: Given the game in Ubisoft Connect's default game folder while Ubisoft Connect has no record of it (for example
-  after Windows was reinstalled), when the Companion starts, then it is found there, with the source `Ubisoft Connect`.
+  build <build> (Ubisoft Connect)`, for example `Game: build 26.29905.4.51797 (Ubisoft Connect)`, and the log has an
+  information line with the source, the build and the folder. `<build>` is the file version of the game's program
+  file `bin\win64\anno117.exe`, not the version the game's main menu shows (`3.0.1733841` on the same installation,
+  `tests/Censio.GameData.Tests/Fixtures/GameInstallation/game-installation.md`). The diagnostics window does not
+  show the line.
+- S2: Given the game in a folder of Ubisoft Connect's default games folder (`C:\Program Files (x86)\Ubisoft\Ubisoft
+  Game Launcher\games`) while Ubisoft Connect has no valid record of it (for example after Windows was reinstalled),
+  when the Companion starts, then it is found there, with the source `Ubisoft Connect`.
 - S3: Given the settings file `%LOCALAPPDATA%\Censio\settings.json` with `"gameFolder"` naming an installation, when the
-  Companion starts, then that folder is used without any automatic search and the menu shows `Game: <version>
+  Companion starts, then that folder is used without any automatic search and the menu shows `Game: build <build>
   (settings file)`. This is also the way for a copy bought elsewhere (Steam) that the search does not find.
 - S4: Given several Ubisoft Connect records of the game, when the Companion starts, then the first valid one by
   ascending record number is used, checked against the real sample (N8).
@@ -36,7 +40,7 @@ settings file the folder or the file as written there.
   such as `%USERPROFILE%`, which are not expanded): `Game: folder in settings is not a full path`.
 - E3: The folder in the settings file exists but is not an installation (for example the player named `maindata`
   itself or the folder of the game's program file): `Game: folder in settings is not an Anno 117 installation`. The
-  warning names what is expected: the folder that holds `maindata\config.rda`.
+  warning names what is expected: the folder that holds `maindata\config.rda` and `bin\win64\anno117.exe`.
 - E4: The settings file is not valid JSON, `gameFolder` is not a text, the key occurs twice (also in different case),
   the file is larger than 1 MiB, or it cannot be read (locked, access denied): `Game: settings file invalid`. A
   leading UTF-8 byte order mark, `//` and `/* */` comments and trailing commas are accepted, since the file is edited
@@ -47,14 +51,12 @@ settings file the folder or the file as written there.
   leftover of an uninstalled game) is skipped and the next record, then the default folder, is tried.
 - E8: Nothing is found: `Game: not found`; the warning names the places checked (the record, the default folder),
   not their folders. The user guide tells a player with another copy (Steam) to use the settings file.
-- E9: An installation is found but its version cannot be determined: `Game: version unknown (<source>)`; the
-  installation is still used.
+- E9: An installation is found but the program file has no file version (unreadable, or all four numbers zero):
+  `Game: build unknown (<source>)`; the installation is still used.
 - E10: A change while the Companion runs (settings edited, game installed or moved) counts only after a restart.
 - E11: The key differs from `gameFolder` only in case (`GameFolder`): it counts as `gameFolder`. Any other spelling
   is an unknown key (N3), so the automatic search runs; the menu then shows `(Ubisoft Connect)` or `Game: not found`,
   not `(settings file)`, which the user guide points out.
-- E12: A version text that holds control or format characters or is longer than 64 characters is shown sanitized as in
-  the log (each such character becomes `?`) and cut to 64 characters with `…`.
 
 ## Non-functional requirements
 
@@ -76,17 +78,18 @@ settings file the folder or the file as written there.
   every menu text above with what to do; the menu lists of `README.md` and the user guide (*Companion*, *First start*)
   gain the line. The user guide's privacy paragraph (*Data and logs*, English and German) and the list in *Log* of
   `companion.md` say that the log now holds the game folder at every start.
-- N8: The plan is written only once the Product Manager's real samples from his Ubisoft Connect installation are in
-  the repository or on the issue: Ubisoft Connect's install records (registry export) with the install folder and
-  whether it is the default game folder, and the source and text of the game version. The reader of the records, the
-  default folder and the version source are built from them, and the plan names them in *Verified facts*.
+- N8: The search is built from the Product Manager's sample of his Ubisoft Connect installation
+  (`tests/Censio.GameData.Tests/Fixtures/GameInstallation/game-installation.md`): the form of the `InstallDir` value
+  (forward slashes, trailing slash), the default games folder, the program file's path and its file version. The
+  sample holds no export of the whole record key; the key the records are read from is confirmed on his machine
+  (AC8), and the plan names every fact in *Verified facts*.
 
 ## Acceptance criteria
 
 - AC1: Without a game folder in the settings file, the Companion finds an installation recorded by Ubisoft Connect,
   taking the first valid record by ascending number, else one in Ubisoft Connect's default game folder, and the menu
-  shows `Game: <version> (Ubisoft Connect)` directly below `Last tick:`; the reader's tests read the real sample (S1,
-  S2, S4, E6, N8).
+  shows `Game: build <build> (Ubisoft Connect)` directly below `Last tick:`; the tests use the `InstallDir` form of
+  the sample (S1, S2, S4, E6, N8).
 - AC2: A `gameFolder` that names an installation is used instead of the automatic search, with the source `settings
   file`; the key matches ignoring case, and a byte order mark, comments and trailing commas are accepted (S3, N3,
   E11).
@@ -94,9 +97,9 @@ settings file the folder or the file as written there.
   no automatic search (E1, E2, E3, E4, E5).
 - AC4: A record that cannot be read or points at no installation is skipped; when nothing is found the menu shows
   `Game: not found` and a warning names the places checked (E7, E8, N4).
-- AC5: The version of a found installation is shown; the same installation gives the same version text at every
-  start, and a changed game version gives a changed text; an undeterminable version shows `Game: version unknown
-  (<source>)`; the menu shows the version sanitized and cut to 64 characters (S1, E9, E12).
+- AC5: The build of a found installation is the file version of `bin\win64\anno117.exe` as four numbers; the same
+  file version gives the same text at every start and another file version another text; without a file version the
+  menu shows `Game: build unknown (<source>)` (S1, E9).
 - AC6: Until the search ends the menu shows `Game: searching`, and the tray, the pipe connection and `Exit` work as
   before; the search runs once per start in every mode and nothing is written (S5, E10, N1, N2, N6).
 - AC7: The log lines of the search are sanitized and cut by the Companion's log rules and hold no game content (N5).
@@ -113,8 +116,8 @@ settings file the folder or the file as written there.
 - The settings window (#43), and any way to write the settings file other than by hand.
 - Noticing changes while the Companion runs, and searching again when the game starts (#25) (E10 only says what
   happens).
-- Extracting the catalog and the cache keyed by the version (#23 to #25); this feature only provides the folder and
-  the version to them.
+- Extracting the catalog and the cache keyed by the build (#23 to #25); this feature only provides the folder and
+  the build to them.
 - Other stores (Epic, Game Pass) and other systems than Windows.
 - Showing the folder in the menu or opening it from there; the line `Game: …` in the diagnostics window.
 
@@ -129,11 +132,9 @@ settings file the folder or the file as written there.
 - Which stores are searched? Answered: by the Product Manager (escalation of the spec challenge, option 2), Ubisoft
   Connect only; Steam is out of scope without a follow-up issue (*Out of scope*). He supplies the Ubisoft Connect
   record and the version source (N8).
-- Where does the game version come from? Answered: the spec fixes what the player sees and what #25 needs (AC5); the
-  plan chooses the source from the Product Manager's sample (N8). `3.0.1733841` (game-files.md, *Locations*) shows the
-  form.
-- On which store is AC8 checked? Answered: Ubisoft Connect, the store of the Product Manager's run recorded in
-  `docs/USER_GUIDE.md` (*First recording, step by step*).
+- Where does the game version come from? Answered: the menu version is shown only in the game (the sample); the
+  Lead takes the program file's version, labelled the build (record 0046).
+- On which store is AC8 checked? Answered: Ubisoft Connect, the Product Manager's (`docs/USER_GUIDE.md`).
 
 ## Area documents
 
@@ -156,5 +157,5 @@ Devil's Advocate, spec challenge (1 major, 6 minor):
 - m2 (byte order mark, comments, duplicates): accepted; a duplicate key is invalid (E4, AC2, AC3).
 - m3 (several installations in one store): accepted (S4, AC1).
 - m4 (menu position, diagnostics window): accepted (S1, AC1, *Out of scope*).
-- m5 (version in the menu): accepted (E12, AC5).
+- m5 (version in the menu): accepted, then moot: the build is four numbers the Companion formats (AC5); E12 removed.
 - m6 (privacy text): accepted (N7).
