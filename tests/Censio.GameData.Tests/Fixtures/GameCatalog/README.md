@@ -1,9 +1,10 @@
 # Game catalog fixture
 
-Four small XML files in the structure of the Anno 117 files `assets.xml`, `datasets.xml`, `texts_english.xml` and
-`texts_german.xml` (their paths in `config.rda` are the constants of `GameCatalogReader`), read by
-`GameCatalogReaderTests`. The structure (roots, nesting, element names, no XML declaration) follows the game's files;
-everything else is invented. Every GUID (around 2,000,000,000), text identifier (around 7.1e18), region type name
+Six small XML files in the structure of the Anno 117 files `assets.xml`, `datasets.xml`, `texts_english.xml`,
+`texts_german.xml`, `properties.xml` and `templates.xml` (their paths in `config.rda` are the constants of
+`GameCatalogReader`), read by `GameCatalogReaderTests`. The structure (roots, nesting, element names) follows the
+game's files; the first four have no XML declaration, `properties.xml` and `templates.xml` start with a UTF-8 BOM and an
+XML declaration as the game's do. Everything else is invented. Every GUID (around 2,000,000,000), text identifier (around 7.1e18), region type name
 (`Zorlan`, `Yultic`, `Xanthi`, `Qwertz`, `Vexan`), internal name, text and icon path is invented (`Good <n>`,
 `Ware <n>` style) and generated from nothing of the game's files. No GUID occurs in a pipe fixture; no name or text of
 the game's files is in the repository ([`game-files.md`](../../../../docs/areas/game-files.md), record 0023). The files are
@@ -33,6 +34,15 @@ Offsets are added to 2,000,000,000.
 | 601 | an asset with `BaseAssetGUID`, no `Template`, a `Building` section and a text identifier (inherited) |
 | 701, 702 | assets of another template with a nested `Item/Asset` reference to a good and a building |
 
+`properties.xml` holds a `Default` group with `Standard` and `Text` values, a group `Outer` with a nested group `Session`
+whose `DefaultValues/Region/RegionID` is `Xanthi` (between sibling properties, its `Name` after the values), and a group
+without values. Decoys that must not be read: a `DefaultContainerValues/Region/RegionID` `Zorlan`, a `Region` field of
+the `Session` property, and a `Group/DefaultValues/Region/RegionID` `Zorlan` nested inside the `BenchmarkScene` property.
+`templates.xml` holds nested groups with the template `Region` (in the group `Session`, a `Properties/Region` section
+without `RegionID`), `SessionModerate` (a `Session/Region` property, no `Region` property), a template with a
+`Description`, and the template `Holder` with a nested `Template` named `Region` whose `RegionID` `Zorlan` is a decoy.
+The region type names stay invented. Region asset 102 resolves to the default `Xanthi`; 101, 103 and 104 keep their own.
+
 `datasets.xml` holds the data set `FixtureKinds` (with an item named `Region` and the item `Vexan`) before the data set
 `Region` (`Zorlan`, `Yultic`, `Xanthi`). `ProductionRegions` of the goods name `Xanthi`.
 
@@ -42,4 +52,4 @@ The catalog of the fixture holds 21 entries: the sessions 201 to 204 (regions), 
 -401, the workforce 351 and the buildings 501 to 503. The sessions 205 and 206, the region assets, the inherited asset
 601 and the other assets are no entries; one asset is counted as inherited; two region types are dropped and counted
 (`Vexan` of 304 and the `RegionID` of 103). The problems: 305 and 308 are incomplete, 311 to 313 nameless, all others
-none. The region types of every entry are asserted by the `GameCatalogReaderRead...` tests of `GameCatalogReaderTests`.
+none. The session 203 carries `Xanthi` from the property default. The region types of every entry are asserted by the `GameCatalogReaderRead...` tests of `GameCatalogReaderTests`.
