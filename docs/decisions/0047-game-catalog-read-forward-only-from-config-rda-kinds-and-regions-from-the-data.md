@@ -22,8 +22,11 @@ catalog at every start until the cache of #25.
    application at every start.
 2. **Generated serialisation types for the game's schema** — typed access; ties the code to hundreds of templates a
    game update may change, and still loads whole documents.
-3. **Forward-only reading, one asset or text element at a time, of `config.rda`'s four files** — memory bounded by
-   the archive entry plus the catalog; only the few nodes the catalog needs are interpreted.
+3. **Forward-only reading of `config.rda`'s four files, one file at a time, walking each asset with the reader
+   itself** — memory holds one archive entry, the catalog candidates, the texts they use and the nodes of one asset;
+   only the few nodes the catalog needs are interpreted. Building each asset as a subtree (`XNode.ReadFrom`) lost: its
+   cost grows with the square of the depth and is paid before any bound can be checked, so one asset within the
+   entry bound could pin a core for hours (Security's measurement).
 4. **Skip a malformed asset and go on** — a partial catalog survives an odd value; a contradiction in untrusted
    input goes unnoticed, unlike the pipe and archive readers ([0033](0033-pipe-reader-strict-from-the-reference-source.md)).
 5. **Resolve inherited assets (`BaseAssetGUID`) through their base** — covers about 45 building-like assets; the
@@ -35,7 +38,8 @@ catalog at every start until the cache of #25.
 
 Option 3 with fail-closed reading: the catalog is built from `config.rda` alone; a defining asset's kind, names and
 regions are taken only from nodes the data states, an inherited asset is left out, a missing `RegionID` stays "not
-stated" (#130), and the first malformed file or value fails the whole catalog. The nodes, rules and failure kinds are
+stated" (#130), each asset is bounded in depth and elements, and the first malformed file or value, or an asset over
+a bound, fails the whole catalog. The nodes, rules and failure kinds are
 in the [game-catalog](../areas/game-catalog.md) area document.
 
 ## Consequences
@@ -47,7 +51,10 @@ in the [game-catalog](../areas/game-catalog.md) area document.
   #130.
 - Text identifiers shared by several assets are normal (a session shares one with its region asset); only a GUID
   defined twice, or one text identifier with two different texts in one language, makes a GUID ambiguous.
-- That the XML parser refuses a document type declaration and resolves no external entity is a property of .NET's
-  `XmlReader` with document type processing prohibited and no resolver; it is pinned by a unit test.
+- That the XML parser refuses every document type form and resolves no entity is a property of .NET's `XmlReader`
+  with document type processing prohibited and no resolver, measured by Security's probe and pinned by a unit test.
+  Exception messages quote content, so no exception text reaches a result or the log.
+- With a UNC installation folder from the settings file, `config.rda` is read and the `maindata` archives listed over
+  the network at every start.
 - Building at every start costs the listing of every archive under `maindata` (for the copy report) and one pass over
   about 60 MB of XML; the duration is measured by #25.

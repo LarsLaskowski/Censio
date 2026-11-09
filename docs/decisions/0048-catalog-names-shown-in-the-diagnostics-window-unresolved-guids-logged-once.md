@@ -32,5 +32,6 @@ window is open, each unresolved one logged once per run by GUID, role and reason
 ## Consequences
 
 - The log line per unresolved GUID is bounded per run, so a stream of invented GUIDs cannot flood the log.
-- Ticks that close before the catalog is ready are not checked; a GUID seen only then is not reported.
+- Ticks that close before the catalog is ready are not checked, except the latest one at the moment it is ready; a GUID seen only in earlier ticks is not reported.
+- A catalog name is cut for display, so one hostile text cannot stall the window's layout.
 - Building and workforce names stay invisible to testers until the web UI.

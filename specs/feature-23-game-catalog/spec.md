@@ -19,7 +19,8 @@ names. The names live in the player's installation (`config.rda`, [`game-files.m
   then `Catalog: <n> entries`.
 - S2: Given the catalog is ready, when the player opens `Open diagnostics`, then the `Region` and `Good` cells show
   `<English name> / <German name> (<GUID>)` instead of the bare number.
-- S3: Given a closed tick, live or replayed, whether or not the diagnostics window is open, when it names a GUID in any
+- S3: Given a closed tick once the catalog is ready (the latest tick at that moment included), live or replayed,
+  whether or not the diagnostics window is open, when it names a GUID in any
   role (region, good, workforce, building) that the catalog cannot name, then the log names that GUID, its role and
   the reason (unknown, incomplete, nameless, ambiguous) once per run, without any name; a shown cell keeps the bare
   number or the name it has; the Companion goes on.
@@ -45,8 +46,8 @@ Regions, as the data states them:
 - E3: No installation: `Catalog: no game`; every GUID stays a number.
 - E4: A missing, unreadable, malformed or oversized file, or one with a document type declaration: no catalog is used
   (fails closed, record 0033); `Catalog: failed`, the log names the failure kind, never content; GUIDs stay numbers.
-- E5: Names with control, format or separator characters, of any length, are shown and logged by the rule of the log
-  ([`companion.md`](../../docs/areas/companion.md), *Log*).
+- E5: Names with control, format or separator characters are shown by the rule of the log
+  ([`companion.md`](../../docs/areas/companion.md), *Log*); a name over 4,096 characters is cut, ending in `…`.
 - E7: A GUID defined by two assets, or one text identifier with two different texts in one language: the GUID is
   treated as unknown and reported as ambiguous. A text identifier repeated with the same text, or shared by several
   assets (a session and its region asset share one), is no ambiguity.
@@ -65,10 +66,10 @@ Regions, as the data states them:
   data is synthetic or an anonymised fixture built from the Product Manager's sample, which stays outside the
   repository (records 0023, 0029). Logs and reports hold GUIDs, kinds, archive paths and counts only.
 - N2: The catalog build writes no file anywhere (the cache is #25) and nothing into the installation.
-- N3: Untrusted input: the XML is read forward-only, one asset or text element at a time, never as a tree of the
-  whole file; without document type processing, external entities or network access; each file within the archive's
-  per-entry bound ([`game-files.md`](../../docs/areas/game-files.md), *Limits*); no byte sequence makes the Companion
-  throw or exit.
+- N3: Untrusted input: the XML is read forward-only, never as a tree of a whole file; without document type
+  processing, external entities or network access; one file at a time within the archive's per-entry bound
+  ([`game-files.md`](../../docs/areas/game-files.md), *Limits*), and one asset within a bound on depth and elements;
+  memory holds at most one file, the catalog and the texts it uses; no byte sequence makes the Companion throw or exit.
 - N4: The build runs in the background at every start until #25 caches it; tray, pipe connection, diagnostics window
   and `Exit` never wait for it.
 - N5: The catalog is built in `Censio.GameData` (platform-neutral, tested on Linux); another language needs only
@@ -108,14 +109,12 @@ Regions, as the data states them:
 
 ## Open questions
 
-- Q1: How do testers see the catalog? Answered: by the Product Manager, option A — names in the diagnostics window's
-  `Region` and `Good` cells, a `Catalog:` menu line, unreported GUIDs in the log (GUIDs only).
+- Q1: How do testers see the catalog? Answered: by the Product Manager, option A (record 0048).
 - Q2: Which nodes hold the data; does a patch archive hold copies? Answered: the Product Manager supplied
   `config.rda`'s files (kept outside the repository), which define all 284 non-zero fixture GUIDs with both texts,
   and saw no copies in the patch archives; E8 is the precedence should one appear.
 - Q3: May AC1 exclude GUID `0`? Answered: yes, by the Product Manager — it means "none".
-- Q4: Where, and how often? Answered: in the Companion (record 0023) at every start until #25; `assets.xml`
-  (46,440,056 bytes) fits the 512 MiB per-entry bound.
+- Q4: Where, and how often? Answered: in the Companion (record 0023) at every start until #25.
 
 ## Area documents
 
