@@ -10,14 +10,17 @@ public sealed class GameCatalog
     /// <summary>
     /// The entries
     /// </summary>
-#pragma warning disable S1144, S4487 // Skeleton: removed with the implementation
     private readonly IReadOnlyCollection<GameCatalogEntry> _entries;
+
+    /// <summary>
+    /// The entries by asset GUID
+    /// </summary>
+    private readonly Dictionary<int, GameCatalogEntry> _byGuid = [];
 
     /// <summary>
     /// The GUIDs defined or named more than once
     /// </summary>
-    private readonly IReadOnlyCollection<int> _ambiguousGuids;
-#pragma warning restore S1144, S4487
+    private readonly HashSet<int> _ambiguousGuids;
 
     #endregion // Fields
 
@@ -33,7 +36,13 @@ public sealed class GameCatalog
     public GameCatalog(IReadOnlyCollection<GameCatalogEntry> entries, IReadOnlyCollection<int> ambiguousGuids, int inheritedAssetCount, int droppedRegionTypeCount)
     {
         _entries = entries;
-        _ambiguousGuids = ambiguousGuids;
+        _ambiguousGuids = [.. ambiguousGuids];
+
+        foreach (var entry in entries)
+        {
+            _byGuid.TryAdd(entry.AssetGuid, entry);
+        }
+
         InheritedAssetCount = inheritedAssetCount;
         DroppedRegionTypeCount = droppedRegionTypeCount;
     }
@@ -45,9 +54,7 @@ public sealed class GameCatalog
     /// <summary>
     /// Gets the number of entries.
     /// </summary>
-#pragma warning disable S2325 // Skeleton: removed with the implementation
-    public int Count => throw new NotImplementedException();
-#pragma warning restore S2325
+    public int Count => _entries.Count;
 
     /// <summary>
     /// Gets the number of inherited assets left out.
@@ -68,10 +75,9 @@ public sealed class GameCatalog
     /// </summary>
     /// <param name="assetGuid">The asset GUID</param>
     /// <returns>The entry, or <c>null</c> when there is none or the GUID is ambiguous</returns>
-#pragma warning disable S2325 // Skeleton: removed with the implementation
     public GameCatalogEntry? Find(int assetGuid)
     {
-        throw new NotImplementedException();
+        return _ambiguousGuids.Contains(assetGuid) ? null : _byGuid.GetValueOrDefault(assetGuid);
     }
 
     /// <summary>
@@ -81,10 +87,25 @@ public sealed class GameCatalog
     /// <returns>The problem, or <see cref="GameCatalogProblem.None" /></returns>
     public GameCatalogProblem Check(int assetGuid)
     {
-        throw new NotImplementedException();
-    }
+        if (_ambiguousGuids.Contains(assetGuid))
+        {
+            return GameCatalogProblem.Ambiguous;
+        }
 
-#pragma warning restore S2325
+        if (_byGuid.TryGetValue(assetGuid, out var entry) == false)
+        {
+            return GameCatalogProblem.Unknown;
+        }
+
+        var names = (string.IsNullOrEmpty(entry.EnglishName) ? 0 : 1) + (string.IsNullOrEmpty(entry.GermanName) ? 0 : 1);
+
+        return names switch
+               {
+                   2 => GameCatalogProblem.None,
+                   1 => GameCatalogProblem.Incomplete,
+                   _ => GameCatalogProblem.Nameless
+               };
+    }
 
     #endregion // Methods
 }
