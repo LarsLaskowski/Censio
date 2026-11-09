@@ -251,14 +251,16 @@ public static class TrayMenu
     /// </summary>
     /// <param name="version">The product version</param>
     /// <param name="snapshot">The snapshot</param>
+    /// <param name="game">The status of the game installation search</param>
     /// <param name="isAutostartEnabled">Whether the Companion starts with Windows</param>
     /// <param name="clock">The clock</param>
     /// <returns>The entries in display order</returns>
-    public static IReadOnlyList<TrayMenuEntry> Create(string version, TraySnapshot snapshot, bool isAutostartEnabled, TimeProvider clock)
+    public static IReadOnlyList<TrayMenuEntry> Create(string version, TraySnapshot snapshot, GameInstallationStatus game, bool isAutostartEnabled, TimeProvider clock)
     {
         return [
                    new TrayMenuEntry(TrayMenuEntryKind.Status, $"Status: {snapshot.StatusText}", false),
                    new TrayMenuEntry(TrayMenuEntryKind.LastTick, FormatLastTick(snapshot.LastTick, clock), false),
+                   new TrayMenuEntry(TrayMenuEntryKind.Game, FormatGame(game), false),
                    new TrayMenuEntry(TrayMenuEntryKind.Separator, string.Empty, false),
                    new TrayMenuEntry(TrayMenuEntryKind.OpenDiagnostics, OpenDiagnosticsText, true),
                    new TrayMenuEntry(TrayMenuEntryKind.ToggleRecording, snapshot.IsRecording ? StopRecordingText : StartRecordingText, snapshot.CanRecord),
@@ -271,6 +273,28 @@ public static class TrayMenu
                    new TrayMenuEntry(TrayMenuEntryKind.Separator, string.Empty, false),
                    new TrayMenuEntry(TrayMenuEntryKind.Exit, ExitText, true)
                ];
+    }
+
+    /// <summary>
+    /// Formats the text of the game entry.
+    /// </summary>
+    /// <param name="status">The status of the game installation search</param>
+    /// <returns>The text</returns>
+    public static string FormatGame(GameInstallationStatus status)
+    {
+        var source = status.Source == GameInstallationSource.UbisoftConnect ? "Ubisoft Connect" : "settings file";
+
+        return status.Kind switch
+               {
+                   GameInstallationStatusKind.Searching => "Game: searching",
+                   GameInstallationStatusKind.Found => $"Game: build {status.Build ?? "unknown"} ({source})",
+                   GameInstallationStatusKind.NotFound => "Game: not found",
+                   GameInstallationStatusKind.SettingsFolderNotFound => "Game: folder in settings not found",
+                   GameInstallationStatusKind.SettingsFolderNotFullPath => "Game: folder in settings is not a full path",
+                   GameInstallationStatusKind.SettingsFolderNotInstallation => "Game: folder in settings is not an Anno 117 installation",
+                   GameInstallationStatusKind.SettingsFileInvalid => "Game: settings file invalid",
+                   _ => throw new ArgumentOutOfRangeException(nameof(status), status.Kind, "The status kind is not defined")
+               };
     }
 
     /// <summary>

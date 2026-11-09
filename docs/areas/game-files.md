@@ -4,7 +4,7 @@
 
 Reading the game's archives in `Censio.GameData`: the archive format version that is read, the block and entry
 kinds, the bounds, the failure kinds, the read-only access shared with the running game, where the game keeps its
-names, texts and icons, and the installation survey that found them. Finding the installation (#22) and building the
+names, texts and icons, and the installation survey that found them. Finding the installation ([`game-installation.md`](game-installation.md)) and building the
 catalog from these files (#23 to #26) are not part of it; they rely on this document for what a reader returns and
 where to look. The archives are untrusted input: the layout is built from the community's description of the format
 and confirmed on a real installation by the layout probe and the survey run (record 0043). A game update may change
@@ -133,6 +133,6 @@ an archive. The largest entry counts are 21,028 (`zz_patchfiles_300`), 46,110 (`
 
 ## Not here
 
-- Finding the installation folder (#22) and building the catalog, converting icons, the cache and the catalog format
+- Finding the installation folder ([`game-installation.md`](game-installation.md)) and building the catalog, converting icons, the cache and the catalog format
   (#23 to #26).
 - The log of the Companion and what may be logged: [`companion.md`](companion.md).

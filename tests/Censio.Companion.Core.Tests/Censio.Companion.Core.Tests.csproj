@@ -15,4 +15,7 @@
     <Compile Include="..\Censio.Pipe.Tests\RecordingTimeProvider.cs" Link="RecordingTimeProvider.cs" />
     <Compile Include="..\Censio.Server.Tests\RecordingLogger.cs" Link="RecordingLogger.cs" />
   </ItemGroup>
+  <ItemGroup>
+    <None Update="Fixtures\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

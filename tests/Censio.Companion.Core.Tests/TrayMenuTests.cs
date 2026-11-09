@@ -49,7 +49,7 @@ public sealed class TrayMenuTests
     }
 
     /// <summary>
-    /// The menu lists status, last tick, separator, open diagnostics, toggle, both folder entries, separator, start with
+    /// The menu lists status, last tick, game, separator, open diagnostics, toggle, both folder entries, separator, start with
     /// Windows, separator, version, separator and exit, in this order, with the status and last-tick entries greyed out and
     /// no entry checked while the autostart is off.
     /// </summary>
@@ -62,6 +62,7 @@ public sealed class TrayMenuTests
                             {
                                 TrayMenuEntryKind.Status,
                                 TrayMenuEntryKind.LastTick,
+                                TrayMenuEntryKind.Game,
                                 TrayMenuEntryKind.Separator,
                                 TrayMenuEntryKind.OpenDiagnostics,
                                 TrayMenuEntryKind.ToggleRecording,
@@ -78,6 +79,7 @@ public sealed class TrayMenuTests
                             {
                                 "Status: Receiving",
                                 "Last tick: 00:30:00, 3 islands",
+                                "Game: searching",
                                 string.Empty,
                                 "Open diagnostics",
                                 "Start recording",
@@ -90,16 +92,16 @@ public sealed class TrayMenuTests
                                 string.Empty,
                                 "Exit"
                             };
-        var expectedEnabled = new[] { false, false, false, true, true, true, true, false, true, false, false, false, true };
-        var expectedChecked = new bool[13];
+        var expectedEnabled = new[] { false, false, false, false, true, true, true, true, false, true, false, false, false, true };
+        var expectedChecked = new bool[14];
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, false, CreateClock(1));
+        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, false, CreateClock(1));
 
         // Assert
         Assert.AreSequenceEqual(expectedKinds, entries.Select(entry => entry.Kind).ToArray(), "The entries should be in the order of the menu");
-        Assert.AreSequenceEqual(expectedTexts, entries.Select(entry => entry.Text).ToArray(), "The entries should carry the status, the last tick, open diagnostics, the toggle, the folders, the version and Exit");
-        Assert.AreSequenceEqual(expectedEnabled, entries.Select(entry => entry.IsEnabled).ToArray(), "Status, last tick, version and separators should be greyed out, the rest enabled");
+        Assert.AreSequenceEqual(expectedTexts, entries.Select(entry => entry.Text).ToArray(), "The entries should carry the status, the last tick, the game, open diagnostics, the toggle, the folders, the version and Exit");
+        Assert.AreSequenceEqual(expectedEnabled, entries.Select(entry => entry.IsEnabled).ToArray(), "Status, last tick, game, version and separators should be greyed out, the rest enabled");
         Assert.AreSequenceEqual(expectedChecked, entries.Select(entry => entry.IsChecked).ToArray(), "No entry should be checked while the autostart is off");
     }
 
@@ -119,7 +121,7 @@ public sealed class TrayMenuTests
         var snapshot = CreateSnapshotForMode(mode);
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, false, CreateClock(1));
+        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, false, CreateClock(1));
 
         // Assert
         var autostart = entries.SingleOrDefault(entry => entry.Kind == TrayMenuEntryKind.ToggleAutostart);
@@ -140,7 +142,7 @@ public sealed class TrayMenuTests
         var snapshot = CreateSnapshot("Receiving", canRecord: true, isRecording: false);
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, true, CreateClock(1));
+        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, true, CreateClock(1));
 
         // Assert
         var checkedKinds = entries.Where(entry => entry.IsChecked).Select(entry => entry.Kind).ToArray();
@@ -159,7 +161,7 @@ public sealed class TrayMenuTests
         var snapshot = CreateSnapshot("Receiving", canRecord: true, isRecording: false);
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, false, CreateClock(1));
+        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, false, CreateClock(1));
 
         // Assert
         var autostart = entries.SingleOrDefault(entry => entry.Kind == TrayMenuEntryKind.ToggleAutostart);
@@ -185,7 +187,7 @@ public sealed class TrayMenuTests
         var snapshot = CreateSnapshotForMode(mode);
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, false, CreateClock(1));
+        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, false, CreateClock(1));
 
         // Assert
         var kinds = entries.Select(entry => entry.Kind).ToList();
@@ -206,7 +208,7 @@ public sealed class TrayMenuTests
         var snapshot = CreateSnapshot("Receiving (recording)", canRecord: true, isRecording: true);
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, false, CreateClock(1));
+        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, false, CreateClock(1));
 
         // Assert
         var toggle = entries.Single(entry => entry.Kind == TrayMenuEntryKind.ToggleRecording);
@@ -225,7 +227,7 @@ public sealed class TrayMenuTests
         var snapshot = CreateSnapshot("Replay: Receiving", canRecord: false, isRecording: false);
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, false, CreateClock(1));
+        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, false, CreateClock(1));
 
         // Assert
         var toggle = entries.Single(entry => entry.Kind == TrayMenuEntryKind.ToggleRecording);
@@ -248,7 +250,7 @@ public sealed class TrayMenuTests
         var snapshot = TraySnapshot.ForInvalidCommandLine();
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, false, CreateClock(1));
+        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, false, CreateClock(1));
 
         // Assert
         var toggle = entries.Single(entry => entry.Kind == TrayMenuEntryKind.ToggleRecording);
@@ -277,7 +279,7 @@ public sealed class TrayMenuTests
         var snapshot = CreateSnapshot(statusText, canRecord: true, isRecording: false);
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, false, CreateClock(1));
+        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, false, CreateClock(1));
 
         // Assert
         var status = entries.Single(entry => entry.Kind == TrayMenuEntryKind.Status);
@@ -296,7 +298,7 @@ public sealed class TrayMenuTests
         const string version = "1.2.3";
 
         // Act
-        var entries = TrayMenu.Create(version, CreateSnapshot("Receiving", canRecord: true, isRecording: false), false, CreateClock(1));
+        var entries = TrayMenu.Create(version, CreateSnapshot("Receiving", canRecord: true, isRecording: false), GameInstallationStatus.Searching, false, CreateClock(1));
 
         // Assert
         Assert.IsFalse(entries.Single(entry => entry.Kind == TrayMenuEntryKind.Version).IsEnabled, "The version entry should be greyed out");
@@ -312,7 +314,7 @@ public sealed class TrayMenuTests
         const string version = "1.2.3";
 
         // Act
-        var entries = TrayMenu.Create(version, CreateSnapshot("Receiving", canRecord: true, isRecording: false), false, CreateClock(1));
+        var entries = TrayMenu.Create(version, CreateSnapshot("Receiving", canRecord: true, isRecording: false), GameInstallationStatus.Searching, false, CreateClock(1));
 
         // Assert
         Assert.IsTrue(entries.Single(entry => entry.Kind == TrayMenuEntryKind.Exit).IsEnabled, "The exit entry should be enabled");
@@ -328,7 +330,7 @@ public sealed class TrayMenuTests
         var version = ProductVersion.Read(typeof(TrayMenu).Assembly);
 
         // Act
-        var entries = TrayMenu.Create(version, CreateSnapshot("Receiving", canRecord: true, isRecording: false), false, CreateClock(1));
+        var entries = TrayMenu.Create(version, CreateSnapshot("Receiving", canRecord: true, isRecording: false), GameInstallationStatus.Searching, false, CreateClock(1));
 
         // Assert
         Assert.AreEqual("Version " + version, entries.Single(entry => entry.Kind == TrayMenuEntryKind.Version).Text, "The version entry should read Version followed by the product version");
@@ -886,6 +888,164 @@ public sealed class TrayMenuTests
 
         // Assert
         Assert.AreEqual(expected, actual, "The Core assembly should carry the build version as its informational version");
+    }
+
+    /// <summary>
+    /// The game entry lies directly below the last-tick entry and above the first separator, greyed out like it, and shows
+    /// the text of each status, never the folder.
+    /// </summary>
+    /// <param name="kind">The status kind</param>
+    /// <param name="source">The source of a found installation</param>
+    /// <param name="build">The build of a found installation</param>
+    /// <param name="expected">The expected text</param>
+    [TestMethod]
+    [TestCategory("AC1")]
+    [TestCategory("AC3")]
+    [TestCategory("AC4")]
+    [TestCategory("AC5")]
+    [TestCategory("AC6")]
+    [DataRow(GameInstallationStatusKind.Searching, null, null, "Game: searching", DisplayName = "Searching")]
+    [DataRow(GameInstallationStatusKind.Found, GameInstallationSource.UbisoftConnect, "26.29905.4.51797", "Game: build 26.29905.4.51797 (Ubisoft Connect)", DisplayName = "Found through Ubisoft Connect")]
+    [DataRow(GameInstallationStatusKind.Found, GameInstallationSource.SettingsFile, null, "Game: build unknown (settings file)", DisplayName = "Found through the settings file, build unknown")]
+    [DataRow(GameInstallationStatusKind.NotFound, null, null, "Game: not found", DisplayName = "Not found")]
+    [DataRow(GameInstallationStatusKind.SettingsFolderNotFound, null, null, "Game: folder in settings not found", DisplayName = "Settings folder not found")]
+    [DataRow(GameInstallationStatusKind.SettingsFolderNotFullPath, null, null, "Game: folder in settings is not a full path", DisplayName = "Settings folder not a full path")]
+    [DataRow(GameInstallationStatusKind.SettingsFolderNotInstallation, null, null, "Game: folder in settings is not an Anno 117 installation", DisplayName = "Settings folder not an installation")]
+    [DataRow(GameInstallationStatusKind.SettingsFileInvalid, null, null, "Game: settings file invalid", DisplayName = "Settings file invalid")]
+    public void TrayMenuCreateGameLineBelowLastTick(GameInstallationStatusKind kind, GameInstallationSource? source, string? build, string expected)
+    {
+        // Arrange
+        var snapshot = CreateSnapshot("Receiving", canRecord: true, isRecording: false);
+        var game = CreateGameStatus(kind, source, build);
+
+        // Act
+        var entries = TrayMenu.Create("1.2.3", snapshot, game, false, CreateClock(1));
+
+        // Assert
+        var kinds = entries.Select(entry => entry.Kind).ToList();
+        var index = kinds.IndexOf(TrayMenuEntryKind.Game);
+
+        Assert.ContainsSingle(entryKind => entryKind == TrayMenuEntryKind.Game, kinds, "The menu should hold exactly one game entry");
+        Assert.AreEqual(kinds.IndexOf(TrayMenuEntryKind.LastTick) + 1, index, "The game entry should be directly below the last-tick entry");
+        Assert.AreEqual(kinds.IndexOf(TrayMenuEntryKind.Separator) - 1, index, "The game entry should be directly above the first separator");
+        Assert.AreEqual(expected, entries[index].Text, "The game entry should show the text of the status");
+        Assert.IsFalse(entries[index].IsEnabled, "The game entry should be greyed out like the last-tick entry");
+        Assert.IsFalse(entries[index].IsChecked, "The game entry should not be checked");
+    }
+
+    /// <summary>
+    /// A found installation shows its build and its source.
+    /// </summary>
+    /// <param name="source">The source</param>
+    /// <param name="expected">The expected text</param>
+    [TestMethod]
+    [TestCategory("AC1")]
+    [TestCategory("AC2")]
+    [DataRow(GameInstallationSource.UbisoftConnect, "Game: build 26.29905.4.51797 (Ubisoft Connect)", DisplayName = "Ubisoft Connect")]
+    [DataRow(GameInstallationSource.SettingsFile, "Game: build 26.29905.4.51797 (settings file)", DisplayName = "Settings file")]
+    public void TrayMenuFormatGameFoundShowsBuildAndSource(GameInstallationSource source, string expected)
+    {
+        // Arrange
+        var status = CreateGameStatus(GameInstallationStatusKind.Found, source, "26.29905.4.51797");
+
+        // Act
+        var text = TrayMenu.FormatGame(status);
+
+        // Assert
+        Assert.AreEqual(expected, text, "A found installation should show its build and source, not its folder");
+    }
+
+    /// <summary>
+    /// A wrong game folder or settings file shows the fixed text of its case.
+    /// </summary>
+    /// <param name="kind">The status kind</param>
+    /// <param name="expected">The expected text</param>
+    [TestMethod]
+    [TestCategory("AC3")]
+    [DataRow(GameInstallationStatusKind.SettingsFolderNotFound, "Game: folder in settings not found", DisplayName = "E1")]
+    [DataRow(GameInstallationStatusKind.SettingsFolderNotFullPath, "Game: folder in settings is not a full path", DisplayName = "E2")]
+    [DataRow(GameInstallationStatusKind.SettingsFolderNotInstallation, "Game: folder in settings is not an Anno 117 installation", DisplayName = "E3")]
+    [DataRow(GameInstallationStatusKind.SettingsFileInvalid, "Game: settings file invalid", DisplayName = "E4")]
+    public void TrayMenuFormatGameProblemShowsText(GameInstallationStatusKind kind, string expected)
+    {
+        // Arrange
+        var status = CreateGameStatus(kind, null, null);
+
+        // Act
+        var text = TrayMenu.FormatGame(status);
+
+        // Assert
+        Assert.AreEqual(expected, text, "The problem should show the fixed text of its case");
+    }
+
+    /// <summary>
+    /// Nothing found shows not found.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC4")]
+    public void TrayMenuFormatGameNotFoundShowsText()
+    {
+        // Arrange
+        var status = CreateGameStatus(GameInstallationStatusKind.NotFound, null, null);
+
+        // Act
+        var text = TrayMenu.FormatGame(status);
+
+        // Assert
+        Assert.AreEqual("Game: not found", text, "Nothing found should show not found");
+    }
+
+    /// <summary>
+    /// A found installation without a build shows the build as unknown with its source.
+    /// </summary>
+    /// <param name="source">The source</param>
+    /// <param name="expected">The expected text</param>
+    [TestMethod]
+    [TestCategory("AC5")]
+    [DataRow(GameInstallationSource.UbisoftConnect, "Game: build unknown (Ubisoft Connect)", DisplayName = "Ubisoft Connect")]
+    [DataRow(GameInstallationSource.SettingsFile, "Game: build unknown (settings file)", DisplayName = "Settings file")]
+    public void TrayMenuFormatGameUnknownBuildShowsText(GameInstallationSource source, string expected)
+    {
+        // Arrange
+        var status = CreateGameStatus(GameInstallationStatusKind.Found, source, null);
+
+        // Act
+        var text = TrayMenu.FormatGame(status);
+
+        // Assert
+        Assert.AreEqual(expected, text, "A found installation without a build should show the build as unknown");
+    }
+
+    /// <summary>
+    /// A search that has not ended shows searching.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC6")]
+    public void TrayMenuFormatGameSearchingShowsText()
+    {
+        // Act
+        var text = TrayMenu.FormatGame(GameInstallationStatus.Searching);
+
+        // Assert
+        Assert.AreEqual("Game: searching", text, "A running search should show searching");
+    }
+
+    /// <summary>
+    /// Creates a game installation status; a found one carries a folder, which the menu must not show.
+    /// </summary>
+    /// <param name="kind">The status kind</param>
+    /// <param name="source">The source of a found installation</param>
+    /// <param name="build">The build of a found installation</param>
+    /// <returns>The status</returns>
+    private static GameInstallationStatus CreateGameStatus(GameInstallationStatusKind kind, GameInstallationSource? source, string? build)
+    {
+        return new GameInstallationStatus
+               {
+                   Kind = kind,
+                   Source = source,
+                   Folder = source is null ? null : "E:/Anno 117 - Pax Romana/",
+                   Build = build
+               };
     }
 
     /// <summary>

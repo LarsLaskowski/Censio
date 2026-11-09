@@ -106,7 +106,7 @@ On Linux a published port bypasses host firewalls such as ufw and firewalld, so 
 The Companion is the Windows program that reads the statistics of the running game. Download `Censio-<version>-win-x64.zip` from the release page `https://github.com/LarsLaskowski/Censio/releases` (under *Assets* of the release). It needs Windows 10 22H2 or Windows 11, 64-bit; it needs no installed .NET, no installer and no administrator rights. Windows other than these and arm64 are not supported. Not yet tried: the ZIP of `v0.1.0` on a machine without .NET.
 
 1. Extract the ZIP to a folder of your choice. It holds one file, `Censio.Companion.exe`.
-2. Start `Censio.Companion.exe`. A tray icon appears; its menu shows the status, the last tick, `Open diagnostics`, `Start recording`, `Open recordings folder`, `Open log folder`, `Start with Windows`, `Version <version>` and `Exit`.
+2. Start `Censio.Companion.exe`. A tray icon appears; its menu shows the status, the last tick, the game installation (`Game: …`, see *Game installation* below), `Open diagnostics`, `Start recording`, `Open recordings folder`, `Open log folder`, `Start with Windows`, `Version <version>` and `Exit`.
 
 The program is not signed, so Windows SmartScreen may show "Windows protected your PC" the first time. Choose "More info", then "Run anyway" (on a German Windows: "Weitere Informationen", then "Trotzdem ausführen"). Tip reported by the Product Manager from a German Windows, not tried against a real release download: open the properties of the extracted `Censio.Companion.exe` (or of the ZIP itself), tick *Zulassen* (on an English Windows probably *Unblock*; not yet tried) and apply; SmartScreen then does not ask.
 
@@ -148,6 +148,49 @@ The menu entry `Open diagnostics` opens a window with the last tick: a header wi
 | ` (recording failed)` after the state | Writing the recording failed (for example the disk is full or too slow); recording stopped, the Companion keeps working | Free disk space, then choose `Start recording`: it tries again with a new file |
 
 When the game quits, the Companion returns to `Waiting for game` and connects again by itself when the game is back; loading another save and a return to the main menu keep the connection. `Exit` in the tray menu works in every state and ends the program within 2 seconds.
+
+#### Game installation
+
+The Companion looks for your Anno 117 installation once at every start, in the background; the tray menu and `Exit` work while it runs. The result is the greyed-out menu line `Game: …` directly below `Last tick:`, for example `Game: build 26.29905.4.51797 (Ubisoft Connect)`. The Companion only reads: it writes nothing to the game, the registry or your settings file. The line is not shown in the diagnostics window.
+
+**Search order.**
+
+1. The folder named in the settings file (below). If it is set it is used, and nothing else is searched.
+2. Ubisoft Connect's records of installed games (the registry key `HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Ubisoft\Launcher\Installs`, read only): the first valid record by number is used, and a record that points at a folder without the game is skipped. A record that points at a network (UNC) or device path is never followed; a mapped drive letter or a folder link still is.
+3. Ubisoft Connect's default games folder, `C:\Program Files (x86)\Ubisoft\Ubisoft Game Launcher\games` (below the 32-bit Program Files folder).
+
+An installation is a folder that holds `maindata\config.rda` and `bin\win64\anno117.exe`. Steam is not searched: with a Steam copy, or a game in another folder, use the settings file. A change counts after the next start of the Companion.
+
+**The build** is the file version of `bin\win64\anno117.exe` as four numbers, for example `26.29905.4.51797`. It is not the version the game's main menu shows (`3.0.1733841` on the same installation), and Ubisoft Connect shows none. Not yet verified: that the build changes with every game update.
+
+**The settings file.** Create `%LOCALAPPDATA%\Censio\settings.json` (type that path into the Explorer address bar; the folder `Censio` exists once the Companion has run) with your game folder, for example:
+
+```json
+{
+  "gameFolder": "C:\\Games\\Anno 117"
+}
+```
+
+- Write a full path and double every backslash, or use forward slashes (`"C:/Games/Anno 117"`). The folder is the one that holds `maindata` and `bin`, not `maindata` itself. Variables such as `%USERPROFILE%` and a bare drive letter (`"C:"`) are not full paths. A network path (`\\\\server\\share\\Anno 117`) you write here is used as written, and Windows then contacts that server.
+- The key `gameFolder` is read ignoring case (`GameFolder` works); any other spelling, such as `game_folder`, is an unknown key, which is ignored: the automatic search runs and the menu then shows `(Ubisoft Connect)` or `Game: not found`, not `(settings file)`. Other keys are ignored. A blank `gameFolder` counts as not set.
+- The file is UTF-8 (Notepad's byte order mark is fine), comments (`//`, `/* */`) and trailing commas are accepted, and it may be up to 1 MiB. Edit it with the Companion closed and start it again.
+- A wrong folder in the file is never replaced by a searched one, so that you see the mistake.
+
+**Menu texts.**
+
+| Text | What to do |
+| ---- | ---------- |
+| `Game: searching` | Wait; it ends by itself. A slow or sleeping drive can take a while. |
+| `Game: build <build> (Ubisoft Connect)` | Nothing; found through Ubisoft Connect. |
+| `Game: build <build> (settings file)` | Nothing; the folder of your settings file is used. |
+| `Game: build unknown (…)` | The installation is used, but its program file has no readable version. Nothing to do. |
+| `Game: not found` | Neither Ubisoft Connect's records nor its default folder hold the game (for example a Steam copy). Name the folder in the settings file. |
+| `Game: folder in settings not found` | The folder in `gameFolder` does not exist. Correct the path (a variable inside a path is not expanded, so it is not found either). |
+| `Game: folder in settings is not a full path` | Write the full path, starting with the drive letter, for example `C:\\Games\\Anno 117`. |
+| `Game: folder in settings is not an Anno 117 installation` | The folder lacks `maindata\config.rda` or `bin\win64\anno117.exe`. Name the folder that holds `maindata` and `bin`. |
+| `Game: settings file invalid` | The file is not valid JSON or not an object, `gameFolder` is not a text, the key occurs twice, the file is larger than 1 MiB or it cannot be read. The log names the reason. |
+
+The log (`Open log folder`) names the cause of every problem and, when the game is found, the source, the build and the folder.
 
 #### Recording and replay
 
@@ -243,13 +286,13 @@ Tried by the Product Manager on Windows 11 (26H2) with Ubisoft Connect in German
 
 Server: open `http://localhost:8080/`; the start page shows the heading `Censio` and the line `Version <version>`. `curl http://localhost:8080/health` answers `Healthy`, and after a few seconds `docker ps` shows the container as `(healthy)`. The first start creates the first data-protection key, and ASP.NET Core logs the warning `No XML encryptor configured` once (see *Limits*).
 
-Companion: the program opens no window until you choose `Open diagnostics`, and shows a taskbar button only while that window is open. One icon appears in the notification area with the tooltip `Censio Companion: <state>` (the states are listed under *Connecting to the game* above); its menu holds the greyed-out status and last tick, `Open diagnostics`, `Start recording` (or `Stop recording`), `Open recordings folder`, `Open log folder`, `Start with Windows` (checked while it is on), `Version <version>` (greyed out) and `Exit`, which removes the icon and ends the program within 2 seconds. The icon is a grey ring, a green circle or a red triangle by state. A second start in the same Windows session does nothing: it ends at once without a message and writes no log line, and the first keeps running. Windows SmartScreen asks once at the first start (see *Companion* above).
+Companion: the program opens no window until you choose `Open diagnostics`, and shows a taskbar button only while that window is open. One icon appears in the notification area with the tooltip `Censio Companion: <state>` (the states are listed under *Connecting to the game* above); its menu holds the greyed-out status, last tick and game installation (`Game: …`, see *Game installation* above), `Open diagnostics`, `Start recording` (or `Stop recording`), `Open recordings folder`, `Open log folder`, `Start with Windows` (checked while it is on), `Version <version>` (greyed out) and `Exit`, which removes the icon and ends the program within 2 seconds. The icon is a grey ring, a green circle or a red triangle by state. A second start in the same Windows session does nothing: it ends at once without a message and writes no log line, and the first keeps running. Windows SmartScreen asks once at the first start (see *Companion* above).
 
 ## Data and logs
 
 Server: the data directory is `/config` in the Docker image. It holds the data-protection key ring in `/config/data-protection-keys`; the keys are unencrypted, so keep the directory and its backups private. The server writes its log to the console; read it with `docker logs censio`. Log times are UTC. The settings are listed in the [README](../README.md#configuration).
 
-Companion: it stores no game data of its own, and the diagnostics window stores nothing (it shows the last tick on screen only and writes nothing to disk or to the log). It writes recording files to `%LOCALAPPDATA%\Censio\Recordings` only while a recording runs (`--record` or `Start recording`); they hold the data of your game as it was sent, stay on your computer and are never deleted by the program, so delete them by hand (*Recording and replay*). It also writes a log to `%LOCALAPPDATA%\Censio\Logs`: one file per day, `companion-<yyyyMMdd>.log` (a file that grows past 10 MiB continues in `companion-<yyyyMMdd>-2.log` and so on). The Companion keeps the 10 newest of these files and deletes older ones; it deletes no other file in the folder. The menu entries `Open recordings folder` and `Open log folder` open both folders in Explorer. Only when you turn `Start with Windows` on does it write one value `Censio Companion` under `HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run` (your account only), and it deletes that value when you turn it off; the log then holds `Autostart enabled` or `Autostart disabled`, and a warning if the setting could not be read or changed (no file path). A line holds the local time, the level and the message: the start, every change of the connection state, recording started and stopped, the names of recording files, replay start and end, and problems. The log holds no game data, but an error text can contain a file path, and so your Windows user name.
+Companion: it stores no game data of its own, and the diagnostics window stores nothing (it shows the last tick on screen only and writes nothing to disk or to the log). It writes recording files to `%LOCALAPPDATA%\Censio\Recordings` only while a recording runs (`--record` or `Start recording`); they hold the data of your game as it was sent, stay on your computer and are never deleted by the program, so delete them by hand (*Recording and replay*). It also writes a log to `%LOCALAPPDATA%\Censio\Logs`: one file per day, `companion-<yyyyMMdd>.log` (a file that grows past 10 MiB continues in `companion-<yyyyMMdd>-2.log` and so on). The Companion keeps the 10 newest of these files and deletes older ones; it deletes no other file in the folder. The menu entries `Open recordings folder` and `Open log folder` open both folders in Explorer. Only when you turn `Start with Windows` on does it write one value `Censio Companion` under `HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run` (your account only), and it deletes that value when you turn it off; the log then holds `Autostart enabled` or `Autostart disabled`, and a warning if the setting could not be read or changed (no file path). A line holds the local time, the level and the message: the start, every change of the connection state, recording started and stopped, the names of recording files, replay start and end, the result of the game installation search (the source, the build and the game folder, or the reason it failed; see *Game installation*), and problems. The log holds no game data, but the game folder at every start and an error text can contain a file path, and so your Windows user name; check a log before you share it. The Companion also reads, but never writes, the optional settings file `%LOCALAPPDATA%\Censio\settings.json` and Ubisoft Connect's install records in the registry.
 
 ## Reporting problems
 
@@ -369,7 +412,7 @@ Unter Linux umgeht ein veröffentlichter Port Host-Firewalls wie ufw und firewal
 Der Companion ist das Windows-Programm, das die Statistik des laufenden Spiels liest. `Censio-<version>-win-x64.zip` von der Release-Seite `https://github.com/LarsLaskowski/Censio/releases` herunterladen (beim Release unter *Assets*). Er braucht Windows 10 22H2 oder Windows 11, 64 Bit; er braucht kein installiertes .NET, keinen Installer und keine Administratorrechte. Anderes Windows und arm64 werden nicht unterstützt. Noch nicht ausprobiert: das ZIP von `v0.1.0` auf einem Rechner ohne .NET.
 
 1. Das ZIP in einen beliebigen Ordner entpacken. Es enthält eine Datei, `Censio.Companion.exe`.
-2. `Censio.Companion.exe` starten. Ein Tray-Symbol erscheint; sein Menü zeigt den Status, den letzten Tick, `Open diagnostics`, `Start recording`, `Open recordings folder`, `Open log folder`, `Start with Windows`, `Version <version>` und `Exit`.
+2. `Censio.Companion.exe` starten. Ein Tray-Symbol erscheint; sein Menü zeigt den Status, den letzten Tick, die Spielinstallation (`Game: …`, siehe *Spielinstallation* unten), `Open diagnostics`, `Start recording`, `Open recordings folder`, `Open log folder`, `Start with Windows`, `Version <version>` und `Exit`.
 
 Das Programm ist nicht signiert, deshalb zeigt Windows SmartScreen beim ersten Start unter Umständen „Der Computer wurde durch Windows geschützt“. „Weitere Informationen“ wählen, dann „Trotzdem ausführen“ (unter englischem Windows: "More info", "Run anyway"). Tipp, vom Product Manager unter deutschem Windows gemeldet und noch nicht an einem echten Release-Download ausprobiert: die Eigenschaften der entpackten `Censio.Companion.exe` (oder des ZIP selbst) öffnen, *Zulassen* ankreuzen (unter englischem Windows vermutlich *Unblock*; noch nicht ausprobiert) und übernehmen; SmartScreen fragt dann nicht.
 
@@ -411,6 +454,49 @@ Der Menüeintrag `Open diagnostics` öffnet ein Fenster mit dem letzten Tick: ei
 | ` (recording failed)` nach dem Zustand | Das Schreiben der Aufzeichnung ist fehlgeschlagen (zum Beispiel weil die Platte voll oder zu langsam ist); die Aufzeichnung endete, der Companion arbeitet weiter | Speicherplatz schaffen, dann `Start recording` wählen: Es versucht es mit einer neuen Datei erneut |
 
 Beendet man das Spiel, kehrt der Companion zu `Waiting for game` zurück und verbindet sich von selbst wieder, sobald das Spiel zurück ist; das Laden eines anderen Spielstands und der Wechsel ins Hauptmenü behalten die Verbindung. `Exit` im Tray-Menü funktioniert in jedem Zustand und beendet das Programm innerhalb von 2 Sekunden.
+
+#### Spielinstallation
+
+Der Companion sucht Ihre Anno-117-Installation bei jedem Start einmal im Hintergrund; das Tray-Menü und `Exit` funktionieren währenddessen. Das Ergebnis ist die ausgegraute Menüzeile `Game: …` direkt unter `Last tick:`, zum Beispiel `Game: build 26.29905.4.51797 (Ubisoft Connect)`. Der Companion liest nur: Er schreibt nichts ins Spiel, in die Registry oder in Ihre Einstellungsdatei. Das Diagnosefenster zeigt die Zeile nicht.
+
+**Suchreihenfolge.**
+
+1. Der in der Einstellungsdatei (unten) genannte Ordner. Ist er gesetzt, wird er verwendet, und sonst wird nichts gesucht.
+2. Die Einträge von Ubisoft Connect zu installierten Spielen (der Registry-Schlüssel `HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Ubisoft\Launcher\Installs`, nur lesend): Der erste gültige Eintrag nach Nummer wird verwendet; ein Eintrag, der auf einen Ordner ohne das Spiel zeigt, wird übersprungen. Ein Eintrag, der auf einen Netzwerkpfad (UNC) oder Gerätepfad zeigt, wird nie verfolgt; ein zugeordneter Laufwerksbuchstabe oder eine Ordnerverknüpfung dagegen schon.
+3. Der Standard-Spieleordner von Ubisoft Connect, `C:\Program Files (x86)\Ubisoft\Ubisoft Game Launcher\games` (unter dem 32-Bit-Programmordner).
+
+Eine Installation ist ein Ordner, der `maindata\config.rda` und `bin\win64\anno117.exe` enthält. Steam wird nicht durchsucht: Bei einer Steam-Kopie oder einem Spiel in einem anderen Ordner die Einstellungsdatei verwenden. Eine Änderung gilt nach dem nächsten Start des Companions.
+
+**Der Build** ist die Dateiversion von `bin\win64\anno117.exe` als vier Zahlen, zum Beispiel `26.29905.4.51797`. Er ist nicht die Version, die das Hauptmenü des Spiels zeigt (`3.0.1733841` bei derselben Installation), und Ubisoft Connect zeigt keine. Noch nicht überprüft: dass sich der Build mit jedem Spiel-Update ändert.
+
+**Die Einstellungsdatei.** `%LOCALAPPDATA%\Censio\settings.json` anlegen (den Pfad in die Adresszeile des Explorers eingeben; der Ordner `Censio` existiert, sobald der Companion einmal lief) mit Ihrem Spieleordner, zum Beispiel:
+
+```json
+{
+  "gameFolder": "C:\\Games\\Anno 117"
+}
+```
+
+- Einen vollständigen Pfad schreiben und jeden Backslash verdoppeln, oder Schrägstriche verwenden (`"C:/Games/Anno 117"`). Der Ordner ist der, der `maindata` und `bin` enthält, nicht `maindata` selbst. Variablen wie `%USERPROFILE%` und ein bloßer Laufwerksbuchstabe (`"C:"`) sind keine vollständigen Pfade. Einen Netzwerkpfad (`\\\\server\\share\\Anno 117`), den Sie hier schreiben, verwendet der Companion wie geschrieben, und Windows kontaktiert dann diesen Server.
+- Der Schlüssel `gameFolder` wird ohne Beachtung der Groß- und Kleinschreibung gelesen (`GameFolder` funktioniert); jede andere Schreibweise, etwa `game_folder`, ist ein unbekannter Schlüssel und wird ignoriert: Die automatische Suche läuft, und das Menü zeigt dann `(Ubisoft Connect)` oder `Game: not found`, nicht `(settings file)`. Andere Schlüssel werden ignoriert. Ein leeres `gameFolder` gilt als nicht gesetzt.
+- Die Datei ist UTF-8 (die Byte-Reihenfolge-Marke von Notepad ist in Ordnung), Kommentare (`//`, `/* */`) und nachgestellte Kommas sind erlaubt, und sie darf bis zu 1 MiB groß sein. Bearbeiten Sie sie bei geschlossenem Companion und starten Sie ihn danach neu.
+- Ein falscher Ordner in der Datei wird nie durch einen gesuchten ersetzt, damit Sie den Fehler sehen.
+
+**Menütexte.**
+
+| Text | Was zu tun ist |
+| ---- | -------------- |
+| `Game: searching` | Warten; es endet von selbst. Ein langsames oder schlafendes Laufwerk kann dauern. |
+| `Game: build <build> (Ubisoft Connect)` | Nichts; über Ubisoft Connect gefunden. |
+| `Game: build <build> (settings file)` | Nichts; der Ordner Ihrer Einstellungsdatei wird verwendet. |
+| `Game: build unknown (…)` | Die Installation wird verwendet, aber ihre Programmdatei hat keine lesbare Version. Nichts zu tun. |
+| `Game: not found` | Weder die Einträge von Ubisoft Connect noch dessen Standardordner enthalten das Spiel (zum Beispiel eine Steam-Kopie). Den Ordner in der Einstellungsdatei nennen. |
+| `Game: folder in settings not found` | Der Ordner in `gameFolder` existiert nicht. Den Pfad korrigieren (eine Variable in einem Pfad wird nicht aufgelöst und wird deshalb ebenfalls nicht gefunden). |
+| `Game: folder in settings is not a full path` | Den vollständigen Pfad mit Laufwerksbuchstaben schreiben, zum Beispiel `C:\\Games\\Anno 117`. |
+| `Game: folder in settings is not an Anno 117 installation` | Dem Ordner fehlt `maindata\config.rda` oder `bin\win64\anno117.exe`. Den Ordner nennen, der `maindata` und `bin` enthält. |
+| `Game: settings file invalid` | Die Datei ist kein gültiges JSON oder kein Objekt, `gameFolder` ist kein Text, der Schlüssel kommt doppelt vor, die Datei ist größer als 1 MiB oder sie ist nicht lesbar. Das Log nennt den Grund. |
+
+Das Log (`Open log folder`) nennt die Ursache jedes Problems und, wenn das Spiel gefunden wird, die Quelle, den Build und den Ordner.
 
 #### Aufzeichnen und Abspielen
 
@@ -506,13 +592,13 @@ Vom Product Manager unter Windows 11 (26H2) mit deutschem Ubisoft Connect und ei
 
 Server: `http://localhost:8080/` öffnen; die Startseite zeigt die Überschrift `Censio` und die Zeile `Version <version>`. `curl http://localhost:8080/health` antwortet mit `Healthy`, und nach wenigen Sekunden zeigt `docker ps` den Container als `(healthy)`. Beim ersten Start wird der erste Data-Protection-Schlüssel angelegt, und ASP.NET Core meldet einmal die Warnung `No XML encryptor configured` (siehe *Einschränkungen*).
 
-Companion: Das Programm öffnet kein Fenster, bis Sie `Open diagnostics` wählen, und zeigt nur solange dieses Fenster offen ist eine Schaltfläche in der Taskleiste. Im Infobereich erscheint ein Symbol mit dem Tooltip `Censio Companion: <Zustand>` (die Zustände stehen oben unter *Verbindung zum Spiel*); sein Menü enthält den ausgegrauten Status und letzten Tick, `Open diagnostics`, `Start recording` (oder `Stop recording`), `Open recordings folder`, `Open log folder`, `Start with Windows` (mit Häkchen, solange es eingeschaltet ist), `Version <version>` (ausgegraut) und `Exit`, das das Symbol entfernt und das Programm innerhalb von 2 Sekunden beendet. Das Symbol ist je nach Zustand ein grauer Ring, ein grüner Kreis oder ein rotes Dreieck. Ein zweiter Start in derselben Windows-Sitzung tut nichts: Er endet sofort ohne Meldung und schreibt keine Logzeile, und der erste läuft weiter. Windows SmartScreen fragt beim ersten Start einmal nach (siehe *Companion* oben).
+Companion: Das Programm öffnet kein Fenster, bis Sie `Open diagnostics` wählen, und zeigt nur solange dieses Fenster offen ist eine Schaltfläche in der Taskleiste. Im Infobereich erscheint ein Symbol mit dem Tooltip `Censio Companion: <Zustand>` (die Zustände stehen oben unter *Verbindung zum Spiel*); sein Menü enthält den ausgegrauten Status, letzten Tick und die Spielinstallation (`Game: …`, siehe *Spielinstallation* oben), `Open diagnostics`, `Start recording` (oder `Stop recording`), `Open recordings folder`, `Open log folder`, `Start with Windows` (mit Häkchen, solange es eingeschaltet ist), `Version <version>` (ausgegraut) und `Exit`, das das Symbol entfernt und das Programm innerhalb von 2 Sekunden beendet. Das Symbol ist je nach Zustand ein grauer Ring, ein grüner Kreis oder ein rotes Dreieck. Ein zweiter Start in derselben Windows-Sitzung tut nichts: Er endet sofort ohne Meldung und schreibt keine Logzeile, und der erste läuft weiter. Windows SmartScreen fragt beim ersten Start einmal nach (siehe *Companion* oben).
 
 ## Daten und Logs
 
 Server: Das Datenverzeichnis ist im Docker-Image `/config`. Es enthält den Data-Protection-Schlüsselring in `/config/data-protection-keys`; die Schlüssel sind unverschlüsselt, deshalb das Verzeichnis und seine Sicherungen privat halten. Der Server schreibt sein Log auf die Konsole; Lesen mit `docker logs censio`. Die Logzeiten sind UTC. Die Einstellungen stehen in der [README](../README.md#konfiguration).
 
-Companion: Er speichert keine eigenen Spieldaten, und das Diagnosefenster speichert nichts (es zeigt den letzten Tick nur auf dem Bildschirm und schreibt nichts auf die Platte oder ins Log). Aufzeichnungsdateien schreibt er nach `%LOCALAPPDATA%\Censio\Recordings` nur, solange eine Aufzeichnung läuft (`--record` oder `Start recording`); sie enthalten die Daten des eigenen Spiels, wie sie gesendet wurden, bleiben auf dem Rechner und werden vom Programm nie gelöscht, also von Hand löschen (*Aufzeichnen und Abspielen*). Außerdem schreibt er ein Log nach `%LOCALAPPDATA%\Censio\Logs`: eine Datei pro Tag, `companion-<yyyyMMdd>.log` (wird eine Datei über 10 MiB groß, wird das Log in `companion-<yyyyMMdd>-2.log` und weiteren Dateien fortgesetzt). Der Companion behält die 10 neuesten dieser Dateien und löscht ältere; andere Dateien im Ordner löscht er nicht. Die Menüeinträge `Open recordings folder` und `Open log folder` öffnen beide Ordner im Explorer. Nur wenn Sie `Start with Windows` einschalten, schreibt er einen Wert `Censio Companion` unter `HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run` (nur Ihr Konto), und er löscht diesen Wert beim Ausschalten; das Log enthält dann `Autostart enabled` oder `Autostart disabled` und eine Warnung, wenn die Einstellung nicht gelesen oder geändert werden konnte (ohne Dateipfad). Eine Zeile enthält die lokale Zeit, die Stufe und die Meldung: den Start, jede Änderung des Verbindungszustands, Aufzeichnung gestartet und beendet, die Namen der Aufzeichnungsdateien, Beginn und Ende eines Abspielens und Probleme. Das Log enthält keine Spieldaten, aber ein Fehlertext kann einen Dateipfad und damit den Windows-Benutzernamen enthalten.
+Companion: Er speichert keine eigenen Spieldaten, und das Diagnosefenster speichert nichts (es zeigt den letzten Tick nur auf dem Bildschirm und schreibt nichts auf die Platte oder ins Log). Aufzeichnungsdateien schreibt er nach `%LOCALAPPDATA%\Censio\Recordings` nur, solange eine Aufzeichnung läuft (`--record` oder `Start recording`); sie enthalten die Daten des eigenen Spiels, wie sie gesendet wurden, bleiben auf dem Rechner und werden vom Programm nie gelöscht, also von Hand löschen (*Aufzeichnen und Abspielen*). Außerdem schreibt er ein Log nach `%LOCALAPPDATA%\Censio\Logs`: eine Datei pro Tag, `companion-<yyyyMMdd>.log` (wird eine Datei über 10 MiB groß, wird das Log in `companion-<yyyyMMdd>-2.log` und weiteren Dateien fortgesetzt). Der Companion behält die 10 neuesten dieser Dateien und löscht ältere; andere Dateien im Ordner löscht er nicht. Die Menüeinträge `Open recordings folder` und `Open log folder` öffnen beide Ordner im Explorer. Nur wenn Sie `Start with Windows` einschalten, schreibt er einen Wert `Censio Companion` unter `HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run` (nur Ihr Konto), und er löscht diesen Wert beim Ausschalten; das Log enthält dann `Autostart enabled` oder `Autostart disabled` und eine Warnung, wenn die Einstellung nicht gelesen oder geändert werden konnte (ohne Dateipfad). Eine Zeile enthält die lokale Zeit, die Stufe und die Meldung: den Start, jede Änderung des Verbindungszustands, Aufzeichnung gestartet und beendet, die Namen der Aufzeichnungsdateien, Beginn und Ende eines Abspielens, das Ergebnis der Suche nach der Spielinstallation (die Quelle, der Build und der Spieleordner oder der Grund des Scheiterns; siehe *Spielinstallation*) und Probleme. Das Log enthält keine Spieldaten, aber der Spieleordner bei jedem Start und ein Fehlertext können einen Dateipfad und damit den Windows-Benutzernamen enthalten; prüfen Sie ein Log, bevor Sie es weitergeben. Der Companion liest außerdem die optionale Einstellungsdatei `%LOCALAPPDATA%\Censio\settings.json` und die Installationseinträge von Ubisoft Connect in der Registry, schreibt sie aber nie.
 
 ## Probleme melden
 

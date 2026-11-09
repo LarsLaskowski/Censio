@@ -17,5 +17,15 @@ public static class CompanionFolders
         return Path.Combine(localApplicationData, "Censio", "Logs");
     }
 
+    /// <summary>
+    /// Gets the path of the settings file.
+    /// </summary>
+    /// <param name="localApplicationData">The local application data folder</param>
+    /// <returns>The path of the settings file</returns>
+    public static string Settings(string localApplicationData)
+    {
+        return Path.Combine(localApplicationData, "Censio", "settings.json");
+    }
+
     #endregion // Methods
 }

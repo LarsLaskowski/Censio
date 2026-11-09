@@ -144,5 +144,57 @@ public static partial class CompanionLog
     [LoggerMessage(Level = LogLevel.Warning, Message = "Could not change the autostart setting")]
     public static partial void AutostartChangeFailed(ILogger logger, Exception? exception);
 
+    /// <summary>
+    /// Logs a found game installation.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    /// <param name="source">The source</param>
+    /// <param name="build">The build</param>
+    /// <param name="folder">The folder</param>
+    [LoggerMessage(Level = LogLevel.Information, Message = "Game installation found through {Source}, build {Build}, folder {Folder}")]
+    public static partial void GameInstallationFound(ILogger logger, string source, string build, string folder);
+
+    /// <summary>
+    /// Logs that no game installation was found.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    /// <param name="exception">The exception, if any</param>
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Game installation not found; checked the Ubisoft Connect records and its default games folder")]
+    public static partial void GameInstallationNotFound(ILogger logger, Exception? exception);
+
+    /// <summary>
+    /// Logs a folder of the settings file that does not exist.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    /// <param name="folder">The folder</param>
+    [LoggerMessage(Level = LogLevel.Warning, Message = "The game folder {Folder} in the settings file does not exist")]
+    public static partial void GameSettingsFolderMissing(ILogger logger, string folder);
+
+    /// <summary>
+    /// Logs a folder of the settings file that is not a full path.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    /// <param name="folder">The folder</param>
+    [LoggerMessage(Level = LogLevel.Warning, Message = "The game folder {Folder} in the settings file is not a full path")]
+    public static partial void GameSettingsFolderNotFullPath(ILogger logger, string folder);
+
+    /// <summary>
+    /// Logs a folder of the settings file that is not a game installation.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    /// <param name="folder">The folder</param>
+    [LoggerMessage(Level = LogLevel.Warning, Message = "The game folder {Folder} in the settings file is not an Anno 117 installation; expected the folder that holds maindata\\\\config.rda and bin\\\\win64\\\\anno117.exe")]
+    public static partial void GameSettingsFolderNotInstallation(ILogger logger, string folder);
+
+    /// <summary>
+    /// Logs a settings file that cannot be used.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    /// <param name="file">The file</param>
+    /// <param name="problem">The problem</param>
+    /// <param name="exception">The exception, if any</param>
+    [LoggerMessage(Level = LogLevel.Warning, Message = "The settings file {File} is invalid: {Problem}")]
+    public static partial void GameSettingsFileInvalid(ILogger logger, string file, string problem, Exception? exception);
+
     #endregion // Methods
 }

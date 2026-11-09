@@ -24,5 +24,22 @@ public sealed class CompanionFoldersTests
         Assert.AreEqual(Path.Combine(data, "Censio", "Logs"), folder, "The log folder should be Censio\\Logs below the local application data");
     }
 
+    /// <summary>
+    /// The settings file is Censio\settings.json below the local application data.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC2")]
+    public void CompanionFoldersSettingsIsUnderCensio()
+    {
+        // Arrange
+        var data = Path.Combine(Path.GetTempPath(), "Local");
+
+        // Act
+        var file = CompanionFolders.Settings(data);
+
+        // Assert
+        Assert.AreEqual(Path.Combine(data, "Censio", "settings.json"), file, "The settings file should be Censio\\settings.json below the local application data");
+    }
+
     #endregion // Methods
 }
