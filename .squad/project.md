@@ -97,3 +97,6 @@ otherwise), one line each: the double, where it lives and what it stands in for;
 - `RecordingTimeProvider` (`tests/Censio.Pipe.Tests/RecordingTimeProvider.cs`) — a `FakeTimeProvider` that records and awaits its timers, for replay and retry waits.
 - `FakeDiagnosticsWindow` (`tests/Censio.Companion.Core.Tests/FakeDiagnosticsWindow.cs`) — an `IDiagnosticsWindow` that records what it shows, for the diagnostics session.
 - `FakeStartupEntryStore` (`tests/Censio.Companion.Core.Tests/FakeStartupEntryStore.cs`) — models the store contract of `RegistryStartupEntryStore` (checked against the .NET 10 `RegistryKey` source), for the autostart.
+- `FakeUbisoftInstallRecords` (`tests/Censio.Companion.Core.Tests/FakeUbisoftInstallRecords.cs`) — an `IUbisoftInstallRecords` of fixed records or a thrown exception, counting its reads.
+- `FakeFileVersionReader` (`tests/Censio.Companion.Core.Tests/FakeFileVersionReader.cs`) — an `IFileVersionReader` with a version per file path (compared as full paths) or a thrown exception, recording the paths asked for.
+- `RegExportUbisoftInstallRecords` (`tests/Censio.Companion.Core.Tests/RegExportUbisoftInstallRecords.cs`) — an `IUbisoftInstallRecords` over a `reg export` file, for the sample in `Fixtures/GameInstallation/`.
