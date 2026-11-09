@@ -640,6 +640,7 @@ public sealed class GameCatalogReaderTests
         // Assert
         Assert.AreEqual(GameCatalogProblem.Ambiguous, catalog.Check(10), "A GUID defined twice should be ambiguous");
         Assert.AreEqual(GameCatalogProblem.None, catalog.Check(11), "A GUID defined once should be unaffected");
+        Assert.AreEqual(1, catalog.Count, "The ambiguous GUID should not be counted as an entry");
     }
 
     /// <summary>
@@ -658,6 +659,7 @@ public sealed class GameCatalogReaderTests
         // Assert
         Assert.AreEqual(GameCatalogProblem.Ambiguous, catalog.Check(10), "A text identifier with two different texts should make the GUID ambiguous");
         Assert.AreEqual(GameCatalogProblem.None, catalog.Check(11), "A GUID with an unambiguous text should be unaffected");
+        Assert.AreEqual(1, catalog.Count, "The ambiguous GUID should not be counted as an entry");
     }
 
     /// <summary>
@@ -1087,6 +1089,8 @@ public sealed class GameCatalogReaderTests
     [DataRow(3, GameCatalogErrorKind.MalformedFile)]
     [DataRow(0, GameCatalogErrorKind.FileUnreadable)]
     [DataRow(2, GameCatalogErrorKind.FileUnreadable)]
+    [DataRow(0, GameCatalogErrorKind.ArchiveUnreadable)]
+    [DataRow(3, GameCatalogErrorKind.ArchiveUnreadable)]
     public void GameCatalogReaderReadEndsWithKindOfSourceError(int file, GameCatalogErrorKind kind)
     {
         // Arrange

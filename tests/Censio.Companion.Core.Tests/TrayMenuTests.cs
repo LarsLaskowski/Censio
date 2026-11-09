@@ -63,6 +63,7 @@ public sealed class TrayMenuTests
                                 TrayMenuEntryKind.Status,
                                 TrayMenuEntryKind.LastTick,
                                 TrayMenuEntryKind.Game,
+                                TrayMenuEntryKind.Catalog,
                                 TrayMenuEntryKind.Separator,
                                 TrayMenuEntryKind.OpenDiagnostics,
                                 TrayMenuEntryKind.ToggleRecording,
@@ -80,6 +81,7 @@ public sealed class TrayMenuTests
                                 "Status: Receiving",
                                 "Last tick: 00:30:00, 3 islands",
                                 "Game: searching",
+                                "Catalog: reading",
                                 string.Empty,
                                 "Open diagnostics",
                                 "Start recording",
@@ -92,16 +94,16 @@ public sealed class TrayMenuTests
                                 string.Empty,
                                 "Exit"
                             };
-        var expectedEnabled = new[] { false, false, false, false, true, true, true, true, false, true, false, false, false, true };
-        var expectedChecked = new bool[14];
+        var expectedEnabled = new[] { false, false, false, false, false, true, true, true, true, false, true, false, false, false, true };
+        var expectedChecked = new bool[15];
 
         // Act
         var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, false, CreateClock(1));
 
         // Assert
         Assert.AreSequenceEqual(expectedKinds, entries.Select(entry => entry.Kind).ToArray(), "The entries should be in the order of the menu");
-        Assert.AreSequenceEqual(expectedTexts, entries.Select(entry => entry.Text).ToArray(), "The entries should carry the status, the last tick, the game, open diagnostics, the toggle, the folders, the version and Exit");
-        Assert.AreSequenceEqual(expectedEnabled, entries.Select(entry => entry.IsEnabled).ToArray(), "Status, last tick, game, version and separators should be greyed out, the rest enabled");
+        Assert.AreSequenceEqual(expectedTexts, entries.Select(entry => entry.Text).ToArray(), "The entries should carry the status, the last tick, the game, the catalog, open diagnostics, the toggle, the folders, the version and Exit");
+        Assert.AreSequenceEqual(expectedEnabled, entries.Select(entry => entry.IsEnabled).ToArray(), "Status, last tick, game, catalog, version and separators should be greyed out, the rest enabled");
         Assert.AreSequenceEqual(expectedChecked, entries.Select(entry => entry.IsChecked).ToArray(), "No entry should be checked while the autostart is off");
     }
 
@@ -927,10 +929,82 @@ public sealed class TrayMenuTests
 
         Assert.ContainsSingle(entryKind => entryKind == TrayMenuEntryKind.Game, kinds, "The menu should hold exactly one game entry");
         Assert.AreEqual(kinds.IndexOf(TrayMenuEntryKind.LastTick) + 1, index, "The game entry should be directly below the last-tick entry");
-        Assert.AreEqual(kinds.IndexOf(TrayMenuEntryKind.Separator) - 1, index, "The game entry should be directly above the first separator");
+        Assert.AreEqual(index + 1, kinds.IndexOf(TrayMenuEntryKind.Catalog), "The catalog entry should be directly below the game entry");
+        Assert.AreEqual(kinds.IndexOf(TrayMenuEntryKind.Separator) - 2, index, "The game entry should be directly above the catalog entry and the first separator");
         Assert.AreEqual(expected, entries[index].Text, "The game entry should show the text of the status");
         Assert.IsFalse(entries[index].IsEnabled, "The game entry should be greyed out like the last-tick entry");
         Assert.IsFalse(entries[index].IsChecked, "The game entry should not be checked");
+    }
+
+    /// <summary>
+    /// The catalog text follows the state of the build: reading, the entry count (invariant, no grouping, also for one
+    /// and none), no game, failed; the count is shown only when ready.
+    /// </summary>
+    /// <param name="kind">The status kind</param>
+    /// <param name="count">The entry count</param>
+    /// <param name="expected">The expected text</param>
+    [TestMethod]
+    [TestCategory("AC5")]
+    [DataRow(GameCatalogStatusKind.Reading, 0, "Catalog: reading", DisplayName = "Reading")]
+    [DataRow(GameCatalogStatusKind.Reading, 7, "Catalog: reading", DisplayName = "Reading ignores the count")]
+    [DataRow(GameCatalogStatusKind.Ready, 0, "Catalog: 0 entries", DisplayName = "Ready, none")]
+    [DataRow(GameCatalogStatusKind.Ready, 1, "Catalog: 1 entries", DisplayName = "Ready, one")]
+    [DataRow(GameCatalogStatusKind.Ready, 1234567, "Catalog: 1234567 entries", DisplayName = "Ready, no grouping")]
+    [DataRow(GameCatalogStatusKind.NoGame, 5, "Catalog: no game", DisplayName = "No game")]
+    [DataRow(GameCatalogStatusKind.Failed, 5, "Catalog: failed", DisplayName = "Failed")]
+    public void TrayMenuFormatCatalogGivesTextPerState(GameCatalogStatusKind kind, int count, string expected)
+    {
+        // Arrange
+        CultureInfo.CurrentCulture = new CultureInfo("de-DE");
+
+        var status = new GameCatalogStatus
+                     {
+                         Kind = kind,
+                         EntryCount = count
+                     };
+
+        // Act
+        var text = TrayMenu.FormatCatalog(status);
+
+        // Assert
+        Assert.AreEqual(expected, text, "The catalog text should follow the state of the build, whatever the culture");
+    }
+
+    /// <summary>
+    /// The catalog entry is greyed out, unchecked and directly below the game entry, with the text of the status.
+    /// </summary>
+    /// <param name="kind">The status kind</param>
+    /// <param name="count">The entry count</param>
+    /// <param name="expected">The expected text</param>
+    [TestMethod]
+    [TestCategory("AC5")]
+    [DataRow(GameCatalogStatusKind.Reading, 0, "Catalog: reading", DisplayName = "Reading")]
+    [DataRow(GameCatalogStatusKind.Ready, 12, "Catalog: 12 entries", DisplayName = "Ready")]
+    [DataRow(GameCatalogStatusKind.NoGame, 0, "Catalog: no game", DisplayName = "No game")]
+    [DataRow(GameCatalogStatusKind.Failed, 0, "Catalog: failed", DisplayName = "Failed")]
+    public void TrayMenuCreatePlacesCatalogBelowGame(GameCatalogStatusKind kind, int count, string expected)
+    {
+        // Arrange
+        var snapshot = CreateSnapshot("Receiving", canRecord: true, isRecording: false);
+        var catalog = new GameCatalogStatus
+                      {
+                          Kind = kind,
+                          EntryCount = count
+                      };
+
+        // Act
+        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, catalog, false, CreateClock(1));
+
+        // Assert
+        var kinds = entries.Select(entry => entry.Kind).ToList();
+        var index = kinds.IndexOf(TrayMenuEntryKind.Catalog);
+
+        Assert.ContainsSingle(entryKind => entryKind == TrayMenuEntryKind.Catalog, kinds, "The menu should hold exactly one catalog entry");
+        Assert.AreEqual(kinds.IndexOf(TrayMenuEntryKind.Game) + 1, index, "The catalog entry should be directly below the game entry");
+        Assert.AreEqual(kinds.IndexOf(TrayMenuEntryKind.Separator) - 1, index, "The catalog entry should be directly above the first separator");
+        Assert.AreEqual(expected, entries[index].Text, "The catalog entry should show the text of the status");
+        Assert.IsFalse(entries[index].IsEnabled, "The catalog entry should be greyed out");
+        Assert.IsFalse(entries[index].IsChecked, "The catalog entry should not be checked");
     }
 
     /// <summary>

@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Globalization;
 
+using Censio.GameData;
 using Censio.Pipe;
 using Censio.Pipe.Tests;
 
@@ -52,6 +53,11 @@ public sealed class DiagnosticsWindowSessionTests
     private PipeTick? _tick;
 
     /// <summary>
+    /// The catalog the session reads.
+    /// </summary>
+    private GameCatalog? _catalog;
+
+    /// <summary>
     /// Whether a posted action runs at once instead of waiting in <see cref="_posted" />.
     /// </summary>
     private bool _postAtOnce;
@@ -101,6 +107,45 @@ public sealed class DiagnosticsWindowSessionTests
     #endregion // Properties
 
     #region Methods
+
+    /// <summary>
+    /// A window opened while the catalog is ready shows the names of the catalog, and so does the update after a
+    /// notification.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC4")]
+    public void DiagnosticsWindowSessionOpenShowsCatalogNames()
+    {
+        // Arrange
+        var session = CreateSession(CreateClock());
+
+        _tick = CreateTick(100, _now.AddMinutes(-2));
+        _catalog = new GameCatalog([
+                                       new GameCatalogEntry
+                                       {
+                                           AssetGuid = 1,
+                                           Kind = GameCatalogKind.Region,
+                                           EnglishName = "Region 1",
+                                           GermanName = "Gebiet 1"
+                                       }
+                                   ],
+                                   [],
+                                   0,
+                                   0);
+
+        // Act
+        session.Open();
+        _tick = CreateTick(200, _now.AddMinutes(-1));
+        session.Notify();
+        RunPosted();
+
+        // Assert
+        var views = _windows.Single().Views;
+
+        Assert.HasCount(2, views, "The window should show the view of the opening and the update");
+        Assert.AreEqual("Region 1 / Gebiet 1 (1)", views[0][0].Cells[0], "The opened window should name the region");
+        Assert.AreEqual("Region 1 / Gebiet 1 (1)", views[1][0].Cells[0], "The updated window should name the region");
+    }
 
     /// <summary>
     /// A notification shows the latest tick in the open window.
@@ -476,7 +521,7 @@ public sealed class DiagnosticsWindowSessionTests
     /// <returns>The session</returns>
     private DiagnosticsWindowSession CreateSession(TimeProvider clock)
     {
-        return new DiagnosticsWindowSession(ReadStatusText, ReadTick, () => null, clock, Post, CreateWindow);
+        return new DiagnosticsWindowSession(ReadStatusText, ReadTick, () => _catalog, clock, Post, CreateWindow);
     }
 
     /// <summary>
