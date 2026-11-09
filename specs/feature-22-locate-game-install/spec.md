@@ -17,7 +17,7 @@ must be visible with its reason, while the Companion today shows no error messag
   build <build> (Ubisoft Connect)`, for example `Game: build 26.29905.4.51797 (Ubisoft Connect)`, and the log has an
   information line with the source, the build and the folder. `<build>` is the file version of the game's program
   file `bin\win64\anno117.exe`, not the version the game's main menu shows (`3.0.1733841` on the same installation,
-  `tests/Censio.GameData.Tests/Fixtures/GameInstallation/game-installation.md`). The diagnostics window does not
+  `tests/Censio.Companion.Core.Tests/Fixtures/GameInstallation/game-installation.md`). The diagnostics window does not
   show the line.
 - S2: Given the game in a folder of Ubisoft Connect's default games folder (`C:\Program Files (x86)\Ubisoft\Ubisoft
   Game Launcher\games`) while Ubisoft Connect has no valid record of it (for example after Windows was reinstalled),
@@ -25,8 +25,8 @@ must be visible with its reason, while the Companion today shows no error messag
 - S3: Given the settings file `%LOCALAPPDATA%\Censio\settings.json` with `"gameFolder"` naming an installation, when the
   Companion starts, then that folder is used without any automatic search and the menu shows `Game: build <build>
   (settings file)`. This is also the way for a copy bought elsewhere (Steam) that the search does not find.
-- S4: Given several Ubisoft Connect records of the game, when the Companion starts, then the first valid one by
-  ascending record number is used, checked against the real sample (N8).
+- S4: Given several Ubisoft Connect records (one per Ubisoft game), when the Companion starts, then the first valid
+  one by ascending record number, compared as numbers (`921` before `4553`), is used (N8).
 - S5: Given the search has not ended yet (a slow or sleeping drive), when the player opens the menu, then it shows
   `Game: searching`, and every other entry and `Exit` work as usual.
 
@@ -79,11 +79,11 @@ settings file the folder or the file as written there.
   every menu text above with what to do; the menu lists of `README.md` and the user guide (*Companion*, *First start*)
   gain the line. The user guide's privacy paragraph (*Data and logs*, English and German) and the list in *Log* of
   `companion.md` say that the log now holds the game folder at every start.
-- N8: The search is built from the Product Manager's sample of his Ubisoft Connect installation
-  (`tests/Censio.GameData.Tests/Fixtures/GameInstallation/game-installation.md`): the form of the `InstallDir` value
-  (forward slashes, trailing slash), the default games folder, the program file's path and its file version. The
-  sample holds no export of the whole record key; the key the records are read from is confirmed on his machine
-  (AC8), and the plan names every fact in *Verified facts*.
+- N8: The search is built from the Product Manager's samples of his Ubisoft Connect installation in
+  `tests/Censio.Companion.Core.Tests/Fixtures/GameInstallation/`: `game-installation.md` (the default games folder,
+  the program file's path and its file version) and `ubisoft-connect-installs.reg`, his export of the record key
+  `HKLM\SOFTWARE\WOW6432Node\Ubisoft\Launcher\Installs` (the subkeys, the `InstallDir` form with forward slashes and
+  a trailing slash). AC8 checks the whole search on his machine; the plan names every fact in *Verified facts*.
 
 ## Acceptance criteria
 
@@ -150,8 +150,7 @@ settings file the folder or the file as written there.
 Devil's Advocate, spec challenge (1 major, 6 minor):
 
 - M1 (store formats unseen, the Product Manager's store): accepted. N8 requires and sources a real sample of each
-  store record, default folder and the version source before the plan; a store without one leaves AC1 for a
-  follow-up issue, one not run with the game is marked "Not yet tried". AC1's tests read the samples; AC8 names
+  store record, default folder and the version source before the plan (supplied: N8). AC1's tests read the samples; AC8 names
   Ubisoft Connect. Escalated for the samples: the Product Manager supplies Ubisoft Connect's only and takes Steam out
   of scope without a follow-up issue, so Steam left the scenarios, edge cases and AC1, and N8 names his samples.
 - m1 (case of the key): accepted (E11, N3, AC2).

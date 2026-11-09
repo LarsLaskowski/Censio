@@ -35,7 +35,7 @@ replaced by a searched one.
 
 - A Steam player, and a player whose Ubisoft Connect record is missing outside the default games folder, names the
   folder in the settings file ([0045](0045-companion-settings-in-a-json-file-under-local-app-data.md)).
-- The key the records are read from is confirmed only on the Product Manager's machine; the sample holds the value
-  form, not an export of the key.
+- The records are read as the Product Manager's export of the key shows them; a record never leads to a network or
+  device path.
 - Revisiting Steam needs a real sample of Steam's library list and app manifest.
 - The rules are in [game-installation](../areas/game-installation.md).

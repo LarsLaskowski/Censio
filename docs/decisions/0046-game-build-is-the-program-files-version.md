@@ -9,7 +9,7 @@
 ## Context
 
 The issue asks for the game version, for the cache keys of #25. The Product Manager's sample
-(`tests/Censio.GameData.Tests/Fixtures/GameInstallation/game-installation.md`) shows the version `3.0.1733841` only in
+(`tests/Censio.Companion.Core.Tests/Fixtures/GameInstallation/game-installation.md`) shows the version `3.0.1733841` only in
 the game's main menu; Ubisoft Connect shows none, and `bin\win64\anno117.exe` has the file version
 `26.29905.4.51797`, a different number. No game file known to the repository holds the menu version
 ([game-files](../areas/game-files.md)).

@@ -13,8 +13,10 @@ See [spec.md](spec.md), *Problem*.
 | # | Claim | Evidence | Status |
 | - | ----- | -------- | ------ |
 | 1 | Nothing finds the installation; only the survey takes a folder, from `CENSIO_ANNO_INSTALL` | `src/Censio.GameData/RdaInstallationSurvey.cs:37` `Run(string installationFolder, …)`; `docs/UNIT_TESTS.md`, layout block | confirmed |
-| 2 | Ubisoft Connect's `InstallDir` value has the form `E:/Anno 117 - Pax Romana/`: forward slashes, trailing slash | Sample `tests/Censio.GameData.Tests/Fixtures/GameInstallation/game-installation.md`, line 1; no private value in it (checked field by field: a drive, the game's folder name, a version, the Windows build) | confirmed |
-| 3 | The records are subkeys of `HKLM\SOFTWARE\WOW6432Node\Ubisoft\Launcher\Installs`, each with a string value `InstallDir` | to verify: AC8, the Product Manager on his machine, step 9 (the sample quotes the value line in `reg export` form but no key; the key is the one the escalation asked to export) | unverified |
+| 2 | Ubisoft Connect's `InstallDir` value has the form `E:/Anno 117 - Pax Romana/`: forward slashes, trailing slash | Samples `game-installation.md`, line 1, and `ubisoft-connect-installs.reg` (both under `tests/Censio.Companion.Core.Tests/Fixtures/GameInstallation/` once the Tester moved them, *Test files*); no private value (checked field by field: drives, the games' folder names, `de-DE`, Ubisoft's game ids, a version, the Windows build) | confirmed |
+| 3 | The records are subkeys of `HKLM\SOFTWARE\WOW6432Node\Ubisoft\Launcher\Installs` named by a number, each with string values `InstallDir` and `Language`; one subkey per Ubisoft game, not only Anno 117 (`4553` is `E:/Anno 1800/`, `921` is `E:/Anno 117 - Pax Romana/`) | `ubisoft-connect-installs.reg` (`reg export`, UTF-16 LE with byte order mark) | confirmed |
+| 3a | Record names compare as numbers: by text `4553` sorts before `921`, by number after | the sample's two names; *Approach*, step 2 orders digit-only names by length, then ordinal | confirmed |
+| 3b | Windows treats a path that starts with `\` or `/` as fully qualified when its second character is `\`, `/` or `?`; `\??\` is the same prefix as `\\?\` | .NET `PathInternal.Windows.IsPartiallyQualified` and `IsExtended` (Security, B3) | confirmed |
 | 4 | Ubisoft Connect's default games folder is `C:\Program Files (x86)\Ubisoft\Ubisoft Game Launcher\games`, changeable by the user | Sample, line 3 (the Product Manager's statement) | confirmed |
 | 5 | The program file is `bin\win64\anno117.exe`; its fixed file version is `26.29905.4.51797`, its version strings are empty | Sample: path line and `VersionInfo` output (`FileMajorPart` … `FilePrivatePart`, `FileVersion :` empty) | confirmed |
 | 6 | The main-menu version `3.0.1733841` is shown in the main menu only, not in Ubisoft Connect or the program file | Sample, lines 5 and last | confirmed |
@@ -40,7 +42,9 @@ See [spec.md](spec.md), *Problem*.
 | AC3 | `GameInstallationSearchSettingsFolderProblemReturnsKind` (DataRow: missing folder, relative, `C:`-style drive only, `%USERPROFILE%\x`, folder without the two files), `GameInstallationSearchSettingsProblemLogsWarningAndReadsNoRecord`, `GameInstallationSearchInvalidSettingsFileReturnsInvalid` | `GameInstallationSearchTests.cs` |
 | AC3 | `CompanionSettingsReadInvalidReturnsInvalid` (DataRow: broken JSON, root array, number, `null`, key twice, key twice in other case, byte `0xFF` inside the `gameFolder` value, inside the `gameFolder` key, inside another key, `"\uD800"` as the value), `CompanionSettingsReadAcceptsInvalidBytesOutsideNames` (`0xFF` inside a comment and inside another key's value), `CompanionSettingsReadTooLargeReturnsInvalid` (DataRow: 1,048,577 bytes, a sparse file of 3 GiB made with `FileStream.SetLength`; 1,048,576 accepted), `CompanionSettingsReadUnreadableReturnsInvalid` (a folder named `settings.json`), `CompanionSettingsReadMissingFileReturnsNoGameFolder` | `CompanionSettingsTests.cs` |
 | AC3 | `TrayMenuFormatGameProblemShowsText` (DataRow per problem kind, exact texts of spec E1–E4) | `TrayMenuTests.cs` |
-| AC4 | `GameInstallationSearchRecordsThrowSkipsToDefaultFolder`, `GameInstallationSearchUnusableRecordIsSkipped` (DataRow: `InstallDir` null, relative, missing folder, no installation, starting with `\\` or `//`), `GameInstallationSearchNothingFoundReturnsNotFoundAndLogsWarning`, `GameInstallationSearchDefaultFolderUnreadableReturnsNotFound` | `GameInstallationSearchTests.cs` |
+| AC4 | `GameInstallationSearchRecordsThrowSkipsToDefaultFolder`, `GameInstallationSearchUnusableRecordIsSkipped` (DataRow: `InstallDir` null, relative, missing folder, no installation, `/` + a temporary installation's path, so it starts with `//`), `GameInstallationSearchSampleRecordsTakeNumericFirst` (the sample's records through `RegExportUbisoftInstallRecords`, each `InstallDir` replaced by a temporary folder kept by record name: both installations → `921`'s folder; only `4553`'s → `4553`'s), `GameInstallationSearchNothingFoundReturnsNotFoundAndLogsWarning`, `GameInstallationSearchDefaultFolderUnreadableReturnsNotFound` | `GameInstallationSearchTests.cs` |
+| AC4 | `GameInstallationIsNetworkOrDevicePathDetectsSeparatorPairs` (DataRow true: `\\srv\share\`, `//srv/share/`, `\/srv/share/`, `/\srv\share\`, `\??\UNC\srv\share\`, `\\?\C:\x`, `\\.\pipe\x`, `/?/x`; false: `C:\x`, `E:/Anno 117 - Pax Romana/`, `/tmp/x`, `\x`, empty) | `GameInstallationTests.cs` |
+| AC4 | `RegExportUbisoftInstallRecordsReadsSample` (the sample gives exactly `4553` → `E:/Anno 1800/` and `921` → `E:/Anno 117 - Pax Romana/`, values verbatim) | `tests/Censio.Companion.Core.Tests/RegExportUbisoftInstallRecordsTests.cs` |
 | AC4 | `TrayMenuFormatGameNotFoundShowsText` | `TrayMenuTests.cs` |
 | AC5 | `GameInstallationSearchBuildIsFileVersion` (two versions give two texts, the same version the same text), `GameInstallationSearchUnusableVersionIsUnknown` (DataRow: null, `0.0.0.0`, reader throws) | `GameInstallationSearchTests.cs` |
 | AC5 | `GameInstallationFormatBuildWritesFourNumbers` | `GameInstallationTests.cs` |
@@ -49,7 +53,7 @@ See [spec.md](spec.md), *Problem*.
 | AC6 | `TrayMenuFormatGameSearchingShowsText` | `TrayMenuTests.cs` |
 | AC6 | manual: the Product Manager, within AC8's run — menu usable and `Exit` at once while `Game: searching` would show, every mode starts the search (a start with `--replay` and with an invalid switch show a `Game:` line) | — |
 | AC7 | `GameInstallationSearchFoundLogLineIsSanitized` (folder name with `\u0007`, the logged message passed through `LogLine.Format` holds `?`), `GameInstallationSearchLogHoldsNoFileContent` | `GameInstallationSearchTests.cs` |
-| AC8 | manual: the Product Manager on Windows, local publish of the branch head with the command of `README.md` (*Build the Companion from source*): without a settings file the menu shows `Game: build 26.29905.4.51797 (Ubisoft Connect)` (or the build of the day) and the log names `E:/Anno 117 - Pax Romana/`; with `{"gameFolder": "E:\\missing"}` it shows `Game: folder in settings not found`, with `"C:"` and with `"%USERPROFILE%\\x"` `Game: folder in settings is not a full path`; and `Get-Acl 'HKLM:\SOFTWARE\WOW6432Node\Ubisoft\Launcher\Installs'` is run and its owners and write rights reported | — |
+| AC8 | manual (end to end through the registry reader, the version reader and the shell; the key itself is fact 3): the Product Manager on Windows, local publish of the branch head with the command of `README.md` (*Build the Companion from source*): without a settings file the menu shows `Game: build 26.29905.4.51797 (Ubisoft Connect)` (or the build of the day) and the log names `E:/Anno 117 - Pax Romana/`; with `{"gameFolder": "E:\\missing"}` it shows `Game: folder in settings not found`, with `"C:"` and with `"%USERPROFILE%\\x"` `Game: folder in settings is not a full path`; and `Get-Acl 'HKLM:\SOFTWARE\WOW6432Node\Ubisoft\Launcher\Installs'` is run and its owners and write rights reported | — |
 | AC9 | manual: the Reviewer, step 8 — README and user guide, English then German, hold every item of spec N7 | — |
 
 ## Approach
@@ -76,9 +80,11 @@ otherwise the value as written. Other I/O failures: invalid, with the exception.
    `Directory.Exists` false → `SettingsFolderNotFound`; not an installation → `SettingsFolderNotInstallation`;
    each with a warning and no further step. Otherwise found, source `SettingsFile`.
 2. Records: `IUbisoftInstallRecords.Read()`; any exception counts as no records. Order: names of ASCII digits only
-   first, by length then ordinal (no overflow), the others after them, ordinal. The first record whose `InstallDir` is
-   fully qualified, does not start with `\\` or `//` (no network or device path from a record), and is an
-   installation is found.
+   first, by length then ordinal — numeric without overflow, `921` before `4553` (fact 3a) —, the others after them,
+   ordinal. The first record whose `InstallDir` is fully qualified, is no network or device path, and is an
+   installation is found. `GameInstallation.IsNetworkOrDevicePath(path)` is true when the first character is `\` or `/`
+   and the second is `\`, `/` or `?`, both counted as separators on every system (fact 3b); after the fully-qualified
+   check only the drive form `X:\` / `X:/` is left on Windows, while `/tmp/…` passes on the Linux test host.
 3. Default games folder (fully qualified only): its top-level folders, ordinal ignoring case; `IOException`,
    `UnauthorizedAccessException` and `SecurityException` count as none. The first installation is found.
 4. Otherwise `NotFound`, warning.
@@ -143,6 +149,7 @@ Types in plain words, one declaration per code span; all public unless marked.
   `GameInstallationStatus.Source` (GameInstallationSource?), `GameInstallationStatus.Folder` (string?),
   `GameInstallationStatus.Build` (string?); static get-only `GameInstallationStatus.Searching`.
 - static class `GameInstallation`: `GameInstallation.IsInstallation(string folder)` (bool),
+  `GameInstallation.IsNetworkOrDevicePath(string path)` (bool),
   `GameInstallation.ProgramFilePath(string folder)` (string), `GameInstallation.DefaultUbisoftGamesFolder(string programFilesX86)`
   (string), `GameInstallation.FormatBuild(Version? version)` (string?).
 - sealed record `UbisoftInstallRecord`: init properties `UbisoftInstallRecord.Name` (required string),
@@ -167,7 +174,9 @@ Files the skeleton rewrites: `src/Censio.Companion.Core/TrayMenu.cs`, `TrayMenuE
 
 ## Test files
 
-`tests/Censio.Companion.Core.Tests/CompanionSettingsTests.cs`, `GameInstallationTests.cs`, `GameInstallationSearchTests.cs` (new); `TrayMenuTests.cs`, `CompanionFoldersTests.cs` (extended). New doubles: `FakeUbisoftInstallRecords.cs` (queued records or an exception, counts reads) and `FakeFileVersionReader.cs` (a version per path or an exception), both in `tests/Censio.Companion.Core.Tests/`. Installations are built in a temporary folder and deleted afterwards.
+`tests/Censio.Companion.Core.Tests/CompanionSettingsTests.cs`, `GameInstallationTests.cs`, `GameInstallationSearchTests.cs` (new); `TrayMenuTests.cs`, `CompanionFoldersTests.cs` (extended). New doubles: `FakeUbisoftInstallRecords.cs` (queued records or an exception, counts reads), `FakeFileVersionReader.cs` (a version per path or an exception) and `RegExportUbisoftInstallRecords.cs` (an `IUbisoftInstallRecords` over a `reg export` file: byte order mark detected, one record per subkey of `…\Ubisoft\Launcher\Installs`, its `"InstallDir"="…"` string with `\\` and `\"` unescaped, other values ignored; tested by `RegExportUbisoftInstallRecordsTests.cs`), all in `tests/Censio.Companion.Core.Tests/`. Installations are built in a temporary folder and deleted afterwards.
+
+Fixtures: the Tester moves both samples from `tests/Censio.GameData.Tests/Fixtures/GameInstallation/` to `tests/Censio.Companion.Core.Tests/Fixtures/GameInstallation/` (the layout keeps a fixture in the project whose tests read it; the orchestrator stages both paths), adds `<None Update="Fixtures\**" CopyToOutputDirectory="PreserveNewest" />` to `Censio.Companion.Core.Tests.csproj` as in `Censio.Pipe.Tests.csproj`, and the tests read the `.reg` file unchanged.
 
 Existing call sites of a changed signature: the twelve `TrayMenu.Create` calls in `TrayMenuTests.cs` — the Tester adapts them (pass `GameInstallationStatus.Searching`), and the entry-order assertions gain the `Game` line; `TrayIcon.cs:133` — the Dev.
 
@@ -178,8 +187,9 @@ Code a unit test cannot cover: `RegistryUbisoftInstallRecords.cs`, `WindowsFileV
 - New area `game-installation` (`docs/areas/game-installation.md`, Lead decision): scope "Finding the Anno 117
   installation folder and its build: the sources and their order, what counts as an installation, the build, the
   failures; not the settings file itself (companion) or the archives (game-files)". Content: *Approach* above, UNC
-  folders from the settings file probed over the network, records limited to local paths, the
-  facts 3 and 7 as not verified, records 0044 and 0046.
+  folders from the settings file probed over the network, "no UNC or device path written in a record is followed"
+  (mapped drive letters and directory symlinks still are), the record key and the numeric order (facts 3, 3a),
+  fact 7 as not verified, records 0044 and 0046.
 - `docs/areas/companion.md`: *Tray icon and menu* (the `Game:` entry, position, texts), new *Settings file* section
   (path, format, tolerated forms, bound, invalid cases — a name that cannot be decoded makes the whole file invalid
   under any key, invalid bytes in a comment or another key's value are accepted —, never written; record 0045), *Log* (the new lines, the
@@ -214,8 +224,9 @@ Dev, once the code is green:
   the option `gameFolder` in `CompanionSettings` with `CompanionSettingsTests`, the interfaces `IUbisoftInstallRecords`
   and `IFileVersionReader`.
 
-Tester: `.squad/project.md` *Test doubles* (the two fakes); `tests/Censio.GameData.Tests/Fixtures/GameInstallation/README.md`
-describing the sample in English (source, date, what each line shows, no private value; read by no test).
+Tester: `.squad/project.md` *Test doubles* (the three doubles); `tests/Censio.Companion.Core.Tests/Fixtures/GameInstallation/README.md`
+describing both samples in English (source, date, what each line shows, no private value; the `.reg` read by
+`RegExportUbisoftInstallRecordsTests` and the search tests, `game-installation.md` by no test).
 
 ## Architecture check
 
@@ -231,7 +242,9 @@ sentences above are updated by the Dev.
   exception (may name a path, as `companion.md` *Log* already accepts).
 - Accepted forms: from the settings file every fully qualified path, the player's own choice; a UNC path there is
   probed as written over the network (SMB), which `game-installation.md` and `.squad/project.md` (*Outbound calls*)
-  state. From a record only local paths: one starting with `\\` or `//` (UNC, `\\?\`, `\\.\`) is skipped. Who can
+  state. From a record no UNC or device path: every form of fact 3b (`\\`, `//`, `\/`, `/\`, `\\?\`, `\??\`, `\\.\`, `/?`) is
+  skipped by `GameInstallation.IsNetworkOrDevicePath`, so only a drive path is left; a mapped drive letter or a
+  directory symlink is still followed. Who can
   write the records key is checked in AC8 (`Get-Acl`). Nothing found is written or executed; only `anno117.exe` is
   opened, by Windows' version reader, to read its version resource.
 
@@ -272,3 +285,7 @@ Devil's Advocate (1 major, 4 minor):
   "administrator-writable" is dropped; AC8 runs `Get-Acl` on the key.
 - N2: taken; a 3 GiB sparse-file DataRow.
 - N3: taken; AC8 tries `"C:"` and `"%USERPROFILE%\\x"`.
+- B3 (2nd `CHANGES_REQUIRED`; Lead decision: accepted and fixed as Security supplied it, one delta confirmation):
+  the rule is a separator followed by a separator or `?` (fact 3b), in `GameInstallation.IsNetworkOrDevicePath` with
+  its own DataRows (AC4); "no UNC or device path written in a record" replaces "local". The real `.reg` export
+  arrived in the same round: fact 3 confirmed, fact 3a and the numeric-order test from the sample added.
