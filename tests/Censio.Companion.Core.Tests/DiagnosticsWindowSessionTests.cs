@@ -476,7 +476,7 @@ public sealed class DiagnosticsWindowSessionTests
     /// <returns>The session</returns>
     private DiagnosticsWindowSession CreateSession(TimeProvider clock)
     {
-        return new DiagnosticsWindowSession(ReadStatusText, ReadTick, clock, Post, CreateWindow);
+        return new DiagnosticsWindowSession(ReadStatusText, ReadTick, () => null, clock, Post, CreateWindow);
     }
 
     /// <summary>
@@ -562,6 +562,7 @@ public sealed class DiagnosticsWindowSessionTests
 
                                                        return readTick();
                                                    },
+                                                   () => null,
                                                    CreateClock(),
                                                    Post,
                                                    CreateWindow);

@@ -1,3 +1,4 @@
+using Censio.GameData;
 using Censio.Pipe;
 
 namespace Censio.Companion.Core;
@@ -18,6 +19,13 @@ public sealed class DiagnosticsWindowSession
     /// Reads the latest closed tick.
     /// </summary>
     private readonly Func<PipeTick?> _readTick;
+
+    /// <summary>
+    /// Reads the game catalog.
+    /// </summary>
+#pragma warning disable S1144, S4487 // Skeleton: removed with the implementation
+    private readonly Func<GameCatalog?> _readCatalog;
+#pragma warning restore S1144, S4487
 
     /// <summary>
     /// The clock.
@@ -48,13 +56,15 @@ public sealed class DiagnosticsWindowSession
     /// </summary>
     /// <param name="readStatusText">Reads the status text</param>
     /// <param name="readTick">Reads the latest closed tick</param>
+    /// <param name="readCatalog">Reads the game catalog</param>
     /// <param name="clock">The clock</param>
     /// <param name="post">Runs an action on the thread of the window</param>
     /// <param name="createWindow">Creates the window</param>
-    public DiagnosticsWindowSession(Func<string> readStatusText, Func<PipeTick?> readTick, TimeProvider clock, Action<Action> post, Func<IDiagnosticsWindow> createWindow)
+    public DiagnosticsWindowSession(Func<string> readStatusText, Func<PipeTick?> readTick, Func<GameCatalog?> readCatalog, TimeProvider clock, Action<Action> post, Func<IDiagnosticsWindow> createWindow)
     {
         _readStatusText = readStatusText;
         _readTick = readTick;
+        _readCatalog = readCatalog;
         _clock = clock;
         _createWindow = createWindow;
         _updater = new TrayStatusUpdater<DiagnosticsView?>(ReadView, post, ShowUpdate);

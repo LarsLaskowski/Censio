@@ -252,10 +252,12 @@ public static class TrayMenu
     /// <param name="version">The product version</param>
     /// <param name="snapshot">The snapshot</param>
     /// <param name="game">The status of the game installation search</param>
+    /// <param name="catalog">The status of the game catalog</param>
     /// <param name="isAutostartEnabled">Whether the Companion starts with Windows</param>
     /// <param name="clock">The clock</param>
     /// <returns>The entries in display order</returns>
-    public static IReadOnlyList<TrayMenuEntry> Create(string version, TraySnapshot snapshot, GameInstallationStatus game, bool isAutostartEnabled, TimeProvider clock)
+#pragma warning disable S1172 // Skeleton: removed with the implementation
+    public static IReadOnlyList<TrayMenuEntry> Create(string version, TraySnapshot snapshot, GameInstallationStatus game, GameCatalogStatus catalog, bool isAutostartEnabled, TimeProvider clock)
     {
         return [
                    new TrayMenuEntry(TrayMenuEntryKind.Status, $"Status: {snapshot.StatusText}", false),
@@ -273,6 +275,17 @@ public static class TrayMenu
                    new TrayMenuEntry(TrayMenuEntryKind.Separator, string.Empty, false),
                    new TrayMenuEntry(TrayMenuEntryKind.Exit, ExitText, true)
                ];
+    }
+#pragma warning restore S1172
+
+    /// <summary>
+    /// Formats the text of the catalog entry.
+    /// </summary>
+    /// <param name="status">The status of the game catalog</param>
+    /// <returns>The text</returns>
+    public static string FormatCatalog(GameCatalogStatus status)
+    {
+        throw new NotImplementedException();
     }
 
     /// <summary>

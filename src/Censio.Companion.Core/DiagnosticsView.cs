@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Globalization;
 
+using Censio.GameData;
 using Censio.Pipe;
 
 namespace Censio.Companion.Core;
@@ -21,6 +22,11 @@ public sealed class DiagnosticsView : IReadOnlyList<DiagnosticsRow>, IList
     /// The text shown when the table has no rows.
     /// </summary>
     public const string NoEntriesText = "(no entries)";
+
+    /// <summary>
+    /// The longest catalog name shown in a cell.
+    /// </summary>
+    public const int MaxCatalogNameLength = 4096;
 
     /// <summary>
     /// The message of the exception thrown by every mutating <see cref="IList" /> member.
@@ -134,6 +140,20 @@ public sealed class DiagnosticsView : IReadOnlyList<DiagnosticsRow>, IList
     /// <returns>The view</returns>
     public static DiagnosticsView Create(string statusText, PipeTick? tick, TimeProvider clock)
     {
+        return Create(statusText, tick, null, clock);
+    }
+
+    /// <summary>
+    /// Creates a view that names the GUIDs from a catalog.
+    /// </summary>
+    /// <param name="statusText">The status text</param>
+    /// <param name="tick">The tick, or <c>null</c> if none</param>
+    /// <param name="catalog">The catalog, or <c>null</c> if none</param>
+    /// <param name="clock">The clock</param>
+    /// <returns>The view</returns>
+#pragma warning disable S1172 // Skeleton: removed with the implementation
+    public static DiagnosticsView Create(string statusText, PipeTick? tick, GameCatalog? catalog, TimeProvider clock)
+    {
         var lines = new List<string>(3)
                     {
                         $"Status: {statusText}",
@@ -149,6 +169,7 @@ public sealed class DiagnosticsView : IReadOnlyList<DiagnosticsRow>, IList
 
         return new DiagnosticsView(lines, tick);
     }
+#pragma warning restore S1172
 
     /// <summary>
     /// Formats an integer culture-independently.

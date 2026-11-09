@@ -1,3 +1,4 @@
+using Censio.GameData;
 using Censio.Pipe;
 
 using Microsoft.Extensions.Logging;
@@ -195,6 +196,59 @@ public static partial class CompanionLog
     /// <param name="exception">The exception, if any</param>
     [LoggerMessage(Level = LogLevel.Warning, Message = "The settings file {File} is invalid: {Problem}")]
     public static partial void GameSettingsFileInvalid(ILogger logger, string file, string problem, Exception? exception);
+
+    /// <summary>
+    /// Logs the built catalog.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    /// <param name="entryCount">The number of entries</param>
+    /// <param name="inheritedAssetCount">The number of inherited assets left out</param>
+    /// <param name="droppedRegionTypeCount">The number of unknown region types dropped</param>
+    [LoggerMessage(Level = LogLevel.Information, Message = "Catalog built: {EntryCount} entries; {InheritedAssetCount} inherited assets left out; {DroppedRegionTypeCount} unknown region types dropped")]
+    public static partial void CatalogBuilt(ILogger logger, int entryCount, int inheritedAssetCount, int droppedRegionTypeCount);
+
+    /// <summary>
+    /// Logs that the catalog could not be built.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    /// <param name="kind">The kind of the error</param>
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Catalog failed: {Kind}")]
+    public static partial void CatalogFailed(ILogger logger, GameCatalogErrorKind kind);
+
+    /// <summary>
+    /// Logs a copy of a catalog file in another archive.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    /// <param name="archive">The name of the archive</param>
+    /// <param name="path">The path of the copy</param>
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Catalog: {Archive} also lists {Path}; the copy in config.rda is used")]
+    public static partial void CatalogCopyFound(ILogger logger, string archive, string path);
+
+    /// <summary>
+    /// Logs the archives that could not be checked for copies.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    /// <param name="count">The number of archives</param>
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Catalog: {Count} other archives could not be checked for copies")]
+    public static partial void CatalogArchivesUnchecked(ILogger logger, int count);
+
+    /// <summary>
+    /// Logs a GUID the catalog cannot name.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    /// <param name="role">The role of the GUID</param>
+    /// <param name="assetGuid">The asset GUID</param>
+    /// <param name="problem">The problem</param>
+    [LoggerMessage(Level = LogLevel.Information, Message = "Catalog cannot name {Role} {AssetGuid}: {Problem}")]
+    public static partial void CatalogCannotName(ILogger logger, GameCatalogKind role, int assetGuid, GameCatalogProblem problem);
+
+    /// <summary>
+    /// Logs that no further GUIDs are reported.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    /// <param name="maxReports">The most GUIDs logged</param>
+    [LoggerMessage(Level = LogLevel.Information, Message = "Catalog: more than {MaxReports} GUIDs cannot be named; further ones are not logged in this run")]
+    public static partial void CatalogReportsCapped(ILogger logger, int maxReports);
 
     #endregion // Methods
 }

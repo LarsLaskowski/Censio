@@ -126,6 +126,7 @@ public partial class App : Application
     {
         _diagnostics = new DiagnosticsWindowSession(() => _snapshot().StatusText,
                                                     readTick,
+                                                    () => null,
                                                     TimeProvider.System,
                                                     action => Dispatcher.BeginInvoke(DispatcherPriority.Background, action),
                                                     () => new DiagnosticsWindow());
@@ -251,7 +252,7 @@ public partial class App : Application
     private TrayIcon CreateTrayIcon()
     {
         _images = new TrayIconImages();
-        _trayIcon = new TrayIcon(ProductVersion.Read(typeof(App).Assembly), _images, () => _snapshot(), () => _gameSearch?.Status ?? GameInstallationStatus.Searching, () => _autostart?.Refresh() ?? false, Dispatch);
+        _trayIcon = new TrayIcon(ProductVersion.Read(typeof(App).Assembly), _images, () => _snapshot(), () => _gameSearch?.Status ?? GameInstallationStatus.Searching, () => GameCatalogStatus.Reading, () => _autostart?.Refresh() ?? false, Dispatch);
 
         return _trayIcon;
     }

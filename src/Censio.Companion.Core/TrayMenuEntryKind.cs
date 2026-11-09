@@ -58,5 +58,10 @@ public enum TrayMenuEntryKind
     /// <summary>
     /// The entry that shows the game installation.
     /// </summary>
-    Game
+    Game,
+
+    /// <summary>
+    /// The entry that shows the game catalog.
+    /// </summary>
+    Catalog
 }
