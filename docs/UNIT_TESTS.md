@@ -27,8 +27,13 @@ neighboring test file before inventing a new pattern.
 - `CENSIO_FIXTURE_DENY_LIST`: the path of the local deny list the fixtures are checked against
   (`FixtureDenyListTests`, `tests/Censio.Pipe.Tests/Fixtures/README.md`); unset, that test is reported inconclusive.
 - `CENSIO_ANNO_INSTALL`: the Anno 117 installation folder, set on Windows for the survey test
-  `RdaInstallationSurveyRealInstallationReadsAssetAndIcon` (`tests/Censio.GameData.Tests`); unset, that test is reported
+  `RdaInstallationSurveyRealInstallationReadsAssetAndIcon` and for the catalog test
+  `GameCatalogReaderInstallationResolvesFixtureGuids` (`tests/Censio.GameData.Tests`); unset, those tests are reported
   inconclusive.
+- `CENSIO_CATALOG_SAMPLE`: the folder of the four loose game files `assets.xml`, `datasets.xml`, `texts_english.xml` and
+  `texts_german.xml` (never in the repository), for `GameCatalogReaderSampleResolvesFixtureGuids` and
+  `GameCatalogReaderFixtureHoldsNoSampleText` (`tests/Censio.GameData.Tests`); unset, those tests are reported
+  inconclusive. They write GUIDs, kinds and counts only, never a name or text.
 <!-- project:end layout -->
 
 ## Naming

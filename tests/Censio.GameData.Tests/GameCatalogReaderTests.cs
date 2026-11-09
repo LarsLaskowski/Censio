@@ -1,0 +1,1364 @@
+using System.Diagnostics;
+using System.Globalization;
+using System.Text;
+using System.Xml;
+
+using Censio.Pipe;
+
+namespace Censio.GameData.Tests;
+
+/// <summary>
+/// Tests for <see cref="GameCatalogReader" />.
+/// </summary>
+[TestClass]
+public sealed class GameCatalogReaderTests
+{
+    #region Constants
+
+    /// <summary>
+    /// The name of the environment variable that names the folder of the four sample files.
+    /// </summary>
+    private const string SampleVariable = "CENSIO_CATALOG_SAMPLE";
+
+    /// <summary>
+    /// The name of the environment variable that names a real installation.
+    /// </summary>
+    private const string InstallationVariable = "CENSIO_ANNO_INSTALL";
+
+    /// <summary>
+    /// The offset of the GUIDs of the fixture.
+    /// </summary>
+    private const int Base = 2_000_000_000;
+
+    /// <summary>
+    /// A text that stands for file content and must never reach an error message.
+    /// </summary>
+    private const string Secret = "INVENTED-CONTENT-7QX";
+
+    #endregion // Constants
+
+    #region Fields
+
+    /// <summary>
+    /// The names of the files of a catalog in the order of their passes.
+    /// </summary>
+    private static readonly string[] _fileNames = ["datasets.xml", "assets.xml", "texts_english.xml", "texts_german.xml"];
+
+    /// <summary>
+    /// The paths of the files of a catalog in the order of their passes.
+    /// </summary>
+    private static readonly string[] _filePaths = [GameCatalogReader.DataSetsPath, GameCatalogReader.AssetsPath, GameCatalogReader.EnglishTextsPath, GameCatalogReader.GermanTextsPath];
+
+    /// <summary>
+    /// The entries of the fixture: GUID, kind, English name, German name and problem.
+    /// </summary>
+    private static readonly (int Guid, GameCatalogKind Kind, string? English, string? German, GameCatalogProblem Problem)[] _fixtureEntries = [
+                                                                                                                                                  (Base + 201, GameCatalogKind.Region, "Region 101", "Gebiet 101", GameCatalogProblem.None),
+                                                                                                                                                  (Base + 202, GameCatalogKind.Region, "Region 104", "Gebiet 104", GameCatalogProblem.None),
+                                                                                                                                                  (Base + 203, GameCatalogKind.Region, "Region 102", "Gebiet 102", GameCatalogProblem.None),
+                                                                                                                                                  (Base + 204, GameCatalogKind.Region, "Region 103", "Gebiet 103", GameCatalogProblem.None),
+                                                                                                                                                  (Base + 301, GameCatalogKind.Good, "Good 301", "Ware 301", GameCatalogProblem.None),
+                                                                                                                                                  (Base + 302, GameCatalogKind.Good, "Good 302", "Ware 302", GameCatalogProblem.None),
+                                                                                                                                                  (Base + 303, GameCatalogKind.Good, "Good 303", "Ware 303", GameCatalogProblem.None),
+                                                                                                                                                  (Base + 304, GameCatalogKind.Good, "Good 304", "Ware 304", GameCatalogProblem.None),
+                                                                                                                                                  (Base + 305, GameCatalogKind.Good, "Good 305", null, GameCatalogProblem.Incomplete),
+                                                                                                                                                  (Base + 306, GameCatalogKind.Good, "Good 306", "Ware 306", GameCatalogProblem.None),
+                                                                                                                                                  (Base + 307, GameCatalogKind.Good, "Good 306", "Ware 306", GameCatalogProblem.None),
+                                                                                                                                                  (Base + 308, GameCatalogKind.Good, null, "Ware 308", GameCatalogProblem.Incomplete),
+                                                                                                                                                  (Base + 309, GameCatalogKind.Good, "Good 309", "Ware 309", GameCatalogProblem.None),
+                                                                                                                                                  (Base + 311, GameCatalogKind.Good, null, null, GameCatalogProblem.Nameless),
+                                                                                                                                                  (Base + 312, GameCatalogKind.Good, null, null, GameCatalogProblem.Nameless),
+                                                                                                                                                  (Base + 313, GameCatalogKind.Good, null, null, GameCatalogProblem.Nameless),
+                                                                                                                                                  (-(Base + 401), GameCatalogKind.Good, "Good 401", "Ware 401", GameCatalogProblem.None),
+                                                                                                                                                  (Base + 351, GameCatalogKind.Workforce, "Worker 351", "Arbeiter 351", GameCatalogProblem.None),
+                                                                                                                                                  (Base + 501, GameCatalogKind.Building, "Building 501", "Gebäude 501", GameCatalogProblem.None),
+                                                                                                                                                  (Base + 502, GameCatalogKind.Building, "Building 502", "Gebäude 502", GameCatalogProblem.None),
+                                                                                                                                                  (Base + 503, GameCatalogKind.Building, "Building 503", "Gebäude 503", GameCatalogProblem.None)
+                                                                                                                                              ];
+
+    /// <summary>
+    /// The folder of the installation of a synthetic test.
+    /// </summary>
+    private readonly string _root = Path.Combine(Path.GetTempPath(), "censio-catalog-" + Guid.NewGuid().ToString("N"));
+
+    #endregion // Fields
+
+    #region Constructors
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="GameCatalogReaderTests" /> class.
+    /// </summary>
+    /// <param name="testContext">The test context</param>
+    public GameCatalogReaderTests(TestContext testContext)
+    {
+        TestContext = testContext;
+    }
+
+    #endregion // Constructors
+
+    #region Properties
+
+    /// <summary>
+    /// Gets the test context.
+    /// </summary>
+    public TestContext TestContext { get; }
+
+    /// <summary>
+    /// Gets the <c>maindata</c> folder of the installation of a synthetic test.
+    /// </summary>
+    private string MainData => Path.Combine(_root, "maindata");
+
+    #endregion // Properties
+
+    #region Methods
+
+    /// <summary>
+    /// Deletes the folder of a synthetic test.
+    /// </summary>
+    [TestCleanup]
+    public void DeleteRoot()
+    {
+        if (Directory.Exists(_root))
+        {
+            Directory.Delete(_root, true);
+        }
+    }
+
+    #endregion // Methods
+
+    #region AC1
+
+    /// <summary>
+    /// With the four loose sample files, every non-zero GUID of the pipe fixture resolves to an entry of its kind with
+    /// both names; the test writes counts, unresolved GUIDs, the elapsed time and the peak working set only.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    [TestCategory("AC1")]
+    public async Task GameCatalogReaderSampleResolvesFixtureGuids()
+    {
+        // Arrange
+        var folder = Environment.GetEnvironmentVariable(SampleVariable);
+
+        if (string.IsNullOrEmpty(folder))
+        {
+            Assert.Inconclusive($"{SampleVariable} is not set: the catalog did not run on the sample files");
+        }
+
+        var guids = await ReadPipeGuidsAsync();
+        var stopwatch = Stopwatch.StartNew();
+
+        // Act
+        var result = GameCatalogReader.Read(() => OpenSample(folder, _fileNames[0]),
+                                            () => OpenSample(folder, _fileNames[1]),
+                                            () => OpenSample(folder, _fileNames[2]),
+                                            () => OpenSample(folder, _fileNames[3]));
+
+        stopwatch.Stop();
+
+        // Assert
+        Assert.IsNull(result.Error, $"The sample should give a catalog, but failed with {result.Error?.Kind}");
+        Assert.IsNotNull(result.Catalog, "The sample should give a catalog");
+        AssertPipeGuidsResolve(result.Catalog, guids);
+
+        using var process = Process.GetCurrentProcess();
+
+        TestContext.WriteLine(string.Create(CultureInfo.InvariantCulture, $"Catalog: {result.Catalog.Count} entries, {result.Catalog.InheritedAssetCount} inherited assets left out, {result.Catalog.DroppedRegionTypeCount} region types dropped"));
+        TestContext.WriteLine(string.Create(CultureInfo.InvariantCulture, $"Elapsed: {stopwatch.ElapsedMilliseconds} ms, peak working set: {process.PeakWorkingSet64 / (1024 * 1024)} MiB"));
+    }
+
+    /// <summary>
+    /// On a real installation, every non-zero GUID of the pipe fixture resolves through <c>Load</c>; the test writes
+    /// counts, unresolved GUIDs, the copies found in other archives, the elapsed time and the peak working set only.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    [TestCategory("AC1")]
+    public async Task GameCatalogReaderInstallationResolvesFixtureGuids()
+    {
+        // Arrange
+        var installation = Environment.GetEnvironmentVariable(InstallationVariable);
+
+        if (string.IsNullOrEmpty(installation))
+        {
+            Assert.Inconclusive($"{InstallationVariable} is not set: the catalog did not run on a real installation");
+        }
+
+        var guids = await ReadPipeGuidsAsync();
+        var stopwatch = Stopwatch.StartNew();
+
+        // Act
+        var result = GameCatalogReader.Load(installation, RdaLimits.Default);
+
+        stopwatch.Stop();
+
+        // Assert
+        Assert.IsNull(result.Error, $"The installation should give a catalog, but failed with {result.Error?.Kind}");
+        Assert.IsNotNull(result.Catalog, "The installation should give a catalog");
+
+        using var process = Process.GetCurrentProcess();
+
+        TestContext.WriteLine(string.Create(CultureInfo.InvariantCulture, $"Catalog: {result.Catalog.Count} entries, {result.Catalog.InheritedAssetCount} inherited assets left out, {result.Catalog.DroppedRegionTypeCount} region types dropped"));
+        TestContext.WriteLine(string.Create(CultureInfo.InvariantCulture, $"Elapsed: {stopwatch.ElapsedMilliseconds} ms, peak working set: {process.PeakWorkingSet64 / (1024 * 1024)} MiB"));
+        TestContext.WriteLine(string.Create(CultureInfo.InvariantCulture, $"Copies in other archives: {result.Copies.Count}, archives that could not be checked: {result.UncheckedArchiveCount}"));
+
+        foreach (var copy in result.Copies)
+        {
+            TestContext.WriteLine($"Copy: {copy.ArchiveName} also lists {copy.Path}");
+        }
+
+        AssertPipeGuidsResolve(result.Catalog, guids);
+    }
+
+    #endregion // AC1
+
+    #region AC2
+
+    /// <summary>
+    /// A session of the template <c>SessionModerate</c> is a region entry with its region asset and region type.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC2")]
+    public void GameCatalogReaderReadResolvesSessionAsRegion()
+    {
+        // Arrange
+        var catalog = ReadFixtureCatalog();
+
+        // Act
+        var entry = catalog.Find(Base + 201);
+
+        // Assert
+        Assert.IsNotNull(entry, "The session should be an entry");
+        Assert.AreEqual(GameCatalogKind.Region, entry.Kind, "The session should be a region entry");
+        Assert.AreEqual(Base + 101, entry.RegionGuid, "The entry should carry the GUID of its region asset");
+        Assert.AreSequenceEqual(["Zorlan"], entry.RegionTypes, "The entry should carry the region type its region asset states");
+    }
+
+    /// <summary>
+    /// A session of the template <c>SessionModerateRandom</c> is a region entry as well.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC2")]
+    public void GameCatalogReaderReadResolvesRandomSessionAsRegion()
+    {
+        // Arrange
+        var catalog = ReadFixtureCatalog();
+
+        // Act
+        var entry = catalog.Find(Base + 202);
+
+        // Assert
+        Assert.IsNotNull(entry, "The random session should be an entry");
+        Assert.AreEqual(GameCatalogKind.Region, entry.Kind, "The random session should be a region entry");
+        Assert.AreEqual(Base + 104, entry.RegionGuid, "The entry should carry the GUID of its region asset");
+        Assert.AreSequenceEqual(["Yultic"], entry.RegionTypes, "The entry should carry the region type its region asset states");
+    }
+
+    /// <summary>
+    /// A region asset without a <c>RegionID</c> gives its region entries no region type.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC2")]
+    public void GameCatalogReaderReadLeavesRegionTypeUnstatedWithoutRegionId()
+    {
+        // Arrange
+        var catalog = ReadFixtureCatalog();
+
+        // Act
+        var entry = catalog.Find(Base + 203);
+
+        // Assert
+        Assert.IsNotNull(entry, "The session should be an entry");
+        Assert.AreEqual(Base + 102, entry.RegionGuid, "The entry should carry the GUID of its region asset");
+        Assert.IsNull(entry.RegionTypes, "A region asset without a RegionID should give no region type, not an empty list");
+    }
+
+    /// <summary>
+    /// A session that names region <c>0</c> or an asset that is no region asset is not an entry.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC2")]
+    public void GameCatalogReaderReadSkipsSessionWithoutRegionAsset()
+    {
+        // Arrange
+        var catalog = ReadFixtureCatalog();
+
+        // Assert
+        Assert.IsNull(catalog.Find(Base + 205), "A session that names region 0 should not be an entry");
+        Assert.IsNull(catalog.Find(Base + 206), "A session that names an asset that is no region asset should not be an entry");
+        Assert.AreEqual(GameCatalogProblem.Unknown, catalog.Check(Base + 205), "A session that names region 0 should be unknown");
+        Assert.AreEqual(GameCatalogProblem.Unknown, catalog.Check(Base + 206), "A session that names no region asset should be unknown");
+    }
+
+    /// <summary>
+    /// A good carries every region type of its association list, in the order of the list.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC2")]
+    public void GameCatalogReaderReadResolvesGoodWithEveryRegionType()
+    {
+        // Arrange
+        var catalog = ReadFixtureCatalog();
+
+        // Act
+        var many = catalog.Find(Base + 302);
+        var one = catalog.Find(Base + 301);
+
+        // Assert
+        Assert.IsNotNull(many, "The good with three region types should be an entry");
+        Assert.AreEqual(GameCatalogKind.Good, many.Kind, "A product should be a good");
+        Assert.AreSequenceEqual(["Zorlan", "Yultic", "Xanthi"], many.RegionTypes, "The good should carry all three region types");
+        Assert.IsNotNull(one, "The good with one region type should be an entry, also with IsWorkforce 0");
+        Assert.AreEqual(GameCatalogKind.Good, one.Kind, "A product with IsWorkforce 0 should be a good");
+        Assert.AreSequenceEqual(["Zorlan"], one.RegionTypes, "The good should carry its one region type");
+    }
+
+    /// <summary>
+    /// A product with <c>IsWorkforce</c> 1 is a workforce entry with its region types.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC2")]
+    public void GameCatalogReaderReadResolvesWorkforce()
+    {
+        // Arrange
+        var catalog = ReadFixtureCatalog();
+
+        // Act
+        var entry = catalog.Find(Base + 351);
+
+        // Assert
+        Assert.IsNotNull(entry, "The workforce should be an entry");
+        Assert.AreEqual(GameCatalogKind.Workforce, entry.Kind, "A product with IsWorkforce 1 should be a workforce");
+        Assert.AreSequenceEqual(["Yultic"], entry.RegionTypes, "The workforce should carry its region type");
+    }
+
+    /// <summary>
+    /// A building carries the region types of its <c>AssociatedRegions</c>.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC2")]
+    public void GameCatalogReaderReadResolvesBuildingRegions()
+    {
+        // Arrange
+        var catalog = ReadFixtureCatalog();
+
+        // Act
+        var entry = catalog.Find(Base + 501);
+
+        // Assert
+        Assert.IsNotNull(entry, "The building should be an entry");
+        Assert.AreEqual(GameCatalogKind.Building, entry.Kind, "An asset with a Building section should be a building");
+        Assert.AreSequenceEqual(["Zorlan", "Xanthi"], entry.RegionTypes, "The building should carry the region types of its list");
+    }
+
+    /// <summary>
+    /// A missing region list is "not stated" (null), for a good and for a building.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC2")]
+    public void GameCatalogReaderReadKeepsMissingRegionListUnstated()
+    {
+        // Arrange
+        var catalog = ReadFixtureCatalog();
+
+        // Assert
+        Assert.IsNull(catalog.Find(Base + 303)?.RegionTypes, "A good without AssociatedRegion should have no region types stated");
+        Assert.IsNull(catalog.Find(Base + 502)?.RegionTypes, "A building without AssociatedRegions should have no region types stated");
+        Assert.IsNotNull(catalog.Find(Base + 303), "The good without a list should be an entry");
+        Assert.IsNotNull(catalog.Find(Base + 502), "The building without a list should be an entry");
+    }
+
+    /// <summary>
+    /// An explicitly empty region list (<c>&lt;AssociatedRegions /&gt;</c>) is "none": an empty list, not null.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC2")]
+    public void GameCatalogReaderReadKeepsEmptyRegionListAsNone()
+    {
+        // Arrange
+        var catalog = ReadFixtureCatalog();
+
+        // Act
+        var entry = catalog.Find(Base + 503);
+
+        // Assert
+        Assert.IsNotNull(entry, "The building with an empty list should be an entry");
+        Assert.IsNotNull(entry.RegionTypes, "An explicitly empty list should not read as not stated");
+        Assert.IsEmpty(entry.RegionTypes, "An explicitly empty list should hold no region type");
+    }
+
+    /// <summary>
+    /// <c>ProductionRegions</c> says where a good is produced and is not read: a good that has only that list states no
+    /// region types, one that has both carries the association list alone.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC2")]
+    public void GameCatalogReaderReadIgnoresProductionRegions()
+    {
+        // Arrange
+        var catalog = ReadFixtureCatalog();
+
+        // Assert
+        Assert.IsNull(catalog.Find(Base + 303)?.RegionTypes, "A good with only ProductionRegions should have no region types stated");
+        Assert.DoesNotContain("Xanthi", catalog.Find(Base + 301)?.RegionTypes ?? [], "A good should not carry the region types of its ProductionRegions");
+    }
+
+    /// <summary>
+    /// A region type name that the <c>Region</c> data set does not hold is dropped from the entry and counted.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC2")]
+    public void GameCatalogReaderReadDropsUnknownRegionType()
+    {
+        // Arrange
+        var assets = Assets(Good(10, 1000, "Zorlan;Vexan;Vexan"));
+
+        // Act
+        var catalog = ReadCatalog(DataSets("Zorlan"), assets, Texts((1000, "Good 10")), Texts((1000, "Ware 10")));
+
+        // Assert
+        Assert.AreSequenceEqual(["Zorlan"], catalog.Find(10)?.RegionTypes, "The unknown region type should be dropped from the entry");
+        Assert.AreEqual(2, catalog.DroppedRegionTypeCount, "Each dropped token should be counted");
+    }
+
+    /// <summary>
+    /// A <c>RegionID</c> that the <c>Region</c> data set does not hold is dropped and counted: the region entry has an
+    /// empty list of region types.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC2")]
+    public void GameCatalogReaderReadDropsUnknownRegionId()
+    {
+        // Arrange
+        var assets = Assets(RegionAsset(5, 1000, "Vexan"), Session(6, "SessionModerate", 5, 1000));
+
+        // Act
+        var catalog = ReadCatalog(DataSets("Zorlan"), assets, Texts((1000, "Region 5")), Texts((1000, "Gebiet 5")));
+
+        // Assert
+        var entry = catalog.Find(6);
+
+        Assert.IsNotNull(entry, "The session should be an entry");
+        Assert.IsNotNull(entry.RegionTypes, "A dropped RegionID should leave an empty list, not no list");
+        Assert.IsEmpty(entry.RegionTypes, "The unknown RegionID should be dropped from the entry");
+        Assert.AreEqual(1, catalog.DroppedRegionTypeCount, "The dropped RegionID should be counted");
+    }
+
+    /// <summary>
+    /// The region data set is the data set whose own name is <c>Region</c>: another data set that has an item named
+    /// <c>Region</c> and other items is not it.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC2")]
+    public void GameCatalogReaderReadFindsRegionDataSetByOwnName()
+    {
+        // Arrange
+        var dataSets = $"<DataSets><Group><Name>Global</Name>{DataSet("Other", "Region", "Vexan")}{DataSet("Region", "Zorlan")}</Group></DataSets>";
+        var assets = Assets(Good(10, 1000, "Region;Vexan;Zorlan"));
+
+        // Act
+        var catalog = ReadCatalog(dataSets, assets, Texts((1000, "Good 10")), Texts((1000, "Ware 10")));
+
+        // Assert
+        Assert.AreSequenceEqual(["Zorlan"], catalog.Find(10)?.RegionTypes, "Only the items of the data set named Region should be region types");
+        Assert.AreEqual(2, catalog.DroppedRegionTypeCount, "The names of the other data set should be dropped and counted");
+    }
+
+    /// <summary>
+    /// A negative GUID is read as an asset GUID.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC2")]
+    public void GameCatalogReaderReadResolvesNegativeGuid()
+    {
+        // Arrange
+        var catalog = ReadFixtureCatalog();
+
+        // Act
+        var entry = catalog.Find(-(Base + 401));
+
+        // Assert
+        Assert.IsNotNull(entry, "The negative GUID should be an entry");
+        Assert.AreEqual(GameCatalogKind.Good, entry.Kind, "The negative GUID should be a good");
+        Assert.AreEqual("Good 401", entry.EnglishName, "The negative GUID should have its English name");
+        Assert.AreEqual("Ware 401", entry.GermanName, "The negative GUID should have its German name");
+    }
+
+    /// <summary>
+    /// The fixture gives exactly its entries with their kinds, names and problems, and no other entry, and the counts
+    /// of its inherited asset and dropped region types.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC2")]
+    public void GameCatalogReaderReadResolvesFixtureEntries()
+    {
+        // Arrange
+        var catalog = ReadFixtureCatalog();
+
+        // Assert
+        Assert.AreEqual(_fixtureEntries.Length, catalog.Count, "The catalog should hold the entries of the fixture and no other");
+
+        foreach (var expected in _fixtureEntries)
+        {
+            var entry = catalog.Find(expected.Guid);
+
+            Assert.IsNotNull(entry, $"GUID {expected.Guid} should be an entry");
+            Assert.AreEqual(expected.Kind, entry.Kind, $"GUID {expected.Guid} should have its kind");
+            Assert.AreEqual(expected.English ?? string.Empty, entry.EnglishName ?? string.Empty, $"GUID {expected.Guid} should have its English name");
+            Assert.AreEqual(expected.German ?? string.Empty, entry.GermanName ?? string.Empty, $"GUID {expected.Guid} should have its German name");
+            Assert.AreEqual(expected.Problem, catalog.Check(expected.Guid), $"GUID {expected.Guid} should give its problem");
+        }
+
+        Assert.AreEqual(1, catalog.InheritedAssetCount, "The fixture's inherited asset should be counted");
+        Assert.AreEqual(2, catalog.DroppedRegionTypeCount, "The fixture's unknown type token and unknown RegionID should be counted");
+    }
+
+    #endregion // AC2
+
+    #region AC3
+
+    /// <summary>
+    /// A GUID defined by two assets is ambiguous.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC3")]
+    public void GameCatalogReaderReadMarksDuplicateGuidAmbiguous()
+    {
+        // Arrange
+        var assets = Assets(Good(10, 1000, null), Good(10, 1001, null), Good(11, 1000, null));
+
+        // Act
+        var catalog = ReadCatalog(DataSets("Zorlan"), assets, Texts((1000, "Good 10"), (1001, "Good 11")), Texts((1000, "Ware 10"), (1001, "Ware 11")));
+
+        // Assert
+        Assert.AreEqual(GameCatalogProblem.Ambiguous, catalog.Check(10), "A GUID defined twice should be ambiguous");
+        Assert.AreEqual(GameCatalogProblem.None, catalog.Check(11), "A GUID defined once should be unaffected");
+    }
+
+    /// <summary>
+    /// A text identifier with two different texts in one language makes its assets ambiguous.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC3")]
+    public void GameCatalogReaderReadMarksDifferingTextAmbiguous()
+    {
+        // Arrange
+        var assets = Assets(Good(10, 1000, null), Good(11, 1001, null));
+
+        // Act
+        var catalog = ReadCatalog(DataSets("Zorlan"), assets, Texts((1000, "Good 10"), (1000, "Good 99"), (1001, "Good 11")), Texts((1000, "Ware 10"), (1001, "Ware 11")));
+
+        // Assert
+        Assert.AreEqual(GameCatalogProblem.Ambiguous, catalog.Check(10), "A text identifier with two different texts should make the GUID ambiguous");
+        Assert.AreEqual(GameCatalogProblem.None, catalog.Check(11), "A GUID with an unambiguous text should be unaffected");
+    }
+
+    /// <summary>
+    /// A text identifier repeated with the same text is no ambiguity.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC3")]
+    public void GameCatalogReaderReadAcceptsRepeatedSameText()
+    {
+        // Arrange
+        var catalog = ReadFixtureCatalog();
+
+        // Act
+        var entry = catalog.Find(Base + 309);
+
+        // Assert
+        Assert.AreEqual(GameCatalogProblem.None, catalog.Check(Base + 309), "A text identifier repeated with the same text should not be ambiguous");
+        Assert.AreEqual("Good 309", entry?.EnglishName, "The repeated text should be the name");
+    }
+
+    /// <summary>
+    /// A text identifier shared by several assets is no ambiguity: two goods, and a session with its region asset.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC3")]
+    public void GameCatalogReaderReadAcceptsSharedTextId()
+    {
+        // Arrange
+        var catalog = ReadFixtureCatalog();
+
+        // Assert
+        Assert.AreEqual(GameCatalogProblem.None, catalog.Check(Base + 306), "The first good of a shared text identifier should resolve");
+        Assert.AreEqual(GameCatalogProblem.None, catalog.Check(Base + 307), "The second good of a shared text identifier should resolve");
+        Assert.AreEqual(catalog.Find(Base + 306)?.EnglishName, catalog.Find(Base + 307)?.EnglishName, "Both goods should have the shared name");
+        Assert.AreEqual("Gebiet 101", catalog.Find(Base + 201)?.GermanName, "A session should resolve with the text it shares with its region asset");
+    }
+
+    /// <summary>
+    /// An asset without a text identifier, one whose texts are both empty, one whose identifier is in neither file
+    /// are nameless, and one whose text is missing from one language is incomplete.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC3")]
+    public void GameCatalogReaderReadTreatsMissingLineIdAsNoName()
+    {
+        // Arrange
+        var catalog = ReadFixtureCatalog();
+
+        // Assert
+        Assert.AreEqual(GameCatalogProblem.Nameless, catalog.Check(Base + 311), "An asset without a text identifier should be nameless");
+        Assert.AreEqual(GameCatalogProblem.Nameless, catalog.Check(Base + 312), "An asset whose texts are both empty should be nameless");
+        Assert.AreEqual(GameCatalogProblem.Nameless, catalog.Check(Base + 313), "An asset whose text identifier is in neither file should be nameless");
+        Assert.AreEqual(GameCatalogProblem.Incomplete, catalog.Check(Base + 305), "An asset whose text identifier is missing from the German file should be incomplete");
+        Assert.AreEqual(GameCatalogProblem.Incomplete, catalog.Check(Base + 308), "An asset whose English text is empty should be incomplete");
+        Assert.IsTrue(string.IsNullOrEmpty(catalog.Find(Base + 305)?.GermanName), "The missing German name should be absent");
+        Assert.AreEqual("Ware 308", catalog.Find(Base + 308)?.GermanName, "The German name should be kept");
+        Assert.IsNotNull(catalog.Find(Base + 311), "A nameless asset should still be an entry");
+    }
+
+    /// <summary>
+    /// An asset that inherits from a base asset (no template of its own) is left out and counted, even with a
+    /// building section and a text identifier; an asset with a template and a base asset is not left out.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC3")]
+    public void GameCatalogReaderReadLeavesInheritedAssetOut()
+    {
+        // Arrange
+        var catalog = ReadFixtureCatalog();
+        var withTemplate = "<Asset><BaseAssetGUID>9</BaseAssetGUID><Template>Product</Template><Values><Standard><GUID>10</GUID></Standard><Text><OasisId>1000</OasisId></Text><Product /></Values></Asset>";
+
+        // Act
+        var other = ReadCatalog(DataSets("Zorlan"), Assets(withTemplate), Texts((1000, "Good 10")), Texts((1000, "Ware 10")));
+
+        // Assert
+        Assert.IsNull(catalog.Find(Base + 601), "The inherited asset should not be an entry");
+        Assert.AreEqual(GameCatalogProblem.Unknown, catalog.Check(Base + 601), "The inherited asset should be unknown");
+        Assert.AreEqual(1, catalog.InheritedAssetCount, "The inherited asset should be counted");
+        Assert.IsNotNull(other.Find(10), "An asset with a template is no inherited asset");
+        Assert.AreEqual(0, other.InheritedAssetCount, "An asset with a template should not be counted as inherited");
+    }
+
+    #endregion // AC3
+
+    #region AC6
+
+    /// <summary>
+    /// An installation without <c>config.rda</c>, and one without a <c>maindata</c> folder, gives the archive error.
+    /// </summary>
+    /// <param name="createMainData">Whether the <c>maindata</c> folder exists</param>
+    [TestMethod]
+    [TestCategory("AC6")]
+    [DataRow(true)]
+    [DataRow(false)]
+    public void GameCatalogReaderLoadFailsWithoutConfigArchive(bool createMainData)
+    {
+        // Arrange
+        Directory.CreateDirectory(createMainData ? MainData : _root);
+
+        // Act
+        var result = GameCatalogReader.Load(_root, RdaLimits.Default);
+
+        // Assert
+        Assert.IsNull(result.Catalog, "No catalog should be used");
+        Assert.AreEqual(GameCatalogErrorKind.ArchiveUnreadable, result.Error?.Kind, "A missing config.rda should be an unreadable archive");
+    }
+
+    /// <summary>
+    /// A <c>config.rda</c> that does not list one of the four files gives a missing-file error.
+    /// </summary>
+    /// <param name="missing">The index of the file the archive lacks</param>
+    [TestMethod]
+    [TestCategory("AC6")]
+    [DataRow(0)]
+    [DataRow(1)]
+    [DataRow(2)]
+    [DataRow(3)]
+    public void GameCatalogReaderLoadFailsForMissingFile(int missing)
+    {
+        // Arrange
+        WriteConfigArchive(missing);
+
+        // Act
+        var result = GameCatalogReader.Load(_root, RdaLimits.Default);
+
+        // Assert
+        Assert.IsNull(result.Catalog, "No catalog should be used");
+        Assert.AreEqual(GameCatalogErrorKind.FileMissing, result.Error?.Kind, "A file the archive does not list should be missing");
+    }
+
+    /// <summary>
+    /// A file above the per-entry bound of the limits gives an unreadable-file error.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC6")]
+    public void GameCatalogReaderLoadFailsAboveEntryBound()
+    {
+        // Arrange
+        WriteConfigArchive(-1);
+
+        var bound = FixtureBytes(_fileNames[0]).Length + 1;
+        var limits = new RdaLimits(RdaLimits.Default.MaxBlocks, RdaLimits.Default.MaxEntries, RdaLimits.Default.MaxDirectoryBytes, bound);
+
+        // Act
+        var result = GameCatalogReader.Load(_root, limits);
+
+        // Assert
+        Assert.IsNull(result.Catalog, "No catalog should be used");
+        Assert.AreEqual(GameCatalogErrorKind.FileUnreadable, result.Error?.Kind, "A file above the bound should be unreadable");
+    }
+
+    /// <summary>
+    /// A malformed document gives the malformed-file kind with a fixed message that holds none of the content.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC6")]
+    public void GameCatalogReaderReadFailsForMalformedXml()
+    {
+        // Act
+        var first = ReadWithFile(1, $"<AssetList><Groups>{Secret}<Group></AssetList>");
+        var second = ReadWithFile(1, $"<AssetList><Groups><Group><Assets><Asset>{Secret}</Assets></Group></Groups></AssetList>");
+        var wrongRoot = ReadWithFile(1, $"<{Secret} />");
+
+        // Assert
+        Assert.AreEqual(GameCatalogErrorKind.MalformedFile, first.Error?.Kind, "A document that is not well-formed should be a malformed file");
+        Assert.AreEqual(GameCatalogErrorKind.MalformedFile, second.Error?.Kind, "A second malformed document should be a malformed file");
+        Assert.AreEqual(GameCatalogErrorKind.MalformedFile, wrongRoot.Error?.Kind, "A wrong root element should be a malformed file");
+        Assert.IsFalse(string.IsNullOrEmpty(first.Error?.Message), "The error should carry a message");
+        Assert.AreEqual(first.Error?.Message, second.Error?.Message, "The message should be one fixed text, whatever the document");
+        Assert.AreEqual(first.Error?.Message, wrongRoot.Error?.Message, "The message of a wrong root should be the same fixed text");
+        Assert.IsFalse(first.Error?.Message.Contains(Secret, StringComparison.Ordinal) ?? true, "The message should hold no content of the document");
+    }
+
+    /// <summary>
+    /// A document type declaration in any of the four files gives the malformed-file kind.
+    /// </summary>
+    /// <param name="file">The index of the file</param>
+    [TestMethod]
+    [TestCategory("AC6")]
+    [DataRow(0)]
+    [DataRow(1)]
+    [DataRow(2)]
+    [DataRow(3)]
+    public void GameCatalogReaderReadFailsForDocumentTypeDeclaration(int file)
+    {
+        // Arrange
+        var root = new[] { "DataSets", "AssetList", "TextExport", "TextExport" }[file];
+        var content = $"<!DOCTYPE {root} [<!ENTITY x \"{Secret}\">]><{root} />";
+
+        // Act
+        var result = ReadWithFile(file, content);
+
+        // Assert
+        Assert.IsNull(result.Catalog, "No catalog should be used");
+        Assert.AreEqual(GameCatalogErrorKind.MalformedFile, result.Error?.Kind, "A document type declaration should be a malformed file");
+        Assert.IsFalse(result.Error?.Message.Contains(Secret, StringComparison.Ordinal) ?? true, "The message should hold no content of the document");
+    }
+
+    /// <summary>
+    /// A GUID or text identifier that is not an integer of its type gives the malformed-file kind.
+    /// </summary>
+    /// <param name="file">The index of the file</param>
+    /// <param name="value">The value</param>
+    [TestMethod]
+    [TestCategory("AC6")]
+    [DataRow(1, "abc")]
+    [DataRow(1, "99999999999")]
+    [DataRow(1, "1.5")]
+    [DataRow(1, "")]
+    [DataRow(2, "abc")]
+    [DataRow(3, "99999999999999999999")]
+    public void GameCatalogReaderReadFailsForNonIntegerGuid(int file, string value)
+    {
+        // Arrange
+        var content = file == 1
+                          ? Assets($"<Asset><Template>Product</Template><Values><Standard><GUID>{value}</GUID></Standard><Product /></Values></Asset>")
+                          : $"<TextExport><Texts><Text><LineId>{value}</LineId><Text>Good 1</Text></Text></Texts></TextExport>";
+
+        // Act
+        var result = ReadWithFile(file, content);
+
+        // Assert
+        Assert.IsNull(result.Catalog, "No catalog should be used");
+        Assert.AreEqual(GameCatalogErrorKind.MalformedFile, result.Error?.Kind, "A value that is not an integer of its type should be a malformed file");
+    }
+
+    /// <summary>
+    /// A data set file without a <c>Region</c> data set gives the malformed-file kind.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC6")]
+    public void GameCatalogReaderReadFailsWithoutRegionDataSet()
+    {
+        // Act
+        var result = ReadWithFile(0, $"<DataSets><Group><Name>Global</Name>{DataSet("Other", "Region", "Zorlan")}</Group></DataSets>");
+
+        // Assert
+        Assert.IsNull(result.Catalog, "No catalog should be used");
+        Assert.AreEqual(GameCatalogErrorKind.MalformedFile, result.Error?.Kind, "A file without a Region data set should be a malformed file");
+    }
+
+    /// <summary>
+    /// A data set file with two <c>Region</c> data sets gives the malformed-file kind.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC6")]
+    public void GameCatalogReaderReadFailsForTwoRegionDataSets()
+    {
+        // Act
+        var result = ReadWithFile(0, $"<DataSets><Group><Name>Global</Name>{DataSet("Region", "Zorlan")}{DataSet("Region", "Yultic")}</Group></DataSets>");
+
+        // Assert
+        Assert.IsNull(result.Catalog, "No catalog should be used");
+        Assert.AreEqual(GameCatalogErrorKind.MalformedFile, result.Error?.Kind, "A file with two Region data sets should be a malformed file");
+    }
+
+    /// <summary>
+    /// An asset nested deeper than <see cref="GameCatalogReader.MaxAssetDepth" /> gives the malformed-file kind.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC6")]
+    public void GameCatalogReaderReadFailsForTooDeepAsset()
+    {
+        // Arrange
+        var depth = GameCatalogReader.MaxAssetDepth + 10;
+        var nested = string.Concat(Enumerable.Repeat("<N>", depth)) + string.Concat(Enumerable.Repeat("</N>", depth));
+        var asset = $"<Asset><Template>Product</Template><Values><Standard><GUID>10</GUID></Standard>{nested}</Values></Asset>";
+
+        // Act
+        var result = ReadWithFile(1, Assets(asset));
+
+        // Assert
+        Assert.IsNull(result.Catalog, "No catalog should be used");
+        Assert.AreEqual(GameCatalogErrorKind.MalformedFile, result.Error?.Kind, "An asset deeper than the bound should be a malformed file");
+    }
+
+    /// <summary>
+    /// An asset with more than <see cref="GameCatalogReader.MaxAssetElements" /> elements gives the malformed-file kind.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC6")]
+    public void GameCatalogReaderReadFailsForTooLargeAsset()
+    {
+        // Arrange
+        var wide = string.Concat(Enumerable.Repeat("<A />", GameCatalogReader.MaxAssetElements + 10));
+        var asset = $"<Asset><Template>Product</Template><Values><Standard><GUID>10</GUID></Standard>{wide}</Values></Asset>";
+
+        // Act
+        var result = ReadWithFile(1, Assets(asset));
+
+        // Assert
+        Assert.IsNull(result.Catalog, "No catalog should be used");
+        Assert.AreEqual(GameCatalogErrorKind.MalformedFile, result.Error?.Kind, "An asset with more elements than the bound should be a malformed file");
+    }
+
+    /// <summary>
+    /// The four files are read forward-only: streams that cannot seek and do not know their length give the same
+    /// catalog as seekable ones.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC6")]
+    public void GameCatalogReaderReadAcceptsNonSeekableStreams()
+    {
+        // Act
+        var result = GameCatalogReader.Read(() => GameCatalogSource.FromStream(new NonSeekableStream(new MemoryStream(FixtureBytes(_fileNames[0])))),
+                                            () => GameCatalogSource.FromStream(new NonSeekableStream(new MemoryStream(FixtureBytes(_fileNames[1])))),
+                                            () => GameCatalogSource.FromStream(new NonSeekableStream(new MemoryStream(FixtureBytes(_fileNames[2])))),
+                                            () => GameCatalogSource.FromStream(new NonSeekableStream(new MemoryStream(FixtureBytes(_fileNames[3])))));
+
+        // Assert
+        Assert.IsNull(result.Error, $"Non-seekable streams should be read, but failed with {result.Error?.Kind}");
+        Assert.AreEqual(_fixtureEntries.Length, result.Catalog?.Count, "The catalog from non-seekable streams should hold the entries of the fixture");
+        Assert.AreEqual("Ware 301", result.Catalog?.Find(Base + 301)?.GermanName, "The catalog from non-seekable streams should hold the names");
+    }
+
+    /// <summary>
+    /// Each file is opened when its pass starts, in the order data set, assets, English, German, and its stream is
+    /// disposed before the next opener is called.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC6")]
+    public void GameCatalogReaderReadOpensOneFileAtATime()
+    {
+        // Arrange
+        var log = new List<string>();
+
+        Func<GameCatalogSource> Opener(int index)
+        {
+            return () =>
+                   {
+                       log.Add($"open {_fileNames[index]}");
+
+                       return GameCatalogSource.FromStream(new TrackingStream(FixtureBytes(_fileNames[index]), $"close {_fileNames[index]}", log));
+                   };
+        }
+
+        // Act
+        var result = GameCatalogReader.Read(Opener(0), Opener(1), Opener(2), Opener(3));
+
+        // Assert
+        Assert.IsNotNull(result.Catalog, "The fixture should give a catalog");
+        Assert.AreSequenceEqual([
+                                    "open datasets.xml",
+                                    "close datasets.xml",
+                                    "open assets.xml",
+                                    "close assets.xml",
+                                    "open texts_english.xml",
+                                    "close texts_english.xml",
+                                    "open texts_german.xml",
+                                    "close texts_german.xml"
+                                ],
+                                log,
+                                "Each stream should be disposed before the next opener is called");
+    }
+
+    #endregion // AC6
+
+    #region AC7
+
+    /// <summary>
+    /// Loading a catalog changes nothing in the installation: no file is created, written or removed. The archive
+    /// copies of another archive are reported.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public void GameCatalogReaderLoadWritesNoFile()
+    {
+        // Arrange
+        WriteConfigArchive(-1);
+        File.WriteAllBytes(Path.Combine(MainData, "patch1.rda"), new RdaArchiveBuilder().AddBlock(0, (GameCatalogReader.AssetsPath, RdaArchiveBuilder.Content("<AssetList />"))).Build().Bytes);
+
+        var before = Snapshot();
+        var workingFolder = Environment.CurrentDirectory;
+        var workingBefore = Directory.GetFiles(workingFolder).Length;
+
+        // Act
+        var result = GameCatalogReader.Load(_root, RdaLimits.Default);
+
+        // Assert
+        Assert.IsNotNull(result.Catalog, $"The installation should give a catalog, but failed with {result.Error?.Kind}");
+        Assert.HasCount(1, result.Copies, "The copy in the other archive should be reported");
+        Assert.Contains("patch1", result.Copies[0].ArchiveName, StringComparison.OrdinalIgnoreCase, "The copy should name the other archive");
+        Assert.AreEqual(GameCatalogReader.AssetsPath, result.Copies[0].Path, "The copy should name the path");
+        Assert.AreSequenceEqual(before, Snapshot(), "The installation should be unchanged");
+        Assert.HasCount(workingBefore, Directory.GetFiles(workingFolder), "No file should be written to the working folder");
+    }
+
+    /// <summary>
+    /// With the sample files at hand, no name, text, icon path, GUID or text identifier of the fixture occurs in them;
+    /// the test writes counts only.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public void GameCatalogReaderFixtureHoldsNoSampleText()
+    {
+        // Arrange
+        var folder = Environment.GetEnvironmentVariable(SampleVariable);
+
+        if (string.IsNullOrEmpty(folder))
+        {
+            Assert.Inconclusive($"{SampleVariable} is not set: the fixture was not compared with the sample files");
+        }
+
+        string[] assetNames = ["GUID", "Name", "IconFilename", "OasisId", "RegionID"];
+        string[] dataSetNames = ["Name"];
+        string[] textNames = ["LineId", "Text"];
+        string[][] names = [dataSetNames, assetNames, textNames, textNames];
+        var shared = 0;
+
+        // Act
+        for (var index = 0; index < _fileNames.Length; index++)
+        {
+            using var sample = File.OpenRead(Path.Combine(folder, _fileNames[index]));
+
+            var sampleValues = CollectValues(sample, names[index]);
+            var fixtureValues = CollectValues(FixtureBytes(_fileNames[index]), names[index]);
+
+            if (index == 0)
+            {
+                fixtureValues.ExceptWith(["Global", "Region"]);
+            }
+
+            var count = fixtureValues.Count(sampleValues.Contains);
+
+            TestContext.WriteLine(string.Create(CultureInfo.InvariantCulture, $"{_fileNames[index]}: {fixtureValues.Count} fixture values, {sampleValues.Count} sample values, {count} in both"));
+            shared += count;
+        }
+
+        // Assert
+        Assert.AreEqual(0, shared, "No value of the fixture should occur in the sample files");
+    }
+
+    #endregion // AC7
+
+    #region Helpers
+
+    /// <summary>
+    /// Gets the folder of the fixture.
+    /// </summary>
+    /// <returns>The folder</returns>
+    private static string FixtureFolder()
+    {
+        return Path.Combine(AppContext.BaseDirectory, "Fixtures", "GameCatalog");
+    }
+
+    /// <summary>
+    /// Reads a file of the fixture.
+    /// </summary>
+    /// <param name="name">The file name</param>
+    /// <returns>The bytes</returns>
+    private static byte[] FixtureBytes(string name)
+    {
+        return File.ReadAllBytes(Path.Combine(FixtureFolder(), name));
+    }
+
+    /// <summary>
+    /// Reads a file of the sample as a source.
+    /// </summary>
+    /// <param name="folder">The folder of the sample</param>
+    /// <param name="name">The file name</param>
+    /// <returns>The source</returns>
+    private static GameCatalogSource OpenSample(string folder, string name)
+    {
+        return GameCatalogSource.FromStream(File.OpenRead(Path.Combine(folder, name)));
+    }
+
+    /// <summary>
+    /// Creates a source over the UTF-8 bytes of a text.
+    /// </summary>
+    /// <param name="content">The text</param>
+    /// <returns>The opener</returns>
+    private static Func<GameCatalogSource> Open(string content)
+    {
+        return () => GameCatalogSource.FromStream(new MemoryStream(Encoding.UTF8.GetBytes(content)));
+    }
+
+    /// <summary>
+    /// Reads the catalog from texts, requiring that it is built.
+    /// </summary>
+    /// <param name="dataSets">The data set file</param>
+    /// <param name="assets">The asset file</param>
+    /// <param name="english">The English text file</param>
+    /// <param name="german">The German text file</param>
+    /// <returns>The catalog</returns>
+    private static GameCatalog ReadCatalog(string dataSets, string assets, string english, string german)
+    {
+        var result = GameCatalogReader.Read(Open(dataSets), Open(assets), Open(english), Open(german));
+
+        Assert.IsNull(result.Error, $"The files should give a catalog, but failed with {result.Error?.Kind}");
+        Assert.IsNotNull(result.Catalog, "The files should give a catalog");
+
+        return result.Catalog;
+    }
+
+    /// <summary>
+    /// Reads the catalog of the fixture, requiring that it is built.
+    /// </summary>
+    /// <returns>The catalog</returns>
+    private static GameCatalog ReadFixtureCatalog()
+    {
+        var result = GameCatalogReader.Read(() => GameCatalogSource.FromStream(new MemoryStream(FixtureBytes(_fileNames[0]))),
+                                            () => GameCatalogSource.FromStream(new MemoryStream(FixtureBytes(_fileNames[1]))),
+                                            () => GameCatalogSource.FromStream(new MemoryStream(FixtureBytes(_fileNames[2]))),
+                                            () => GameCatalogSource.FromStream(new MemoryStream(FixtureBytes(_fileNames[3]))));
+
+        Assert.IsNull(result.Error, $"The fixture should give a catalog, but failed with {result.Error?.Kind}");
+        Assert.IsNotNull(result.Catalog, "The fixture should give a catalog");
+
+        return result.Catalog;
+    }
+
+    /// <summary>
+    /// Reads the fixture with one file replaced.
+    /// </summary>
+    /// <param name="file">The index of the file</param>
+    /// <param name="content">The content of the file</param>
+    /// <returns>The result</returns>
+    private static GameCatalogResult ReadWithFile(int file, string content)
+    {
+        Func<GameCatalogSource> Opener(int index)
+        {
+            return index == file ? Open(content) : () => GameCatalogSource.FromStream(new MemoryStream(FixtureBytes(_fileNames[index])));
+        }
+
+        return GameCatalogReader.Read(Opener(0), Opener(1), Opener(2), Opener(3));
+    }
+
+    /// <summary>
+    /// Creates a data set file with a <c>Region</c> data set.
+    /// </summary>
+    /// <param name="regionTypes">The region types</param>
+    /// <returns>The file</returns>
+    private static string DataSets(params string[] regionTypes)
+    {
+        return $"<DataSets><Group><Name>Global</Name>{DataSet("Region", regionTypes)}</Group></DataSets>";
+    }
+
+    /// <summary>
+    /// Creates a data set.
+    /// </summary>
+    /// <param name="name">The name of the data set</param>
+    /// <param name="items">The names of its items</param>
+    /// <returns>The data set</returns>
+    private static string DataSet(string name, params string[] items)
+    {
+        var list = string.Concat(items.Select(item => $"<Item><Name>{item}</Name><Id>1</Id></Item>"));
+
+        return $"<DataSet><Name>{name}</Name><Id>1</Id><Items>{list}</Items></DataSet>";
+    }
+
+    /// <summary>
+    /// Creates an asset file.
+    /// </summary>
+    /// <param name="assets">The assets</param>
+    /// <returns>The file</returns>
+    private static string Assets(params string[] assets)
+    {
+        return $"<AssetList><Groups><Group><Assets>{string.Concat(assets)}</Assets></Group></Groups></AssetList>";
+    }
+
+    /// <summary>
+    /// Creates a good.
+    /// </summary>
+    /// <param name="guid">The GUID</param>
+    /// <param name="textId">The text identifier</param>
+    /// <param name="regions">The association list, or null for none</param>
+    /// <returns>The asset</returns>
+    private static string Good(int guid, long textId, string? regions)
+    {
+        var list = regions is null ? string.Empty : $"<AssociatedRegion>{regions}</AssociatedRegion>";
+
+        return string.Create(CultureInfo.InvariantCulture, $"<Asset><Template>Product</Template><Values><Standard><GUID>{guid}</GUID><Name>Good {guid}</Name></Standard><Text><OasisId>{textId}</OasisId></Text><Product>{list}</Product></Values></Asset>");
+    }
+
+    /// <summary>
+    /// Creates a region asset.
+    /// </summary>
+    /// <param name="guid">The GUID</param>
+    /// <param name="textId">The text identifier</param>
+    /// <param name="regionId">The region type</param>
+    /// <returns>The asset</returns>
+    private static string RegionAsset(int guid, long textId, string regionId)
+    {
+        return string.Create(CultureInfo.InvariantCulture, $"<Asset><Template>Region</Template><Values><Standard><GUID>{guid}</GUID></Standard><Text><OasisId>{textId}</OasisId></Text><Region><RegionID>{regionId}</RegionID></Region></Values></Asset>");
+    }
+
+    /// <summary>
+    /// Creates a session.
+    /// </summary>
+    /// <param name="guid">The GUID</param>
+    /// <param name="template">The template</param>
+    /// <param name="region">The GUID of the region asset</param>
+    /// <param name="textId">The text identifier</param>
+    /// <returns>The asset</returns>
+    private static string Session(int guid, string template, int region, long textId)
+    {
+        return string.Create(CultureInfo.InvariantCulture, $"<Asset><Template>{template}</Template><Values><Standard><GUID>{guid}</GUID></Standard><Text><OasisId>{textId}</OasisId></Text><Session><Region>{region}</Region></Session></Values></Asset>");
+    }
+
+    /// <summary>
+    /// Creates a text file.
+    /// </summary>
+    /// <param name="texts">The text identifiers and texts</param>
+    /// <returns>The file</returns>
+    private static string Texts(params (long Id, string Text)[] texts)
+    {
+        var list = string.Concat(texts.Select(text => string.Create(CultureInfo.InvariantCulture, $"<Text><LineId>{text.Id}</LineId><Text>{text.Text}</Text></Text>")));
+
+        return $"<TextExport><Texts>{list}</Texts></TextExport>";
+    }
+
+    /// <summary>
+    /// Creates an XML reader over a stream as the tests read the fixture.
+    /// </summary>
+    /// <param name="stream">The stream</param>
+    /// <returns>The reader</returns>
+    private static XmlReader CreateXmlReader(Stream stream)
+    {
+        return XmlReader.Create(stream,
+                                new XmlReaderSettings
+                                {
+                                    DtdProcessing = DtdProcessing.Prohibit,
+                                    XmlResolver = null,
+                                    IgnoreWhitespace = true,
+                                    IgnoreComments = true
+                                });
+    }
+
+    /// <summary>
+    /// Collects the text values of the elements with given names.
+    /// </summary>
+    /// <param name="bytes">The XML</param>
+    /// <param name="names">The element names</param>
+    /// <returns>The values</returns>
+    private static HashSet<string> CollectValues(byte[] bytes, string[] names)
+    {
+        using var stream = new MemoryStream(bytes);
+
+        return CollectValues(stream, names);
+    }
+
+    /// <summary>
+    /// Collects the text values of the elements with given names.
+    /// </summary>
+    /// <param name="stream">The XML</param>
+    /// <param name="names">The element names</param>
+    /// <returns>The values</returns>
+    private static HashSet<string> CollectValues(Stream stream, string[] names)
+    {
+        var values = new HashSet<string>(StringComparer.Ordinal);
+        string? pending = null;
+
+        using var reader = CreateXmlReader(stream);
+
+        while (reader.Read())
+        {
+            switch (reader.NodeType)
+            {
+                case XmlNodeType.Element:
+                    {
+                        pending = reader.IsEmptyElement ? null : reader.LocalName;
+                    }
+                    break;
+
+                case XmlNodeType.Text:
+                    {
+                        if (pending is not null && names.Contains(pending))
+                        {
+                            values.Add(reader.Value);
+                        }
+
+                        pending = null;
+                    }
+                    break;
+
+                default:
+                    {
+                        pending = null;
+                    }
+                    break;
+            }
+        }
+
+        return values;
+    }
+
+    /// <summary>
+    /// Decodes the pipe fixture and collects the GUIDs of its ticks by role, without GUID <c>0</c>.
+    /// </summary>
+    /// <returns>The region, good, workforce and building GUIDs</returns>
+    private static async Task<(HashSet<int> Regions, HashSet<int> Goods, HashSet<int> Workforce, HashSet<int> Buildings)> ReadPipeGuidsAsync()
+    {
+        var regions = new HashSet<int>();
+        var goods = new HashSet<int>();
+        var workforce = new HashSet<int>();
+        var buildings = new HashSet<int>();
+        var clock = new PipeReplayClock(DateTimeOffset.UnixEpoch);
+
+        using var replay = new PipeReplayStream(File.OpenRead(Path.Combine(AppContext.BaseDirectory, "Fixtures", "Pipe", "long-session.jsonl")), PipeReplaySpeed.Maximum, clock, TimeProvider.System);
+        using var assembler = new PipeTickAssembler(new PipeMessageReader(replay), clock);
+
+        PipeTickResult result;
+
+        do
+        {
+            result = await assembler.ReadAsync(CancellationToken.None);
+
+            foreach (var island in result.Tick?.Islands ?? [])
+            {
+                regions.Add(island.Key.SessionGuid);
+
+                foreach (var entry in island.Entries)
+                {
+                    goods.Add(entry.ProductGuid);
+                    workforce.UnionWith(entry.WorkforceAmounts.Keys);
+                    buildings.UnionWith(entry.BuildingAmounts.Keys);
+                }
+            }
+        }
+        while (result.Kind != PipeTickResultKind.EndOfStream);
+
+        regions.Remove(0);
+        goods.Remove(0);
+        workforce.Remove(0);
+        buildings.Remove(0);
+
+        return (regions, goods, workforce, buildings);
+    }
+
+    /// <summary>
+    /// Checks that every GUID resolves to an entry of its kind with a non-empty English and German name, and writes
+    /// counts and unresolved GUIDs, never a name.
+    /// </summary>
+    /// <param name="catalog">The catalog</param>
+    /// <param name="guids">The GUIDs by role</param>
+    private void AssertPipeGuidsResolve(GameCatalog catalog, (HashSet<int> Regions, HashSet<int> Goods, HashSet<int> Workforce, HashSet<int> Buildings) guids)
+    {
+        var problems = new List<string>();
+
+        foreach (var (role, kind, set) in new[] { ("Region", GameCatalogKind.Region, guids.Regions), ("Good", GameCatalogKind.Good, guids.Goods), ("Workforce", GameCatalogKind.Workforce, guids.Workforce), ("Building", GameCatalogKind.Building, guids.Buildings) })
+        {
+            var unresolved = 0;
+
+            foreach (var guid in set.Order())
+            {
+                var entry = catalog.Find(guid);
+                string? problem = null;
+
+                if (entry is null)
+                {
+                    problem = $"{role} {guid}: unresolved ({catalog.Check(guid)})";
+                }
+                else if (entry.Kind != kind)
+                {
+                    problem = $"{role} {guid}: kind {entry.Kind}";
+                }
+                else if (string.IsNullOrEmpty(entry.EnglishName) || string.IsNullOrEmpty(entry.GermanName))
+                {
+                    problem = $"{role} {guid}: name missing ({catalog.Check(guid)})";
+                }
+
+                if (problem is not null)
+                {
+                    unresolved++;
+                    problems.Add(problem);
+                }
+            }
+
+            TestContext.WriteLine(string.Create(CultureInfo.InvariantCulture, $"{role}: {set.Count} GUIDs, {unresolved} unresolved"));
+        }
+
+        foreach (var problem in problems)
+        {
+            TestContext.WriteLine(problem);
+        }
+
+        Assert.IsEmpty(problems, $"Every GUID should resolve to an entry of its kind with both names: {string.Join("; ", problems)}");
+    }
+
+    /// <summary>
+    /// Writes <c>maindata/config.rda</c> with the fixture files.
+    /// </summary>
+    /// <param name="omit">The index of a file to leave out, or <c>-1</c> for none</param>
+    private void WriteConfigArchive(int omit)
+    {
+        Directory.CreateDirectory(MainData);
+
+        var files = _filePaths.Select((path, index) => (Path: path, Index: index))
+                              .Where(file => file.Index != omit)
+                              .Select(file => (file.Path, FixtureBytes(_fileNames[file.Index])))
+                              .ToArray();
+
+        File.WriteAllBytes(Path.Combine(MainData, "config.rda"), new RdaArchiveBuilder().AddBlock(RdaArchiveBuilder.Compressed, files).Build().Bytes);
+    }
+
+    /// <summary>
+    /// Lists every file and folder of the installation with its size and write time.
+    /// </summary>
+    /// <returns>The lines</returns>
+    private List<string> Snapshot()
+    {
+        return Directory.EnumerateFileSystemEntries(_root, "*", SearchOption.AllDirectories)
+                        .Order(StringComparer.Ordinal)
+                        .Select(path => File.Exists(path)
+                                            ? string.Create(CultureInfo.InvariantCulture, $"{path} {new FileInfo(path).Length} {File.GetLastWriteTimeUtc(path).Ticks}")
+                                            : path)
+                        .ToList();
+    }
+
+    #endregion // Helpers
+}
