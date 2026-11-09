@@ -94,7 +94,7 @@ public sealed class TrayMenuTests
         var expectedChecked = new bool[13];
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, false, CreateClock(1));
+        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, false, CreateClock(1));
 
         // Assert
         Assert.AreSequenceEqual(expectedKinds, entries.Select(entry => entry.Kind).ToArray(), "The entries should be in the order of the menu");
@@ -119,7 +119,7 @@ public sealed class TrayMenuTests
         var snapshot = CreateSnapshotForMode(mode);
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, false, CreateClock(1));
+        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, false, CreateClock(1));
 
         // Assert
         var autostart = entries.SingleOrDefault(entry => entry.Kind == TrayMenuEntryKind.ToggleAutostart);
@@ -140,7 +140,7 @@ public sealed class TrayMenuTests
         var snapshot = CreateSnapshot("Receiving", canRecord: true, isRecording: false);
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, true, CreateClock(1));
+        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, true, CreateClock(1));
 
         // Assert
         var checkedKinds = entries.Where(entry => entry.IsChecked).Select(entry => entry.Kind).ToArray();
@@ -159,7 +159,7 @@ public sealed class TrayMenuTests
         var snapshot = CreateSnapshot("Receiving", canRecord: true, isRecording: false);
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, false, CreateClock(1));
+        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, false, CreateClock(1));
 
         // Assert
         var autostart = entries.SingleOrDefault(entry => entry.Kind == TrayMenuEntryKind.ToggleAutostart);
@@ -185,7 +185,7 @@ public sealed class TrayMenuTests
         var snapshot = CreateSnapshotForMode(mode);
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, false, CreateClock(1));
+        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, false, CreateClock(1));
 
         // Assert
         var kinds = entries.Select(entry => entry.Kind).ToList();
@@ -206,7 +206,7 @@ public sealed class TrayMenuTests
         var snapshot = CreateSnapshot("Receiving (recording)", canRecord: true, isRecording: true);
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, false, CreateClock(1));
+        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, false, CreateClock(1));
 
         // Assert
         var toggle = entries.Single(entry => entry.Kind == TrayMenuEntryKind.ToggleRecording);
@@ -225,7 +225,7 @@ public sealed class TrayMenuTests
         var snapshot = CreateSnapshot("Replay: Receiving", canRecord: false, isRecording: false);
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, false, CreateClock(1));
+        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, false, CreateClock(1));
 
         // Assert
         var toggle = entries.Single(entry => entry.Kind == TrayMenuEntryKind.ToggleRecording);
@@ -248,7 +248,7 @@ public sealed class TrayMenuTests
         var snapshot = TraySnapshot.ForInvalidCommandLine();
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, false, CreateClock(1));
+        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, false, CreateClock(1));
 
         // Assert
         var toggle = entries.Single(entry => entry.Kind == TrayMenuEntryKind.ToggleRecording);
@@ -277,7 +277,7 @@ public sealed class TrayMenuTests
         var snapshot = CreateSnapshot(statusText, canRecord: true, isRecording: false);
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, false, CreateClock(1));
+        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, false, CreateClock(1));
 
         // Assert
         var status = entries.Single(entry => entry.Kind == TrayMenuEntryKind.Status);
@@ -296,7 +296,7 @@ public sealed class TrayMenuTests
         const string version = "1.2.3";
 
         // Act
-        var entries = TrayMenu.Create(version, CreateSnapshot("Receiving", canRecord: true, isRecording: false), false, CreateClock(1));
+        var entries = TrayMenu.Create(version, CreateSnapshot("Receiving", canRecord: true, isRecording: false), GameInstallationStatus.Searching, false, CreateClock(1));
 
         // Assert
         Assert.IsFalse(entries.Single(entry => entry.Kind == TrayMenuEntryKind.Version).IsEnabled, "The version entry should be greyed out");
@@ -312,7 +312,7 @@ public sealed class TrayMenuTests
         const string version = "1.2.3";
 
         // Act
-        var entries = TrayMenu.Create(version, CreateSnapshot("Receiving", canRecord: true, isRecording: false), false, CreateClock(1));
+        var entries = TrayMenu.Create(version, CreateSnapshot("Receiving", canRecord: true, isRecording: false), GameInstallationStatus.Searching, false, CreateClock(1));
 
         // Assert
         Assert.IsTrue(entries.Single(entry => entry.Kind == TrayMenuEntryKind.Exit).IsEnabled, "The exit entry should be enabled");
@@ -328,7 +328,7 @@ public sealed class TrayMenuTests
         var version = ProductVersion.Read(typeof(TrayMenu).Assembly);
 
         // Act
-        var entries = TrayMenu.Create(version, CreateSnapshot("Receiving", canRecord: true, isRecording: false), false, CreateClock(1));
+        var entries = TrayMenu.Create(version, CreateSnapshot("Receiving", canRecord: true, isRecording: false), GameInstallationStatus.Searching, false, CreateClock(1));
 
         // Assert
         Assert.AreEqual("Version " + version, entries.Single(entry => entry.Kind == TrayMenuEntryKind.Version).Text, "The version entry should read Version followed by the product version");

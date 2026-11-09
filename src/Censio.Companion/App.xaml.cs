@@ -246,7 +246,7 @@ public partial class App : Application
     private TrayIcon CreateTrayIcon()
     {
         _images = new TrayIconImages();
-        _trayIcon = new TrayIcon(ProductVersion.Read(typeof(App).Assembly), _images, () => _snapshot(), () => _autostart?.Refresh() ?? false, Dispatch);
+        _trayIcon = new TrayIcon(ProductVersion.Read(typeof(App).Assembly), _images, () => _snapshot(), () => GameInstallationStatus.Searching, () => _autostart?.Refresh() ?? false, Dispatch);
 
         return _trayIcon;
     }
