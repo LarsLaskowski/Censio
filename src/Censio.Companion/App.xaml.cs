@@ -4,6 +4,7 @@ using System.Windows.Threading;
 
 using Censio.Companion.Core;
 using Censio.Contracts;
+using Censio.GameData;
 using Censio.Pipe;
 
 using Microsoft.Extensions.Logging;
@@ -42,6 +43,21 @@ public partial class App : Application
     /// The search of the game installation.
     /// </summary>
     private GameInstallationSearch? _gameSearch;
+
+    /// <summary>
+    /// The loader of the game catalog.
+    /// </summary>
+    private GameCatalogLoader? _catalogLoader;
+
+    /// <summary>
+    /// The check of the GUIDs of closed ticks against the catalog.
+    /// </summary>
+    private GameCatalogReporter? _catalogReporter;
+
+    /// <summary>
+    /// Reads the latest closed tick of the source, <c>null</c> until a source is running.
+    /// </summary>
+    private volatile Func<PipeTick?>? _readLatestTick;
 
     /// <summary>
     /// The recording session, <c>null</c> in a replay or with an invalid command line
@@ -126,7 +142,7 @@ public partial class App : Application
     {
         _diagnostics = new DiagnosticsWindowSession(() => _snapshot().StatusText,
                                                     readTick,
-                                                    () => null,
+                                                    () => _catalogLoader?.Catalog,
                                                     TimeProvider.System,
                                                     action => Dispatcher.BeginInvoke(DispatcherPriority.Background, action),
                                                     () => new DiagnosticsWindow());
@@ -197,11 +213,13 @@ public partial class App : Application
         _snapshot = () => TraySnapshot.ForConnection(connection.Status, recording.State, connection.LastTick);
 
         CreateDiagnostics(() => connection.LatestTick);
+        _readLatestTick = () => connection.LatestTick;
 
         var trayIcon = CreateTrayIcon();
         var updater = CreateUpdater(trayIcon);
 
         connection.StatusChanged += (_, _) => Notify(updater);
+        connection.TickReceived += (_, tick) => _catalogReporter?.Report(tick);
         connection.TickReceived += (_, _) => Notify(updater);
         recording.StateChanged += (_, _) => Notify(updater);
         updater.Notify();
@@ -224,15 +242,32 @@ public partial class App : Application
         _snapshot = () => TraySnapshot.ForReplay(runner.Status, runner.LastTick);
 
         CreateDiagnostics(() => runner.LatestTick);
+        _readLatestTick = () => runner.LatestTick;
 
         var trayIcon = CreateTrayIcon();
         var updater = CreateUpdater(trayIcon);
 
         runner.StatusChanged += (_, _) => Notify(updater);
+        runner.TickReceived += (_, tick) => _catalogReporter?.Report(tick);
         runner.TickReceived += (_, _) => Notify(updater);
         updater.Notify();
 
         Run(runner.RunAsync);
+    }
+
+    /// <summary>
+    /// Checks the latest tick against a catalog that became ready and refreshes the diagnostics window.
+    /// </summary>
+    /// <param name="sender">The loader</param>
+    /// <param name="status">The new status</param>
+    private void OnCatalogStatusChanged(object? sender, GameCatalogStatus status)
+    {
+        if (status.Kind == GameCatalogStatusKind.Ready && _readLatestTick?.Invoke() is { } tick)
+        {
+            _catalogReporter?.Report(tick);
+        }
+
+        _diagnostics?.Notify();
     }
 
     /// <summary>
@@ -252,7 +287,7 @@ public partial class App : Application
     private TrayIcon CreateTrayIcon()
     {
         _images = new TrayIconImages();
-        _trayIcon = new TrayIcon(ProductVersion.Read(typeof(App).Assembly), _images, () => _snapshot(), () => _gameSearch?.Status ?? GameInstallationStatus.Searching, () => GameCatalogStatus.Reading, () => _autostart?.Refresh() ?? false, Dispatch);
+        _trayIcon = new TrayIcon(ProductVersion.Read(typeof(App).Assembly), _images, () => _snapshot(), () => _gameSearch?.Status ?? GameInstallationStatus.Searching, () => _catalogLoader?.Status ?? GameCatalogStatus.Reading, () => _autostart?.Refresh() ?? false, Dispatch);
 
         return _trayIcon;
     }
@@ -368,11 +403,16 @@ public partial class App : Application
             var gameSearch = new GameInstallationSearch(new RegistryUbisoftInstallRecords(), new WindowsFileVersionReader(), GameInstallation.DefaultUbisoftGamesFolder(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86)), _logger);
             var settingsFile = CompanionFolders.Settings(localAppData);
 
+            var catalogLoader = new GameCatalogLoader(folder => GameCatalogReader.Load(folder, RdaLimits.Default), _logger);
+
             _gameSearch = gameSearch;
+            _catalogLoader = catalogLoader;
+            _catalogReporter = new GameCatalogReporter(() => catalogLoader.Catalog, _logger);
+            catalogLoader.StatusChanged += OnCatalogStatusChanged;
 
             Run(_ =>
                 {
-                    gameSearch.Run(settingsFile);
+                    catalogLoader.Run(gameSearch.Run(settingsFile));
 
                     return Task.CompletedTask;
                 });

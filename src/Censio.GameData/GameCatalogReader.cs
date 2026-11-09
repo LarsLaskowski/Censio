@@ -66,17 +66,21 @@ public static class GameCatalogReader
 
         try
         {
-            var regionTypes = ReadPass(openDataSets, GameCatalogFiles.ReadRegionTypes);
-            var assets = ReadPass(openAssets, GameCatalogFiles.ReadAssets);
+            if (TryReadPass(openDataSets, GameCatalogFiles.ReadRegionTypes, out var regionTypes, out var failure) == false
+                || TryReadPass(openAssets, GameCatalogFiles.ReadAssets, out var assets, out failure) == false)
+            {
+                return CreateError(failure);
+            }
+
             var used = GameCatalogBuilder.UsedTextIds(assets);
-            var english = ReadPass(openEnglishTexts, stream => GameCatalogFiles.ReadTexts(stream, used));
-            var german = ReadPass(openGermanTexts, stream => GameCatalogFiles.ReadTexts(stream, used));
+
+            if (TryReadPass(openEnglishTexts, stream => GameCatalogFiles.ReadTexts(stream, used), out var english, out failure) == false
+                || TryReadPass(openGermanTexts, stream => GameCatalogFiles.ReadTexts(stream, used), out var german, out failure) == false)
+            {
+                return CreateError(failure);
+            }
 
             return GameCatalogResult.FromCatalog(GameCatalogBuilder.Build(regionTypes, assets, english, german), [], 0);
-        }
-        catch (FileNotFoundException)
-        {
-            return CreateError(GameCatalogErrorKind.FileMissing);
         }
         catch (XmlException)
         {
@@ -134,8 +138,10 @@ public static class GameCatalogReader
     /// <typeparam name="TResult">The type of what the pass reads</typeparam>
     /// <param name="open">Opens the source</param>
     /// <param name="read">Reads the stream</param>
-    /// <returns>What the pass read</returns>
-    private static TResult ReadPass<TResult>(Func<GameCatalogSource> open, Func<Stream, TResult> read)
+    /// <param name="result">What the pass read</param>
+    /// <param name="failure">The kind of the source's error when the source could not be opened</param>
+    /// <returns><c>true</c> when the pass read the source</returns>
+    private static bool TryReadPass<TResult>(Func<GameCatalogSource> open, Func<Stream, TResult> read, out TResult result, out GameCatalogErrorKind failure)
     {
         GameCatalogSource source;
 
@@ -148,22 +154,20 @@ public static class GameCatalogReader
             throw new IOException();
         }
 
-        if (source.ErrorKind == GameCatalogErrorKind.FileMissing)
-        {
-            throw new FileNotFoundException();
-        }
+        result = default!;
+        failure = source.ErrorKind ?? GameCatalogErrorKind.FileUnreadable;
 
-        if (source.ErrorKind == GameCatalogErrorKind.MalformedFile)
+        if (source.Stream is not { } stream)
         {
-            throw GameCatalogXml.Malformed();
+            return false;
         }
-
-        var stream = source.Stream ?? throw new IOException();
 
         using (stream)
         {
-            return read(stream);
+            result = read(stream);
         }
+
+        return true;
     }
 
     /// <summary>

@@ -71,6 +71,11 @@ public sealed class DiagnosticsView : IReadOnlyList<DiagnosticsRow>, IList
     private readonly PipeTick? _tick;
 
     /// <summary>
+    /// The catalog that names the GUIDs, or <c>null</c> if none.
+    /// </summary>
+    private readonly GameCatalog? _catalog;
+
+    /// <summary>
     /// The index of the first row of each island; an island without entries has one row.
     /// </summary>
     private readonly int[] _firstRows;
@@ -89,10 +94,12 @@ public sealed class DiagnosticsView : IReadOnlyList<DiagnosticsRow>, IList
     /// </summary>
     /// <param name="headerLines">The lines of the header</param>
     /// <param name="tick">The tick, or <c>null</c> if none</param>
-    private DiagnosticsView(IReadOnlyList<string> headerLines, PipeTick? tick)
+    /// <param name="catalog">The catalog, or <c>null</c> if none</param>
+    private DiagnosticsView(IReadOnlyList<string> headerLines, PipeTick? tick, GameCatalog? catalog)
     {
         _headerLines = headerLines;
         _tick = tick;
+        _catalog = catalog;
 
         var islands = tick?.Islands ?? [];
         var firstRows = new int[islands.Count];
@@ -151,7 +158,6 @@ public sealed class DiagnosticsView : IReadOnlyList<DiagnosticsRow>, IList
     /// <param name="catalog">The catalog, or <c>null</c> if none</param>
     /// <param name="clock">The clock</param>
     /// <returns>The view</returns>
-#pragma warning disable S1172 // Skeleton: removed with the implementation
     public static DiagnosticsView Create(string statusText, PipeTick? tick, GameCatalog? catalog, TimeProvider clock)
     {
         var lines = new List<string>(3)
@@ -167,9 +173,8 @@ public sealed class DiagnosticsView : IReadOnlyList<DiagnosticsRow>, IList
             lines.Add(tick.IsNoDataYet ? $"{gameTime} (no data yet)" : gameTime);
         }
 
-        return new DiagnosticsView(lines, tick);
+        return new DiagnosticsView(lines, tick, catalog);
     }
-#pragma warning restore S1172
 
     /// <summary>
     /// Formats an integer culture-independently.
@@ -192,6 +197,26 @@ public sealed class DiagnosticsView : IReadOnlyList<DiagnosticsRow>, IList
     }
 
     /// <summary>
+    /// Formats a GUID with the names the catalog has for it.
+    /// </summary>
+    /// <param name="guid">The GUID</param>
+    /// <returns>The names and the GUID, or the GUID alone if the catalog cannot name it</returns>
+    private string FormatGuid(int guid)
+    {
+        var number = Format(guid);
+
+        if (guid == 0 || _catalog is null || _catalog.Check(guid) is not (GameCatalogProblem.None or GameCatalogProblem.Incomplete) || _catalog.Find(guid) is not { } entry)
+        {
+            return number;
+        }
+
+        var names = new[] { entry.EnglishName, entry.GermanName }.Where(name => string.IsNullOrEmpty(name) == false)
+                                                                 .Select(name => LogLine.Sanitize(name!, MaxCatalogNameLength));
+
+        return $"{string.Join(" / ", names)} ({number})";
+    }
+
+    /// <summary>
     /// Creates the row at an index.
     /// </summary>
     /// <param name="index">The index</param>
@@ -210,7 +235,7 @@ public sealed class DiagnosticsView : IReadOnlyList<DiagnosticsRow>, IList
         var key = island.Key;
         var cells = new string[_columns.Length];
 
-        cells[0] = Format(key.SessionGuid);
+        cells[0] = FormatGuid(key.SessionGuid);
         cells[1] = Format(key.IslandId);
         cells[2] = Format(key.AreaIndex);
         cells[3] = Format(island.SessionId);
@@ -230,7 +255,7 @@ public sealed class DiagnosticsView : IReadOnlyList<DiagnosticsRow>, IList
 
         var entry = island.Entries[entryIndex];
 
-        cells[5] = Format(entry.ProductGuid);
+        cells[5] = FormatGuid(entry.ProductGuid);
         cells[6] = Format(entry.Generation);
         cells[7] = Format(entry.Consumption);
         cells[8] = Format(entry.Delta);

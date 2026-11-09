@@ -256,13 +256,13 @@ public static class TrayMenu
     /// <param name="isAutostartEnabled">Whether the Companion starts with Windows</param>
     /// <param name="clock">The clock</param>
     /// <returns>The entries in display order</returns>
-#pragma warning disable S1172 // Skeleton: removed with the implementation
     public static IReadOnlyList<TrayMenuEntry> Create(string version, TraySnapshot snapshot, GameInstallationStatus game, GameCatalogStatus catalog, bool isAutostartEnabled, TimeProvider clock)
     {
         return [
                    new TrayMenuEntry(TrayMenuEntryKind.Status, $"Status: {snapshot.StatusText}", false),
                    new TrayMenuEntry(TrayMenuEntryKind.LastTick, FormatLastTick(snapshot.LastTick, clock), false),
                    new TrayMenuEntry(TrayMenuEntryKind.Game, FormatGame(game), false),
+                   new TrayMenuEntry(TrayMenuEntryKind.Catalog, FormatCatalog(catalog), false),
                    new TrayMenuEntry(TrayMenuEntryKind.Separator, string.Empty, false),
                    new TrayMenuEntry(TrayMenuEntryKind.OpenDiagnostics, OpenDiagnosticsText, true),
                    new TrayMenuEntry(TrayMenuEntryKind.ToggleRecording, snapshot.IsRecording ? StopRecordingText : StartRecordingText, snapshot.CanRecord),
@@ -276,7 +276,6 @@ public static class TrayMenu
                    new TrayMenuEntry(TrayMenuEntryKind.Exit, ExitText, true)
                ];
     }
-#pragma warning restore S1172
 
     /// <summary>
     /// Formats the text of the catalog entry.
@@ -285,7 +284,14 @@ public static class TrayMenu
     /// <returns>The text</returns>
     public static string FormatCatalog(GameCatalogStatus status)
     {
-        throw new NotImplementedException();
+        return status.Kind switch
+               {
+                   GameCatalogStatusKind.Reading => "Catalog: reading",
+                   GameCatalogStatusKind.Ready => string.Create(CultureInfo.InvariantCulture, $"Catalog: {status.EntryCount} entries"),
+                   GameCatalogStatusKind.NoGame => "Catalog: no game",
+                   GameCatalogStatusKind.Failed => "Catalog: failed",
+                   _ => throw new ArgumentOutOfRangeException(nameof(status), status.Kind, "The status kind is not defined")
+               };
     }
 
     /// <summary>

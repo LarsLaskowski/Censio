@@ -116,7 +116,7 @@ public sealed class DiagnosticsWindowSession
     /// <returns>The view</returns>
     private DiagnosticsView CreateView()
     {
-        return DiagnosticsView.Create(_readStatusText(), _readTick(), _clock);
+        return DiagnosticsView.Create(_readStatusText(), _readTick(), _readCatalog(), _clock);
     }
 
     /// <summary>

@@ -24,14 +24,27 @@ public sealed class GameCatalogReporter
     /// <summary>
     /// Reads the catalog.
     /// </summary>
-#pragma warning disable S1144, S4487 // Skeleton: removed with the implementation
     private readonly Func<GameCatalog?> _readCatalog;
 
     /// <summary>
     /// The logger.
     /// </summary>
     private readonly ILogger _logger;
-#pragma warning restore S1144, S4487
+
+    /// <summary>
+    /// Guards the reported set and the cap flag.
+    /// </summary>
+    private readonly Lock _lock = new();
+
+    /// <summary>
+    /// The roles and GUIDs reported so far; it stops growing at <see cref="MaxReports" />.
+    /// </summary>
+    private readonly HashSet<(GameCatalogKind Role, int AssetGuid)> _reported = [];
+
+    /// <summary>
+    /// Whether the line about the cap was logged.
+    /// </summary>
+    private bool _isCapped;
 
     #endregion // Fields
 
@@ -56,12 +69,73 @@ public sealed class GameCatalogReporter
     /// Logs the GUIDs of a tick that the catalog cannot name.
     /// </summary>
     /// <param name="tick">The tick</param>
-#pragma warning disable S2325 // Skeleton: removed with the implementation
     public void Report(PipeTick tick)
     {
-        throw new NotImplementedException();
+        if (_readCatalog() is not { } catalog)
+        {
+            return;
+        }
+
+        foreach (var island in tick.Islands)
+        {
+            ReportGuid(catalog, GameCatalogKind.Region, island.Key.SessionGuid);
+
+            foreach (var entry in island.Entries)
+            {
+                ReportGuid(catalog, GameCatalogKind.Good, entry.ProductGuid);
+
+                foreach (var guid in entry.WorkforceAmounts.Keys)
+                {
+                    ReportGuid(catalog, GameCatalogKind.Workforce, guid);
+                }
+
+                foreach (var guid in entry.BuildingAmounts.Keys)
+                {
+                    ReportGuid(catalog, GameCatalogKind.Building, guid);
+                }
+            }
+        }
     }
-#pragma warning restore S2325
+
+    /// <summary>
+    /// Logs a GUID once if the catalog cannot name it.
+    /// </summary>
+    /// <param name="catalog">The catalog</param>
+    /// <param name="role">The role</param>
+    /// <param name="guid">The GUID</param>
+    private void ReportGuid(GameCatalog catalog, GameCatalogKind role, int guid)
+    {
+        if (guid == 0)
+        {
+            return;
+        }
+
+        var problem = catalog.Check(guid);
+
+        if (problem == GameCatalogProblem.None)
+        {
+            return;
+        }
+
+        lock (_lock)
+        {
+            if (_isCapped || _reported.Contains((role, guid)))
+            {
+                return;
+            }
+
+            if (_reported.Count >= MaxReports)
+            {
+                _isCapped = true;
+                CompanionLog.CatalogReportsCapped(_logger, MaxReports);
+
+                return;
+            }
+
+            _reported.Add((role, guid));
+            CompanionLog.CatalogCannotName(_logger, role, guid, problem);
+        }
+    }
 
     #endregion // Methods
 }

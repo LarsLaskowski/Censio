@@ -52,7 +52,7 @@ internal static class GameCatalogBuilder
             }
         }
 
-        return new GameCatalog(entries.Values, ambiguous, assets.InheritedCount, dropped);
+        return new GameCatalog(entries.Values.Where(entry => ambiguous.Contains(entry.AssetGuid) == false).ToList(), ambiguous, assets.InheritedCount, dropped);
     }
 
     /// <summary>
