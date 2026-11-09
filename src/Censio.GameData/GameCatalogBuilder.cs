@@ -24,7 +24,7 @@ internal static class GameCatalogBuilder
 
         foreach (var (guid, region) in assets.Regions)
         {
-            regionLists[guid] = RegionIdList(region.RegionId, regionTypes, ref dropped);
+            regionLists[guid] = RegionIdList(ResolveRegionId(region, templateRegionIds, defaultRegionId), regionTypes, ref dropped);
         }
 
         var entries = new Dictionary<int, GameCatalogEntry>();
@@ -114,6 +114,28 @@ internal static class GameCatalogBuilder
                    GermanName = german.NameOf(candidate.TextId),
                    RegionTypes = RegionList(list, regionTypes, ref dropped)
                };
+    }
+
+    /// <summary>
+    /// Resolves the region type of a region asset: its own, else its template's, else the property default.
+    /// </summary>
+    /// <param name="region">The region asset</param>
+    /// <param name="templateRegionIds">The stated region type of each template with a <c>Region</c> property, or <c>null</c></param>
+    /// <param name="defaultRegionId">The default region type of the <c>Region</c> property, or <c>null</c></param>
+    /// <returns>The region type, or <c>null</c> when none is stated</returns>
+    private static string? ResolveRegionId(GameCatalogAsset region, Dictionary<string, string?> templateRegionIds, string? defaultRegionId)
+    {
+        if (region.RegionId is not null)
+        {
+            return region.RegionId;
+        }
+
+        if (region.Template is null || templateRegionIds.TryGetValue(region.Template, out var templateRegionId) == false)
+        {
+            return null;
+        }
+
+        return templateRegionId ?? defaultRegionId;
     }
 
     /// <summary>
