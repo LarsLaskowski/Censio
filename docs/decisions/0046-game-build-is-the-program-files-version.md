@@ -1,6 +1,6 @@
 # 0046: The game build is identified by the program file's version, not the main-menu version
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-09
 - **Area:** game-installation
 - **Source:** Issue #22; Issue #25 (cache keys)

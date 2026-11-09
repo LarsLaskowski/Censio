@@ -1,6 +1,6 @@
 # 0045: The Companion's settings are a hand-edited JSON file under the local app data folder
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-09
 - **Area:** companion
 - **Source:** Issue #22; Issue #43 (settings window)

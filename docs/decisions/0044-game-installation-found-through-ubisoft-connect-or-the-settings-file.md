@@ -1,6 +1,6 @@
 # 0044: The game installation is found through Ubisoft Connect's records or the settings file; Steam is not searched
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-09
 - **Area:** game-installation
 - **Source:** Issue #22
