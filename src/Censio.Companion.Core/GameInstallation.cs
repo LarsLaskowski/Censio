@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace Censio.Companion.Core;
 
 /// <summary>
@@ -14,7 +16,7 @@ public static class GameInstallation
     /// <returns><c>true</c> if the folder is an installation</returns>
     public static bool IsInstallation(string folder)
     {
-        throw new NotImplementedException();
+        return File.Exists(Path.Combine(folder, "maindata", "config.rda")) && File.Exists(ProgramFilePath(folder));
     }
 
     /// <summary>
@@ -24,7 +26,7 @@ public static class GameInstallation
     /// <returns><c>true</c> if the path is a network or device path</returns>
     public static bool IsNetworkOrDevicePath(string path)
     {
-        throw new NotImplementedException();
+        return path.Length >= 2 && IsSeparator(path[0]) && (IsSeparator(path[1]) || path[1] == '?');
     }
 
     /// <summary>
@@ -34,7 +36,7 @@ public static class GameInstallation
     /// <returns>The path of the program file</returns>
     public static string ProgramFilePath(string folder)
     {
-        throw new NotImplementedException();
+        return Path.Combine(folder, "bin", "win64", "anno117.exe");
     }
 
     /// <summary>
@@ -44,7 +46,7 @@ public static class GameInstallation
     /// <returns>The default games folder</returns>
     public static string DefaultUbisoftGamesFolder(string programFilesX86)
     {
-        throw new NotImplementedException();
+        return Path.Combine(programFilesX86, "Ubisoft", "Ubisoft Game Launcher", "games");
     }
 
     /// <summary>
@@ -54,7 +56,22 @@ public static class GameInstallation
     /// <returns>The build, or <c>null</c> if it is unknown</returns>
     public static string? FormatBuild(Version? version)
     {
-        throw new NotImplementedException();
+        if (version is null || (version.Major <= 0 && version.Minor <= 0 && version.Build <= 0 && version.Revision <= 0))
+        {
+            return null;
+        }
+
+        return string.Create(CultureInfo.InvariantCulture, $"{Math.Max(version.Major, 0)}.{Math.Max(version.Minor, 0)}.{Math.Max(version.Build, 0)}.{Math.Max(version.Revision, 0)}");
+    }
+
+    /// <summary>
+    /// Determines whether a character is a path separator, <c>\</c> and <c>/</c> counted on every system.
+    /// </summary>
+    /// <param name="character">The character</param>
+    /// <returns><c>true</c> if the character is a separator</returns>
+    private static bool IsSeparator(char character)
+    {
+        return character is '\\' or '/';
     }
 
     #endregion // Methods
