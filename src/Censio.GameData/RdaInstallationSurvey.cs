@@ -74,7 +74,7 @@ public static class RdaInstallationSurvey
     /// </summary>
     /// <param name="mainData">The <c>maindata</c> folder</param>
     /// <returns>The relative paths, ordinal and ignoring case</returns>
-    private static List<string> FindArchives(string mainData)
+    internal static List<string> FindArchives(string mainData)
     {
         if (Directory.Exists(mainData) == false)
         {

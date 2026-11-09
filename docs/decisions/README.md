@@ -108,4 +108,6 @@ once in the [area document](../areas/README.md) of the record's area, and the re
 | [0044](0044-game-installation-found-through-ubisoft-connect-or-the-settings-file.md) | The game installation is found through Ubisoft Connect's records or the settings file; Steam is not searched | Accepted | 2026-11-09 |
 | [0045](0045-companion-settings-in-a-json-file-under-local-app-data.md) | The Companion's settings are a hand-edited JSON file under the local app data folder | Accepted | 2026-11-09 |
 | [0046](0046-game-build-is-the-program-files-version.md) | The game build is identified by the program file's version, not the main-menu version | Accepted | 2026-11-09 |
+| [0047](0047-game-catalog-read-forward-only-from-config-rda-kinds-and-regions-from-the-data.md) | The game catalog is read forward-only from `config.rda`; kinds and regions come from the data, and the reader fails closed | Accepted | 2026-11-09 |
+| [0048](0048-catalog-names-shown-in-the-diagnostics-window-unresolved-guids-logged-once.md) | Catalog names are shown in the diagnostics window; GUIDs the catalog cannot name are logged once per run | Accepted | 2026-11-09 |
 <!-- project:end index -->

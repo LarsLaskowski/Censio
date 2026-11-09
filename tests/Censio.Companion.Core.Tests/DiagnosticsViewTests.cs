@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Globalization;
 using System.Text;
 
+using Censio.GameData;
 using Censio.Pipe;
 using Censio.Pipe.Tests;
 
@@ -716,6 +717,197 @@ public sealed class DiagnosticsViewTests
 
         // Assert
         Assert.AreEqual("array", exception.ParamName, "The exception should name the array");
+    }
+
+    /// <summary>
+    /// With a catalog, the region and good cells of a known GUID show both names and the GUID.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC4")]
+    public void DiagnosticsViewCreateShowsBothNamesWithGuid()
+    {
+        // Arrange
+        var tick = CreateTick(100, CreateIsland(new PipeIslandKey(100, 1, 0), 4, "Ostia", CreateEntry(200)));
+        var catalog = CreateCatalog(Named(100, GameCatalogKind.Region, "Region 1", "Gebiet 1"), Named(200, GameCatalogKind.Good, "Good 1", "Ware 1"));
+
+        // Act
+        var view = DiagnosticsView.Create("Receiving", tick, catalog, CreateClock());
+
+        // Assert
+        Assert.AreEqual("Region 1 / Gebiet 1 (100)", view[0].Cells[0], "The region cell should show both names and the GUID");
+        Assert.AreEqual("Good 1 / Ware 1 (200)", view[0].Cells[5], "The good cell should show both names and the GUID");
+        Assert.AreEqual("1", view[0].Cells[1], "The other cells should be unchanged");
+    }
+
+    /// <summary>
+    /// An entry with one name shows the name it has and the GUID.
+    /// </summary>
+    /// <param name="english">The English name</param>
+    /// <param name="german">The German name</param>
+    /// <param name="expected">The expected cell</param>
+    [TestMethod]
+    [TestCategory("AC4")]
+    [DataRow("Good 2", null, "Good 2 (201)", DisplayName = "English only")]
+    [DataRow(null, "Ware 2", "Ware 2 (201)", DisplayName = "German only")]
+    [DataRow("Good 2", "", "Good 2 (201)", DisplayName = "German empty")]
+    public void DiagnosticsViewCreateShowsAvailableNameOfIncompleteEntry(string? english, string? german, string expected)
+    {
+        // Arrange
+        var tick = CreateTick(100, CreateIsland(new PipeIslandKey(100, 1, 0), 4, "Ostia", CreateEntry(201)));
+        var catalog = CreateCatalog(Named(201, GameCatalogKind.Good, english, german));
+
+        // Act
+        var view = DiagnosticsView.Create("Receiving", tick, catalog, CreateClock());
+
+        // Assert
+        Assert.AreEqual(expected, view[0].Cells[5], "The cell should show the name the entry has and the GUID");
+    }
+
+    /// <summary>
+    /// A GUID the catalog does not know, a nameless entry and an ambiguous GUID stay numbers.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC4")]
+    public void DiagnosticsViewCreateShowsNumberOfUnknownNamelessAndAmbiguous()
+    {
+        // Arrange
+        var tick = CreateTick(100,
+                              CreateIsland(new PipeIslandKey(300, 1, 0), 4, "Ostia", CreateEntry(301), CreateEntry(302), CreateEntry(303)),
+                              CreateIsland(new PipeIslandKey(100, 2, 0), 4, "Capua", CreateEntry(200)));
+        var catalog = new GameCatalog([Named(302, GameCatalogKind.Good, null, null), Named(100, GameCatalogKind.Region, "Region 1", "Gebiet 1"), Named(200, GameCatalogKind.Good, "Good 1", "Ware 1")], [303], 0, 0);
+
+        // Act
+        var view = DiagnosticsView.Create("Receiving", tick, catalog, CreateClock());
+
+        // Assert
+        Assert.AreEqual("300", view[0].Cells[0], "An unknown region should stay a number");
+        Assert.AreEqual("301", view[0].Cells[5], "An unknown good should stay a number");
+        Assert.AreEqual("302", view[1].Cells[5], "A nameless good should stay a number");
+        Assert.AreEqual("303", view[2].Cells[5], "An ambiguous good should stay a number");
+        Assert.AreEqual("Good 1 / Ware 1 (200)", view[3].Cells[5], "A known good in the same tick should be named");
+    }
+
+    /// <summary>
+    /// GUID 0 is never looked up: it stays <c>0</c> even if the catalog holds an entry for it, while a known GUID of the
+    /// same tick is named.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC4")]
+    public void DiagnosticsViewCreateShowsZeroAsNumber()
+    {
+        // Arrange
+        var tick = CreateTick(100,
+                              CreateIsland(new PipeIslandKey(0, 1, 0), 4, "Ostia", CreateEntry(0), CreateEntry(200)));
+        var catalog = CreateCatalog(Named(0, GameCatalogKind.Good, "Good 0", "Ware 0"), Named(200, GameCatalogKind.Good, "Good 1", "Ware 1"));
+
+        // Act
+        var view = DiagnosticsView.Create("Receiving", tick, catalog, CreateClock());
+
+        // Assert
+        Assert.AreEqual("0", view[0].Cells[0], "Region 0 should stay 0");
+        Assert.AreEqual("0", view[0].Cells[5], "Good 0 should stay 0");
+        Assert.AreEqual("Good 1 / Ware 1 (200)", view[1].Cells[5], "A known good of the same tick should be named");
+    }
+
+    /// <summary>
+    /// Without a catalog, every cell of a region and a good shows the bare number.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC4")]
+    public void DiagnosticsViewCreateShowsNumbersWithoutCatalog()
+    {
+        // Arrange
+        var tick = CreateTick(100, CreateIsland(new PipeIslandKey(100, 1, 0), 4, "Ostia", CreateEntry(200)));
+
+        // Act
+        var view = DiagnosticsView.Create("Receiving", tick, null, CreateClock());
+
+        // Assert
+        Assert.AreEqual("100", view[0].Cells[0], "The region cell should show the number");
+        Assert.AreEqual("200", view[0].Cells[5], "The good cell should show the number");
+        Assert.AreEqual("1", view[0].Cells[1], "The other cells should be unchanged");
+    }
+
+    /// <summary>
+    /// Names follow the rule of the log: control, format and separator characters become <c>?</c>.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC4")]
+    public void DiagnosticsViewCreateSanitizesNames()
+    {
+        // Arrange
+        var tick = CreateTick(100, CreateIsland(new PipeIslandKey(100, 1, 0), 4, "Ostia", CreateEntry(200)));
+        var catalog = CreateCatalog(Named(200, GameCatalogKind.Good, "Good\u0007\n1", "Ware\u202E2\u2028"));
+
+        // Act
+        var view = DiagnosticsView.Create("Receiving", tick, catalog, CreateClock());
+
+        // Assert
+        Assert.AreEqual("Good??1 / Ware?2? (200)", view[0].Cells[5], "Control, format and separator characters should be replaced");
+    }
+
+    /// <summary>
+    /// A name over <see cref="DiagnosticsView.MaxCatalogNameLength" /> characters is cut and ends in an ellipsis, one at
+    /// the limit is kept.
+    /// </summary>
+    /// <param name="length">The length of the English name</param>
+    /// <param name="isCut">Whether the name is cut</param>
+    [TestMethod]
+    [TestCategory("AC4")]
+    [DataRow(4096, false)]
+    [DataRow(4097, true)]
+    [DataRow(100000, true)]
+    public void DiagnosticsViewCreateCutsLongName(int length, bool isCut)
+    {
+        // Arrange
+        var tick = CreateTick(100, CreateIsland(new PipeIslandKey(100, 1, 0), 4, "Ostia", CreateEntry(200)));
+        var catalog = CreateCatalog(Named(200, GameCatalogKind.Good, new string('x', length), "Ware 1"));
+        const string tail = " / Ware 1 (200)";
+
+        // Act
+        var cell = DiagnosticsView.Create("Receiving", tick, catalog, CreateClock())[0].Cells[5];
+
+        // Assert
+        Assert.IsTrue(cell.EndsWith(tail, StringComparison.Ordinal), "The cell should end with the German name and the GUID");
+
+        var name = cell[..^tail.Length];
+
+        Assert.AreEqual(isCut, name.EndsWith('\u2026'), "A name over the limit should end in an ellipsis, one at the limit should not");
+        Assert.IsLessThanOrEqualTo(DiagnosticsView.MaxCatalogNameLength + 1, name.Length, "The name should be cut to the limit");
+
+        if (isCut == false)
+        {
+            Assert.AreEqual(length, name.Length, "A name at the limit should be kept whole");
+        }
+    }
+
+    /// <summary>
+    /// Creates a catalog of entries.
+    /// </summary>
+    /// <param name="entries">The entries</param>
+    /// <returns>The catalog</returns>
+    private static GameCatalog CreateCatalog(params GameCatalogEntry[] entries)
+    {
+        return new GameCatalog(entries, [], 0, 0);
+    }
+
+    /// <summary>
+    /// Creates a catalog entry.
+    /// </summary>
+    /// <param name="guid">The GUID</param>
+    /// <param name="kind">The kind</param>
+    /// <param name="english">The English name</param>
+    /// <param name="german">The German name</param>
+    /// <returns>The entry</returns>
+    private static GameCatalogEntry Named(int guid, GameCatalogKind kind, string? english, string? german)
+    {
+        return new GameCatalogEntry
+               {
+                   AssetGuid = guid,
+                   Kind = kind,
+                   EnglishName = english,
+                   GermanName = german
+               };
     }
 
     /// <summary>

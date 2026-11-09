@@ -1,0 +1,37 @@
+<DataSets>
+  <Group>
+    <Name>Global</Name>
+    <DataSet>
+      <Name>FixtureKinds</Name>
+      <Id>40</Id>
+      <Items>
+        <Item>
+          <Name>Region</Name>
+          <Id>0</Id>
+        </Item>
+        <Item>
+          <Name>Vexan</Name>
+          <Id>1</Id>
+        </Item>
+      </Items>
+    </DataSet>
+    <DataSet>
+      <Name>Region</Name>
+      <Id>41</Id>
+      <Items>
+        <Item>
+          <Name>Zorlan</Name>
+          <Id>0</Id>
+        </Item>
+        <Item>
+          <Name>Yultic</Name>
+          <Id>7</Id>
+        </Item>
+        <Item>
+          <Name>Xanthi</Name>
+          <Id>8</Id>
+        </Item>
+      </Items>
+    </DataSet>
+  </Group>
+</DataSets>

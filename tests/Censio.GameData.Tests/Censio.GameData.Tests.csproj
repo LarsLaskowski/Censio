@@ -5,5 +5,10 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Censio.GameData\Censio.GameData.csproj" />
     <ProjectReference Include="..\..\src\Censio.Contracts\Censio.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\Censio.Pipe\Censio.Pipe.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Update="Fixtures\**" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\Censio.Pipe.Tests\Fixtures\long-session.jsonl" Link="Fixtures\Pipe\long-session.jsonl" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
