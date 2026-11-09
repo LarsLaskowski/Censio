@@ -971,6 +971,26 @@ public sealed class TrayMenuTests
     }
 
     /// <summary>
+    /// A status kind that is not defined is rejected with an exception that names the parameter.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC5")]
+    public void TrayMenuFormatCatalogRejectsUndefinedKind()
+    {
+        // Arrange
+        var status = new GameCatalogStatus
+                     {
+                         Kind = (GameCatalogStatusKind)99
+                     };
+
+        // Act
+        var exception = Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => TrayMenu.FormatCatalog(status), "An undefined kind should throw");
+
+        // Assert
+        Assert.AreEqual("status", exception.ParamName, "The exception should name the status");
+    }
+
+    /// <summary>
     /// The catalog entry is greyed out, unchecked and directly below the game entry, with the text of the status.
     /// </summary>
     /// <param name="kind">The status kind</param>

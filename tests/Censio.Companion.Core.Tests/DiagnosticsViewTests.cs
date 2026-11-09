@@ -810,6 +810,25 @@ public sealed class DiagnosticsViewTests
     }
 
     /// <summary>
+    /// Without a catalog, every cell of a region and a good shows the bare number.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC4")]
+    public void DiagnosticsViewCreateShowsNumbersWithoutCatalog()
+    {
+        // Arrange
+        var tick = CreateTick(100, CreateIsland(new PipeIslandKey(100, 1, 0), 4, "Ostia", CreateEntry(200)));
+
+        // Act
+        var view = DiagnosticsView.Create("Receiving", tick, null, CreateClock());
+
+        // Assert
+        Assert.AreEqual("100", view[0].Cells[0], "The region cell should show the number");
+        Assert.AreEqual("200", view[0].Cells[5], "The good cell should show the number");
+        Assert.AreEqual("1", view[0].Cells[1], "The other cells should be unchanged");
+    }
+
+    /// <summary>
     /// Names follow the rule of the log: control, format and separator characters become <c>?</c>.
     /// </summary>
     [TestMethod]
