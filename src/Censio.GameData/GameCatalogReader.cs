@@ -41,6 +41,16 @@ public static class GameCatalogReader
     public const string GermanTextsPath = "data/base/config/gui/texts_german.xml";
 
     /// <summary>
+    /// The archive path of the property defaults file
+    /// </summary>
+    public const string PropertiesPath = "data/base/config/export/properties.xml";
+
+    /// <summary>
+    /// The archive path of the templates file
+    /// </summary>
+    public const string TemplatesPath = "data/base/config/export/templates.xml";
+
+    /// <summary>
     /// The name of the configuration archive in <c>maindata</c>
     /// </summary>
     private const string ConfigArchiveName = "config.rda";
@@ -50,19 +60,23 @@ public static class GameCatalogReader
     #region Methods
 
     /// <summary>
-    /// Builds the catalog from four sources, each opened when its pass starts.
+    /// Builds the catalog from six sources, each opened when its pass starts.
     /// </summary>
     /// <param name="openDataSets">Opens the data sets file</param>
     /// <param name="openAssets">Opens the assets file</param>
     /// <param name="openEnglishTexts">Opens the English texts file</param>
     /// <param name="openGermanTexts">Opens the German texts file</param>
+    /// <param name="openProperties">Opens the property defaults file</param>
+    /// <param name="openTemplates">Opens the templates file</param>
     /// <returns>The result</returns>
-    public static GameCatalogResult Read(Func<GameCatalogSource> openDataSets, Func<GameCatalogSource> openAssets, Func<GameCatalogSource> openEnglishTexts, Func<GameCatalogSource> openGermanTexts)
+    public static GameCatalogResult Read(Func<GameCatalogSource> openDataSets, Func<GameCatalogSource> openAssets, Func<GameCatalogSource> openEnglishTexts, Func<GameCatalogSource> openGermanTexts, Func<GameCatalogSource> openProperties, Func<GameCatalogSource> openTemplates)
     {
         ArgumentNullException.ThrowIfNull(openDataSets);
         ArgumentNullException.ThrowIfNull(openAssets);
         ArgumentNullException.ThrowIfNull(openEnglishTexts);
         ArgumentNullException.ThrowIfNull(openGermanTexts);
+        ArgumentNullException.ThrowIfNull(openProperties);
+        ArgumentNullException.ThrowIfNull(openTemplates);
 
         try
         {
@@ -80,7 +94,13 @@ public static class GameCatalogReader
                 return CreateError(failure);
             }
 
-            return GameCatalogResult.FromCatalog(GameCatalogBuilder.Build(regionTypes, assets, english, german), [], 0);
+            if (TryReadPass(openProperties, GameCatalogDefaults.ReadDefaultRegionId, out var defaultRegionId, out failure) == false
+                || TryReadPass(openTemplates, GameCatalogDefaults.ReadTemplateRegionIds, out var templateRegionIds, out failure) == false)
+            {
+                return CreateError(failure);
+            }
+
+            return GameCatalogResult.FromCatalog(GameCatalogBuilder.Build(regionTypes, assets, english, german, templateRegionIds, defaultRegionId), [], 0);
         }
         catch (XmlException)
         {
@@ -115,7 +135,7 @@ public static class GameCatalogReader
 
             using var archive = opened.Archive;
 
-            var result = Read(() => OpenEntry(archive, DataSetsPath), () => OpenEntry(archive, AssetsPath), () => OpenEntry(archive, EnglishTextsPath), () => OpenEntry(archive, GermanTextsPath));
+            var result = Read(() => OpenEntry(archive, DataSetsPath), () => OpenEntry(archive, AssetsPath), () => OpenEntry(archive, EnglishTextsPath), () => OpenEntry(archive, GermanTextsPath), () => OpenEntry(archive, PropertiesPath), () => OpenEntry(archive, TemplatesPath));
 
             if (result.Catalog is null)
             {
@@ -202,7 +222,7 @@ public static class GameCatalogReader
     private static List<GameCatalogCopy> FindCopies(string mainData, RdaLimits limits, out int uncheckedCount)
     {
         var copies = new List<GameCatalogCopy>();
-        var paths = new[] { DataSetsPath, AssetsPath, EnglishTextsPath, GermanTextsPath };
+        var paths = new[] { DataSetsPath, AssetsPath, EnglishTextsPath, GermanTextsPath, PropertiesPath, TemplatesPath };
         var wanted = new HashSet<string>(paths, StringComparer.OrdinalIgnoreCase);
 
         uncheckedCount = 0;

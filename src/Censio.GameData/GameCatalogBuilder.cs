@@ -1,7 +1,7 @@
 namespace Censio.GameData;
 
 /// <summary>
-/// Builds the catalog from what the four passes collected.
+/// Builds the catalog from what the passes collected.
 /// </summary>
 internal static class GameCatalogBuilder
 {
@@ -14,8 +14,10 @@ internal static class GameCatalogBuilder
     /// <param name="assets">The collected assets</param>
     /// <param name="english">The English texts</param>
     /// <param name="german">The German texts</param>
+    /// <param name="templateRegionIds">The stated region type of each template with a <c>Region</c> property, or <c>null</c></param>
+    /// <param name="defaultRegionId">The default region type of the <c>Region</c> property, or <c>null</c></param>
     /// <returns>The catalog</returns>
-    internal static GameCatalog Build(HashSet<string> regionTypes, GameCatalogAssets assets, GameCatalogTexts english, GameCatalogTexts german)
+    internal static GameCatalog Build(HashSet<string> regionTypes, GameCatalogAssets assets, GameCatalogTexts english, GameCatalogTexts german, Dictionary<string, string?> templateRegionIds, string? defaultRegionId)
     {
         var dropped = 0;
         var regionLists = new Dictionary<int, IReadOnlyList<string>?>();

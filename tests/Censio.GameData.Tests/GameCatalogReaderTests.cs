@@ -63,12 +63,12 @@ public sealed class GameCatalogReaderTests
     /// <summary>
     /// The names of the files of a catalog in the order of their passes.
     /// </summary>
-    private static readonly string[] _fileNames = ["datasets.xml", "assets.xml", "texts_english.xml", "texts_german.xml"];
+    private static readonly string[] _fileNames = ["datasets.xml", "assets.xml", "texts_english.xml", "texts_german.xml", "properties.xml", "templates.xml"];
 
     /// <summary>
     /// The paths of the files of a catalog in the order of their passes.
     /// </summary>
-    private static readonly string[] _filePaths = [GameCatalogReader.DataSetsPath, GameCatalogReader.AssetsPath, GameCatalogReader.EnglishTextsPath, GameCatalogReader.GermanTextsPath];
+    private static readonly string[] _filePaths = [GameCatalogReader.DataSetsPath, GameCatalogReader.AssetsPath, GameCatalogReader.EnglishTextsPath, GameCatalogReader.GermanTextsPath, GameCatalogReader.PropertiesPath, GameCatalogReader.TemplatesPath];
 
     /// <summary>
     /// The entries of the fixture: GUID, kind, English name, German name and problem.
@@ -173,7 +173,9 @@ public sealed class GameCatalogReaderTests
         var result = GameCatalogReader.Read(() => OpenSample(folder, _fileNames[0]),
                                             () => OpenSample(folder, _fileNames[1]),
                                             () => OpenSample(folder, _fileNames[2]),
-                                            () => OpenSample(folder, _fileNames[3]));
+                                            () => OpenSample(folder, _fileNames[3]),
+                                            () => OpenSample(folder, _fileNames[4]),
+                                            () => OpenSample(folder, _fileNames[5]));
 
         stopwatch.Stop();
 
@@ -1025,7 +1027,9 @@ public sealed class GameCatalogReaderTests
         var result = GameCatalogReader.Read(() => GameCatalogSource.FromStream(new NonSeekableStream(new MemoryStream(FixtureBytes(_fileNames[0])))),
                                             () => GameCatalogSource.FromStream(new NonSeekableStream(new MemoryStream(FixtureBytes(_fileNames[1])))),
                                             () => GameCatalogSource.FromStream(new NonSeekableStream(new MemoryStream(FixtureBytes(_fileNames[2])))),
-                                            () => GameCatalogSource.FromStream(new NonSeekableStream(new MemoryStream(FixtureBytes(_fileNames[3])))));
+                                            () => GameCatalogSource.FromStream(new NonSeekableStream(new MemoryStream(FixtureBytes(_fileNames[3])))),
+                                            () => GameCatalogSource.FromStream(new NonSeekableStream(new MemoryStream(FixtureBytes(_fileNames[4])))),
+                                            () => GameCatalogSource.FromStream(new NonSeekableStream(new MemoryStream(FixtureBytes(_fileNames[5])))));
 
         // Assert
         Assert.IsNull(result.Error, $"Non-seekable streams should be read, but failed with {result.Error?.Kind}");
@@ -1055,7 +1059,7 @@ public sealed class GameCatalogReaderTests
         }
 
         // Act
-        var result = GameCatalogReader.Read(Opener(0), Opener(1), Opener(2), Opener(3));
+        var result = GameCatalogReader.Read(Opener(0), Opener(1), Opener(2), Opener(3), Opener(4), Opener(5));
 
         // Assert
         Assert.IsNotNull(result.Catalog, "The fixture should give a catalog");
@@ -1472,7 +1476,7 @@ public sealed class GameCatalogReaderTests
     /// <returns>The catalog</returns>
     private static GameCatalog ReadCatalog(string dataSets, string assets, string english, string german)
     {
-        var result = GameCatalogReader.Read(Open(dataSets), Open(assets), Open(english), Open(german));
+        var result = GameCatalogReader.Read(Open(dataSets), Open(assets), Open(english), Open(german), FixtureOpener(4), FixtureOpener(5));
 
         Assert.IsNull(result.Error, $"The files should give a catalog, but failed with {result.Error?.Kind}");
         Assert.IsNotNull(result.Catalog, "The files should give a catalog");
@@ -1489,12 +1493,24 @@ public sealed class GameCatalogReaderTests
         var result = GameCatalogReader.Read(() => GameCatalogSource.FromStream(new MemoryStream(FixtureBytes(_fileNames[0]))),
                                             () => GameCatalogSource.FromStream(new MemoryStream(FixtureBytes(_fileNames[1]))),
                                             () => GameCatalogSource.FromStream(new MemoryStream(FixtureBytes(_fileNames[2]))),
-                                            () => GameCatalogSource.FromStream(new MemoryStream(FixtureBytes(_fileNames[3]))));
+                                            () => GameCatalogSource.FromStream(new MemoryStream(FixtureBytes(_fileNames[3]))),
+                                            () => GameCatalogSource.FromStream(new MemoryStream(FixtureBytes(_fileNames[4]))),
+                                            () => GameCatalogSource.FromStream(new MemoryStream(FixtureBytes(_fileNames[5]))));
 
         Assert.IsNull(result.Error, $"The fixture should give a catalog, but failed with {result.Error?.Kind}");
         Assert.IsNotNull(result.Catalog, "The fixture should give a catalog");
 
         return result.Catalog;
+    }
+
+    /// <summary>
+    /// Opens a fixture file.
+    /// </summary>
+    /// <param name="index">The index of the file</param>
+    /// <returns>The opener</returns>
+    private static Func<GameCatalogSource> FixtureOpener(int index)
+    {
+        return () => GameCatalogSource.FromStream(new MemoryStream(FixtureBytes(_fileNames[index])));
     }
 
     /// <summary>
@@ -1510,7 +1526,7 @@ public sealed class GameCatalogReaderTests
             return index == file ? Open(content) : () => GameCatalogSource.FromStream(new MemoryStream(FixtureBytes(_fileNames[index])));
         }
 
-        return GameCatalogReader.Read(Opener(0), Opener(1), Opener(2), Opener(3));
+        return GameCatalogReader.Read(Opener(0), Opener(1), Opener(2), Opener(3), Opener(4), Opener(5));
     }
 
     /// <summary>
@@ -1760,7 +1776,7 @@ public sealed class GameCatalogReaderTests
                    };
         }
 
-        return GameCatalogReader.Read(Opener(0), Opener(1), Opener(2), Opener(3));
+        return GameCatalogReader.Read(Opener(0), Opener(1), Opener(2), Opener(3), Opener(4), Opener(5));
     }
 
     /// <summary>
