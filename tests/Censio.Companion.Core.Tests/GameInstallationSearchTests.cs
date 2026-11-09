@@ -528,6 +528,49 @@ public sealed class GameInstallationSearchTests
     }
 
     /// <summary>
+    /// An exception that escapes every step, here from a damaged record without a name, ends the search in not found
+    /// and is logged with the not-found warning.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC6")]
+    public void GameInstallationSearchEscapingExceptionIsLoggedAndEndsNotFound()
+    {
+        // Arrange
+        var records = new FakeUbisoftInstallRecords(Record(null!, CreateInstallation("anno") + "/"));
+        var search = CreateSearch(records, MissingFolder());
+
+        // Act
+        var result = search.Run(MissingSettings());
+
+        // Assert
+        Assert.AreEqual(GameInstallationStatusKind.NotFound, result.Kind, "The search should end in not found");
+        Assert.AreEqual(GameInstallationStatusKind.NotFound, search.Status.Kind, "The status should never stay searching");
+        Assert.HasCount(1, _logger.Entries, "The search should log exactly one line");
+        Assert.AreEqual(LogLevel.Warning, _logger.Entries[0].Level, "The escaping exception should be logged as a warning");
+        Assert.AreEqual(NotFoundMessage, _logger.Entries[0].Message, "The escaping exception should be logged with the not-found warning");
+        Assert.IsInstanceOfType<NullReferenceException>(_logger.Entries[0].Exception, "The warning should carry the escaping exception");
+    }
+
+    /// <summary>
+    /// Before it runs, the search reports that it is searching.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC6")]
+    public void GameInstallationSearchStatusIsSearchingBeforeRun()
+    {
+        // Arrange
+        var records = new FakeUbisoftInstallRecords(Record("921", CreateInstallation("anno") + "/"));
+
+        // Act
+        var search = CreateSearch(records, MissingFolder());
+
+        // Assert
+        Assert.AreEqual(GameInstallationStatus.Searching, search.Status, "The status should be searching until the search ends");
+        Assert.AreEqual(GameInstallationStatusKind.Searching, search.Status.Kind, "The kind should be searching");
+        Assert.AreEqual(0, records.ReadCount, "Nothing should be read before the search runs");
+    }
+
+    /// <summary>
     /// A control character in the folder is replaced when the line is written to the log.
     /// </summary>
     [TestMethod]
