@@ -1,7 +1,7 @@
 # Spec: Catalog cache and re-extraction after game updates
 
 Source: Issue #25
-Status: Draft
+Status: Approved by Lead
 
 ## Problem
 
@@ -101,7 +101,7 @@ last check's result — successful or failed — held in memory, and at start wi
 - AC5: Only a complete result (catalog and icons built) is cached; E1, E2 and E3 behave as written (E1, E2, E3, E6).
 - AC6: A cache as in E4, or left by an interrupted or concurrent write, is never used in part, is logged and is
   extracted again (E4, E7, N3).
-- AC7: Each extraction and each cache load logs its duration line, timed on an injected clock; a re-extraction resets
+- AC7: Each extraction that builds a catalog and each cache load logs its duration line, timed on an injected clock; a re-extraction resets
   the `Catalog cannot name` reporting (S1, S2, E13, N6).
 - AC8: `README.md` (the overview bullets on the Companion and on names and icons, the quick-start menu line) and
   `docs/USER_GUIDE.md` (*Game catalog* with its icon paragraph, the storage paragraph "built in memory at every start
