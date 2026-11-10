@@ -1954,6 +1954,74 @@ public sealed class GameCatalogReaderTests
     }
 
     /// <summary>
+    /// An asset without a <c>Building</c> section of its own is no building when its template is listed without a
+    /// <c>Building</c> property or not listed, also when the property default states a building list.
+    /// </summary>
+    /// <param name="templates">The template file</param>
+    [TestMethod]
+    [TestCategory("AC1")]
+    [DataRow("<Templates><Group><Name>Session</Name><Template><Name>Plain</Name><Properties><Standard /></Properties></Template></Group></Templates>")]
+    [DataRow("<Templates><Group><Name>Session</Name></Group></Templates>")]
+    public void GameCatalogReaderReadMakesNoBuildingWithoutBuildingProperty(string templates)
+    {
+        // Arrange
+        var assets = Assets(TemplatedAsset(10, "Plain", string.Empty));
+        var properties = Properties(BuildingYultic);
+
+        // Act
+        var catalog = ReadCatalogWithDefaults(DataSets("Zorlan", "Yultic"), assets, properties, templates);
+
+        // Assert
+        Assert.IsNull(catalog.Find(10), "An asset with neither a Building section nor a Building template property should be no entry");
+        Assert.AreEqual(0, catalog.Count, "No entry should be made");
+    }
+
+    /// <summary>
+    /// A building with a list of its own keeps it over the list of its template.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC2")]
+    public void GameCatalogReaderReadPrefersOwnBuildingRegionsOverTemplate()
+    {
+        // Arrange
+        var catalog = ReadFixtureCatalog();
+
+        // Act
+        var entry = catalog.Find(Base + 506);
+
+        // Assert
+        Assert.IsNotNull(entry, "The building should be an entry");
+        Assert.AreSequenceEqual(["Xanthi"], entry.RegionTypes, "The building should keep its own list over the list of its template");
+    }
+
+    /// <summary>
+    /// A property default is taken only for an asset whose template is listed with that property: a template listed
+    /// without it, or not listed, gives only the asset's own value, which is not stated.
+    /// </summary>
+    /// <param name="fact">The kind of the asset</param>
+    /// <param name="template">The <c>Properties</c> of the template, or <c>null</c> for a template that is not listed</param>
+    /// <param name="defaults">The <c>DefaultValues</c></param>
+    /// <param name="expected">The expected observation</param>
+    [TestMethod]
+    [TestCategory("AC2")]
+    [DataRow("Product", "<Standard />", ProductYultic, "Good unstated")]
+    [DataRow("Product", null, ProductYultic, "Good unstated")]
+    [DataRow("Workforce", "<Standard />", ProductYultic, "Workforce unstated")]
+    [DataRow("Workforce", null, ProductYultic, "Workforce unstated")]
+    [DataRow("Building", "<Standard />", BuildingYultic, "Building unstated")]
+    [DataRow("Building", null, BuildingYultic, "Building unstated")]
+    [DataRow("Session", "<Standard />", SessionRegion8, "none")]
+    [DataRow("Session", null, SessionRegion8, "none")]
+    public void GameCatalogReaderReadTakesNoDefaultWithoutProperty(string fact, string? template, string defaults, string expected)
+    {
+        // Act
+        var observed = ObserveLayers(fact, string.Empty, template, defaults);
+
+        // Assert
+        Assert.AreEqual(expected, observed, "The default should not be taken for a template without the property");
+    }
+
+    /// <summary>
     /// A building without a list of its own takes the list of the <c>Building</c> property of its template.
     /// </summary>
     [TestMethod]
