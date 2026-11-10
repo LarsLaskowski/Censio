@@ -56,14 +56,16 @@ internal static class GameCatalogFiles
     /// Reads the defining assets.
     /// </summary>
     /// <param name="stream">The asset file</param>
+    /// <param name="templates">The facts of the defining templates by name</param>
+    /// <param name="defaults">The property defaults</param>
     /// <returns>What the pass collected</returns>
-    internal static GameCatalogAssets ReadAssets(Stream stream)
+    internal static GameCatalogAssets ReadAssets(Stream stream, Dictionary<string, GameCatalogValues> templates, GameCatalogValues defaults)
     {
         using var reader = GameCatalogXml.Create(stream, "AssetList");
 
         var names = new string[GameCatalogReader.MaxAssetDepth + 1];
         var path = new string[4];
-        var assets = new GameCatalogAssets();
+        var assets = new GameCatalogAssets(templates, defaults);
         var more = reader.Read();
 
         while (more)
@@ -345,15 +347,15 @@ internal static class GameCatalogFiles
     }
 
     /// <summary>
-    /// Reads the GUID an element names; an empty element names none.
+    /// Reads the GUID an element names; an empty element names no region and gives <c>0</c>.
     /// </summary>
     /// <param name="reader">The reader, at the element</param>
-    /// <returns>The GUID, or <c>null</c> when the element is empty</returns>
-    private static int? ReadOptionalGuid(XmlReader reader)
+    /// <returns>The GUID, or <c>0</c> when the element is empty</returns>
+    private static int ReadOptionalGuid(XmlReader reader)
     {
         var text = reader.ReadElementContentAsString();
 
-        return string.IsNullOrWhiteSpace(text) ? null : GameCatalogXml.ParseInt(text);
+        return string.IsNullOrWhiteSpace(text) ? 0 : GameCatalogXml.ParseInt(text);
     }
 
     /// <summary>

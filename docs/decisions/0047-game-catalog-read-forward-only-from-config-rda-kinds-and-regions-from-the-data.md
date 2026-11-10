@@ -37,7 +37,7 @@ catalog at every start until the cache of #25.
 ## Decision
 
 Option 3 with fail-closed reading: the catalog is built from `config.rda` alone; a defining asset's kind, names and
-regions are taken only from nodes the data states, an inherited asset is left out, a missing `RegionID` is taken from the game's template and
+regions are taken only from nodes the data states, an inherited asset is left out, a value an asset does not state is taken from the game's template and
 property defaults ([0049](0049-region-type-of-a-region-asset-from-its-template-and-the-property-defaults.md)), each asset is bounded in depth and elements, and the first malformed file or value, or an asset over
 a bound, fails the whole catalog. The nodes, rules and failure kinds are
 in the [game-catalog](../areas/game-catalog.md) area document.

@@ -92,5 +92,21 @@
       <LineId>7100000000000000601</LineId>
       <Text>Building 601</Text>
     </Text>
+    <Text>
+      <LineId>7100000000000000207</LineId>
+      <Text>Session 207</Text>
+    </Text>
+    <Text>
+      <LineId>7100000000000000504</LineId>
+      <Text>Building 504</Text>
+    </Text>
+    <Text>
+      <LineId>7100000000000000505</LineId>
+      <Text>Building 505</Text>
+    </Text>
+    <Text>
+      <LineId>7100000000000000506</LineId>
+      <Text>Building 506</Text>
+    </Text>
   </Texts>
 </TextExport>

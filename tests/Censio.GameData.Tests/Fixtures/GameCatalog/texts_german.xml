@@ -88,5 +88,21 @@
       <LineId>7100000000000000601</LineId>
       <Text>Gebäude 601</Text>
     </Text>
+    <Text>
+      <LineId>7100000000000000207</LineId>
+      <Text>Sitzung 207</Text>
+    </Text>
+    <Text>
+      <LineId>7100000000000000504</LineId>
+      <Text>Gebäude 504</Text>
+    </Text>
+    <Text>
+      <LineId>7100000000000000505</LineId>
+      <Text>Gebäude 505</Text>
+    </Text>
+    <Text>
+      <LineId>7100000000000000506</LineId>
+      <Text>Gebäude 506</Text>
+    </Text>
   </Texts>
 </TextExport>

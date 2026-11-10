@@ -1,3 +1,5 @@
+using System.Collections.ObjectModel;
+
 namespace Censio.GameData;
 
 /// <summary>
@@ -10,7 +12,7 @@ public sealed class GameCatalog
     /// <summary>
     /// The entries
     /// </summary>
-    private readonly IReadOnlyCollection<GameCatalogEntry> _entries;
+    private readonly ReadOnlyCollection<GameCatalogEntry> _entries;
 
     /// <summary>
     /// The entries by asset GUID
@@ -35,7 +37,7 @@ public sealed class GameCatalog
     /// <param name="droppedRegionTypeCount">The number of unknown region types dropped</param>
     public GameCatalog(IReadOnlyCollection<GameCatalogEntry> entries, IReadOnlyCollection<int> ambiguousGuids, int inheritedAssetCount, int droppedRegionTypeCount)
     {
-        _entries = entries;
+        _entries = entries.ToList().AsReadOnly();
         _ambiguousGuids = [.. ambiguousGuids];
 
         foreach (var entry in entries)
@@ -55,6 +57,11 @@ public sealed class GameCatalog
     /// Gets the number of entries.
     /// </summary>
     public int Count => _entries.Count;
+
+    /// <summary>
+    /// Gets the entries the catalog kept.
+    /// </summary>
+    public IReadOnlyCollection<GameCatalogEntry> Entries => _entries;
 
     /// <summary>
     /// Gets the number of inherited assets left out.

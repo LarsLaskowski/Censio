@@ -5,6 +5,21 @@ namespace Censio.GameData;
 /// </summary>
 internal sealed class GameCatalogAssets
 {
+    #region Constructors
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="GameCatalogAssets" /> class.
+    /// </summary>
+    /// <param name="templates">The facts of the defining templates by name</param>
+    /// <param name="defaults">The property defaults</param>
+    internal GameCatalogAssets(Dictionary<string, GameCatalogValues> templates, GameCatalogValues defaults)
+    {
+        Templates = templates;
+        Defaults = defaults;
+    }
+
+    #endregion // Constructors
+
     #region Fields
 
     /// <summary>
@@ -15,6 +30,16 @@ internal sealed class GameCatalogAssets
     #endregion // Fields
 
     #region Properties
+
+    /// <summary>
+    /// Gets the facts of the defining templates by name.
+    /// </summary>
+    internal Dictionary<string, GameCatalogValues> Templates { get; }
+
+    /// <summary>
+    /// Gets the property defaults.
+    /// </summary>
+    internal GameCatalogValues Defaults { get; }
 
     /// <summary>
     /// Gets the assets that may become entries.
@@ -63,6 +88,8 @@ internal sealed class GameCatalogAssets
             return;
         }
 
+        Resolve(asset);
+
         if (string.Equals(asset.Template, "Region", StringComparison.Ordinal))
         {
             Regions.TryAdd(guid, asset);
@@ -91,6 +118,39 @@ internal sealed class GameCatalogAssets
         }
 
         return asset.HasBuildingSection ? GameCatalogKind.Building : null;
+    }
+
+    /// <summary>
+    /// Fills the facts an asset does not state from its template, else from the property defaults.
+    /// </summary>
+    /// <param name="asset">The asset</param>
+    private void Resolve(GameCatalogAsset asset)
+    {
+        if (asset.Template is null || Templates.TryGetValue(asset.Template, out var template) == false)
+        {
+            return;
+        }
+
+        if (template.HasProduct)
+        {
+            asset.ProductRegions ??= template.ProductRegions ?? Defaults.ProductRegions;
+        }
+
+        if (template.HasBuilding)
+        {
+            asset.HasBuildingSection = true;
+            asset.BuildingRegions ??= template.BuildingRegions ?? Defaults.BuildingRegions;
+        }
+
+        if (template.HasSession)
+        {
+            asset.SessionRegion ??= template.SessionRegion ?? Defaults.SessionRegion;
+        }
+
+        if (template.HasRegion)
+        {
+            asset.RegionId ??= template.RegionId ?? Defaults.RegionId;
+        }
     }
 
     #endregion // Methods
