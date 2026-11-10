@@ -1537,6 +1537,66 @@ public sealed class GameCatalogReaderTests
 
     #endregion // AC7
 
+    #region Icons
+
+    /// <summary>
+    /// An entry carries the trimmed <c>IconFilename</c> of its asset, the last one when the asset states several, and none
+    /// for an asset without or with an empty one.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public void GameCatalogReaderReadEntryCarriesIconFilename()
+    {
+        // Arrange
+        var assets = Assets(WithIcon(Good(10, 1000, null), "  data/ui/fhd/a/b.png  "), Good(11, 1000, null), WithIcon(Good(12, 1000, null), string.Empty), WithIcon(WithIcon(Good(13, 1000, null), "data/ui/fhd/first.png"), "data/ui/fhd/last.png"));
+
+        // Act
+        var catalog = ReadCatalog(DataSets("Zorlan"), assets, Texts((1000, "Good")), Texts((1000, "Ware")));
+
+        // Assert
+        Assert.AreEqual("data/ui/fhd/a/b.png", catalog.Find(10)?.IconFilename, "The value should be trimmed");
+        Assert.IsNull(catalog.Find(11)?.IconFilename, "An asset without the element should name no icon");
+        Assert.IsNull(catalog.Find(12)?.IconFilename, "An empty value should name no icon");
+        Assert.AreEqual("data/ui/fhd/last.png", catalog.Find(13)?.IconFilename, "The last value should win");
+    }
+
+    /// <summary>
+    /// A region entry without an icon of its own takes the icon of its region asset.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public void GameCatalogReaderReadRegionEntryTakesRegionAssetIcon()
+    {
+        // Arrange
+        var assets = Assets(WithIcon(RegionAsset(5, 1000, "Zorlan"), "data/ui/fhd/region.png"), Session(6, "SessionModerate", 5, 1000), RegionAsset(7, 1000, "Zorlan"), Session(8, "SessionModerate", 7, 1000));
+
+        // Act
+        var catalog = ReadCatalog(DataSets("Zorlan"), assets, Texts((1000, "Region")), Texts((1000, "Gebiet")));
+
+        // Assert
+        Assert.AreEqual("data/ui/fhd/region.png", catalog.Find(6)?.IconFilename, "The session should take the icon of its region asset");
+        Assert.IsNull(catalog.Find(8)?.IconFilename, "A session whose region asset names no icon should name none");
+    }
+
+    /// <summary>
+    /// The icon a session names itself comes before that of its region asset.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public void GameCatalogReaderReadSessionIconBeforeRegionAssetIcon()
+    {
+        // Arrange
+        var assets = Assets(WithIcon(RegionAsset(5, 1000, "Zorlan"), "data/ui/fhd/region.png"), WithIcon(Session(6, "SessionModerate", 5, 1000), "data/ui/fhd/session.png"));
+
+        // Act
+        var catalog = ReadCatalog(DataSets("Zorlan"), assets, Texts((1000, "Region")), Texts((1000, "Gebiet")));
+
+        // Assert
+        Assert.AreEqual("data/ui/fhd/session.png", catalog.Find(6)?.IconFilename, "The session's own icon should win");
+    }
+
+    #endregion // Icons
+
     #region Region type defaults
 
     /// <summary>
@@ -2275,6 +2335,49 @@ public sealed class GameCatalogReaderTests
     #region Helpers
 
     /// <summary>
+    /// Decodes the pipe fixture and collects the GUIDs of its ticks by role, without GUID <c>0</c>.
+    /// </summary>
+    /// <returns>The region, good, workforce and building GUIDs</returns>
+    internal static async Task<(HashSet<int> Regions, HashSet<int> Goods, HashSet<int> Workforce, HashSet<int> Buildings)> ReadPipeGuidsAsync()
+    {
+        var regions = new HashSet<int>();
+        var goods = new HashSet<int>();
+        var workforce = new HashSet<int>();
+        var buildings = new HashSet<int>();
+        var clock = new PipeReplayClock(DateTimeOffset.UnixEpoch);
+
+        using var replay = new PipeReplayStream(File.OpenRead(Path.Combine(AppContext.BaseDirectory, "Fixtures", "Pipe", "long-session.jsonl")), PipeReplaySpeed.Maximum, clock, TimeProvider.System);
+        using var assembler = new PipeTickAssembler(new PipeMessageReader(replay), clock);
+
+        PipeTickResult result;
+
+        do
+        {
+            result = await assembler.ReadAsync(CancellationToken.None);
+
+            foreach (var island in result.Tick?.Islands ?? [])
+            {
+                regions.Add(island.Key.SessionGuid);
+
+                foreach (var entry in island.Entries)
+                {
+                    goods.Add(entry.ProductGuid);
+                    workforce.UnionWith(entry.WorkforceAmounts.Keys);
+                    buildings.UnionWith(entry.BuildingAmounts.Keys);
+                }
+            }
+        }
+        while (result.Kind != PipeTickResultKind.EndOfStream);
+
+        regions.Remove(0);
+        goods.Remove(0);
+        workforce.Remove(0);
+        buildings.Remove(0);
+
+        return (regions, goods, workforce, buildings);
+    }
+
+    /// <summary>
     /// Gets the folder of the fixture.
     /// </summary>
     /// <returns>The folder</returns>
@@ -2440,6 +2543,17 @@ public sealed class GameCatalogReaderTests
         var list = regions is null ? string.Empty : $"<AssociatedRegion>{regions}</AssociatedRegion>";
 
         return string.Create(CultureInfo.InvariantCulture, $"<Asset><Template>Product</Template><Values><Standard><GUID>{guid}</GUID><Name>Good {guid}</Name></Standard><Text><OasisId>{textId}</OasisId></Text><Product>{list}</Product></Values></Asset>");
+    }
+
+    /// <summary>
+    /// Adds an <c>IconFilename</c> element to the <c>Standard</c> section of an asset.
+    /// </summary>
+    /// <param name="asset">The asset</param>
+    /// <param name="icon">The value</param>
+    /// <returns>The asset</returns>
+    private static string WithIcon(string asset, string icon)
+    {
+        return asset.Replace("</Standard>", $"<IconFilename>{icon}</IconFilename></Standard>", StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -2654,49 +2768,6 @@ public sealed class GameCatalogReaderTests
         }
 
         return values;
-    }
-
-    /// <summary>
-    /// Decodes the pipe fixture and collects the GUIDs of its ticks by role, without GUID <c>0</c>.
-    /// </summary>
-    /// <returns>The region, good, workforce and building GUIDs</returns>
-    private static async Task<(HashSet<int> Regions, HashSet<int> Goods, HashSet<int> Workforce, HashSet<int> Buildings)> ReadPipeGuidsAsync()
-    {
-        var regions = new HashSet<int>();
-        var goods = new HashSet<int>();
-        var workforce = new HashSet<int>();
-        var buildings = new HashSet<int>();
-        var clock = new PipeReplayClock(DateTimeOffset.UnixEpoch);
-
-        using var replay = new PipeReplayStream(File.OpenRead(Path.Combine(AppContext.BaseDirectory, "Fixtures", "Pipe", "long-session.jsonl")), PipeReplaySpeed.Maximum, clock, TimeProvider.System);
-        using var assembler = new PipeTickAssembler(new PipeMessageReader(replay), clock);
-
-        PipeTickResult result;
-
-        do
-        {
-            result = await assembler.ReadAsync(CancellationToken.None);
-
-            foreach (var island in result.Tick?.Islands ?? [])
-            {
-                regions.Add(island.Key.SessionGuid);
-
-                foreach (var entry in island.Entries)
-                {
-                    goods.Add(entry.ProductGuid);
-                    workforce.UnionWith(entry.WorkforceAmounts.Keys);
-                    buildings.UnionWith(entry.BuildingAmounts.Keys);
-                }
-            }
-        }
-        while (result.Kind != PipeTickResultKind.EndOfStream);
-
-        regions.Remove(0);
-        goods.Remove(0);
-        workforce.Remove(0);
-        buildings.Remove(0);
-
-        return (regions, goods, workforce, buildings);
     }
 
     /// <summary>

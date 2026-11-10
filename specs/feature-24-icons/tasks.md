@@ -9,7 +9,7 @@ Plan: [plan.md](plan.md)
 | 3 | G1 | Implement decoder, header check, PNG writer | `src/Censio.GameData/` | AC1, AC3 | 2 | Dev | [x] |
 | 4 | G1 | Re-run the reference project on the four real samples, counts only (fact 13) | scratch, outside the repository | AC1 | 3 | Tester | [x] |
 | 5 | G2 | Skeleton: `GameCatalogEntry.IconFilename`; `GameIconReader` (MaxIconSide, MaxIconEntryBytes, MaxIconPathLength, MaxIconSetBytes, UiArchiveName, Load, EntryPathOf, PatchNumberOf); `GameIcon` (Width, Height, Png); `GameIconSet` (Find, Check, Count, GoodsWithIcon, RegionsWithIcon, PngBytes); `GameIconProblem`; `GameIconError` (Kind, Archive); `GameIconErrorKind`; `GameIconResult` (Icons, Error, FromIcons, FromError) | `src/Censio.GameData/` | AC2, AC3, AC6, AC7 | 3 | Dev | [x] |
-| 6 | G2 | Tests first, including the opt-in installation test | `GameIconReaderTests.cs`, `GameCatalogReaderTests.cs` | AC2, AC3, AC4, AC6, AC7 | 5 | Tester | [ ] |
+| 6 | G2 | Tests first, including the opt-in installation test | `GameIconReaderTests.cs`, `GameCatalogReaderTests.cs` | AC2, AC3, AC4, AC6, AC7 | 5 | Tester | [x] |
 | 7 | G2 | Implement `IconFilename` reading and the icon step | `GameCatalogAsset.cs`, `GameCatalogFiles.cs`, `GameCatalogBuilder.cs`, new types | AC2, AC3, AC6, AC7 | 6 | Dev | [ ] |
 | 8 | G3 | Skeleton: `GameCatalogLoader` constructor, Icons, IconsChanged; `DiagnosticsRow` constructor, RegionIcon, GoodIcon; `DiagnosticsView.Create` overload; `DiagnosticsWindowSession` constructor; `CompanionLog` CatalogIconsBuilt, CatalogIconsFailed | `src/Censio.Companion.Core/` | AC3, AC5 | 7 | Dev | [ ] |
 | 9 | G3 | Tests first | `GameCatalogLoaderTests.cs`, `DiagnosticsViewTests.cs` | AC3, AC5 | 8 | Tester | [ ] |

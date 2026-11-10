@@ -215,6 +215,26 @@ public static class DdsFileBuilder
     }
 
     /// <summary>
+    /// Builds a square DDS file of one level whose blocks are random blocks of mode 6, so that the pixels hardly compress.
+    /// </summary>
+    /// <param name="side">The side in pixels, a multiple of 4</param>
+    /// <returns>The file</returns>
+    public static byte[] BuildNoise(int side)
+    {
+        var file = Build(side, side, DxgiBc7Srgb, 1);
+        var random = new Random(side);
+
+        random.NextBytes(file.AsSpan(HeadersSize));
+
+        for (var position = HeadersSize; position < file.Length; position += BlockBytes)
+        {
+            file[position] = (byte)(0x40 | (file[position] & 0x80));
+        }
+
+        return file;
+    }
+
+    /// <summary>
     /// Gets the pixels a reader must return for a file of <see cref="Build(int, int, int, int)" />, cropped to the size.
     /// </summary>
     /// <param name="width">The width in pixels</param>
