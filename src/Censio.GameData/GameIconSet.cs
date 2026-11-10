@@ -43,12 +43,12 @@ public sealed class GameIconSet
     /// <summary>
     /// Gets the icons by asset GUID.
     /// </summary>
-    public IReadOnlyDictionary<int, GameIcon> Icons => throw new NotImplementedException();
+    public IReadOnlyDictionary<int, GameIcon> Icons => _icons;
 
     /// <summary>
     /// Gets the reasons assets have no icon, by asset GUID.
     /// </summary>
-    public IReadOnlyDictionary<int, GameIconProblem> Problems => throw new NotImplementedException();
+    public IReadOnlyDictionary<int, GameIconProblem> Problems => _problems;
 
     /// <summary>
     /// Gets the number of goods that have an icon.

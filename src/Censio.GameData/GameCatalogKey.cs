@@ -57,7 +57,39 @@ public sealed class GameCatalogKey
     /// <returns><c>true</c> when folder, build and archives are the same</returns>
     public bool IsSameGame(GameCatalogKey other)
     {
-        throw new NotImplementedException();
+        if (string.Equals(Folder, other.Folder, StringComparison.OrdinalIgnoreCase) == false
+            || string.Equals(Build, other.Build, StringComparison.Ordinal) == false
+            || Archives.Count != other.Archives.Count)
+        {
+            return false;
+        }
+
+        for (var index = 0; index < Archives.Count; index++)
+        {
+            var archive = other.Archives[index];
+
+            if (IsSameArchive(Archives[index], archive.Path, archive.Length, archive.LastWriteTimeUtc.Ticks) == false)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Checks whether an archive state has the given path, length and time.
+    /// </summary>
+    /// <param name="state">The state</param>
+    /// <param name="path">The path, compared ignoring case</param>
+    /// <param name="length">The length in bytes</param>
+    /// <param name="ticks">The ticks of the last write time</param>
+    /// <returns><c>true</c> when all three are the same</returns>
+    internal static bool IsSameArchive(GameArchiveState state, string path, long length, long ticks)
+    {
+        return string.Equals(state.Path, path, StringComparison.OrdinalIgnoreCase)
+               && state.Length == length
+               && state.LastWriteTimeUtc.Ticks == ticks;
     }
 
     #endregion // Methods

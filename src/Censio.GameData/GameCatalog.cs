@@ -66,7 +66,7 @@ public sealed class GameCatalog
     /// <summary>
     /// Gets the GUIDs defined or named more than once.
     /// </summary>
-    public IReadOnlyCollection<int> AmbiguousGuids => throw new NotImplementedException();
+    public IReadOnlyCollection<int> AmbiguousGuids => _ambiguousGuids;
 
     /// <summary>
     /// Gets the number of inherited assets left out.

@@ -7,8 +7,6 @@ public sealed class GameCatalogCacheResult
 {
     #region Constructors
 
-    // Skeleton: removed with the implementation
-#pragma warning disable S1144, S1172
     /// <summary>
     /// Initializes a new instance of the <see cref="GameCatalogCacheResult" /> class.
     /// </summary>
@@ -21,7 +19,6 @@ public sealed class GameCatalogCacheResult
         Catalog = catalog;
         Icons = icons;
     }
-#pragma warning restore S1144, S1172
 
     #endregion // Constructors
 
@@ -54,7 +51,7 @@ public sealed class GameCatalogCacheResult
     /// <returns>The result</returns>
     public static GameCatalogCacheResult FromContent(GameCatalog catalog, GameIconSet icons)
     {
-        throw new NotImplementedException();
+        return new GameCatalogCacheResult(GameCatalogCacheResultKind.Loaded, catalog, icons);
     }
 
     /// <summary>
@@ -64,7 +61,12 @@ public sealed class GameCatalogCacheResult
     /// <returns>The result</returns>
     public static GameCatalogCacheResult FromKind(GameCatalogCacheResultKind kind)
     {
-        throw new NotImplementedException();
+        if (kind == GameCatalogCacheResultKind.Loaded)
+        {
+            throw new ArgumentException("A loaded result needs a catalog and icons", nameof(kind));
+        }
+
+        return new GameCatalogCacheResult(kind, null, null);
     }
 
     #endregion // Methods
