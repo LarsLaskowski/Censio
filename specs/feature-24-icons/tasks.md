@@ -14,7 +14,7 @@ Plan: [plan.md](plan.md)
 | 8 | G3 | Skeleton: `GameCatalogLoader` constructor, Icons, IconsChanged; `DiagnosticsRow` constructor, RegionIcon, GoodIcon; `DiagnosticsView.Create` overload; `DiagnosticsWindowSession` constructor; `CompanionLog` CatalogIconsBuilt, CatalogIconsFailed | `src/Censio.Companion.Core/` | AC3, AC5 | 7 | Dev | [x] |
 | 9 | G3 | Tests first | `GameCatalogLoaderTests.cs`, `DiagnosticsViewTests.cs` | AC3, AC5 | 8 | Tester | [x] |
 | 10 | G3 | Implement Core, wire `App`, template columns and `GameIconImageConverter` (no new API) | `src/Censio.Companion.Core/`, `src/Censio.Companion/` | AC3, AC5 | 9 | Dev | [x] |
-| 11 | G3 | Check of AC6: `git ls-files`, Companion publish listing, `Directory.Packages.props` | — | AC6 | 10 | Dev | [ ] |
-| 12 | G3 | Documentation updates of the plan | `docs/areas/game-catalog.md`, `game-files.md`, `companion.md`, `README.md` (areas), `docs/ARCHITECTURE.md`, `README.md`, `docs/USER_GUIDE.md` | AC5 | 10 | Dev | [ ] |
-| 13 | G3 | `.squad/project.md` entries from the Dev's and the Tester's text | `.squad/project.md` | — | 12 | Orchestrator | [ ] |
+| 11 | G3 | Check of AC6: `git ls-files`, Companion publish listing, `Directory.Packages.props` | — | AC6 | 10 | Dev | [x] |
+| 12 | G3 | Documentation updates of the plan | `docs/areas/game-catalog.md`, `game-files.md`, `companion.md`, `README.md` (areas), `docs/ARCHITECTURE.md`, `README.md`, `docs/USER_GUIDE.md` | AC5 | 10 | Dev | [x] |
+| 13 | G3 | `.squad/project.md` entries from the Dev's and the Tester's text | `.squad/project.md` | — | 12 | Orchestrator | [x] |
 | 14 | PM | Opt-in installation run and window check on Windows | — | AC4, AC5 | 12 | Product Manager | [ ] |
