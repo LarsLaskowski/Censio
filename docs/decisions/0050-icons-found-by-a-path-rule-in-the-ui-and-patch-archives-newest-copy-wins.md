@@ -33,7 +33,7 @@ keep the names when an icon is odd. Icons stay on the player's machine
 
 Option 3: icons are taken by the path rule from `ui.rda` and the patch archives, newest first, after the names are
 published, and held in memory with the catalog. An icon archive that cannot be opened, or a duplicate patch number,
-withholds every icon (not option 4); a single icon that is missing or unreadable leaves only its entry without an
+withholds every icon (not option 4), and so does a set of kept PNGs above a total bound; a single icon that is missing or unreadable leaves only its entry without an
 icon, and no icon problem changes the names (not option 5). The rules are in the
 [game-catalog](../areas/game-catalog.md) area document (*Icons*).
 
@@ -42,6 +42,9 @@ icon, and no icon problem changes the names (not option 5). The rules are in the
 - Residual risks: the rule and the order rest on the Product Manager's samples and statement (game version
   3.0.1733841); a game update that renames the folders shows as *missing* icons, counted in the log, and the opt-in
   installation test reports copies that differ between archives. No region icon file was sampled.
+- The total bound exists because the archive reader allows entries that share one image's data: many paths to one
+  large image would otherwise keep many large PNGs for the whole run (Security's review). Withholding the whole set,
+  rather than counting the rest *unreadable*, keeps the result independent of the read order.
 - An `IconFilename` with child elements is a malformed `assets.xml` like any other value and fails the catalog, as
   record 0047 says for the values it reads.
 - Building icons adds a second listing of the icon archives and, with a UNC game folder, their reads over SMB at every

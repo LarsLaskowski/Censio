@@ -7,10 +7,9 @@ Status: Approved by Lead
 
 The Companion's catalog ([`game-catalog.md`](../../docs/areas/game-catalog.md)) names goods and regions, but has no
 pictures: the diagnostics window shows text only ([`companion.md`](../../docs/areas/companion.md), *Diagnostics
-window*, "icons do not exist yet"), and the later web UI (#26, #42) has nothing to show beside a name. The icons are in
-the player's own installation as DDS files in `ui.rda` and the `zz_patchfiles_*` archives
-([`game-files.md`](../../docs/areas/game-files.md), *Locations*), which no browser shows, and may only be extracted on
-the player's machine (record [0023](../../docs/decisions/0023-game-names-and-icons-extracted-locally.md)).
+window*, "icons do not exist yet"), and the later web UI (#26, #42) has nothing to show beside a name. The icons are DDS files in
+the player's installation ([`game-files.md`](../../docs/areas/game-files.md), *Locations*), which no browser shows,
+and may only be extracted on the player's machine (record [0023](../../docs/decisions/0023-game-names-and-icons-extracted-locally.md)).
 
 ## Scenarios
 
@@ -33,7 +32,7 @@ the player's machine (record [0023](../../docs/decisions/0023-game-names-and-ico
 ## Errors and edge cases
 
 - E1: `ui.rda` or any patch archive is missing (`ui.rda` only), cannot be opened or listed, the listing fails, or two
-  patch archives have the same `<n>`: no entry has an icon; names, entries and the `Catalog:` line are unchanged; a
+  patch archives have the same `<n>`, or the PNGs kept would exceed their total bound (N2): no entry has an icon; names, entries and the `Catalog:` line are unchanged; a
   warning log line names the kind and the archive path. A file named like a patch archive whose `<n>` is no number or
   exceeds 32 bits is no icon archive.
 - E2: The asset (for a region entry also its region asset) names no icon: counted as *not named*.
@@ -55,7 +54,8 @@ the player's machine (record [0023](../../docs/decisions/0023-game-names-and-ico
   [0029](../../docs/decisions/0029-anonymised-test-fixtures-only.md)). Logs hold GUIDs, archive paths, kinds and counts.
 - N2: Bounds against hostile input: a per-entry bound for icon entries below the archive's 512 MiB, checked before the
   entry is read, and a bound on width and height checked from the header before any pixel is decoded; the plan sets
-  both above the real icons (512 by 512 pixels, 10 levels, 349,700 bytes) and the largest one AC4 reports.
+  both above the real icons (512 by 512 pixels, 10 levels, 349,700 bytes) and the largest one AC4 reports; and a bound on
+  the total PNG bytes kept, well above AC4's total.
 - N3: Memory: the catalog holds one PNG per distinct icon path and at most one icon's decoded pixels at a time; the
   window decodes each distinct icon once, at cell size, and shares it across cells and ticks.
 - N4: Decoding and conversion run in the platform-neutral game data library, tested on Linux; only the display is
@@ -80,8 +80,8 @@ the player's machine (record [0023](../../docs/decisions/0023-game-names-and-ico
   warning with kind and archive), and every name, entry and the `Catalog:` line unchanged (S5, E1, E2, E3, E4, E5, E7, N2).
 - AC4: On the Product Manager's installation, the opt-in test with `CENSIO_ANNO_INSTALL` finds an icon for every good
   GUID of `long-session.jsonl` the catalog names, and fails when a region entry naming a path of S1's form is
-  *unreadable*; it reports per region entry its icon or reason, the icon paths held by more than one archive and
-  whether their sizes differ, the largest icon, the total PNG bytes, duration and peak working set, never a name or
+  *unreadable*; it reports per region entry its GUID with its icon or reason, the number of icon paths held by more
+  than one archive and how many of them differ in size, the largest icon, the total PNG bytes, duration and peak working set, never a name or
   image (issue: "every good in the fixtures has an icon"; N2, N3, N6).
 - AC5: On a Windows build, the window shows icons in the `Region` and `Good` cells, names before icons arrive, and
   cells without one as today (manual, S2).
@@ -92,7 +92,7 @@ the player's machine (record [0023](../../docs/decisions/0023-game-names-and-ico
 
 ## Out of scope
 
-- Icons of workforce and buildings (the window shows neither; the web UI adds them when it needs them).
+- Icons of workforce and buildings (the window shows neither).
 - Caching icons on disk and re-extracting after updates (#25); catalog format (#26); upload (#42); WebP; other sizes.
 
 ## Open questions
@@ -126,8 +126,7 @@ the player's machine (record [0023](../../docs/decisions/0023-game-names-and-ico
 - M1 accepted: AC1 now covers modes 0 to 7, partitions, rotation and index selection, and the reserved mode, with
   expected pixels derived independently; E4 and N8 fix the reserved mode (transparent black, the format's rule),
   cropping, DXGI 98 and 99 alike, alpha, no colour-space chunk. The path rule moved to AC7.
-- M2 accepted: S4 defines the patch archives, their name, number and order; E1 makes any unopenable icon archive and a
-  duplicate `<n>` withhold all icons with a warning, so no stale copy is used silently; AC2 and AC3 cover it.
+- M2 accepted: S4 defines the patch archives and their order; E1 withholds all icons when one fails; AC2, AC3.
 - Minor 1 accepted: AC4 reports copies and per-region reasons and fails on an *unreadable* region icon.
 - Minor 2 accepted: lookup ignores case (S1); two matches in one archive are *unreadable* (E4); AC7 tests it.
 - Minor 3 accepted: N2 sets a lower per-entry bound for icons.
