@@ -1941,10 +1941,11 @@ public sealed class GameCatalogReaderTests
     [TestCategory("AC1")]
     [DataRow("Product", "<Building />", GameCatalogKind.Good)]
     [DataRow("KindMix", "<Building /><Session><Region>5</Region></Session>", GameCatalogKind.Region)]
+    [DataRow("KindZero", "<Building /><Session><Region>0</Region></Session>", GameCatalogKind.Building)]
     public void GameCatalogReaderReadKeepsKindOrderWithTemplateProperties(string template, string properties, GameCatalogKind expected)
     {
         // Arrange
-        var assets = Assets(RegionAsset(5, 1000, "Zorlan"), TemplatedAsset(10, template, string.Empty));
+        var assets = Assets(RegionAsset(0, 1000, "Zorlan"), RegionAsset(5, 1000, "Zorlan"), TemplatedAsset(10, template, string.Empty));
 
         // Act
         var catalog = ReadCatalogWithDefaults(DataSets("Zorlan"), assets, Properties(string.Empty), Templates(Template(template, properties)));
