@@ -233,6 +233,27 @@ public static partial class CompanionLog
     public static partial void CatalogArchivesUnchecked(ILogger logger, int count);
 
     /// <summary>
+    /// Logs the built catalog icons.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    /// <param name="goodCount">The number of goods with an icon</param>
+    /// <param name="regionCount">The number of regions with an icon</param>
+    /// <param name="notNamedCount">The number of assets that name no icon</param>
+    /// <param name="missingCount">The number of assets whose icon is missing</param>
+    /// <param name="unreadableCount">The number of assets whose icon is unreadable</param>
+    [LoggerMessage(Level = LogLevel.Information, Message = "Catalog icons: {GoodCount} goods and {RegionCount} regions with an icon; without one: {NotNamedCount} not named, {MissingCount} missing, {UnreadableCount} unreadable")]
+    public static partial void CatalogIconsBuilt(ILogger logger, int goodCount, int regionCount, int notNamedCount, int missingCount, int unreadableCount);
+
+    /// <summary>
+    /// Logs that the catalog icons could not be loaded.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    /// <param name="kind">The kind of the error</param>
+    /// <param name="archive">The name of the archive concerned</param>
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Catalog icons failed: {Kind} ({Archive})")]
+    public static partial void CatalogIconsFailed(ILogger logger, GameIconErrorKind kind, string archive);
+
+    /// <summary>
     /// Logs a GUID the catalog cannot name.
     /// </summary>
     /// <param name="logger">The logger</param>

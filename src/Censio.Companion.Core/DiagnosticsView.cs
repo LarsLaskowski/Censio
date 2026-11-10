@@ -177,6 +177,20 @@ public sealed class DiagnosticsView : IReadOnlyList<DiagnosticsRow>, IList
     }
 
     /// <summary>
+    /// Creates a view that names the GUIDs from a catalog and shows their icons.
+    /// </summary>
+    /// <param name="statusText">The status text</param>
+    /// <param name="tick">The tick, or <c>null</c> if none</param>
+    /// <param name="catalog">The catalog, or <c>null</c> if none</param>
+    /// <param name="icons">The icons, or <c>null</c> if none</param>
+    /// <param name="clock">The clock</param>
+    /// <returns>The view</returns>
+    public static DiagnosticsView Create(string statusText, PipeTick? tick, GameCatalog? catalog, GameIconSet? icons, TimeProvider clock)
+    {
+        throw new NotImplementedException();
+    }
+
+    /// <summary>
     /// Formats an integer culture-independently.
     /// </summary>
     /// <param name="value">The value</param>

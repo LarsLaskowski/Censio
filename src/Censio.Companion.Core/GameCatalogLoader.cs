@@ -17,6 +17,11 @@ public sealed class GameCatalogLoader
     private readonly Func<string, GameCatalogResult> _build;
 
     /// <summary>
+    /// Builds the icons of a catalog, or <c>null</c> when none are built.
+    /// </summary>
+    private readonly Func<string, GameCatalog, GameIconResult>? _buildIcons;
+
+    /// <summary>
     /// The logger.
     /// </summary>
     private readonly ILogger _logger;
@@ -31,6 +36,11 @@ public sealed class GameCatalogLoader
     /// </summary>
     private volatile GameCatalog? _catalog;
 
+    /// <summary>
+    /// The icons, or <c>null</c> if none are built.
+    /// </summary>
+    private volatile GameIconSet? _icons;
+
     #endregion // Fields
 
     #region Constructor
@@ -41,8 +51,20 @@ public sealed class GameCatalogLoader
     /// <param name="build">Builds the catalog of an installation folder</param>
     /// <param name="logger">The logger</param>
     public GameCatalogLoader(Func<string, GameCatalogResult> build, ILogger logger)
+        : this(build, null, logger)
+    {
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="GameCatalogLoader" /> class.
+    /// </summary>
+    /// <param name="build">Builds the catalog of an installation folder</param>
+    /// <param name="buildIcons">Builds the icons of a catalog, or <c>null</c> if none are built</param>
+    /// <param name="logger">The logger</param>
+    public GameCatalogLoader(Func<string, GameCatalogResult> build, Func<string, GameCatalog, GameIconResult>? buildIcons, ILogger logger)
     {
         _build = build;
+        _buildIcons = buildIcons;
         _logger = logger;
     }
 
@@ -54,6 +76,11 @@ public sealed class GameCatalogLoader
     /// Occurs when the status changed.
     /// </summary>
     public event EventHandler<GameCatalogStatus>? StatusChanged;
+
+    /// <summary>
+    /// Occurs when the icons changed.
+    /// </summary>
+    public event EventHandler? IconsChanged;
 
     #endregion // Events
 
@@ -68,6 +95,11 @@ public sealed class GameCatalogLoader
     /// Gets the catalog, or <c>null</c> if none is built.
     /// </summary>
     public GameCatalog? Catalog => _catalog;
+
+    /// <summary>
+    /// Gets the icons, or <c>null</c> if none are built.
+    /// </summary>
+    public GameIconSet? Icons => _icons;
 
     #endregion // Properties
 
