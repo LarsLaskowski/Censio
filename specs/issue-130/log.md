@@ -29,3 +29,4 @@ are quoted in full.
 | 2026-11-09 16:07 | 9 PR approval | Product Manager | Will run the installation test on Windows on the branch head and send its output; step 9 waits for it |
 | 2026-11-10 08:36 | 9 PR approval | Product Manager | Installation run on the branch head: catalog 1038 entries, 0 region types dropped, copies in other archives 0 (0 unchecked); Region 3245 -> region asset 3225, 1 region type; 6627 -> 6626, 1; 149679 -> 149678, 1; Region/Good/Workforce/Building 0 unresolved |
 | 2026-11-10 08:36 | 9 PR approval | Orchestrator | approved by checklist: installation run confirms facts 2, 11, 12; record 0049 and its index row set to Accepted, decision-check passes |
+| 2026-11-10 08:37 | 7 Gate stamp | Orchestrator | PASS on eefdc3f5aa45ffe0509f9e90fc53b623f96347eb (tier standard, verbatim): Format check pass; decision-check.py pass; scope-check.py pass |
