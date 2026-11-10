@@ -84,7 +84,9 @@ environment for `sonarcloud.io` and `*.sonarcloud.io` (the agent proxy attaches 
 session or member sees it), or else `SONAR_TOKEN` in the environment, which every process of the session can
 read. A finding of a rule no local analyzer reports is noted in this section, in the same change, instead of a
 squad lesson. `csharpsquid:S3776` (cognitive complexity above 15 in one method) is such a rule: no local analyzer
-reports it, so split a long method with nested branches into private methods while writing it.
+reports it, so split a long method with nested branches into private methods while writing it. `csharpsquid:S1192`
+(a string literal repeated four times or more in one file) is such a rule too: name a repeated literal with a private
+constant while writing the code.
 
 ## Image build check
 

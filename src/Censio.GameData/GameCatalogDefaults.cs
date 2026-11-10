@@ -7,6 +7,25 @@ namespace Censio.GameData;
 /// </summary>
 internal static class GameCatalogDefaults
 {
+    #region Constants
+
+    /// <summary>
+    /// The name of the property whose field names a product region.
+    /// </summary>
+    private const string ProductProperty = "Product";
+
+    /// <summary>
+    /// The name of the property whose field names the regions of a building.
+    /// </summary>
+    private const string BuildingProperty = "Building";
+
+    /// <summary>
+    /// The name of the property whose field names the region of a session.
+    /// </summary>
+    private const string SessionProperty = "Session";
+
+    #endregion // Constants
+
     #region Methods
 
     /// <summary>
@@ -96,9 +115,9 @@ internal static class GameCatalogDefaults
     {
         return property switch
                {
-                   "Product" => "AssociatedRegion",
-                   "Building" => "AssociatedRegions",
-                   "Session" => "Region",
+                   ProductProperty => "AssociatedRegion",
+                   BuildingProperty => "AssociatedRegions",
+                   SessionProperty => "Region",
                    "Region" => "RegionID",
                    _ => null
                };
@@ -111,15 +130,15 @@ internal static class GameCatalogDefaults
     /// <param name="property">The name of the property</param>
     private static void SetPresent(GameCatalogValues values, string property)
     {
-        if (string.Equals(property, "Product", StringComparison.Ordinal))
+        if (string.Equals(property, ProductProperty, StringComparison.Ordinal))
         {
             values.HasProduct = true;
         }
-        else if (string.Equals(property, "Building", StringComparison.Ordinal))
+        else if (string.Equals(property, BuildingProperty, StringComparison.Ordinal))
         {
             values.HasBuilding = true;
         }
-        else if (string.Equals(property, "Session", StringComparison.Ordinal))
+        else if (string.Equals(property, SessionProperty, StringComparison.Ordinal))
         {
             values.HasSession = true;
         }
@@ -137,15 +156,15 @@ internal static class GameCatalogDefaults
     /// <param name="text">The text of the field</param>
     private static void SetValue(GameCatalogValues values, string property, string text)
     {
-        if (string.Equals(property, "Product", StringComparison.Ordinal))
+        if (string.Equals(property, ProductProperty, StringComparison.Ordinal))
         {
             values.ProductRegions = text;
         }
-        else if (string.Equals(property, "Building", StringComparison.Ordinal))
+        else if (string.Equals(property, BuildingProperty, StringComparison.Ordinal))
         {
             values.BuildingRegions = text;
         }
-        else if (string.Equals(property, "Session", StringComparison.Ordinal))
+        else if (string.Equals(property, SessionProperty, StringComparison.Ordinal))
         {
             values.SessionRegion = string.IsNullOrWhiteSpace(text) ? 0 : GameCatalogXml.ParseInt(text);
         }
@@ -214,9 +233,9 @@ internal static class GameCatalogDefaults
     {
         return property switch
                {
-                   "Product" => values.HasProduct,
-                   "Building" => values.HasBuilding,
-                   "Session" => values.HasSession,
+                   ProductProperty => values.HasProduct,
+                   BuildingProperty => values.HasBuilding,
+                   SessionProperty => values.HasSession,
                    _ => values.HasRegion
                };
     }
@@ -337,28 +356,44 @@ internal static class GameCatalogDefaults
                 path[relative] = reader.LocalName;
             }
 
-            if (relative == 1 && path[1] == "Name")
-            {
-                name = reader.ReadElementContentAsString();
-            }
-            else if (relative == 3 && path[1] == "Properties" && FieldOf(path[2]) is { } field && string.Equals(path[3], field, StringComparison.Ordinal))
-            {
-                SetValue(values, path[2], reader.ReadElementContentAsString());
-            }
-            else
-            {
-                if (relative == 2 && path[1] == "Properties" && FieldOf(path[2]) is not null)
-                {
-                    SetPresent(values, path[2]);
-                }
-
-                reader.Read();
-            }
+            name = ReadTemplatePart(reader, path, relative, values) ?? name;
         }
 
         reader.Read();
 
         return (name, values);
+    }
+
+    /// <summary>
+    /// Reads one element of a defining template and moves the reader past it or into it.
+    /// </summary>
+    /// <param name="reader">The reader, at the element</param>
+    /// <param name="path">The names of the first levels of the template</param>
+    /// <param name="relative">The depth of the element below the template element</param>
+    /// <param name="values">The facts the template states</param>
+    /// <returns>The name of the template when the element is its <c>Name</c>, otherwise <c>null</c></returns>
+    private static string? ReadTemplatePart(XmlReader reader, string[] path, int relative, GameCatalogValues values)
+    {
+        if (relative == 1 && path[1] == "Name")
+        {
+            return reader.ReadElementContentAsString();
+        }
+
+        if (relative == 3 && path[1] == "Properties" && FieldOf(path[2]) is { } field && string.Equals(path[3], field, StringComparison.Ordinal))
+        {
+            SetValue(values, path[2], reader.ReadElementContentAsString());
+
+            return null;
+        }
+
+        if (relative == 2 && path[1] == "Properties" && FieldOf(path[2]) is not null)
+        {
+            SetPresent(values, path[2]);
+        }
+
+        reader.Read();
+
+        return null;
     }
 
     #endregion // Methods
