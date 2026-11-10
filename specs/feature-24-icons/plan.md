@@ -92,7 +92,9 @@ other chunk.
 `IconsChanged`. `App` passes `GameIconReader.Load` and calls `_diagnostics?.Notify()` on
 `IconsChanged`. `DiagnosticsView` puts `icons.Find(guid)` of the session GUID and the product GUID on each row (not for
 GUID `0`). The window's `Region` and `Good` columns become template columns: an image of 20 by 20
-device-independent pixels, a 4-pixel gap, then the text, vertically centred; without an icon only the text, no gap. An
+device-independent pixels, a 4-pixel gap, then the text, vertically centred; without an icon only the text, no gap. In
+the `Region` column the image lies on a dark neutral disc of the same 20 by 20 (the game's region icons are light glyphs
+on transparent, drawn on coloured discs in game; step 9), collapsed with the image when there is none. An
 internal converter in `Censio.Companion` decodes each `GameIcon` once (decoded at 40 pixels, frozen) into a
 dictionary of that window.
 
