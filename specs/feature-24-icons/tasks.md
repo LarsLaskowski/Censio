@@ -4,7 +4,7 @@ Plan: [plan.md](plan.md)
 
 | # | Group | Task | Files | Criteria | Depends on | Owner | Done |
 | - | ----- | ---- | ----- | -------- | ---------- | ----- | ---- |
-| 1 | G1 | Skeleton: `Bc7Decoder` (BlockBytes, DecodeBlock), `DdsReader` (Read), `DdsImage` (Width, Height, Rgba), `PngWriter` (Write) | `src/Censio.GameData/` | AC1 | — | Dev | [ ] |
+| 1 | G1 | Skeleton: `Bc7Decoder` (BlockBytes, DecodeBlock), `DdsReader` (Read), `DdsImage` (Width, Height, Rgba), `PngWriter` (Write) | `src/Censio.GameData/` | AC1 | — | Dev | [x] |
 | 2 | G1 | Tests first; build the reference scratch project outside the repository and pin the expected BC7 pixels from it (plan facts 12, 13) | `Bc7DecoderTests.cs`, `DdsReaderTests.cs`, `PngWriterTests.cs`, `DdsFileBuilder.cs` | AC1, AC3 | 1 | Tester | [ ] |
 | 3 | G1 | Implement decoder, header check, PNG writer | `src/Censio.GameData/` | AC1, AC3 | 2 | Dev | [ ] |
 | 4 | G1 | Re-run the reference project on the four real samples, counts only (fact 13) | scratch, outside the repository | AC1 | 3 | Tester | [ ] |
