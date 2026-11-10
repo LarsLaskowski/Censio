@@ -33,7 +33,12 @@ neighboring test file before inventing a new pattern.
 - `CENSIO_CATALOG_SAMPLE`: the folder of the six loose game files `assets.xml`, `datasets.xml`, `texts_english.xml`,
   `texts_german.xml`, `properties.xml` and `templates.xml` (never in the repository), for `GameCatalogReaderSampleResolvesFixtureGuids` and
   `GameCatalogReaderFixtureHoldsNoSampleText` (`tests/Censio.GameData.Tests`); unset, those tests are reported
-  inconclusive. They write GUIDs, kinds and counts only, never a name or text.
+  inconclusive. They write GUIDs, kinds and counts only, never a name or text. `GameCatalogReaderSampleResolvesFixtureGuids` and
+  `GameCatalogReaderInstallationResolvesFixtureGuids` also build the catalog a second time with empty `properties.xml`
+  and `templates.xml` (the assets' own values), write the difference to the catalog with the template and property
+  defaults as counts and GUIDs (kind changes, region-list transitions, the pipe-fixture GUIDs that changed), and fail
+  when an entry of that build is missing from the other; the installation test is the one the Product Manager runs to
+  confirm the changes against the real files.
 <!-- project:end layout -->
 
 ## Naming

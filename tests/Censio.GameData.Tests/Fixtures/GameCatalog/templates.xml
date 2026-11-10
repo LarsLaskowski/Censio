@@ -28,11 +28,34 @@
         <Properties>
           <Standard />
           <Session>
-            <Region />
+            <Region>2000000101</Region>
           </Session>
         </Properties>
       </Template>
     </Group>
+    <Template>
+      <Name>FixtureBuildingListed</Name>
+      <Properties>
+        <Standard />
+        <Building>
+          <AssociatedRegions>Yultic;Zorlan</AssociatedRegions>
+        </Building>
+      </Properties>
+    </Template>
+    <Template>
+      <Name>FixtureBuildingBare</Name>
+      <Properties>
+        <Standard />
+        <Building />
+      </Properties>
+    </Template>
+    <Template>
+      <Name>FixtureSessionBare</Name>
+      <Properties>
+        <Standard />
+        <Session />
+      </Properties>
+    </Template>
     <Group>
       <Name>Holder</Name>
       <Template>
@@ -45,6 +68,12 @@
                 <Region>
                   <RegionID>Zorlan</RegionID>
                 </Region>
+                <Building>
+                  <AssociatedRegions>Zorlan</AssociatedRegions>
+                </Building>
+                <Session>
+                  <Region>2000000102</Region>
+                </Session>
               </Properties>
             </Template>
           </Items>

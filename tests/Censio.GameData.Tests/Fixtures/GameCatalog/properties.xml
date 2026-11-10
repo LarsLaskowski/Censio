@@ -21,6 +21,12 @@
               <PathLayerDefinitions />
               <RegionID>Zorlan</RegionID>
             </Region>
+            <Building>
+              <AssociatedRegions>Zorlan</AssociatedRegions>
+            </Building>
+            <Session>
+              <Region>2000000102</Region>
+            </Session>
           </DefaultContainerValues>
           <DefaultValues>
             <Locked>
@@ -41,6 +47,12 @@
                     <Region>
                       <RegionID>Zorlan</RegionID>
                     </Region>
+                    <Building>
+                      <AssociatedRegions>Zorlan</AssociatedRegions>
+                    </Building>
+                    <Session>
+                      <Region>2000000102</Region>
+                    </Session>
                   </DefaultValues>
                   <Name>Nested</Name>
                 </Group>
@@ -51,6 +63,14 @@
         </Group>
       </Groups>
       <Name>Outer</Name>
+    </Group>
+    <Group>
+      <DefaultValues>
+        <Building>
+          <AssociatedRegions>Xanthi;Zorlan</AssociatedRegions>
+        </Building>
+      </DefaultValues>
+      <Name>Construction</Name>
     </Group>
     <Group>
       <Name>Empty</Name>
