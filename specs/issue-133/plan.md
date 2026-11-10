@@ -210,3 +210,9 @@ list per source string). No guarantee of `.squad/project.md` is weakened.
 ## Out of scope / follow-ups
 
 - `IsWorkforce`, `Text/OasisId` and inherited assets stay as they are (record 0049, option 4; record 0047).
+
+## Security notes
+
+From Security's delta confirmation (round 2, `APPROVED`), verbatim:
+
+> One point for the diff review: the shared list must be read-only in fact, not only by type. Today `RegionList` returns a `List<string>`, which a caller can cast back to `List<string>` and change, and that would alter every entry sharing it. An array or a read-only wrapper avoids that. This is an implementation detail for the Dev and the diff review, not a plan finding.
