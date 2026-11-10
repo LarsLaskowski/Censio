@@ -37,5 +37,10 @@ public sealed class GameCatalogEntry
     /// </summary>
     public IReadOnlyList<string>? RegionTypes { get; init; }
 
+    /// <summary>
+    /// Gets the icon file name the asset states, or <c>null</c> when the asset states none.
+    /// </summary>
+    public string? IconFilename { get; init; }
+
     #endregion // Properties
 }
