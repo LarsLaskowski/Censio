@@ -77,7 +77,7 @@ it without notice.
 - A path comes from the file and is untrusted text. A consumer that logs one follows the rule of the Companion's log
   ([`companion.md`](companion.md), *Log*): control characters, format characters, line and paragraph separators
   and unpaired surrogates are replaced, and the message is cut.
-- A consumer that derives a file system path from an entry path (the icon cache of #24 and #25) confines the result
+- A consumer that derives a file system path from an entry path (the icon cache of #25) confines the result
   to its own folder: it does not use `..`, a rooted path or a drive letter from the entry.
 
 ### Privacy
@@ -109,7 +109,7 @@ an archive. The largest entry counts are 21,028 (`zz_patchfiles_300`), 46,110 (`
 | Goods, buildings, workforce | Two configuration files exist in `config.rda` (194 entries, folder `data/base`): `data/base/config/export/assets.xml` (46,440,056 bytes) and `data/base/config/game/datasets.xml` (615,716 bytes). Issue #23 confirmed that every good, workforce and building the pipe fixture names is a defining asset of `assets.xml` with names in both texts; the nodes are in [`game-catalog.md`](game-catalog.md) | Whether a patch archive may replace them: none holds a copy on the Product Manager's installation |
 | Regions | The province data archives exist (`provinces_roman`, `provinces_celtic`, `dlc01_provinces`, `dlc03_provinces_01`, `dlc03_provinces_02`; entries of the kinds `.ctt`, `.tmc`, `.dds`, `.png`, `.a7m`, `.a7t`); no entry path outside `config.rda`'s assets, datasets and texts matched `province`. Issue #23 confirmed that the regions the pipe names are sessions of `assets.xml` whose `Session/Region` names a region asset, and that region types are the `Region` data set of `datasets.xml` ([`game-catalog.md`](game-catalog.md)) | Answered by #130 and #133: a region asset without a `RegionID`, and likewise a good, a building or a session without its own region value, takes it from its template in `templates.xml`, else from the property default in `properties.xml` (same folder `data/base/config/export`) |
 | Texts (German, English) | `data/base/config/gui/texts_<language>.xml` in `config.rda`, for brazilian, english (6,784,986 bytes), french, german (7,071,912 bytes), italian, japanese, korean, metadata, polish, russian, simplified_chinese, spanish and traditional_chinese | The nodes (`TextExport/Texts/Text` with `LineId` and `Text`) are confirmed by #23. The language archives `de_de0.rda` and `en_us0.rda` hold only sound (`data/sound/generatedsoundbanks/windows/<de_de or en_us>/` with `.json`, `.txt`, `.xml`, `.wem` and `.bnk` entries), no texts |
-| Icons | `.dds` files under `data/ui/` in `ui.rda` (19,027 entries) and in the patch archives `zz_patchfiles_*`; one icon was read (a DDS file of 260 bytes from `ui.rda`). Folders, by group: `data/ui/4k/base/icon_content/<group>` (`production_goods`, `building`, `workforce`, `generic`, `items_specialist`, `ornaments`, `trade_route`, ship icons and others), `data/ui/4k/dlc01`, `dlc02` and `dlc03` with the same `icon_content/<group>` layout, `data/ui/2kimages/main/3dicons/<group>`, `data/ui/2kimages/main/icons/` (`workforce`, `limestone_workforce`) and `data/ui/2kimages/fpp/icons/` (`provinces`, `workforce_tiers`, `tech_tree`) | Which icon belongs to which good, building or workforce tier: the file names are not matched to identifiers; for #24 |
+| Icons | `.dds` files under `data/ui/` in `ui.rda` (19,027 entries) and in the patch archives `zz_patchfiles_*`; one icon was read (a DDS file of 260 bytes from `ui.rda`). Folders, by group: `data/ui/4k/base/icon_content/<group>` (`production_goods`, `building`, `workforce`, `generic`, `items_specialist`, `ornaments`, `trade_route`, ship icons and others), `data/ui/4k/dlc01`, `dlc02` and `dlc03` with the same `icon_content/<group>` layout, `data/ui/2kimages/main/3dicons/<group>`, `data/ui/2kimages/main/icons/` (`workforce`, `limestone_workforce`) and `data/ui/2kimages/fpp/icons/` (`provinces`, `workforce_tiers`, `tech_tree`) | Which icon belongs to which building or workforce tier: not matched; goods and regions are answered by #24 (below) |
 
 - The repeat of the survey on the final head was made on game version 3.0.1733841 (reported by the Product Manager; store not stated).
 - The survey was repeated on the final head while the game was running, with the same result: 40 archives opened without an error line, with the same entry counts and folders.
@@ -119,9 +119,16 @@ an archive. The largest entry counts are 21,028 (`zz_patchfiles_300`), 46,110 (`
   `zz_patchfiles_300`). **Load order and which copy wins: unknown** (record
   [0043](../decisions/0043-rda-archives-read-by-an-own-bounded-reader.md)); the catalog uses `config.rda` and reports a
   copy of its six files in another archive ([`game-catalog.md`](game-catalog.md)), and none exists on the Product
-  Manager's installation (his statement of 2026-11-09); #24 depends on the order for icons. The Product Manager says the number in `zz_patchfiles_<n>` is the game
+  Manager's installation (his statement of 2026-11-09); the icons take the copy of the highest number (an assumption
+  of record 0050). The Product Manager says the number in `zz_patchfiles_<n>` is the game
   version (higher is newer), but that probably all of these archives are loaded because a newer one does not contain
   the contents of the older ones; no evidence was found (Product Manager's statement, unverified), input for the load-order question. It is no reader error: a path in several archives is returned by each.
+- **Icons of goods and regions (#24):** the assets name `data/ui/fhd/<rest>.png`, while `ui.rda` and the patch archives hold
+  `data/ui/4k/<rest>_0.dds` (Product Manager's samples, five asset values of one installation); the path rule, the
+  archives read and their order are in [`game-catalog.md`](game-catalog.md) (*Icons*, records
+  [0050](../decisions/0050-icons-found-by-a-path-rule-in-the-ui-and-patch-archives-newest-copy-wins.md) and
+  [0051](../decisions/0051-dds-icons-decoded-by-own-bc7-and-png-code.md)). The samples were four DDS files with the
+  extended header in BC7; no region icon was sampled.
 - The run confirms these locations on one installation; the repeat on the final head confirms them again.
 
 ## Related decisions
@@ -133,6 +140,6 @@ an archive. The largest entry counts are 21,028 (`zz_patchfiles_300`), 46,110 (`
 
 ## Not here
 
-- Finding the installation folder ([`game-installation.md`](game-installation.md)) and building the catalog
-  ([`game-catalog.md`](game-catalog.md)); converting icons, the cache and the catalog format (#24 to #26).
+- Finding the installation folder ([`game-installation.md`](game-installation.md)), building the catalog and
+  finding and converting the icons ([`game-catalog.md`](game-catalog.md)); the icon cache and the catalog format (#25, #26).
 - The log of the Companion and what may be logged: [`companion.md`](companion.md).

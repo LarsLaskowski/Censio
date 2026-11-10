@@ -882,6 +882,78 @@ public sealed class DiagnosticsViewTests
     }
 
     /// <summary>
+    /// The region and good cells of a row carry the icons of the session GUID and the product GUID: shared between rows,
+    /// none for a GUID without an icon, for GUID <c>0</c> or for an island without entries' good.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC5")]
+    public void DiagnosticsViewCreateSetsRegionAndGoodIcons()
+    {
+        // Arrange
+        var tick = CreateTick(100,
+                              CreateIsland(new PipeIslandKey(100, 1, 0), 4, "Ostia", CreateEntry(200), CreateEntry(201)),
+                              CreateIsland(new PipeIslandKey(101, 1, 0), 4, "Capua", CreateEntry(200)),
+                              CreateIsland(new PipeIslandKey(0, 1, 0), 4, "Roma", CreateEntry(0)),
+                              CreateIsland(new PipeIslandKey(100, 2, 0), 4, "Pisa"));
+        var catalog = CreateCatalog(Named(100, GameCatalogKind.Region, "Region 1", "Gebiet 1"), Named(200, GameCatalogKind.Good, "Good 1", "Ware 1"));
+        var region = new GameIcon(1, 1, new byte[] { 1 });
+        var good = new GameIcon(1, 1, new byte[] { 2 });
+        var zero = new GameIcon(1, 1, new byte[] { 3 });
+        var icons = new GameIconSet(new Dictionary<int, GameIcon>
+                                    {
+                                        [100] = region,
+                                        [200] = good,
+                                        [0] = zero
+                                    },
+                                    new Dictionary<int, GameIconProblem>(),
+                                    1,
+                                    1);
+
+        // Act
+        var view = DiagnosticsView.Create("Receiving", tick, catalog, icons, CreateClock());
+
+        // Assert
+        Assert.AreEqual(5, view.Count, "The view should hold a row per entry and per island without entries");
+        Assert.AreSame(region, view[0].RegionIcon, "The region cell should show the icon of the session GUID");
+        Assert.AreSame(good, view[0].GoodIcon, "The good cell should show the icon of the product GUID");
+        Assert.AreSame(region, view[1].RegionIcon, "Another row of the island should show the same region icon");
+        Assert.IsNull(view[1].GoodIcon, "A product GUID without an icon should show none");
+        Assert.IsNull(view[2].RegionIcon, "A session GUID without an icon should show none");
+        Assert.AreSame(good, view[2].GoodIcon, "Rows with the same product GUID should share the icon");
+        Assert.IsNull(view[3].RegionIcon, "GUID 0 should show no region icon");
+        Assert.IsNull(view[3].GoodIcon, "GUID 0 should show no good icon");
+        Assert.AreSame(region, view[4].RegionIcon, "An island without entries should show its region icon");
+        Assert.IsNull(view[4].GoodIcon, "An island without entries should show no good icon");
+        Assert.AreEqual("Region 1 / Gebiet 1 (100)", view[0].Cells[0], "The text of the cells should be unchanged");
+        Assert.AreEqual("Good 1 / Ware 1 (200)", view[0].Cells[5], "The text of the good cell should be unchanged");
+    }
+
+    /// <summary>
+    /// Without icons, also with an empty set, the rows have no icon and the same cells as without the icon parameter.
+    /// </summary>
+    /// <param name="useEmptySet">Whether an empty set is passed instead of <see langword="null" /></param>
+    [TestMethod]
+    [TestCategory("AC5")]
+    [DataRow(false)]
+    [DataRow(true)]
+    public void DiagnosticsViewCreateWithoutIconsLeavesRowsAsToday(bool useEmptySet)
+    {
+        // Arrange
+        var tick = CreateTwoIslandTick();
+        var catalog = CreateCatalog(Named(5, GameCatalogKind.Region, "Region 1", "Gebiet 1"), Named(10, GameCatalogKind.Good, "Good 1", "Ware 1"));
+        var today = DiagnosticsView.Create("Receiving", tick, catalog, CreateClock());
+        var icons = useEmptySet ? new GameIconSet(new Dictionary<int, GameIcon>(), new Dictionary<int, GameIconProblem>(), 0, 0) : null;
+
+        // Act
+        var view = DiagnosticsView.Create("Receiving", tick, catalog, icons, CreateClock());
+
+        // Assert
+        Assert.AreEqual(today.Count, view.Count, "The rows should be the same");
+        Assert.IsTrue(Enumerable.Range(0, view.Count).All(index => view[index].RegionIcon is null && view[index].GoodIcon is null), "No row should show an icon");
+        Assert.IsTrue(Enumerable.Range(0, view.Count).All(index => view[index].Cells.SequenceEqual(today[index].Cells)), "The cells should be as without icons");
+    }
+
+    /// <summary>
     /// Creates a catalog of entries.
     /// </summary>
     /// <param name="entries">The entries</param>

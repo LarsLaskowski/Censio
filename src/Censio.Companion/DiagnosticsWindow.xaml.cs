@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
+using System.Windows.Media;
 using System.Windows.Threading;
 
 using Censio.Companion.Core;
@@ -18,6 +19,26 @@ internal sealed partial class DiagnosticsWindow : Window, IDiagnosticsWindow
     /// The name of the scroll viewer in the template of the grid
     /// </summary>
     private const string GridScrollViewerName = "DG_ScrollViewer";
+
+    /// <summary>
+    /// The index of the column with the region
+    /// </summary>
+    private const int RegionColumn = 0;
+
+    /// <summary>
+    /// The index of the column with the good
+    /// </summary>
+    private const int GoodColumn = 5;
+
+    /// <summary>
+    /// The converter of icons to images
+    /// </summary>
+    private static readonly GameIconImageConverter _converter = new();
+
+    /// <summary>
+    /// The dark backdrop of a region icon, whose glyph is light
+    /// </summary>
+    private static readonly SolidColorBrush _regionBackdrop = CreateRegionBackdrop();
 
     /// <summary>
     /// Whether the window was shown
@@ -54,6 +75,13 @@ internal sealed partial class DiagnosticsWindow : Window, IDiagnosticsWindow
 
         for (var index = 0; index < DiagnosticsView.Columns.Count; index++)
         {
+            if (index == RegionColumn || index == GoodColumn)
+            {
+                RowsGrid.Columns.Add(CreateIconColumn(index));
+
+                continue;
+            }
+
             RowsGrid.Columns.Add(new DataGridTextColumn
                                  {
                                      Header = DiagnosticsView.Columns[index],
@@ -71,6 +99,117 @@ internal sealed partial class DiagnosticsWindow : Window, IDiagnosticsWindow
     #endregion // Constructors
 
     #region Methods
+
+    /// <summary>
+    /// Creates the column of a name that shows an icon before the text.
+    /// </summary>
+    /// <param name="index">The index of the column</param>
+    /// <returns>The column</returns>
+    private static DataGridTemplateColumn CreateIconColumn(int index)
+    {
+        var isRegion = index == RegionColumn;
+        var image = new FrameworkElementFactory(typeof(Image));
+
+        image.SetBinding(Image.SourceProperty,
+                         new Binding(isRegion ? nameof(DiagnosticsRow.RegionIcon) : nameof(DiagnosticsRow.GoodIcon))
+                         {
+                             Mode = BindingMode.OneTime,
+                             Converter = _converter
+                         });
+        image.SetValue(FrameworkElement.WidthProperty, (double)GameIconImageConverter.CellSide);
+        image.SetValue(FrameworkElement.HeightProperty, (double)GameIconImageConverter.CellSide);
+
+        FrameworkElementFactory icon;
+
+        if (isRegion)
+        {
+            var disc = new FrameworkElementFactory(typeof(Border));
+
+            disc.SetValue(FrameworkElement.WidthProperty, (double)GameIconImageConverter.CellSide);
+            disc.SetValue(FrameworkElement.HeightProperty, (double)GameIconImageConverter.CellSide);
+            disc.SetValue(Border.CornerRadiusProperty, new CornerRadius(GameIconImageConverter.CellSide / 2d));
+            disc.SetValue(Border.BackgroundProperty, _regionBackdrop);
+            disc.SetValue(FrameworkElement.MarginProperty, new Thickness(0, 0, 4, 0));
+
+            var withoutRegionIcon = new DataTrigger
+                                    {
+                                        Binding = new Binding(nameof(DiagnosticsRow.RegionIcon))
+                                                  {
+                                                      Converter = _converter
+                                                  },
+                                        Value = null
+                                    };
+
+            withoutRegionIcon.Setters.Add(new Setter(UIElement.VisibilityProperty, Visibility.Collapsed));
+
+            var discStyle = new Style(typeof(Border));
+
+            discStyle.Triggers.Add(withoutRegionIcon);
+            disc.SetValue(FrameworkElement.StyleProperty, discStyle);
+            disc.AppendChild(image);
+
+            icon = disc;
+        }
+        else
+        {
+            image.SetValue(FrameworkElement.MarginProperty, new Thickness(0, 0, 4, 0));
+
+            var withoutIcon = new Trigger
+                              {
+                                  Property = Image.SourceProperty,
+                                  Value = null
+                              };
+
+            withoutIcon.Setters.Add(new Setter(UIElement.VisibilityProperty, Visibility.Collapsed));
+
+            var style = new Style(typeof(Image));
+
+            style.Triggers.Add(withoutIcon);
+            image.SetValue(FrameworkElement.StyleProperty, style);
+
+            icon = image;
+        }
+
+        var text = new FrameworkElementFactory(typeof(TextBlock));
+
+        text.SetBinding(TextBlock.TextProperty,
+                        new Binding($"Cells[{index}]")
+                        {
+                            Mode = BindingMode.OneTime
+                        });
+        text.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+
+        var panel = new FrameworkElementFactory(typeof(StackPanel));
+
+        panel.SetValue(StackPanel.OrientationProperty, Orientation.Horizontal);
+        panel.AppendChild(icon);
+        panel.AppendChild(text);
+
+        return new DataGridTemplateColumn
+               {
+                   Header = DiagnosticsView.Columns[index],
+                   CellTemplate = new DataTemplate
+                                  {
+                                      VisualTree = panel
+                                  },
+                   IsReadOnly = true,
+                   CanUserSort = false,
+                   MinWidth = 60
+               };
+    }
+
+    /// <summary>
+    /// Creates the frozen backdrop brush of a region icon.
+    /// </summary>
+    /// <returns>The brush</returns>
+    private static SolidColorBrush CreateRegionBackdrop()
+    {
+        var brush = new SolidColorBrush(Color.FromRgb(0x3C, 0x3C, 0x3C));
+
+        brush.Freeze();
+
+        return brush;
+    }
 
     /// <summary>
     /// Gets the scroll viewer of the grid.

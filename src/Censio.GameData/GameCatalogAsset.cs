@@ -58,6 +58,11 @@ internal sealed class GameCatalogAsset
     internal string? RegionId { get; set; }
 
     /// <summary>
+    /// Gets or sets the icon file name, or <c>null</c> when the asset states none.
+    /// </summary>
+    internal string? IconFilename { get; set; }
+
+    /// <summary>
     /// Gets or sets the kind of the product or building the asset is, or <c>null</c> when it is neither.
     /// </summary>
     internal GameCatalogKind? Kind { get; set; }

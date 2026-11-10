@@ -26,6 +26,11 @@ public sealed class DiagnosticsWindowSession
     private readonly Func<GameCatalog?> _readCatalog;
 
     /// <summary>
+    /// Reads the game icons.
+    /// </summary>
+    private readonly Func<GameIconSet?> _readIcons;
+
+    /// <summary>
     /// The clock.
     /// </summary>
     private readonly TimeProvider _clock;
@@ -59,10 +64,26 @@ public sealed class DiagnosticsWindowSession
     /// <param name="post">Runs an action on the thread of the window</param>
     /// <param name="createWindow">Creates the window</param>
     public DiagnosticsWindowSession(Func<string> readStatusText, Func<PipeTick?> readTick, Func<GameCatalog?> readCatalog, TimeProvider clock, Action<Action> post, Func<IDiagnosticsWindow> createWindow)
+        : this(readStatusText, readTick, readCatalog, () => null, clock, post, createWindow)
+    {
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="DiagnosticsWindowSession" /> class.
+    /// </summary>
+    /// <param name="readStatusText">Reads the status text</param>
+    /// <param name="readTick">Reads the latest closed tick</param>
+    /// <param name="readCatalog">Reads the game catalog</param>
+    /// <param name="readIcons">Reads the game icons</param>
+    /// <param name="clock">The clock</param>
+    /// <param name="post">Runs an action on the thread of the window</param>
+    /// <param name="createWindow">Creates the window</param>
+    public DiagnosticsWindowSession(Func<string> readStatusText, Func<PipeTick?> readTick, Func<GameCatalog?> readCatalog, Func<GameIconSet?> readIcons, TimeProvider clock, Action<Action> post, Func<IDiagnosticsWindow> createWindow)
     {
         _readStatusText = readStatusText;
         _readTick = readTick;
         _readCatalog = readCatalog;
+        _readIcons = readIcons;
         _clock = clock;
         _createWindow = createWindow;
         _updater = new TrayStatusUpdater<DiagnosticsView?>(ReadView, post, ShowUpdate);
@@ -114,7 +135,7 @@ public sealed class DiagnosticsWindowSession
     /// <returns>The view</returns>
     private DiagnosticsView CreateView()
     {
-        return DiagnosticsView.Create(_readStatusText(), _readTick(), _readCatalog(), _clock);
+        return DiagnosticsView.Create(_readStatusText(), _readTick(), _readCatalog(), _readIcons(), _clock);
     }
 
     /// <summary>

@@ -110,7 +110,7 @@ described in the other sections.
 
 `Open diagnostics` opens one window, titled `Censio Companion: Diagnostics`, with the latest closed tick (record
 [0038](../decisions/0038-diagnostics-window-flat-table-of-rows-made-on-demand.md)). It shows every value as the game
-sent it: GUIDs are raw numbers where the catalog has no name for them, and icons do not exist yet.
+sent it: GUIDs are raw numbers where the catalog has no name for them; icons are shown where the game's files give one.
 
 - **Header**, top to bottom: `Status: <status text>`; `Last tick: <time>, <n> islands` or `Last tick: none`, exactly the
   text of the menu entry of the same name (*Tray icon and menu*); and, once a tick exists, `Game time: <game time>`, with
@@ -130,6 +130,15 @@ sent it: GUIDs are raw numbers where the catalog has no name for them, and icons
   name (unknown, nameless, ambiguous), GUID `0` and every cell while no catalog is ready show the bare number. The names
   pass the rule of the log (*Log*) and a name over 4,096 UTF-16 characters is cut there, ending in `…`; a name of
   exactly 4,096 is kept whole. Buildings and workforce have no column.
+- **Icons:** once the icons are built ([`game-catalog.md`](game-catalog.md), *Icons*), the `Region` and `Good` cells show
+  the icon of the cell's GUID before the text: an image of 20 by 20 device-independent pixels, then a gap of 4, then the
+  text, vertically centred. In the `Region` column the icon sits on a dark round backdrop of that size (the game's region
+  icons are light glyphs); the `Good` icon has none. A GUID without an icon (none, unknown, a problem of the icon, GUID `0`) and every cell while
+  no icons are built show the text alone, without the image's place, backdrop or gap.
+  The names are published first: the window shows them as soon as the catalog is ready and adds the icons when they are
+  built, and a new build of the catalog removes the icons until the new ones are ready. Each distinct icon is decoded once, at twice the size of the
+  cell (sharp up to 200 % display scaling), and shared by the rows that show it. The icons are held in memory only: nothing of them is written to disk,
+  logged or sent, and a screenshot holds the game's icons.
 - **Area names** (the `Name` column) pass the rule of the log (*Log*): each control character, format character, line
   separator, paragraph separator (the categories Cc, Cf, Zl, Zp) and unpaired surrogate is shown as one `?`, nothing
   else is changed (combining marks, right-to-left letters and spaces stay as sent), and an area name is never cut, also
@@ -149,7 +158,7 @@ sent it: GUIDs are raw numbers where the catalog has no name for them, and icons
   with the window open, closed or stalled.
 - **Memory:** the window makes text only for the rows on screen. At most three ticks are referenced: the open one, the
   kept one and the one shown; a replaced or a closed window references none.
-- **Privacy:** the window shows island names and economic data on screen only. Nothing of it is written to disk, logged
+- **Privacy:** the window shows island names, economic data and the game's icons on screen only. Nothing of it is written to disk, logged
   or sent anywhere, and the window adds no log line. A screenshot holds the savegame's island names.
 
 ### Start with Windows
@@ -209,6 +218,12 @@ sent it: GUIDs are raw numbers where the catalog has no name for them, and icons
   GUIDs cannot be named; further ones are not logged in this run`, ends them. Ticks closed before the catalog is ready
   are not checked, except the latest one at that moment, which is checked unless no connection or replay has started
   yet.
+- **Icon lines** ([`game-catalog.md`](game-catalog.md), *Icons*), written after the catalog line of the same build, none
+  with a name, an entry path or image data: `Catalog icons: <g> goods and <r> regions with an icon; without one: <a> not
+  named, <m> missing, <u> unreadable` (Information; the counts are of entries) and `Catalog icons failed: <kind>
+  (<archive>)` (Warning; the kinds `ArchiveMissing`, `ArchiveUnreadable`, `DuplicateArchiveNumber` and `IconSetTooLarge`,
+  the archive as a path relative to `maindata`, `maindata` itself when the listing failed). One of them is written per build, and
+  none while the catalog fails or no game is found.
 - The log holds no pipe content (figure name, island names, values): recording files and folders are logged by name only.
 - Text that came from outside (a replay file name, exception texts) is sanitized: each control character, format
   character, line or paragraph separator and unpaired surrogate becomes one `?`, so a text cannot add a line or hide
