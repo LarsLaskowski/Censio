@@ -252,6 +252,152 @@ public sealed class GameCatalogLoaderTests
         Assert.DoesNotContain(entry => entry.Message.Contains(Secret, StringComparison.Ordinal), _logger.Entries, "The log should hold no content of the message");
     }
 
+    /// <summary>
+    /// After the catalog is ready the icon step runs with the folder and the catalog, its icons are published before the
+    /// event, and the log holds the counts only.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC3")]
+    public void GameCatalogLoaderRunLogsIconCounts()
+    {
+        // Arrange
+        var catalog = new GameCatalog([Entry(1)], [], 0, 0);
+        var icons = new GameIconSet(new Dictionary<int, GameIcon>
+                                    {
+                                        [1] = new(1, 1, new byte[] { 1 })
+                                    },
+                                    new Dictionary<int, GameIconProblem>
+                                    {
+                                        [2] = GameIconProblem.NotNamed,
+                                        [3] = GameIconProblem.NotNamed,
+                                        [4] = GameIconProblem.Missing,
+                                        [5] = GameIconProblem.Unreadable
+                                    },
+                                    3,
+                                    2);
+        var calls = new List<(string Folder, GameCatalog Catalog)>();
+        var loader = new GameCatalogLoader(_ => GameCatalogResult.FromCatalog(catalog, [], 0),
+                                           (folder, built) =>
+                                           {
+                                               calls.Add((folder, built));
+
+                                               return GameIconResult.FromIcons(icons);
+                                           },
+                                           _logger);
+        var events = new List<(object? Sender, GameIconSet? Published)>();
+
+        loader.IconsChanged += (sender, _) => events.Add((sender, loader.Icons));
+
+        // Act
+        loader.Run(Found("C:\\Game"));
+
+        // Assert
+        Assert.AreSequenceEqual(["C:\\Game"], calls.Select(call => call.Folder), "The icons should be built from the folder of the installation");
+        Assert.AreSame(catalog, calls[0].Catalog, "The icons should be built for the catalog");
+        Assert.AreSame(icons, loader.Icons, "The loader should publish the icons");
+        Assert.HasCount(1, events, "The change of the icons should be raised once");
+        Assert.AreSame(loader, events[0].Sender, "The event should come from the loader");
+        Assert.AreSame(icons, events[0].Published, "The icons should be published before the event");
+        Assert.Contains((LogLevel.Information, "Catalog icons: 3 goods and 2 regions with an icon; without one: 2 not named, 1 missing, 1 unreadable"), Lines(), "The log should hold the counts");
+    }
+
+    /// <summary>
+    /// A failed icon step logs a warning with the kind and the archive, keeps the catalog, its status and its log lines, and
+    /// publishes no icons.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC3")]
+    public void GameCatalogLoaderRunLogsIconFailureAndKeepsNames()
+    {
+        // Arrange
+        var catalog = new GameCatalog([Entry(1)], [], 0, 0);
+        var loader = new GameCatalogLoader(_ => GameCatalogResult.FromCatalog(catalog, [], 0),
+                                           (_, _) => GameIconResult.FromError(new GameIconError(GameIconErrorKind.DuplicateArchiveNumber, "zz_patchfiles_300.rda")),
+                                           _logger);
+
+        // Act
+        var status = loader.Run(Found("C:\\Game"));
+
+        // Assert
+        Assert.AreEqual(GameCatalogStatusKind.Ready, status.Kind, "The catalog should stay ready");
+        Assert.AreEqual(1, status.EntryCount, "The entry count should be unchanged");
+        Assert.AreEqual(status, loader.Status, "The loader should keep the status it returns");
+        Assert.AreSame(catalog, loader.Catalog, "The catalog should be kept");
+        Assert.IsNull(loader.Icons, "No icons should be published");
+        Assert.Contains((LogLevel.Warning, "Catalog icons failed: DuplicateArchiveNumber (zz_patchfiles_300.rda)"), Lines(), "The log should name the kind and the archive");
+        Assert.Contains((LogLevel.Information, "Catalog built: 1 entries; 0 inherited assets left out; 0 unknown region types dropped"), Lines(), "The line about the catalog should be unchanged");
+        Assert.DoesNotContain(line => line.Message.StartsWith("Catalog icons:", StringComparison.Ordinal), Lines(), "No line of counts should be logged");
+    }
+
+    /// <summary>
+    /// The names are published, with their event, before the icon step starts, and the icons follow with their own event.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC3")]
+    public void GameCatalogLoaderRunPublishesNamesBeforeIcons()
+    {
+        // Arrange
+        var catalog = new GameCatalog([Entry(1)], [], 0, 0);
+        var icons = new GameIconSet(new Dictionary<int, GameIcon>(), new Dictionary<int, GameIconProblem>(), 0, 0);
+        var steps = new List<string>();
+        GameCatalogLoader? loader = null;
+
+        loader = new GameCatalogLoader(_ => GameCatalogResult.FromCatalog(catalog, [], 0),
+                                       (_, _) =>
+                                       {
+                                           steps.Add($"build {loader!.Status.Kind} {ReferenceEquals(loader.Catalog, catalog)} {loader.Icons is null}");
+
+                                           return GameIconResult.FromIcons(icons);
+                                       },
+                                       _logger);
+        loader.StatusChanged += (_, status) => steps.Add($"status {status.Kind} {loader.Icons is null}");
+        loader.IconsChanged += (_, _) => steps.Add("icons");
+
+        // Act
+        loader.Run(Found("C:\\Game"));
+
+        // Assert
+        Assert.AreSequenceEqual(["status Ready True", "build Ready True True", "icons"], steps, "The names and their event should come before the icon step, and the icons last");
+    }
+
+    /// <summary>
+    /// Without a game, or when the catalog fails, the icon step does not run and nothing is published.
+    /// </summary>
+    /// <param name="kind">The kind of the installation status</param>
+    [TestMethod]
+    [TestCategory("AC3")]
+    [DataRow(GameInstallationStatusKind.NotFound)]
+    [DataRow(GameInstallationStatusKind.Found)]
+    public void GameCatalogLoaderRunWithoutGameBuildsNoIcons(GameInstallationStatusKind kind)
+    {
+        // Arrange
+        var iconBuilds = 0;
+        var raised = 0;
+        var loader = new GameCatalogLoader(_ => GameCatalogResult.FromError(new GameCatalogError(GameCatalogErrorKind.FileMissing, "x")),
+                                           (_, _) =>
+                                           {
+                                               iconBuilds++;
+
+                                               return GameIconResult.FromError(new GameIconError(GameIconErrorKind.ArchiveMissing, "ui.rda"));
+                                           },
+                                           _logger);
+
+        loader.IconsChanged += (_, _) => raised++;
+
+        // Act
+        loader.Run(new GameInstallationStatus
+                   {
+                       Kind = kind,
+                       Folder = "C:\\Game"
+                   });
+
+        // Assert
+        Assert.AreEqual(0, iconBuilds, "No icons should be built");
+        Assert.AreEqual(0, raised, "No change of the icons should be raised");
+        Assert.IsNull(loader.Icons, "No icons should be published");
+        Assert.DoesNotContain(line => line.Message.StartsWith("Catalog icons", StringComparison.Ordinal), Lines(), "No line about icons should be logged");
+    }
+
     #endregion // Methods
 
     #region Helpers
