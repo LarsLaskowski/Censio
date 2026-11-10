@@ -20,7 +20,7 @@ player relies on the names it shows; the later web UI relies on the same catalog
   is written anywhere, no cache and nothing into the installation.
 - Each file is read in one forward-only pass with an XML reader that processes no document type declaration, resolves
   no entity and makes no network access; comments, processing instructions and white space between elements are
-  ignored. The passes run in the order data sets, assets, English texts, German texts, properties, templates; each file is opened when its pass
+  ignored. The passes run in the order data sets, properties, templates, assets, English texts, German texts; each file is opened when its pass
   starts and released when the pass ends, before the next is opened (record
   [0047](../decisions/0047-game-catalog-read-forward-only-from-config-rda-kinds-and-regions-from-the-data.md)).
 - **Data sets:** the region types are the `Item` names of the `DataSet` whose own `Name` is `Region`, directly under
@@ -30,22 +30,29 @@ player relies on the names it shows; the later web UI relies on the same catalog
   elsewhere (a reference inside an `Item`) is not a definition. The facts used, all below `Values` unless noted:
   `Template` and `BaseAssetGUID` (directly below the asset), `Text/OasisId`, `Product/IsWorkforce`,
   `Product/AssociatedRegion`, the presence of a `Building` section, `Building/AssociatedRegions`, `Session/Region` and
-  `Region/RegionID`. Other nodes, `ProductionRegions` included, are not used.
+  `Region/RegionID`. Other nodes, `ProductionRegions` included, are not used. The four values and the presence of the
+  `Building` section are layered with the template and the property defaults (*Region types*).
 - **Texts:** `TextExport/Texts/Text` holds a `LineId` (signed 64-bit) and a `Text`. Only the identifiers a catalog
   candidate uses are kept.
-- **Properties** (root `Properties`): the default of the `Region` property is the `RegionID` child of the `Region` child
-  of a `DefaultValues` element directly under a `Group` (groups nest through `Groups/Group`). Defaults belong to the
-  property, not to the group, and the group's `Name` is not used. `DefaultContainerValues` and a `DefaultValues` nested
-  deeper inside another property's part are not read. A second `DefaultValues/Region` is a malformed file; a default
-  without `RegionID` is *not stated*.
+- **Properties** (root `Properties`): the default of a property is its field in the child of a `DefaultValues`
+  element directly under a `Group` (groups nest through `Groups/Group`) that is named after the property:
+  `Product/AssociatedRegion`, `Building/AssociatedRegions`, `Session/Region` and `Region/RegionID`. Defaults belong to
+  the property, not to the group, and the group's `Name` is not used. `DefaultContainerValues` and a `DefaultValues`
+  nested deeper inside another property's part are not read. A second `DefaultValues` part `Building`, `Product`,
+  `Session` or `Region` anywhere in the file, in the same or in another group, is a malformed file; a default
+  without its field is *not stated*, but the property counts as present.
 - **Templates** (root `Templates`): a defining template is a `Template` element directly under a `Group`; a `Template`
   nested inside its properties is part of it and no definition. For each defining template with a `Name` the file is
-  checked for a `Properties/Region` section and its `RegionID`. A second defining template of the same name is a
-  malformed file, whether or not it has a `Region` property; a template without `Name` is ignored.
+  checked for the sections `Properties/Product`, `Properties/Building`, `Properties/Session` and `Properties/Region`
+  and their fields as above; a second field in one section is resolved as the last one. A second defining template of
+  the same name is a malformed file, whether or not it has such a property; a template without `Name` is ignored.
+  Because the templates and defaults are read before the assets, an asset's kind and region lists are decided from
+  the resolved values in the asset pass.
 - GUIDs are read as signed 32-bit and text identifiers as signed 64-bit integers, after white space around the value
   is removed (the game's file writes some GUIDs on their own line). A value that is not such an integer is a
-  malformed file; so is an empty `Standard/GUID` or `Text/OasisId`. An empty `Session/Region` means "no region" and
-  is not an error (the game's file has such sessions).
+  malformed file; so is an empty `Standard/GUID` or `Text/OasisId`. An empty `Session/Region`, in an asset, a template
+  or a default, means "no region" (it counts as `0`) and is not an error (the game's file has such sessions); a
+  `Session/Region` of a template or default that is neither empty nor such an integer is a malformed file.
 
 ### Kinds
 
@@ -56,32 +63,42 @@ Rules apply in this order to every defining asset; the first that fits decides.
    Resolving inherited assets is out of scope. (The Product Manager's installation has 962 of them; the fixture, which
    stands for the structure only, has one.)
 2. `Template` `Region`: a region asset. It is no entry itself; sessions refer to it.
-3. A `Session/Region` that is not `0` and names a region asset: a **region entry**, any session template counts. It
-   carries the GUID of the region asset and, where a `RegionID` resolves for that asset (*Region types*), that region type. Its names are those
+3. A resolved `Session/Region` (*Region types*) that is not `0` and names a region asset: a **region entry**, any
+   session template counts. It carries the GUID of the region asset and, where a `RegionID` resolves for that asset
+   (*Region types*), that region type. Its names are those
    of its own `Text/OasisId` (a session and its region asset normally share one). A session that names `0` or an
    asset that is no region asset falls through to the next rules and is no region entry. If two region assets have one
    GUID, the first is used.
 4. `Template` `Product`: a **workforce** when `IsWorkforce` is `1`, otherwise a **good**.
-5. A `Building` section: a **building**.
+5. A `Building` section of the asset, or a `Building` property of its template in `templates.xml`: a **building**.
 6. Anything else is not in the catalog.
 
 ### Region types
 
 - A good or workforce carries the region types of its `AssociatedRegion`, a building those of its
   `AssociatedRegions`: names of the `Region` data set separated by `;`, each trimmed, empty parts ignored, in the
-  order written.
+  order written. The lists are read-only.
 - A missing element means *not stated*; an element that is present and empty (also `<AssociatedRegions />`) means
   *none*, an empty list. The two stay distinct.
 - A name that the `Region` data set does not hold is dropped from the entry and counted. A `RegionID` that is not in
   the data set leaves the region entry with an empty list and is counted once per region asset, whether or not a session
   uses it. The count is the sum of dropped names and dropped `RegionID`s over the catalog.
-- **Region type of a region asset** (record [0049](../decisions/0049-region-type-of-a-region-asset-from-its-template-and-the-property-defaults.md)):
-  the `RegionID` the asset states; without one, the `RegionID` the `Region` property of the asset's template states in
-  `templates.xml`; without one, the `RegionID` of the `Region` property's default in `properties.xml`. A stated empty
-  `<RegionID />` counts as stated at any level. When none of the three states one, or the asset's template has no
-  `Region` property in `templates.xml`, the region entries carry no region types (*not stated*). A second `RegionID` in
-  one section is resolved as the last one. Only `RegionID` is layered this way; other facts are read from the asset's
-  own values.
+- **Layering** (records [0047](../decisions/0047-game-catalog-read-forward-only-from-config-rda-kinds-and-regions-from-the-data.md)
+  and [0049](../decisions/0049-region-type-of-a-region-asset-from-its-template-and-the-property-defaults.md)):
+  `Product/AssociatedRegion` (goods, workforce), `Building/AssociatedRegions` (buildings), `Session/Region` and
+  `Region/RegionID` are each the asset's own value; without one, when the asset's template has that property in
+  `templates.xml`, the template's value; without one, the value of the property's `DefaultValues` in
+  `properties.xml`. A template that is not listed, or that lacks the property, gives only the asset's own value, never
+  the default. A present empty element is stated at every level: an empty list means *none*, an empty `RegionID` is
+  stated, an empty `Session/Region` means no region. When no level states a value it is *not stated*. A second field
+  in one section is resolved as the last one.
+- A template's `Building` property also makes an asset a building (*Kinds*, rule 5); a `Product` template stays a good
+  or workforce whatever its properties. The resolved `Session/Region` decides the region entry, and `0` never makes
+  one, also against a region asset of GUID `0`.
+- **Region type of a region asset:** its layered `RegionID`. When none is stated the region entries carry no region
+  types (*not stated*).
+- A template's or a default's list is split and checked once, and the entries that resolve to it share one read-only
+  list; its dropped names are counted once per source list, as a dropped `RegionID` once per region asset.
 - No region, region type or name is written into the code: a region the code has never seen resolves like the others.
 
 ### Names and the problem of a GUID
@@ -130,7 +147,7 @@ Rules apply in this order to every defining asset; the first that fits decides.
 | Archive unreadable | `config.rda` is missing or cannot be opened, or the listing of the installation fails |
 | File missing | the archive lists none of a required path |
 | File unreadable | an entry cannot be read (the per-entry bound included), the stream fails, or opening the source throws |
-| Malformed file | the XML is not well-formed, has a document type declaration or the wrong root element, a value is not an integer of its type, the `Region` data set is not exactly one, a second `Region` default or a second defining template of one name, or a bound of *Limits* is exceeded |
+| Malformed file | the XML is not well-formed, has a document type declaration or the wrong root element, a value is not an integer of its type (a `Session/Region` of a template or default included), the `Region` data set is not exactly one, a second `Building`, `Product`, `Session` or `Region` default anywhere in `properties.xml` or a second defining template of one name, or a bound of *Limits* is exceeded |
 
 - A source that reports an error kind ends the read with that same kind and no later file is opened. Exceptions of
   the XML reader and of the streams are standard exceptions mapped to a kind at the boundary of the reader; only an
@@ -145,8 +162,10 @@ Rules apply in this order to every defining asset; the first that fits decides.
   malformed file. The same two bounds apply to each part of `properties.xml` (a child of a `DefaultValues` or
   `DefaultContainerValues` element) and to each defining template of `templates.xml`. (On the four files of the Product Manager's installation measured for #23 the deepest asset has 46 levels and the largest 3,740 elements; in his `properties.xml` and `templates.xml` of game version 3.0.1733841 the largest property has 588 elements and 13 levels, the largest template 1,352 elements and 16 levels.)
 - **Memory:** at one time the catalog build holds one file's entry content, the open `config.rda` with its entry
-  list, the candidate assets (the few hundred to some thousand goods, buildings, workforce and sessions), the texts they
-  use and the facts of the asset being read; while the other archives are listed, one archive's entry list on top. A
+  list, the facts of every defining template (about a thousand, held from the templates pass until the build ends), the
+  candidate assets (the few hundred to some thousand goods, buildings, workforce and sessions), the texts they use and
+  the facts of the asset being read; each distinct source list of region types is split once and kept once, shared by
+  the entries that use it; while the other archives are listed, one archive's entry list on top. A
   file is never held as a document tree.
 - **Time:** reading the four files of #23 of the Product Manager's installation took 1.3 s with a peak working set of 108 MiB
   in the test process; the whole build including the archive listing is measured by the opt-in installation test
@@ -160,6 +179,10 @@ Rules apply in this order to every defining asset; the first that fits decides.
 - `CENSIO_CATALOG_SAMPLE` names a folder with the six loose files; `CENSIO_ANNO_INSTALL` names an installation. Unset,
   the opt-in tests are inconclusive. They check every non-zero GUID of the pipe fixture `long-session.jsonl` against the
   catalog and write counts, unresolved GUIDs, elapsed time and peak working set, never a name ([`UNIT_TESTS.md`](../UNIT_TESTS.md)).
+  They also build the catalog a second time with empty `properties.xml` and `templates.xml` (the assets' own values)
+  and report the difference as counts and GUIDs: the entries per kind of both builds, the kind changes, the
+  transitions of the region lists and the pipe-fixture GUIDs whose kind or region list changed. They fail when an
+  entry of that build is missing from the layered one.
 
 ## Privacy
 

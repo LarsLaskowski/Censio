@@ -1,3 +1,5 @@
+using System.Collections.ObjectModel;
+
 namespace Censio.GameData;
 
 /// <summary>
@@ -19,10 +21,11 @@ internal static class GameCatalogBuilder
     {
         var dropped = 0;
         var regionLists = new Dictionary<int, IReadOnlyList<string>?>();
+        var lists = new Dictionary<string, IReadOnlyList<string>>(ReferenceEqualityComparer.Instance);
 
         foreach (var (guid, region) in assets.Regions)
         {
-            regionLists[guid] = RegionIdList(ResolveRegionId(region, assets.Templates, assets.Defaults.RegionId), regionTypes, ref dropped);
+            regionLists[guid] = RegionIdList(region.RegionId, regionTypes, ref dropped);
         }
 
         var entries = new Dictionary<int, GameCatalogEntry>();
@@ -37,7 +40,7 @@ internal static class GameCatalogBuilder
                 continue;
             }
 
-            var entry = CreateEntry(candidate, regionTypes, regionLists, english, german, ref dropped);
+            var entry = CreateEntry(candidate, regionTypes, regionLists, lists, english, german, ref dropped);
 
             if (entry is null)
             {
@@ -71,6 +74,7 @@ internal static class GameCatalogBuilder
     /// <param name="candidate">The candidate</param>
     /// <param name="regionTypes">The names of the region types</param>
     /// <param name="regionLists">The region types of the region assets</param>
+    /// <param name="lists">The split lists by source string, compared by reference</param>
     /// <param name="english">The English texts</param>
     /// <param name="german">The German texts</param>
     /// <param name="dropped">The number of dropped region types</param>
@@ -78,13 +82,14 @@ internal static class GameCatalogBuilder
     private static GameCatalogEntry? CreateEntry(GameCatalogAsset candidate,
                                                  HashSet<string> regionTypes,
                                                  Dictionary<int, IReadOnlyList<string>?> regionLists,
+                                                 Dictionary<string, IReadOnlyList<string>> lists,
                                                  GameCatalogTexts english,
                                                  GameCatalogTexts german,
                                                  ref int dropped)
     {
         var guid = candidate.Guid.GetValueOrDefault();
 
-        if (candidate.SessionRegion is { } regionGuid && regionLists.TryGetValue(regionGuid, out var types))
+        if (candidate.SessionRegion is { } regionGuid && regionGuid != 0 && regionLists.TryGetValue(regionGuid, out var types))
         {
             return new GameCatalogEntry
                    {
@@ -110,30 +115,8 @@ internal static class GameCatalogBuilder
                    Kind = kind,
                    EnglishName = english.NameOf(candidate.TextId),
                    GermanName = german.NameOf(candidate.TextId),
-                   RegionTypes = RegionList(list, regionTypes, ref dropped)
+                   RegionTypes = RegionList(list, regionTypes, lists, ref dropped)
                };
-    }
-
-    /// <summary>
-    /// Resolves the region type of a region asset: its own, else its template's, else the property default.
-    /// </summary>
-    /// <param name="region">The region asset</param>
-    /// <param name="templates">The facts of the defining templates by name</param>
-    /// <param name="defaultRegionId">The default region type of the <c>Region</c> property, or <c>null</c></param>
-    /// <returns>The region type, or <c>null</c> when none is stated</returns>
-    private static string? ResolveRegionId(GameCatalogAsset region, Dictionary<string, GameCatalogValues> templates, string? defaultRegionId)
-    {
-        if (region.RegionId is not null)
-        {
-            return region.RegionId;
-        }
-
-        if (region.Template is null || templates.TryGetValue(region.Template, out var template) == false)
-        {
-            return null;
-        }
-
-        return template.RegionId ?? defaultRegionId;
     }
 
     /// <summary>
@@ -161,17 +144,23 @@ internal static class GameCatalogBuilder
     }
 
     /// <summary>
-    /// Splits an association list into its known region types.
+    /// Splits an association list into its known region types, once per source string.
     /// </summary>
     /// <param name="list">The list, or <c>null</c> when none is stated</param>
     /// <param name="regionTypes">The names of the region types</param>
+    /// <param name="lists">The split lists by source string, compared by reference</param>
     /// <param name="dropped">The number of dropped region types</param>
-    /// <returns>The region types, or <c>null</c> when none are stated</returns>
-    private static List<string>? RegionList(string? list, HashSet<string> regionTypes, ref int dropped)
+    /// <returns>The read-only region types, or <c>null</c> when none are stated</returns>
+    private static IReadOnlyList<string>? RegionList(string? list, HashSet<string> regionTypes, Dictionary<string, IReadOnlyList<string>> lists, ref int dropped)
     {
         if (list is null)
         {
             return null;
+        }
+
+        if (lists.TryGetValue(list, out var known))
+        {
+            return known;
         }
 
         var result = new List<string>();
@@ -188,7 +177,11 @@ internal static class GameCatalogBuilder
             }
         }
 
-        return result;
+        var shared = new ReadOnlyCollection<string>(result);
+
+        lists.Add(list, shared);
+
+        return shared;
     }
 
     #endregion // Methods

@@ -48,7 +48,7 @@ internal sealed class GameCatalogAsset
     internal string? BuildingRegions { get; set; }
 
     /// <summary>
-    /// Gets or sets the GUID of the region asset a session names, or <c>null</c> when it names none.
+    /// Gets or sets the GUID of the region asset a session names, <c>0</c> when it states an empty element, or <c>null</c> when it states none.
     /// </summary>
     internal int? SessionRegion { get; set; }
 

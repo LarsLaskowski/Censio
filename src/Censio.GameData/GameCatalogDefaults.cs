@@ -19,8 +19,7 @@ internal static class GameCatalogDefaults
         using var reader = GameCatalogXml.Create(stream, "Properties");
 
         var names = new string[GameCatalogReader.MaxAssetDepth + 1];
-        var regionSections = 0;
-        string? regionId = null;
+        var defaults = new GameCatalogValues();
         var more = reader.Read();
 
         while (more)
@@ -34,7 +33,7 @@ internal static class GameCatalogDefaults
                 {
                     var isDefault = string.Equals(reader.LocalName, "DefaultValues", StringComparison.Ordinal);
 
-                    ReadValues(reader, isDefault, ref regionSections, ref regionId);
+                    ReadValues(reader, isDefault, defaults);
                     more = reader.EOF == false;
 
                     continue;
@@ -44,11 +43,7 @@ internal static class GameCatalogDefaults
             more = reader.Read();
         }
 
-        return new GameCatalogValues
-               {
-                   HasRegion = regionSections > 0,
-                   RegionId = regionId
-               };
+        return defaults;
     }
 
     /// <summary>
@@ -62,8 +57,7 @@ internal static class GameCatalogDefaults
 
         var names = new string[GameCatalogReader.MaxAssetDepth + 1];
         var path = new string[4];
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-        var regionIds = new Dictionary<string, GameCatalogValues>(StringComparer.Ordinal);
+        var templates = new Dictionary<string, GameCatalogValues>(StringComparer.Ordinal);
         var more = reader.Read();
 
         while (more)
@@ -74,9 +68,13 @@ internal static class GameCatalogDefaults
 
                 if (string.Equals(reader.LocalName, "Template", StringComparison.Ordinal) && GameCatalogXml.HasParent(reader, names, "Group"))
                 {
-                    var (name, hasRegion, regionId) = ReadTemplate(reader, path);
+                    var (name, values) = ReadTemplate(reader, path);
 
-                    RegisterTemplate(seen, regionIds, name, hasRegion, regionId);
+                    if (name is not null && templates.TryAdd(name, values) == false)
+                    {
+                        throw GameCatalogXml.Malformed();
+                    }
+
                     more = reader.EOF == false;
 
                     continue;
@@ -86,37 +84,74 @@ internal static class GameCatalogDefaults
             more = reader.Read();
         }
 
-        return regionIds;
+        return templates;
     }
 
     /// <summary>
-    /// Records one defining template, rejecting a name that is repeated.
+    /// Gets the name of the one field of a property that the catalog uses.
     /// </summary>
-    /// <param name="seen">The names of all defining templates met so far</param>
-    /// <param name="regionIds">The facts by template name</param>
-    /// <param name="name">The template name, or <c>null</c> when it has none</param>
-    /// <param name="hasRegion">Whether the template has a <c>Region</c> property</param>
-    /// <param name="regionId">The <c>RegionID</c> that property states</param>
-    private static void RegisterTemplate(HashSet<string> seen, Dictionary<string, GameCatalogValues> regionIds, string? name, bool hasRegion, string? regionId)
+    /// <param name="property">The name of the property</param>
+    /// <returns>The name of the field, or <c>null</c> when the catalog uses no field of the property</returns>
+    private static string? FieldOf(string property)
     {
-        if (name is null)
-        {
-            return;
-        }
+        return property switch
+               {
+                   "Product" => "AssociatedRegion",
+                   "Building" => "AssociatedRegions",
+                   "Session" => "Region",
+                   "Region" => "RegionID",
+                   _ => null
+               };
+    }
 
-        if (seen.Add(name) == false)
+    /// <summary>
+    /// Marks a property as present.
+    /// </summary>
+    /// <param name="values">The values</param>
+    /// <param name="property">The name of the property</param>
+    private static void SetPresent(GameCatalogValues values, string property)
+    {
+        if (string.Equals(property, "Product", StringComparison.Ordinal))
         {
-            throw GameCatalogXml.Malformed();
+            values.HasProduct = true;
         }
-
-        if (hasRegion)
+        else if (string.Equals(property, "Building", StringComparison.Ordinal))
         {
-            regionIds.Add(name,
-                          new GameCatalogValues
-                          {
-                              HasRegion = true,
-                              RegionId = regionId
-                          });
+            values.HasBuilding = true;
+        }
+        else if (string.Equals(property, "Session", StringComparison.Ordinal))
+        {
+            values.HasSession = true;
+        }
+        else
+        {
+            values.HasRegion = true;
+        }
+    }
+
+    /// <summary>
+    /// Stores the value of the field of a property.
+    /// </summary>
+    /// <param name="values">The values</param>
+    /// <param name="property">The name of the property</param>
+    /// <param name="text">The text of the field</param>
+    private static void SetValue(GameCatalogValues values, string property, string text)
+    {
+        if (string.Equals(property, "Product", StringComparison.Ordinal))
+        {
+            values.ProductRegions = text;
+        }
+        else if (string.Equals(property, "Building", StringComparison.Ordinal))
+        {
+            values.BuildingRegions = text;
+        }
+        else if (string.Equals(property, "Session", StringComparison.Ordinal))
+        {
+            values.SessionRegion = string.IsNullOrWhiteSpace(text) ? 0 : GameCatalogXml.ParseInt(text);
+        }
+        else
+        {
+            values.RegionId = text;
         }
     }
 
@@ -125,9 +160,8 @@ internal static class GameCatalogDefaults
     /// </summary>
     /// <param name="reader">The reader, at the element</param>
     /// <param name="isDefault">Whether the element is a <c>DefaultValues</c> element</param>
-    /// <param name="regionSections">The number of <c>Region</c> defaults met so far</param>
-    /// <param name="regionId">The default region type</param>
-    private static void ReadValues(XmlReader reader, bool isDefault, ref int regionSections, ref string? regionId)
+    /// <param name="defaults">The defaults met so far in the file</param>
+    private static void ReadValues(XmlReader reader, bool isDefault, GameCatalogValues defaults)
     {
         var baseDepth = reader.Depth;
 
@@ -149,16 +183,17 @@ internal static class GameCatalogDefaults
                 continue;
             }
 
-            if (reader.Depth - baseDepth == 1 && isDefault && string.Equals(reader.LocalName, "Region", StringComparison.Ordinal))
+            if (reader.Depth - baseDepth == 1 && isDefault && FieldOf(reader.LocalName) is not null)
             {
-                regionSections++;
+                var property = reader.LocalName;
 
-                if (regionSections > 1)
+                if (IsPresent(defaults, property))
                 {
                     throw GameCatalogXml.Malformed();
                 }
 
-                regionId = ReadRegionDefault(reader);
+                SetPresent(defaults, property);
+                ReadDefault(reader, defaults, property);
             }
             else
             {
@@ -170,21 +205,39 @@ internal static class GameCatalogDefaults
     }
 
     /// <summary>
-    /// Reads the <c>Region</c> default.
+    /// Checks whether a property is marked as present.
     /// </summary>
-    /// <param name="reader">The reader, at the <c>Region</c> element</param>
-    /// <returns>The <c>RegionID</c> it states, or <c>null</c></returns>
-    private static string? ReadRegionDefault(XmlReader reader)
+    /// <param name="values">The values</param>
+    /// <param name="property">The name of the property</param>
+    /// <returns><c>true</c> when the property is present</returns>
+    private static bool IsPresent(GameCatalogValues values, string property)
+    {
+        return property switch
+               {
+                   "Product" => values.HasProduct,
+                   "Building" => values.HasBuilding,
+                   "Session" => values.HasSession,
+                   _ => values.HasRegion
+               };
+    }
+
+    /// <summary>
+    /// Reads the field the catalog uses from a property default.
+    /// </summary>
+    /// <param name="reader">The reader, at the property element</param>
+    /// <param name="defaults">The defaults</param>
+    /// <param name="property">The name of the property</param>
+    private static void ReadDefault(XmlReader reader, GameCatalogValues defaults, string property)
     {
         var baseDepth = reader.Depth;
         var count = 1;
-        string? regionId = null;
+        var field = FieldOf(property);
 
         if (reader.IsEmptyElement)
         {
             reader.Read();
 
-            return null;
+            return;
         }
 
         reader.Read();
@@ -200,9 +253,9 @@ internal static class GameCatalogDefaults
 
             GameCatalogXml.CountElement(reader, baseDepth, ref count);
 
-            if (reader.Depth - baseDepth == 1 && string.Equals(reader.LocalName, "RegionID", StringComparison.Ordinal))
+            if (reader.Depth - baseDepth == 1 && string.Equals(reader.LocalName, field, StringComparison.Ordinal))
             {
-                regionId = reader.ReadElementContentAsString();
+                SetValue(defaults, property, reader.ReadElementContentAsString());
             }
             else
             {
@@ -211,8 +264,6 @@ internal static class GameCatalogDefaults
         }
 
         reader.Read();
-
-        return regionId;
     }
 
     /// <summary>
@@ -251,20 +302,19 @@ internal static class GameCatalogDefaults
     /// </summary>
     /// <param name="reader">The reader, at the <c>Template</c> element</param>
     /// <param name="path">The names of the first levels of the template</param>
-    /// <returns>The name, whether it has a <c>Region</c> property, and the <c>RegionID</c> that property states</returns>
-    private static (string? Name, bool HasRegion, string? RegionId) ReadTemplate(XmlReader reader, string[] path)
+    /// <returns>The name, or <c>null</c> when the template has none, and the facts the template states</returns>
+    private static (string? Name, GameCatalogValues Values) ReadTemplate(XmlReader reader, string[] path)
     {
         var baseDepth = reader.Depth;
         var count = 1;
         string? name = null;
-        var hasRegion = false;
-        string? regionId = null;
+        var values = new GameCatalogValues();
 
         if (reader.IsEmptyElement)
         {
             reader.Read();
 
-            return (null, false, null);
+            return (null, values);
         }
 
         reader.Read();
@@ -291,20 +341,24 @@ internal static class GameCatalogDefaults
             {
                 name = reader.ReadElementContentAsString();
             }
-            else if (relative == 3 && path[1] == "Properties" && path[2] == "Region" && path[3] == "RegionID")
+            else if (relative == 3 && path[1] == "Properties" && FieldOf(path[2]) is { } field && string.Equals(path[3], field, StringComparison.Ordinal))
             {
-                regionId = reader.ReadElementContentAsString();
+                SetValue(values, path[2], reader.ReadElementContentAsString());
             }
             else
             {
-                hasRegion |= relative == 2 && path[1] == "Properties" && path[2] == "Region";
+                if (relative == 2 && path[1] == "Properties" && FieldOf(path[2]) is not null)
+                {
+                    SetPresent(values, path[2]);
+                }
+
                 reader.Read();
             }
         }
 
         reader.Read();
 
-        return (name, hasRegion, regionId);
+        return (name, values);
     }
 
     #endregion // Methods

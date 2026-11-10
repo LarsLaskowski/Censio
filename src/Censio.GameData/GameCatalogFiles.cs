@@ -347,15 +347,15 @@ internal static class GameCatalogFiles
     }
 
     /// <summary>
-    /// Reads the GUID an element names; an empty element names none.
+    /// Reads the GUID an element names; an empty element names no region and gives <c>0</c>.
     /// </summary>
     /// <param name="reader">The reader, at the element</param>
-    /// <returns>The GUID, or <c>null</c> when the element is empty</returns>
-    private static int? ReadOptionalGuid(XmlReader reader)
+    /// <returns>The GUID, or <c>0</c> when the element is empty</returns>
+    private static int ReadOptionalGuid(XmlReader reader)
     {
         var text = reader.ReadElementContentAsString();
 
-        return string.IsNullOrWhiteSpace(text) ? null : GameCatalogXml.ParseInt(text);
+        return string.IsNullOrWhiteSpace(text) ? 0 : GameCatalogXml.ParseInt(text);
     }
 
     /// <summary>

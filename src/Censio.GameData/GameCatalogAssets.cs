@@ -88,6 +88,8 @@ internal sealed class GameCatalogAssets
             return;
         }
 
+        Resolve(asset);
+
         if (string.Equals(asset.Template, "Region", StringComparison.Ordinal))
         {
             Regions.TryAdd(guid, asset);
@@ -116,6 +118,39 @@ internal sealed class GameCatalogAssets
         }
 
         return asset.HasBuildingSection ? GameCatalogKind.Building : null;
+    }
+
+    /// <summary>
+    /// Fills the facts an asset does not state from its template, else from the property defaults.
+    /// </summary>
+    /// <param name="asset">The asset</param>
+    private void Resolve(GameCatalogAsset asset)
+    {
+        if (asset.Template is null || Templates.TryGetValue(asset.Template, out var template) == false)
+        {
+            return;
+        }
+
+        if (template.HasProduct)
+        {
+            asset.ProductRegions ??= template.ProductRegions ?? Defaults.ProductRegions;
+        }
+
+        if (template.HasBuilding)
+        {
+            asset.HasBuildingSection = true;
+            asset.BuildingRegions ??= template.BuildingRegions ?? Defaults.BuildingRegions;
+        }
+
+        if (template.HasSession)
+        {
+            asset.SessionRegion ??= template.SessionRegion ?? Defaults.SessionRegion;
+        }
+
+        if (template.HasRegion)
+        {
+            asset.RegionId ??= template.RegionId ?? Defaults.RegionId;
+        }
     }
 
     #endregion // Methods
