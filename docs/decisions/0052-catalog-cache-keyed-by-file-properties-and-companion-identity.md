@@ -47,5 +47,8 @@ both built is cached. The rules are in [`game-catalog.md`](../areas/game-catalog
 - A failure is not retried until the next start or a changed key, so a permanent failure does not re-read the
   archives at every reconnect.
 - A game started without `/pipe`, or a replay, is checked only at the Companion's start.
-- That the module version id is stable for one source and changes with the code was measured for this record (plan of
-  #25, *Verified facts*); if a build setting turned determinism off, every start would extract again.
+- That the module version id is stable for one source and changes with the code is to be measured (plan of #25, fact
+  9); if a build setting turned determinism off, every start would extract again. A change of the product version
+  changes the id too, which costs one extraction.
+- An unreadable program file counts as one without a version (`unknown`); a missing one, a missing `maindata` or a
+  folder that cannot be listed makes the check fail, and the current catalog is kept.

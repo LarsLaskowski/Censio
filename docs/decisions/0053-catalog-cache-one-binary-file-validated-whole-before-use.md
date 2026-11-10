@@ -25,8 +25,9 @@ the Windows image decoder in the diagnostics window. Readers of external input a
 
 ## Decision
 
-Option 4. The file is checked as a whole before anything of it is published, and each icon must have exactly the PNG
-layout the Companion's own writer produces; one failure refuses the whole file and leads to an extraction. Layout,
+Option 4. The file is checked as a whole before anything of it is published; each icon is inflated within its bound
+and written again by the Companion's own PNG writer, and must equal the stored bytes. One failure refuses the whole file
+and leads to an extraction. Layout,
 bounds and checks are in [`game-catalog.md`](../areas/game-catalog.md), *Cache*.
 
 ## Consequences
@@ -34,4 +35,8 @@ bounds and checks are in [`game-catalog.md`](../areas/game-catalog.md), *Cache*.
 - The checksum detects damage and torn writes, not a deliberate change by a program of the same account, which could
   also change the Companion itself; the PNG checks keep anything but the writer's own layout from the image decoder.
 - A change of the format raises its version number, and an older file is then extracted again.
+- The re-encoding costs one compression per icon at each load, and a different compression library (another runtime
+  under a build that does not bundle it) makes the cache invalid once.
+- Checking only the chunk layout and leaving the compressed data to the Windows decoder lost: the decoder's exceptions
+  for bad data are not caught by the window's converter, and no measurement on Windows exists.
 - #26 may later read the same catalog but defines its own format.
