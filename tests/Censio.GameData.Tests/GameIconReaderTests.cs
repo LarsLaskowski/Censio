@@ -779,6 +779,29 @@ public sealed class GameIconReaderTests
         AssertSize(icons.Find(78), 4, 4);
     }
 
+    /// <summary>
+    /// Of two entries with one GUID that is not ambiguous, only the one the catalog finds is read: with a bound equal to its PNG bytes the second one's icon would exceed it.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public void GameIconReaderLoadDuplicateGuidReadsOnlyTheFoundEntry()
+    {
+        // Arrange
+        WriteArchive("ui.rda",
+                     (Inner(RestA), DdsFileBuilder.Build(4, 4, DdsFileBuilder.DxgiBc7Srgb, 1)),
+                     (Inner(RestB), DdsFileBuilder.Build(8, 8, DdsFileBuilder.DxgiBc7Srgb, 1)));
+
+        var catalog = CatalogOf(Entry(5, GameCatalogKind.Good, Asset(RestA)), Entry(5, GameCatalogKind.Good, Asset(RestB)));
+        var bytes = GameIconReader.Load(_root, CatalogOf(Entry(5, GameCatalogKind.Good, Asset(RestA)))).Icons!.PngBytes;
+
+        // Act
+        var result = GameIconReader.Load(_root, catalog, bytes);
+
+        // Assert
+        Assert.IsNull(result.Error, "Only the found entry's icon should count towards the bound");
+        AssertSize(result.Icons?.Find(5), 4, 4);
+    }
+
     #endregion // AC7
 
     /// <summary>
