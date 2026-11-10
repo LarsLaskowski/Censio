@@ -40,11 +40,15 @@ from the menu, the optional start with Windows, the diagnostics window with the 
   settings is not a full path`, `Game: folder in settings is not an Anno 117 installation` or `Game: settings file
   invalid`. The search, its order and the texts are in [`game-installation.md`](game-installation.md); it runs in the
   background in every mode and the menu never waits for it. The diagnostics window does not show the line.
-- The `Catalog:` entry, directly below `Game:`, shows the build of the game catalog ([`game-catalog.md`](game-catalog.md)):
-  `Catalog: reading` (also while the game search runs), `Catalog: <n> entries` (`n` in decimal digits without grouping,
-  also `1 entries`), `Catalog: no game` (the search found no installation, or ended in a settings error) or `Catalog:
-  failed`. The catalog is built in the background at every start in every mode, the invalid command line included,
-  and neither the menu, the connection, the diagnostics window nor `Exit` waits for it.
+- The `Catalog:` entry, directly below `Game:`, shows the state of the game catalog ([`game-catalog.md`](game-catalog.md)):
+  `Catalog: reading` (also while the game search runs), `Catalog: checking`, `Catalog: extracting names`, `Catalog:
+  extracting icons, <n> entries` (the names are shown), `Catalog: <n> entries` (`n` in decimal digits without grouping,
+  also `1 entries`; also after a cache load), `Catalog: <n> entries, icons failed`, `Catalog: <n> entries, not cached`
+  (names and icons are used, the cache could not be written), `Catalog: no game` (the search found no installation, or
+  ended in a settings error) or `Catalog: failed`. The catalog is loaded from the cache or built in the background at
+  every start in every mode, the invalid command line included, and again when a check at a new pipe connection finds the
+  game changed; neither the menu, the connection, the diagnostics window nor `Exit` waits for it, and `Exit` during an
+  extraction or a cache write ends the process within 2 seconds as always.
 - `<version>` is the informational version the Companion was built with: `0.0.0` without a version, otherwise
   the build property `Version` exactly as passed.
 - `Exit` removes the icon at once and ends the process with exit code 0 within 2 seconds in every connection state;
@@ -105,6 +109,8 @@ described in the other sections.
   (`<Windows folder>\explorer.exe`) with the folder as its one argument, and only for a fully qualified folder path.
 - The menu does not wait for the disk or for Explorer. If a folder cannot be created or opened, or is not a full path
   (local app data unresolved), a warning is logged and nothing else changes.
+- The catalog cache lies in `%LOCALAPPDATA%\Censio\Cache` (file `catalog.bin`, [`game-catalog.md`](game-catalog.md), *Cache*):
+  fixed, without a menu entry, created at the first write, private like the recordings folder, and kept when the Companion is removed.
 
 ### Diagnostics window
 
@@ -211,19 +217,28 @@ sent it: GUIDs are raw numbers where the catalog has no name for them; icons are
   (Information); `Catalog failed: <kind>` (Warning; the kinds `ArchiveUnreadable`, `FileMissing`, `FileUnreadable`,
   `MalformedFile`); for each catalog file that another archive also lists, `Catalog: <archive> also lists <path>; the
   copy in config.rda is used` (Warning), and `Catalog: <c> other archives could not be checked for copies` (Warning,
-  only when `c` is above 0); and for every closed tick once the catalog is ready, `Catalog cannot name <role> <GUID>:
+  only when `c` is above 0); and for every closed tick once a catalog is published, `Catalog cannot name <role> <GUID>:
   <problem>` (Information) with the role `Region` (the session GUID), `Good`, `Workforce` or `Building` and the problem
-  `Unknown`, `Incomplete`, `Nameless` or `Ambiguous`. Each (role, GUID) is logged once per run, GUID `0` never, live or
+  `Unknown`, `Incomplete`, `Nameless` or `Ambiguous`. Each (role, GUID) is logged once per published catalog, GUID `0` never, live or
   replayed, whether or not the diagnostics window is open; after 1,000 such lines one line, `Catalog: more than 1000
-  GUIDs cannot be named; further ones are not logged in this run`, ends them. Ticks closed before the catalog is ready
+  GUIDs cannot be named; further ones are not logged for this catalog`, ends them. A catalog that replaces another (a
+  re-extraction after a game update) starts its own set and its own limit. Ticks closed before a catalog is published
   are not checked, except the latest one at that moment, which is checked unless no connection or replay has started
   yet.
-- **Icon lines** ([`game-catalog.md`](game-catalog.md), *Icons*), written after the catalog line of the same build, none
+- **Cache lines** ([`game-catalog.md`](game-catalog.md), *Cache*), none with a name or an image:
+  `Catalog cache not used: <missing|game changed|Companion changed>` (Information, at the start before the extraction);
+  `Catalog cache not used: invalid` and `Catalog check failed; the current catalog is kept` (Warnings);
+  `Catalog cache not written` (Warning, with the exception, which may hold the cache path and so the Windows user name);
+  `Catalog extracted in <t> s (names <a> s, icons <b> s)` (Information, after the icon line of the extraction, also when the
+  icons failed, not when the catalog failed); and `Catalog loaded from cache in <t> s: <n> entries, <g> goods and <r> regions
+  with an icon` (Information; the only catalog line of a cache load). Durations have one decimal and a decimal point. A
+  check that finds the game unchanged writes nothing.
+- **Icon lines** ([`game-catalog.md`](game-catalog.md), *Icons*), written after the catalog line of the same extraction, none
   with a name, an entry path or image data: `Catalog icons: <g> goods and <r> regions with an icon; without one: <a> not
   named, <m> missing, <u> unreadable` (Information; the counts are of entries) and `Catalog icons failed: <kind>
   (<archive>)` (Warning; the kinds `ArchiveMissing`, `ArchiveUnreadable`, `DuplicateArchiveNumber` and `IconSetTooLarge`,
-  the archive as a path relative to `maindata`, `maindata` itself when the listing failed). One of them is written per build, and
-  none while the catalog fails or no game is found.
+  the archive as a path relative to `maindata`, `maindata` itself when the listing failed). One of them is written per extraction, and
+  none while the catalog fails, no game is found or the catalog is loaded from the cache.
 - The log holds no pipe content (figure name, island names, values): recording files and folders are logged by name only.
 - Text that came from outside (a replay file name, exception texts) is sanitized: each control character, format
   character, line or paragraph separator and unpaired surrogate becomes one `?`, so a text cannot add a line or hide
@@ -298,5 +313,5 @@ sent it: GUIDs are raw numbers where the catalog has no name for them; icons are
 - Opening the pipe, the connection states and the retry rules: [`pipe-connection.md`](pipe-connection.md).
 - The recording file, its writing and failures, and the replay rules: [`pipe-recording.md`](pipe-recording.md).
 - Finding the game installation: [`game-installation.md`](game-installation.md).
-- Building the catalog: [`game-catalog.md`](game-catalog.md).
+- Building and caching the catalog: [`game-catalog.md`](game-catalog.md).
 - Reading the game files: [`game-files.md`](game-files.md); the connection to the server, a settings window (later issues).
