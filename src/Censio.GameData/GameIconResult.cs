@@ -43,7 +43,7 @@ public sealed class GameIconResult
     /// <returns>The result</returns>
     public static GameIconResult FromIcons(GameIconSet icons)
     {
-        throw new NotImplementedException();
+        return new GameIconResult(icons, null);
     }
 
     /// <summary>
@@ -53,7 +53,7 @@ public sealed class GameIconResult
     /// <returns>The result</returns>
     public static GameIconResult FromError(GameIconError error)
     {
-        throw new NotImplementedException();
+        return new GameIconResult(null, error);
     }
 
     #endregion // Methods

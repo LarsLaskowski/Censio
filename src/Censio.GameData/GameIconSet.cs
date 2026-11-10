@@ -53,7 +53,7 @@ public sealed class GameIconSet
     /// <summary>
     /// Gets the bytes of the distinct PNG files together.
     /// </summary>
-    public long PngBytes => throw new NotImplementedException();
+    public long PngBytes => _icons.Values.Distinct().Sum(icon => (long)icon.Png.Length);
 
     #endregion // Properties
 
@@ -66,7 +66,7 @@ public sealed class GameIconSet
     /// <returns>The icon, or <c>null</c> when the asset has none</returns>
     public GameIcon? Find(int assetGuid)
     {
-        throw new NotImplementedException();
+        return _icons.GetValueOrDefault(assetGuid);
     }
 
     /// <summary>
@@ -76,7 +76,12 @@ public sealed class GameIconSet
     /// <returns>The problem, or <see cref="GameIconProblem.None" /> when the asset has an icon</returns>
     public GameIconProblem Check(int assetGuid)
     {
-        throw new NotImplementedException();
+        if (_icons.ContainsKey(assetGuid))
+        {
+            return GameIconProblem.None;
+        }
+
+        return _problems.GetValueOrDefault(assetGuid, GameIconProblem.NoEntry);
     }
 
     /// <summary>
@@ -86,7 +91,7 @@ public sealed class GameIconSet
     /// <returns>The number of assets with the problem</returns>
     public int Count(GameIconProblem problem)
     {
-        throw new NotImplementedException();
+        return _problems.Values.Count(value => value == problem);
     }
 
     #endregion // Methods

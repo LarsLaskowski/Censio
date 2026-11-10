@@ -297,6 +297,15 @@ internal static class GameCatalogFiles
                     return true;
                 }
 
+            case ("Standard", "IconFilename"):
+                {
+                    var text = reader.ReadElementContentAsString().Trim();
+
+                    asset.IconFilename = text.Length == 0 ? null : text;
+
+                    return true;
+                }
+
             case ("Text", "OasisId"):
                 {
                     asset.TextId = GameCatalogXml.ParseLong(reader.ReadElementContentAsString());

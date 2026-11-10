@@ -40,7 +40,7 @@ internal static class GameCatalogBuilder
                 continue;
             }
 
-            var entry = CreateEntry(candidate, regionTypes, regionLists, lists, english, german, ref dropped);
+            var entry = CreateEntry(candidate, regionTypes, regionLists, assets.Regions, lists, english, german, ref dropped);
 
             if (entry is null)
             {
@@ -74,6 +74,7 @@ internal static class GameCatalogBuilder
     /// <param name="candidate">The candidate</param>
     /// <param name="regionTypes">The names of the region types</param>
     /// <param name="regionLists">The region types of the region assets</param>
+    /// <param name="regions">The region assets by GUID</param>
     /// <param name="lists">The split lists by source string, compared by reference</param>
     /// <param name="english">The English texts</param>
     /// <param name="german">The German texts</param>
@@ -82,6 +83,7 @@ internal static class GameCatalogBuilder
     private static GameCatalogEntry? CreateEntry(GameCatalogAsset candidate,
                                                  HashSet<string> regionTypes,
                                                  Dictionary<int, IReadOnlyList<string>?> regionLists,
+                                                 Dictionary<int, GameCatalogAsset> regions,
                                                  Dictionary<string, IReadOnlyList<string>> lists,
                                                  GameCatalogTexts english,
                                                  GameCatalogTexts german,
@@ -98,7 +100,8 @@ internal static class GameCatalogBuilder
                        EnglishName = english.NameOf(candidate.TextId),
                        GermanName = german.NameOf(candidate.TextId),
                        RegionGuid = regionGuid,
-                       RegionTypes = types
+                       RegionTypes = types,
+                       IconFilename = candidate.IconFilename ?? regions.GetValueOrDefault(regionGuid)?.IconFilename
                    };
         }
 
@@ -115,7 +118,8 @@ internal static class GameCatalogBuilder
                    Kind = kind,
                    EnglishName = english.NameOf(candidate.TextId),
                    GermanName = german.NameOf(candidate.TextId),
-                   RegionTypes = RegionList(list, regionTypes, lists, ref dropped)
+                   RegionTypes = RegionList(list, regionTypes, lists, ref dropped),
+                   IconFilename = candidate.IconFilename
                };
     }
 
