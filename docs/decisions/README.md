@@ -110,4 +110,5 @@ once in the [area document](../areas/README.md) of the record's area, and the re
 | [0046](0046-game-build-is-the-program-files-version.md) | The game build is identified by the program file's version, not the main-menu version | Accepted | 2026-11-09 |
 | [0047](0047-game-catalog-read-forward-only-from-config-rda-kinds-and-regions-from-the-data.md) | The game catalog is read forward-only from `config.rda`; kinds and regions come from the data, and the reader fails closed | Accepted | 2026-11-09 |
 | [0048](0048-catalog-names-shown-in-the-diagnostics-window-unresolved-guids-logged-once.md) | Catalog names are shown in the diagnostics window; GUIDs the catalog cannot name are logged once per run | Accepted | 2026-11-09 |
+| [0049](0049-region-type-of-a-region-asset-from-its-template-and-the-property-defaults.md) | A region asset's missing region type comes from its template and the property defaults | Accepted | 2026-11-09 |
 <!-- project:end index -->

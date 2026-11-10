@@ -1,0 +1,59 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Properties>
+  <Groups>
+    <Group>
+      <DefaultValues>
+        <Standard>
+          <GUID>0</GUID>
+          <Name>Property 1</Name>
+        </Standard>
+        <Text>
+          <OasisId>0</OasisId>
+        </Text>
+      </DefaultValues>
+      <Name>Default</Name>
+    </Group>
+    <Group>
+      <Groups>
+        <Group>
+          <DefaultContainerValues>
+            <Region>
+              <PathLayerDefinitions />
+              <RegionID>Zorlan</RegionID>
+            </Region>
+          </DefaultContainerValues>
+          <DefaultValues>
+            <Locked>
+              <IsLocked>0</IsLocked>
+            </Locked>
+            <Region>
+              <Kontor>0</Kontor>
+              <RegionID>Xanthi</RegionID>
+              <PathLayerDefinitions />
+            </Region>
+            <Session>
+              <Region>0</Region>
+            </Session>
+            <BenchmarkScene>
+              <Groups>
+                <Group>
+                  <DefaultValues>
+                    <Region>
+                      <RegionID>Zorlan</RegionID>
+                    </Region>
+                  </DefaultValues>
+                  <Name>Nested</Name>
+                </Group>
+              </Groups>
+            </BenchmarkScene>
+          </DefaultValues>
+          <Name>Session</Name>
+        </Group>
+      </Groups>
+      <Name>Outer</Name>
+    </Group>
+    <Group>
+      <Name>Empty</Name>
+    </Group>
+  </Groups>
+</Properties>

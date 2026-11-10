@@ -51,7 +51,7 @@ it without notice.
   corrupt first.
 - An archive that is opened retains at most the bound on entries, each with a path of at most 260 characters, plus
   the open file; directory buffers are freed per block. A read holds one entry's decompressed content on top, and for an entry of a memory-resident block also that block's decompressed data while it is read.
-- An entry above the entry bound cannot be read. The catalog's four files fit it (the largest, `assets.xml`, is about
+- An entry above the entry bound cannot be read. The catalog's six files fit it (the largest, `assets.xml`, is about
   44 MiB of 512 MiB); a file above it fails the catalog ([`game-catalog.md`](game-catalog.md), *Failures*).
 
 ### Typed results
@@ -107,7 +107,7 @@ an archive. The largest entry counts are 21,028 (`zz_patchfiles_300`), 46,110 (`
 | Data kind | What the run confirms | What it does not |
 | --------- | --------------------- | ---------------- |
 | Goods, buildings, workforce | Two configuration files exist in `config.rda` (194 entries, folder `data/base`): `data/base/config/export/assets.xml` (46,440,056 bytes) and `data/base/config/game/datasets.xml` (615,716 bytes). Issue #23 confirmed that every good, workforce and building the pipe fixture names is a defining asset of `assets.xml` with names in both texts; the nodes are in [`game-catalog.md`](game-catalog.md) | Whether a patch archive may replace them: none holds a copy on the Product Manager's installation |
-| Regions | The province data archives exist (`provinces_roman`, `provinces_celtic`, `dlc01_provinces`, `dlc03_provinces_01`, `dlc03_provinces_02`; entries of the kinds `.ctt`, `.tmc`, `.dds`, `.png`, `.a7m`, `.a7t`); no entry path outside `config.rda`'s assets, datasets and texts matched `province`. Issue #23 confirmed that the regions the pipe names are sessions of `assets.xml` whose `Session/Region` names a region asset, and that region types are the `Region` data set of `datasets.xml` ([`game-catalog.md`](game-catalog.md)) | The region type of a region asset without a `RegionID` (#130) |
+| Regions | The province data archives exist (`provinces_roman`, `provinces_celtic`, `dlc01_provinces`, `dlc03_provinces_01`, `dlc03_provinces_02`; entries of the kinds `.ctt`, `.tmc`, `.dds`, `.png`, `.a7m`, `.a7t`); no entry path outside `config.rda`'s assets, datasets and texts matched `province`. Issue #23 confirmed that the regions the pipe names are sessions of `assets.xml` whose `Session/Region` names a region asset, and that region types are the `Region` data set of `datasets.xml` ([`game-catalog.md`](game-catalog.md)) | Answered by #130: a region asset without a `RegionID` takes it from its template in `templates.xml`, else from the `Region` property default in `properties.xml` (same folder `data/base/config/export`) |
 | Texts (German, English) | `data/base/config/gui/texts_<language>.xml` in `config.rda`, for brazilian, english (6,784,986 bytes), french, german (7,071,912 bytes), italian, japanese, korean, metadata, polish, russian, simplified_chinese, spanish and traditional_chinese | The nodes (`TextExport/Texts/Text` with `LineId` and `Text`) are confirmed by #23. The language archives `de_de0.rda` and `en_us0.rda` hold only sound (`data/sound/generatedsoundbanks/windows/<de_de or en_us>/` with `.json`, `.txt`, `.xml`, `.wem` and `.bnk` entries), no texts |
 | Icons | `.dds` files under `data/ui/` in `ui.rda` (19,027 entries) and in the patch archives `zz_patchfiles_*`; one icon was read (a DDS file of 260 bytes from `ui.rda`). Folders, by group: `data/ui/4k/base/icon_content/<group>` (`production_goods`, `building`, `workforce`, `generic`, `items_specialist`, `ornaments`, `trade_route`, ship icons and others), `data/ui/4k/dlc01`, `dlc02` and `dlc03` with the same `icon_content/<group>` layout, `data/ui/2kimages/main/3dicons/<group>`, `data/ui/2kimages/main/icons/` (`workforce`, `limestone_workforce`) and `data/ui/2kimages/fpp/icons/` (`provinces`, `workforce_tiers`, `tech_tree`) | Which icon belongs to which good, building or workforce tier: the file names are not matched to identifiers; for #24 |
 
@@ -118,7 +118,7 @@ an archive. The largest entry counts are 21,028 (`zz_patchfiles_300`), 46,110 (`
   for example the group `production_goods` of the base folder in `ui.rda`, `zz_patchfiles_150` and
   `zz_patchfiles_300`). **Load order and which copy wins: unknown** (record
   [0043](../decisions/0043-rda-archives-read-by-an-own-bounded-reader.md)); the catalog uses `config.rda` and reports a
-  copy of its four files in another archive ([`game-catalog.md`](game-catalog.md)), and none exists on the Product
+  copy of its six files in another archive ([`game-catalog.md`](game-catalog.md)), and none exists on the Product
   Manager's installation (his statement of 2026-11-09); #24 depends on the order for icons. The Product Manager says the number in `zz_patchfiles_<n>` is the game
   version (higher is newer), but that probably all of these archives are loaded because a newer one does not contain
   the contents of the older ones; no evidence was found (Product Manager's statement, unverified), input for the load-order question. It is no reader error: a path in several archives is returned by each.

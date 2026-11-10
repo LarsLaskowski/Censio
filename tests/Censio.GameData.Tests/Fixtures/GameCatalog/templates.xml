@@ -1,0 +1,55 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Templates>
+  <Group>
+    <Name>Misc</Name>
+    <Template>
+      <Name>Plain</Name>
+      <Description>Template 1</Description>
+      <Properties>
+        <Standard />
+        <Text />
+      </Properties>
+    </Template>
+    <Group>
+      <Name>Session</Name>
+      <Template>
+        <Name>Region</Name>
+        <Properties>
+          <Standard />
+          <Region>
+            <Kontor>0</Kontor>
+          </Region>
+          <Locked />
+        </Properties>
+      </Template>
+      <Template>
+        <Name>SessionModerate</Name>
+        <Description>Template 2</Description>
+        <Properties>
+          <Standard />
+          <Session>
+            <Region />
+          </Session>
+        </Properties>
+      </Template>
+    </Group>
+    <Group>
+      <Name>Holder</Name>
+      <Template>
+        <Name>Holder</Name>
+        <Properties>
+          <Items>
+            <Template>
+              <Name>Region</Name>
+              <Properties>
+                <Region>
+                  <RegionID>Zorlan</RegionID>
+                </Region>
+              </Properties>
+            </Template>
+          </Items>
+        </Properties>
+      </Template>
+    </Group>
+  </Group>
+</Templates>

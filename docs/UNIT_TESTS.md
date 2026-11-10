@@ -30,8 +30,8 @@ neighboring test file before inventing a new pattern.
   `RdaInstallationSurveyRealInstallationReadsAssetAndIcon` and for the catalog test
   `GameCatalogReaderInstallationResolvesFixtureGuids` (`tests/Censio.GameData.Tests`); unset, those tests are reported
   inconclusive.
-- `CENSIO_CATALOG_SAMPLE`: the folder of the four loose game files `assets.xml`, `datasets.xml`, `texts_english.xml` and
-  `texts_german.xml` (never in the repository), for `GameCatalogReaderSampleResolvesFixtureGuids` and
+- `CENSIO_CATALOG_SAMPLE`: the folder of the six loose game files `assets.xml`, `datasets.xml`, `texts_english.xml`,
+  `texts_german.xml`, `properties.xml` and `templates.xml` (never in the repository), for `GameCatalogReaderSampleResolvesFixtureGuids` and
   `GameCatalogReaderFixtureHoldsNoSampleText` (`tests/Censio.GameData.Tests`); unset, those tests are reported
   inconclusive. They write GUIDs, kinds and counts only, never a name or text.
 <!-- project:end layout -->

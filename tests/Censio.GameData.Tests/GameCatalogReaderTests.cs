@@ -17,7 +17,7 @@ public sealed class GameCatalogReaderTests
     #region Constants
 
     /// <summary>
-    /// The name of the environment variable that names the folder of the four sample files.
+    /// The name of the environment variable that names the folder of the six sample files.
     /// </summary>
     private const string SampleVariable = "CENSIO_CATALOG_SAMPLE";
 
@@ -63,12 +63,12 @@ public sealed class GameCatalogReaderTests
     /// <summary>
     /// The names of the files of a catalog in the order of their passes.
     /// </summary>
-    private static readonly string[] _fileNames = ["datasets.xml", "assets.xml", "texts_english.xml", "texts_german.xml"];
+    private static readonly string[] _fileNames = ["datasets.xml", "assets.xml", "texts_english.xml", "texts_german.xml", "properties.xml", "templates.xml"];
 
     /// <summary>
     /// The paths of the files of a catalog in the order of their passes.
     /// </summary>
-    private static readonly string[] _filePaths = [GameCatalogReader.DataSetsPath, GameCatalogReader.AssetsPath, GameCatalogReader.EnglishTextsPath, GameCatalogReader.GermanTextsPath];
+    private static readonly string[] _filePaths = [GameCatalogReader.DataSetsPath, GameCatalogReader.AssetsPath, GameCatalogReader.EnglishTextsPath, GameCatalogReader.GermanTextsPath, GameCatalogReader.PropertiesPath, GameCatalogReader.TemplatesPath];
 
     /// <summary>
     /// The entries of the fixture: GUID, kind, English name, German name and problem.
@@ -150,8 +150,9 @@ public sealed class GameCatalogReaderTests
     #region AC1
 
     /// <summary>
-    /// With the four loose sample files, every non-zero GUID of the pipe fixture resolves to an entry of its kind with
-    /// both names; the test writes counts, unresolved GUIDs, the elapsed time and the peak working set only.
+    /// With the six loose sample files, every non-zero GUID of the pipe fixture resolves to an entry of its kind with
+    /// both names, and every region carries exactly one region type; the test writes counts, unresolved GUIDs, per region
+    /// its GUID, its region asset GUID and its number of region types, the elapsed time and the peak working set only.
     /// </summary>
     /// <returns>The task</returns>
     [TestMethod]
@@ -173,7 +174,9 @@ public sealed class GameCatalogReaderTests
         var result = GameCatalogReader.Read(() => OpenSample(folder, _fileNames[0]),
                                             () => OpenSample(folder, _fileNames[1]),
                                             () => OpenSample(folder, _fileNames[2]),
-                                            () => OpenSample(folder, _fileNames[3]));
+                                            () => OpenSample(folder, _fileNames[3]),
+                                            () => OpenSample(folder, _fileNames[4]),
+                                            () => OpenSample(folder, _fileNames[5]));
 
         stopwatch.Stop();
 
@@ -189,8 +192,9 @@ public sealed class GameCatalogReaderTests
     }
 
     /// <summary>
-    /// On a real installation, every non-zero GUID of the pipe fixture resolves through <c>Load</c>; the test writes
-    /// counts, unresolved GUIDs, the copies found in other archives, the elapsed time and the peak working set only.
+    /// On a real installation, every non-zero GUID of the pipe fixture resolves through <c>Load</c> and every region carries
+    /// exactly one region type; the test writes counts, unresolved GUIDs, per region its GUID, its region asset GUID and
+    /// its number of region types, the copies found in other archives, the elapsed time and the peak working set only.
     /// </summary>
     /// <returns>The task</returns>
     [TestMethod]
@@ -273,25 +277,6 @@ public sealed class GameCatalogReaderTests
         Assert.AreEqual(GameCatalogKind.Region, entry.Kind, "The random session should be a region entry");
         Assert.AreEqual(Base + 104, entry.RegionGuid, "The entry should carry the GUID of its region asset");
         Assert.AreSequenceEqual(["Yultic"], entry.RegionTypes, "The entry should carry the region type its region asset states");
-    }
-
-    /// <summary>
-    /// A region asset without a <c>RegionID</c> gives its region entries no region type.
-    /// </summary>
-    [TestMethod]
-    [TestCategory("AC2")]
-    public void GameCatalogReaderReadLeavesRegionTypeUnstatedWithoutRegionId()
-    {
-        // Arrange
-        var catalog = ReadFixtureCatalog();
-
-        // Act
-        var entry = catalog.Find(Base + 203);
-
-        // Assert
-        Assert.IsNotNull(entry, "The session should be an entry");
-        Assert.AreEqual(Base + 102, entry.RegionGuid, "The entry should carry the GUID of its region asset");
-        Assert.IsNull(entry.RegionTypes, "A region asset without a RegionID should give no region type, not an empty list");
     }
 
     /// <summary>
@@ -823,7 +808,7 @@ public sealed class GameCatalogReaderTests
     }
 
     /// <summary>
-    /// A <c>config.rda</c> that does not list one of the four files gives a missing-file error.
+    /// A <c>config.rda</c> that does not list one of the six files gives a missing-file error.
     /// </summary>
     /// <param name="missing">The index of the file the archive lacks</param>
     [TestMethod]
@@ -832,6 +817,8 @@ public sealed class GameCatalogReaderTests
     [DataRow(1)]
     [DataRow(2)]
     [DataRow(3)]
+    [DataRow(4)]
+    [DataRow(5)]
     public void GameCatalogReaderLoadFailsForMissingFile(int missing)
     {
         // Arrange
@@ -892,7 +879,7 @@ public sealed class GameCatalogReaderTests
     }
 
     /// <summary>
-    /// A document type declaration in any of the four files gives the malformed-file kind.
+    /// A document type declaration in any of the six files gives the malformed-file kind.
     /// </summary>
     /// <param name="file">The index of the file</param>
     [TestMethod]
@@ -901,10 +888,12 @@ public sealed class GameCatalogReaderTests
     [DataRow(1)]
     [DataRow(2)]
     [DataRow(3)]
+    [DataRow(4)]
+    [DataRow(5)]
     public void GameCatalogReaderReadFailsForDocumentTypeDeclaration(int file)
     {
         // Arrange
-        var root = new[] { "DataSets", "AssetList", "TextExport", "TextExport" }[file];
+        var root = new[] { "DataSets", "AssetList", "TextExport", "TextExport", "Properties", "Templates" }[file];
         var content = $"<!DOCTYPE {root} [<!ENTITY x \"{Secret}\">]><{root} />";
 
         // Act
@@ -1014,7 +1003,7 @@ public sealed class GameCatalogReaderTests
     }
 
     /// <summary>
-    /// The four files are read forward-only: streams that cannot seek and do not know their length give the same
+    /// The six files are read forward-only: streams that cannot seek and do not know their length give the same
     /// catalog as seekable ones.
     /// </summary>
     [TestMethod]
@@ -1025,7 +1014,9 @@ public sealed class GameCatalogReaderTests
         var result = GameCatalogReader.Read(() => GameCatalogSource.FromStream(new NonSeekableStream(new MemoryStream(FixtureBytes(_fileNames[0])))),
                                             () => GameCatalogSource.FromStream(new NonSeekableStream(new MemoryStream(FixtureBytes(_fileNames[1])))),
                                             () => GameCatalogSource.FromStream(new NonSeekableStream(new MemoryStream(FixtureBytes(_fileNames[2])))),
-                                            () => GameCatalogSource.FromStream(new NonSeekableStream(new MemoryStream(FixtureBytes(_fileNames[3])))));
+                                            () => GameCatalogSource.FromStream(new NonSeekableStream(new MemoryStream(FixtureBytes(_fileNames[3])))),
+                                            () => GameCatalogSource.FromStream(new NonSeekableStream(new MemoryStream(FixtureBytes(_fileNames[4])))),
+                                            () => GameCatalogSource.FromStream(new NonSeekableStream(new MemoryStream(FixtureBytes(_fileNames[5])))));
 
         // Assert
         Assert.IsNull(result.Error, $"Non-seekable streams should be read, but failed with {result.Error?.Kind}");
@@ -1034,7 +1025,7 @@ public sealed class GameCatalogReaderTests
     }
 
     /// <summary>
-    /// Each file is opened when its pass starts, in the order data set, assets, English, German, and its stream is
+    /// Each file is opened when its pass starts, in the order data set, assets, English, German, properties, templates, and its stream is
     /// disposed before the next opener is called.
     /// </summary>
     [TestMethod]
@@ -1055,7 +1046,7 @@ public sealed class GameCatalogReaderTests
         }
 
         // Act
-        var result = GameCatalogReader.Read(Opener(0), Opener(1), Opener(2), Opener(3));
+        var result = GameCatalogReader.Read(Opener(0), Opener(1), Opener(2), Opener(3), Opener(4), Opener(5));
 
         // Assert
         Assert.IsNotNull(result.Catalog, "The fixture should give a catalog");
@@ -1067,7 +1058,11 @@ public sealed class GameCatalogReaderTests
                                     "open texts_english.xml",
                                     "close texts_english.xml",
                                     "open texts_german.xml",
-                                    "close texts_german.xml"
+                                    "close texts_german.xml",
+                                    "open properties.xml",
+                                    "close properties.xml",
+                                    "open templates.xml",
+                                    "close templates.xml"
                                 ],
                                 log,
                                 "Each stream should be disposed before the next opener is called");
@@ -1091,6 +1086,12 @@ public sealed class GameCatalogReaderTests
     [DataRow(2, GameCatalogErrorKind.FileUnreadable)]
     [DataRow(0, GameCatalogErrorKind.ArchiveUnreadable)]
     [DataRow(3, GameCatalogErrorKind.ArchiveUnreadable)]
+    [DataRow(4, GameCatalogErrorKind.FileMissing)]
+    [DataRow(5, GameCatalogErrorKind.FileMissing)]
+    [DataRow(4, GameCatalogErrorKind.MalformedFile)]
+    [DataRow(5, GameCatalogErrorKind.MalformedFile)]
+    [DataRow(4, GameCatalogErrorKind.FileUnreadable)]
+    [DataRow(5, GameCatalogErrorKind.ArchiveUnreadable)]
     public void GameCatalogReaderReadEndsWithKindOfSourceError(int file, GameCatalogErrorKind kind)
     {
         // Arrange
@@ -1117,6 +1118,8 @@ public sealed class GameCatalogReaderTests
     [DataRow(1)]
     [DataRow(2)]
     [DataRow(3)]
+    [DataRow(4)]
+    [DataRow(5)]
     public void GameCatalogReaderReadGivesFileUnreadableWhenOpenerThrows(int file)
     {
         // Arrange
@@ -1142,6 +1145,8 @@ public sealed class GameCatalogReaderTests
     [DataRow(1)]
     [DataRow(2)]
     [DataRow(3)]
+    [DataRow(4)]
+    [DataRow(5)]
     public void GameCatalogReaderReadDisposesStreamOfFailedPass(int file)
     {
         // Arrange
@@ -1166,6 +1171,8 @@ public sealed class GameCatalogReaderTests
     [DataRow(1)]
     [DataRow(2)]
     [DataRow(3)]
+    [DataRow(4)]
+    [DataRow(5)]
     public void GameCatalogReaderReadAcceptsPartAtElementBound(int file)
     {
         // Arrange
@@ -1189,6 +1196,8 @@ public sealed class GameCatalogReaderTests
     [DataRow(1)]
     [DataRow(2)]
     [DataRow(3)]
+    [DataRow(4)]
+    [DataRow(5)]
     public void GameCatalogReaderReadFailsOneAboveElementBound(int file)
     {
         // Arrange
@@ -1212,6 +1221,8 @@ public sealed class GameCatalogReaderTests
     [DataRow(1)]
     [DataRow(2)]
     [DataRow(3)]
+    [DataRow(4)]
+    [DataRow(5)]
     public void GameCatalogReaderReadAcceptsPartAtDepthBound(int file)
     {
         // Act
@@ -1232,6 +1243,8 @@ public sealed class GameCatalogReaderTests
     [DataRow(1)]
     [DataRow(2)]
     [DataRow(3)]
+    [DataRow(4)]
+    [DataRow(5)]
     public void GameCatalogReaderReadFailsOneAboveDepthBound(int file)
     {
         // Act
@@ -1258,6 +1271,10 @@ public sealed class GameCatalogReaderTests
     [DataRow(2, 1, true)]
     [DataRow(3, 0, false)]
     [DataRow(3, 1, true)]
+    [DataRow(4, 0, false)]
+    [DataRow(4, 1, true)]
+    [DataRow(5, 0, false)]
+    [DataRow(5, 1, true)]
     public void GameCatalogReaderReadBoundsDepthOutsideDefinitions(int file, int extra, bool malformed)
     {
         // Arrange
@@ -1266,7 +1283,9 @@ public sealed class GameCatalogReaderTests
                       {
                           0 => $"<DataSets>{chain}<Group><Name>Global</Name>{DataSet("Region", "Zorlan")}</Group></DataSets>",
                           1 => $"<AssetList>{chain}</AssetList>",
-                          _ => $"<TextExport>{chain}</TextExport>"
+                          2 or 3 => $"<TextExport>{chain}</TextExport>",
+                          4 => $"<Properties>{chain}</Properties>",
+                          _ => $"<Templates>{chain}</Templates>"
                       };
 
         // Act
@@ -1364,7 +1383,8 @@ public sealed class GameCatalogReaderTests
         string[] assetNames = ["GUID", "Name", "IconFilename", "OasisId", "RegionID"];
         string[] dataSetNames = ["Name"];
         string[] textNames = ["LineId", "Text"];
-        string[][] names = [dataSetNames, assetNames, textNames, textNames];
+        string[] defaultNames = ["RegionID"];
+        string[][] names = [dataSetNames, assetNames, textNames, textNames, defaultNames, defaultNames];
         var shared = 0;
 
         // Act
@@ -1406,6 +1426,8 @@ public sealed class GameCatalogReaderTests
         var names = CollectValues(assets, ["Name"]);
         var icons = CollectValues(assets, ["IconFilename"]);
         var regionIds = CollectValues(assets, ["RegionID", "AssociatedRegion", "AssociatedRegions", "RegionType"]).SelectMany(value => value.Split(';')).ToHashSet();
+        var defaultRegionIds = CollectValues(FixtureBytes(_fileNames[4]), ["RegionID"]).Concat(CollectValues(FixtureBytes(_fileNames[5]), ["RegionID"])).ToHashSet();
+        var templateTexts = CollectValues(FixtureBytes(_fileNames[5]), ["Description"]).Concat(CollectValues(FixtureBytes(_fileNames[4]), ["Name"]).Where(value => value.StartsWith("Property ", StringComparison.Ordinal))).ToList();
         var textValues = texts.SelectMany(bytes => CollectValues(bytes, ["Text"])).ToList();
         var dataSetNames = CollectValues(FixtureBytes(_fileNames[0]), ["Name"]);
 
@@ -1415,10 +1437,379 @@ public sealed class GameCatalogReaderTests
         Assert.AreEqual(0, icons.Count(icon => IsInvented(icon, @"^data/fixture/icon_\d+\.png$") == false), "Every icon path should be an invented path");
         Assert.AreEqual(0, textValues.Count(text => IsInvented(text, @"^(Region|Gebiet|Session|Sitzung|Good|Ware|Worker|Arbeiter|Building|Gebäude|Unused|Ungenutzt) \d+$") == false), "Every text should be an invented text");
         Assert.IsEmpty(regionIds.Except(["Zorlan", "Yultic", "Xanthi", "Qwertz", "Vexan"]), "Every region type name should be an invented name");
+        Assert.IsNotEmpty(defaultRegionIds, "The property and template files should state region types");
+        Assert.IsEmpty(defaultRegionIds.Except(["Zorlan", "Yultic", "Xanthi", "Qwertz", "Vexan"]), "Every region type name of the property and template files should be an invented name");
+        Assert.IsNotEmpty(templateTexts, "The property and template files should hold descriptions or property names");
+        Assert.AreEqual(0, templateTexts.Count(text => IsInvented(text, @"^(Template|Property) \d+$") == false), "Every description and property name should be an invented text");
         Assert.IsEmpty(dataSetNames.Except(["Global", "FixtureKinds", "Region", "Zorlan", "Yultic", "Xanthi", "Vexan"]), "Every data set name should be an invented name");
     }
 
     #endregion // AC7
+
+    #region Region type defaults
+
+    /// <summary>
+    /// A region asset without a <c>RegionID</c> takes the default of the <c>Region</c> property: the fixture session of
+    /// region asset 102 carries the default type.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC1")]
+    public void GameCatalogReaderReadResolvesRegionTypeFromPropertyDefault()
+    {
+        // Arrange
+        var catalog = ReadFixtureCatalog();
+
+        // Act
+        var entry = catalog.Find(Base + 203);
+
+        // Assert
+        Assert.IsNotNull(entry, "The session should be an entry");
+        Assert.AreEqual(Base + 102, entry.RegionGuid, "The entry should carry the GUID of its region asset");
+        Assert.AreSequenceEqual(["Xanthi"], entry.RegionTypes, "A region asset without a RegionID should take the default of the Region property");
+    }
+
+    /// <summary>
+    /// The <c>RegionID</c> a template states wins over the property default.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC1")]
+    public void GameCatalogReaderReadPrefersTemplateRegionIdOverDefault()
+    {
+        // Arrange
+        var assets = Assets(RegionAssetWithoutRegionId(5, 1000, "Region"), Session(6, "SessionModerate", 5, 1000));
+
+        // Act
+        var catalog = ReadCatalogWithDefaults(DataSets("Zorlan", "Yultic"), assets, Properties(RegionDefault("Zorlan")), Templates(Template("Region", RegionDefault("Yultic"))));
+
+        // Assert
+        Assert.AreSequenceEqual(["Yultic"], catalog.Find(6)?.RegionTypes, "The RegionID of the template should win over the default");
+    }
+
+    /// <summary>
+    /// The <c>RegionID</c> a region asset states wins over its template and the property default.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC1")]
+    public void GameCatalogReaderReadPrefersAssetRegionIdOverTemplate()
+    {
+        // Arrange
+        var assets = Assets(RegionAsset(5, 1000, "Qwertz"), Session(6, "SessionModerate", 5, 1000));
+
+        // Act
+        var catalog = ReadCatalogWithDefaults(DataSets("Zorlan", "Yultic", "Qwertz"), assets, Properties(RegionDefault("Zorlan")), Templates(Template("Region", RegionDefault("Yultic"))));
+
+        // Assert
+        Assert.AreSequenceEqual(["Qwertz"], catalog.Find(6)?.RegionTypes, "The RegionID of the asset should win over the template and the default");
+    }
+
+    /// <summary>
+    /// An empty <c>RegionID</c> in the template or in the default is a stated value: it is dropped and counted, and the
+    /// session has an empty list of region types, not the default and not "not stated".
+    /// </summary>
+    /// <param name="templateRegion">The content of the template's <c>Properties</c> element</param>
+    /// <param name="defaultRegion">The content of the <c>DefaultValues</c> element</param>
+    [TestMethod]
+    [TestCategory("AC1")]
+    [DataRow("<Region><RegionID /></Region>", "<Region><RegionID>Zorlan</RegionID></Region>")]
+    [DataRow("<Region><Kontor>1</Kontor></Region>", "<Region><RegionID /></Region>")]
+    public void GameCatalogReaderReadCountsEmptyRegionIdAsStated(string templateRegion, string defaultRegion)
+    {
+        // Arrange
+        var assets = Assets(RegionAssetWithoutRegionId(5, 1000, "Region"), Session(6, "SessionModerate", 5, 1000));
+
+        // Act
+        var catalog = ReadCatalogWithDefaults(DataSets("Zorlan"), assets, Properties(defaultRegion), Templates(Template("Region", templateRegion)));
+
+        // Assert
+        var entry = catalog.Find(6);
+
+        Assert.IsNotNull(entry, "The session should be an entry");
+        Assert.IsNotNull(entry.RegionTypes, "An empty RegionID is stated, so the list should not be null");
+        Assert.IsEmpty(entry.RegionTypes, "The empty RegionID should win over the default and leave an empty list");
+        Assert.AreEqual(1, catalog.DroppedRegionTypeCount, "The empty RegionID should be counted as dropped");
+    }
+
+    /// <summary>
+    /// A region asset whose asset, template and default state no <c>RegionID</c> stays "not stated" (null).
+    /// </summary>
+    /// <param name="defaultValues">The content of the <c>DefaultValues</c> element</param>
+    [TestMethod]
+    [TestCategory("AC1")]
+    [DataRow("")]
+    [DataRow("<Region />")]
+    [DataRow("<Region><Kontor>1</Kontor></Region>")]
+    public void GameCatalogReaderReadLeavesRegionTypeUnstatedWithoutAnyRegionId(string defaultValues)
+    {
+        // Arrange
+        var assets = Assets(RegionAssetWithoutRegionId(5, 1000, "Region"), Session(6, "SessionModerate", 5, 1000));
+
+        // Act
+        var catalog = ReadCatalogWithDefaults(DataSets("Zorlan"), assets, Properties(defaultValues), Templates(Template("Region", "<Region><Kontor>1</Kontor></Region>")));
+
+        // Assert
+        var entry = catalog.Find(6);
+
+        Assert.IsNotNull(entry, "The session should be an entry");
+        Assert.IsNull(entry.RegionTypes, "Without a RegionID at any level the region type should stay not stated, not an empty list");
+        Assert.AreEqual(0, catalog.DroppedRegionTypeCount, "Nothing should be dropped");
+    }
+
+    /// <summary>
+    /// Empty <c>DefaultValues</c> and <c>DefaultContainerValues</c> elements state no default.
+    /// </summary>
+    /// <param name="properties">The property file</param>
+    [TestMethod]
+    [TestCategory("AC1")]
+    [DataRow("<Properties><Groups><Group><DefaultValues /><Name>Session</Name></Group></Groups></Properties>")]
+    [DataRow("<Properties><Groups><Group><DefaultContainerValues /><Name>Session</Name></Group></Groups></Properties>")]
+    [DataRow("<Properties><Groups><Group><DefaultValues /><DefaultContainerValues /></Group></Groups></Properties>")]
+    public void GameCatalogReaderReadLeavesRegionTypeUnstatedForEmptyDefaultElements(string properties)
+    {
+        // Arrange
+        var assets = Assets(RegionAssetWithoutRegionId(5, 1000, "Region"), Session(6, "SessionModerate", 5, 1000));
+
+        // Act
+        var catalog = ReadCatalogWithDefaults(DataSets("Zorlan"), assets, properties, Templates(Template("Region", "<Region><Kontor>1</Kontor></Region>")));
+
+        // Assert
+        var entry = catalog.Find(6);
+
+        Assert.IsNotNull(entry, "The session should be an entry");
+        Assert.IsNull(entry.RegionTypes, "An empty default element should state no region type");
+    }
+
+    /// <summary>
+    /// A text node and an empty part next to the <c>Region</c> default in <c>DefaultValues</c> change nothing.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC1")]
+    public void GameCatalogReaderReadSkipsTextAndEmptyPartsInDefaultValues()
+    {
+        // Arrange
+        var assets = Assets(RegionAssetWithoutRegionId(5, 1000, "Region"), Session(6, "SessionModerate", 5, 1000));
+        var properties = "<Properties><Groups><Group><DefaultValues>text<Other /><Region><RegionID>Zorlan</RegionID></Region></DefaultValues><Name>Session</Name></Group></Groups></Properties>";
+
+        // Act
+        var catalog = ReadCatalogWithDefaults(DataSets("Zorlan"), assets, properties, Templates(Template("Region", "<Region />")));
+
+        // Assert
+        Assert.AreSequenceEqual(["Zorlan"], catalog.Find(6)?.RegionTypes, "The Region default should still be read next to a text node and an empty part");
+    }
+
+    /// <summary>
+    /// An empty <c>Template</c> element is ignored and does not hide the templates next to it.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC1")]
+    public void GameCatalogReaderReadIgnoresEmptyTemplateElement()
+    {
+        // Arrange
+        var assets = Assets(RegionAssetWithoutRegionId(5, 1000, "Region"), Session(6, "SessionModerate", 5, 1000));
+
+        // Act
+        var catalog = ReadCatalogWithDefaults(DataSets("Zorlan", "Yultic"), assets, Properties(RegionDefault("Zorlan")), Templates("<Template />", Template("Region", RegionDefault("Yultic"))));
+
+        // Assert
+        Assert.AreSequenceEqual(["Yultic"], catalog.Find(6)?.RegionTypes, "The template after an empty Template element should still be read");
+    }
+
+    /// <summary>
+    /// A region asset whose template has no <c>Region</c> property, or is not listed, takes no default.
+    /// </summary>
+    /// <param name="listed">Whether the template is listed without a <c>Region</c> property</param>
+    [TestMethod]
+    [TestCategory("AC1")]
+    [DataRow(true)]
+    [DataRow(false)]
+    public void GameCatalogReaderReadLeavesRegionTypeUnstatedWithoutRegionProperty(bool listed)
+    {
+        // Arrange
+        var assets = Assets(RegionAssetWithoutRegionId(5, 1000, "Region"), Session(6, "SessionModerate", 5, 1000));
+        var templates = listed ? Templates(Template("Region", "<Standard />")) : Templates(Template("Other", RegionDefault("Zorlan")));
+
+        // Act
+        var catalog = ReadCatalogWithDefaults(DataSets("Zorlan"), assets, Properties(RegionDefault("Zorlan")), templates);
+
+        // Assert
+        var entry = catalog.Find(6);
+
+        Assert.IsNotNull(entry, "The session should be an entry");
+        Assert.IsNull(entry.RegionTypes, "A template without a Region property should take no default");
+    }
+
+    /// <summary>
+    /// A default <c>RegionID</c> that the <c>Region</c> data set does not hold leaves an empty list and is counted once
+    /// per region asset.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC1")]
+    public void GameCatalogReaderReadDropsUnknownDefaultRegionId()
+    {
+        // Arrange
+        var assets = Assets(RegionAssetWithoutRegionId(5, 1000, "Region"), RegionAssetWithoutRegionId(8, 1000, "Region"), Session(6, "SessionModerate", 5, 1000), Session(7, "SessionModerate", 5, 1000), Session(9, "SessionModerate", 8, 1000));
+
+        // Act
+        var catalog = ReadCatalogWithDefaults(DataSets("Zorlan"), assets, Properties(RegionDefault("Vexan")), Templates(Template("Region", "<Region />")));
+
+        // Assert
+        var entry = catalog.Find(6);
+
+        Assert.AreEqual(3, catalog.Count, "All three sessions should be entries");
+        Assert.IsNotNull(entry, "The session should be an entry");
+        Assert.IsNotNull(entry.RegionTypes, "A dropped default should leave an empty list, not no list");
+        Assert.IsEmpty(entry.RegionTypes, "The unknown default should be dropped from the entry");
+        Assert.AreEqual(2, catalog.DroppedRegionTypeCount, "The dropped default should be counted once per region asset");
+    }
+
+    /// <summary>
+    /// The default region type comes from the data, whatever its name.
+    /// </summary>
+    /// <param name="name">The invented name</param>
+    [TestMethod]
+    [TestCategory("AC2")]
+    [DataRow("Kalmar")]
+    [DataRow("Dunlin")]
+    public void GameCatalogReaderReadTakesDefaultRegionIdFromData(string name)
+    {
+        // Arrange
+        var assets = Assets(RegionAssetWithoutRegionId(5, 1000, "Region"), Session(6, "SessionModerate", 5, 1000));
+
+        // Act
+        var catalog = ReadCatalogWithDefaults(DataSets("Zorlan", name), assets, Properties(RegionDefault(name)), Templates(Template("Region", "<Region />")));
+
+        // Assert
+        Assert.AreSequenceEqual([name], catalog.Find(6)?.RegionTypes, "The region type should be the name the data states");
+    }
+
+    /// <summary>
+    /// A <c>DefaultContainerValues</c> region, a <c>Region</c> field of another property, a <c>Region</c> property
+    /// nested in another property's default and a template nested in another template's property are not read: the
+    /// fixture still resolves region asset 102 to its default, and the other region assets keep their own types.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC3")]
+    public void GameCatalogReaderReadIgnoresContainerDefaultsAndNestedTemplates()
+    {
+        // Arrange
+        var catalog = ReadFixtureCatalog();
+        var unknown = catalog.Find(Base + 204);
+
+        // Assert
+        Assert.AreSequenceEqual(["Xanthi"], catalog.Find(Base + 203)?.RegionTypes, "Only the DefaultValues region of a group should give the default");
+        Assert.AreSequenceEqual(["Zorlan"], catalog.Find(Base + 201)?.RegionTypes, "A region asset with its own RegionID should keep it");
+        Assert.AreSequenceEqual(["Yultic"], catalog.Find(Base + 202)?.RegionTypes, "A second region asset with its own RegionID should keep it");
+        Assert.IsNotNull(unknown?.RegionTypes, "The region asset with an unknown RegionID should keep its empty list");
+        Assert.IsEmpty(unknown.RegionTypes, "The region asset with an unknown RegionID should stay dropped");
+        Assert.AreEqual(2, catalog.DroppedRegionTypeCount, "The decoys should drop nothing more");
+    }
+
+    /// <summary>
+    /// A second <c>DefaultValues/Region</c> is a malformed file.
+    /// </summary>
+    /// <param name="content">The property file</param>
+    [TestMethod]
+    [TestCategory("AC3")]
+    [DataRow("<Properties><Groups><Group><DefaultValues><Region /><Region /></DefaultValues></Group></Groups></Properties>")]
+    [DataRow("<Properties><Groups><Group><DefaultValues><Region /></DefaultValues></Group><Group><DefaultValues><Region /></DefaultValues></Group></Groups></Properties>")]
+    public void GameCatalogReaderReadFailsForSecondRegionDefault(string content)
+    {
+        // Act
+        var result = ReadWithFile(4, content);
+
+        // Assert
+        Assert.IsNull(result.Catalog, "No catalog should be used");
+        Assert.AreEqual(GameCatalogErrorKind.MalformedFile, result.Error?.Kind, "A second Region default should be a malformed file");
+        Assert.AreEqual(MalformedMessage, result.Error?.Message, "The message should be the fixed text of a malformed file");
+    }
+
+    /// <summary>
+    /// A second defining template of the same name is a malformed file, whichever of the two has a <c>Region</c>
+    /// property.
+    /// </summary>
+    /// <param name="firstHasRegion">Whether the first template has a <c>Region</c> property</param>
+    /// <param name="secondHasRegion">Whether the second template has a <c>Region</c> property</param>
+    [TestMethod]
+    [TestCategory("AC3")]
+    [DataRow(true, true)]
+    [DataRow(true, false)]
+    [DataRow(false, true)]
+    [DataRow(false, false)]
+    public void GameCatalogReaderReadFailsForSecondRegionTemplate(bool firstHasRegion, bool secondHasRegion)
+    {
+        // Arrange
+        var first = Template("Region", firstHasRegion ? "<Region />" : "<Standard />");
+        var second = Template("Region", secondHasRegion ? "<Region />" : "<Standard />");
+
+        // Act
+        var result = ReadWithFile(5, Templates(first, second));
+
+        // Assert
+        Assert.IsNull(result.Catalog, "No catalog should be used");
+        Assert.AreEqual(GameCatalogErrorKind.MalformedFile, result.Error?.Kind, "A second defining template of a name should be a malformed file");
+        Assert.AreEqual(MalformedMessage, result.Error?.Message, "The message should be the fixed text of a malformed file");
+    }
+
+    /// <summary>
+    /// A property file with the root of the template file, and the reverse, is a malformed file.
+    /// </summary>
+    /// <param name="file">The index of the file</param>
+    /// <param name="root">The wrong root element</param>
+    [TestMethod]
+    [TestCategory("AC3")]
+    [DataRow(4, "Templates")]
+    [DataRow(5, "Properties")]
+    public void GameCatalogReaderReadFailsForWrongRootOfDefaultFile(int file, string root)
+    {
+        // Act
+        var result = ReadWithFile(file, $"<{root}><Groups /></{root}>");
+
+        // Assert
+        Assert.IsNull(result.Catalog, "No catalog should be used");
+        Assert.AreEqual(GameCatalogErrorKind.MalformedFile, result.Error?.Kind, "A wrong root element should be a malformed file");
+        Assert.AreEqual(MalformedMessage, result.Error?.Message, "The message should be the fixed text of a malformed file");
+    }
+
+    /// <summary>
+    /// A copy of the template file in another archive is reported.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC3")]
+    public void GameCatalogReaderLoadReportsCopyOfTemplates()
+    {
+        // Arrange
+        WriteConfigArchive(-1);
+        File.WriteAllBytes(Path.Combine(MainData, "patch1.rda"), new RdaArchiveBuilder().AddBlock(0, (GameCatalogReader.TemplatesPath, RdaArchiveBuilder.Content("<Templates />"))).Build().Bytes);
+
+        // Act
+        var result = GameCatalogReader.Load(_root, RdaLimits.Default);
+
+        // Assert
+        Assert.IsNotNull(result.Catalog, $"The installation should give a catalog, but failed with {result.Error?.Kind}");
+        Assert.HasCount(1, result.Copies, "The copy in the other archive should be reported");
+        Assert.AreEqual(GameCatalogReader.TemplatesPath, result.Copies[0].Path, "The copy should name the path of the template file");
+    }
+
+    /// <summary>
+    /// A copy of the property file in another archive is reported.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC3")]
+    public void GameCatalogReaderLoadReportsCopyOfProperties()
+    {
+        // Arrange
+        WriteConfigArchive(-1);
+        File.WriteAllBytes(Path.Combine(MainData, "patch1.rda"), new RdaArchiveBuilder().AddBlock(0, (GameCatalogReader.PropertiesPath, RdaArchiveBuilder.Content("<Properties />"))).Build().Bytes);
+
+        // Act
+        var result = GameCatalogReader.Load(_root, RdaLimits.Default);
+
+        // Assert
+        Assert.IsNotNull(result.Catalog, $"The installation should give a catalog, but failed with {result.Error?.Kind}");
+        Assert.HasCount(1, result.Copies, "The copy in the other archive should be reported");
+        Assert.AreEqual(GameCatalogReader.PropertiesPath, result.Copies[0].Path, "The copy should name the path of the property file");
+    }
+
+    #endregion // Region type defaults
 
     #region Helpers
 
@@ -1472,7 +1863,25 @@ public sealed class GameCatalogReaderTests
     /// <returns>The catalog</returns>
     private static GameCatalog ReadCatalog(string dataSets, string assets, string english, string german)
     {
-        var result = GameCatalogReader.Read(Open(dataSets), Open(assets), Open(english), Open(german));
+        var result = GameCatalogReader.Read(Open(dataSets), Open(assets), Open(english), Open(german), FixtureOpener(4), FixtureOpener(5));
+
+        Assert.IsNull(result.Error, $"The files should give a catalog, but failed with {result.Error?.Kind}");
+        Assert.IsNotNull(result.Catalog, "The files should give a catalog");
+
+        return result.Catalog;
+    }
+
+    /// <summary>
+    /// Reads the catalog from texts with given property and template files, requiring that it is built.
+    /// </summary>
+    /// <param name="dataSets">The data set file</param>
+    /// <param name="assets">The asset file</param>
+    /// <param name="properties">The property file</param>
+    /// <param name="templates">The template file</param>
+    /// <returns>The catalog</returns>
+    private static GameCatalog ReadCatalogWithDefaults(string dataSets, string assets, string properties, string templates)
+    {
+        var result = GameCatalogReader.Read(Open(dataSets), Open(assets), Open(Texts((1000, "Region 5"))), Open(Texts((1000, "Gebiet 5"))), Open(properties), Open(templates));
 
         Assert.IsNull(result.Error, $"The files should give a catalog, but failed with {result.Error?.Kind}");
         Assert.IsNotNull(result.Catalog, "The files should give a catalog");
@@ -1489,12 +1898,24 @@ public sealed class GameCatalogReaderTests
         var result = GameCatalogReader.Read(() => GameCatalogSource.FromStream(new MemoryStream(FixtureBytes(_fileNames[0]))),
                                             () => GameCatalogSource.FromStream(new MemoryStream(FixtureBytes(_fileNames[1]))),
                                             () => GameCatalogSource.FromStream(new MemoryStream(FixtureBytes(_fileNames[2]))),
-                                            () => GameCatalogSource.FromStream(new MemoryStream(FixtureBytes(_fileNames[3]))));
+                                            () => GameCatalogSource.FromStream(new MemoryStream(FixtureBytes(_fileNames[3]))),
+                                            () => GameCatalogSource.FromStream(new MemoryStream(FixtureBytes(_fileNames[4]))),
+                                            () => GameCatalogSource.FromStream(new MemoryStream(FixtureBytes(_fileNames[5]))));
 
         Assert.IsNull(result.Error, $"The fixture should give a catalog, but failed with {result.Error?.Kind}");
         Assert.IsNotNull(result.Catalog, "The fixture should give a catalog");
 
         return result.Catalog;
+    }
+
+    /// <summary>
+    /// Opens a fixture file.
+    /// </summary>
+    /// <param name="index">The index of the file</param>
+    /// <returns>The opener</returns>
+    private static Func<GameCatalogSource> FixtureOpener(int index)
+    {
+        return () => GameCatalogSource.FromStream(new MemoryStream(FixtureBytes(_fileNames[index])));
     }
 
     /// <summary>
@@ -1510,7 +1931,7 @@ public sealed class GameCatalogReaderTests
             return index == file ? Open(content) : () => GameCatalogSource.FromStream(new MemoryStream(FixtureBytes(_fileNames[index])));
         }
 
-        return GameCatalogReader.Read(Opener(0), Opener(1), Opener(2), Opener(3));
+        return GameCatalogReader.Read(Opener(0), Opener(1), Opener(2), Opener(3), Opener(4), Opener(5));
     }
 
     /// <summary>
@@ -1570,6 +1991,59 @@ public sealed class GameCatalogReaderTests
     private static string RegionAsset(int guid, long textId, string regionId)
     {
         return string.Create(CultureInfo.InvariantCulture, $"<Asset><Template>Region</Template><Values><Standard><GUID>{guid}</GUID></Standard><Text><OasisId>{textId}</OasisId></Text><Region><RegionID>{regionId}</RegionID></Region></Values></Asset>");
+    }
+
+    /// <summary>
+    /// Creates a region asset that states no <c>RegionID</c>.
+    /// </summary>
+    /// <param name="guid">The GUID</param>
+    /// <param name="textId">The text identifier</param>
+    /// <param name="template">The template</param>
+    /// <returns>The asset</returns>
+    private static string RegionAssetWithoutRegionId(int guid, long textId, string template)
+    {
+        return string.Create(CultureInfo.InvariantCulture, $"<Asset><Template>{template}</Template><Values><Standard><GUID>{guid}</GUID></Standard><Text><OasisId>{textId}</OasisId></Text><Region><Kontor>1</Kontor></Region></Values></Asset>");
+    }
+
+    /// <summary>
+    /// Creates a property defaults file with one group.
+    /// </summary>
+    /// <param name="defaultValues">The content of the <c>DefaultValues</c> element</param>
+    /// <returns>The file</returns>
+    private static string Properties(string defaultValues)
+    {
+        return $"<Properties><Groups><Group><DefaultValues>{defaultValues}</DefaultValues><Name>Session</Name></Group></Groups></Properties>";
+    }
+
+    /// <summary>
+    /// Creates the <c>Region</c> property default.
+    /// </summary>
+    /// <param name="regionId">The region type</param>
+    /// <returns>The property</returns>
+    private static string RegionDefault(string regionId)
+    {
+        return $"<Region><RegionID>{regionId}</RegionID></Region>";
+    }
+
+    /// <summary>
+    /// Creates a templates file with one group.
+    /// </summary>
+    /// <param name="templates">The templates</param>
+    /// <returns>The file</returns>
+    private static string Templates(params string[] templates)
+    {
+        return $"<Templates><Group><Name>Session</Name>{string.Concat(templates)}</Group></Templates>";
+    }
+
+    /// <summary>
+    /// Creates a defining template.
+    /// </summary>
+    /// <param name="name">The name</param>
+    /// <param name="properties">The content of its <c>Properties</c> element</param>
+    /// <returns>The template</returns>
+    private static string Template(string name, string properties)
+    {
+        return $"<Template><Name>{name}</Name><Properties>{properties}</Properties></Template>";
     }
 
     /// <summary>
@@ -1760,7 +2234,7 @@ public sealed class GameCatalogReaderTests
                    };
         }
 
-        return GameCatalogReader.Read(Opener(0), Opener(1), Opener(2), Opener(3));
+        return GameCatalogReader.Read(Opener(0), Opener(1), Opener(2), Opener(3), Opener(4), Opener(5));
     }
 
     /// <summary>
@@ -1801,7 +2275,9 @@ public sealed class GameCatalogReaderTests
                {
                    0 => $"<DataSets><Group><Name>Global</Name><DataSet><Name>Region</Name><Items><Item><Name>Zorlan</Name></Item></Items>{filler}</DataSet></Group></DataSets>",
                    1 => $"<AssetList><Groups><Group><Assets><Asset><Template>Product</Template><Values><Standard><GUID>10</GUID></Standard></Values>{filler}</Asset></Assets></Group></Groups></AssetList>",
-                   _ => $"<TextExport><Texts><Text><LineId>1000</LineId><Text>Good 10</Text>{filler}</Text></Texts></TextExport>"
+                   2 or 3 => $"<TextExport><Texts><Text><LineId>1000</LineId><Text>Good 10</Text>{filler}</Text></Texts></TextExport>",
+                   4 => $"<Properties><Groups><Group><DefaultValues><Region>{filler}</Region></DefaultValues><Name>Session</Name></Group></Groups></Properties>",
+                   _ => $"<Templates><Group><Template><Name>Plain</Name><Properties />{filler}</Template></Group></Templates>"
                };
     }
 
@@ -1812,7 +2288,12 @@ public sealed class GameCatalogReaderTests
     /// <returns>The number of elements</returns>
     private static int BaseElements(int file)
     {
-        return file < 2 ? 5 : 3;
+        return file switch
+               {
+                   < 2 => 5,
+                   4 => 1,
+                   _ => 3
+               };
     }
 
     /// <summary>
@@ -1826,8 +2307,9 @@ public sealed class GameCatalogReaderTests
     }
 
     /// <summary>
-    /// Checks that every GUID resolves to an entry of its kind with a non-empty English and German name, and writes
-    /// counts and unresolved GUIDs, never a name.
+    /// Checks that every GUID resolves to an entry of its kind with a non-empty English and German name and that every
+    /// region carries exactly one region type, and writes counts, unresolved GUIDs and per region its GUID, its region
+    /// asset GUID and its number of region types, never a name.
     /// </summary>
     /// <param name="catalog">The catalog</param>
     /// <param name="guids">The GUIDs by role</param>
@@ -1855,6 +2337,17 @@ public sealed class GameCatalogReaderTests
                 else if (string.IsNullOrEmpty(entry.EnglishName) || string.IsNullOrEmpty(entry.GermanName))
                 {
                     problem = $"{role} {guid}: name missing ({catalog.Check(guid)})";
+                }
+                else if (kind == GameCatalogKind.Region)
+                {
+                    var count = entry.RegionTypes?.Count ?? 0;
+
+                    TestContext.WriteLine(string.Create(CultureInfo.InvariantCulture, $"Region {guid}: region asset {entry.RegionGuid}, {count} region types"));
+
+                    if (count != 1)
+                    {
+                        problem = $"{role} {guid}: region asset {entry.RegionGuid} has {count} region types";
+                    }
                 }
 
                 if (problem is not null)

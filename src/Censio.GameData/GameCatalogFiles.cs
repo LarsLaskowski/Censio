@@ -3,7 +3,7 @@ using System.Xml;
 namespace Censio.GameData;
 
 /// <summary>
-/// Reads the four catalog files, each in one forward-only pass.
+/// Reads the data set, asset and text files, each in one forward-only pass.
 /// </summary>
 internal static class GameCatalogFiles
 {
