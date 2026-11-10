@@ -1029,6 +1029,73 @@ public sealed class GameCatalogLoaderTests
     }
 
     /// <summary>
+    /// A changed installation without a folder is not extracted and changes nothing.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    [TestCategory("AC3")]
+    public async Task GameCatalogLoaderConnectedRefreshedWithoutFolderDoesNothing()
+    {
+        // Arrange
+        using var rig = new CatalogLoaderRig();
+
+        rig.Loader.Run(CatalogLoaderRig.Found());
+        rig.CurrentKey = CatalogLoaderRig.Key("2");
+
+        var statuses = rig.Statuses.Count;
+        var messages = rig.Logger.Entries.Count;
+
+        // Act
+        await rig.Loader.OnConnectionStatusChangedAsync(Connected(),
+                                                        () => new GameInstallationStatus
+                                                              {
+                                                                  Kind = GameInstallationStatusKind.Found,
+                                                                  Build = "2"
+                                                              }).WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(1, rig.BuildCalls, "Nothing should be extracted");
+        Assert.HasCount(statuses, rig.Statuses, "No status should be raised");
+        Assert.HasCount(messages, rig.Logger.Entries, "Nothing should be logged");
+    }
+
+    /// <summary>
+    /// A check that throws logs the failed check, keeps the catalog and the icons, and leaves the loader free for the next
+    /// check, which extracts a changed game.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    [TestCategory("AC3")]
+    public async Task GameCatalogLoaderConnectedCheckThrowsLogsWarningAndCanCheckAgain()
+    {
+        // Arrange
+        using var rig = new CatalogLoaderRig();
+
+        rig.Loader.Run(CatalogLoaderRig.Found());
+
+        var catalog = rig.Loader.Catalog;
+        var icons = rig.Loader.Icons;
+        var before = rig.Logger.Entries.Count;
+
+        // Act
+        await rig.Loader.OnConnectionStatusChangedAsync(Connected(), () => throw new IOException("The build cannot be read")).WaitAsync(_guard, TestContext.CancellationToken);
+
+        var afterFailure = rig.Logger.Entries.Skip(before).Select(entry => (entry.Level, entry.Message)).ToList();
+        var keptCatalog = rig.Loader.Catalog;
+        var keptIcons = rig.Loader.Icons;
+
+        rig.CurrentKey = CatalogLoaderRig.Key("2");
+
+        await Check(rig, "2");
+
+        // Assert
+        Assert.AreSequenceEqual([(LogLevel.Warning, "Catalog check failed; the current catalog is kept")], afterFailure, "A warning should be the only new line");
+        Assert.AreSame(catalog, keptCatalog, "The current catalog should be kept");
+        Assert.AreSame(icons, keptIcons, "The current icons should be kept");
+        Assert.AreEqual(2, rig.BuildCalls, "The next check should extract the changed game");
+    }
+
+    /// <summary>
     /// A connection during a running check starts no second check: the call returns at once and the extraction runs once.
     /// </summary>
     /// <returns>The task</returns>

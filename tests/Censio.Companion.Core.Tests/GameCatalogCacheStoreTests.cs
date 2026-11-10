@@ -392,5 +392,83 @@ public sealed class GameCatalogCacheStoreTests
         Assert.IsTrue(File.Exists(target), "The file the link pointed to should stay");
     }
 
+    /// <summary>
+    /// A cache file that cannot be opened, here because it is a folder, is invalid and no exception reaches the caller.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC6")]
+    public void GameCatalogCacheStoreLoadFileIsFolderReturnsInvalid()
+    {
+        // Arrange
+        Directory.CreateDirectory(Path.Combine(Folder, GameCatalogCacheStore.FileName));
+
+        var store = new GameCatalogCacheStore(Folder, _clock);
+
+        // Act
+        var result = store.Load(CatalogLoaderRig.Key());
+
+        // Assert
+        Assert.AreEqual(GameCatalogCacheResultKind.Invalid, result.Kind, "A cache file that cannot be opened should be invalid");
+        Assert.IsNull(result.Catalog, "No catalog should be returned");
+    }
+
+    /// <summary>
+    /// Content that exceeds a bound of the file is not written: the save fails with an exception, leaves no temporary file and
+    /// keeps the cache that was there.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC5")]
+    public void GameCatalogCacheStoreSaveAboveBoundReturnsFailureAndLeavesNoTemporaryFile()
+    {
+        // Arrange
+        var store = new GameCatalogCacheStore(Folder, _clock);
+        var tooLong = new GameCatalogEntry
+                      {
+                          AssetGuid = 1,
+                          Kind = GameCatalogKind.Good,
+                          EnglishName = new string('a', GameCatalogCacheFile.MaxStringBytes + 1)
+                      };
+
+        store.Save(CatalogLoaderRig.Key("1"), CatalogLoaderRig.Catalog(2), CatalogLoaderRig.Icons());
+
+        // Act
+        var result = store.Save(CatalogLoaderRig.Key("2"), new GameCatalog([tooLong], [], 0, 0), CatalogLoaderRig.Icons());
+
+        // Assert
+        Assert.IsFalse(result.IsWritten, "Content above a bound should not be written");
+        Assert.IsNotNull(result.Failure, "The failure should carry an exception");
+        Assert.AreSequenceEqual([GameCatalogCacheStore.FileName], Directory.GetFileSystemEntries(Folder).Select(Path.GetFileName).ToList(), "No temporary file should remain");
+        Assert.AreEqual(GameCatalogCacheResultKind.Loaded, store.Load(CatalogLoaderRig.Key("1")).Kind, "The earlier cache should be kept");
+    }
+
+    /// <summary>
+    /// An old temporary file that cannot be deleted, here because another handle holds it without sharing deletion, is left
+    /// and does not stop the save.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC6")]
+    [OSCondition(OperatingSystems.Windows)]
+    public void GameCatalogCacheStoreSaveUndeletableTemporaryFileStillWrites()
+    {
+        // Arrange
+        Directory.CreateDirectory(Folder);
+
+        var path = Path.Combine(Folder, TemporaryName);
+
+        File.WriteAllBytes(path, [1]);
+        File.SetLastWriteTimeUtc(path, _clock.GetUtcNow().UtcDateTime.AddHours(-100));
+
+        using var held = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+
+        var store = new GameCatalogCacheStore(Folder, _clock);
+
+        // Act
+        var result = store.Save(CatalogLoaderRig.Key(), CatalogLoaderRig.Catalog(2), CatalogLoaderRig.Icons());
+
+        // Assert
+        Assert.IsTrue(result.IsWritten, "The cache should be written although an old file stays");
+        Assert.IsTrue(File.Exists(path), "The file that could not be deleted should stay");
+    }
+
     #endregion // Methods
 }
