@@ -236,30 +236,12 @@ public static class Bc7Decoder
     {
         var count = _subsetCounts[mode] * 2;
 
-        for (var channel = 0; channel < Channels; channel++)
-        {
-            var bits = channel == AlphaChannel ? _alphaBits[mode] : _colorBits[mode];
-
-            for (var endpoint = 0; endpoint < count; endpoint++)
-            {
-                endpoints[(endpoint * Channels) + channel] = ReadBits(block, ref position, bits);
-            }
-        }
+        ReadStoredEndpoints(block, ref position, mode, count, endpoints);
 
         var kind = _sharedBitKinds[mode];
         Span<int> shared = stackalloc int[count];
 
-        for (var endpoint = 0; endpoint < count; endpoint++)
-        {
-            if (kind == 1 || (kind == 2 && (endpoint & 1) == 0))
-            {
-                shared[endpoint] = ReadBits(block, ref position, 1);
-            }
-            else if (kind == 2)
-            {
-                shared[endpoint] = shared[endpoint - 1];
-            }
-        }
+        ReadSharedBits(block, ref position, kind, shared);
 
         for (var endpoint = 0; endpoint < count; endpoint++)
         {
@@ -269,6 +251,49 @@ public static class Bc7Decoder
                 var index = (endpoint * Channels) + channel;
 
                 endpoints[index] = bits == 0 ? 255 : Expand(endpoints[index], bits, kind, shared[endpoint]);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Reads the stored bits of the endpoints, channel by channel.
+    /// </summary>
+    /// <param name="block">The block</param>
+    /// <param name="position">The bit position, advanced past the stored bits</param>
+    /// <param name="mode">The mode of the block</param>
+    /// <param name="count">The number of endpoints</param>
+    /// <param name="endpoints">Receives the stored values, four channels each</param>
+    private static void ReadStoredEndpoints(ReadOnlySpan<byte> block, ref int position, int mode, int count, Span<int> endpoints)
+    {
+        for (var channel = 0; channel < Channels; channel++)
+        {
+            var bits = channel == AlphaChannel ? _alphaBits[mode] : _colorBits[mode];
+
+            for (var endpoint = 0; endpoint < count; endpoint++)
+            {
+                endpoints[(endpoint * Channels) + channel] = ReadBits(block, ref position, bits);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Reads the shared bits of the endpoints.
+    /// </summary>
+    /// <param name="block">The block</param>
+    /// <param name="position">The bit position, advanced past the shared bits</param>
+    /// <param name="kind">The kind of shared bits of the mode</param>
+    /// <param name="shared">Receives the shared bit of each endpoint</param>
+    private static void ReadSharedBits(ReadOnlySpan<byte> block, ref int position, int kind, Span<int> shared)
+    {
+        for (var endpoint = 0; endpoint < shared.Length; endpoint++)
+        {
+            if (kind == 1 || (kind == 2 && (endpoint & 1) == 0))
+            {
+                shared[endpoint] = ReadBits(block, ref position, 1);
+            }
+            else if (kind == 2)
+            {
+                shared[endpoint] = shared[endpoint - 1];
             }
         }
     }

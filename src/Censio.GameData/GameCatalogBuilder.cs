@@ -40,7 +40,7 @@ internal static class GameCatalogBuilder
                 continue;
             }
 
-            var entry = CreateEntry(candidate, regionTypes, regionLists, assets.Regions, lists, english, german, ref dropped);
+            var entry = CreateEntry(candidate, regionTypes, regionLists, assets.Regions, lists, (english.NameOf(candidate.TextId), german.NameOf(candidate.TextId)), ref dropped);
 
             if (entry is null)
             {
@@ -76,8 +76,7 @@ internal static class GameCatalogBuilder
     /// <param name="regionLists">The region types of the region assets</param>
     /// <param name="regions">The region assets by GUID</param>
     /// <param name="lists">The split lists by source string, compared by reference</param>
-    /// <param name="english">The English texts</param>
-    /// <param name="german">The German texts</param>
+    /// <param name="names">The English and the German name of the candidate</param>
     /// <param name="dropped">The number of dropped region types</param>
     /// <returns>The entry, or <c>null</c> when the candidate is none</returns>
     private static GameCatalogEntry? CreateEntry(GameCatalogAsset candidate,
@@ -85,8 +84,7 @@ internal static class GameCatalogBuilder
                                                  Dictionary<int, IReadOnlyList<string>?> regionLists,
                                                  Dictionary<int, GameCatalogAsset> regions,
                                                  Dictionary<string, IReadOnlyList<string>> lists,
-                                                 GameCatalogTexts english,
-                                                 GameCatalogTexts german,
+                                                 (string? English, string? German) names,
                                                  ref int dropped)
     {
         var guid = candidate.Guid.GetValueOrDefault();
@@ -97,8 +95,8 @@ internal static class GameCatalogBuilder
                    {
                        AssetGuid = guid,
                        Kind = GameCatalogKind.Region,
-                       EnglishName = english.NameOf(candidate.TextId),
-                       GermanName = german.NameOf(candidate.TextId),
+                       EnglishName = names.English,
+                       GermanName = names.German,
                        RegionGuid = regionGuid,
                        RegionTypes = types,
                        IconFilename = candidate.IconFilename ?? regions.GetValueOrDefault(regionGuid)?.IconFilename
@@ -116,8 +114,8 @@ internal static class GameCatalogBuilder
                {
                    AssetGuid = guid,
                    Kind = kind,
-                   EnglishName = english.NameOf(candidate.TextId),
-                   GermanName = german.NameOf(candidate.TextId),
+                   EnglishName = names.English,
+                   GermanName = names.German,
                    RegionTypes = RegionList(list, regionTypes, lists, ref dropped),
                    IconFilename = candidate.IconFilename
                };

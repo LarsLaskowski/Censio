@@ -86,7 +86,9 @@ read. A finding of a rule no local analyzer reports is noted in this section, in
 squad lesson. `csharpsquid:S3776` (cognitive complexity above 15 in one method) is such a rule: no local analyzer
 reports it, so split a long method with nested branches into private methods while writing it. `csharpsquid:S1192`
 (a string literal repeated four times or more in one file) is such a rule too: name a repeated literal with a private
-constant while writing the code.
+constant while writing the code. `csharpsquid:S107` (a method with more than seven parameters) is such a rule too: bundle
+related arguments into a small type (a record or a readonly struct with XML documentation) while writing the signature,
+rather than adding parameters to a method that already has seven.
 
 ## Image build check
 
