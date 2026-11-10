@@ -9,19 +9,19 @@ The Companion's catalog ([`game-catalog.md`](../../docs/areas/game-catalog.md)) 
 pictures: the diagnostics window shows text only ([`companion.md`](../../docs/areas/companion.md), *Diagnostics
 window*, "icons do not exist yet"), and the later web UI (#26, #42) has nothing to show beside a name. The icons are in
 the player's own installation as DDS files in `ui.rda` and the `zz_patchfiles_*` archives
-([`game-files.md`](../../docs/areas/game-files.md), *Locations*), a format no browser shows, and they belong to the
-publisher, so they may only be extracted on the player's machine (record
+([`game-files.md`](../../docs/areas/game-files.md), *Locations*), which no browser shows, and may only be extracted on the player's machine (record
 [0023](../../docs/decisions/0023-game-names-and-icons-extracted-locally.md)).
 
 ## Scenarios
 
-- S1: Given a found installation, when the Companion builds the catalog at start, then every good entry, and every
-  region entry, whose asset names an icon the game's archives hold gets that icon as a PNG image, held in memory with
-  the catalog; nothing is written to disk.
+- S1: Given a found installation, when the Companion builds the catalog at start, then every good entry whose asset
+  names an icon (`IconFilename`) the game's archives hold gets that icon as a PNG image of the full size the archive
+  holds, kept in memory with the catalog; nothing is written to disk. The asset names
+  `data/ui/fhd/<rest>.png`; the archives hold it as `data/ui/4k/<rest>_0.dds` (the Product Manager's sample).
 - S2: Given a ready catalog with icons, when the player opens `Open diagnostics`, then the `Region` and `Good` cells of a
   GUID that has an icon show the icon before the text they show today; a cell without an icon looks as today.
-- S3: Given a region entry whose session asset names no icon, when the catalog is built, then the entry gets the icon
-  of the region asset it refers to, if that one names one.
+- S3: Given a region entry, when the catalog is built, then it gets the icon its own session asset names, and without
+  one the icon of the region asset it refers to (game sessions name none).
 - S4: Given an icon path that `ui.rda` and one or more `zz_patchfiles_<n>` archives all hold, when the icon is
   extracted, then the copy of the newest archive is used: the highest `<n>`, `ui.rda` being the oldest.
 - S5: Given a built catalog, when the build ends, then the log holds one information line with the number of good and
@@ -29,16 +29,19 @@ publisher, so they may only be extracted on the player's machine (record
 
 ## Errors and edge cases
 
-- E1: `ui.rda` is missing or cannot be opened, or listing the patch archives fails: no entry has an icon; the names,
-  the entries and the `Catalog:` menu line are the same as without icons; a warning log line names the failure kind.
+- E1: `ui.rda` is missing or cannot be opened, or listing the patch archives fails: no entry has an icon; names,
+  entries and the `Catalog:` line are unchanged; a warning log line names the failure kind.
 - E2: The asset (and for a region entry also its region asset) names no icon: no icon, counted as *not named*.
-- E3: No archive of S4 holds the named icon: no icon, counted as *missing*.
-- E4: The file is not a DDS image of a supported pixel format, contradicts its own size, exceeds a bound (N2), or its
-  archive entry cannot be read: no icon, counted as *unreadable*; the other icons and the names are unaffected.
+- E3: The named path does not have the form `data/ui/fhd/<rest>.png` (compared ignoring case), or no archive of S4
+  holds its `data/ui/4k/<rest>_0.dds`: no icon, counted as *missing*.
+- E4: The file is not a two-dimensional DDS image with a `DX10` header of the pixel format the game's icons use
+  (BC7, sRGB or not), contradicts its own size, exceeds a bound (N2), or its archive entry cannot be read: no icon,
+  counted as *unreadable*; the other icons and the names are unaffected. Only the largest image of the file is used;
+  its smaller levels are not.
 - E5: An icon path holding `..`, a rooted path or a drive letter is only compared with archive entry paths, never
   turned into a file system path; one that matches no entry is E3.
 - E6: Several entries name the same icon: each gets it.
-- E7: The catalog fails or finds no game: no icons; the window and the log are as today.
+- E7: The catalog fails or finds no game: no icons, as today.
 - E8: An ambiguous or unknown GUID has no entry and so no icon; an incomplete or nameless entry can have one.
 
 ## Non-functional requirements
@@ -48,22 +51,24 @@ publisher, so they may only be extracted on the player's machine (record
   0023 and [0029](../../docs/decisions/0029-anonymised-test-fixtures-only.md)). Logs hold GUIDs, archive paths, kinds
   and counts only.
 - N2: Bounds against hostile input: the archive's per-entry bound, plus a bound on an icon's width and height checked
-  from its header before any pixel is decoded; the values are the plan's, set above the largest real icon the opt-in
-  test reports.
+  from its header before any pixel is decoded; the values are the plan's, above the real icons (four samples: 512 by
+  512 pixels, 10 levels, 349,700 bytes) and above the largest one the opt-in test reports.
 - N3: Memory: the catalog holds one PNG per distinct icon path used; at most one icon's decoded pixels are held at a
   time beside them.
 - N4: Platform: decoding and conversion run in the platform-neutral game data library and are tested on Linux; only the
   display is Windows code.
-- N5: A library used for decoding or encoding has a licence that permits use in an MIT project without further
-  conditions (record [0028](../../docs/decisions/0028-mit-licence.md)); the plan checks it from the licence text.
+- N5: Decoding and encoding use own code or a library under MIT, BSD, Apache 2.0 or the Unlicense (record
+  [0028](../../docs/decisions/0028-mit-licence.md)); ImageSharp (Six Labors Split License) is excluded by the Product
+  Manager. The plan checks a library's licence from its text.
 - N6: Time: building icons runs with the catalog in the background and delays neither the tray menu, the connection
   nor `Exit`; the opt-in test reports its duration and peak working set.
-- N7: The archives are opened read-only and shared with the running game, as today.
+- N7: Archives are opened read-only, shared with the running game.
 
 ## Acceptance criteria
 
 - AC1: From a synthetic archive set, the catalog gives each good and region entry the icon its asset (or, for a region
-  entry, its region asset) names, as a PNG whose pixels equal the DDS image's, for every supported pixel format, and
+  entry, its region asset) names, found by the path rule of S1, as a PNG whose pixels equal those decoded from the largest image of a BC7
+  DDS file (sRGB and not), and
   shares one icon between entries that name the same path (S1, S3, E6, E8, N3, N4, N7).
 - AC2: When several archives hold an icon path, the copy of the highest-numbered `zz_patchfiles_<n>` is used, `ui.rda`
   only when no patch archive holds it (S4).
@@ -86,19 +91,22 @@ publisher, so they may only be extracted on the player's machine (record
   them).
 - Caching icons on disk and re-extracting after game updates (#25); the catalog format and icon references (#26); the
   upload to the server (#42); WebP.
-- Icon sizes other than the one the game's file holds; scaling is the display's.
+- Other icon sizes; scaling is the display's.
 
 ## Open questions
 
-- How an asset names its icon and which archive entries hold it: the fixture, whose structure follows the game's
-  `assets.xml`, has `Values/Standard/IconFilename` with a `.png` path on goods, sessions and region assets, while the
-  archives hold `.dds` files ([`game-files.md`](../../docs/areas/game-files.md), *Locations*, "the file names are not
-  matched to identifiers; for #24"); the real path form (extension, size or mip suffixes such as `_0`) and the DDS pixel
-  formats the icons use are unknown. Answered: not yet — escalated to the Product Manager (real sample).
+- How does an asset name its icon, and which archive entry and pixel format hold it? Answered: by the Product
+  Manager (escalation, sample kept outside the repository). Goods and region assets name it in
+  `Values/Standard/IconFilename` as `data/ui/fhd/<category>/.../<name>.png` (five samples, four goods of `base` and
+  `dlc03`, one region asset); the game's sessions name none. `ui.rda` and `zz_patchfiles_300` hold
+  `data/ui/4k/<same rest>_0.dds` (no `fhd` folder; `2kimages` not expanded); the `dlc03` sample only in
+  `zz_patchfiles_300`. The four goods' files are DDS with a `DX10` header, BC7 sRGB, 512 by 512 pixels, 10 levels,
+  349,700 bytes. No region icon file was supplied, so region icons
+  rest on the same rule unverified until AC4's run.
 - Which copy wins (S4)? Answered: by the Lead from the Product Manager's statement in `game-files.md` (higher patch
   number is newer, all are loaded), unverified; AC4's run shows the result, and the residual risk goes into the plan's
   decision record.
-- PNG or WebP? Answered: PNG — lossless, shown by browsers and by WPF without an extra codec.
+- PNG or WebP? Answered: PNG, which browsers and WPF show without an extra codec.
 - Where are icons stored ("store icons with the catalog")? Answered: in memory with the catalog; the disk cache is #25, and today nothing is
   written ([`game-catalog.md`](../../docs/areas/game-catalog.md), *Files and nodes*).
 - How do external testers see icons? Answered: in the diagnostics window's `Region` and `Good` cells, beside the names
