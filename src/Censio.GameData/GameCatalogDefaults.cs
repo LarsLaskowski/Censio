@@ -72,19 +72,7 @@ internal static class GameCatalogDefaults
                 {
                     var (name, hasRegion, regionId) = ReadTemplate(reader, path);
 
-                    if (name is not null)
-                    {
-                        if (seen.Add(name) == false)
-                        {
-                            throw GameCatalogXml.Malformed();
-                        }
-
-                        if (hasRegion)
-                        {
-                            regionIds.Add(name, regionId);
-                        }
-                    }
-
+                    RegisterTemplate(seen, regionIds, name, hasRegion, regionId);
                     more = reader.EOF == false;
 
                     continue;
@@ -95,6 +83,32 @@ internal static class GameCatalogDefaults
         }
 
         return regionIds;
+    }
+
+    /// <summary>
+    /// Records one defining template, rejecting a name that is repeated.
+    /// </summary>
+    /// <param name="seen">The names of all defining templates met so far</param>
+    /// <param name="regionIds">The region types by template name</param>
+    /// <param name="name">The template name, or <c>null</c> when it has none</param>
+    /// <param name="hasRegion">Whether the template has a <c>Region</c> property</param>
+    /// <param name="regionId">The <c>RegionID</c> that property states</param>
+    private static void RegisterTemplate(HashSet<string> seen, Dictionary<string, string?> regionIds, string? name, bool hasRegion, string? regionId)
+    {
+        if (name is null)
+        {
+            return;
+        }
+
+        if (seen.Add(name) == false)
+        {
+            throw GameCatalogXml.Malformed();
+        }
+
+        if (hasRegion)
+        {
+            regionIds.Add(name, regionId);
+        }
     }
 
     /// <summary>
