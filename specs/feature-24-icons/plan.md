@@ -222,6 +222,10 @@ the installation; Windows code stays in the shell.
   (`IconSetTooLarge`; why in record 0050; spec E1, N2; AC3 test). An AC4 `PngBytes` above a quarter of it reopens it.
 - N1, N3, N4 accepted: spec AC4 (GUIDs and counts, no entry path); *Documentation updates*; *Approach*.
 
+## Security notes
+
+- (Security, plan delta, non-blocking) The plan does not say what `GameIconError.Archive` holds for `IconSetTooLarge`. That value fills `{Archive}` in the warning "Catalog icons failed: {Kind} ({Archive})". Smallest fix: add to step 4 of *Approach* the sentence "for `IconSetTooLarge`, `Archive` is the relative path of the archive being read", so the log line still contains only a relative archive path.
+
 ## Out of scope / follow-ups
 
 As the spec; the cache (#25) and the format (#26) carry `GameIconSet` on.
