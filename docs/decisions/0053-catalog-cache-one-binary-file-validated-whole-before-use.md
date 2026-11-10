@@ -35,8 +35,8 @@ bounds and checks are in [`game-catalog.md`](../areas/game-catalog.md), *Cache*.
 - The checksum detects damage and torn writes, not a deliberate change by a program of the same account, which could
   also change the Companion itself; the PNG checks keep anything but the writer's own layout from the image decoder.
 - A change of the format raises its version number, and an older file is then extracted again.
-- The re-encoding work is bounded: a PNG no GUID uses is refused, and the decoded sizes of all icons together may not
-  exceed four times the icon set bound.
+- The re-encoding work is bounded: the decoded sizes of all icons together may not exceed four times the icon set bound,
+  and a PNG no GUID uses is refused.
 - The re-encoding costs one compression per icon at each load, and a different compression library (another runtime
   under a build that does not bundle it) makes the cache invalid once.
 - Checking only the chunk layout and leaving the compressed data to the Windows decoder lost: the window's converter does
