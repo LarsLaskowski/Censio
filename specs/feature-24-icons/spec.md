@@ -1,7 +1,7 @@
 # Spec: Extract and convert icons
 
 Source: Issue #24
-Status: Draft
+Status: Approved by Lead
 
 ## Problem
 
@@ -112,10 +112,10 @@ the player's machine (record [0023](../../docs/decisions/0023-game-names-and-ico
 
 ## Area documents
 
-- A new area `game-icons` (the plan decides; `game-catalog.md` the alternative): entries with icons, path rule and
-  lookup, archives and order, format, PNG, bounds, reasons, privacy, the opt-in test; its index row; the *Not here*
-  lines of `game-catalog.md` and `game-files.md` and the latter's *Icons* row; `game-catalog.md` *Network* (icon
-  entries over SMB); `game-files.md` *Paths* ("the icon cache of #24" no longer holds).
+- [`game-catalog.md`](../../docs/areas/game-catalog.md), new section *Icons* (chosen over a new area):
+  entries with icons, path rule and lookup, archives and order, format, PNG, bounds, reasons, privacy, the opt-in test;
+  its index row; *Network* (icon entries over SMB); the *Not here* lines of `game-catalog.md` and `game-files.md` and
+  the latter's *Icons* row; `game-files.md` *Paths* ("the icon cache of #24" no longer holds).
 - [`companion.md`](../../docs/areas/companion.md): icons in the cells, icons after names, the log lines.
 - `.squad/project.md`: the DDS decoder under *Parsing of external input*, the icon reads under *Outbound calls* and
   file paths (orchestrator, from the Dev's text).
