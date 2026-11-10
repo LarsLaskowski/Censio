@@ -35,7 +35,7 @@ public sealed class GameIconReaderTests
     /// <summary>
     /// The number of distinct paths of the test of the total bound.
     /// </summary>
-    private const int TotalBoundPaths = 21;
+    private const int TotalBoundPaths = 4;
 
     #endregion // Constants
 
@@ -510,29 +510,60 @@ public sealed class GameIconReaderTests
     }
 
     /// <summary>
-    /// The PNGs of the icons together above the bound end the step with no icon, and the error names the archive being read.
-    /// The PNGs hardly compress: this takes the time of encoding 21 images of 2,048 by 2,048 pixels.
+    /// With a bound one byte below the PNG bytes of the icons together, the step ends with no icon and the error names the
+    /// archive being read.
     /// </summary>
     [TestMethod]
     [TestCategory("AC3")]
-    [Timeout(120000, CooperativeCancellation = true)]
     public void GameIconReaderLoadAboveTotalIconBytesBoundFails()
     {
         // Arrange
-        var rests = Enumerable.Range(0, TotalBoundPaths).Select(index => string.Create(CultureInfo.InvariantCulture, $"noise/n{index}")).ToArray();
-
-        WriteBytes("ui.rda", SharedArchive(rests.Select(Inner).ToArray(), DdsFileBuilder.BuildNoise(GameIconReader.MaxIconSide)));
-
-        var catalog = CatalogOf(rests.Select((rest, index) => Entry(index + 1, GameCatalogKind.Good, Asset(rest))).ToArray());
+        var catalog = WriteSharedIcons();
+        var total = LoadSet(catalog).PngBytes;
 
         // Act
-        var result = GameIconReader.Load(_root, catalog);
+        var result = GameIconReader.Load(_root, catalog, total - 1);
 
         // Assert
         Assert.IsNull(result.Icons, "No entry should have an icon");
         Assert.IsNotNull(result.Error, "The total bound should be reported");
         Assert.AreEqual(GameIconErrorKind.IconSetTooLarge, result.Error.Kind, "The kind should be IconSetTooLarge");
-        Assert.AreEqual("ui.rda", result.Error.Archive, "The error should name the archive being read");
+        Assert.AreEqual(GameIconReader.UiArchiveName, result.Error.Archive, "The error should name the archive being read");
+    }
+
+    /// <summary>
+    /// With a bound equal to the PNG bytes of the icons together, the icons are kept.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC3")]
+    public void GameIconReaderLoadAtTotalIconBytesBoundKeepsIcons()
+    {
+        // Arrange
+        var catalog = WriteSharedIcons();
+        var total = LoadSet(catalog).PngBytes;
+
+        // Act
+        var result = GameIconReader.Load(_root, catalog, total);
+
+        // Assert
+        Assert.IsNull(result.Error, "A total equal to the bound should be kept");
+        Assert.IsNotNull(result.Icons, "The icons should be kept");
+        Assert.AreEqual(TotalBoundPaths, result.Icons.GoodsWithIcon, "Every entry should have its icon");
+        Assert.AreEqual(total, result.Icons.PngBytes, "The PNG bytes should be those of the first run");
+    }
+
+    /// <summary>
+    /// The bound of the PNG bytes kept is 256 MiB.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC3")]
+    public void GameIconReaderMaxIconSetBytesIsQuarterGibibyte()
+    {
+        // Arrange & Act
+        var bound = GameIconReader.MaxIconSetBytes;
+
+        // Assert
+        Assert.AreEqual(268435456, bound, "The bound should be 256 MiB");
     }
 
     #endregion // AC3
@@ -718,6 +749,8 @@ public sealed class GameIconReaderTests
         // Assert
         Assert.IsNull(icons.Find(2), "A workforce entry should have no icon");
         Assert.IsNull(icons.Find(3), "A building entry should have no icon");
+        Assert.AreEqual(GameIconProblem.NoEntry, icons.Check(2), "A workforce entry should have no entry for icons");
+        Assert.AreEqual(GameIconProblem.NoEntry, icons.Check(3), "A building entry should have no entry for icons");
         Assert.AreEqual(1, icons.GoodsWithIcon, "Only the good should count");
         Assert.AreEqual(0, icons.RegionsWithIcon, "No region should count");
         Assert.AreEqual(icons.Find(1)!.Png.Length, icons.PngBytes, "Only the good's PNG should be held");
@@ -910,6 +943,19 @@ public sealed class GameIconReaderTests
 
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllBytes(path, bytes);
+    }
+
+    /// <summary>
+    /// Writes <c>ui.rda</c> with one small image listed under several paths, and creates a catalog of goods that name them.
+    /// </summary>
+    /// <returns>The catalog</returns>
+    private GameCatalog WriteSharedIcons()
+    {
+        var rests = Enumerable.Range(0, TotalBoundPaths).Select(index => string.Create(CultureInfo.InvariantCulture, $"shared/n{index}")).ToArray();
+
+        WriteBytes("ui.rda", SharedArchive(rests.Select(Inner).ToArray(), DdsFileBuilder.Build(8, 8, DdsFileBuilder.DxgiBc7Srgb, 1)));
+
+        return CatalogOf(rests.Select((rest, index) => Entry(index + 1, GameCatalogKind.Good, Asset(rest))).ToArray());
     }
 
     /// <summary>
