@@ -59,5 +59,22 @@ public sealed class CompanionLogTests
         Assert.AreSequenceEqual(expected, logger.Entries.Select(entry => (entry.Level, entry.Message, entry.Exception)).ToArray(), "Each method should log its level, its text and its exception");
     }
 
+    /// <summary>
+    /// The line about the cap says that further GUIDs are not logged for this catalog.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public void CompanionLogCatalogReportsCappedText()
+    {
+        // Arrange
+        var logger = new RecordingLogger();
+
+        // Act
+        CompanionLog.CatalogReportsCapped(logger, 1000);
+
+        // Assert
+        Assert.AreSequenceEqual([(LogLevel.Information, "Catalog: more than 1000 GUIDs cannot be named; further ones are not logged for this catalog")], logger.Entries.Select(entry => (entry.Level, entry.Message)).ToArray(), "The cap line should name the catalog");
+    }
+
     #endregion // Methods
 }

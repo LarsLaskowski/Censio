@@ -971,6 +971,42 @@ public sealed class TrayMenuTests
     }
 
     /// <summary>
+    /// The new catalog texts: checking, extracting names, extracting icons with the count, and the count with the icons failed or
+    /// the cache not written.
+    /// </summary>
+    /// <param name="kind">The status kind</param>
+    /// <param name="count">The entry count</param>
+    /// <param name="expected">The expected text</param>
+    [TestMethod]
+    [TestCategory("AC4")]
+    [DataRow(GameCatalogStatusKind.Checking, 0, "Catalog: checking", DisplayName = "Checking")]
+    [DataRow(GameCatalogStatusKind.Checking, 7, "Catalog: checking", DisplayName = "Checking ignores the count")]
+    [DataRow(GameCatalogStatusKind.ExtractingNames, 0, "Catalog: extracting names", DisplayName = "Extracting names")]
+    [DataRow(GameCatalogStatusKind.ExtractingNames, 7, "Catalog: extracting names", DisplayName = "Extracting names ignores the count")]
+    [DataRow(GameCatalogStatusKind.ExtractingIcons, 412, "Catalog: extracting icons, 412 entries", DisplayName = "Extracting icons")]
+    [DataRow(GameCatalogStatusKind.ExtractingIcons, 1234567, "Catalog: extracting icons, 1234567 entries", DisplayName = "Extracting icons, no grouping")]
+    [DataRow(GameCatalogStatusKind.IconsFailed, 412, "Catalog: 412 entries, icons failed", DisplayName = "Icons failed")]
+    [DataRow(GameCatalogStatusKind.NotCached, 412, "Catalog: 412 entries, not cached", DisplayName = "Not cached")]
+    [DataRow(GameCatalogStatusKind.NotCached, 1234567, "Catalog: 1234567 entries, not cached", DisplayName = "Not cached, no grouping")]
+    public void TrayMenuFormatCatalogNewStates(GameCatalogStatusKind kind, int count, string expected)
+    {
+        // Arrange
+        CultureInfo.CurrentCulture = new CultureInfo("de-DE");
+
+        var status = new GameCatalogStatus
+                     {
+                         Kind = kind,
+                         EntryCount = count
+                     };
+
+        // Act
+        var text = TrayMenu.FormatCatalog(status);
+
+        // Assert
+        Assert.AreEqual(expected, text, "The catalog text should be the one of the state, whatever the culture");
+    }
+
+    /// <summary>
     /// A status kind that is not defined is rejected with an exception that names the parameter.
     /// </summary>
     [TestMethod]

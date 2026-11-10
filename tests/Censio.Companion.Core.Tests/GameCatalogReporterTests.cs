@@ -221,7 +221,7 @@ public sealed class GameCatalogReporterTests
         reporter.Report(Tick(1, [Entry(1, buildings: first)]));
 
         // Assert
-        var capLines = Messages().Where(message => message == "Catalog: more than 1000 GUIDs cannot be named; further ones are not logged in this run").ToList();
+        var capLines = Messages().Where(message => message == "Catalog: more than 1000 GUIDs cannot be named; further ones are not logged for this catalog").ToList();
         var nameLines = Messages().Where(message => message.StartsWith("Catalog cannot name", StringComparison.Ordinal)).ToList();
 
         Assert.HasCount(1, capLines, "One line should say that further GUIDs are not logged");
@@ -230,6 +230,56 @@ public sealed class GameCatalogReporterTests
         Assert.HasCount(linesAfterFirst, _logger.Entries, "No further line should be logged after the cap");
         Assert.IsGreaterThan(0, rememberedAfterFirst, "The reporter should remember the GUIDs it reported");
         Assert.AreEqual(rememberedAfterFirst, Remembered(reporter), "The remembered GUIDs should stop growing at the cap");
+    }
+
+    /// <summary>
+    /// A GUID that was reported for one catalog is reported again for the next catalog instance.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public void GameCatalogReporterNewCatalogReportsAgain()
+    {
+        // Arrange
+        _catalog = Catalog();
+
+        var reporter = CreateReporter();
+        var tick = Tick(5, [Entry(6)]);
+
+        reporter.Report(tick);
+        reporter.Report(tick);
+
+        // Act
+        _catalog = Catalog();
+        reporter.Report(tick);
+
+        // Assert
+        Assert.AreSequenceEqual(["Catalog cannot name Region 5: Unknown", "Catalog cannot name Good 6: Unknown", "Catalog cannot name Region 5: Unknown", "Catalog cannot name Good 6: Unknown"], Messages(), "Each catalog should report its GUIDs once");
+    }
+
+    /// <summary>
+    /// A new catalog instance restarts the cap: after the cap of the first catalog the second one reports again, up to its own
+    /// cap.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public void GameCatalogReporterNewCatalogResetsCap()
+    {
+        // Arrange
+        _catalog = Catalog();
+
+        var reporter = CreateReporter();
+
+        reporter.Report(Tick(1, [Entry(1, buildings: Enumerable.Range(1, GameCatalogReporter.MaxReports + 50).ToArray())]));
+
+        var before = _logger.Entries.Count;
+
+        // Act
+        _catalog = Catalog();
+        reporter.Report(Tick(1, [Entry(1, buildings: [20_000])]));
+
+        // Assert
+        Assert.HasCount(before + 3, _logger.Entries, "The new catalog should report its region, good and building again");
+        Assert.Contains("Catalog cannot name Building 20000: Unknown", Messages(), "The new catalog should report a GUID after the cap of the first one");
     }
 
     #endregion // Methods
