@@ -1,3 +1,5 @@
+using System.Collections.ObjectModel;
+
 namespace Censio.GameData;
 
 /// <summary>
@@ -10,7 +12,7 @@ public sealed class GameCatalog
     /// <summary>
     /// The entries
     /// </summary>
-    private readonly IReadOnlyCollection<GameCatalogEntry> _entries;
+    private readonly ReadOnlyCollection<GameCatalogEntry> _entries;
 
     /// <summary>
     /// The entries by asset GUID
