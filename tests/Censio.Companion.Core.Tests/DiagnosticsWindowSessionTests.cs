@@ -109,6 +109,39 @@ public sealed class DiagnosticsWindowSessionTests
     #region Methods
 
     /// <summary>
+    /// A session built with an icon reader gives views whose rows carry the icons of that set, and a session built without
+    /// one gives rows without icons.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC5")]
+    public void DiagnosticsWindowSessionOpenPassesIconsIntoView()
+    {
+        // Arrange
+        var icon = new GameIcon(1, 1, new byte[] { 1 });
+        var icons = new GameIconSet(new Dictionary<int, GameIcon>
+                                    {
+                                        [1] = icon
+                                    },
+                                    new Dictionary<int, GameIconProblem>(),
+                                    0,
+                                    1);
+        var clock = CreateClock();
+        var withIcons = new DiagnosticsWindowSession(ReadStatusText, ReadTick, () => _catalog, () => icons, clock, Post, CreateWindow);
+        var withoutIcons = CreateSession(clock);
+
+        _tick = CreateTick(100, _now.AddMinutes(-2));
+
+        // Act
+        withIcons.Open();
+        withoutIcons.Open();
+
+        // Assert
+        Assert.HasCount(2, _windows, "Each session should open its window");
+        Assert.AreSame(icon, _windows[0].Views.Single()[0].RegionIcon, "The session with an icon reader should show the icons of its set");
+        Assert.IsNull(_windows[1].Views.Single()[0].RegionIcon, "The session without an icon reader should show no icons");
+    }
+
+    /// <summary>
     /// A window opened while the catalog is ready shows the names of the catalog, and so does the update after a
     /// notification.
     /// </summary>

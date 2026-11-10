@@ -330,6 +330,38 @@ public sealed class GameCatalogLoaderTests
     }
 
     /// <summary>
+    /// A run after icons were published drops them and raises the change of the icons again, so that no icon set outlives
+    /// its catalog.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC3")]
+    public void GameCatalogLoaderSecondRunClearsPublishedIcons()
+    {
+        // Arrange
+        var catalog = new GameCatalog([Entry(1)], [], 0, 0);
+        var icons = new GameIconSet(new Dictionary<int, GameIcon>(), new Dictionary<int, GameIconProblem>(), 0, 0);
+        var builds = 0;
+        var loader = new GameCatalogLoader(_ => GameCatalogResult.FromCatalog(catalog, [], 0),
+                                           (_, _) => ++builds == 1
+                                                         ? GameIconResult.FromIcons(icons)
+                                                         : GameIconResult.FromError(new GameIconError(GameIconErrorKind.ArchiveUnreadable, "ui.rda")),
+                                           _logger);
+        var published = new List<GameIconSet?>();
+
+        loader.IconsChanged += (_, _) => published.Add(loader.Icons);
+
+        // Act
+        loader.Run(Found("C:\\Game"));
+        loader.Run(Found("C:\\Game"));
+
+        // Assert
+        Assert.HasCount(2, published, "The icons should be announced when published and when cleared");
+        Assert.AreSame(icons, published[0], "The first event should carry the icons");
+        Assert.IsNull(published[1], "The second event should come with the icons cleared");
+        Assert.IsNull(loader.Icons, "No icons of the earlier run should remain");
+    }
+
+    /// <summary>
     /// The names are published, with their event, before the icon step starts, and the icons follow with their own event.
     /// </summary>
     [TestMethod]
