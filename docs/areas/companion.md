@@ -132,8 +132,9 @@ sent it: GUIDs are raw numbers where the catalog has no name for them; icons are
   exactly 4,096 is kept whole. Buildings and workforce have no column.
 - **Icons:** once the icons are built ([`game-catalog.md`](game-catalog.md), *Icons*), the `Region` and `Good` cells show
   the icon of the cell's GUID before the text: an image of 20 by 20 device-independent pixels, then a gap of 4, then the
-  text, vertically centred. A GUID without an icon (none, unknown, a problem of the icon, GUID `0`) and every cell while
-  no icons are built show the text alone, without the image's place or gap.
+  text, vertically centred. In the `Region` column the icon sits on a dark round backdrop of that size (the game's region
+  icons are light glyphs); the `Good` icon has none. A GUID without an icon (none, unknown, a problem of the icon, GUID `0`) and every cell while
+  no icons are built show the text alone, without the image's place, backdrop or gap.
   The names are published first: the window shows them as soon as the catalog is ready and adds the icons when they are
   built, and a new build of the catalog removes the icons until the new ones are ready. Each distinct icon is decoded once, at twice the size of the
   cell (sharp up to 200 % display scaling), and shared by the rows that show it. The icons are held in memory only: nothing of them is written to disk,

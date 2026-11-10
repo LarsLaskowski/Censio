@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
+using System.Windows.Media;
 using System.Windows.Threading;
 
 using Censio.Companion.Core;
@@ -33,6 +34,11 @@ internal sealed partial class DiagnosticsWindow : Window, IDiagnosticsWindow
     /// The converter of icons to images
     /// </summary>
     private static readonly GameIconImageConverter _converter = new();
+
+    /// <summary>
+    /// The dark backdrop of a region icon, whose glyph is light
+    /// </summary>
+    private static readonly Brush _regionBackdrop = CreateRegionBackdrop();
 
     /// <summary>
     /// Whether the window was shown
@@ -101,30 +107,68 @@ internal sealed partial class DiagnosticsWindow : Window, IDiagnosticsWindow
     /// <returns>The column</returns>
     private static DataGridTemplateColumn CreateIconColumn(int index)
     {
+        var isRegion = index == RegionColumn;
         var image = new FrameworkElementFactory(typeof(Image));
 
         image.SetBinding(Image.SourceProperty,
-                         new Binding(index == RegionColumn ? nameof(DiagnosticsRow.RegionIcon) : nameof(DiagnosticsRow.GoodIcon))
+                         new Binding(isRegion ? nameof(DiagnosticsRow.RegionIcon) : nameof(DiagnosticsRow.GoodIcon))
                          {
                              Mode = BindingMode.OneTime,
                              Converter = _converter
                          });
         image.SetValue(FrameworkElement.WidthProperty, (double)GameIconImageConverter.CellSide);
         image.SetValue(FrameworkElement.HeightProperty, (double)GameIconImageConverter.CellSide);
-        image.SetValue(FrameworkElement.MarginProperty, new Thickness(0, 0, 4, 0));
 
-        var withoutIcon = new Trigger
-                          {
-                              Property = Image.SourceProperty,
-                              Value = null
-                          };
+        FrameworkElementFactory icon;
 
-        withoutIcon.Setters.Add(new Setter(UIElement.VisibilityProperty, Visibility.Collapsed));
+        if (isRegion)
+        {
+            var disc = new FrameworkElementFactory(typeof(Border));
 
-        var style = new Style(typeof(Image));
+            disc.SetValue(FrameworkElement.WidthProperty, (double)GameIconImageConverter.CellSide);
+            disc.SetValue(FrameworkElement.HeightProperty, (double)GameIconImageConverter.CellSide);
+            disc.SetValue(Border.CornerRadiusProperty, new CornerRadius(GameIconImageConverter.CellSide / 2d));
+            disc.SetValue(Border.BackgroundProperty, _regionBackdrop);
+            disc.SetValue(FrameworkElement.MarginProperty, new Thickness(0, 0, 4, 0));
 
-        style.Triggers.Add(withoutIcon);
-        image.SetValue(FrameworkElement.StyleProperty, style);
+            var withoutRegionIcon = new DataTrigger
+                                    {
+                                        Binding = new Binding(nameof(DiagnosticsRow.RegionIcon))
+                                                  {
+                                                      Converter = _converter
+                                                  },
+                                        Value = null
+                                    };
+
+            withoutRegionIcon.Setters.Add(new Setter(UIElement.VisibilityProperty, Visibility.Collapsed));
+
+            var discStyle = new Style(typeof(Border));
+
+            discStyle.Triggers.Add(withoutRegionIcon);
+            disc.SetValue(FrameworkElement.StyleProperty, discStyle);
+            disc.AppendChild(image);
+
+            icon = disc;
+        }
+        else
+        {
+            image.SetValue(FrameworkElement.MarginProperty, new Thickness(0, 0, 4, 0));
+
+            var withoutIcon = new Trigger
+                              {
+                                  Property = Image.SourceProperty,
+                                  Value = null
+                              };
+
+            withoutIcon.Setters.Add(new Setter(UIElement.VisibilityProperty, Visibility.Collapsed));
+
+            var style = new Style(typeof(Image));
+
+            style.Triggers.Add(withoutIcon);
+            image.SetValue(FrameworkElement.StyleProperty, style);
+
+            icon = image;
+        }
 
         var text = new FrameworkElementFactory(typeof(TextBlock));
 
@@ -138,7 +182,7 @@ internal sealed partial class DiagnosticsWindow : Window, IDiagnosticsWindow
         var panel = new FrameworkElementFactory(typeof(StackPanel));
 
         panel.SetValue(StackPanel.OrientationProperty, Orientation.Horizontal);
-        panel.AppendChild(image);
+        panel.AppendChild(icon);
         panel.AppendChild(text);
 
         return new DataGridTemplateColumn
@@ -152,6 +196,19 @@ internal sealed partial class DiagnosticsWindow : Window, IDiagnosticsWindow
                    CanUserSort = false,
                    MinWidth = 60
                };
+    }
+
+    /// <summary>
+    /// Creates the frozen backdrop brush of a region icon.
+    /// </summary>
+    /// <returns>The brush</returns>
+    private static Brush CreateRegionBackdrop()
+    {
+        var brush = new SolidColorBrush(Color.FromRgb(0x3C, 0x3C, 0x3C));
+
+        brush.Freeze();
+
+        return brush;
     }
 
     /// <summary>
