@@ -237,11 +237,6 @@ internal sealed class GameCatalogCacheReader
     /// <returns>The bytes, or <c>null</c> after a failure</returns>
     public byte[]? ReadPng(int length)
     {
-        if (IsFailed)
-        {
-            return null;
-        }
-
         if (length <= 0 || length > Remaining || _pngBytes + length > GameIconReader.MaxIconSetBytes)
         {
             IsFailed = true;

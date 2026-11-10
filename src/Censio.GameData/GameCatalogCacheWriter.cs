@@ -176,14 +176,6 @@ internal sealed class GameCatalogCacheWriter
     }
 
     /// <summary>
-    /// Marks the writing as failed because a bound would be exceeded.
-    /// </summary>
-    public void Fail()
-    {
-        IsFailed = true;
-    }
-
-    /// <summary>
     /// Writes the hash of everything written before.
     /// </summary>
     public void WriteHash()
