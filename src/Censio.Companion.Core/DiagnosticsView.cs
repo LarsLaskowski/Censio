@@ -76,6 +76,11 @@ public sealed class DiagnosticsView : IReadOnlyList<DiagnosticsRow>, IList
     private readonly GameCatalog? _catalog;
 
     /// <summary>
+    /// The icons of the GUIDs, or <c>null</c> if none.
+    /// </summary>
+    private readonly GameIconSet? _icons;
+
+    /// <summary>
     /// The index of the first row of each island; an island without entries has one row.
     /// </summary>
     private readonly int[] _firstRows;
@@ -95,8 +100,10 @@ public sealed class DiagnosticsView : IReadOnlyList<DiagnosticsRow>, IList
     /// <param name="headerLines">The lines of the header</param>
     /// <param name="tick">The tick, or <c>null</c> if none</param>
     /// <param name="catalog">The catalog, or <c>null</c> if none</param>
-    private DiagnosticsView(IReadOnlyList<string> headerLines, PipeTick? tick, GameCatalog? catalog)
+    /// <param name="icons">The icons, or <c>null</c> if none</param>
+    private DiagnosticsView(IReadOnlyList<string> headerLines, PipeTick? tick, GameCatalog? catalog, GameIconSet? icons)
     {
+        _icons = icons;
         _headerLines = headerLines;
         _tick = tick;
         _catalog = catalog;
@@ -160,20 +167,7 @@ public sealed class DiagnosticsView : IReadOnlyList<DiagnosticsRow>, IList
     /// <returns>The view</returns>
     public static DiagnosticsView Create(string statusText, PipeTick? tick, GameCatalog? catalog, TimeProvider clock)
     {
-        var lines = new List<string>(3)
-                    {
-                        $"Status: {statusText}",
-                        TrayMenu.FormatLastTick(tick is null ? null : PipeTickSummary.From(tick), clock)
-                    };
-
-        if (tick is not null)
-        {
-            var gameTime = string.Create(CultureInfo.InvariantCulture, $"Game time: {tick.GameTime}");
-
-            lines.Add(tick.IsNoDataYet ? $"{gameTime} (no data yet)" : gameTime);
-        }
-
-        return new DiagnosticsView(lines, tick, catalog);
+        return Create(statusText, tick, catalog, null, clock);
     }
 
     /// <summary>
@@ -187,7 +181,20 @@ public sealed class DiagnosticsView : IReadOnlyList<DiagnosticsRow>, IList
     /// <returns>The view</returns>
     public static DiagnosticsView Create(string statusText, PipeTick? tick, GameCatalog? catalog, GameIconSet? icons, TimeProvider clock)
     {
-        throw new NotImplementedException();
+        var lines = new List<string>(3)
+                    {
+                        $"Status: {statusText}",
+                        TrayMenu.FormatLastTick(tick is null ? null : PipeTickSummary.From(tick), clock)
+                    };
+
+        if (tick is not null)
+        {
+            var gameTime = string.Create(CultureInfo.InvariantCulture, $"Game time: {tick.GameTime}");
+
+            lines.Add(tick.IsNoDataYet ? $"{gameTime} (no data yet)" : gameTime);
+        }
+
+        return new DiagnosticsView(lines, tick, catalog, icons);
     }
 
     /// <summary>
@@ -264,7 +271,7 @@ public sealed class DiagnosticsView : IReadOnlyList<DiagnosticsRow>, IList
                 cells[column] = string.Empty;
             }
 
-            return new DiagnosticsRow(index, cells);
+            return new DiagnosticsRow(index, cells, IconOf(key.SessionGuid), null);
         }
 
         var entry = island.Entries[entryIndex];
@@ -282,7 +289,17 @@ public sealed class DiagnosticsView : IReadOnlyList<DiagnosticsRow>, IList
         cells[15] = Format(entry.SummedProductivity);
         cells[16] = Format(entry.AverageProductivity);
 
-        return new DiagnosticsRow(index, cells);
+        return new DiagnosticsRow(index, cells, IconOf(key.SessionGuid), IconOf(entry.ProductGuid));
+    }
+
+    /// <summary>
+    /// Finds the icon of a GUID.
+    /// </summary>
+    /// <param name="guid">The GUID</param>
+    /// <returns>The icon, or <c>null</c> if there is none or the GUID is 0</returns>
+    private GameIcon? IconOf(int guid)
+    {
+        return guid == 0 ? null : _icons?.Find(guid);
     }
 
     /// <summary>

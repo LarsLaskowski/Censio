@@ -146,12 +146,48 @@ public sealed class GameCatalogLoader
             CompanionLog.CatalogArchivesUnchecked(_logger, result.UncheckedArchiveCount);
         }
 
-        return Publish(new GameCatalogStatus
-                       {
-                           Kind = GameCatalogStatusKind.Ready,
-                           EntryCount = catalog.Count
-                       },
-                       catalog);
+        var ready = Publish(new GameCatalogStatus
+                            {
+                                Kind = GameCatalogStatusKind.Ready,
+                                EntryCount = catalog.Count
+                            },
+                            catalog);
+
+        BuildIcons(folder, catalog);
+
+        return ready;
+    }
+
+    /// <summary>
+    /// Builds the icons of a published catalog, publishes them and raises the event.
+    /// </summary>
+    /// <param name="folder">The folder of the installation</param>
+    /// <param name="catalog">The catalog</param>
+    private void BuildIcons(string folder, GameCatalog catalog)
+    {
+        if (_buildIcons is null)
+        {
+            return;
+        }
+
+        var result = _buildIcons(folder, catalog);
+
+        if (result.Icons is not { } icons)
+        {
+            var error = result.Error;
+
+            CompanionLog.CatalogIconsFailed(_logger, error?.Kind ?? GameIconErrorKind.ArchiveUnreadable, error?.Archive ?? string.Empty);
+
+            return;
+        }
+
+        var notNamed = icons.Count(GameIconProblem.NotNamed);
+        var missing = icons.Count(GameIconProblem.Missing);
+        var unreadable = icons.Count(GameIconProblem.Unreadable);
+
+        CompanionLog.CatalogIconsBuilt(_logger, icons.GoodsWithIcon, icons.RegionsWithIcon, notNamed, missing, unreadable);
+        _icons = icons;
+        IconsChanged?.Invoke(this, EventArgs.Empty);
     }
 
     /// <summary>
@@ -162,9 +198,17 @@ public sealed class GameCatalogLoader
     /// <returns>The status</returns>
     private GameCatalogStatus Publish(GameCatalogStatus status, GameCatalog? catalog)
     {
+        var hadIcons = _icons is not null;
+
+        _icons = null;
         _catalog = catalog;
         _status = status;
         StatusChanged?.Invoke(this, status);
+
+        if (hadIcons)
+        {
+            IconsChanged?.Invoke(this, EventArgs.Empty);
+        }
 
         return status;
     }

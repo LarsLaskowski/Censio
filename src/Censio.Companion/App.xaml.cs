@@ -143,6 +143,7 @@ public partial class App : Application
         _diagnostics = new DiagnosticsWindowSession(() => _snapshot().StatusText,
                                                     readTick,
                                                     () => _catalogLoader?.Catalog,
+                                                    () => _catalogLoader?.Icons,
                                                     TimeProvider.System,
                                                     action => Dispatcher.BeginInvoke(DispatcherPriority.Background, action),
                                                     () => new DiagnosticsWindow());
@@ -267,6 +268,16 @@ public partial class App : Application
             _catalogReporter?.Report(tick);
         }
 
+        _diagnostics?.Notify();
+    }
+
+    /// <summary>
+    /// Announces the icons to the diagnostics window.
+    /// </summary>
+    /// <param name="sender">The loader</param>
+    /// <param name="eventArgs">The event data</param>
+    private void OnCatalogIconsChanged(object? sender, EventArgs eventArgs)
+    {
         _diagnostics?.Notify();
     }
 
@@ -403,12 +414,13 @@ public partial class App : Application
             var gameSearch = new GameInstallationSearch(new RegistryUbisoftInstallRecords(), new WindowsFileVersionReader(), GameInstallation.DefaultUbisoftGamesFolder(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86)), _logger);
             var settingsFile = CompanionFolders.Settings(localAppData);
 
-            var catalogLoader = new GameCatalogLoader(folder => GameCatalogReader.Load(folder, RdaLimits.Default), _logger);
+            var catalogLoader = new GameCatalogLoader(folder => GameCatalogReader.Load(folder, RdaLimits.Default), GameIconReader.Load, _logger);
 
             _gameSearch = gameSearch;
             _catalogLoader = catalogLoader;
             _catalogReporter = new GameCatalogReporter(() => catalogLoader.Catalog, _logger);
             catalogLoader.StatusChanged += OnCatalogStatusChanged;
+            catalogLoader.IconsChanged += OnCatalogIconsChanged;
 
             Run(_ =>
                 {

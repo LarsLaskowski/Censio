@@ -20,6 +20,21 @@ internal sealed partial class DiagnosticsWindow : Window, IDiagnosticsWindow
     private const string GridScrollViewerName = "DG_ScrollViewer";
 
     /// <summary>
+    /// The index of the column with the region
+    /// </summary>
+    private const int RegionColumn = 0;
+
+    /// <summary>
+    /// The index of the column with the good
+    /// </summary>
+    private const int GoodColumn = 5;
+
+    /// <summary>
+    /// The converter of icons to images
+    /// </summary>
+    private static readonly GameIconImageConverter _converter = new();
+
+    /// <summary>
     /// Whether the window was shown
     /// </summary>
     private bool _shown;
@@ -54,6 +69,13 @@ internal sealed partial class DiagnosticsWindow : Window, IDiagnosticsWindow
 
         for (var index = 0; index < DiagnosticsView.Columns.Count; index++)
         {
+            if (index == RegionColumn || index == GoodColumn)
+            {
+                RowsGrid.Columns.Add(CreateIconColumn(index));
+
+                continue;
+            }
+
             RowsGrid.Columns.Add(new DataGridTextColumn
                                  {
                                      Header = DiagnosticsView.Columns[index],
@@ -71,6 +93,53 @@ internal sealed partial class DiagnosticsWindow : Window, IDiagnosticsWindow
     #endregion // Constructors
 
     #region Methods
+
+    /// <summary>
+    /// Creates the column of a name that shows an icon before the text.
+    /// </summary>
+    /// <param name="index">The index of the column</param>
+    /// <returns>The column</returns>
+    private static DataGridTemplateColumn CreateIconColumn(int index)
+    {
+        var image = new FrameworkElementFactory(typeof(Image));
+
+        image.SetBinding(Image.SourceProperty,
+                         new Binding(index == RegionColumn ? nameof(DiagnosticsRow.RegionIcon) : nameof(DiagnosticsRow.GoodIcon))
+                         {
+                             Mode = BindingMode.OneTime,
+                             Converter = _converter
+                         });
+        image.SetValue(FrameworkElement.WidthProperty, (double)GameIconImageConverter.CellSide);
+        image.SetValue(FrameworkElement.HeightProperty, (double)GameIconImageConverter.CellSide);
+        image.SetValue(FrameworkElement.MarginProperty, new Thickness(0, 0, 4, 0));
+
+        var text = new FrameworkElementFactory(typeof(TextBlock));
+
+        text.SetBinding(TextBlock.TextProperty,
+                        new Binding($"Cells[{index}]")
+                        {
+                            Mode = BindingMode.OneTime
+                        });
+        text.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+
+        var panel = new FrameworkElementFactory(typeof(StackPanel));
+
+        panel.SetValue(StackPanel.OrientationProperty, Orientation.Horizontal);
+        panel.AppendChild(image);
+        panel.AppendChild(text);
+
+        return new DataGridTemplateColumn
+               {
+                   Header = DiagnosticsView.Columns[index],
+                   CellTemplate = new DataTemplate
+                                  {
+                                      VisualTree = panel
+                                  },
+                   IsReadOnly = true,
+                   CanUserSort = false,
+                   MinWidth = 60
+               };
+    }
 
     /// <summary>
     /// Gets the scroll viewer of the grid.
