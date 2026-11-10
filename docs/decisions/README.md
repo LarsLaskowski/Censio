@@ -111,6 +111,6 @@ once in the [area document](../areas/README.md) of the record's area, and the re
 | [0047](0047-game-catalog-read-forward-only-from-config-rda-kinds-and-regions-from-the-data.md) | The game catalog is read forward-only from `config.rda`; kinds and regions come from the data, and the reader fails closed | Accepted | 2026-11-09 |
 | [0048](0048-catalog-names-shown-in-the-diagnostics-window-unresolved-guids-logged-once.md) | Catalog names are shown in the diagnostics window; GUIDs the catalog cannot name are logged once per run | Accepted | 2026-11-09 |
 | [0049](0049-region-type-of-a-region-asset-from-its-template-and-the-property-defaults.md) | An asset's missing catalog facts come from its template and the property defaults | Accepted | 2026-11-10 |
-| [0050](0050-icons-found-by-a-path-rule-in-the-ui-and-patch-archives-newest-copy-wins.md) | Icons are found by a path rule in `ui.rda` and the patch archives; the newest copy wins, and an unreadable icon archive withholds every icon | Proposed | 2026-11-10 |
-| [0051](0051-dds-icons-decoded-by-own-bc7-and-png-code.md) | DDS icons are decoded by own BC7 and PNG code, without an image library | Proposed | 2026-11-10 |
+| [0050](0050-icons-found-by-a-path-rule-in-the-ui-and-patch-archives-newest-copy-wins.md) | Icons are found by a path rule in `ui.rda` and the patch archives; the newest copy wins, and an unreadable icon archive withholds every icon | Accepted | 2026-11-10 |
+| [0051](0051-dds-icons-decoded-by-own-bc7-and-png-code.md) | DDS icons are decoded by own BC7 and PNG code, without an image library | Accepted | 2026-11-10 |
 <!-- project:end index -->

@@ -1,6 +1,6 @@
 # 0051: DDS icons are decoded by own BC7 and PNG code, without an image library
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-10
 - **Area:** game-catalog
 - **Source:** Issue #24

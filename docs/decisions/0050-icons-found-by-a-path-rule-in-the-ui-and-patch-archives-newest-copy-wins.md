@@ -1,6 +1,6 @@
 # 0050: Icons are found by a path rule in `ui.rda` and the patch archives; the newest copy wins, and an unreadable icon archive withholds every icon
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-10
 - **Area:** game-catalog
 - **Source:** Issue #24
