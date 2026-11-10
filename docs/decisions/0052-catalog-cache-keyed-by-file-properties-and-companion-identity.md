@@ -28,8 +28,7 @@ sign of a running game is the statistics pipe.
    rule would reuse an old cache.
 5. **Companion side: a hash of the exe** — reads the whole single-file exe at every check, and is not defined for a
    build run from `bin`.
-6. **Companion side: the module version ids of `Censio.GameData` and `Censio.Companion.Core`** — deterministic builds
-   give one id per content, so a code change, and only a code change, changes it.
+6. **Companion side: the module version ids of `Censio.GameData` and `Censio.Companion.Core`** — deterministic builds give one id per content, so a code change changes it even when the product version stays the same, and a change of the product version changes it too.
 7. **When to check: watching `maindata` for file changes** — file notifications over SMB are unreliable and fire
    throughout an update; **the game's process** — needs process enumeration the Companion does not do today; **each
    new pipe connection** — already observed, and an unchanged check costs only the listing.

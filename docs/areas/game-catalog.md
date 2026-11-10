@@ -193,7 +193,7 @@ archives again.
 - **Terms:** the *game state* is the installation folder, the build (*unknown* equals *unknown*) and, of every `.rda`
   file below `maindata` (subfolders included, links not followed), its path relative to `maindata`, its size and its
   modification time. The *Companion identity* is the module version ids of the assemblies that extract and write the
-  cache (`Censio.GameData`, `Censio.Companion.Core`), which change with their code, not with the version number. A *key* is
+  cache (`Censio.GameData`, `Censio.Companion.Core`), which change with their code even when the version number stays the same, and with the version number too. A *key* is
   the identity plus the game state; folder and paths are compared ignoring case, sizes and times exactly.
 - **Where:** one file, `catalog.bin`, in `%LOCALAPPDATA%\Censio\Cache` ([`companion.md`](companion.md), *Folders*): one
   cache per Windows account, for the installation extracted last. A folder that is no full path is never read or written.
@@ -231,7 +231,7 @@ archives again.
   row starts with filter byte 0 and the length is exact, and the pixels written again by the Companion's own PNG writer give
   exactly the stored bytes, which leaves no other chunk, field or trailing byte. The decoded sizes of all distinct icons together may not exceed four times the icon set bound
   (1 GiB), checked from the stored sides before an icon is read, and a PNG that no GUID uses is refused. Anything
-  else, a truncated file, a flipped byte, a trailing byte, another magic or version, is `invalid`. A different compression library makes it invalid once.
+  else, a truncated file, a flipped byte, a trailing byte, another magic or version, is `invalid`. Another compression library invalidates it once.
 - **Writes:** the Companion writes `catalog-<32 lowercase hex>.tmp` in the cache folder, created new, flushes it to
   disk and moves it over `catalog.bin`; it deletes its own temporary file on any failure. A torn or mixed file fails the
   checksum: the next load finds the previous complete file, one writer's, or none.
@@ -246,7 +246,7 @@ archives again.
 
 - The Companion checks the GUIDs of ticks closed after a catalog is published, and the latest tick at that moment, unless
   no tick source (connection or replay) has started yet; ticks closed earlier are not checked
-  ([`companion.md`](companion.md), *Log*). A catalog is published when its names are ready (the icons may still be extracted) or when it is loaded from the cache,
+  ([`companion.md`](companion.md), *Log*). A catalog is published when its names are ready or when it is loaded from the cache,
   so a re-extraction checks the latest tick against its new catalog and restarts the reporting.
 
 ### Failures
@@ -321,7 +321,7 @@ archives again.
   and invented GUIDs, identifiers, names and paths; a test asserts that none of its GUIDs occurs in the pipe fixture.
   Logs and reports hold GUIDs, kinds, archive paths and counts only. The same holds for the icons: no icon file, PNG
   or image of the game enters the repository, a fixture, a release or a log, and the tests build their DDS files
-  from invented pixels. The cache file is as private as a recording: it is never sent, logged or released, and stays when the Companion is removed.
+  from invented pixels. The cache file is private like a recording: never sent, logged or released; it stays when the Companion is removed.
 
 ## Related decisions
 

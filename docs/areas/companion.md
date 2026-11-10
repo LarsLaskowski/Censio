@@ -143,8 +143,7 @@ sent it: GUIDs are raw numbers where the catalog has no name for them; icons are
   no icons are built show the text alone, without the image's place, backdrop or gap.
   The names are published first: the window shows them as soon as the catalog is ready and adds the icons when they are
   built, and a new build of the catalog removes the icons until the new ones are ready. Each distinct icon is decoded once, at twice the size of the
-  cell (sharp up to 200 % display scaling), and shared by the rows that show it. The icons are held in memory only: nothing of them is written to disk,
-  logged or sent, and a screenshot holds the game's icons.
+  cell (sharp up to 200 % display scaling), and shared by the rows that show it. The icons are held in memory and written only to the catalog cache ([`game-catalog.md`](game-catalog.md), *Cache*): the window writes nothing of them to disk, nothing of them is logged or sent, and a screenshot holds the game's icons.
 - **Area names** (the `Name` column) pass the rule of the log (*Log*): each control character, format character, line
   separator, paragraph separator (the categories Cc, Cf, Zl, Zp) and unpaired surrogate is shown as one `?`, nothing
   else is changed (combining marks, right-to-left letters and spaces stay as sent), and an area name is never cut, also
