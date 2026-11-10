@@ -98,6 +98,15 @@ public sealed class GameInstallationSearch
     }
 
     /// <summary>
+    /// Reads the build of the last found installation again.
+    /// </summary>
+    /// <returns>The status with the build read now</returns>
+    public GameInstallationStatus RefreshBuild()
+    {
+        throw new NotImplementedException();
+    }
+
+    /// <summary>
     /// Determines whether the folder of an install record can be used.
     /// </summary>
     /// <param name="installDir">The folder as written, if any</param>

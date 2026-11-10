@@ -2,6 +2,7 @@ using Censio.GameData;
 using Censio.Server.Tests;
 
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Time.Testing;
 
 namespace Censio.Companion.Core.Tests;
 
@@ -76,6 +77,10 @@ public sealed class GameCatalogLoaderTests
 
                                                return GameCatalogResult.FromError(new GameCatalogError(GameCatalogErrorKind.FileMissing, "x"));
                                            },
+                                           NoIcons,
+                                           _ => null,
+                                           NewStore(),
+                                           new FakeTimeProvider(),
                                            _logger);
 
         // Act
@@ -112,6 +117,10 @@ public sealed class GameCatalogLoaderTests
 
                                                return GameCatalogResult.FromError(new GameCatalogError(GameCatalogErrorKind.FileMissing, "x"));
                                            },
+                                           NoIcons,
+                                           _ => null,
+                                           NewStore(),
+                                           new FakeTimeProvider(),
                                            _logger);
 
         // Act
@@ -144,6 +153,10 @@ public sealed class GameCatalogLoaderTests
 
                                                return GameCatalogResult.FromCatalog(catalog, [new GameCatalogCopy("patch1.rda", "data/a.xml")], 4);
                                            },
+                                           NoIcons,
+                                           _ => null,
+                                           NewStore(),
+                                           new FakeTimeProvider(),
                                            _logger);
         var events = new List<(GameCatalogStatus Status, GameCatalogStatus Published, GameCatalog? Catalog)>();
 
@@ -175,7 +188,7 @@ public sealed class GameCatalogLoaderTests
     public void GameCatalogLoaderRunLogsNoUncheckedArchivesWhenAllChecked()
     {
         // Arrange
-        var loader = new GameCatalogLoader(_ => GameCatalogResult.FromCatalog(new GameCatalog([Entry(1)], [], 0, 0), [], 0), _logger);
+        var loader = new GameCatalogLoader(_ => GameCatalogResult.FromCatalog(new GameCatalog([Entry(1)], [], 0, 0), [], 0), NoIcons, _ => null, NewStore(), new FakeTimeProvider(), _logger);
 
         // Act
         loader.Run(Found("C:\\Game"));
@@ -205,6 +218,10 @@ public sealed class GameCatalogLoaderTests
 
                                                return GameCatalogResult.FromCatalog(catalog, [], 0);
                                            },
+                                           NoIcons,
+                                           _ => null,
+                                           NewStore(),
+                                           new FakeTimeProvider(),
                                            _logger);
 
         // Act
@@ -239,7 +256,7 @@ public sealed class GameCatalogLoaderTests
     public void GameCatalogLoaderRunGivesFailedAndLogsKindOnly(GameCatalogErrorKind kind)
     {
         // Arrange
-        var loader = new GameCatalogLoader(_ => GameCatalogResult.FromError(new GameCatalogError(kind, Secret)), _logger);
+        var loader = new GameCatalogLoader(_ => GameCatalogResult.FromError(new GameCatalogError(kind, Secret)), NoIcons, _ => null, NewStore(), new FakeTimeProvider(), _logger);
 
         // Act
         var status = loader.Run(Found("C:\\Game"));
@@ -283,6 +300,9 @@ public sealed class GameCatalogLoaderTests
 
                                                return GameIconResult.FromIcons(icons);
                                            },
+                                           _ => null,
+                                           NewStore(),
+                                           new FakeTimeProvider(),
                                            _logger);
         var events = new List<(object? Sender, GameIconSet? Published)>();
 
@@ -311,9 +331,7 @@ public sealed class GameCatalogLoaderTests
     {
         // Arrange
         var catalog = new GameCatalog([Entry(1)], [], 0, 0);
-        var loader = new GameCatalogLoader(_ => GameCatalogResult.FromCatalog(catalog, [], 0),
-                                           (_, _) => GameIconResult.FromError(new GameIconError(GameIconErrorKind.DuplicateArchiveNumber, "zz_patchfiles_300.rda")),
-                                           _logger);
+        var loader = new GameCatalogLoader(_ => GameCatalogResult.FromCatalog(catalog, [], 0), (_, _) => GameIconResult.FromError(new GameIconError(GameIconErrorKind.DuplicateArchiveNumber, "zz_patchfiles_300.rda")), _ => null, NewStore(), new FakeTimeProvider(), _logger);
 
         // Act
         var status = loader.Run(Found("C:\\Game"));
@@ -345,6 +363,9 @@ public sealed class GameCatalogLoaderTests
                                            (_, _) => ++builds == 1
                                                          ? GameIconResult.FromIcons(icons)
                                                          : GameIconResult.FromError(new GameIconError(GameIconErrorKind.ArchiveUnreadable, "ui.rda")),
+                                           _ => null,
+                                           NewStore(),
+                                           new FakeTimeProvider(),
                                            _logger);
         var published = new List<GameIconSet?>();
 
@@ -381,6 +402,9 @@ public sealed class GameCatalogLoaderTests
 
                                            return GameIconResult.FromIcons(icons);
                                        },
+                                       _ => null,
+                                       NewStore(),
+                                       new FakeTimeProvider(),
                                        _logger);
         loader.StatusChanged += (_, status) => steps.Add($"status {status.Kind} {loader.Icons is null}");
         loader.IconsChanged += (_, _) => steps.Add("icons");
@@ -412,6 +436,9 @@ public sealed class GameCatalogLoaderTests
 
                                                return GameIconResult.FromError(new GameIconError(GameIconErrorKind.ArchiveMissing, "ui.rda"));
                                            },
+                                           _ => null,
+                                           NewStore(),
+                                           new FakeTimeProvider(),
                                            _logger);
 
         loader.IconsChanged += (_, _) => raised++;
@@ -428,6 +455,26 @@ public sealed class GameCatalogLoaderTests
         Assert.AreEqual(0, raised, "No change of the icons should be raised");
         Assert.IsNull(loader.Icons, "No icons should be published");
         Assert.DoesNotContain(line => line.Message.StartsWith("Catalog icons", StringComparison.Ordinal), Lines(), "No line about icons should be logged");
+    }
+
+    /// <summary>
+    /// Creates a cache store in a folder that does not exist.
+    /// </summary>
+    /// <returns>The store</returns>
+    private static GameCatalogCacheStore NewStore()
+    {
+        return new GameCatalogCacheStore(Path.Combine(Path.GetTempPath(), "censio-loader-tests", Guid.NewGuid().ToString("N")), new FakeTimeProvider());
+    }
+
+    /// <summary>
+    /// Builds the icons of a catalog as an empty set.
+    /// </summary>
+    /// <param name="folder">The installation folder</param>
+    /// <param name="catalog">The catalog</param>
+    /// <returns>The icons</returns>
+    private static GameIconResult NoIcons(string folder, GameCatalog catalog)
+    {
+        return GameIconResult.FromIcons(new GameIconSet(new Dictionary<int, GameIcon>(), new Dictionary<int, GameIconProblem>(), 0, 0));
     }
 
     #endregion // Methods

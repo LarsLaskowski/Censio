@@ -414,7 +414,7 @@ public partial class App : Application
             var gameSearch = new GameInstallationSearch(new RegistryUbisoftInstallRecords(), new WindowsFileVersionReader(), GameInstallation.DefaultUbisoftGamesFolder(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86)), _logger);
             var settingsFile = CompanionFolders.Settings(localAppData);
 
-            var catalogLoader = new GameCatalogLoader(folder => GameCatalogReader.Load(folder, RdaLimits.Default), GameIconReader.Load, _logger);
+            var catalogLoader = new GameCatalogLoader(folder => GameCatalogReader.Load(folder, RdaLimits.Default), GameIconReader.Load, status => GameCatalogKeyReader.Read(status, CompanionIdentity.Current), new GameCatalogCacheStore(CompanionFolders.Cache(localAppData), TimeProvider.System), TimeProvider.System, _logger);
 
             _gameSearch = gameSearch;
             _catalogLoader = catalogLoader;

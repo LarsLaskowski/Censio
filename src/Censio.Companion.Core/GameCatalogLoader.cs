@@ -19,7 +19,25 @@ public sealed class GameCatalogLoader
     /// <summary>
     /// Builds the icons of a catalog, or <c>null</c> when none are built.
     /// </summary>
-    private readonly Func<string, GameCatalog, GameIconResult>? _buildIcons;
+    private readonly Func<string, GameCatalog, GameIconResult> _buildIcons;
+
+    // Skeleton: removed with the implementation
+#pragma warning disable S1144, S4487
+    /// <summary>
+    /// Reads the key of an installation, or <c>null</c> when it cannot be read.
+    /// </summary>
+    private readonly Func<GameInstallationStatus, GameCatalogKey?> _readKey;
+
+    /// <summary>
+    /// The catalog cache.
+    /// </summary>
+    private readonly GameCatalogCacheStore _cache;
+
+    /// <summary>
+    /// The clock.
+    /// </summary>
+    private readonly TimeProvider _clock;
+#pragma warning restore S1144, S4487
 
     /// <summary>
     /// The logger.
@@ -49,22 +67,23 @@ public sealed class GameCatalogLoader
     /// Initializes a new instance of the <see cref="GameCatalogLoader" /> class.
     /// </summary>
     /// <param name="build">Builds the catalog of an installation folder</param>
+    /// <param name="buildIcons">Builds the icons of a catalog</param>
+    /// <param name="readKey">Reads the key of an installation, or <c>null</c> when it cannot be read</param>
+    /// <param name="cache">The catalog cache</param>
+    /// <param name="clock">The clock</param>
     /// <param name="logger">The logger</param>
-    public GameCatalogLoader(Func<string, GameCatalogResult> build, ILogger logger)
-        : this(build, null, logger)
-    {
-    }
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="GameCatalogLoader" /> class.
-    /// </summary>
-    /// <param name="build">Builds the catalog of an installation folder</param>
-    /// <param name="buildIcons">Builds the icons of a catalog, or <c>null</c> if none are built</param>
-    /// <param name="logger">The logger</param>
-    public GameCatalogLoader(Func<string, GameCatalogResult> build, Func<string, GameCatalog, GameIconResult>? buildIcons, ILogger logger)
+    public GameCatalogLoader(Func<string, GameCatalogResult> build,
+                             Func<string, GameCatalog, GameIconResult> buildIcons,
+                             Func<GameInstallationStatus, GameCatalogKey?> readKey,
+                             GameCatalogCacheStore cache,
+                             TimeProvider clock,
+                             ILogger logger)
     {
         _build = build;
         _buildIcons = buildIcons;
+        _readKey = readKey;
+        _cache = cache;
+        _clock = clock;
         _logger = logger;
     }
 
@@ -81,6 +100,13 @@ public sealed class GameCatalogLoader
     /// Occurs when the icons changed.
     /// </summary>
     public event EventHandler? IconsChanged;
+
+    /// <summary>
+    /// Occurs when a catalog instance, or none after a failure, was published.
+    /// </summary>
+#pragma warning disable CS0067 // Skeleton: removed with the implementation
+    public event EventHandler<GameCatalog?>? CatalogChanged;
+#pragma warning restore CS0067
 
     #endregion // Events
 
@@ -159,17 +185,23 @@ public sealed class GameCatalogLoader
     }
 
     /// <summary>
+    /// Checks the game for a change when the pipe connected, and extracts the catalog again when it changed.
+    /// </summary>
+    /// <param name="status">The status of the pipe connection</param>
+    /// <param name="refreshInstallation">Reads the build of the installation again</param>
+    /// <returns>The task of the check; completed at once when no check is needed</returns>
+    public Task OnConnectionStatusChangedAsync(PipeConnectionStatus status, Func<GameInstallationStatus> refreshInstallation)
+    {
+        throw new NotImplementedException();
+    }
+
+    /// <summary>
     /// Builds the icons of a published catalog, publishes them and raises the event.
     /// </summary>
     /// <param name="folder">The folder of the installation</param>
     /// <param name="catalog">The catalog</param>
     private void BuildIcons(string folder, GameCatalog catalog)
     {
-        if (_buildIcons is null)
-        {
-            return;
-        }
-
         var result = _buildIcons(folder, catalog);
 
         if (result.Icons is not { } icons)

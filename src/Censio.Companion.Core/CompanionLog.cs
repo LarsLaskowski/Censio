@@ -271,5 +271,56 @@ public static partial class CompanionLog
     [LoggerMessage(Level = LogLevel.Information, Message = "Catalog: more than {MaxReports} GUIDs cannot be named; further ones are not logged in this run")]
     public static partial void CatalogReportsCapped(ILogger logger, int maxReports);
 
+    /// <summary>
+    /// Logs why the catalog cache was not used.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    /// <param name="reason">The reason</param>
+    [LoggerMessage(Level = LogLevel.Information, Message = "Catalog cache not used: {Reason}")]
+    public static partial void CatalogCacheNotUsed(ILogger logger, string reason);
+
+    /// <summary>
+    /// Logs that the catalog cache is invalid.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Catalog cache not used: invalid")]
+    public static partial void CatalogCacheInvalid(ILogger logger);
+
+    /// <summary>
+    /// Logs that the catalog cache could not be written.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    /// <param name="exception">The exception, if any</param>
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Catalog cache not written")]
+    public static partial void CatalogCacheNotWritten(ILogger logger, Exception? exception);
+
+    /// <summary>
+    /// Logs that the check for a changed game failed.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Catalog check failed; the current catalog is kept")]
+    public static partial void CatalogCheckFailed(ILogger logger);
+
+    /// <summary>
+    /// Logs the durations of an extraction.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    /// <param name="seconds">The total seconds</param>
+    /// <param name="nameSeconds">The seconds of the names</param>
+    /// <param name="iconSeconds">The seconds of the icons</param>
+    [LoggerMessage(Level = LogLevel.Information, Message = "Catalog extracted in {Seconds} s (names {NameSeconds} s, icons {IconSeconds} s)")]
+    public static partial void CatalogExtracted(ILogger logger, string seconds, string nameSeconds, string iconSeconds);
+
+    /// <summary>
+    /// Logs a catalog loaded from the cache.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    /// <param name="seconds">The seconds</param>
+    /// <param name="count">The number of entries</param>
+    /// <param name="goodCount">The number of goods with an icon</param>
+    /// <param name="regionCount">The number of regions with an icon</param>
+    [LoggerMessage(Level = LogLevel.Information, Message = "Catalog loaded from cache in {Seconds} s: {Count} entries, {GoodCount} goods and {RegionCount} regions with an icon")]
+    public static partial void CatalogLoadedFromCache(ILogger logger, string seconds, int count, int goodCount, int regionCount);
+
     #endregion // Methods
 }
