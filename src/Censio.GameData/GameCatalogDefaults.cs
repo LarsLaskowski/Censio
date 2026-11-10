@@ -10,11 +10,11 @@ internal static class GameCatalogDefaults
     #region Methods
 
     /// <summary>
-    /// Reads the default region type of the <c>Region</c> property.
+    /// Reads the property defaults.
     /// </summary>
     /// <param name="stream">The property defaults file</param>
-    /// <returns>The default <c>RegionID</c>, or <c>null</c> when none is stated</returns>
-    internal static string? ReadDefaultRegionId(Stream stream)
+    /// <returns>The defaults</returns>
+    internal static GameCatalogValues ReadPropertyDefaults(Stream stream)
     {
         using var reader = GameCatalogXml.Create(stream, "Properties");
 
@@ -44,22 +44,26 @@ internal static class GameCatalogDefaults
             more = reader.Read();
         }
 
-        return regionId;
+        return new GameCatalogValues
+               {
+                   HasRegion = regionSections > 0,
+                   RegionId = regionId
+               };
     }
 
     /// <summary>
-    /// Reads the region type each template with a <c>Region</c> property states.
+    /// Reads the facts each defining template states.
     /// </summary>
     /// <param name="stream">The templates file</param>
-    /// <returns>The stated <c>RegionID</c>, or <c>null</c>, by template name</returns>
-    internal static Dictionary<string, string?> ReadTemplateRegionIds(Stream stream)
+    /// <returns>The facts by template name</returns>
+    internal static Dictionary<string, GameCatalogValues> ReadTemplates(Stream stream)
     {
         using var reader = GameCatalogXml.Create(stream, "Templates");
 
         var names = new string[GameCatalogReader.MaxAssetDepth + 1];
         var path = new string[4];
         var seen = new HashSet<string>(StringComparer.Ordinal);
-        var regionIds = new Dictionary<string, string?>(StringComparer.Ordinal);
+        var regionIds = new Dictionary<string, GameCatalogValues>(StringComparer.Ordinal);
         var more = reader.Read();
 
         while (more)
@@ -89,11 +93,11 @@ internal static class GameCatalogDefaults
     /// Records one defining template, rejecting a name that is repeated.
     /// </summary>
     /// <param name="seen">The names of all defining templates met so far</param>
-    /// <param name="regionIds">The region types by template name</param>
+    /// <param name="regionIds">The facts by template name</param>
     /// <param name="name">The template name, or <c>null</c> when it has none</param>
     /// <param name="hasRegion">Whether the template has a <c>Region</c> property</param>
     /// <param name="regionId">The <c>RegionID</c> that property states</param>
-    private static void RegisterTemplate(HashSet<string> seen, Dictionary<string, string?> regionIds, string? name, bool hasRegion, string? regionId)
+    private static void RegisterTemplate(HashSet<string> seen, Dictionary<string, GameCatalogValues> regionIds, string? name, bool hasRegion, string? regionId)
     {
         if (name is null)
         {
@@ -107,7 +111,12 @@ internal static class GameCatalogDefaults
 
         if (hasRegion)
         {
-            regionIds.Add(name, regionId);
+            regionIds.Add(name,
+                          new GameCatalogValues
+                          {
+                              HasRegion = true,
+                              RegionId = regionId
+                          });
         }
     }
 

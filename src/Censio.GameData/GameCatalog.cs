@@ -57,6 +57,11 @@ public sealed class GameCatalog
     public int Count => _entries.Count;
 
     /// <summary>
+    /// Gets the entries the catalog kept.
+    /// </summary>
+    public IReadOnlyCollection<GameCatalogEntry> Entries => _entries;
+
+    /// <summary>
     /// Gets the number of inherited assets left out.
     /// </summary>
     public int InheritedAssetCount { get; }

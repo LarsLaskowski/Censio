@@ -5,6 +5,21 @@ namespace Censio.GameData;
 /// </summary>
 internal sealed class GameCatalogAssets
 {
+    #region Constructors
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="GameCatalogAssets" /> class.
+    /// </summary>
+    /// <param name="templates">The facts of the defining templates by name</param>
+    /// <param name="defaults">The property defaults</param>
+    internal GameCatalogAssets(Dictionary<string, GameCatalogValues> templates, GameCatalogValues defaults)
+    {
+        Templates = templates;
+        Defaults = defaults;
+    }
+
+    #endregion // Constructors
+
     #region Fields
 
     /// <summary>
@@ -15,6 +30,16 @@ internal sealed class GameCatalogAssets
     #endregion // Fields
 
     #region Properties
+
+    /// <summary>
+    /// Gets the facts of the defining templates by name.
+    /// </summary>
+    internal Dictionary<string, GameCatalogValues> Templates { get; }
+
+    /// <summary>
+    /// Gets the property defaults.
+    /// </summary>
+    internal GameCatalogValues Defaults { get; }
 
     /// <summary>
     /// Gets the assets that may become entries.

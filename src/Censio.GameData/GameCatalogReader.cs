@@ -81,7 +81,9 @@ public static class GameCatalogReader
         try
         {
             if (TryReadPass(openDataSets, GameCatalogFiles.ReadRegionTypes, out var regionTypes, out var failure) == false
-                || TryReadPass(openAssets, GameCatalogFiles.ReadAssets, out var assets, out failure) == false)
+                || TryReadPass(openProperties, GameCatalogDefaults.ReadPropertyDefaults, out var defaults, out failure) == false
+                || TryReadPass(openTemplates, GameCatalogDefaults.ReadTemplates, out var templates, out failure) == false
+                || TryReadPass(openAssets, stream => GameCatalogFiles.ReadAssets(stream, templates, defaults), out var assets, out failure) == false)
             {
                 return CreateError(failure);
             }
@@ -94,13 +96,7 @@ public static class GameCatalogReader
                 return CreateError(failure);
             }
 
-            if (TryReadPass(openProperties, GameCatalogDefaults.ReadDefaultRegionId, out var defaultRegionId, out failure) == false
-                || TryReadPass(openTemplates, GameCatalogDefaults.ReadTemplateRegionIds, out var templateRegionIds, out failure) == false)
-            {
-                return CreateError(failure);
-            }
-
-            return GameCatalogResult.FromCatalog(GameCatalogBuilder.Build(regionTypes, assets, english, german, templateRegionIds, defaultRegionId), [], 0);
+            return GameCatalogResult.FromCatalog(GameCatalogBuilder.Build(regionTypes, assets, english, german), [], 0);
         }
         catch (XmlException)
         {

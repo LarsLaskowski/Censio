@@ -14,17 +14,15 @@ internal static class GameCatalogBuilder
     /// <param name="assets">The collected assets</param>
     /// <param name="english">The English texts</param>
     /// <param name="german">The German texts</param>
-    /// <param name="templateRegionIds">The stated region type of each template with a <c>Region</c> property, or <c>null</c></param>
-    /// <param name="defaultRegionId">The default region type of the <c>Region</c> property, or <c>null</c></param>
     /// <returns>The catalog</returns>
-    internal static GameCatalog Build(HashSet<string> regionTypes, GameCatalogAssets assets, GameCatalogTexts english, GameCatalogTexts german, Dictionary<string, string?> templateRegionIds, string? defaultRegionId)
+    internal static GameCatalog Build(HashSet<string> regionTypes, GameCatalogAssets assets, GameCatalogTexts english, GameCatalogTexts german)
     {
         var dropped = 0;
         var regionLists = new Dictionary<int, IReadOnlyList<string>?>();
 
         foreach (var (guid, region) in assets.Regions)
         {
-            regionLists[guid] = RegionIdList(ResolveRegionId(region, templateRegionIds, defaultRegionId), regionTypes, ref dropped);
+            regionLists[guid] = RegionIdList(ResolveRegionId(region, assets.Templates, assets.Defaults.RegionId), regionTypes, ref dropped);
         }
 
         var entries = new Dictionary<int, GameCatalogEntry>();
@@ -120,22 +118,22 @@ internal static class GameCatalogBuilder
     /// Resolves the region type of a region asset: its own, else its template's, else the property default.
     /// </summary>
     /// <param name="region">The region asset</param>
-    /// <param name="templateRegionIds">The stated region type of each template with a <c>Region</c> property, or <c>null</c></param>
+    /// <param name="templates">The facts of the defining templates by name</param>
     /// <param name="defaultRegionId">The default region type of the <c>Region</c> property, or <c>null</c></param>
     /// <returns>The region type, or <c>null</c> when none is stated</returns>
-    private static string? ResolveRegionId(GameCatalogAsset region, Dictionary<string, string?> templateRegionIds, string? defaultRegionId)
+    private static string? ResolveRegionId(GameCatalogAsset region, Dictionary<string, GameCatalogValues> templates, string? defaultRegionId)
     {
         if (region.RegionId is not null)
         {
             return region.RegionId;
         }
 
-        if (region.Template is null || templateRegionIds.TryGetValue(region.Template, out var templateRegionId) == false)
+        if (region.Template is null || templates.TryGetValue(region.Template, out var template) == false)
         {
             return null;
         }
 
-        return templateRegionId ?? defaultRegionId;
+        return template.RegionId ?? defaultRegionId;
     }
 
     /// <summary>
