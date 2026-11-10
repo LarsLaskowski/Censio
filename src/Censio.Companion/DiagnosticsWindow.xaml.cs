@@ -38,7 +38,7 @@ internal sealed partial class DiagnosticsWindow : Window, IDiagnosticsWindow
     /// <summary>
     /// The dark backdrop of a region icon, whose glyph is light
     /// </summary>
-    private static readonly Brush _regionBackdrop = CreateRegionBackdrop();
+    private static readonly SolidColorBrush _regionBackdrop = CreateRegionBackdrop();
 
     /// <summary>
     /// Whether the window was shown
@@ -202,7 +202,7 @@ internal sealed partial class DiagnosticsWindow : Window, IDiagnosticsWindow
     /// Creates the frozen backdrop brush of a region icon.
     /// </summary>
     /// <returns>The brush</returns>
-    private static Brush CreateRegionBackdrop()
+    private static SolidColorBrush CreateRegionBackdrop()
     {
         var brush = new SolidColorBrush(Color.FromRgb(0x3C, 0x3C, 0x3C));
 
