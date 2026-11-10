@@ -16,10 +16,8 @@ the kind and candidacy are decided from them at once (`GameCatalogAssets.cs:73-9
 ## Verified facts
 
 Sample: the invented fixture `tests/Censio.GameData.Tests/Fixtures/GameCatalog/` (structure of the Product Manager's
-real files of game version 3.0.1733841: roots, groups, `DefaultValues`/`DefaultContainerValues`, defining and nested
-templates, BOM) and the notes taken from the real `templates.xml`/`properties.xml` in #130 (plan at `d0a87cc`, facts
-3–10 and 14). The real files are not in this session; the variants the fixture lacks (template and default values of
-`Building`, `Product`, `Session`) are added by the Tester from those notes and checked by AC4's installation run.
+real files of game version 3.0.1733841) and the notes taken from the real files in #130 (plan at `d0a87cc`, facts
+3–10, 14). The Tester adds the variants it lacks from those notes; AC4's installation run checks them.
 
 | # | Claim | Evidence | Status |
 | - | ----- | -------- | ------ |
@@ -32,7 +30,7 @@ templates, BOM) and the notes taken from the real `templates.xml`/`properties.xm
 | 7 | Whether a template or default states `Product/AssociatedRegion`, and whether templates hold empty fields as placeholders | to verify: AC4 report (goods changed; transitions to *none*), Product Manager, before step 9 | unverified |
 | 8 | On `main` the installation catalog has 1,038 entries and every pipe-fixture GUID resolves to its kind | #130 working record, Product Manager's run of 2026-11-10 | confirmed |
 | 9 | The fixture lists no template `Product` or `ResidenceBuilding7`; its `SessionModerate` template states an empty `Session/Region`, its `Session` default `0`; every fixture and inline session states its own `Session/Region` | `Fixtures/GameCatalog/templates.xml`, `properties.xml`, `assets.xml`; `GameCatalogReaderTests.cs:578`, `:2057-2060` | confirmed |
-| 10 | Tests reach the reader through `Read` and `Load` only (no `InternalsVisibleTo`); `GameCatalog` offers no enumeration of its entries | grep; `GameCatalog.cs:57-90` | confirmed |
+| 10 | Tests use only `Read` and `Load`; `GameCatalog` cannot enumerate entries | no `InternalsVisibleTo`; `GameCatalog.cs:57-90` | confirmed |
 | 11 | Records 0047 and 0049 are unreleased | `git tag --contains` of their commits: none (`v0.1.0` is `6d0384e`) | confirmed |
 
 ## Acceptance criteria
@@ -45,10 +43,14 @@ templates, BOM) and the notes taken from the real `templates.xml`/`properties.xm
   `templates.xml`, the template's value; without one, the value of the property's `DefaultValues` in
   `properties.xml`. A template that is not listed or lacks the property gives only the asset's own value. A present
   empty element is stated at every level (an empty list means *none*, an empty `Session/Region` no region, like `0`).
-  The resolved `Session/Region` decides the region entry; resolved lists are split, checked and counted as today.
+  The resolved `Session/Region` decides the region entry, and `0` never makes one (also against a region asset of
+  GUID `0`). Each source list (an asset's own, a template's, a default's) is split and checked once: the entries that
+  resolve to one template or default list share one read-only list, and its dropped names are counted once per source
+  list, as a dropped `RegionID` once per region asset.
 - AC3: `properties.xml` and `templates.xml` are read before the assets: passes data sets, properties, templates,
   assets, English, German, one file open at a time, a failing pass ending the read with its kind and no later file
-  opened. A second `DefaultValues` part `Building`, `Product`, `Session` or `Region`, or a `Session/Region` in a
+  opened. A second `DefaultValues` part `Building`, `Product`, `Session` or `Region` anywhere in the file (any
+  group), or a `Session/Region` in a
   template or default that is neither empty nor a signed 32-bit integer, is a malformed file; `DefaultContainerValues`
   and nested templates stay unread.
 - AC4: The opt-in sample and installation tests also build the catalog with empty `properties.xml` and
@@ -61,8 +63,8 @@ templates, BOM) and the notes taken from the real `templates.xml`/`properties.xm
 | AC | Test(s) | Test file |
 | -- | ------- | --------- |
 | AC1 | `GameCatalogReaderReadMakesBuildingOfTemplateWithBuildingProperty` (fixture asset without own section); `GameCatalogReaderReadMakesNoBuildingWithoutBuildingProperty` (`DataRow`: template listed without it; not listed); `GameCatalogReaderReadKeepsKindOrderWithTemplateProperties` (`DataRow`: `Product` template with a `Building` property → good; template with `Building` and a `Session/Region` naming a region asset → region) | `tests/Censio.GameData.Tests/GameCatalogReaderTests.cs` |
-| AC2 | `GameCatalogReaderReadTakesBuildingRegionsFromTemplate`, `...TakesBuildingRegionsFromPropertyDefault`, `...PrefersOwnBuildingRegionsOverTemplate` (fixture); `GameCatalogReaderReadLayersProductRegions` (`DataRow`: own, template, default; a good and a workforce); `GameCatalogReaderReadLayersSessionRegion` (`DataRow`: own wins, template, default, template `0` over a default region); `GameCatalogReaderReadCountsEmptyLayerValueAsStated` (`DataRow` per fact and level); `GameCatalogReaderReadTakesNoDefaultWithoutProperty` (`DataRow` per fact: template listed without the property, not listed); `GameCatalogReaderReadCountsDroppedDefaultRegionTypes` (an unknown name of a default list, counted per entry); `GameCatalogReaderReadResolvesFixtureEntries` adapted | `tests/Censio.GameData.Tests/GameCatalogReaderTests.cs` |
-| AC3 | `GameCatalogReaderReadFailsForSecondCatalogPropertyDefault` (`DataRow`: `Building`, `Product`, `Session`); `GameCatalogReaderReadFailsForNonIntegerSessionRegionLayer` (`DataRow`: template `abc`, default `abc`, template `99999999999`); `GameCatalogReaderReadOpensOneFileAtATime` and `ExpectedLog` adapted to the new order; `GameCatalogReaderReadIgnoresContainerDefaultsAndNestedTemplates` extended with `Building` and `Session` decoys | `tests/Censio.GameData.Tests/GameCatalogReaderTests.cs` |
+| AC2 | `GameCatalogReaderReadTakesBuildingRegionsFromTemplate`, `...TakesBuildingRegionsFromPropertyDefault`, `...PrefersOwnBuildingRegionsOverTemplate` (fixture); `GameCatalogReaderReadLayersProductRegions` (`DataRow`: own, template, default; a good and a workforce); `GameCatalogReaderReadLayersSessionRegion` (`DataRow`: own wins, template, default, template `0` over a default region, default `0` with a region asset of GUID `0`); `GameCatalogReaderReadCountsEmptyLayerValueAsStated` (`DataRow` per fact and level); `GameCatalogReaderReadTakesNoDefaultWithoutProperty` (`DataRow` per fact: template listed without the property, not listed); `GameCatalogReaderReadCountsDroppedDefaultRegionTypes` (`DataRow`: an unknown name of a template list and of a default list used by two buildings, counted once); `GameCatalogReaderReadSharesLayeredRegionList` (two buildings of one template without own list: `ReferenceEquals` of their `RegionTypes` through `Entries`, and of two using the default); `GameCatalogReaderReadResolvesFixtureEntries` adapted | `tests/Censio.GameData.Tests/GameCatalogReaderTests.cs` |
+| AC3 | `GameCatalogReaderReadFailsForSecondCatalogPropertyDefault` (`DataRow`: `Building`, `Product`, `Session`, each in one group and in two different groups); `GameCatalogReaderReadFailsForNonIntegerSessionRegionLayer` (`DataRow`: template `abc`, default `abc`, template `99999999999`); `GameCatalogReaderReadOpensOneFileAtATime` and `ExpectedLog` adapted to the new order; `GameCatalogReaderReadIgnoresContainerDefaultsAndNestedTemplates` extended with `Building` and `Session` decoys | `tests/Censio.GameData.Tests/GameCatalogReaderTests.cs` |
 | AC4 | `GameCatalogEntriesHoldsEntriesWithoutAmbiguousGuids`; `GameCatalogReaderSampleResolvesFixtureGuids` and `GameCatalogReaderInstallationResolvesFixtureGuids` extended; manual: the Product Manager on Windows, local build of the branch head after step 8, *Single test* of `GameCatalogReaderInstallationResolvesFixtureGuids` with `CENSIO_ANNO_INSTALL` set, before step 9 | `tests/Censio.GameData.Tests/GameCatalogTests.cs`, `tests/Censio.GameData.Tests/GameCatalogReaderTests.cs` |
 
 ## Approach
@@ -71,7 +73,9 @@ templates, BOM) and the notes taken from the real `templates.xml`/`properties.xm
   and its one field (`AssociatedRegion`, `AssociatedRegions`, `Region`, `RegionID`); `null` = not stated.
 - **properties.xml.** `ReadPropertyDefaults` generalizes today's walk: a `DefaultValues` child (relative depth 1) named
   `Building`, `Product`, `Session` or `Region` is read as a bounded part (`CountElement`), its field at relative depth 1
-  taken (last one wins), its presence flag set; a second part of the same name is malformed. `Session/Region` is
+  taken (last one wins), its presence flag set; a second part of the same name is malformed, counted across all
+  `Group/DefaultValues` elements of the file (one `GameCatalogValues` for the file, as `regionSections` today), not
+  per element. Inside a template a repeated property stays last-wins, as `RegionID`. `Session/Region` is
   parsed with `GameCatalogXml.ParseInt` after trimming, an empty one gives `0`. Everything else is skipped as now.
 - **templates.xml.** `ReadTemplates` returns every named defining template with its `GameCatalogValues`:
   `Properties/<Property>` at relative depth 2 sets the flag, `Properties/<Property>/<Field>` at depth 3 the value
@@ -80,7 +84,10 @@ templates, BOM) and the notes taken from the real `templates.xml`/`properties.xm
   the inherited check and before the region-asset check, looks the asset's template up and, for each property the
   template has, fills each field the asset left `null` from the template, else from the default; `HasBuildingSection`
   is also set by the template's `Building` property. Kind and candidacy then run unchanged on the resolved facts.
-- **Builder.** `ResolveRegionId` goes; a region asset's `RegionId` arrives resolved.
+- **Builder.** `ResolveRegionId` goes. `Build` caches by the source string's reference (`ReferenceEqualityComparer`:
+  no lookup hashes a long value): `RegionList` runs once per source string, its dropped names count once, and its
+  entries share one read-only list. Layering copies the reference, so own strings behave as today.
+  `CreateEntry` makes a region entry only for a `SessionRegion` other than `0`.
 - **Reader.** `Read` keeps its signature (all parameters share one type, so a reorder would compile silently); its
   passes run data sets, properties, templates, assets (with templates and defaults), English, German. Its summary
   names the order.
@@ -100,15 +107,11 @@ templates, BOM) and the notes taken from the real `templates.xml`/`properties.xm
 
 ## Options considered
 
-1. Layer every fact of option 3 of record 0049, files read before the assets — chosen.
-2. `RegionID` only (today) — loses: the issue.
-3. Every value, `GUID`, `Text/OasisId`, `IsWorkforce` included — loses: a default `GUID` or text identifier would be
-   shared by all assets; no template values seen for them (record 0049, option 4).
-4. Keep the pass order, decide kinds after the templates — loses: keeps every templated asset and its texts in memory.
-5. Reorder `Read`'s parameters to the pass order — loses: same parameter types, call sites would compile with
-   swapped files.
-6. Compare the effect only on the pipe-fixture GUIDs through `Find`, without `Entries` — loses: buildings the fixture
-   lacks would change unseen.
+1. Option 3 of record 0049, files read before the assets — chosen; options 1, 4 and 5 of the record lost as it says
+   (`RegionID` only; every value; kinds decided after the templates).
+2. Reorder `Read`'s parameters to the pass order — loses: same types, call sites would compile with swapped files.
+3. The effect only on the pipe-fixture GUIDs through `Find`, without `Entries` — loses: other buildings change unseen.
+4. Dedupe in `RegionList`, or dropped names per entry — lose (*Security review*, B1).
 
 ## Affected projects and types
 
@@ -158,7 +161,9 @@ Files no unit test can cover: none.
 - `docs/areas/game-catalog.md` — *Files and nodes*: pass order, the nodes of both files, the second-default rule;
   *Kinds*: rule 3 on the resolved `Session/Region`, rule 5 with the template's `Building` property; *Region types*:
   the layering for all four facts in one paragraph, "Only `RegionID` is layered this way" removed; *Failures*: the two
-  new malformed cases; *Memory*: the templates' facts held from the templates pass on; *Tests with the real files*:
+  new malformed cases, the second default counted across groups; *Region types*: a shared list counted once per
+  source list, `0` never a region; *Memory*: the templates' facts held from the templates pass on, one split list per
+  source string shared by its entries; *Tests with the real files*:
   the report.
 - `docs/areas/game-files.md` — the *Regions* row (line 110): the answer covers goods, buildings and sessions (#133).
 
@@ -166,18 +171,22 @@ Files no unit test can cover: none.
 
 - Dev: the two area documents above, against the code as built.
 - Tester: `docs/UNIT_TESTS.md` lines 29–36 (the two opt-in tests also write the report); `Fixtures/GameCatalog/README.md`.
-- None: `docs/ARCHITECTURE.md` (line 59 stays true), `.squad/project.md` (the parsing line names both files),
-  `README.md` and `docs/USER_GUIDE.md` (no text or number they state changes); the repository has no changelog.
+- None: `docs/ARCHITECTURE.md`, `.squad/project.md`, `README.md`, `docs/USER_GUIDE.md` (nothing they state changes); no
+  changelog exists.
 
 ## Architecture check
 
 Still `config.rda` only, forward-only, one file at a time, nothing written, fail closed (record 0047). Memory adds the
-facts of about 1,046 templates during the asset and text passes. No guarantee of `.squad/project.md` is weakened.
+facts of about 1,046 templates during the asset and text passes; split lists stay bounded by the files' content (one
+list per source string). No guarantee of `.squad/project.md` is weakened.
 
 ## Security considerations
 
-- [x] Bounds unchanged: per property part and per template, counted on elements as met after decoding; the
-  archive's entry bound before decompression.
+- [x] Bounds of the read unchanged: per property part and per template, counted on elements as met after
+  decoding; the archive's entry bound before decompression. Derived values: a template or default value reaches many
+  assets by reference; it is split once and kept as one list shared by its entries, so the kept lists and the split
+  time grow with the files' content, not with entries × value length, and the dropped count with the source lists
+  (at most the tokens of the six files, within `int`).
 - [x] No exception text reaches a result: the new integer parse throws the existing malformed exception, mapped to
   the fixed text of `GameCatalogReader.CreateError`.
 
@@ -187,6 +196,16 @@ facts of about 1,046 templates during the asset and text passes. No guarantee of
   (unreleased, fact 11): title, context, options and decision now cover all four facts and the pass order (option 3
   chosen); the file name is kept so no link moves. Index row updated.
 - `docs/decisions/0047-…` edited in place: "a missing `RegionID`" → "a value an asset does not state".
+
+## Security review
+
+- B1, accepted: each source string split once, its list shared and its dropped names counted once (AC2, *Builder*,
+  *Security considerations*, *Areas*, record 0049; tests `...SharesLayeredRegionList`,
+  `...CountsDroppedDefaultRegionTypes`). Dedupe rejected: bounds memory, not the repeated split, and changes own lists
+  of repeated names; dropped names per entry rejected: multiplies with the entries, can overflow `int`.
+- N1, fixed now: `CreateEntry` requires a `SessionRegion` other than `0`; `DataRow` in `...LayersSessionRegion`.
+- N2, fixed now: the second-default count runs across the file (*properties.xml*, AC3); `DataRow`s with the parts in
+  two groups in `...FailsForSecondCatalogPropertyDefault`.
 
 ## Out of scope / follow-ups
 

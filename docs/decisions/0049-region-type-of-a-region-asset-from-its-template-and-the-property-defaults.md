@@ -59,6 +59,10 @@ others. The rules are in the [game-catalog](../areas/game-catalog.md) area docum
 - Buildings and goods whose region list sits in a template or a default carry it, and assets that are buildings only
   through their template become entries; the opt-in installation test reports the change of kinds and region lists
   against a build from the assets' own values, as counts.
+- One template or default value reaches many assets: it is split once and its list shared by reference, and its
+  unknown names are counted once, so memory, time and the count grow with the files' content, not with the number of
+  assets (Security's plan review of #133). Removing duplicate names instead would bound memory but not the repeated
+  splitting, and would change lists the assets state themselves.
 - Two more required files: a missing or malformed `templates.xml` or `properties.xml` fails the whole catalog, now
   before the assets are read.
 - That a template value overrides the property default is inferred from the files' structure; no template states a
