@@ -172,7 +172,7 @@ conversion) hold the reasoning.
 
 | Kind | When |
 | ---- | ---- |
-| Archive missing | `maindata/ui.rda` does not exist (also when `maindata` does) |
+| Archive missing | `maindata/ui.rda` does not exist (also when `maindata` itself does not) |
 | Archive unreadable | an icon archive cannot be opened, or the listing of `maindata` or any other step fails (`maindata` named then) |
 | Duplicate archive number | two patch archives have the same number (`zz_patchfiles_300.rda` and `zz_patchfiles_0300.rda`); the second is named |
 | Icon set too large | the PNG files kept would together take more than 256 MiB; the archive being read is named |
@@ -214,7 +214,7 @@ conversion) hold the reasoning.
   `DefaultContainerValues` element) and to each defining template of `templates.xml`. (On the four files of the Product Manager's installation measured for #23 the deepest asset has 46 levels and the largest 3,740 elements; in his `properties.xml` and `templates.xml` of game version 3.0.1733841 the largest property has 588 elements and 13 levels, the largest template 1,352 elements and 16 levels.)
 - **Icons:** an icon entry above 8 MiB (stored or decompressed) is not read and its icon is *unreadable*; the check is made
   before the entry is allocated. The header is checked before any pixel is decoded: at most 2,048 by 2,048 pixels, so a
-  decoded image takes at most 16 MiB. The PNG files kept take at most 256 MiB together, shared data counted once; at
+  decoded image takes at most 16 MiB. The PNG files kept take at most 256 MiB together, an icon that several entries share counted once; at
   exactly 256 MiB the icons are kept, above it the step fails with *icon set too large* and no icon is kept. The path of
   an icon file name is at most 1,024 characters.
 - **Memory:** at one time the catalog build holds one file's entry content, the open `config.rda` with its entry
