@@ -35,7 +35,7 @@ public sealed class GameCatalog
     /// <param name="droppedRegionTypeCount">The number of unknown region types dropped</param>
     public GameCatalog(IReadOnlyCollection<GameCatalogEntry> entries, IReadOnlyCollection<int> ambiguousGuids, int inheritedAssetCount, int droppedRegionTypeCount)
     {
-        _entries = entries;
+        _entries = entries.ToList().AsReadOnly();
         _ambiguousGuids = [.. ambiguousGuids];
 
         foreach (var entry in entries)

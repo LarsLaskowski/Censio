@@ -60,7 +60,7 @@ public static class GameCatalogReader
     #region Methods
 
     /// <summary>
-    /// Builds the catalog from six sources, each opened when its pass starts.
+    /// Builds the catalog from six sources, each opened when its pass starts, in the order data sets, properties, templates, assets, English texts, German texts.
     /// </summary>
     /// <param name="openDataSets">Opens the data sets file</param>
     /// <param name="openAssets">Opens the assets file</param>
