@@ -219,6 +219,7 @@ public partial class App : Application
         var trayIcon = CreateTrayIcon();
         var updater = CreateUpdater(trayIcon);
 
+        connection.StatusChanged += (_, status) => CheckCatalog(status);
         connection.StatusChanged += (_, _) => Notify(updater);
         connection.TickReceived += (_, tick) => _catalogReporter?.Report(tick);
         connection.TickReceived += (_, _) => Notify(updater);
@@ -257,13 +258,35 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// Checks the latest tick against a catalog that became ready and refreshes the diagnostics window.
+    /// Lets the catalog loader check the game for a change when the pipe connected.
+    /// </summary>
+    /// <param name="status">The status of the pipe connection</param>
+    private void CheckCatalog(PipeConnectionStatus status)
+    {
+        if (_catalogLoader is { } loader && _gameSearch is { } search)
+        {
+            Run(_ => loader.OnConnectionStatusChangedAsync(status, search.RefreshBuild));
+        }
+    }
+
+    /// <summary>
+    /// Refreshes the diagnostics window when the status of the catalog changed.
     /// </summary>
     /// <param name="sender">The loader</param>
     /// <param name="status">The new status</param>
     private void OnCatalogStatusChanged(object? sender, GameCatalogStatus status)
     {
-        if (status.Kind == GameCatalogStatusKind.Ready && _readLatestTick?.Invoke() is { } tick)
+        _diagnostics?.Notify();
+    }
+
+    /// <summary>
+    /// Checks the latest tick against a catalog that was published and refreshes the diagnostics window.
+    /// </summary>
+    /// <param name="sender">The loader</param>
+    /// <param name="catalog">The published catalog, or <c>null</c> when there is none</param>
+    private void OnCatalogChanged(object? sender, GameCatalog? catalog)
+    {
+        if (catalog is not null && _readLatestTick?.Invoke() is { } tick)
         {
             _catalogReporter?.Report(tick);
         }
@@ -420,6 +443,7 @@ public partial class App : Application
             _catalogLoader = catalogLoader;
             _catalogReporter = new GameCatalogReporter(() => catalogLoader.Catalog, _logger);
             catalogLoader.StatusChanged += OnCatalogStatusChanged;
+            catalogLoader.CatalogChanged += OnCatalogChanged;
             catalogLoader.IconsChanged += OnCatalogIconsChanged;
 
             Run(_ =>

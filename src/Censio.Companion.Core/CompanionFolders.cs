@@ -24,7 +24,7 @@ public static class CompanionFolders
     /// <returns>The cache folder</returns>
     public static string Cache(string localApplicationData)
     {
-        throw new NotImplementedException();
+        return Path.Combine(localApplicationData, "Censio", "Cache");
     }
 
     /// <summary>

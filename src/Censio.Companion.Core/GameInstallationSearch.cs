@@ -103,7 +103,21 @@ public sealed class GameInstallationSearch
     /// <returns>The status with the build read now</returns>
     public GameInstallationStatus RefreshBuild()
     {
-        throw new NotImplementedException();
+        var status = _status;
+
+        if (status.Kind != GameInstallationStatusKind.Found || status.Folder is not { } folder)
+        {
+            return status;
+        }
+
+        var refreshed = status with
+                               {
+                                   Build = ReadBuild(folder)
+                               };
+
+        _status = refreshed;
+
+        return refreshed;
     }
 
     /// <summary>
@@ -261,6 +275,23 @@ public sealed class GameInstallationSearch
     }
 
     /// <summary>
+    /// Reads the build of the program file of an installation.
+    /// </summary>
+    /// <param name="folder">The folder as written</param>
+    /// <returns>The build, or <c>null</c> when it cannot be read</returns>
+    private string? ReadBuild(string folder)
+    {
+        try
+        {
+            return GameInstallation.FormatBuild(_versions.ReadVersion(GameInstallation.ProgramFilePath(folder)));
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
     /// Builds the status of a found installation and logs it.
     /// </summary>
     /// <param name="source">The source</param>
@@ -268,16 +299,7 @@ public sealed class GameInstallationSearch
     /// <returns>The status</returns>
     private GameInstallationStatus Found(GameInstallationSource source, string folder)
     {
-        string? build;
-
-        try
-        {
-            build = GameInstallation.FormatBuild(_versions.ReadVersion(GameInstallation.ProgramFilePath(folder)));
-        }
-        catch (Exception)
-        {
-            build = null;
-        }
+        var build = ReadBuild(folder);
 
         CompanionLog.GameInstallationFound(_logger, source == GameInstallationSource.UbisoftConnect ? "Ubisoft Connect" : "settings file", build ?? "unknown", folder);
 

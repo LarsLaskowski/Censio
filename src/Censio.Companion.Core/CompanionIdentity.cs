@@ -1,3 +1,5 @@
+using Censio.GameData;
+
 namespace Censio.Companion.Core;
 
 /// <summary>
@@ -10,7 +12,7 @@ public static class CompanionIdentity
     /// <summary>
     /// Gets the identity of this build: the module version ids of the assemblies that shape the catalog.
     /// </summary>
-    public static string Current => throw new NotImplementedException();
+    public static string Current { get; } = string.Join(';', typeof(GameCatalog).Module.ModuleVersionId.ToString("D"), typeof(CompanionIdentity).Module.ModuleVersionId.ToString("D"));
 
     #endregion // Properties
 }

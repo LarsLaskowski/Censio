@@ -290,6 +290,11 @@ public static class TrayMenu
                    GameCatalogStatusKind.Ready => string.Create(CultureInfo.InvariantCulture, $"Catalog: {status.EntryCount} entries"),
                    GameCatalogStatusKind.NoGame => "Catalog: no game",
                    GameCatalogStatusKind.Failed => "Catalog: failed",
+                   GameCatalogStatusKind.Checking => "Catalog: checking",
+                   GameCatalogStatusKind.ExtractingNames => "Catalog: extracting names",
+                   GameCatalogStatusKind.ExtractingIcons => string.Create(CultureInfo.InvariantCulture, $"Catalog: extracting icons, {status.EntryCount} entries"),
+                   GameCatalogStatusKind.IconsFailed => string.Create(CultureInfo.InvariantCulture, $"Catalog: {status.EntryCount} entries, icons failed"),
+                   GameCatalogStatusKind.NotCached => string.Create(CultureInfo.InvariantCulture, $"Catalog: {status.EntryCount} entries, not cached"),
                    _ => throw new ArgumentOutOfRangeException(nameof(status), status.Kind, "The status kind is not defined")
                };
     }

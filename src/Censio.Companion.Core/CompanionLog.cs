@@ -268,7 +268,7 @@ public static partial class CompanionLog
     /// </summary>
     /// <param name="logger">The logger</param>
     /// <param name="maxReports">The most GUIDs logged</param>
-    [LoggerMessage(Level = LogLevel.Information, Message = "Catalog: more than {MaxReports} GUIDs cannot be named; further ones are not logged in this run")]
+    [LoggerMessage(Level = LogLevel.Information, Message = "Catalog: more than {MaxReports} GUIDs cannot be named; further ones are not logged for this catalog")]
     public static partial void CatalogReportsCapped(ILogger logger, int maxReports);
 
     /// <summary>

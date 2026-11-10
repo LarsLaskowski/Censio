@@ -17,7 +17,24 @@ public static class GameCatalogKeyReader
     /// <returns>The key, or <c>null</c> when the installation cannot be read</returns>
     public static GameCatalogKey? Read(GameInstallationStatus installation, string identity)
     {
-        throw new NotImplementedException();
+        if (installation.Kind != GameInstallationStatusKind.Found || installation.Folder is not { } folder)
+        {
+            return null;
+        }
+
+        try
+        {
+            if (File.Exists(GameInstallation.ProgramFilePath(folder)) == false)
+            {
+                return null;
+            }
+
+            return new GameCatalogKey(identity, folder, installation.Build, GameArchiveStateReader.Read(folder));
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException or System.Security.SecurityException)
+        {
+            return null;
+        }
     }
 
     #endregion // Methods
