@@ -17,17 +17,17 @@ the kind and candidacy are decided from them at once (`GameCatalogAssets.cs:73-9
 
 Sample: the invented fixture `tests/Censio.GameData.Tests/Fixtures/GameCatalog/` (structure of the Product Manager's
 real files of game version 3.0.1733841) and the notes taken from the real files in #130 (plan at `d0a87cc`, facts
-3–10, 14). The Tester adds the variants it lacks from those notes; AC4's installation run checks them.
+3–10, 14). The Tester adds the variants it lacks from those notes; AC4's installation run confirmed facts 4, 5 and 7.
 
 | # | Claim | Evidence | Status |
 | - | ----- | -------- | ------ |
 | 1 | Goods, buildings and sessions take the four facts from their own values only; a building needs its own `Building` section | `GameCatalogFiles.cs:260`, `:312-331`; `GameCatalogAssets.cs:86-93`; `GameCatalogBuilder.cs:107-116` | confirmed |
 | 2 | Kinds and candidates are fixed in the asset pass, before the texts, which are read for candidates only; properties and templates are read last | `GameCatalogAssets.cs:73-77`; `GameCatalogReader.cs:83-99` | confirmed |
 | 3 | The `Building` property default lists region types (`Roman;Celtic;Egyptian`); building templates state their own `AssociatedRegions`; `SessionModerate` states a `Session/Region` (issue) | #130 plan facts 8 and 14 (real files) | confirmed |
-| 4 | The node paths are `Template/Properties/<Property>/<Field>` and `Group/DefaultValues/<Property>/<Field>` for `Building/AssociatedRegions`, `Product/AssociatedRegion`, `Session/Region` as for `Region/RegionID` | to verify: AC4 installation run, Product Manager, before step 9 (a wrong path shows as no change in the report); evidence so far: #130 facts 3, 6, 7 for `Region` | unverified |
-| 5 | `SessionModerate`'s `Session/Region` and the `Session` default are integers or empty | to verify: AC4 installation run (a non-integer fails the catalog as *Malformed file*), Product Manager, before step 9; evidence so far: the issue says it "names a region asset" | unverified |
+| 4 | The node paths are `Template/Properties/<Property>/<Field>` and `Group/DefaultValues/<Property>/<Field>` for `Building/AssociatedRegions`, `Product/AssociatedRegion`, `Session/Region` as for `Region/RegionID` | AC4 installation run, Product Manager, 2026-11-10: `Building` lists not stated → list 338, sessions none → Region 2; `Product` by the same walk, no good changed (fact 7) | confirmed |
+| 5 | `SessionModerate`'s `Session/Region` and the `Session` default are integers or empty | AC4 installation run, Product Manager, 2026-11-10: no *Malformed file* | confirmed |
 | 6 | Each property has its defaults in exactly one group, so a second default of `Building`, `Product` or `Session` never occurs in the real file | #130 fact 4 (1,057 names, each once) | confirmed |
-| 7 | Whether a template or default states `Product/AssociatedRegion`, and whether templates hold empty fields as placeholders | to verify: AC4 report (goods changed; transitions to *none*), Product Manager, before step 9 | unverified |
+| 7 | Whether a template or default states `Product/AssociatedRegion`, and whether templates hold empty fields as placeholders | AC4 installation run, Product Manager, 2026-11-10: no good or workforce changed, no transition to *none*, kinds changed only none → Region 2: no effect in the real files | confirmed |
 | 8 | On `main` the installation catalog has 1,038 entries and every pipe-fixture GUID resolves to its kind | #130 working record, Product Manager's run of 2026-11-10 | confirmed |
 | 9 | The fixture lists no template `Product` or `ResidenceBuilding7`; its `SessionModerate` template states an empty `Session/Region`, its `Session` default `0`; every fixture and inline session states its own `Session/Region` | `Fixtures/GameCatalog/templates.xml`, `properties.xml`, `assets.xml`; `GameCatalogReaderTests.cs:578`, `:2057-2060` | confirmed |
 | 10 | Tests use only `Read` and `Load`; `GameCatalog` cannot enumerate entries | no `InternalsVisibleTo`; `GameCatalog.cs:57-90` | confirmed |
