@@ -1,6 +1,6 @@
 # 0049: A region asset's missing region type comes from its template and the property defaults
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-09
 - **Area:** game-catalog
 - **Source:** Issue #130
