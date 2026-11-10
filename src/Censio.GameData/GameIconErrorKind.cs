@@ -16,11 +16,6 @@ public enum GameIconErrorKind
     ArchiveUnreadable,
 
     /// <summary>
-    /// The installation folder's archives could not be listed.
-    /// </summary>
-    ListingFailed,
-
-    /// <summary>
     /// Two UI archives carry the same patch number.
     /// </summary>
     DuplicateArchiveNumber,

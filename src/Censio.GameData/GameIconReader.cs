@@ -48,6 +48,18 @@ public static class GameIconReader
     }
 
     /// <summary>
+    /// Loads the icons of the catalog's entries; the icon set fails with <see cref="GameIconErrorKind.IconSetTooLarge" /> when the kept PNG bytes go above the given limit.
+    /// </summary>
+    /// <param name="installationFolder">The game's installation folder</param>
+    /// <param name="catalog">The catalog whose entries name the icons</param>
+    /// <param name="maxIconSetBytes">The most bytes of PNG data the kept icons may take together</param>
+    /// <returns>The icons or the reason they could not be loaded</returns>
+    public static GameIconResult Load(string installationFolder, GameCatalog catalog, long maxIconSetBytes)
+    {
+        throw new NotImplementedException();
+    }
+
+    /// <summary>
     /// Derives the archive entry path of an icon file name.
     /// </summary>
     /// <param name="iconFilename">The icon file name an asset states</param>

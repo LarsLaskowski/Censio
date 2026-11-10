@@ -11,7 +11,7 @@ public enum GameIconProblem
     None,
 
     /// <summary>
-    /// The catalog has no entry for the asset.
+    /// No good or region entry for the asset.
     /// </summary>
     NoEntry,
 
