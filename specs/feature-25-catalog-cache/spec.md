@@ -5,133 +5,145 @@ Status: Draft
 
 ## Problem
 
-The Companion extracts the catalog (names) and the icons from the player's installation at every start
-([`game-catalog.md`](../../docs/areas/game-catalog.md)), although the game files change only with a game update. Every
-start pays the extraction time; with the game folder on a network share every start reads the archives over SMB. A
-game update while the Companion runs (it may run all day through `Start with Windows`) is not noticed until the next
-start. The tray shows `Catalog: reading` for the whole extraction and says nothing when the icons fail. Record
-[0023](../../docs/decisions/0023-game-names-and-icons-extracted-locally.md) decided to cache the extraction and
-extract again after updates; this feature delivers it.
+The Companion extracts names and icons at every start ([`game-catalog.md`](../../docs/areas/game-catalog.md)), over
+SMB too when the game lies on a share, although the files change only with a game update; an update while the
+Companion runs goes unnoticed until a restart, and the tray says nothing while it extracts or when the icons fail.
+Record [0023](../../docs/decisions/0023-game-names-and-icons-extracted-locally.md) decided to cache and re-extract.
 
 ## Scenarios
 
-Texts in the tray are the greyed-out `Catalog:` menu line; log lines are in the Companion's log.
+Texts in the tray are the greyed-out `Catalog:` menu line; log lines are in the Companion's log. The *game state* is
+the installation folder, the build (`unknown` equals `unknown`), and the name, size and modification time of every
+archive below `maindata`; the *Companion identity* is the module version ids of the assemblies that extract and write
+the cache, which change with their code, not with the version number. A *check* compares both with the state of the
+last check's result — successful or failed — held in memory, and at start with the cache.
 
-- S1: Given no cache, when the Companion starts and finds the game, then the line reads `Catalog: checking`, then
-  `Catalog: extracting names`, then `Catalog: extracting icons, <n> entries` (names already shown in the diagnostics
-  window), then `Catalog: <n> entries`; the cache is written, and the log holds `Catalog cache not used: missing` and,
-  after the icon line, `Catalog extracted in <t> s (names <a> s, icons <b> s)`.
-- S2: Given a cache of the same game and Companion build, when the Companion starts, then the line goes from
-  `Catalog: checking` to `Catalog: <n> entries`, names and icons show as after an extraction, no game archive's content
-  is read, and the log holds `Catalog loaded from cache in <t> s: <n> entries, <g> goods and <r> regions with an icon`.
-- S3: Given a cache, when the game was updated while the Companion was not running, then the start logs
-  `Catalog cache not used: game changed`, runs S1's extraction and replaces the cache.
-- S4: Given the Companion runs with a catalog, when the game is updated and the player starts it with `/pipe`, then
-  once the pipe connection reaches `Connected` the check runs; it finds the change, the names and icons disappear
-  (GUIDs show), the `Game:` line shows the build read now, S1's extraction runs and the cache is replaced.
-- S5: Given the Companion runs with a catalog, when the player starts the unchanged game, then the check at
-  `Connected` changes nothing visible and writes no log line.
-- S6: Given a cache written by another Companion build (another version, or another build of the same version), when
-  the Companion starts, then it logs `Catalog cache not used: Companion changed` and extracts as in S1.
-- S7: Given a cache of one installation, when the settings file names another installation, then the start logs
-  `Catalog cache not used: game changed`, extracts, and the cache then holds only the new installation.
+- S1: Given no cache, when the Companion starts and finds the game, then the line reads `Catalog: reading` while the
+  game search runs, then `Catalog: checking`, `Catalog: extracting names`, `Catalog: extracting icons, <n> entries`
+  (names already shown in the diagnostics window) and `Catalog: <n> entries`; the cache is written, and the log holds
+  `Catalog cache not used: missing`, the existing catalog and icon lines and, after them, `Catalog extracted in <t> s
+  (names <a> s, icons <b> s)`.
+- S2: Given a cache of the same game state and Companion identity, when the Companion starts, then the line goes from
+  `Catalog: checking` to `Catalog: <n> entries`, names and icons show as after an extraction, no archive content is
+  read, and the log holds only `Catalog loaded from cache in <t> s: <n> entries, <g> goods and <r> regions with an
+  icon` (the other catalog and icon lines are written at an extraction only).
+- S3: Given a cache, when the game was updated or the settings file names another installation, then the start logs
+  `Catalog cache not used: game changed`, extracts as in S1 and replaces the cache (one cache, N1).
+- S4: Given the Companion runs, when the game is updated and the player starts it with `/pipe`, then at the new pipe
+  connection the check finds the change, the `Game:` line shows the build read now, and S1's extraction runs while the
+  previous names stay shown; the new names replace them when ready, the previous icons go until the new ones are
+  built, and the cache is replaced.
+- S5: Given the Companion runs, when the player starts the unchanged game, then the check changes, extracts and logs
+  nothing — also after a failed last result (E1 to E3).
+- S6: Given a cache of another Companion identity (an updated Companion), when it starts, then it logs `Catalog cache
+  not used: Companion changed` and extracts as in S1; there is no migration.
 
 ## Errors and edge cases
 
-- E1: The catalog extraction fails: `Catalog: failed`, the diagnostics window shows GUIDs, nothing is written to the
-  cache, a cache of the old game state is not used, and the next start or game start tries again.
-- E2: The names are built but the icons fail: `Catalog: <n> entries, icons failed`, names without icons, the existing
-  `Catalog icons failed: …` warning, and nothing is cached, so the next check extracts again.
-- E3: The cache cannot be written (folder cannot be created, disk full, access denied, local app data not a full path):
-  names and icons are used, the line reads `Catalog: <n> entries, not cached`, and the Warning `Catalog cache not
-  written` is logged with the exception where there is one.
-- E4: The cache is unreadable, truncated, larger than its bound, of another format, or its content contradicts itself
-  or its own checks (a modified file included): no part of it is used, the Warning `Catalog cache not used: invalid` is
-  logged, and S1's extraction replaces it.
-- E5: The check cannot read what it compares (the build, the listing of `maindata`, an archive's properties): the
-  cache is not used (`Catalog cache not used: game changed`) and the extraction runs and reports as today.
-- E6: No game is found or the settings file is invalid: `Catalog: no game`; the cache is neither used nor deleted.
-- E7: `Exit` during an extraction or while the cache is written: the Companion still ends within 2 seconds, and the
-  next start uses either the previous complete cache or none (E4), never a half-written one.
-- E8: The game starts (or the pipe reconnects) while a check or an extraction runs: no second one starts; each later
-  `Connected` runs a check again.
-- E9: The game files change during an extraction: the cache never claims the new state for content read before the
-  change, so the next check extracts again.
-- E10: An archive rewritten with the same name, size and modification time is not detected; the user guide tells the
-  player to delete the cache folder and restart.
-- E11: In a replay or with an invalid command line there is no pipe connection: only the check at start runs.
-- E12: The game is started without `/pipe`: no connection, so only the check at start runs.
+- E1: The catalog extraction fails: `Catalog: failed`, the diagnostics window shows GUIDs (previous names and icons
+  removed), nothing is cached and no cache of an old state is used; it is tried again only at the next start or when a
+  check finds the game state changed.
+- E2: The names are built but the icons fail: `Catalog: <n> entries, icons failed`, the existing `Catalog icons failed:
+  …` warning, nothing cached; retried as E1.
+- E3: The cache cannot be written (no folder, disk full, access denied, local app data not a full path): names and
+  icons are used, the line reads `Catalog: <n> entries, not cached`, the Warning `Catalog cache not written`
+  is logged with the exception where there is one; retried as E1.
+- E4: The cache is unreadable, truncated, above 320 MiB, of another format, or fails a validation of N3: no part of it
+  is used, the Warning `Catalog cache not used: invalid` is logged, and S1's extraction replaces it.
+- E5: At start the check cannot read what it compares (the build file, the listing of `maindata`, an archive's
+  properties): the cache is not used (`Catalog cache not used: game changed`) and the extraction runs and reports as
+  today. At a later check the current catalog, icons and line stay, nothing is extracted, and the Warning `Catalog
+  check failed; the current catalog is kept` is logged.
+- E6: No game found or settings file invalid: `Catalog: no game`; the cache is neither used nor deleted.
+- E7: `Exit` during an extraction or a cache write still ends the Companion within 2 seconds. Two Companions of one
+  account in two Windows sessions may write at once. The next load finds the previous complete cache, one writer's
+  complete cache, or none (E4) — never a half-written or mixed one.
+- E8: A new pipe connection during the game search, a check or an extraction (as when the game already runs) starts
+  no second check.
+- E9: Files changed during an extraction: the result keeps the state taken before it, so the next check extracts.
+- E10: An archive rewritten with the same name, size and modification time goes undetected; the user guide says to
+  delete the cache folder and restart.
+- E11: A replay, an invalid command line or a game started without `/pipe` has no pipe connection: only the check at
+  start runs.
+- E13: Each published catalog has its own `Catalog cannot name …` lines and 1,000-line limit.
 
 ## Non-functional requirements
 
 - N1: The cache lies in the fixed folder `%LOCALAPPDATA%\Censio\Cache`, one cache per Windows account for the
-  installation last checked; nothing is written into the installation or elsewhere. No new setting.
-- N2: Privacy (record 0023): names and icons are now saved on the player's disk, in the cache only; they are never
-  sent, logged, or part of a repository, fixture or release. The documents that promise "held in memory only, never
-  saved" change.
-- N3: The cache is untrusted input when read (a security area of `.squad/project.md`): bounded before it is read,
-  validated completely before any of it is used, and refused as a whole otherwise (fails closed, record 0033).
-- N4: A check of an unchanged game reads the build, the listing of `maindata` and each archive's name, size and
-  modification time, and no archive content — over SMB too.
-- N5: Neither the menu, the pipe connection, ticks, the diagnostics window nor `Exit` waits for a check, a cache load,
-  an extraction or a cache write.
+  installation last extracted; nothing is written into the installation or elsewhere. No new setting.
+- N2: Privacy (record 0023): names and icons are saved in the cache only, never sent, logged or released; the cache is
+  private like a recording and stays when the Companion is removed.
+- N3: The cache is untrusted input when read (a security area of `.squad/project.md`). A file above 320 MiB (the
+  256 MiB icon bound of `game-catalog.md`, *Limits*, plus 64 MiB for the catalog) is refused before it is read. Before
+  anything is used, the whole file is checked: its format, its Companion identity and game state, a checksum over its
+  content, the bounds of the catalog, and per icon the PNG signature, a header of 1 to 2,048 pixels per side, 8 bits
+  per channel with alpha, and exactly the chunks the Companion's own PNG writer emits. One failure refuses the whole
+  file (record 0033).
+- N4: A check reads the build and the listing of `maindata` with each archive's size and modification time, never
+  archive content.
+- N5: Nothing the player uses (menu, connection, ticks, diagnostics window, `Exit`) waits for the catalog work.
 - N6: The durations are logged with one decimal place and a decimal point; the user guide and `game-catalog.md`
   state the extraction and cache-load durations measured on the Product Manager's installation.
-- N7: A cache load holds no more memory than an extraction of the same game holds today.
-- N8: The first start after updating the Companion extracts once (S6); there is no migration.
+- N7: A cache load reads the file in one forward pass and holds no whole copy of it beside the catalog and icons it
+  publishes.
 
 ## Acceptance criteria
 
-- AC1: An unchanged game — same installation folder, build, set of archives below `maindata` with the same sizes and
-  modification times, same Companion build — at start publishes names and icons from the cache without reading any
-  archive's content, and logs the cache-load line (S2, N4, N7).
-- AC2: A different build, an archive below `maindata` added, removed, or with another size or modification time,
-  another installation folder, an unreadable property (E5) or another Companion build makes the check extract again,
-  log the reason (`missing`, `game changed`, `Companion changed`) and replace the cache; a change during the
-  extraction leads to another extraction at the next check (S1, S3, S6, S7, E5, E9, N8).
-- AC3: In a live mode each transition of the pipe connection to `Connected` runs a check unless one or an extraction
-  runs; the check runs in the background, so the connection and its ticks never wait for it; a found change removes
-  names and icons, updates the build of the `Game:` line and extracts; no change shows and logs nothing (S4, S5, E8,
-  E11, N5).
-- AC4: The `Catalog:` line shows `checking`, `extracting names`, `extracting icons, <n> entries`, `<n> entries`,
-  `<n> entries, icons failed`, `<n> entries, not cached`, `no game` and `failed` exactly as in S1, S2, E1, E2, E3 and
-  E6.
-- AC5: Only a complete result (catalog and icons built) is cached; a failed catalog or icon build caches nothing and
-  uses no cache of the old state, and a cache that cannot be written leaves the extracted names and icons in use with
-  the Warning (E1, E2, E3, E6).
-- AC6: A cache that is missing, unreadable, truncated, above its bound, of another format, modified, or left by an
-  interrupted write is never used in part: it is logged (`missing` or the Warning `invalid`) and extracted again (E4,
-  E7, N3).
-- AC7: Each extraction logs `Catalog extracted in <t> s (names <a> s, icons <b> s)` and each cache load `Catalog loaded
-  from cache in <t> s: …`, timed on an injected clock (S1, S2, N6).
-- AC8: `README.md` and `docs/USER_GUIDE.md` (English, then German) describe the cache, its folder, when it is
-  extracted again, the new menu and log texts, deleting the folder (E10), the privacy change, and the durations the
-  Product Manager measured (N1, N2, N6, E10, E12).
+- AC1: At start, a cache of the same game state and Companion identity publishes names and icons without reading any
+  archive's content, in one forward pass over the file, and logs only the cache-load line (S2, N4, N7).
+- AC2: Each difference of the game state (build, an archive added, removed or with another size or modification time,
+  another folder), an unreadable property at start, or another Companion identity with the same version number makes
+  the check extract, log its reason and replace the cache; a change during the extraction is extracted at the next
+  check (S1, S3, S6, E5, E9).
+- AC3: In a live mode each new pipe connection runs a background check, merged into one that runs; it behaves as S4,
+  S5 and E5 (a later check) say, after a successful or a failed last result (S4, S5, E1, E5, E8, E11, N5).
+- AC4: The `Catalog:` line shows each text of S1, S2, E1, E2, E3 and E6 exactly as written there.
+- AC5: Only a complete result (catalog and icons built) is cached; E1, E2 and E3 behave as written (E1, E2, E3, E6).
+- AC6: A cache as in E4, or left by an interrupted or concurrent write, is never used in part, is logged and is
+  extracted again (E4, E7, N3).
+- AC7: Each extraction and each cache load logs its duration line, timed on an injected clock; a re-extraction resets
+  the `Catalog cannot name` reporting (S1, S2, E13, N6).
+- AC8: `README.md` (the overview bullets on the Companion and on names and icons, the quick-start menu line) and
+  `docs/USER_GUIDE.md` (*Game catalog* with its icon paragraph, the storage paragraph "built in memory at every start
+  and not saved", the log contents, *Reporting problems*), English and German, describe the cache and its folder, when
+  it is extracted again, the new texts, that it is private, stays after removal and can be deleted (E10), and the
+  measured durations (N1, N2, N6, E10, E11).
 
 ## Out of scope
 
 - A menu entry to rebuild or delete the cache, a percentage, and a cache per installation (N1).
-- Detecting a game start without the pipe (E12), and a new game search at game start (only the build is read again).
+- Detecting a game start without the pipe (E11), and a new game search at a check (only the build is read again).
 - The catalog format sent to the server (#26) and the upload (#42).
 
 ## Open questions
 
-- Hashes or file properties as the key? Answered: properties (N4). Hashing every archive reads the whole of
-  `maindata` at every check, over SMB too, and costs more than the extraction it avoids; the build alone is not enough,
-  since `game-installation.md` (*Build*) states it unverified that the file version changes with every update. E10 is
-  the accepted residual case.
-- Use the old cache when the extraction after a change fails? Answered: no; the issue asks for GUIDs, and record 0033
-  fails closed (E1).
-- What is "when the game starts"? Answered: the pipe connection reaching `Connected` — the only sign of a running
-  game the Companion has.
-- Who measures the durations (N6)? Answered: only the Product Manager has the game; a manual run on a local build of
-  the branch head before the PR approval.
+- Hashes or file properties as the key? Answered: properties (N4) — a departure from the issue's "file hashes", shown
+  to the Product Manager at spec approval. Hashing reads all of `maindata` at every check and costs more than the
+  extraction; the build alone is not enough (`game-installation.md`, *Build*: unverified that it changes with every
+  update). E10 is the residual case.
+- Old cache after a failed extraction? Answered: no — the issue asks for GUIDs; record 0033 fails closed (E1).
+- "When the game starts"? Answered: a new pipe connection, the Companion's only sign of a running game.
+- Who measures the durations (N6)? Answered: the Product Manager, on a local build of the branch head before the PR
+  approval.
 
 ## Area documents
 
-- `game-catalog.md`: a *Cache* section (folder, what decides "unchanged", when the check runs, complete results only,
-  validation and bounds, failures, interrupted writes); *Memory only* and *Privacy* revised; *Time* with the measured
-  durations; *Network* — an unchanged game reads no archive over SMB.
-- `companion.md`: the `Catalog:` texts (*Tray icon and menu*), the new log lines (*Log*), the cache folder (*Folders*),
-  the 2-second `Exit` with an extraction running.
-- `game-installation.md`: the build is read again at each check at game start, and the `Game:` line shows it.
+- `game-catalog.md`: a *Cache* section (the terms above, checks, results, bound, validation, failures, writes);
+  *Memory only*, *Privacy*, *Time* (measured durations) and *Network* revised.
+- `companion.md`: the `Catalog:` texts, the new log lines and the per-catalog `cannot name` reporting, the cache folder,
+  `Exit` during an extraction.
+- `game-installation.md`: the build is read again at each later check and shown in the `Game:` line.
+
+## Challenge
+
+- M1 — accepted: checks compare with the last result's state, failed or not; failures retry only at start or on a
+  change (S5, E1 to E3, AC3).
+- 1 — accepted: a later check that cannot read keeps the current state with a Warning (E5, AC3).
+- 2 — accepted: previous names stay until new ones are published; `cannot name` reporting restarts per catalog (S4,
+  E13, AC7).
+- 3 — accepted: module version ids (AC2).
+- 4 — accepted: `unknown` equals `unknown`.
+- 5 — accepted: `Catalog: reading` stays (S1); a connection then merges (E8).
+- 6 — accepted: 320 MiB, per-icon checks (N3); N7 checkable (AC1).
+- 7 — accepted: AC8 names the passages.
+- 8 — accepted: other catalog lines at an extraction only (S2); no mixed cache (E7).
