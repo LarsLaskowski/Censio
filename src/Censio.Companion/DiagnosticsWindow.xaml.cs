@@ -113,6 +113,19 @@ internal sealed partial class DiagnosticsWindow : Window, IDiagnosticsWindow
         image.SetValue(FrameworkElement.HeightProperty, (double)GameIconImageConverter.CellSide);
         image.SetValue(FrameworkElement.MarginProperty, new Thickness(0, 0, 4, 0));
 
+        var withoutIcon = new Trigger
+                          {
+                              Property = Image.SourceProperty,
+                              Value = null
+                          };
+
+        withoutIcon.Setters.Add(new Setter(UIElement.VisibilityProperty, Visibility.Collapsed));
+
+        var style = new Style(typeof(Image));
+
+        style.Triggers.Add(withoutIcon);
+        image.SetValue(FrameworkElement.StyleProperty, style);
+
         var text = new FrameworkElementFactory(typeof(TextBlock));
 
         text.SetBinding(TextBlock.TextProperty,

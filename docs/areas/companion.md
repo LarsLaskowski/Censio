@@ -133,10 +133,10 @@ sent it: GUIDs are raw numbers where the catalog has no name for them; icons are
 - **Icons:** once the icons are built ([`game-catalog.md`](game-catalog.md), *Icons*), the `Region` and `Good` cells show
   the icon of the cell's GUID before the text: an image of 20 by 20 device-independent pixels, then a gap of 4, then the
   text, vertically centred. A GUID without an icon (none, unknown, a problem of the icon, GUID `0`) and every cell while
-  no icons are built show the text alone and leave the image's place empty, so the texts of a column stay aligned.
+  no icons are built show the text alone, without the image's place or gap.
   The names are published first: the window shows them as soon as the catalog is ready and adds the icons when they are
-  built, and a new build of the catalog removes the icons until the new ones are ready. Each distinct icon is decoded once, at the size of the
-  cell, and shared by the rows that show it. The icons are held in memory only: nothing of them is written to disk,
+  built, and a new build of the catalog removes the icons until the new ones are ready. Each distinct icon is decoded once, at twice the size of the
+  cell (sharp up to 200 % display scaling), and shared by the rows that show it. The icons are held in memory only: nothing of them is written to disk,
   logged or sent, and a screenshot holds the game's icons.
 - **Area names** (the `Name` column) pass the rule of the log (*Log*): each control character, format character, line
   separator, paragraph separator (the categories Cc, Cf, Zl, Zp) and unpaired surrogate is shown as one `?`, nothing

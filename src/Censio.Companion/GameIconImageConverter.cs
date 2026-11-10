@@ -9,7 +9,7 @@ using Censio.GameData;
 namespace Censio.Companion;
 
 /// <summary>
-/// Converts a game icon to a frozen image decoded at the size of a table cell; each distinct icon is decoded once.
+/// Converts a game icon to a frozen image decoded at twice the size of a table cell; each distinct icon is decoded once.
 /// </summary>
 internal sealed class GameIconImageConverter : IValueConverter
 {
@@ -19,6 +19,11 @@ internal sealed class GameIconImageConverter : IValueConverter
     /// The side of the image in a cell in device-independent pixels
     /// </summary>
     internal const int CellSide = 20;
+
+    /// <summary>
+    /// The factor of the decoded side to the displayed side, so the image stays sharp up to 200 % display scaling
+    /// </summary>
+    private const int DecodeFactor = 2;
 
     #endregion // Constants
 
@@ -52,11 +57,11 @@ internal sealed class GameIconImageConverter : IValueConverter
 
             if (icon.Width >= icon.Height)
             {
-                image.DecodePixelWidth = CellSide;
+                image.DecodePixelWidth = CellSide * DecodeFactor;
             }
             else
             {
-                image.DecodePixelHeight = CellSide;
+                image.DecodePixelHeight = CellSide * DecodeFactor;
             }
 
             image.EndInit();
