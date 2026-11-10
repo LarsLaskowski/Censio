@@ -179,6 +179,10 @@ differently.
 
 Not coverable by a unit test: `src/Censio.Companion/` (`App.xaml.cs`, `DiagnosticsWindow.xaml(.cs)`,
 `GameIconImageConverter.cs`) — the Windows shell, excluded already (record 0004); AC5's manual check covers it.
+In `GameIconReader.cs`: the boundary catch of `Load` (no input makes `LoadCore` throw: the listing skips inaccessible
+folders, `RdaArchive.Open` returns results; kept as in record 0047, record 0050) and the read pass's failed reopen of
+an archive the listing pass opened (only a file changed between the passes reaches it). Entries whose GUID
+`GameCatalog.Find` does not return (ambiguous, duplicate) are skipped, so icons follow the entry the window shows.
 
 ## Areas
 
