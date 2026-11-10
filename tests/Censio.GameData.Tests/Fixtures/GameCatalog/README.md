@@ -38,8 +38,9 @@ Offsets are added to 2,000,000,000.
 
 `properties.xml` holds a `Default` group with `Standard` and `Text` values, a group `Outer` with a nested group `Session`
 whose `DefaultValues/Region/RegionID` is `Xanthi` (between sibling properties, its `Name` after the values), and a group
-without values. Decoys that must not be read: a `DefaultContainerValues/Region/RegionID` `Zorlan`, a `Region` field of
-the `Session` property, and a `Group/DefaultValues/Region/RegionID` `Zorlan` nested inside the `BenchmarkScene` property.
+without values. The same `DefaultValues` also state the `Session` default `Session/Region` `0`, which the session 208
+takes. Decoys that must not be read: a `DefaultContainerValues/Region/RegionID` `Zorlan` and a
+`Group/DefaultValues/Region/RegionID` `Zorlan` nested inside the `BenchmarkScene` property.
 A group `Construction` states `DefaultValues/Building/AssociatedRegions` (`Xanthi;Zorlan`); decoys that must not be read
 are also a `Building` and a `Session` under the `DefaultContainerValues` and under the nested group of `BenchmarkScene`.
 `templates.xml` holds nested groups with the template `Region` (in the group `Session`, a `Properties/Region` section
