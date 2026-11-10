@@ -45,6 +45,11 @@ icon, and no icon problem changes the names (not option 5). The rules are in the
 - The total bound exists because the archive reader allows entries that share one image's data: many paths to one
   large image would otherwise keep many large PNGs for the whole run (Security's review). Withholding the whole set,
   rather than counting the rest *unreadable*, keeps the result independent of the read order.
+- A failing listing of `maindata` has no error kind of its own: the survey's listing skips inaccessible folders and
+  reports a missing `maindata` as no archives (*archive missing*), so only an exception reaches it, and the boundary
+  catch reports it as *archive unreadable*, as the catalog does
+  ([0047](0047-game-catalog-read-forward-only-from-config-rda-kinds-and-regions-from-the-data.md)). An archive in an
+  inaccessible folder is therefore not seen, and an older copy of its icons may win.
 - An `IconFilename` with child elements is a malformed `assets.xml` like any other value and fails the catalog, as
   record 0047 says for the values it reads.
 - Building icons adds a second listing of the icon archives and, with a UNC game folder, their reads over SMB at every

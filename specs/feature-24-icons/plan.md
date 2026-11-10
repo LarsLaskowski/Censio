@@ -3,6 +3,7 @@
 Source: [spec.md](spec.md)
 Tier: standard — new behavior (icons read, decoded and shown) that creates, changes or removes no security control; the new parsers are input handling.
 Security areas touched: Parsing of external input (a new DDS/BC7 reader; `IconFilename` read by `GameCatalogReader`); File paths the Companion opens (`ui.rda` and the patch archives, read-only); Logging and showing external data (two new catalog log lines; icons in the diagnostics window); Outbound calls (with a UNC game folder the icon archives are listed and read over SMB)
+Plan size: three parsers of external formats (BC7, DDS, the icon archives' path rule), each with the accepted forms its guard tests, plus the PNG writer and the Companion display in one feature.
 
 ## Problem / root cause
 
@@ -12,10 +13,8 @@ Feature: see [spec.md](spec.md).
 
 | # | Claim | Evidence | Status |
 | - | ----- | -------- | ------ |
-| 1 | The catalog reader ignores `IconFilename` today | `GameCatalogFiles.cs` 248–337 (the facts read); `game-catalog.md`, *Files and nodes* | confirmed |
 | 3 | Real values: `data/ui/fhd/<rest>.png`; archives hold `data/ui/4k/<rest>_0.dds` (`ui.rda`, `zz_patchfiles_300`); sessions name none | PM samples, `log.md` 11:38 (five assets, one installation) | confirmed |
 | 4 | Real icons: DDS, header size 124, flags `0xa1007`, 512×512, 10 levels, FourCC `DX10`, DXGI 99, dimension 3, array size 1; 349,700 bytes = 148 + the full BC7 chain | Lead read the four headers in the scratchpad `icon-samples` | confirmed |
-| 5 | The samples use all eight BC7 modes and no reserved block | Devil's Advocate's count, `log.md` 11:42 | confirmed |
 | 6 | `RdaArchive.Read` matches the path ordinally; two equal paths give `DuplicateEntry` | `RdaArchive.cs` 182–205 | confirmed |
 | 7 | The entry bound is checked before an entry's data is allocated; a caller may pass its own `RdaLimits` | `RdaArchive.cs` 571, 586, 643; `RdaLimits.cs` 17 | confirmed |
 | 8 | `FindArchives` lists `.rda` files recursively, links skipped, as relative paths | `RdaInstallationSurvey.cs` 77–97 | confirmed |
@@ -32,13 +31,13 @@ Feature: see [spec.md](spec.md).
 | AC1 | DdsReaderReadSrgbAndUnormGiveSameBytes, DdsReaderReadSizeNotMultipleOfFourIsCropped, DdsReaderReadUsesLargestLevel | `tests/Censio.GameData.Tests/DdsReaderTests.cs` |
 | AC1 | PngWriterWriteRoundTripsRgbaWithAlpha (test-side chunk reader and `ZLibStream`), PngWriterWriteHasOnlyHeaderDataAndEndChunks, PngWriterWriteChunkCrcsAreValid (IEND CRC `AE426082`) | `tests/Censio.GameData.Tests/PngWriterTests.cs` |
 | AC2 | GameIconReaderLoadHighestPatchNumberWins, GameIconReaderLoadUiArchiveUsedWithoutPatchCopy, GameIconReaderLoadPatchNumbersOrderedNumerically (9 before 10), GameIconReaderLoadPatchArchiveInSubfolderCounts, GameIconReaderPatchNumberOfRecognisesForms (forms in *Approach*) | `tests/Censio.GameData.Tests/GameIconReaderTests.cs` |
-| AC3 | GameIconReaderLoadUiArchiveMissingFails, GameIconReaderLoadPatchArchiveUnreadableFails, GameIconReaderLoadDuplicatePatchNumberFails (`300` and `0300`), GameIconReaderLoadIconNotNamedCounted, GameIconReaderLoadIconMissingCounted, GameIconReaderLoadIconOverEntryBoundUnreadable, GameIconReaderLoadIconListedTwiceUnreadable, GameIconReaderLoadParentPathOnlyComparedWithEntries, GameIconReaderLoadAboveTotalIconBytesBoundFails (one shared-data entry listed under many paths, `RdaArchiveBuilder`) | `tests/Censio.GameData.Tests/GameIconReaderTests.cs` |
+| AC3 | GameIconReaderLoadUiArchiveMissingFails, GameIconReaderLoadPatchArchiveUnreadableFails, GameIconReaderLoadDuplicatePatchNumberFails (`300` and `0300`), GameIconReaderLoadIconNotNamedCounted, GameIconReaderLoadIconMissingCounted, GameIconReaderLoadIconOverEntryBoundUnreadable, GameIconReaderLoadIconListedTwiceUnreadable, GameIconReaderLoadParentPathOnlyComparedWithEntries, GameIconReaderLoadAboveTotalIconBytesBoundFails and GameIconReaderLoadAtTotalIconBytesBoundKeepsIcons (small icons, one shared-data entry listed under several paths, `RdaArchiveBuilder`; `maxIconSetBytes` the `PngBytes` of a run with the default bound, minus 1 and equal), GameIconReaderMaxIconSetBytesIsQuarterGibibyte (the constant pinned at 268435456); E1's failing listing has no test: `FindArchives` reports no failure (a missing `maindata` is `ArchiveMissing`, inaccessible folders are skipped), so only the boundary catch reaches it, as in record 0047 | `tests/Censio.GameData.Tests/GameIconReaderTests.cs` |
 | AC3 | DdsReaderReadRejectsMalformedHeader (DataRows: under 148 bytes, magic, header size, pixel format size, no FourCC flag, FourCC `DXT5`, DXGI 71 and 100, dimension 4, array size 2, cube flag, width 0, width and height above the bound, length one byte short and one long, level count above the chain) | `tests/Censio.GameData.Tests/DdsReaderTests.cs` |
 | AC3 | GameCatalogLoaderRunLogsIconCounts, GameCatalogLoaderRunLogsIconFailureAndKeepsNames, GameCatalogLoaderRunPublishesNamesBeforeIcons, GameCatalogLoaderRunWithoutGameBuildsNoIcons | `tests/Censio.Companion.Core.Tests/GameCatalogLoaderTests.cs` |
 | AC4 | GameIconReaderRealInstallationGivesEveryFixtureGoodAnIcon (opt-in, `CENSIO_ANNO_INSTALL`; inconclusive unset); manual: PM, Windows, PR head, step 9 | `tests/Censio.GameData.Tests/GameIconReaderTests.cs` |
 | AC5 | DiagnosticsViewCreateSetsRegionAndGoodIcons, DiagnosticsViewCreateWithoutIconsLeavesRowsAsToday; manual: PM, Windows build of the PR head, step 9 | `tests/Censio.Companion.Core.Tests/DiagnosticsViewTests.cs` |
 | AC6 | GameIconReaderLoadWritesNothing (the temporary installation tree is byte-identical after `Load`); check: Dev, step 7: `git ls-files` lists no `.dds` or `.png`, a `dotnet publish` of `Censio.Companion` lists none, `Directory.Packages.props` unchanged | `tests/Censio.GameData.Tests/GameIconReaderTests.cs` |
-| AC7 | GameIconReaderEntryPathOfMapsFhdToFourK (forms in *Approach*), GameIconReaderLoadLookupIgnoresCase (the entry's case differs from the asset value, so a read with the mapped path fails), GameIconReaderLoadSharesIconBetweenEntries, GameIconReaderLoadSkipsWorkforceAndBuildings, GameIconReaderLoadAmbiguousGuidHasNoIcon | `tests/Censio.GameData.Tests/GameIconReaderTests.cs` |
+| AC7 | GameIconReaderEntryPathOfMapsFhdToFourK (forms in *Approach*), GameIconReaderLoadLookupIgnoresCase (the entry's case differs from the asset value, so a read with the mapped path fails), GameIconReaderLoadSharesIconBetweenEntries, GameIconReaderLoadSkipsWorkforceAndBuildings (`Check` gives `NoEntry`), GameIconReaderLoadAmbiguousGuidHasNoIcon | `tests/Censio.GameData.Tests/GameIconReaderTests.cs` |
 | AC7 | GameCatalogReaderReadEntryCarriesIconFilename, GameCatalogReaderReadRegionEntryTakesRegionAssetIcon, GameCatalogReaderReadSessionIconBeforeRegionAssetIcon (inline XML, fixture unchanged) | `tests/Censio.GameData.Tests/GameCatalogReaderTests.cs` |
 
 ## Approach
@@ -48,8 +47,12 @@ asset, region assets included. The builder sets `GameCatalogEntry.IconFilename`:
 without one takes its region asset's.
 
 **Icon step** (`GameIconReader.Load`, never throws; a boundary catch outside `OutOfMemoryException` gives
-`ArchiveUnreadable` with the archive in progress):
-1. `FindArchives(maindata)` (a throw: `ListingFailed`, archive `maindata`). Icon archives: the relative path `ui.rda`
+`ArchiveUnreadable` with the archive in progress, `maindata` before the first; the two-parameter `Load` passes
+`MaxIconSetBytes` to the three-parameter one). `GameIconError.Archive` is a relative path as `FindArchives` gives it:
+`UiArchiveName` for `ArchiveMissing`, the failing archive for `ArchiveUnreadable`, the second of the two in
+`FindArchives` order for `DuplicateArchiveNumber` (`zz_patchfiles_300.rda` beside `zz_patchfiles_0300.rda`), the
+archive being read for `IconSetTooLarge`.
+1. `FindArchives(maindata)` (a throw: the boundary catch). Icon archives: the relative path `ui.rda`
    (ignoring case; absent: `ArchiveMissing`) and every file whose name `PatchNumberOf` accepts; two equal numbers:
    `DuplicateArchiveNumber` with the second path. Rank: `ui.rda` 0, then patches by number. Every comparison
    "ignoring case" in this plan is `StringComparison.OrdinalIgnoreCase` / `StringComparer.OrdinalIgnoreCase`.
@@ -61,8 +64,11 @@ without one takes its region asset's.
 4. Read pass, one archive open at a time, `Read` called with the matched `RdaEntry.Path`, never the mapped path: two
    matches in the winner, a read error, or `DdsReader.Read` returning `null` make the path *unreadable*; otherwise
    `PngWriter.Write` gives one `GameIcon` shared by every entry naming the path. An open failure here is
-   `ArchiveUnreadable`; a PNG that takes the kept PNG bytes above `MaxIconSetBytes` ends the step with
-   `IconSetTooLarge` (no icons).
+   `ArchiveUnreadable`; a PNG that takes the kept PNG bytes above `maxIconSetBytes` (greater than; equal keeps) ends
+   the step with `IconSetTooLarge` (no icons).
+
+`GameIconSet.Check` gives `NoEntry` for every GUID that is no good or region entry of the catalog (workforce, building,
+ambiguous, unknown); `Count` counts good and region entries only.
 
 `EntryPathOf`: trimmed, at most `MaxIconPathLength` characters, starts with `data/ui/fhd/` and ends with `.png`
 (ignoring case), a non-empty rest; result `data/ui/4k/` + rest as written + `_0.dds`. Test forms: the sample form,
@@ -102,6 +108,10 @@ failed: {Kind} ({Archive})`.
 - Icons inside `GameCatalog` instead of a separate `GameIconSet`: lost, the names are published first and the
   catalog is immutable.
 - A new area `game-icons`: lost to a section *Icons* in `game-catalog.md`, under its size limit.
+- Testing the total bound at 256 MiB: lost (13.7 s, 7 % above the bound); a lower bound: lost (N2, AC4 unmeasured);
+  an internal overload: lost, no project exposes internals to tests, and limits are public parameters already
+  (`RdaLimits`, `DdsReader.Read`'s `maxSide`).
+- Keeping `ListingFailed`: lost, nothing reaches it (record 0050).
 
 ## Affected projects and types
 
@@ -123,6 +133,7 @@ Censio.GameData, all public:
 - `GameIconReader.MaxIconSetBytes = 268435456` (const int, 256 MiB of kept PNG bytes)
 - `GameIconReader.UiArchiveName = "ui.rda"` (const string)
 - `public static GameIconResult Load(string installationFolder, GameCatalog catalog)`
+- `public static GameIconResult Load(string installationFolder, GameCatalog catalog, long maxIconSetBytes)`
 - `public static string? EntryPathOf(string? iconFilename)`
 - `public static uint? PatchNumberOf(string fileName)`
 - `public GameIcon(int width, int height, ReadOnlyMemory<byte> png)`, a sealed class
@@ -132,8 +143,8 @@ Censio.GameData, all public:
 - `public GameIconProblem Check(int assetGuid)`
 - `public int Count(GameIconProblem problem)`
 - `GameIconSet.GoodsWithIcon { get; }`, `GameIconSet.RegionsWithIcon { get; }` (int) and `GameIconSet.PngBytes { get; }` (long, the bytes of the distinct PNGs)
-- `public enum GameIconProblem { None, NoEntry, NotNamed, Missing, Unreadable }`
-- `public enum GameIconErrorKind { ArchiveMissing, ArchiveUnreadable, ListingFailed, DuplicateArchiveNumber, IconSetTooLarge }`
+- `public enum GameIconProblem { None, NoEntry, NotNamed, Missing, Unreadable }` (its None-to-Unreadable order unchanged; the second member now means no good or region entry)
+- `public enum GameIconErrorKind { ArchiveMissing, ArchiveUnreadable, DuplicateArchiveNumber, IconSetTooLarge }`
 - `public GameIconError(GameIconErrorKind kind, string archive)`, a sealed class with `GameIconError.Kind { get; }` and `GameIconError.Archive { get; }`
 - `GameIconResult.Icons { get; }` (GameIconSet?) and `GameIconResult.Error { get; }` (GameIconError?), a sealed class
 - `public static GameIconResult FromIcons(GameIconSet icons)`
@@ -212,25 +223,16 @@ the installation; Windows code stays in the shell.
 
 ## Challenge
 
-- 1 accepted: partitions within each mode's field, anchors other than 15 (AC1 row).
-- 2 accepted: the reference project is built in task 2, re-run in task 4.
-- 3 accepted: `Read` takes the listed entry's own path; the case test discriminates.
+All three minor objections accepted and built in (AC1 partitions, task 2 reference project, `Read` with the listed
+path).
 
 ## Security review
 
 - B1 accepted: `MaxIconSetBytes` (256 MiB) bounds the kept PNGs; reaching it withholds every icon
   (`IconSetTooLarge`; why in record 0050; spec E1, N2; AC3 test). An AC4 `PngBytes` above a quarter of it reopens it.
 - N1, N3, N4 accepted: spec AC4 (GUIDs and counts, no entry path); *Documentation updates*; *Approach*.
-
-## Challenge notes
-
-1. **minor (AC1 partition tests):** The plan's test `Bc7DecoderDecodeBlockPartitionsMatchReference` uses partitions 0, 13 and 63 for modes 0, 1, 2, 3 and 7. That choice has two gaps that the in-repository tests would not catch: Partition 63 does not exist in mode 0. Mode 0 has a 4-bit partition field, so its partitions are 0–15. In the BC7 format description's table of anchor indices for two-subset partitions, the second anchor of partitions 0, 13 and 63 is 15, as it is for every partition below 16. So modes 1, 3 and 7 never test an anchor that is not 15, which is the entry most likely to be typed wrong. Instruction to the Tester: choose partitions per mode within that mode's partition field (mode 0: 0–15). For modes 1, 3 and 7, add at least one partition whose second anchor is not 15 (for example 17 or 18). For mode 2, add at least one partition whose second and third anchors differ from the most common values. Confirm each choice against the description's anchor tables before pinning.
-2. **minor (fact 13 versus tasks 2 and 4):** The AC1 rows pin expected pixels from "fact 13's project". Fact 13 places that project in the step after the Dev's tests pass ("step 6 (after the Dev's green)"), which is task 4. But task 2, which writes the tests first, already needs those expected values. Instruction: the Tester builds the BCnEncoder.NET 2.3.0 scratch project outside the repository in task 2 and pins the synthetic-block expectations there. Task 4 only re-runs it on the four real samples and reports counts only. Nothing from that project enters the repository.
-3. **minor (read pass, Approach step 4):** The lookup ignores case, but `RdaArchive.Read` (`RdaArchive.cs` 182–205) compares paths ordinally. If `Read` is called with the mapped path (`data/ui/4k/<rest>_0.dds` as `EntryPathOf` writes it), any difference in case returns `NotFound`. Instruction to the Dev: call `Read` with the matched entry's own `RdaEntry.Path` from the listing pass, never with the mapped path. `GameIconReaderLoadLookupIgnoresCase` should give the archive entry a case that differs from the asset value, so the test fails if the mapped path is used.
-
-## Security notes
-
-- (Security, plan delta, non-blocking) The plan does not say what `GameIconError.Archive` holds for `IconSetTooLarge`. That value fills `{Archive}` in the warning "Catalog icons failed: {Kind} ({Archive})". Smallest fix: add to step 4 of *Approach* the sentence "for `IconSetTooLarge`, `Archive` is the relative path of the archive being read", so the log line still contains only a relative archive path.
+- Note on `IconSetTooLarge` accepted: its `Archive` is the archive being read (*Approach*). The bound became a
+  parameter of `Load` for its test; the two-parameter `Load` keeps 256 MiB (pinned).
 
 ## Out of scope / follow-ups
 
