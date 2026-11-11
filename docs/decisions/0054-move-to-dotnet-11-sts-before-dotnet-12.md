@@ -1,6 +1,6 @@
 # 0054: Move to .NET 11 (STS) now, not wait for .NET 12
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-11
 - **Area:** —
 - **Source:** feature `dotnet-11-upgrade` (the user's request to check the move from .NET 10 to .NET 11)
