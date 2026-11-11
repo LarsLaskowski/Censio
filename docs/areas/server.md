@@ -62,8 +62,8 @@ the Docker health probe rely on it.
 ### Docker image
 
 - The image `networlddev/censio` is built from `src/Censio.Server/Dockerfile`, for linux/amd64 only. Build stage:
-  `mcr.microsoft.com/dotnet/sdk:10.0.404-alpine3.24-amd64`; runtime stage:
-  `mcr.microsoft.com/dotnet/aspnet:10.0.14-alpine3.24-amd64`; both are pinned by their amd64 manifest digest. It
+  `mcr.microsoft.com/dotnet/sdk:11.0.100-alpine3.24-amd64`; runtime stage:
+  `mcr.microsoft.com/dotnet/aspnet:11.0.0-alpine3.24-amd64`; both are pinned by their amd64 manifest digest. It
   contains only the published server.
 - The image sets `ASPNETCORE_HTTP_PORTS=8080` and exposes 8080: the server listens on all interfaces of the
   container, on plain HTTP. Which host addresses can reach it is decided by the `-p` mapping
