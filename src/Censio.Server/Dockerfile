@@ -25,7 +25,7 @@ RUN dotnet publish src/Censio.Server/Censio.Server.csproj -c Release --no-restor
 RUN ls /app/publish/wwwroot/_framework/blazor.web*.js > /dev/null 2>&1 \
     || { echo "publish output lacks wwwroot/_framework/blazor.web*.js (see docs/decisions/0007)" >&2; exit 1; }
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0.14-alpine3.24-amd64@sha256:fbad312ed75e0f10c4fcba4d48e0c0f133de07219bd0f78054e4a102501c0650
+FROM mcr.microsoft.com/dotnet/aspnet:10.0.15-alpine3.24-amd64@sha256:ca5fcc45a7632e09463199812ed63c240148ddd2a2bffacfd5e20252ad0c8f90
 LABEL org.opencontainers.image.base.name="mcr.microsoft.com/dotnet/aspnet:10.0.14-alpine3.24-amd64" \
       org.opencontainers.image.base.digest="sha256:fbad312ed75e0f10c4fcba4d48e0c0f133de07219bd0f78054e4a102501c0650" \
       org.opencontainers.image.description="Censio server: live state and history of Anno 117 statistics" \
