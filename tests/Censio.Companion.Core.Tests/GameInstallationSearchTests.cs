@@ -482,6 +482,84 @@ public sealed class GameInstallationSearchTests
     }
 
     /// <summary>
+    /// Reading the build again gives the status of the found installation with the build of the program file now, keeps the
+    /// source and the folder, and becomes the status of the search.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC3")]
+    public void GameInstallationSearchRefreshBuildRereadsVersion()
+    {
+        // Arrange
+        var installDir = CreateInstallation("anno") + "/";
+        var search = CreateSearch(new FakeUbisoftInstallRecords(Record("921", installDir)), MissingFolder());
+        var found = search.Run(MissingSettings());
+
+        _versions.Set(ProgramFile(installDir), new Version(26, 29906, 0, 1));
+
+        // Act
+        var refreshed = search.RefreshBuild();
+
+        // Assert
+        Assert.AreEqual(GameInstallationStatusKind.Found, refreshed.Kind, "The installation should still be found");
+        Assert.AreEqual("26.29906.0.1", refreshed.Build, "The build should be the one read now");
+        Assert.AreEqual(found.Folder, refreshed.Folder, "The folder should be kept");
+        Assert.AreEqual(found.Source, refreshed.Source, "The source should be kept");
+        Assert.AreEqual(refreshed, search.Status, "The status of the search should hold the build read now");
+    }
+
+    /// <summary>
+    /// A program file that now has no version gives an unknown build.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC3")]
+    public void GameInstallationSearchRefreshBuildWithoutVersionIsUnknown()
+    {
+        // Arrange
+        var installDir = CreateInstallation("anno") + "/";
+        var search = CreateSearch(new FakeUbisoftInstallRecords(Record("921", installDir)), MissingFolder());
+
+        search.Run(MissingSettings());
+        _versions.Set(ProgramFile(installDir), null);
+
+        // Act
+        var refreshed = search.RefreshBuild();
+
+        // Assert
+        Assert.AreEqual(GameInstallationStatusKind.Found, refreshed.Kind, "The installation should still be found");
+        Assert.IsNull(refreshed.Build, "The build should be unknown");
+    }
+
+    /// <summary>
+    /// Without a found installation, before the search ended and after a search that found nothing, the status stays and
+    /// nothing is read.
+    /// </summary>
+    /// <param name="runSearch">Whether the search ran before</param>
+    [TestMethod]
+    [TestCategory("AC3")]
+    [DataRow(false)]
+    [DataRow(true)]
+    public void GameInstallationSearchRefreshBuildNotFoundKeepsStatus(bool runSearch)
+    {
+        // Arrange
+        var search = CreateSearch(new FakeUbisoftInstallRecords(), MissingFolder());
+
+        if (runSearch)
+        {
+            search.Run(MissingSettings());
+        }
+
+        var before = search.Status;
+
+        // Act
+        var refreshed = search.RefreshBuild();
+
+        // Assert
+        Assert.AreEqual(before, refreshed, "The status should be returned as it was");
+        Assert.AreEqual(before, search.Status, "The status should stay");
+        Assert.IsEmpty(_versions.Reads, "No version should be read");
+    }
+
+    /// <summary>
     /// A search writes nothing: the files and folders it reads keep their listing, lengths, contents and write times.
     /// </summary>
     [TestMethod]

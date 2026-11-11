@@ -18,6 +18,16 @@ public static class CompanionFolders
     }
 
     /// <summary>
+    /// Gets the folder of the catalog cache.
+    /// </summary>
+    /// <param name="localApplicationData">The local application data folder</param>
+    /// <returns>The cache folder</returns>
+    public static string Cache(string localApplicationData)
+    {
+        return Path.Combine(localApplicationData, "Censio", "Cache");
+    }
+
+    /// <summary>
     /// Gets the path of the settings file.
     /// </summary>
     /// <param name="localApplicationData">The local application data folder</param>

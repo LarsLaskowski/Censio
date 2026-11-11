@@ -18,7 +18,7 @@ of that name does not count. A trailing separator and forward slashes in the fol
 
 The search runs once per start, in every mode (the invalid command line included), in the background; the tray, the
 pipe connection and `Exit` do not wait for it. Until it ends the menu line reads `Game: searching`. A change while the
-Companion runs counts only after a restart.
+Companion runs counts only after a restart, except the build (*Build*).
 
 1. **The settings file.** A `gameFolder` that is a text (not blank) is used and nothing else is searched:
    - not a full path (relative, a bare drive letter, a variable such as `%USERPROFILE%`; variables are never
@@ -48,9 +48,7 @@ Steam is not searched. A player with another copy (Steam) names the folder in th
 - **UNC and device paths:** no UNC or device path written in a record is followed (a path whose first character is `\`
   or `/` and whose second is `\`, `/` or `?`, both counted as separators); a mapped drive letter and a directory
   symlink are still followed. A UNC folder the player writes in the settings file is the player's own choice and is
-  probed as written, over the network. With such a folder found, the catalog then reads `config.rda` and lists and
-  opens every archive below `maindata` over the network (SMB) at every start ([`game-catalog.md`](game-catalog.md),
-  *Limits and errors*).
+  probed as written, over the network. With such a folder found, the Companion lists every archive below `maindata` with its size and modification time over the network (SMB) at the start and at each check, and reads `config.rda` and opens the archives over it only when it extracts the catalog ([`game-catalog.md`](game-catalog.md), *Limits and errors*).
 - The Companion only reads: it checks that the two files exist, asks Windows for the file version of the program file,
   and writes nothing to the installation, the registry or the settings file. It reads no whole drive.
 
@@ -61,6 +59,11 @@ The build is the file version of `bin\win64\anno117.exe` as four numbers `Major.
 cannot be read, has no version or has all four numbers zero gives the build *unknown*; the installation is still
 used. The same file version gives the same text at every start. Not verified: that the file version changes with
 every game update.
+
+The build is read again at each later check of the catalog, at a new pipe connection ([`game-catalog.md`](game-catalog.md),
+*Cache*): only the file version of the program file of the installation found at the start, not a new search. The
+`Game:` line then shows the build read last, the next time the menu is opened; no log line is written. A build that cannot be read
+then is *unknown*. The build is part of the key of the catalog cache.
 
 ### Menu line
 
@@ -107,4 +110,4 @@ line ([`companion.md`](companion.md), *Log*); no game content is logged.
 
 - The settings file's format and reading rules: [`companion.md`](companion.md) (*Settings file*).
 - The archives below the installation and their reading: [`game-files.md`](game-files.md).
-- The catalog built from the installation: [`game-catalog.md`](game-catalog.md); the cache keyed by the build (#25).
+- The catalog built from the installation: [`game-catalog.md`](game-catalog.md); the cache keyed by the build: [`game-catalog.md`](game-catalog.md), *Cache*.

@@ -25,6 +25,23 @@ public sealed class CompanionFoldersTests
     }
 
     /// <summary>
+    /// The cache folder is Censio\Cache below the local application data.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC1")]
+    public void CompanionFoldersCacheIsUnderCensio()
+    {
+        // Arrange
+        var data = Path.Combine(Path.GetTempPath(), "Local");
+
+        // Act
+        var folder = CompanionFolders.Cache(data);
+
+        // Assert
+        Assert.AreEqual(Path.Combine(data, "Censio", "Cache"), folder, "The cache folder should be Censio\\Cache below the local application data");
+    }
+
+    /// <summary>
     /// The settings file is Censio\settings.json below the local application data.
     /// </summary>
     [TestMethod]

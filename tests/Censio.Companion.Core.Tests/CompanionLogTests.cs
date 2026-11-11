@@ -59,5 +59,57 @@ public sealed class CompanionLogTests
         Assert.AreSequenceEqual(expected, logger.Entries.Select(entry => (entry.Level, entry.Message, entry.Exception)).ToArray(), "Each method should log its level, its text and its exception");
     }
 
+    /// <summary>
+    /// The log methods of the catalog cache write their level and their exact text with the values filled in, and pass on their
+    /// exception.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public void CompanionLogCatalogCacheTemplates()
+    {
+        // Arrange
+        var logger = new RecordingLogger();
+        var failure = new IOException("The cache folder is gone");
+
+        // Act
+        CompanionLog.CatalogCacheNotUsed(logger, "game changed");
+        CompanionLog.CatalogCacheInvalid(logger);
+        CompanionLog.CatalogCacheNotWritten(logger, failure);
+        CompanionLog.CatalogCacheNotWritten(logger, null);
+        CompanionLog.CatalogCheckFailed(logger);
+        CompanionLog.CatalogExtracted(logger, "12.3", "1.4", "10.9");
+        CompanionLog.CatalogLoadedFromCache(logger, "0.8", 1234, 300, 12);
+
+        // Assert
+        (LogLevel, string, Exception?)[] expected = [
+                                                        (LogLevel.Information, "Catalog cache not used: game changed", null),
+                                                        (LogLevel.Warning, "Catalog cache not used: invalid", null),
+                                                        (LogLevel.Warning, "Catalog cache not written", failure),
+                                                        (LogLevel.Warning, "Catalog cache not written", null),
+                                                        (LogLevel.Warning, "Catalog check failed; the current catalog is kept", null),
+                                                        (LogLevel.Information, "Catalog extracted in 12.3 s (names 1.4 s, icons 10.9 s)", null),
+                                                        (LogLevel.Information, "Catalog loaded from cache in 0.8 s: 1234 entries, 300 goods and 12 regions with an icon", null),
+                                                    ];
+
+        Assert.AreSequenceEqual(expected, logger.Entries.Select(entry => (entry.Level, entry.Message, entry.Exception)).ToArray(), "Each method should log its level, its text and its exception");
+    }
+
+    /// <summary>
+    /// The line about the cap says that further GUIDs are not logged for this catalog.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public void CompanionLogCatalogReportsCappedText()
+    {
+        // Arrange
+        var logger = new RecordingLogger();
+
+        // Act
+        CompanionLog.CatalogReportsCapped(logger, 1000);
+
+        // Assert
+        Assert.AreSequenceEqual([(LogLevel.Information, "Catalog: more than 1000 GUIDs cannot be named; further ones are not logged for this catalog")], logger.Entries.Select(entry => (entry.Level, entry.Message)).ToArray(), "The cap line should name the catalog");
+    }
+
     #endregion // Methods
 }

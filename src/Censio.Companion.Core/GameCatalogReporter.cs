@@ -37,9 +37,14 @@ public sealed class GameCatalogReporter
     private readonly Lock _lock = new();
 
     /// <summary>
-    /// The roles and GUIDs reported so far; it stops growing at <see cref="MaxReports" />.
+    /// The roles and GUIDs reported so far for the current catalog; it stops growing at <see cref="MaxReports" />.
     /// </summary>
     private readonly HashSet<(GameCatalogKind Role, int AssetGuid)> _reported = [];
+
+    /// <summary>
+    /// The catalog instance the reported set belongs to.
+    /// </summary>
+    private GameCatalog? _reportedCatalog;
 
     /// <summary>
     /// Whether the line about the cap was logged.
@@ -119,6 +124,13 @@ public sealed class GameCatalogReporter
 
         lock (_lock)
         {
+            if (ReferenceEquals(_reportedCatalog, catalog) == false)
+            {
+                _reportedCatalog = catalog;
+                _reported.Clear();
+                _isCapped = false;
+            }
+
             if (_isCapped || _reported.Contains((role, guid)))
             {
                 return;

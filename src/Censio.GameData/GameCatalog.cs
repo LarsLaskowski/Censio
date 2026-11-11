@@ -64,6 +64,11 @@ public sealed class GameCatalog
     public IReadOnlyCollection<GameCatalogEntry> Entries => _entries;
 
     /// <summary>
+    /// Gets the GUIDs defined or named more than once.
+    /// </summary>
+    public IReadOnlyCollection<int> AmbiguousGuids => _ambiguousGuids;
+
+    /// <summary>
     /// Gets the number of inherited assets left out.
     /// </summary>
     public int InheritedAssetCount { get; }
