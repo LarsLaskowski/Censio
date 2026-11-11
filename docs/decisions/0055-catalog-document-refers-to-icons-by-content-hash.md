@@ -1,6 +1,6 @@
 # 0055: The catalog document refers to each icon by the SHA-256 of its PNG and carries no image data
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-11
 - **Area:** game-catalog-format
 - **Source:** Issue #26

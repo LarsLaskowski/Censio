@@ -1,6 +1,6 @@
 # 0056: The catalog document is read strictly, by exactly the schema versions a reader lists
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-11
 - **Area:** game-catalog-format
 - **Source:** Issue #26
