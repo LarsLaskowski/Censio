@@ -1,7 +1,7 @@
 # Spec: Move from .NET 10 to .NET 11
 
 Source: the user's description ("Prüfe mit dem Squad eine Aktualisierung .NET 10 auf .NET 11")
-Status: Draft
+Status: Approved by Lead
 
 ## Problem
 
@@ -124,8 +124,8 @@ restore order of the Dockerfile (record 0007 holds). It also showed E1, E2 and E
   retry or a skipped test (E3).
 - AC6: The CI jobs `check`, `image-build` and `release-check` pass. The release ZIP holds exactly the
   self-contained `Censio.Companion.exe`, within N2. The image passes `image-check.sh` (port, user, `/config`, health).
-  With one `/config` volume, the .NET 11 image starts on a key ring the current .NET 10 image wrote, and the .NET 10
-  image starts again on that ring after the .NET 11 image ran, both without an error (S2, S3, E6, E8, E9, E10, N2).
+  With one data directory, the .NET 11 server starts on a key ring the current .NET 10 server wrote, and the .NET 10
+  server starts again on that ring after the .NET 11 server ran, both without an error (S2, S3, E6, E8, E9, E10, N2).
 - AC7: `README.md` and `docs/USER_GUIDE.md` (English and German), `docs/CONTRIBUTING.md`, the project
   blocks of `AGENTS.md` and `.github/copilot-instructions.md`, `.squad/stack.md`, `.squad/project.md` (test doubles
   re-checked as N5), the `.github/dependabot.yml` comments and the area documents below name .NET 11 and the SDK of
