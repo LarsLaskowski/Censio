@@ -1,7 +1,7 @@
 # Spec: Versioned catalog format
 
 Source: Issue #26
-Status: Draft
+Status: Approved by Lead
 
 ## Problem
 
@@ -52,11 +52,11 @@ decoded (E1, E5); (3) `schemaVersion` (E2, E3); (4) the structure of version 1 (
 - E2: A property unknown to the version, a property given twice (also an identical language tag in one entry's names),
   a missing property, a property name in another case, a value of the wrong JSON type, `null` where the version allows
   none, a number with a fraction or an exponent or outside the signed 32-bit range (GUIDs, region GUIDs and
-  `schemaVersion` alike, so `1.0` and `1e0` are no version 1), a `schemaVersion` that is missing or given twice:
-  *malformed*.
+  `schemaVersion` alike, so `1.0` and `1e0` are no version 1), a `schemaVersion` that is missing or given twice, a
+  kind other than the four lowercase words of S1: *malformed*.
 - E3: A `schemaVersion` that is a signed 32-bit integer other than 1: *unsupported version*, whatever else the
   document holds (properties of a later version included), as long as steps 1 and 2 pass.
-- E4: GUID `0`, a GUID on two entries, a kind not listed in S1, a region entry without a region GUID or with `0`, a
+- E4: GUID `0`, a GUID on two entries, a region entry without a region GUID or with `0`, a
   region GUID on another kind, an empty name, a language tag that is not a lowercase BCP 47 tag of at most 35
   characters (a primary subtag of 2 or 3 letters `a`–`z`, then subtags of 1 to 8 letters `a`–`z` or digits, each after
   one `-`; `pt-br` is valid, `pt-BR` and `EN` are not), an empty region type, an icon reference that is not 64
@@ -67,7 +67,8 @@ decoded (E1, E5); (3) `schemaVersion` (E2, E3); (4) the structure of version 1 (
   string bound, [`game-catalog-cache.md`](../../docs/areas/game-catalog-cache.md)): *too large*.
 - E6: A catalog with no entries, an entry with no name in any language (*nameless*) or in one only (*incomplete*):
   valid; the names object then lists only the languages with a name.
-- E7: The writer given a document that breaks a rule of E4 or a bound of E5 refuses it with that kind and writes
+- E7: The writer given a document that breaks a rule of E4 or a bound of E5, or a string that is no well-formed
+  Unicode text (*invalid*), refuses it with that kind and writes
   nothing: the writer never produces a document the reader refuses. The conversion of S1 never gives such a document
   for GUIDs (it leaves out `0` and repeats).
 
@@ -130,8 +131,8 @@ decoded (E1, E5); (3) `schemaVersion` (E2, E3); (4) the structure of version 1 (
   document of names. The plan's decision record states the options.
 - Accept unknown properties for forward compatibility? Answered: no; strict reading with a version raised on every
   change (records 0018, 0033); a mismatched pair is refused (N2).
-- README and user guide (issue's *Documentation*)? Answered: no change; nothing a tester can try changes (the README's
-  "Nothing is sent from the Companion to the server" stays true). The format is described in its area document.
+- README and user guide (issue's *Documentation*)? Answered: no change; nothing a tester can try changes. The area
+  document describes the format.
 
 ## Area documents
 

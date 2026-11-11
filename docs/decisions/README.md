@@ -116,4 +116,6 @@ once in the [area document](../areas/README.md) of the record's area, and the re
 | [0052](0052-catalog-cache-keyed-by-file-properties-and-companion-identity.md) | The catalog cache is keyed by the archives' file properties, the build and the Companion's module identity, and checked at start and at each new pipe connection | Accepted | 2026-11-10 |
 | [0053](0053-catalog-cache-one-binary-file-validated-whole-before-use.md) | The catalog cache is one own binary file with a checksum, validated whole before any of it is used | Accepted | 2026-11-10 |
 | [0054](0054-censio-moves-to-every-current-dotnet-major.md) | Censio moves to every current .NET major, STS and LTS alike | Accepted | 2026-11-11 |
+| [0055](0055-catalog-document-refers-to-icons-by-content-hash.md) | The catalog document refers to each icon by the SHA-256 of its PNG and carries no image data | Proposed | 2026-11-11 |
+| [0056](0056-catalog-document-read-strictly-by-exact-schema-version.md) | The catalog document is read strictly, by exactly the schema versions a reader lists | Proposed | 2026-11-11 |
 <!-- project:end index -->
