@@ -91,12 +91,16 @@ request.
   the analysis itself fails, and the alerts it finds appear under *Security > Code scanning*. No local command
   reproduces it.
 - **Dependabot** (`.github/dependabot.yml`): weekly version updates for NuGet (the .NET tools of the manifest
-  included), GitHub Actions and Docker (`src/Censio.Server/`), each ecosystem in one grouped pull request;
-  security updates arrive separately. A base-image pull request fails the job `image` until the labels
-  `org.opencontainers.image.base.name` and `…base.digest` in the Dockerfile are set by hand to the tag and digest of
-  the new runtime `FROM` line. Major base-image updates are ignored until the target framework moves. A new
-  Alpine minor (a new tag suffix such as `alpine3.25`) is a manual bump of both `FROM` lines and the labels;
-  the *Base image check* reports when that bump is due.
+  included), GitHub Actions and Docker (`src/Censio.Server/`), each ecosystem in one grouped pull request, and for
+  the .NET SDK of `global.json`; security updates arrive separately. Major updates of the SDK, the base images and
+  the `Microsoft.Extensions.*` and `Microsoft.AspNetCore.*` packages are ignored until the target framework moves.
+  The image build reads `global.json`, whose version is the lowest SDK it accepts, so an SDK pull request fails the
+  job `image` until the SDK `FROM` line of the Dockerfile is on that version or a later one (merge the base-image
+  pull request first, or move the line in the SDK pull request), and it moves the SDK version in `README.md` and
+  `docs/USER_GUIDE.md`, English and German, with it. A base-image pull request fails the job `image` until the
+  labels `org.opencontainers.image.base.name` and `…base.digest` in the Dockerfile are set by hand to the tag and
+  digest of the new runtime `FROM` line. A new Alpine minor (a new tag suffix such as `alpine3.25`) is a manual bump
+  of both `FROM` lines and the labels; the *Base image check* reports when that bump is due.
 - **Fork scope** (`.github/workflows/fork-scope.yml`): runs on pull requests from forks, with the check as it
   is on `main`, and turns red when one changes a squad or agent instruction file (`.squad/` except `stack.md`
   and `project.md`, `.claude/`, `CLAUDE.md`, `AGENTS.md`, `.github/copilot-instructions.md`), text outside the

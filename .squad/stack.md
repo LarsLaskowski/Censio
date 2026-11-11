@@ -6,13 +6,14 @@ profile and owned by this repository: keep it true when the build changes.
 
 ## Toolchain
 
-- .NET SDK of `global.json` (`10.0.404`, the newest SDK of the major; `rollForward` `latestFeature`: the newest
+- .NET SDK of `global.json` (the newest SDK of the major, which Dependabot raises; `rollForward` `latestFeature`: the newest
   installed feature band of that major, never the next major), target framework `net10.0` (`net10.0-windows` for
   `Censio.Companion`), solution `Censio.slnx`. Several majors may be installed side by side (a machine, CI); the
   repository is built for one: every project's target framework, `global.json` and every .NET image name the same
   major, which `dotnet_major.py` checks in the *Analyzer gate*, and a new project gets it from the SDK `global.json`
   selects. Dependabot keeps the SDK, the packages and the images current within that major; the move to the next one
-  (target frameworks, `global.json`, the ASP.NET Core and EF Core packages, the images) is one change of its own.
+  (target frameworks, `global.json`, the Microsoft.Extensions and ASP.NET Core packages, the images) is one change of its
+  own.
 - .NET tools: `reihitsu-format` (`Reihitsu.Cli`) and `dotnet-sonarscanner` are pinned in
   `.config/dotnet-tools.json` and restored with `dotnet tool restore`; CI runs both and the *Format* commands below run the formatter through the manifest (`dotnet tool run`), so every machine uses the pinned version. The formatter stays on
   the same release line (major.minor) as the **Reihitsu.Analyzer** version pinned in `Directory.Packages.props`,
