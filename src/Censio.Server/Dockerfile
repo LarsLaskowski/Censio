@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/dotnet/sdk:10.0.404-alpine3.24-amd64@sha256:19a9b6214e3e78ffabc3469de57aeccb4d388bacb14de1e98533e7f94c34f4b3 AS build
+FROM mcr.microsoft.com/dotnet/sdk:11.0.100-alpine3.24-amd64@sha256:8234f4b51a16ff4416c013729616bd5df1211ced20e746067ddc66be7f526063 AS build
 WORKDIR /src
 
 COPY global.json ./
@@ -25,9 +25,9 @@ RUN dotnet publish src/Censio.Server/Censio.Server.csproj -c Release --no-restor
 RUN ls /app/publish/wwwroot/_framework/blazor.web*.js > /dev/null 2>&1 \
     || { echo "publish output lacks wwwroot/_framework/blazor.web*.js (see docs/decisions/0007)" >&2; exit 1; }
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0.14-alpine3.24-amd64@sha256:fbad312ed75e0f10c4fcba4d48e0c0f133de07219bd0f78054e4a102501c0650
-LABEL org.opencontainers.image.base.name="mcr.microsoft.com/dotnet/aspnet:10.0.14-alpine3.24-amd64" \
-      org.opencontainers.image.base.digest="sha256:fbad312ed75e0f10c4fcba4d48e0c0f133de07219bd0f78054e4a102501c0650" \
+FROM mcr.microsoft.com/dotnet/aspnet:11.0.0-alpine3.24-amd64@sha256:c25d33205f2064b811c82770635314433c758eac35d364c1f2b6f3711da75bfd
+LABEL org.opencontainers.image.base.name="mcr.microsoft.com/dotnet/aspnet:11.0.0-alpine3.24-amd64" \
+      org.opencontainers.image.base.digest="sha256:c25d33205f2064b811c82770635314433c758eac35d364c1f2b6f3711da75bfd" \
       org.opencontainers.image.description="Censio server: live state and history of Anno 117 statistics" \
       org.opencontainers.image.licenses="MIT"
 ENV ASPNETCORE_HTTP_PORTS=8080 \
