@@ -430,6 +430,50 @@ public sealed class CatalogDocumentWriterTests
     }
 
     /// <summary>
+    /// A document whose strings sum to less than 16 MiB but whose escaped JSON is above it is refused as too large.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public void CatalogDocumentWriterWriteRefusesDocumentAboveBoundOnlyOnceEscaped()
+    {
+        // Arrange
+        var name = new string('\u6728', 340);
+        var entries = Enumerable.Range(1, CatalogDocumentReader.MaxEntries).Select(guid => Entry(guid, CatalogEntryKind.Good, Names(("en", name)))).ToArray();
+        var document = Document(null, entries);
+        var rawBytes = (long)CatalogDocumentReader.MaxEntries * (Encoding.UTF8.GetByteCount(name) + 2);
+
+        // Act
+        var result = CatalogDocumentWriter.Write(document);
+
+        // Assert
+        Assert.IsLessThan(CatalogDocumentReader.MaxDocumentBytes, rawBytes, "The strings alone should fit the document bound");
+        AssertRefusal(result, CatalogDocumentErrorKind.TooLarge, TooLargeText, "strings below 16 MiB, escaped JSON above it");
+    }
+
+    /// <summary>
+    /// Serializing a type the source-generated context does not know fails, because reflection serialization is disabled in the test assembly.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC2")]
+    public void CatalogDocumentWriterReflectionSerializationIsDisabled()
+    {
+        // Arrange
+        var document = Document(null, Entry(5, CatalogEntryKind.Good, Names(("en", "Wood"))));
+
+        // Act
+        var result = CatalogDocumentWriter.Write(document);
+        var reflection = Assert.Throws<InvalidOperationException>(() => System.Text.Json.JsonSerializer.Serialize(new List<int>
+                                                                                                                  {
+                                                                                                                      1
+                                                                                                                  }),
+                                                                  "Reflection serialization should be disabled");
+
+        // Assert
+        Assert.IsNull(result.Error, "The writer should serialize without reflection");
+        Assert.IsNotNull(reflection, "The reflection call should have thrown");
+    }
+
+    /// <summary>
     /// Builds a document.
     /// </summary>
     /// <param name="gameVersion">The game version</param>
