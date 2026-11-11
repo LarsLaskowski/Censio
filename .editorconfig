@@ -284,5 +284,8 @@ dotnet_diagnostic.S8969.severity = suggestion
 dotnet_diagnostic.S8970.severity = suggestion
 dotnet_diagnostic.S9022.severity = suggestion
 dotnet_diagnostic.S9129.severity = suggestion
+dotnet_diagnostic.S9414.severity = suggestion
+dotnet_diagnostic.S9415.severity = suggestion
+dotnet_diagnostic.S9422.severity = suggestion
 dotnet_diagnostic.S4347.severity = none
 # squad:sonar-rules end
