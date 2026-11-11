@@ -110,3 +110,7 @@ Record 0048 (unreleased): the Lead changed its closing sentence to name the thre
 ## Out of scope / follow-ups
 
 - game-catalog.md (5,008 words) is over the limit too; not this issue.
+
+## Security notes
+
+- Non-blocking (Security, plan review): AC4 reads "no reference anywhere"; released records 0037 and 0038 still link companion.md for the log and the diagnostics window and stay unedited. Read AC4 as "outside released decision records".
