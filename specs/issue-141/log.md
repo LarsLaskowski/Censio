@@ -10,3 +10,4 @@ are quoted in full.
 | 2026-11-11 13:17 | 2 Challenge skipped | Orchestrator | challenge skipped — tier trivial is never challenged |
 | 2026-11-11 13:17 | 3 Plan security | Security | VERDICT: APPROVED; non-blocking: AC4 should say outside released decision records (0037, 0038 still link companion.md) (opus/medium · 38,376 tokens · 5 tool uses · 44 s · 8 in · 4,446 out · 62,239 cache read · 35,333 cache write · 139,032 weighted) |
 | 2026-11-11 13:17 | 4-5 Skipped | Orchestrator | no production or test code: see *Verification without tests* |
+| 2026-11-11 13:19 | 6 Implement | Dev | Split done; project.md links applied by orchestrator from the Dev's report (sonnet/medium · 101,858 tokens · 12 tool uses · 81 s · 24 in · 8,454 out · 947,558 cache read · 100,241 cache write · 262,351 weighted) |

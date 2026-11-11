@@ -50,7 +50,7 @@ The state is shown in the tray tooltip ([`companion.md`](companion.md)).
 - Every change of the state or of its cause is raised as an event on whatever thread the connection runs on; a
   handler that throws affects neither the connection nor the other handlers. An unchanged state raises no event.
   Events carry the state, the error kind, the Windows error code or the received version, and no pipe content. The
-  same values are written to the Companion's log ([`companion.md`](companion.md), *Log*), once per change.
+  same values are written to the Companion's log ([`companion-log.md`](companion-log.md)), once per change.
 
 ### Retry
 
@@ -72,7 +72,7 @@ The state is shown in the tray tooltip ([`companion.md`](companion.md)).
   ([`pipe.md`](pipe.md), *Ticks and sessions*). It keeps a summary of the latest closed tick (its receive time and
   island count) and the tick itself, whole, across connections, and raises an event for each closed tick; a handler
   that throws affects neither the connection nor the other handlers. The diagnostics window is the consumer of that
-  tick ([`companion.md`](companion.md), *Diagnostics window*).
+  tick ([`companion-diagnostics.md`](companion-diagnostics.md)).
 
 ### Stop
 
