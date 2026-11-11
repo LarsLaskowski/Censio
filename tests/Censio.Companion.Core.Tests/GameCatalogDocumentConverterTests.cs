@@ -281,6 +281,23 @@ public sealed class GameCatalogDocumentConverterTests
     }
 
     /// <summary>
+    /// An entry of an undefined kind is not converted silently but refused with an argument exception.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC1")]
+    public void GameCatalogDocumentConverterToDocumentThrowsForUndefinedKind()
+    {
+        // Arrange
+        var catalog = CatalogOf(Entry(1, (GameCatalogKind)99, "A", "A", null, null, null));
+
+        // Act
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(() => GameCatalogDocumentConverter.ToDocument(catalog, null, null), "An undefined kind should be refused");
+
+        // Assert
+        Assert.AreEqual("kind", exception.ParamName, "The exception should name the kind parameter");
+    }
+
+    /// <summary>
     /// Opens a file of the linked fixture.
     /// </summary>
     /// <param name="index">The index of the file</param>
