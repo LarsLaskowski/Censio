@@ -27,7 +27,8 @@ region and good of each row and no building or workforce column
 Option 1, chosen by the Product Manager: the `Region` and `Good` cells show both names with the GUID, the tray menu
 shows the catalog's state, and every GUID of every closed tick in all four roles is checked, whether or not the
 window is open, each unresolved one logged once per run by GUID, role and reason, never by name. The texts are in the
-[companion](../areas/companion.md) area document.
+[companion](../areas/companion.md), [companion-diagnostics](../areas/companion-diagnostics.md) and
+[companion-log](../areas/companion-log.md) area documents.
 
 ## Consequences
 

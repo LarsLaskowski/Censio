@@ -167,7 +167,7 @@ conversion) hold the reasoning.
 - **Reasons** (per good or region entry without an icon): *not named* (the asset has no `IconFilename`), *missing* (the
   value gives no path, or no icon archive lists it) and *unreadable* (the archive that wins lists the path more than
   once, the entry cannot be read or is above its bound, or the DDS file is refused). Each reason is counted and logged
-  as a number of entries ([`companion.md`](companion.md), *Log*), with the goods and regions that have an icon.
+  as a number of entries ([`companion-log.md`](companion-log.md)), with the goods and regions that have an icon.
 - **Failure kinds** (the icons are then withheld as a whole; the names are not touched). The result holds the kind and
   the relative path of the archive concerned, never an exception text or content:
 
@@ -240,13 +240,13 @@ archives again.
   a folder, and a fresh file of a concurrent writer are never deleted. The writer refuses content above a bound (the summed decoded size
   included). A failure to write (no folder, disk full, access denied, a bound) leaves names and icons in use and shows
   `Catalog: <n> entries, not cached` and the warning `Catalog cache not written` with the exception.
-- Each published catalog has its own `Catalog cannot name` lines and 1,000-line limit ([`companion.md`](companion.md), *Log*).
+- Each published catalog has its own `Catalog cannot name` lines and 1,000-line limit ([`companion-log.md`](companion-log.md)).
 
 ### Use by the Companion
 
 - The Companion checks the GUIDs of ticks closed after a catalog is published, and the latest tick at that moment, unless
   no tick source (connection or replay) has started yet; ticks closed earlier are not checked
-  ([`companion.md`](companion.md), *Log*). A catalog is published when its names are ready or when it is loaded from the cache,
+  ([`companion-log.md`](companion-log.md)). A catalog is published when its names are ready or when it is loaded from the cache,
   so a re-extraction checks the latest tick against its new catalog and restarts the reporting.
 
 ### Failures
@@ -344,5 +344,5 @@ archives again.
 
 - The archives, their bounds and failure kinds: [`game-files.md`](game-files.md); finding the installation:
   [`game-installation.md`](game-installation.md).
-- The tray line, the diagnostics cells and icons, the check of tick GUIDs and the log lines: [`companion.md`](companion.md).
+- The tray line: [`companion.md`](companion.md); the diagnostics cells and icons: [`companion-diagnostics.md`](companion-diagnostics.md); the check of tick GUIDs and the log lines: [`companion-log.md`](companion-log.md).
 - The catalog format for the server and the upload (#26, #42).

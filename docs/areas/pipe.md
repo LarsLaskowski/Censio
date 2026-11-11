@@ -118,7 +118,7 @@ A tick is delivered when it closes, once, and is never reopened. It closes when:
   steps change no item: a deadline that the clock reaches closes the tick as before.
 - The caller must keep requesting: the receive time of a frame is stamped when its read completes, but the next read
   starts only on a request. A slow consumer belongs behind the tick buffer (#41) or a hand-off that never blocks the
-  reading ([`companion.md`](companion.md), *Diagnostics window*).
+  reading ([`companion-diagnostics.md`](companion-diagnostics.md)).
 
 ## Limits and errors
 

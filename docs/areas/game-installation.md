@@ -82,7 +82,7 @@ A greyed-out entry directly below `Last tick:` and above the first separator, no
 ### Log
 
 One line per search, with the folder as written (it may hold the Windows user name), sanitized and cut like every log
-line ([`companion.md`](companion.md), *Log*); no game content is logged.
+line ([`companion-log.md`](companion-log.md)); no game content is logged.
 
 | Level | Message |
 | ----- | ------- |

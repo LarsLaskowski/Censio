@@ -75,7 +75,7 @@ it without notice.
 ### Entry paths are untrusted
 
 - A path comes from the file and is untrusted text. A consumer that logs one follows the rule of the Companion's log
-  ([`companion.md`](companion.md), *Log*): control characters, format characters, line and paragraph separators
+  ([`companion-log.md`](companion-log.md)): control characters, format characters, line and paragraph separators
   and unpaired surrogates are replaced, and the message is cut.
 - A consumer that derives a file system path from an entry path (the icon cache of #25) confines the result
   to its own folder: it does not use `..`, a rooted path or a drive letter from the entry.
@@ -142,4 +142,4 @@ an archive. The largest entry counts are 21,028 (`zz_patchfiles_300`), 46,110 (`
 
 - Finding the installation folder ([`game-installation.md`](game-installation.md)), building the catalog and
   finding and converting the icons ([`game-catalog.md`](game-catalog.md)); the icon cache and the catalog format (#25, #26).
-- The log of the Companion and what may be logged: [`companion.md`](companion.md).
+- The log of the Companion and what may be logged: [`companion-log.md`](companion-log.md).
