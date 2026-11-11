@@ -290,8 +290,8 @@ archives again.
   re-encoded PNG, but no copy of the file; a write streams to the temporary file.
 - **Time:** reading the four files of #23 of the Product Manager's installation took 1.3 s with a peak working set of 108 MiB
   in the test process; the whole build including the archive listing is measured by the opt-in installation test
-  (below) and is not stated here. On the Product Manager's installation a complete extraction and a cache load took
-  TODO-DURATION (the log lines `Catalog extracted in <t> s …` and `Catalog loaded from cache in <t> s …`).
+  (below) and is not stated here. On the Product Manager's installation (1,040 entries, one machine, not a guarantee) a complete extraction took about 7 s
+  (names 2.5 s, icons 4.5 s) and a cache load about 2.4 s (the log lines `Catalog extracted in <t> s …` and `Catalog loaded from cache in <t> s …`).
 - **Network:** when the installation folder is a UNC path from the settings file ([`game-installation.md`](game-installation.md),
   *Folders from outside*), `config.rda` is read and every archive below `maindata` is opened and listed over the
   network (SMB) at an extraction, and the icon archives (`ui.rda` and the patch archives) are listed a second time and
