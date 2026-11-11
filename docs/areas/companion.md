@@ -109,7 +109,7 @@ described in the other sections.
   (`<Windows folder>\explorer.exe`) with the folder as its one argument, and only for a fully qualified folder path.
 - The menu does not wait for the disk or for Explorer. If a folder cannot be created or opened, or is not a full path
   (local app data unresolved), a warning is logged and nothing else changes.
-- The catalog cache lies in `%LOCALAPPDATA%\Censio\Cache` (file `catalog.bin`, [`game-catalog.md`](game-catalog.md), *Cache*):
+- The catalog cache lies in `%LOCALAPPDATA%\Censio\Cache` (file `catalog.bin`, [`game-catalog-cache.md`](game-catalog-cache.md)):
   fixed, without a menu entry, created at the first write, private like the recordings folder, and kept when the Companion is removed.
 
 ### Diagnostics window
@@ -136,14 +136,14 @@ sent it: GUIDs are raw numbers where the catalog has no name for them; icons are
   name (unknown, nameless, ambiguous), GUID `0` and every cell while no catalog is ready show the bare number. The names
   pass the rule of the log (*Log*) and a name over 4,096 UTF-16 characters is cut there, ending in `…`; a name of
   exactly 4,096 is kept whole. Buildings and workforce have no column.
-- **Icons:** once the icons are built ([`game-catalog.md`](game-catalog.md), *Icons*), the `Region` and `Good` cells show
+- **Icons:** once the icons are built ([`game-catalog-icons.md`](game-catalog-icons.md)), the `Region` and `Good` cells show
   the icon of the cell's GUID before the text: an image of 20 by 20 device-independent pixels, then a gap of 4, then the
   text, vertically centred. In the `Region` column the icon sits on a dark round backdrop of that size (the game's region
   icons are light glyphs); the `Good` icon has none. A GUID without an icon (none, unknown, a problem of the icon, GUID `0`) and every cell while
   no icons are built show the text alone, without the image's place, backdrop or gap.
   The names are published first: the window shows them as soon as the catalog is ready and adds the icons when they are
   built, and a new build of the catalog removes the icons until the new ones are ready. Each distinct icon is decoded once, at twice the size of the
-  cell (sharp up to 200 % display scaling), and shared by the rows that show it. The icons are held in memory and written only to the catalog cache ([`game-catalog.md`](game-catalog.md), *Cache*): the window writes nothing of them to disk, nothing of them is logged or sent, and a screenshot holds the game's icons.
+  cell (sharp up to 200 % display scaling), and shared by the rows that show it. The icons are held in memory and written only to the catalog cache ([`game-catalog-cache.md`](game-catalog-cache.md)): the window writes nothing of them to disk, nothing of them is logged or sent, and a screenshot holds the game's icons.
 - **Area names** (the `Name` column) pass the rule of the log (*Log*): each control character, format character, line
   separator, paragraph separator (the categories Cc, Cf, Zl, Zp) and unpaired surrogate is shown as one `?`, nothing
   else is changed (combining marks, right-to-left letters and spaces stay as sent), and an area name is never cut, also
@@ -224,7 +224,7 @@ sent it: GUIDs are raw numbers where the catalog has no name for them; icons are
   re-extraction after a game update) starts its own set and its own limit. Ticks closed before a catalog is published
   are not checked, except the latest one at that moment, which is checked unless no connection or replay has started
   yet.
-- **Cache lines** ([`game-catalog.md`](game-catalog.md), *Cache*), none with a name or an image:
+- **Cache lines** ([`game-catalog-cache.md`](game-catalog-cache.md)), none with a name or an image:
   `Catalog cache not used: <missing|game changed|Companion changed>` (Information, at the start before the extraction);
   `Catalog cache not used: invalid` and `Catalog check failed; the current catalog is kept` (Warnings);
   `Catalog cache not written` (Warning, with the exception, which may hold the cache path and so the Windows user name);
@@ -232,7 +232,7 @@ sent it: GUIDs are raw numbers where the catalog has no name for them; icons are
   icons failed, not when the catalog failed); and `Catalog loaded from cache in <t> s: <n> entries, <g> goods and <r> regions
   with an icon` (Information; the only catalog line of a cache load). Durations have one decimal and a decimal point. A
   check that finds the game unchanged writes nothing.
-- **Icon lines** ([`game-catalog.md`](game-catalog.md), *Icons*), written after the catalog line of the same extraction, none
+- **Icon lines** ([`game-catalog-icons.md`](game-catalog-icons.md)), written after the catalog line of the same extraction, none
   with a name, an entry path or image data: `Catalog icons: <g> goods and <r> regions with an icon; without one: <a> not
   named, <m> missing, <u> unreadable` (Information; the counts are of entries) and `Catalog icons failed: <kind>
   (<archive>)` (Warning; the kinds `ArchiveMissing`, `ArchiveUnreadable`, `DuplicateArchiveNumber` and `IconSetTooLarge`,
@@ -312,5 +312,5 @@ sent it: GUIDs are raw numbers where the catalog has no name for them; icons are
 - Opening the pipe, the connection states and the retry rules: [`pipe-connection.md`](pipe-connection.md).
 - The recording file, its writing and failures, and the replay rules: [`pipe-recording.md`](pipe-recording.md).
 - Finding the game installation: [`game-installation.md`](game-installation.md).
-- Building and caching the catalog: [`game-catalog.md`](game-catalog.md).
+- Building the catalog: [`game-catalog.md`](game-catalog.md); the icons: [`game-catalog-icons.md`](game-catalog-icons.md); the cache: [`game-catalog-cache.md`](game-catalog-cache.md).
 - Reading the game files: [`game-files.md`](game-files.md); the connection to the server, a settings window (later issues).
