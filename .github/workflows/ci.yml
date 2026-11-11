@@ -37,7 +37,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
-          dotnet-version: '10.0.x'
+          global-json-file: global.json  # the SDK and the one .NET major of the solution (.squad/stack.md)
 
       - name: Restore tools
         run: dotnet tool restore
@@ -128,7 +128,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
-          dotnet-version: '10.0.x'
+          global-json-file: global.json  # the SDK and the one .NET major of the solution (.squad/stack.md)
 
       - name: Build and check the server image
         run: bash .github/scripts/image-check.sh
@@ -146,7 +146,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
-          dotnet-version: '10.0.x'
+          global-json-file: global.json  # the SDK and the one .NET major of the solution (.squad/stack.md)
 
       - name: Show the GitHub CLI version
         run: gh --version

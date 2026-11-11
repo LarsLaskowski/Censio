@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/dotnet/sdk:10.0.403-alpine3.24-amd64@sha256:91641f1bb088b241879fc9bf4ecc11bbbac0835bbb8cb871dd482eb73a51e80b AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0.404-alpine3.24-amd64@sha256:19a9b6214e3e78ffabc3469de57aeccb4d388bacb14de1e98533e7f94c34f4b3 AS build
 WORKDIR /src
 
 COPY global.json ./
