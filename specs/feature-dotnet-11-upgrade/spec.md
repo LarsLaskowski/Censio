@@ -74,7 +74,8 @@ restore order of the Dockerfile (record 0007 holds). It also showed E1, E2 and E
   `global.json` (11.0.100) is installed.
 - E8: The tools of `.config/dotnet-tools.json` on a runner with only the .NET 11 runtime:
   - `reihitsu-format` 1.2.0 targets `net10.0`, with the manifest's `rollForward: true`.
-  - `dotnet-sonarscanner` 12.1.0 targets `netcoreapp3.1` and already rolls forward in CI today.
+  - `dotnet-sonarscanner` 12.1.0 (`netcoreapp3.1`): manifest `rollForward: false`, but its `runtimeconfig.json` says
+    `LatestMajor`.
   - Both must run in CI (the sandbox also has the .NET 10 runtime).
 - E9: Upgrade: a `/config` whose key ring the .NET 10 image wrote is used by the .NET 11 image (record 0011). The
   server starts and does not fail on the old keys.

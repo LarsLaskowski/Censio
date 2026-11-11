@@ -16,7 +16,7 @@ race in the test, at `PipeRecordingSessionTests.cs:172-197`.
 | - | ----- | -------- | ------ |
 | 1 | .NET 11.0.0 / SDK 11.0.100 were released on 2026-11-10 as STS. .NET 10 and .NET 11 both end support on 2028-11-14. | `releases-index.json` at `builds.dotnet.microsoft.com`, read 2026-11-11. | confirmed |
 | 2 | The tags `sdk:11.0.100-alpine3.24-amd64` and `aspnet:11.0.0-alpine3.24-amd64` exist, and they are single-arch manifests. Digests: `sha256:8234f4b51a16ff4416c013729616bd5df1211ced20e746067ddc66be7f526063` (sdk) and `sha256:c25d33205f2064b811c82770635314433c758eac35d364c1f2b6f3711da75bfd` (aspnet). | MCR `tags/list`, and a manifest HEAD with `Docker-Content-Digest` (v2 manifest), 2026-11-11. The Dev reads both again when editing. | confirmed |
-| 3 | Retargeted to .NET 11, the solution builds. The only new diagnostics are `CA2016` and `S8949` at `AnonymiserCommand.cs:89` and `NU1510` in `Censio.Companion.Core`. There is no `RH` diagnostic. The failing tests are those of E1, E2 and E3. | A full SARIF build in a scratch copy and a SARIF build of `main`, compared. Three full test runs. | confirmed |
+| 3 | On .NET 11 the solution builds; the only new diagnostics are those of spec E4 and E5, with no `RH` diagnostic; the failing tests are those of E1–E3. | SARIF builds of a scratch copy and of `main`, compared; three full test runs. | confirmed |
 | 4 | Writing the template of `CompanionLog.cs:187` with one escaped backslash (`maindata\\config.rda` in the C# source) logs single backslashes on .NET 11. | Generated `LoggerMessage.g.cs` read on both majors. In the scratch copy, that spelling made the "No installation" case pass. | confirmed |
 | 5 | `decimal.TryParse(text, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, …)` succeeds for every text the current `double` check accepts, and it gives the written value. | Twelve forms tried on .NET 11: `0.1`, `.5`, `5.`, `1000.0`, leading zeros, `0.09999999999999999999`, and others. Overflow happens only far above 1000. | confirmed |
 | 6 | At `0.4`, `Math.Round(ticks / 0.4m)` gives 8 for 3 ticks and 75000008 for 30000003 ticks. For 922337203685477581 ticks at `0.1m` the result reaches `long.MaxValue`, so it saturates. | Scratch runs on 10.0.15 and 11.0.0, where `(decimal)` of a parsed `double` differs. | confirmed |
@@ -27,15 +27,15 @@ race in the test, at `PipeRecordingSessionTests.cs:172-197`.
 | 11 | With the server restored the way the Dockerfile does it, the .NET 11 publish holds `wwwroot/_framework/blazor.web.js`. | The *Image build check* reproduction in the scratch copy. | confirmed |
 | 12 | With the path fixed, `release-check.sh companion` builds a ZIP holding only `Censio.Companion.exe`, 72.2 MB (69.7 MB on .NET 10). | A scratch run. | confirmed |
 | 13 | `reihitsu-format` (`net10.0` tool, `rollForward: true`) and `dotnet-sonarscanner` run in CI with the SDK of `global.json`. | to verify: CI job `check` on the draft PR, step 11, orchestrator. | unverified |
-| 14 | A key ring written by the .NET 10 server is read by the .NET 11 server, and the other way round. | to verify: the Dev's cross-run (*Verification* under AC6), step 6. | unverified |
+| 14 | A key ring written by the .NET 10 server is read by the .NET 11 server, and the other way round. | Security's measurement M1 (plan review): 10.0.15, then 11.0.0, then 10.0.15 on one `FileSystemXmlRepository`, purpose `Censio.Server.KeyRingCheck`. .NET 11 created a second key, .NET 10 then used it as the default key, unprotect succeeded both ways, the key count after each run was 1/2/2, and no run logged a failure or a critical error. The Dev's cross-run confirms it (*Approach* 6). | confirmed |
 | 15 | Neither major's support list names Windows 10 22H2, and the lowest Windows 10 entry is 1607 for both. | `supported-os.json` 10.0 and 11.0, 2026-11-11. | confirmed |
 
 ## Tests per criterion
 
 | AC | Test(s) | Test file |
 | -- | ------- | --------- |
-| AC1 | check: `python3 .squad/tools/dotnet_major.py` passes, and `git grep -nE 'net10\.0\|10\.0\.404\|10\.0\.14\|\.NET 10\|\.NET-10' -- ':!specs' ':!docs/decisions/0*'` lists only the example of `docs/CONTRIBUTING.md` (*Base image check*), by the Dev in step 6. CI: `base-check.yml` and `check` | — |
-| AC2 | `AnonymiserCommandWrongArgumentCountWithCancelledTokenPrintsUsage` (new). It also passes before the fix, as a guard: it fails if the Dev passes the run's token to the usage write. Gates: step 7 | `tests/Censio.Anonymiser.Tests/AnonymiserCommandTests.cs` |
+| AC1 | check: `python3 .squad/tools/dotnet_major.py` passes, and `git grep -nE 'net10\.0\|10\.0\.404\|10\.0\.14\|\.NET 10\|\.NET-10' -- ':!specs' ':!docs/decisions/0*'` lists only the expected leftovers (list below), by the Dev in step 6. CI: `base-check.yml` and `check` | — |
+| AC2 | `AnonymiserCommandWrongArgumentCountWithCancelledTokenPrintsUsage` (new). It also passes before the fix, as a guard (proof below). The *Analyzer gate* shows `CA2016` and `S8949` gone, unsuppressed | `tests/Censio.Anonymiser.Tests/AnonymiserCommandTests.cs` |
 | AC3 | `GameInstallationSearchSettingsProblemLogsWarningAndReadsNoRecord` (existing, unchanged, fails on .NET 11 before the fix). check: the grep of spec E1 (every `[LoggerMessage]` template in `src/` with an escape or `{{`) lists only `CompanionLog.cs:187`, by the Dev | `tests/Censio.Companion.Core.Tests/GameInstallationSearchTests.cs` |
 | AC4 | `PipeReplaySpeedScaleNonBinaryFactorDividesByWrittenSpeed` (new; DataRows `"0.4", 3, 8` and `"0.4", 30000003, 75000008`; fails on .NET 11 before the fix). All existing cases of the class stay unchanged | `tests/Censio.Pipe.Tests/PipeReplaySpeedTests.cs` |
 | AC5 | `PipeRecordingSessionSeveralFailuresRaiseStateChangedOnce` (adapted). check: *Test* five times in a row, all green, by the Tester after the adaptation and again in step 7. CI: `check` | `tests/Censio.Companion.Core.Tests/PipeRecordingSessionTests.cs` |
@@ -43,6 +43,9 @@ race in the test, at `PipeRecordingSessionTests.cs:172-197`.
 | AC7 | check: the Reviewer reads each file of *Documentation updates* and record 0054 against the spec | — |
 | AC8 | manual: the Product Manager, on Windows 11 x64, with the artifact `companion-dry-run` of CI job `release-check`, from an *Early draft PR*, before step 9 | — |
 | AC9 | check: fallback only. If S6 applies, the Reviewer confirms that no project, image or package changed and that the record and the issue exist | — |
+
+- AC1, the expected leftovers, not edited: `docs/CONTRIBUTING.md:66` (a hypothetical example), `docs/decisions/README.md:80` (the row of released 0016), and `.claude/hooks/session-start.sh:44-45` (a squad file, still true).
+- AC2, the guard proof: the Tester temporarily passes `cancellationToken` at `AnonymiserCommand.cs:89` once and confirms that the test fails. If it does not, the test uses a writer that honours the token. The Tester reports the result.
 
 ## Approach
 
@@ -56,23 +59,30 @@ race in the test, at `PipeRecordingSessionTests.cs:172-197`.
 3. **E2 (AC4).**
    - `PipeReplaySpeed` keeps its public API, including `double? Factor`, so the existing tests stay unchanged.
    - It gets a private `decimal?` divisor. `TryParse` validates exactly as today with `double`, then sets the divisor from `decimal.TryParse` of the same text (fact 5). `RealTime` gets `1m`, and `Maximum` and `default` get `null`.
+   - `TryParse` fails closed (record 0033): a failed `decimal` parse or a divisor `<= 0m` returns `false` and never builds a speed with a `null` divisor.
+   - The decimal parse and that check are part of the one condition that already holds the `double` checks. Fact 5 says no text reaches them, so no test can, and keeping them in one condition leaves no uncovered line.
    - `Scale` divides by the divisor. It no longer converts with `(decimal)factor`.
    - The accepted texts and the documented range do not change.
 4. **E3 (AC5, Tester).** The test calls `first.HoldWrites()` before the first `Record` and `first.ReleaseWrites()` after the second `Record`. It keeps both failures, the wait for both disposals and the assertions. The production code is unchanged: the behavior of a failed session (no further file) is the one documented.
-5. **E4 (AC2).** Line 89 becomes `await _error.WriteLineAsync(Usage, CancellationToken.None).ConfigureAwait(false);`. The usage line is not cancellable work, and output and exit code stay unchanged with a cancelled token.
+5. **E4 (AC2).** Line 89 becomes `await _error.WriteLineAsync(Usage, CancellationToken.None).ConfigureAwait(false);`. The usage line is not cancellable work.
 6. **Key-ring cross-run (AC6, Dev, step 6).** There is no Docker daemon in the sandbox, so the Dev uses two published servers.
    - Publish the server from `main` (a scratch `git worktree`, .NET 10) and from the branch (.NET 11).
-   - With one empty data directory (`CENSIO__DATADIRECTORY`, a free port in `ASPNETCORE_HTTP_PORTS`), start in turn: .NET 10, then .NET 11, then .NET 10 again. Before the third start, set the key's activation and expiration dates back 91 days so the .NET 11 run creates a new key. Each run waits for `/health` 200 and stops.
-   - Expected: no `Error` or `Critical` log line from data protection in any run, and the key files of the earlier runs still present.
+   - Use one empty data directory (`CENSIO__DATADIRECTORY`, a free port in `ASPNETCORE_HTTP_PORTS`). Each run waits for `/health` 200 and stops.
+   - Run 1: .NET 10. It writes one key file.
+   - Then set that key's activation, creation and expiration dates back 91 days, so it is expired.
+   - Run 2: .NET 11. It must create exactly one new key (2 key files).
+   - Run 3: .NET 10 again. It must create none (still 2 key files) and use the key of run 2.
+   - Expected in every run: no `Error` or `Critical` line from data protection.
+   - The Dev reports the commands, the key-file count after each run and the data-protection log lines.
    - The Dev reports the commands and the log lines.
 7. No new user-visible output.
 
 ## Options considered
 
-- **E2: parse the divisor from the text** (chosen) against **change `Factor` to `decimal?`** and against **round the converted `double` to 15 significant digits**. Changing `Factor` alters the public API and its eight existing tests, and every test would then build `decimal` expectations from `double` DataRows, which again depends on the conversion. Rounding to 15 digits copies the old runtime's conversion by hand: it is exact only for texts of 15 digits or fewer, and it hides the rule.
-- **E6: update the literal** (chosen) against **derive the path from `dotnet msbuild -getProperty`**. Deriving adds a build call to the release job of a security area, to save one line per major. The gap that let the literal go stale belongs to `dotnet_major.py` and goes to a squad issue (*Out of scope*).
-- **AC6 key ring: the cross-run of two published servers** (chosen) against **extending `image-check.sh` with a pull of the last released image**. The extension makes every CI run depend on Docker Hub and on a release existing. The data-protection library the image runs is the same one the published server runs.
-- **The move itself:** option 1 of record 0054, staying until .NET 12, was rejected by the Product Manager.
+- **E2: parse the divisor from the text** (chosen) against **change `Factor` to `decimal?`** and against **round the converted `double` to 15 significant digits**. Changing `Factor` changes the public API and the existing tests, whose `double` DataRows would again depend on the conversion. Rounding copies the old conversion by hand and hides the rule.
+- **E6: update the literal** (chosen) against **derive the path from `dotnet msbuild -getProperty`**. Deriving adds a build call to a release script to save one line per major. The real gap is `dotnet_major.py` (squad issue, *Out of scope*).
+- **AC6 key ring: the cross-run of two published servers** (chosen) against **extending `image-check.sh` with a pull of the last released image**. That makes every CI run depend on Docker Hub and on a release, and the image runs the same data-protection library.
+- **The move itself:** the Product Manager rejected staying until .NET 12 (record 0054).
 
 ## Affected projects and types
 
@@ -118,7 +128,7 @@ All by the Dev, once the code is green, unless another owner is named.
 - `.squad/stack.md` lines 10 and 32: `net11.0` and `net11.0-windows`. The Dev reports the exact text, and the orchestrator writes it.
 - `.squad/project.md` lines 89, 90 and 99: `release/11.0` and ".NET 11 `RegistryKey` source" (fact 10). The Tester reports the text, and the orchestrator writes it.
 - `tests/Censio.Pipe.Tests/ControlledWriteStream.cs` line 10: `release/11.0`, by the Tester.
-- The sweep of `docs/ARCHITECTURE.md`, `docs/UNIT_TESTS.md` and `docs/protocol.md` found no hit.
+- Sweep: `docs/ARCHITECTURE.md`, `docs/UNIT_TESTS.md` and `docs/protocol.md` have no hit.
 
 ## Architecture check
 
@@ -138,7 +148,25 @@ No guarantee in `.squad/project.md` changes:
 
 ## Decision records
 
-- `docs/decisions/0054-move-to-dotnet-11-sts-before-dotnet-12.md` (Proposed). It amends 0016, which stays unedited.
+- `docs/decisions/0054-move-to-dotnet-11-sts-before-dotnet-12.md` (Proposed), with its index row in `docs/decisions/README.md` (Proposed, 2026-11-11), written by the Lead. It amends 0016, whose record and index row stay unedited.
+
+## Challenge
+
+- **Major (key-ring order):** accepted. Approach 6 now backdates the key after run 1, so the .NET 11 run must create a key, and run 3 tests the rollback (E10).
+- **Minor 1 (AC1 leftovers):** accepted. The AC1 row names the three expected leftovers.
+- **Minor 2 (index row):** accepted. Named under *Decision records*; the row was written with the record.
+- **Minor 3 (AC2 guard):** accepted. The Tester proves the guard once (AC2 row).
+- **Minor 4 (analyzers):** accepted. The *Analyzer gate* confirms that `CA2016` and `S8949` are gone (AC2 row).
+
+## Security review
+
+- **B1 (order and expected result):** resolved with both (a) and (b).
+  - (a) Approach 6 backdates after run 1 and expects key counts 1/2/2 and no `Error`/`Critical` line, with counts and log lines reported.
+  - (b) Security's measurement M1 is the evidence for fact 14, now confirmed. The Dev's cross-run confirms it on the published servers.
+- **N1 (fail closed):** taken. `TryParse` returns `false` on a failed `decimal` parse or a divisor `<= 0m` (Approach 3).
+  - No test: fact 5 shows no input reaches that branch.
+  - The existing rejection tests keep covering the condition's line.
+- **Note on the sonarscanner `rollForward`:** spec E8 is corrected. The manifest says `false`, the tool's `runtimeconfig.json` says `LatestMajor` (read from the package), and CI confirms it (fact 13).
 
 ## Out of scope / follow-ups
 
