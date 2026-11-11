@@ -109,7 +109,7 @@ described in the other sections.
   (`<Windows folder>\explorer.exe`) with the folder as its one argument, and only for a fully qualified folder path.
 - The menu does not wait for the disk or for Explorer. If a folder cannot be created or opened, or is not a full path
   (local app data unresolved), a warning is logged and nothing else changes.
-- The catalog cache lies in `%LOCALAPPDATA%\Censio\Cache` (file `catalog.bin`, [`game-catalog.md`](game-catalog.md), *Cache*):
+- The catalog cache lies in `%LOCALAPPDATA%\Censio\Cache` (file `catalog.bin`, [`game-catalog-cache.md`](game-catalog-cache.md)):
   fixed, without a menu entry, created at the first write, private like the recordings folder, and kept when the Companion is removed.
 
 ### Start with Windows
@@ -201,5 +201,5 @@ described in the other sections.
 - Finding the game installation: [`game-installation.md`](game-installation.md).
 - The diagnostics window: [`companion-diagnostics.md`](companion-diagnostics.md).
 - The log file, its lines and its writer: [`companion-log.md`](companion-log.md).
-- Building and caching the catalog: [`game-catalog.md`](game-catalog.md).
+- Building the catalog: [`game-catalog.md`](game-catalog.md); the icons: [`game-catalog-icons.md`](game-catalog-icons.md); the cache: [`game-catalog-cache.md`](game-catalog-cache.md).
 - Reading the game files: [`game-files.md`](game-files.md); the connection to the server, a settings window (later issues).

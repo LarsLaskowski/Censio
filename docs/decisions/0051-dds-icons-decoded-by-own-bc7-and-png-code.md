@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-11-10
-- **Area:** game-catalog
+- **Area:** game-catalog-icons
 - **Source:** Issue #24
 - **Supersedes:** —
 
@@ -28,7 +28,7 @@ Split License). The decoder reads untrusted input in the platform-neutral `Censi
 
 Option 3: `Censio.GameData` reads the DDS header, decodes BC7 blocks and writes PNG itself, from the BC7 format
 description; BCnEncoder.NET serves only as the reference the tests' expected pixels were checked against. The formats
-read and the bounds are in the [game-catalog](../areas/game-catalog.md) area document (*Icons*).
+read and the bounds are in the [game-catalog-icons](../areas/game-catalog-icons.md) area document.
 
 ## Consequences
 

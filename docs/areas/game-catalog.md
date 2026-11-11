@@ -3,11 +3,12 @@
 ## Scope
 
 Building the catalog of regions, goods, workforce and buildings, each GUID with its kind, its English and German name
-and its region types, from the asset, data set, text, template and property default files in the game's `config.rda`, and the icons of its goods and regions from the game's UI
-archives: the files and nodes read, the kinds, the names, the reported cases, the copies in other archives, the icons
-(how they are found, converted and bounded), the bounds, the failure kinds and the privacy rules. The Companion loads
-the catalog and the icons from its cache or builds them in the background at every start, the catalog first, and checks the game for a
-change at each new pipe connection; the diagnostics window and the log use both. The
+and its region types, from the asset, data set, text, template and property default files in the game's `config.rda`:
+the files and nodes read, the kinds, the names, the reported cases, the copies in other archives, the bounds, the
+failure kinds and the privacy rules. The icons of its goods and regions are in
+[`game-catalog-icons.md`](game-catalog-icons.md), the cache in [`game-catalog-cache.md`](game-catalog-cache.md). The
+Companion loads the catalog and the icons from its cache or builds them in the background at every start, the catalog
+first, and checks the game for a change at each new pipe connection; the diagnostics window and the log use both. The
 player relies on the names and icons it shows; the later web UI relies on the same catalog. The files are untrusted
 input.
 
@@ -20,7 +21,7 @@ input.
   `data/base/config/gui/texts_german.xml`, `data/base/config/export/properties.xml` and
   `data/base/config/export/templates.xml`. Another language needs only another text file (record
   [0023](../decisions/0023-game-names-and-icons-extracted-locally.md)). Nothing else is read for the catalog, and nothing
-  is written into the installation; the cache the Companion writes after a complete extraction is in *Cache*.
+  is written into the installation; the cache the Companion writes after a complete extraction is in [`game-catalog-cache.md`](game-catalog-cache.md).
 - Each file is read in one forward-only pass with an XML reader that processes no document type declaration, resolves
   no entity and makes no network access; comments, processing instructions and white space between elements are
   ignored. The passes run in the order data sets, properties, templates, assets, English texts, German texts; each file is opened when its pass
@@ -34,7 +35,7 @@ input.
   `Template` and `BaseAssetGUID` (directly below the asset), `Text/OasisId`, `Product/IsWorkforce`,
   `Product/AssociatedRegion`, the presence of a `Building` section, `Building/AssociatedRegions`, `Session/Region`,
   `Region/RegionID` and `Standard/IconFilename` (trimmed; empty means none; a second one in one asset is resolved as
-  the last one; read for every asset, region assets included, and used for the icons, *Icons*). Other nodes, `ProductionRegions` included, are not used. The four values and the presence of the
+  the last one; read for every asset, region assets included, and used for the icons, [`game-catalog-icons.md`](game-catalog-icons.md)). Other nodes, `ProductionRegions` included, are not used. The four values and the presence of the
   `Building` section are layered with the template and the property defaults (*Region types*).
 - **Texts:** `TextExport/Texts/Text` holds a `LineId` (signed 64-bit) and a `Text`. Only the identifiers a catalog
   candidate uses are kept.
@@ -134,120 +135,13 @@ Rules apply in this order to every defining asset; the first that fits decides.
   counted as unchecked. The Product Manager's installation has no copies (statement of 2026-11-09, unverified for other
   installations; the load order of the archives stays unknown).
 
-### Icons
-
-Record [0050](../decisions/0050-icons-found-by-a-path-rule-in-the-ui-and-patch-archives-newest-copy-wins.md) (where the
-icons are and which copy wins) and record [0051](../decisions/0051-dds-icons-decoded-by-own-bc7-and-png-code.md) (the
-conversion) hold the reasoning.
-
-- **Entries:** only goods and region entries get an icon; workforce, buildings and every GUID that is no good or region
-  entry of the catalog (unknown or ambiguous GUIDs included) have none, and no problem is counted for them. An entry's
-  icon file name is the `IconFilename` of its asset; a region entry takes the one of its session and, if the session has
-  none, the one of its region asset. Several entries that name one file share one icon.
-- **Names first:** the icons are built after the catalog is published. No icon problem changes a name, the catalog or
-  its status; a catalog that fails builds no icons.
-- **Path rule:** the files the assets name are `data/ui/fhd/<rest>.png`, but the archives hold `data/ui/4k/<rest>_0.dds`.
-  A value is trimmed and must start with `data/ui/fhd/` and end with `.png` (both ignoring case), with a non-empty
-  `<rest>` and at most 1,024 characters; the entry sought is `data/ui/4k/<rest>_0.dds`, compared with the archive's
-  paths ignoring case, and read under the path the archive lists. A named value that gives no path (another folder, another
-  extension, too long) counts as *missing*; the path is only compared with entry paths, never used as a file path.
-- **Archives and order:** only `maindata/ui.rda` (directly in `maindata`, ignoring case) and the patch archives
-  `zz_patchfiles_<n>.rda` (ignoring case, `<n>` ASCII digits only and at most 4,294,967,295, found by the listing of the
-  survey, subfolders of `maindata` included) are read for icons. Their order is `ui.rda`, then the patch archives by
-  `<n>` as a number (9 before 10, `007` is 7); an icon is taken from the archive latest in that order that lists its path, and an older copy is never used
-  instead (record 0050). That a higher `<n>` is newer is the Product Manager's statement for game version 3.0.1733841 (not
-  verified); the opt-in test below reports the paths that several archives hold.
-- **Formats:** the entry is a DDS file with the extended (`DX10`) header, one 2D texture, one array element, no cube
-  map, in BC7 (UNORM or sRGB), 1 to 2,048 pixels per side, and exactly as long as its header and the levels the header
-  states need (a chain of one level is allowed). Only the largest level is used: all eight BC7 modes are decoded, a
-  block of the reserved mode gives transparent black pixels, a size that is no multiple of four is cropped, and the sRGB
-  and UNORM forms give the same colour values (the values are not converted). The result is a PNG of 8 bits per channel
-  with alpha that holds the image data only (no colour-space or other chunk). Any other header, size or length makes
-  the icon *unreadable*.
-- **Reasons** (per good or region entry without an icon): *not named* (the asset has no `IconFilename`), *missing* (the
-  value gives no path, or no icon archive lists it) and *unreadable* (the archive that wins lists the path more than
-  once, the entry cannot be read or is above its bound, or the DDS file is refused). Each reason is counted and logged
-  as a number of entries ([`companion-log.md`](companion-log.md)), with the goods and regions that have an icon.
-- **Failure kinds** (the icons are then withheld as a whole; the names are not touched). The result holds the kind and
-  the relative path of the archive concerned, never an exception text or content:
-
-| Kind | When |
-| ---- | ---- |
-| Archive missing | `maindata/ui.rda` does not exist (also when `maindata` itself does not) |
-| Archive unreadable | an icon archive cannot be opened, or the listing of `maindata` or any other step fails (`maindata` named then) |
-| Duplicate archive number | two patch archives have the same number (`zz_patchfiles_300.rda` and `zz_patchfiles_0300.rda`); the second is named |
-| Icon set too large | the PNG files kept would together take more than 256 MiB; the archive being read is named |
-
-- **Kept and sent nowhere:** the icons are held in memory with the catalog, as PNG data, until the next build or the end of
-  the Companion. They are written only to the cache file (*Cache*) in the player's own local app data, after a
-  complete extraction; nothing is written into the installation, and nothing is sent. The PNG data of an icon enters no log,
-  repository, fixture or release.
-
-### Cache
-
-Records [0052](../decisions/0052-catalog-cache-keyed-by-file-properties-and-companion-identity.md) (the key and the
-trigger) and [0053](../decisions/0053-catalog-cache-one-binary-file-validated-whole-before-use.md) (the file) hold the
-reasoning. The cache holds the catalog and the icons of the last complete extraction, so that a start does not read the
-archives again.
-
-- **Terms:** the *game state* is the installation folder, the build (*unknown* equals *unknown*) and, of every `.rda`
-  file below `maindata` (subfolders included, links not followed), its path relative to `maindata`, its size and its
-  modification time. The *Companion identity* is the module version ids of the assemblies that extract and write the
-  cache (`Censio.GameData`, `Censio.Companion.Core`), which change with their code even when the version number stays the same, and with the version number too. A *key* is
-  the identity plus the game state; folder and paths are compared ignoring case, sizes and times exactly.
-- **Where:** one file, `catalog.bin`, in `%LOCALAPPDATA%\Censio\Cache` ([`companion.md`](companion.md), *Folders*): one
-  cache per Windows account, for the installation extracted last. A folder that is no full path is never read or written.
-- **Start:** after the game search the Companion reads the key (`Catalog: checking`). A cache of the same identity and
-  game state is loaded and published, names, then icons, without reading any archive's content; the other catalog and icon
-  lines are not written. Otherwise the reason is logged (`missing`, `game changed`, `Companion changed`; when both differ,
-  `Companion changed`) and the catalog and icons are extracted. A key that cannot be read (the build file or
-  the listing of `maindata`, an archive's properties, a missing program file) counts as `game changed`. A cache that fails
-  a validation is not used in part, is logged as a warning (`invalid`) and replaced by the extraction.
-- **Later checks:** each new connection to the game's pipe (state `Connected`), once the start has ended and a game was found, runs a
-  background check: it reads the build again ([`game-installation.md`](game-installation.md), *Build*) and the key, and
-  compares the game state with that of the last extraction or cache load, whatever its outcome (held in memory). The same
-  state does nothing: no status, no log line, no new extraction, also after a failed extraction. A different state extracts
-  again (the cache is not consulted) while the previous names and icons stay; the new names replace them when
-  published, the icons go until the new ones are built. A key that cannot be read keeps everything and logs the warning `Catalog check failed; the current catalog is kept`. A connection while a start or a check
-  runs starts no second check. A replay, an invalid command line or a game started without `/pipe` has no connection: only the start checks.
-  An archive rewritten with the same name, size and modification time goes undetected; deleting the cache folder extracts it.
-- **What is cached:** only a complete result, catalog and icons built. A failed catalog, failed icons, an unreadable key and a failed write
-  leave the cache as it was; an old cache is never used for another state. The key stored is the one read before the
-  extraction, so a change during it is found at the next check. Without a game the cache is neither used nor deleted.
-- **Layout** (little-endian; strings are a 4-byte length and UTF-8; a nullable value has a presence byte): magic
-  `CENSIOCC`, format version 1, the identity, the key (folder, build, archives), the catalog section (entries with
-  GUID, kind, both names, region GUID, region types and icon file name; the ambiguous GUIDs; the two counts), the icon
-  section (the distinct PNG files with width and height; per GUID an icon index or a problem; the two counts) and the
-  SHA-256 of everything before it. A change of the format raises the version, and an older file is extracted again.
-- **Bounds** (checked before an allocation, with no collection sized from a count): the file at most 320 MiB
-  (335,544,320 bytes), checked against the length of the opened handle before it is read; everything but PNG data at most
-  64 MiB; the PNG data at most 256 MiB; a string at most 65,536 bytes; every count at most the bytes left divided by the
-  least encoded size of its element.
-- **Validation:** the file is read in one forward pass through an incremental hash and used only when the whole of it
-  was valid; nothing follows the hash. The identity is compared first, then the game state; the first difference ends the
-  read with its kind. Strings are strict UTF-8, kinds and problems must be defined, an asset GUID occurs once. Each icon is
-  checked when it is read, and the first invalid one stops the read: its sides are 1 to 2,048 and equal those of its
-  PNG header, the one data chunk inflates within height x (1 + 4 x width) bytes plus one, without a preset dictionary, every
-  row starts with filter byte 0 and the length is exact, and the pixels written again by the Companion's own PNG writer give
-  exactly the stored bytes, which leaves no other chunk, field or trailing byte. The decoded sizes of all distinct icons together may not exceed four times the icon set bound
-  (1 GiB), checked from the stored sides before an icon is read, and a PNG that no GUID uses is refused. Anything
-  else, a truncated file, a flipped byte, a trailing byte, another magic or version, is `invalid`. Another compression library invalidates it once.
-- **Writes:** the Companion writes `catalog-<32 lowercase hex>.tmp` in the cache folder, created new, flushes it to
-  disk and moves it over `catalog.bin`; it deletes its own temporary file on any failure. A torn or mixed file fails the
-  checksum: the next load finds the previous complete file, one writer's, or none.
-  Before it writes, it deletes the top-level files in the folder whose whole name is exactly that of a temporary file
-  (lowercase hex, case-sensitive) and which are more than 24 hours old, a link as a link; a file of any other name,
-  a folder, and a fresh file of a concurrent writer are never deleted. The writer refuses content above a bound (the summed decoded size
-  included). A failure to write (no folder, disk full, access denied, a bound) leaves names and icons in use and shows
-  `Catalog: <n> entries, not cached` and the warning `Catalog cache not written` with the exception.
-- Each published catalog has its own `Catalog cannot name` lines and 1,000-line limit ([`companion-log.md`](companion-log.md)).
-
 ### Use by the Companion
 
 - The Companion checks the GUIDs of ticks closed after a catalog is published, and the latest tick at that moment, unless
   no tick source (connection or replay) has started yet; ticks closed earlier are not checked
   ([`companion-log.md`](companion-log.md)). A catalog is published when its names are ready or when it is loaded from the cache,
   so a re-extraction checks the latest tick against its new catalog and restarts the reporting.
+- Each published catalog has its own `Catalog cannot name` lines and 1,000-line limit ([`companion-log.md`](companion-log.md)).
 
 ### Failures
 
@@ -274,20 +168,14 @@ archives again.
   them, before each one. The same two bounds apply to each `Text` element of the text files and to each `DataSet`; and the structure above the assets, texts, data sets, property parts and defining templates may be at most 256 levels deep. A file above any of them is a
   malformed file. The same two bounds apply to each part of `properties.xml` (a child of a `DefaultValues` or
   `DefaultContainerValues` element) and to each defining template of `templates.xml`. (On the four files of the Product Manager's installation measured for #23 the deepest asset has 46 levels and the largest 3,740 elements; in his `properties.xml` and `templates.xml` of game version 3.0.1733841 the largest property has 588 elements and 13 levels, the largest template 1,352 elements and 16 levels.)
-- **Icons:** an icon entry above 8 MiB (stored or decompressed) is not read and its icon is *unreadable*; the check is made
-  before the entry is allocated. The header is checked before any pixel is decoded: at most 2,048 by 2,048 pixels, so a
-  decoded image takes at most 16 MiB. The PNG files kept take at most 256 MiB together, an icon that several entries share counted once; at
-  exactly 256 MiB the icons are kept, above it the step fails with *icon set too large* and no icon is kept. The path of
-  an icon file name is at most 1,024 characters.
 - **Memory:** at one time the catalog build holds one file's entry content, the open `config.rda` with its entry
   list, the facts of every defining template (about a thousand, held from the templates pass until the build ends), the
   candidate assets (the few hundred to some thousand goods, buildings, workforce and sessions), the texts they use and
   the facts of the asset being read; each distinct source list of region types is split once and kept once, shared by
   the entries that use it; while the other archives are listed, one archive's entry list on top. A
-  file is never held as a document tree. Building the icons holds, on top, one icon archive's entry list, the entry being
-  read and decoded, and the PNG files kept (at most 256 MiB, *Icons*) for the whole run. A cache load holds the catalog and
-  the icons it publishes and, for the icon being checked, its inflated data, its pixels (each at most 16 MiB) and its
-  re-encoded PNG, but no copy of the file; a write streams to the temporary file.
+  file is never held as a document tree. The icons and the cache load add to it
+  ([`game-catalog-icons.md`](game-catalog-icons.md) and [`game-catalog-cache.md`](game-catalog-cache.md), *Limits and
+  errors*).
 - **Time:** reading the four files of #23 of the Product Manager's installation took 1.3 s with a peak working set of 108 MiB
   in the test process; the whole build including the archive listing is measured by the opt-in installation test
   (below) and is not stated here. On the Product Manager's installation (1,040 entries, one machine, not a guarantee) a complete extraction took about 7 s
@@ -296,7 +184,7 @@ archives again.
   *Folders from outside*), `config.rda` is read and every archive below `maindata` is opened and listed over the
   network (SMB) at an extraction, and the icon archives (`ui.rda` and the patch archives) are listed a second time and
   the icon entries read over it. The listing of `maindata` with each archive's size and time is read over it at the start
-  and at each check, never an archive's content (*Cache*).
+  and at each check, never an archive's content ([`game-catalog-cache.md`](game-catalog-cache.md)).
 
 ## Tests with the real files
 
@@ -307,11 +195,6 @@ archives again.
   and report the difference as counts and GUIDs: the entries per kind of both builds, the kind changes, the
   transitions of the region lists and the pipe-fixture GUIDs whose kind or region list changed. They fail when an
   entry of that build is missing from the layered one.
-- The icon test (`CENSIO_ANNO_INSTALL`) loads the icons of that installation, fails when a good of the pipe fixture
-  that the catalog names has no icon or a region entry that names a path of the rule is unreadable, and writes counts,
-  GUIDs, the problem of each GUID without an icon, the size and PNG bytes of the largest icon and of each region icon,
-  the number of icon paths that several archives hold and, of them, those whose entries differ in size, the elapsed time
-  and the peak working set, never a name or an entry path.
 
 ## Privacy
 
@@ -319,9 +202,8 @@ archives again.
   output (records [0023](../decisions/0023-game-names-and-icons-extracted-locally.md) and
   [0029](../decisions/0029-anonymised-test-fixtures-only.md)). The test fixture has the structure of the game's files
   and invented GUIDs, identifiers, names and paths; a test asserts that none of its GUIDs occurs in the pipe fixture.
-  Logs and reports hold GUIDs, kinds, archive paths and counts only. The same holds for the icons: no icon file, PNG
-  or image of the game enters the repository, a fixture, a release or a log, and the tests build their DDS files
-  from invented pixels. The cache file is private like a recording: never sent, logged or released; it stays when the Companion is removed.
+  Logs and reports hold GUIDs, kinds, archive paths and counts only. The icons and the cache file follow the same rule
+  ([`game-catalog-icons.md`](game-catalog-icons.md) and [`game-catalog-cache.md`](game-catalog-cache.md), *Privacy*).
 
 ## Related decisions
 
@@ -329,20 +211,14 @@ archives again.
   — forward-only reading, kinds and regions from the data, fail closed.
 - [`decisions/0048-catalog-names-shown-in-the-diagnostics-window-unresolved-guids-logged-once.md`](../decisions/0048-catalog-names-shown-in-the-diagnostics-window-unresolved-guids-logged-once.md)
   — names in the diagnostics window, unresolved GUIDs logged once.
-- [`decisions/0050-icons-found-by-a-path-rule-in-the-ui-and-patch-archives-newest-copy-wins.md`](../decisions/0050-icons-found-by-a-path-rule-in-the-ui-and-patch-archives-newest-copy-wins.md)
-  — the path rule, the archives and their order, withholding every icon on an archive problem.
-- [`decisions/0051-dds-icons-decoded-by-own-bc7-and-png-code.md`](../decisions/0051-dds-icons-decoded-by-own-bc7-and-png-code.md)
-  — BC7 decoded and PNG written by own code.
 - [`decisions/0023-game-names-and-icons-extracted-locally.md`](../decisions/0023-game-names-and-icons-extracted-locally.md)
   — names are read from the player's installation and never shipped.
-- [`decisions/0052-catalog-cache-keyed-by-file-properties-and-companion-identity.md`](../decisions/0052-catalog-cache-keyed-by-file-properties-and-companion-identity.md)
-  — the cache is keyed by the Companion identity and the game's file properties, checked at the pipe connection.
-- [`decisions/0053-catalog-cache-one-binary-file-validated-whole-before-use.md`](../decisions/0053-catalog-cache-one-binary-file-validated-whole-before-use.md)
-  — one binary file with a checksum, validated whole, each icon written again by the Companion's PNG writer.
 
 ## Not here
 
 - The archives, their bounds and failure kinds: [`game-files.md`](game-files.md); finding the installation:
   [`game-installation.md`](game-installation.md).
+- The icons of goods and regions: [`game-catalog-icons.md`](game-catalog-icons.md); the catalog cache:
+  [`game-catalog-cache.md`](game-catalog-cache.md).
 - The tray line: [`companion.md`](companion.md); the diagnostics cells and icons: [`companion-diagnostics.md`](companion-diagnostics.md); the check of tick GUIDs and the log lines: [`companion-log.md`](companion-log.md).
 - The catalog format for the server and the upload (#26, #42).

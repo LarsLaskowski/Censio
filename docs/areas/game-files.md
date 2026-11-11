@@ -125,7 +125,7 @@ an archive. The largest entry counts are 21,028 (`zz_patchfiles_300`), 46,110 (`
   the contents of the older ones; no evidence was found (Product Manager's statement, unverified), input for the load-order question. It is no reader error: a path in several archives is returned by each.
 - **Icons of goods and regions (#24):** the assets name `data/ui/fhd/<rest>.png`, while `ui.rda` and the patch archives hold
   `data/ui/4k/<rest>_0.dds` (Product Manager's samples, five asset values of one installation); the path rule, the
-  archives read and their order are in [`game-catalog.md`](game-catalog.md) (*Icons*, records
+  archives read and their order are in [`game-catalog-icons.md`](game-catalog-icons.md) (records
   [0050](../decisions/0050-icons-found-by-a-path-rule-in-the-ui-and-patch-archives-newest-copy-wins.md) and
   [0051](../decisions/0051-dds-icons-decoded-by-own-bc7-and-png-code.md)). The samples were four DDS files with the
   extended header in BC7; no region icon was sampled.
@@ -141,5 +141,5 @@ an archive. The largest entry counts are 21,028 (`zz_patchfiles_300`), 46,110 (`
 ## Not here
 
 - Finding the installation folder ([`game-installation.md`](game-installation.md)), building the catalog and
-  finding and converting the icons ([`game-catalog.md`](game-catalog.md)); the icon cache and the catalog format (#25, #26).
+  finding and converting the icons ([`game-catalog-icons.md`](game-catalog-icons.md)), the catalog cache ([`game-catalog-cache.md`](game-catalog-cache.md)); the catalog format (#26).
 - The log of the Companion and what may be logged: [`companion-log.md`](companion-log.md).

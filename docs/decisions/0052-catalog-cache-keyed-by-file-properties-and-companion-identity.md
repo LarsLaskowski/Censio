@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-11-10
-- **Area:** game-catalog
+- **Area:** game-catalog-cache
 - **Source:** Issue #25
 - **Supersedes:** —
 
@@ -37,7 +37,7 @@ sign of a running game is the statistics pipe.
 
 Options 3, 6 and the pipe connection of 7. A check compares the current key with the key of the last result held in
 memory, successful or failed, and at start with the key in the cache; only an extraction whose catalog and icons were
-both built is cached. The rules are in [`game-catalog.md`](../areas/game-catalog.md), *Cache*.
+both built is cached. The rules are in [`game-catalog-cache.md`](../areas/game-catalog-cache.md).
 
 ## Consequences
 

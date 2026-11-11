@@ -38,7 +38,7 @@ background writer with its bounds. A user who checks a log before sharing it, an
   re-extraction after a game update) starts its own set and its own limit. Ticks closed before a catalog is published
   are not checked, except the latest one at that moment, which is checked unless no connection or replay has started
   yet.
-- **Cache lines** ([`game-catalog.md`](game-catalog.md), *Cache*), none with a name or an image:
+- **Cache lines** ([`game-catalog-cache.md`](game-catalog-cache.md)), none with a name or an image:
   `Catalog cache not used: <missing|game changed|Companion changed>` (Information, at the start before the extraction);
   `Catalog cache not used: invalid` and `Catalog check failed; the current catalog is kept` (Warnings);
   `Catalog cache not written` (Warning, with the exception, which may hold the cache path and so the Windows user name);
@@ -46,7 +46,7 @@ background writer with its bounds. A user who checks a log before sharing it, an
   icons failed, not when the catalog failed); and `Catalog loaded from cache in <t> s: <n> entries, <g> goods and <r> regions
   with an icon` (Information; the only catalog line of a cache load). Durations have one decimal and a decimal point. A
   check that finds the game unchanged writes nothing.
-- **Icon lines** ([`game-catalog.md`](game-catalog.md), *Icons*), written after the catalog line of the same extraction, none
+- **Icon lines** ([`game-catalog-icons.md`](game-catalog-icons.md)), written after the catalog line of the same extraction, none
   with a name, an entry path or image data: `Catalog icons: <g> goods and <r> regions with an icon; without one: <a> not
   named, <m> missing, <u> unreadable` (Information; the counts are of entries) and `Catalog icons failed: <kind>
   (<archive>)` (Warning; the kinds `ArchiveMissing`, `ArchiveUnreadable`, `DuplicateArchiveNumber` and `IconSetTooLarge`,
@@ -77,4 +77,4 @@ background writer with its bounds. A user who checks a log before sharing it, an
 - The menu entry `Open log folder` and the other folders: [`companion.md`](companion.md) (*Folders*).
 - The tray icon, the menu, the settings file and the other Companion behavior: [`companion.md`](companion.md).
 - The diagnostics window: [`companion-diagnostics.md`](companion-diagnostics.md).
-- The catalog, its cache and icons that the lines report on: [`game-catalog.md`](game-catalog.md).
+- The catalog, its icons and its cache that the lines report on: [`game-catalog.md`](game-catalog.md), [`game-catalog-icons.md`](game-catalog-icons.md), [`game-catalog-cache.md`](game-catalog-cache.md).

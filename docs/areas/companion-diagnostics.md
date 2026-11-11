@@ -30,14 +30,14 @@ sent it: GUIDs are raw numbers where the catalog has no name for them; icons are
   name (unknown, nameless, ambiguous), GUID `0` and every cell while no catalog is ready show the bare number. The names
   pass the rule of the log ([`companion-log.md`](companion-log.md)) and a name over 4,096 UTF-16 characters is cut there, ending in `…`; a name of
   exactly 4,096 is kept whole. Buildings and workforce have no column.
-- **Icons:** once the icons are built ([`game-catalog.md`](game-catalog.md), *Icons*), the `Region` and `Good` cells show
+- **Icons:** once the icons are built ([`game-catalog-icons.md`](game-catalog-icons.md)), the `Region` and `Good` cells show
   the icon of the cell's GUID before the text: an image of 20 by 20 device-independent pixels, then a gap of 4, then the
   text, vertically centred. In the `Region` column the icon sits on a dark round backdrop of that size (the game's region
   icons are light glyphs); the `Good` icon has none. A GUID without an icon (none, unknown, a problem of the icon, GUID `0`) and every cell while
   no icons are built show the text alone, without the image's place, backdrop or gap.
   The names are published first: the window shows them as soon as the catalog is ready and adds the icons when they are
   built, and a new build of the catalog removes the icons until the new ones are ready. Each distinct icon is decoded once, at twice the size of the
-  cell (sharp up to 200 % display scaling), and shared by the rows that show it. The icons are held in memory and written only to the catalog cache ([`game-catalog.md`](game-catalog.md), *Cache*): the window writes nothing of them to disk, nothing of them is logged or sent, and a screenshot holds the game's icons.
+  cell (sharp up to 200 % display scaling), and shared by the rows that show it. The icons are held in memory and written only to the catalog cache ([`game-catalog-cache.md`](game-catalog-cache.md)): the window writes nothing of them to disk, nothing of them is logged or sent, and a screenshot holds the game's icons.
 - **Area names** (the `Name` column) pass the rule of the log ([`companion-log.md`](companion-log.md)): each control character, format character, line
   separator, paragraph separator (the categories Cc, Cf, Zl, Zp) and unpaired surrogate is shown as one `?`, nothing
   else is changed (combining marks, right-to-left letters and spaces stay as sent), and an area name is never cut, also
@@ -73,5 +73,5 @@ sent it: GUIDs are raw numbers where the catalog has no name for them; icons are
 
 - The menu entry `Open diagnostics`, the tooltip and the other Companion behavior: [`companion.md`](companion.md).
 - The log file and its lines: [`companion-log.md`](companion-log.md).
-- Building the catalog, its names and icons: [`game-catalog.md`](game-catalog.md).
+- Building the catalog and its names: [`game-catalog.md`](game-catalog.md); the icons: [`game-catalog-icons.md`](game-catalog-icons.md); the cache: [`game-catalog-cache.md`](game-catalog-cache.md).
 - The latest tick the window shows: [`pipe-connection.md`](pipe-connection.md) (*Latest tick*).
