@@ -2,13 +2,13 @@
 
 - **Status:** Accepted
 - **Date:** 2026-11-10
-- **Area:** game-catalog
+- **Area:** game-catalog-cache
 - **Source:** Issue #25
 - **Supersedes:** —
 
 ## Context
 
-The cache holds the catalog and up to 256 MiB of PNG icons ([`game-catalog.md`](../areas/game-catalog.md), *Limits*)
+The cache holds the catalog and up to 256 MiB of PNG icons ([`game-catalog-icons.md`](../areas/game-catalog-icons.md), *Limits and errors*)
 in the player's local app data folder. Any program of the player's account can change it, two Companions of one
 account in two Windows sessions can write it at once, and `Exit` may interrupt a write. The icons' PNG data reaches
 the Windows image decoder in the diagnostics window. Readers of external input are strict and fail closed (record
@@ -28,7 +28,7 @@ the Windows image decoder in the diagnostics window. Readers of external input a
 Option 4. The file is checked as a whole before anything of it is published; each icon is inflated within its bound
 and written again by the Companion's own PNG writer, and must equal the stored bytes. One failure refuses the whole file
 and leads to an extraction. Layout,
-bounds and checks are in [`game-catalog.md`](../areas/game-catalog.md), *Cache*.
+bounds and checks are in [`game-catalog-cache.md`](../areas/game-catalog-cache.md).
 
 ## Consequences
 

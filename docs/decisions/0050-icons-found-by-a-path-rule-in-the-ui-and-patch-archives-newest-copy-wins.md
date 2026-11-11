@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-11-10
-- **Area:** game-catalog
+- **Area:** game-catalog-icons
 - **Source:** Issue #24
 - **Supersedes:** —
 
@@ -35,7 +35,7 @@ Option 3: icons are taken by the path rule from `ui.rda` and the patch archives,
 published, and held in memory with the catalog. An icon archive that cannot be opened, or a duplicate patch number,
 withholds every icon (not option 4), and so does a set of kept PNGs above a total bound; a single icon that is missing or unreadable leaves only its entry without an
 icon, and no icon problem changes the names (not option 5). The rules are in the
-[game-catalog](../areas/game-catalog.md) area document (*Icons*).
+[game-catalog-icons](../areas/game-catalog-icons.md) area document.
 
 ## Consequences
 
