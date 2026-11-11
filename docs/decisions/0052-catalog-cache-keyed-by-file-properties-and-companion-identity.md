@@ -1,6 +1,6 @@
 # 0052: The catalog cache is keyed by the archives' file properties, the build and the Companion's module identity, and checked at start and at each new pipe connection
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-10
 - **Area:** game-catalog
 - **Source:** Issue #25

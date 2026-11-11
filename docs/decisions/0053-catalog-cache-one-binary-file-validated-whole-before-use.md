@@ -1,6 +1,6 @@
 # 0053: The catalog cache is one own binary file with a checksum, validated whole before any of it is used
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-10
 - **Area:** game-catalog
 - **Source:** Issue #25
