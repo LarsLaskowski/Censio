@@ -221,4 +221,4 @@ Rules apply in this order to every defining asset; the first that fits decides.
 - The icons of goods and regions: [`game-catalog-icons.md`](game-catalog-icons.md); the catalog cache:
   [`game-catalog-cache.md`](game-catalog-cache.md).
 - The tray line: [`companion.md`](companion.md); the diagnostics cells and icons: [`companion-diagnostics.md`](companion-diagnostics.md); the check of tick GUIDs and the log lines: [`companion-log.md`](companion-log.md).
-- The catalog format for the server and the upload (#26, #42).
+- The catalog format for the server: [`game-catalog-format.md`](game-catalog-format.md); the upload (#42).
