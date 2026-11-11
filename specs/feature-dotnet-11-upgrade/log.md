@@ -27,3 +27,4 @@ are quoted in full.
 | 2026-11-11 15:10 | 6 Documentation | Orchestrator | written in 6 Implement (G2); Test run green by the Dev |
 | 2026-11-11 15:12 | 7 Gate stamp | Orchestrator | PASS on 571cd138e5b5a532fcad7a618cdb942f93892368 (tier standard): Format check pass; Analyzer gate pass; Test with coverage pass; Coverage gate pass; decision-check.py pass; scope-check.py pass · figure-check.py 5 hit(s) |
 | 2026-11-11 15:12 | 7 Early draft PR | Orchestrator | https://github.com/LarsLaskowski/Censio/pull/157 (draft) |
+| 2026-11-11 15:16 | 7 CI on early draft PR | Orchestrator | All checks green on the PR (build, release-check, image, Base image check, CodeQL, Sonar quality gate; sonar-check.py pr 157 PASS). Waiting for the manual Windows check (AC8) |
