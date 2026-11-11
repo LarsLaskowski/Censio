@@ -14,31 +14,27 @@ behavior that users can see.
 
 A trial build of the whole solution retargeted to .NET 11 (SDK 11.0.100, packages 11.0.0, made in a scratch copy on
 2026-11-11) restores, builds and publishes. The server publish output holds `_framework/blazor.web.js` in the
-restore order of the Dockerfile, so record 0007 still holds. The trial also showed the defects E1, E2 and E4–E6, and
-E3 more often than on .NET 10.
-
-There are two outcomes, and the Product Manager chooses between them (*Open questions*). Option A moves to .NET 11
-now (AC1–AC8). Option B stays on .NET 10 until .NET 12 and records the findings (AC9).
+restore order of the Dockerfile (record 0007 holds). It also showed E1, E2 and E4–E6, and E3 more often than on
+.NET 10. The Product Manager decided to move now (*Open questions*).
 
 ## Scenarios
 
-- S1: (option A) Given a contributor's machine or the CI runner with the .NET 11 SDK, when they run *Restore*,
+- S1: Given a contributor's machine or the CI runner with the .NET 11 SDK, when they run *Restore*,
   *Format check*, *Build*, *Test*, the *Analyzer gate* and the *Coverage gate* of `.squad/stack.md`, then every one
   passes. The solution is built for .NET 11 only.
-- S2: (option A) Given an operator running the server image, when they pull the image of the first release after the
+- S2: Given an operator running the server image, when they pull the image of the first release after the
   move and start it with their existing `/config` volume, then it runs on the .NET 11 ASP.NET Core runtime. Port
   8080, user `1654:1654`, `/config`, `/health` and the pages behave as before.
-- S3: (option A) Given a player, when they download `Censio-<version>-win-x64.zip` of that release, then it holds the
+- S3: Given a player, when they download `Censio-<version>-win-x64.zip` of that release, then it holds the
   one self-contained `Censio.Companion.exe` (now .NET 11 inside). It needs no installed .NET and behaves as before:
   menu, log lines, recording, replay at every `--speed`.
-- S4: (option A) Given a contributor who builds the Companion locally, when they read `README.md`,
+- S4: Given a contributor who builds the Companion locally, when they read `README.md`,
   `docs/USER_GUIDE.md` or `docs/CONTRIBUTING.md`, then they find that building needs the .NET 11 SDK (11.0.100 or a
   later patch or feature band) and that running a local build needs the .NET 11 Desktop Runtime.
-- S5: (option A) Given the move is merged, when Dependabot runs, then it proposes SDK, package and image updates
+- S5: Given the move is merged, when Dependabot runs, then it proposes SDK, package and image updates
   within .NET 11 and none of .NET 12.
-- S6: (option B, or option A stopped by a defect that cannot be removed here without a change users can see) Given
-  that outcome, when the change is merged, then the repository stays on .NET 10. The findings are recorded, and the
-  move is planned again with .NET 12.
+- S6: (fallback) Given a defect of E1–E10 that cannot be removed here without a change users can see, when the squad
+  finds it, then the repository stays on .NET 10 and the findings are recorded (AC9).
 
 ## Errors and edge cases
 
@@ -48,7 +44,7 @@ now (AC1–AC8). Option B stays on .NET 10 until .NET 12 and records the finding
   generator copied the template into the generated literal without escaping it, and the .NET 11 generator escapes
   it. The four-backslash spelling only worked because of the old behavior. The "No installation" case of
   `GameInstallationSearchSettingsProblemLogsWarningAndReadsNoRecord` fails. It is the only `[LoggerMessage]` template
-  in `src/` holding `\\`, `\"`, `\t`, `\n` or `{{` (grep over `src/`, 2026-11-11).
+  in `src/` holding `\\`, `\"`, `\t`, `\n` or `{{` (grep, 2026-11-11).
 - E2: The scaled replay pause changes inside the documented speed range. The .NET 11 runtime converts `double` to
   `decimal` exactly (`(decimal)0.4` = `0.40000000000000002220446049250`), where .NET 10 rounded to `0.4`.
   `PipeReplaySpeed.Scale` (`PipeReplaySpeed.cs:97`, `Math.Round(ticks / (decimal)factor)`, rounding to even) divides by
@@ -65,22 +61,21 @@ now (AC1–AC8). Option B stays on .NET 10 until .NET 12 and records the finding
     (`PipeRecordingSession.cs:331-332`).
   - The second `Record` then returns early (`:218`) and creates no recorder. Its stream is never disposed, so the
     wait for it runs into the guard.
-  - The documented behavior (a failed session opens no further file) is kept.
 - E4: New diagnostics `CA2016` and `S8949` at `src/Censio.Anonymiser/AnonymiserCommand.cs:89`. .NET 11 offers a
   `WriteLineAsync` overload that takes the cancellation token. That write lies before the `try` that maps
   cancellation to `Error: cancelled` (`:95-102`). With the token passed and already cancelled, the usage line may not
   print and an unhandled exception may replace exit code 2.
 - E5: Build warning `NU1510` for `Microsoft.Extensions.Logging.Abstractions` in `Censio.Companion.Core`. .NET 11
-  ships the assembly in `Microsoft.NETCore.App` (checked in the installed 11.0.0 shared framework).
+  ships the assembly in `Microsoft.NETCore.App`.
 - E6: `.github/scripts/release-check.sh:27` and `.github/scripts/release-check-test.sh:290` hard-code
   `obj/Release/net10.0-windows/…`. `dotnet_major.py` does not read scripts, so the release ZIP check fails after the
   retarget (measured; with the path changed, the ZIP holds exactly `Censio.Companion.exe`).
 - E7: A machine with only the .NET 10 SDK cannot build any more, and `dotnet` reports that no SDK compatible with
-  `global.json` (11.0.100) is installed. The documentation of S4 names the SDK it needs.
+  `global.json` (11.0.100) is installed.
 - E8: The tools of `.config/dotnet-tools.json` on a runner with only the .NET 11 runtime:
   - `reihitsu-format` 1.2.0 targets `net10.0`, with the manifest's `rollForward: true`.
   - `dotnet-sonarscanner` 12.1.0 targets `netcoreapp3.1` and already rolls forward in CI today.
-  - Both must run in CI; the sandbox, which also has the .NET 10 runtime, cannot show it.
+  - Both must run in CI (the sandbox also has the .NET 10 runtime).
 - E9: Upgrade: a `/config` whose key ring the .NET 10 image wrote is used by the .NET 11 image (record 0011). The
   server starts and does not fail on the old keys.
 - E10: Rollback: an operator who returns to the last .NET 10 image with a `/config` that the .NET 11 image used (and
@@ -99,49 +94,48 @@ now (AC1–AC8). Option B stays on .NET 10 until .NET 12 and records the finding
 - N5: The test doubles whose behavior was checked against the .NET 10 runtime source (`ControlledPipeStream`,
   `ControlledWriteStream`, `FakeStartupEntryStore`, `.squad/project.md`, *Test doubles*) are checked again against
   `dotnet/runtime` `release/11.0` (`.squad/team.md`, *Test doubles that model a real component*).
-- N6: Windows: `supported-os.json` of `builds.dotnet.microsoft.com` (10.0 and 11.0, read 2026-11-11) lists for x64
-  Windows 11 (11.0 no longer has 23H2 Enterprise and 24H2 Home/Pro) and Windows 10 only as LTSC 1607, 1809 and 21H2.
-  Neither major lists Windows 10 22H2, which `README.md:40` and `docs/USER_GUIDE.md:289` name. .NET 11 keeps the same
-  lowest Windows 10 build (1607), so the minimum does not rise. Windows 10 22H2 stays as untested on .NET 11 as it is
-  on .NET 10, and the new decision record says so.
+- N6: Windows: `supported-os.json` (`builds.dotnet.microsoft.com`, 10.0 and 11.0, read 2026-11-11) lists Windows 10
+  only as LTSC 1607, 1809 and 21H2 for both majors. Neither lists Windows 10 22H2 (`README.md:40`,
+  `docs/USER_GUIDE.md:289`), and the minimum does not rise. The new decision record states that Windows 10 22H2 is
+  untested on .NET 11.
 
 ## Acceptance criteria
 
-- AC1: (option A) Every project targets `net11.0` (`Censio.Companion`: `net11.0-windows`), `global.json` names SDK
+- AC1: Every project targets `net11.0` (`Censio.Companion`: `net11.0-windows`), `global.json` names SDK
   11.0.100 (`rollForward` `latestFeature`, no prerelease), the `Microsoft.AspNetCore.*` and `Microsoft.Extensions.*`
   packages are on 11.0.x or are removed where .NET 11 provides them, and both Dockerfile stages use the images of N1
   pinned by amd64 manifest digest, with matching labels. `dotnet_major.py` passes, and no tracked file outside
   `specs/` and the released decision records names `net10.0` or a .NET 10 SDK, image or runtime as the current one
   (S1, S2, E5, E6, N1, N4).
-- AC2: (option A) On SDK 11, *Restore*, *Format check*, *Build* (no warning), *Test*, the *Analyzer gate* and the
+- AC2: On SDK 11, *Restore*, *Format check*, *Build* (no warning), *Test*, the *Analyzer gate* and the
   *Coverage gate* pass. The diagnostics of E4 and E5 are fixed, not suppressed. A run with the wrong number of
   arguments and an already-cancelled token still prints the usage line and returns the usage exit code, and a test
   pins it (S1, E4, E5).
-- AC3: (option A) On .NET 11 the game-folder warning is logged exactly as `docs/areas/game-installation.md` states
+- AC3: On .NET 11 the game-folder warning is logged exactly as `docs/areas/game-installation.md` states
   it, with single backslashes. The existing "No installation" case passes unchanged. The grep of E1 over every
   `[LoggerMessage]` template in `src/` finds no other template with an escape or `{{` (E1, N3).
-- AC4: (option A) `PipeReplaySpeed.Scale` divides by the speed as written, not by its binary approximation, and does
+- AC4: `PipeReplaySpeed.Scale` divides by the speed as written, not by its binary approximation, and does
   not depend on how the runtime converts `double` to `decimal`. On .NET 11 every existing case of
   `PipeReplaySpeedTests` passes unchanged, saturation included, and a new case pins `--speed 0.4` with a 3-tick pause
   to 8 ticks (the .NET 10 result) (E2, N3).
-- AC5: (option A and B) The test of E3 holds the first write until both recorders exist and keeps the assertion that
+- AC5: The test of E3 holds the first write until both recorders exist and keeps the assertion that
   the state change is raised once. The plan confirms the race of E3 or refutes it with evidence. The full test suite
-  (*Test*) passes in five consecutive runs in the sandbox on the change's major, and in CI, without a longer guard, a
+  (*Test*) passes in five consecutive runs in the sandbox and in CI, without a longer guard, a
   retry or a skipped test (E3).
-- AC6: (option A) The CI jobs `check`, `image-build` and `release-check` pass. The release ZIP holds exactly the
+- AC6: The CI jobs `check`, `image-build` and `release-check` pass. The release ZIP holds exactly the
   self-contained `Censio.Companion.exe`, within N2. The image passes `image-check.sh` (port, user, `/config`, health).
   With one `/config` volume, the .NET 11 image starts on a key ring the current .NET 10 image wrote, and the .NET 10
   image starts again on that ring after the .NET 11 image ran, both without an error (S2, S3, E6, E8, E9, E10, N2).
-- AC7: (option A) `README.md` and `docs/USER_GUIDE.md` (English and German), `docs/CONTRIBUTING.md`, the project
+- AC7: `README.md` and `docs/USER_GUIDE.md` (English and German), `docs/CONTRIBUTING.md`, the project
   blocks of `AGENTS.md` and `.github/copilot-instructions.md`, `.squad/stack.md`, `.squad/project.md` (test doubles
   re-checked as N5), the `.github/dependabot.yml` comments and the area documents below name .NET 11 and the SDK of
   S4. A decision record supersedes the released record 0016 and states N6 (S4, S5, E7, N5, N6).
-- AC8: (option A, manual, before the pull request is approved) the Product Manager starts the branch's Companion ZIP
+- AC8: (manual, before the pull request is approved) the Product Manager starts the branch's Companion ZIP
   on Windows 11 x64. The tray menu shows `Version <version>`, the diagnostics window opens, and
   `--replay <recording> --speed 10` runs to `Replay finished` (S3).
-- AC9: (option B) No project, image or package changes; AC5 is delivered on .NET 10. A decision record "Stay on .NET
-  10 until .NET 12" lists E1–E10 with cause and evidence and the reason for the choice. The orchestrator opens a
-  follow-up issue "Move to .NET 12" that carries those findings (S6).
+- AC9: (fallback, only if S6 applies, instead of AC1–AC4 and AC6–AC8) No project, image or package changes, and
+  AC5 is delivered on .NET 10. A decision record "Stay on .NET 10" lists each finding with cause and evidence, and the
+  orchestrator opens a follow-up issue carrying them (S6).
 
 ## Out of scope
 
@@ -149,43 +143,34 @@ now (AC1–AC8). Option B stays on .NET 10 until .NET 12 and records the finding
 - The move to .NET 12 itself, and any change of the Dependabot policy beyond the comments.
 - The .NET 10.0.15 patch released on 2026-11-10 (Dependabot's ordinary update).
 - An arm64 image, and changing the Windows versions the README names (N6 only records their status).
-- The comment in `.claude/hooks/session-start.sh` (a squad file, and still true).
 
 ## Open questions
 
 - Is .NET 11 released, and are its images there? Answered: yes. Runtime 11.0.0 and SDK 11.0.100 came out on
   2026-11-10, support phase "active". MCR has `sdk:11.0.100-alpine3.24-amd64` and `aspnet:11.0.0-alpine3.24-amd64`,
   and NuGet has the 11.0.0 packages.
-- Option A (move now) or option B (stay on .NET 10 until .NET 12)? Answered: escalated to the Product Manager on
-  2026-11-11; the plan waits for the answer.
-  - .NET 11 (STS) and .NET 10 (LTS) both end on 2028-11-14 (release index, read 2026-11-11), and .NET 12 (LTS) is
-    expected in November 2027.
-  - Option A means two migrations before that date (10 to 11, then 11 to 12). Option B means one (10 to 12).
-  - Option A gives players and operators nothing they can see. Its gain is taking the breaking changes (E1, E2, E4,
-    E5) one major at a time.
-  - Option B costs only AC5 and the record, and every finding carries over to the .NET 12 move.
-  - Lead's recommendation: option B.
-- Record 0016 decides "C# on .NET 10". Answered: it was released in v0.1.0, and its consequences already foresee a
-  move to a later .NET. Option A supersedes it with a new record (AC7). Option B leaves it in force. Records 0004,
-  0007 and 0010 name .NET 10 only as an example or measured fact, and their decisions hold on .NET 11 (0007 measured).
-- Do the analyzers and test tools work with SDK 11? Answered: yes in the trial. Reihitsu, Sonar and MSTest analyzers
-  load, there is no `RH` diagnostic, MSTest 4.5.2 and coverlet 10.1.0 run and write coverage, and the only new
-  diagnostics are those of E4 and E5.
+- Move to .NET 11 now, or stay on .NET 10 until .NET 12? Answered: the Product Manager, 2026-11-11: "Jetzt auf .NET 11
+  wechseln" (move now). This was weighed against the facts that both majors end on 2028-11-14 and that moving now
+  means two migrations before .NET 12 instead of one. The decision record of AC7 states the decision and that reason.
+- Record 0016 decides "C# on .NET 10". Answered: it is released (v0.1.0), so a new record supersedes it (AC7).
+  Records 0004, 0007 and 0010 still hold on .NET 11.
+- Do the analyzers and test tools work with SDK 11? Answered: yes in the trial. There is no `RH` diagnostic, MSTest
+  and coverlet run, and the only new diagnostics are those of E4 and E5.
 
 ## Area documents
 
-- `docs/areas/server.md` (*Docker image*): option A, the two image names and versions of N1.
-- `docs/areas/companion.md` (*Platform*): option A, a local build needs the .NET 11 Desktop Runtime, and the release
+- `docs/areas/server.md` (*Docker image*): the two image names and versions of N1.
+- `docs/areas/companion.md` (*Platform*): a local build needs the .NET 11 Desktop Runtime, and the release
   ZIP still needs none.
 - `docs/areas/game-installation.md` and `docs/areas/pipe-recording.md`: unchanged. AC3 and AC4 keep their text true.
 
 ## Challenge
 
 - 1 (major, AC4 passes a wrong build): accepted. The 0.4 results were re-measured, and E2 and AC4 changed.
-- 2 (major, product decision): accepted. The question is escalated with both options and the recommendation, and
-  scenarios and criteria are marked by option.
-- 3 (minor, E3 cause): accepted. The race is in E3, the test fix in AC5 (both options), and E3 is no blocker.
+- 2 (major, product decision): accepted. It was escalated, and the Product Manager chose to move now. The stay path
+  remains only as a fallback (S6, AC9).
+- 3 (minor, E3 cause): accepted. The race is in E3, the test fix in AC5 (also under the fallback), and E3 is no blocker.
 - 4 (minor, cancelled token before the `try`): accepted. See E4 and AC2.
 - 5 (minor, other templates): accepted. The grep was run, see E1 and AC3.
-- 6 (minor, rollback): accepted. E10 was added, checked in AC6.
+- 6 (minor, rollback): accepted. See E10 and AC6.
 - 7 (minor, Windows support): accepted. See N6. The minimum does not rise, so there is no new scenario.
