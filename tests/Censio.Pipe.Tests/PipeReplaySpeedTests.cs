@@ -155,6 +155,28 @@ public sealed class PipeReplaySpeedTests
     }
 
     /// <summary>
+    /// A pause is divided by the speed as written, not by its binary approximation.
+    /// </summary>
+    /// <param name="text">The speed</param>
+    /// <param name="pauseTicks">The recorded pause in ticks</param>
+    /// <param name="expectedTicks">The expected time to wait in ticks</param>
+    [TestMethod]
+    [TestCategory("AC4")]
+    [DataRow("0.4", 3L, 8L)]
+    [DataRow("0.4", 30000003L, 75000008L)]
+    public void PipeReplaySpeedScaleNonBinaryFactorDividesByWrittenSpeed(string text, long pauseTicks, long expectedTicks)
+    {
+        // Arrange
+        Assert.IsTrue(PipeReplaySpeed.TryParse(text, out var speed), "The speed should be valid");
+
+        // Act
+        var scaled = speed.Scale(TimeSpan.FromTicks(pauseTicks));
+
+        // Assert
+        Assert.AreEqual(expectedTicks, scaled.Ticks, "The pause should be divided by the speed as written");
+    }
+
+    /// <summary>
     /// The slowest speed multiplies the pause by ten, within one tick of the exact value.
     /// </summary>
     [TestMethod]

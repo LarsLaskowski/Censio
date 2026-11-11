@@ -86,7 +86,8 @@ mismatch`: the version gate skips every frame of a file without it.
   closes as *stream ended*, where the live run may have closed it by the quiet period.
 - The replay keeps the latest closed tick whole, as the live connection does
   ([`pipe-connection.md`](pipe-connection.md), *Latest tick*).
-- Speed: before a frame the replay waits the recorded pause to the previous frame divided by the speed. The speed is
+- Speed: before a frame the replay waits the recorded pause to the previous frame divided by the speed exactly as
+  written (`0.4` divides by 0.4, not by the nearest binary fraction). The speed is
   a factor from `0.1` to `1000` (default `1`, real speed) or `max` (no waiting). A time that goes backwards or
   repeats gets no wait and is stamped as recorded, without clamping. A long pause is waited in steps of at most one
   day.

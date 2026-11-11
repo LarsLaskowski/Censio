@@ -23,8 +23,8 @@ dotnet build Censio.slnx -c Release --no-restore
 ```
 
 Every build, on Linux too, writes the Windows executable
-`src/Censio.Companion/bin/<configuration>/net10.0-windows/win-x64/Censio.Companion.exe` (framework-dependent: it
-needs the .NET 10 Desktop Runtime and runs only on Windows).
+`src/Censio.Companion/bin/<configuration>/net11.0-windows/win-x64/Censio.Companion.exe` (framework-dependent: it
+needs the .NET 11 Desktop Runtime and runs only on Windows).
 
 Start the server with:
 

@@ -7,7 +7,7 @@ profile and owned by this repository: keep it true when the build changes.
 ## Toolchain
 
 - .NET SDK of `global.json` (the newest SDK of the major, which Dependabot raises; `rollForward` `latestFeature`: the newest
-  installed feature band of that major, never the next major), target framework `net10.0` (`net10.0-windows` for
+  installed feature band of that major, never the next major), target framework `net11.0` (`net11.0-windows` for
   `Censio.Companion`), solution `Censio.slnx`. Several majors may be installed side by side (a machine, CI); the
   repository is built for one: every project's target framework, `global.json` and every .NET image name the same
   major, which `dotnet_major.py` checks in the *Analyzer gate*, and a new project gets it from the SDK `global.json`
@@ -29,7 +29,7 @@ profile and owned by this repository: keep it true when the build changes.
 - Production code: `src/` — `Censio.Contracts`, `Censio.Pipe`, `Censio.GameData`, `Censio.Server.Data`,
   `Censio.Server` (Blazor Server), `Censio.Companion.Core` (the Companion's platform-neutral logic),
   `Censio.Anonymiser` (a contributor console tool, not released) and `Censio.Companion` (the Windows tray shell,
-  `net10.0-windows`, no test project).
+  `net11.0-windows`, no test project).
 - Tests: `tests/<Project>.Tests/`, one test class per type under test in `{TypeUnderTest}Tests.cs`,
   placed flat in the test project. Anonymised recordings used as fixtures lie in `tests/<Project>.Tests/Fixtures/`
   with a `README.md`.

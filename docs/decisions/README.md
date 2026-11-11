@@ -115,4 +115,5 @@ once in the [area document](../areas/README.md) of the record's area, and the re
 | [0051](0051-dds-icons-decoded-by-own-bc7-and-png-code.md) | DDS icons are decoded by own BC7 and PNG code, without an image library | Accepted | 2026-11-10 |
 | [0052](0052-catalog-cache-keyed-by-file-properties-and-companion-identity.md) | The catalog cache is keyed by the archives' file properties, the build and the Companion's module identity, and checked at start and at each new pipe connection | Accepted | 2026-11-10 |
 | [0053](0053-catalog-cache-one-binary-file-validated-whole-before-use.md) | The catalog cache is one own binary file with a checksum, validated whole before any of it is used | Accepted | 2026-11-10 |
+| [0054](0054-censio-moves-to-every-current-dotnet-major.md) | Censio moves to every current .NET major, STS and LTS alike | Accepted | 2026-11-11 |
 <!-- project:end index -->

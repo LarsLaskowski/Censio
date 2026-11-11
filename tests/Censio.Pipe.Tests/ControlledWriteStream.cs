@@ -7,7 +7,7 @@ namespace Censio.Pipe.Tests;
 /// write or a flush after a given length with a given exception, counts writes and flushes, remembers how many bytes
 /// each flush covered, records its disposal and can fail it. It models the failures of a <see cref="FileStream" /> (a full disk as
 /// <see cref="IOException" />, a deleted folder as <see cref="DirectoryNotFoundException" />, a refused access as
-/// <see cref="UnauthorizedAccessException" />, checked by reading <c>dotnet/runtime</c> <c>release/10.0</c>
+/// <see cref="UnauthorizedAccessException" />, checked by reading <c>dotnet/runtime</c> <c>release/11.0</c>
 /// <c>Win32Marshal.GetExceptionForWin32Error</c>); a failed write keeps none of its bytes. Only the asynchronous
 /// <c>WriteAsync</c> and <c>FlushAsync</c> are supported.
 /// </summary>

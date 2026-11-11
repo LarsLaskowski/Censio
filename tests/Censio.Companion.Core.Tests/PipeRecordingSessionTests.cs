@@ -169,6 +169,7 @@ public sealed class PipeRecordingSessionTests
     /// </summary>
     /// <returns>The task</returns>
     [TestMethod]
+    [TestCategory("AC5")]
     public async Task PipeRecordingSessionSeveralFailuresRaiseStateChangedOnce()
     {
         // Arrange
@@ -187,8 +188,10 @@ public sealed class PipeRecordingSessionTests
         second.FailWritesAfter(0, new IOException("Disk full"));
 
         // Act
+        first.HoldWrites();
         firstConnection.Record(Result(PipeTestFrames.Version(2)), _start);
         secondConnection.Record(Result(PipeTestFrames.Version(2)), _start.AddSeconds(1));
+        first.ReleaseWrites();
 
         await Task.WhenAll(first.WaitForDisposeAsync(TestContext.CancellationToken), second.WaitForDisposeAsync(TestContext.CancellationToken)).WaitAsync(_guard, TestContext.CancellationToken);
 

@@ -22,8 +22,8 @@ updates:
         applies-to: version-updates
         patterns:
           - "*"
-    # The next major of these belongs to the next .NET (Microsoft.AspNetCore.Mvc.Testing 11.0.0 targets net11.0 only;
-    # Microsoft.Extensions.* 11.0.0 would restore into a net10.0 project too): it comes with the change of the target
+    # The next major of these belongs to the next .NET (Microsoft.AspNetCore.Mvc.Testing 12.0.0 targets net12.0 only;
+    # Microsoft.Extensions.* 12.0.0 would restore into a net11.0 project too): it comes with the change of the target
     # framework, not alone.
     ignore:
       - dependency-name: "Microsoft.Extensions.*"
@@ -31,7 +31,7 @@ updates:
       - dependency-name: "Microsoft.AspNetCore.*"
         update-types: ["version-update:semver-major"]
 
-  # The SDK of global.json: patch and feature bands as they are released; the next major (10 to 11) comes with the
+  # The SDK of global.json: patch and feature bands as they are released; the next major (11 to 12) comes with the
   # change of the target framework, never alone.
   - package-ecosystem: dotnet-sdk
     directory: "/"

@@ -86,7 +86,7 @@ public sealed class AnonymiserCommand
     {
         if (arguments.Count != 2)
         {
-            await _error.WriteLineAsync(Usage).ConfigureAwait(false);
+            await _error.WriteLineAsync(Usage, CancellationToken.None).ConfigureAwait(false);
 
             return UsageCode;
         }

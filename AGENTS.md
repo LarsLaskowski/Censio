@@ -108,8 +108,8 @@ The solution is `Censio.slnx`; `docs/ARCHITECTURE.md` lists the projects and the
 - **Solution format** is `.slnx` (XML-based) at the repository root.
 <!-- stack:end configuration -->
 <!-- project:begin configuration -->
-- `Censio.Companion` targets `net10.0-windows` (WPF and Windows Forms) with `EnableWindowsTargeting` and the
-  `RuntimeIdentifier` `win-x64`, so it builds on Linux; every other project targets `net10.0` (record 0004,
+- `Censio.Companion` targets `net11.0-windows` (WPF and Windows Forms) with `EnableWindowsTargeting` and the
+  `RuntimeIdentifier` `win-x64`, so it builds on Linux; every other project targets `net11.0` (record 0004,
   *Known pitfalls* in `.squad/stack.md`).
 - The product version is the one build property `Version` in `Directory.Build.props` (`0.0.0` on `main`), set
   only by the release build (record 0005); no project sets a version of its own.
