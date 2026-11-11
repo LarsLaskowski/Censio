@@ -12,38 +12,35 @@ Feature: see [spec.md](spec.md); its criteria AC1–AC8 are the plan's.
 
 | # | Claim | Evidence | Status |
 | - | ----- | -------- | ------ |
-| 1 | `Censio.Contracts` holds only `ProductVersion` and references no project | `src/Censio.Contracts/Censio.Contracts.csproj`, `docs/ARCHITECTURE.md:19` | confirmed |
-| 2 | The builder can produce an entry of GUID `0` | `GameCatalogAssets.cs:74` skips only a missing GUID; `GameCatalogBuilder.cs:36,90` `GetValueOrDefault()`, no filter | confirmed |
-| 3 | `GameCatalog` accepts repeated GUIDs and `Find` answers the first; the builder's entries are unique and exclude ambiguous GUIDs | `GameCatalog.cs` constructor (`TryAdd`); `GameCatalogBuilder.cs:37-58` | confirmed |
+| 1 | `Censio.Contracts` references no project | its `.csproj`, `docs/ARCHITECTURE.md:19` | confirmed |
+| 2 | The builder can produce an entry of GUID `0` | `GameCatalogAssets.cs:74`; `GameCatalogBuilder.cs:36,90` | confirmed |
+| 3 | `GameCatalog` accepts repeated GUIDs, `Find` answers the first and nothing for an ambiguous GUID | `GameCatalog.cs` constructor and `Find` | confirmed |
 | 4 | Region entries carry a non-zero `RegionGuid`, other kinds none | `GameCatalogBuilder.cs:92-121` | confirmed |
-| 5 | A missing name is `null`; `GameCatalog.Check` treats an empty one as missing too | `GameCatalog.cs` `Check` (`IsNullOrEmpty`); `game-catalog.md` *Names* | confirmed |
-| 6 | The build is `null` (unknown) or four non-negative numbers, not all zero, formatted invariantly without leading zeros | `GameInstallation.cs:57-65` `FormatBuild` | confirmed |
-| 7 | A real file version has 16-bit parts, so a real build fits the game-version rule | Win32 `VS_FIXEDFILEINFO` (two 32-bit fields per pair) | confirmed |
-| 8 | Entries that name one icon file share one `GameIcon`; `GameIconSet.Find` gives the icon per GUID | `GameIconSet.cs`; `game-catalog-icons.md` *Entries* | confirmed |
-| 9 | .NET 11 has `JsonSourceGenerationOptionsAttribute.AllowDuplicateProperties`, `RespectNullableAnnotations`, `UnmappedMemberHandling`, and `Convert.ToHexStringLower` | `/usr/lib/dotnet/packs/Microsoft.NETCore.App.Ref/11.0.0/ref/net11.0/System.Text.Json.xml`, `System.Runtime.xml` | confirmed |
-| 10 | `AllowDuplicateProperties = false` also refuses a repeated dictionary key | to verify: AC5 duplicate-language case, Tester, step 5; if it fails, the Dev adds a per-object name check to step 2 | unverified |
-| 11 | `Utf8JsonReader.CopyString` throws `ArgumentException` when the unescaped value exceeds the buffer, and an escaped lone surrogate (`\uD800`) is refused by it or by the UTF-8 check after it | to verify: AC5 lone-surrogate and AC7 escaped-string cases, Tester, step 5 | unverified |
-| 12 | Deserializing `1.0`, `1e0`, `"1"` or 2147483648 into an `int` throws `JsonException` under strict number handling | to verify: AC4 and AC5 cases, Tester, step 5 | unverified |
-| 13 | Switching reflection-based serialization off in `Censio.Companion.Core.Tests` would break `GameInstallationSearchTests.cs:871` (`JsonSerializer.Serialize` without a context) | `tests/Censio.Companion.Core.Tests/GameInstallationSearchTests.cs:871` | confirmed |
-| 14 | `Censio.Companion.Core.Tests` copies only its own `Fixtures\**`; the catalog fixture lies in `tests/Censio.GameData.Tests/Fixtures/GameCatalog/` | `Censio.Companion.Core.Tests.csproj:19` | confirmed |
-| 15 | `GameCatalogReader.Read` builds a catalog from six stream sources, usable on the loose fixture files | `GameCatalogReader.cs:72`, `GameCatalogSource.FromStream` | confirmed |
-| 16 | The README already says nothing is sent to the server | `README.md`, *Status* | confirmed |
+| 5 | A missing name is `null`; `Check` treats an empty one as missing | `GameCatalog.cs` `Check` | confirmed |
+| 6 | The build is `null` or four numbers of 16-bit file-version parts, not all zero, without leading zeros | `GameInstallation.cs:57-65`; Win32 `VS_FIXEDFILEINFO` | confirmed |
+| 7 | Entries naming one icon file share one `GameIcon` | `GameIconSet.cs`; `game-catalog-icons.md` *Entries* | confirmed |
+| 8 | .NET 11 has `AllowDuplicateProperties` (also on the source-generation attribute), `RespectNullableAnnotations`, `UnmappedMemberHandling`, `Convert.ToHexStringLower` | reference pack 11.0.0 XML docs | confirmed |
+| 9 | Duplicate dictionary keys are refused; `CopyString` throws `ArgumentException` on a short buffer and `InvalidOperationException` on an escaped lone surrogate; unescaped invalid UTF-8 passes the reader; `1.0`, `1e0`, `"1"`, 2147483648 into `int` throw `JsonException` | Security's scratch runs (plan review), pinned by AC4, AC5, AC7 rows | confirmed |
+| 10 | A 64 MiB document of short strings retains over 500 MB of model | Security's measurement (plan review) | confirmed |
+| 11 | At the bounds of spec E5 the model holds about 1.05 million strings and at most 32 MiB of UTF-16 text; estimated peak below 150 MiB | to verify: the Dev reads the document of `CatalogDocumentReaderReadAcceptsCountsAtBound` once in a scratch run in step 6 and logs the peak working set | unverified |
+| 12 | Switching reflection off in `Censio.Companion.Core.Tests` would break `GameInstallationSearchTests.cs:871` | that line | confirmed |
+| 13 | `Censio.Companion.Core.Tests` copies only its own fixtures; `GameCatalogReader.Read` builds a catalog from six streams | `Censio.Companion.Core.Tests.csproj:19`; `GameCatalogReader.cs:72` | confirmed |
 
 ## Tests per criterion
 
 | AC | Test(s) | Test file |
 | -- | ------- | --------- |
-| AC1 | `GameCatalogDocumentConverterToDocumentMapsEveryField`, `GameCatalogDocumentConverterToDocumentSharesReferenceOfSharedImage`, `GameCatalogDocumentConverterToDocumentWithoutIconSetHasNoReferences`, `GameCatalogDocumentConverterToDocumentLeavesOutGuidZero`, `GameCatalogDocumentConverterToDocumentKeepsFirstOfRepeatedGuid`, `GameCatalogDocumentConverterToDocumentWritesUnknownBuildAsNull`, `GameCatalogDocumentConverterToDocumentIsAcceptedByWriter` | `tests/Censio.Companion.Core.Tests/GameCatalogDocumentConverterTests.cs` |
+| AC1 | `GameCatalogDocumentConverterToDocumentMapsEveryField`, `GameCatalogDocumentConverterToDocumentSharesReferenceOfSharedImage`, `GameCatalogDocumentConverterToDocumentWithoutIconSetHasNoReferences`, `GameCatalogDocumentConverterToDocumentLeavesOutGuidZero`, `GameCatalogDocumentConverterToDocumentKeepsFirstOfRepeatedGuid`, `GameCatalogDocumentConverterToDocumentLeavesOutAmbiguousGuid` (catalog built as in `GameIconReaderTests.cs:769`: GUID 77 missing, 78 present), `GameCatalogDocumentConverterToDocumentWritesUnknownBuildAsNull`, `GameCatalogDocumentConverterToDocumentIsAcceptedByWriter` | `tests/Censio.Companion.Core.Tests/GameCatalogDocumentConverterTests.cs` |
 | AC2 | `CatalogDocumentWriterWriteRoundTripsEveryField` (rows of the spec's cases), `CatalogDocumentWriterWriteTwiceGivesIdenticalBytes`, `CatalogDocumentWriterWriteOrdersLanguagesOrdinally`, `CatalogDocumentWriterWriteRoundTripsEmptyCatalog`, `CatalogDocumentWriterReflectionSerializationIsDisabled` | `tests/Censio.Contracts.Tests/CatalogDocumentWriterTests.cs` |
 | AC3 | `GameCatalogDocumentConverterFixtureCatalogRoundTripsValid` | `tests/Censio.Companion.Core.Tests/GameCatalogDocumentConverterTests.cs` |
-| AC4 | `CatalogDocumentReaderReadRefusesOtherVersionAsUnsupported` (0, 2, -1), `CatalogDocumentReaderReadRefusesLaterVersionWithUnknownPropertyAsUnsupported`, `CatalogDocumentReaderReadRefusesMalformedVersion` (missing, `1.0`, `1e0`, `"1"`, 2147483648, repeated), `CatalogDocumentReaderReadRefusesTruncatedVersionTwoAsMalformed` | `tests/Censio.Contracts.Tests/CatalogDocumentReaderTests.cs` |
+| AC4 | (reader tests in `CatalogDocumentReaderTests.cs`, the writer test in `CatalogDocumentWriterTests.cs`) `CatalogDocumentReaderReadRefusesOtherVersionAsUnsupported` (0, 2, -1), `CatalogDocumentReaderReadRefusesLaterVersionWithUnknownPropertyAsUnsupported`, `CatalogDocumentReaderReadRefusesMalformedVersion` (missing, `1.0`, `1e0`, `"1"`, 2147483648, repeated), `CatalogDocumentReaderReadRefusesTruncatedVersionTwoAsMalformed`, `CatalogDocumentReaderReadFindsEscapedVersionName` (`"schema\u0056ersion": 2` → unsupported version), `CatalogDocumentReaderReadIgnoresVersionInsideEntry` (only inside an entry → malformed), `CatalogDocumentWriterWriteRefusesOtherSchemaVersionAsUnsupported` (text `Catalog schema version 2 is not supported; supported: 1`) | `tests/Censio.Contracts.Tests/CatalogDocumentReaderTests.cs` |
 | AC5 | `CatalogDocumentReaderReadRefusesMalformedSyntax` (E1 rows), `CatalogDocumentReaderReadRefusesMalformedStructure` (E2 rows: unknown, repeated, missing, other-case property, wrong type, `null`, GUID 2147483648 and `5.0`, kind `Good` and `castle`, repeated language), `CatalogDocumentReaderReadRefusesInvalidUtf8`, `CatalogDocumentReaderReadRefusesLoneSurrogate` | `tests/Censio.Contracts.Tests/CatalogDocumentReaderTests.cs` |
-| AC6 | `CatalogDocumentReaderReadRefusesInvalidValue` (E4 rows, `EN`, `pt-BR`, `e`, a 36-character tag), `CatalogDocumentReaderReadAcceptsLanguageTag` (`en`, `de`, `pt-br`), `CatalogDocumentReaderReadAcceptsNegativeGuid` | `tests/Censio.Contracts.Tests/CatalogDocumentReaderTests.cs` |
-| AC7 | `CatalogDocumentReaderReadRefusesDocumentAboveBound`, `CatalogDocumentReaderReadAcceptsDocumentAtBound`, `CatalogDocumentReaderReadRefusesStringAboveBound`, `CatalogDocumentReaderReadAcceptsStringAtBound`, `CatalogDocumentReaderReadAcceptsEscapedStringWithinBound` | `tests/Censio.Contracts.Tests/CatalogDocumentReaderTests.cs` |
-| AC7 | `CatalogDocumentWriterWriteRefusesInvalidDocument` (E4 rows, undefined kind, schema version 2), `CatalogDocumentWriterWriteRefusesStringAboveBound`, `CatalogDocumentWriterWriteRefusesLoneSurrogate`, `CatalogDocumentWriterWriteRefusesDocumentAboveBound` | `tests/Censio.Contracts.Tests/CatalogDocumentWriterTests.cs` |
+| AC6 | `CatalogDocumentReaderReadRefusesInvalidValue` (E4 rows, `EN`, `pt-BR`, `e`, `stra\u00dfe`, a 36-character tag, game versions `+1.0.0.0`, ` 1.0.0.0`, `1.0.0.0 `, `\u0661.0.0.0`, an icon with one uppercase hex digit), `CatalogDocumentReaderReadAcceptsLanguageTag` (`en`, `de`, `pt-br`), `CatalogDocumentReaderReadAcceptsNegativeGuid` | `tests/Censio.Contracts.Tests/CatalogDocumentReaderTests.cs` |
+| AC7 | `CatalogDocumentReaderReadRefusesDocumentAboveBound`, `CatalogDocumentReaderReadAcceptsDocumentAtBound`, `CatalogDocumentReaderReadRefusesStringAboveBound`, `CatalogDocumentReaderReadAcceptsStringAtBound`, `CatalogDocumentReaderReadAcceptsEscapedStringWithinBound`, `CatalogDocumentReaderReadRefusesCountsAboveBound` (rows: 16,385 entries, 17 names, 33 region types), `CatalogDocumentReaderReadAcceptsCountsAtBound` (one document of 16,384 entries, one of them with 16 names and 32 region types), `CatalogDocumentReaderReadRefusesCountsBeforeDeserializing` (17 names in an entry that also breaks a step-4 rule: *too large*, not *malformed*) | `tests/Censio.Contracts.Tests/CatalogDocumentReaderTests.cs` |
+| AC7 | `CatalogDocumentWriterWriteRefusesInvalidDocument` (E4 rows, undefined kind), `CatalogDocumentWriterWriteRefusesCountsAboveBound`, `CatalogDocumentWriterWriteRefusesStringAboveBound`, `CatalogDocumentWriterWriteRefusesLoneSurrogate`, `CatalogDocumentWriterWriteRefusesDocumentAboveBound` | `tests/Censio.Contracts.Tests/CatalogDocumentWriterTests.cs` |
 | AC8 | `CatalogDocumentReaderReadReturnsFixedTextPerKind`, `CatalogDocumentReaderReadTextHoldsNoContent`, `CatalogDocumentReaderReadNeverThrows` (every refusal row of AC4–AC7 plus an empty input, a BOM, a top-level array and depth 65) | `tests/Censio.Contracts.Tests/CatalogDocumentReaderTests.cs` |
 
-The document at the bound is a valid document padded with spaces to exactly 67,108,864 bytes; only the kinds are asserted (spec AC7). `CatalogDocumentReaderReadTextHoldsNoContent` refuses documents holding a marker name, region type and reference in each kind and asserts the text contains none of them.
+The document at the bound is a valid one padded with spaces to 16,777,216 bytes. `CatalogDocumentReaderReadTextHoldsNoContent` refuses documents holding a marker name, region type and reference in each kind and asserts the text contains none of them.
 
 ## Approach
 
@@ -51,30 +48,28 @@ The document at the bound is a valid document padded with spaces to exactly 67,1
 
 **Reader** (`CatalogDocumentReader.Read`, bytes in, result out, the spec's five steps):
 1. Length above `MaxDocumentBytes` → *too large*.
-2. One pass of `Utf8JsonReader` over the whole input (default depth 64). For each string and property-name token: not escaped — raw length above `MaxStringBytes` → *too large*, `Utf8.IsValid` false → *malformed*; escaped — `CopyString` into one rented buffer of `MaxStringBytes` bytes (`ArgumentException` → *too large*), then `Utf8.IsValid` on the result. The same pass finds the root's `schemaVersion`: a root that is no object, a missing or repeated `schemaVersion`, or a value that is not a number token with `TryGetInt32` → *malformed*.
+2. One pass of `Utf8JsonReader` over the whole input (default depth 64). For each string and property-name token: not escaped — raw length above `MaxStringBytes` → *too large*, `Utf8.IsValid` false → *malformed*; escaped — `CopyString` into `buffer.AsSpan(0, MaxStringBytes)` of one rented buffer (`ArgumentException` → *too large*, `InvalidOperationException` → *malformed*), then `Utf8.IsValid` on the result; the buffer is returned with `clearArray: true`. The same pass counts, matching property names with `ValueTextEquals` (which unescapes): the items of the root's `entries` array (above `MaxEntries` → *too large*), and per item the properties of its `names` object (`MaxNamesPerEntry`) and the items of its `regionTypes` array (`MaxRegionTypesPerEntry`), whatever the version; and it finds `schemaVersion` with `ValueTextEquals` among the root's own properties only (`CurrentDepth` 1): a root that is no object, a missing or repeated `schemaVersion`, or a value that is not a number token with `TryGetInt32` → *malformed*.
 3. Version ≠ 1 → *unsupported version*, text with the number (invariant culture).
 4. `JsonSerializer.Deserialize` with the context → `JsonException` → *malformed*.
 5. Internal `CatalogDocumentRules`: first a sweep for `null` in places the model forbids that the serializer does not check (an entry, a name value, a region type) → *malformed*; then the value rules of E4 → *invalid*.
 
 `JsonException`, `InvalidOperationException` and `ArgumentException` are caught in steps 2 and 4 and mapped as above; an out-of-memory condition is not caught. The result holds the document or an error, never both.
 
-**Writer** (`CatalogDocumentWriter.Write`): `SchemaVersion` ≠ 1 → *unsupported version*; then the same `CatalogDocumentRules` (*invalid*, `null` included here, as the writer has no *malformed* input), an undefined kind → *invalid*, every string encoded with a throwing `UTF8Encoding` (a lone surrogate → *invalid*, more than `MaxStringBytes` bytes → *too large*). It serializes a normalized copy (names in a `SortedDictionary` with `StringComparer.Ordinal`) to a byte array with the default `JavaScriptEncoder` (non-ASCII escaped; deterministic), and refuses a result above `MaxDocumentBytes` (*too large*); on any refusal it returns no bytes.
+**Writer** (`CatalogDocumentWriter.Write`): `SchemaVersion` ≠ 1 → *unsupported version* (the reader's text); the count bounds → *too large*; then the same `CatalogDocumentRules` (*invalid*, `null` included here, as the writer has no *malformed* input), an undefined kind → *invalid*, every string encoded with a throwing `UTF8Encoding` (a lone surrogate → *invalid*, more than `MaxStringBytes` bytes → *too large*). It serializes a normalized copy (names in a `SortedDictionary` with `StringComparer.Ordinal`) to a byte array with the default `JavaScriptEncoder` (non-ASCII escaped; deterministic), and refuses a result above `MaxDocumentBytes` (*too large*); on any refusal it returns no bytes.
 
-**Language tag rule**, in `CatalogDocumentRules`: 1 to 35 characters; a primary subtag of 2 or 3 of `a`–`z`, then subtags of 1 to 8 of `a`–`z` or `0`–`9`, each after one `-`. **Game version**: four parts of ASCII digits joined by `.`, each 0 to 65,535, `0` or no leading zero, not all four `0`. **Icon**: exactly 64 of `0`–`9`, `a`–`f`.
+**Value rules**, in `CatalogDocumentRules`, with ASCII-only checks (`char.IsAsciiLetterLower`, `char.IsAsciiDigit`, `char.IsAsciiHexDigitLower` or explicit ranges; never `char.IsLower`, `IsLetter`, `IsDigit`, `int.Parse` with default styles or `Convert.FromHexString`). Language tag: 1 to 35 characters; a primary subtag of 2 or 3 of `a`–`z`, then subtags of 1 to 8 of `a`–`z` or `0`–`9`, each after one `-`. **Game version**: four parts of ASCII digits joined by `.`, each 0 to 65,535, `0` or no leading zero, not all four `0`. **Icon**: exactly 64 of `0`–`9`, `a`–`f`.
 
-**Converter (`Censio.Companion.Core`)** `GameCatalogDocumentConverter.ToDocument`: for each entry of `catalog.Entries` in order, skip GUID `0` and a GUID already taken; map the kind; names `en` from `EnglishName`, `de` from `GermanName`, each left out when null or empty; `RegionGuid` and `RegionTypes` as they are (the list copied); `icon` = `Convert.ToHexStringLower(SHA256.HashData(png))` of `icons?.Find(guid)`, computed once per `GameIcon` instance; `GameVersion` = the build. It validates nothing; the writer does.
+**Converter (`Censio.Companion.Core`)** `GameCatalogDocumentConverter.ToDocument`: for each entry of `catalog.Entries` in order, keep it only when its GUID is not `0` and `ReferenceEquals(catalog.Find(entry.AssetGuid), entry)` (this leaves out repeated and ambiguous GUIDs); map the kind; names `en` from `EnglishName`, `de` from `GermanName`, each left out when null or empty; `RegionGuid` and `RegionTypes` as they are (the list copied); `icon` = `Convert.ToHexStringLower(SHA256.HashData(png))` of `icons?.Find(guid)`, computed once per `GameIcon` instance; `GameVersion` = the build. It validates nothing; the writer does.
 
 No user-visible output.
 
 ## Options considered
 
-- Icon data in the document, references by index or by file name: lost to the content hash (record 0055).
-- A tolerant reader or a major/minor version: lost to exact versions and strict reading (record 0056).
-- Reflection-based serialization: excluded by the issue (source generation).
-- `JsonStringEnumConverter` for `kind`: reads case-insensitively and accepts numbers, against strict reading; one small converter instead.
-- Two layers (wire DTOs with string kinds, then a typed model): no rule needs them once the kind converter refuses unknown words; the spec moved an unknown kind to *malformed*.
-- The converter in `Censio.GameData` (referencing `Censio.Contracts`): `Censio.GameData` would depend on the contract only for this; `Censio.Companion.Core` already references both.
-- Own duplicate-name detection in step 2: unneeded while fact 10 holds; it is the fallback.
+- Icon data in the document, or references by index or file name: record 0055. A tolerant reader or a major/minor version: record 0056.
+- Reflection-based serialization: excluded by the issue.
+- `JsonStringEnumConverter`: reads case-insensitively and accepts numbers; one strict converter instead.
+- Wire types with string kinds beside a typed model: no rule needs them once the kind converter is strict.
+- The converter in `Censio.GameData`: it would depend on the contract for this alone.
 
 ## Affected projects and types
 
@@ -114,8 +109,11 @@ Namespace Censio.Contracts. The JSON names of *Approach* are set with JsonProper
 - `public sealed class CatalogDocumentWriteResult`
 - `public ReadOnlyMemory<byte> Utf8Json { get; }`
 - `public static class CatalogDocumentReader`
-- `public const int MaxDocumentBytes = 67108864;`
+- `public const int MaxDocumentBytes = 16777216;`
 - `public const int MaxStringBytes = 65536;`
+- `public const int MaxEntries = 16384;`
+- `public const int MaxNamesPerEntry = 16;`
+- `public const int MaxRegionTypesPerEntry = 32;`
 - `public static CatalogDocumentReadResult Read(ReadOnlySpan<byte> utf8Json)`
 - `public static class CatalogDocumentWriter`
 - `public static CatalogDocumentWriteResult Write(CatalogDocument document)`
@@ -146,24 +144,24 @@ New area **game-catalog-format** — the catalog document for the server: proper
 
 All by the Dev once the code is green, unless noted:
 
-- `docs/areas/game-catalog-format.md` (new, from `_template.md`): the content of *Approach* as rules (no type names as contract), a JSON example of invented values (two entries, one with an icon), the kind table with the spec's exact texts, the five-step order, the bounds, the compatibility rules (spec N2), privacy (spec N5); *Related decisions* 0055, 0056, 0018, 0033.
+- `docs/areas/game-catalog-format.md` (new, from `_template.md`): the content of *Approach* as rules (no type names as contract), a JSON example of invented values (two entries, one with an icon), the five bounds with their values, the kind table with the spec's exact texts, the five-step order, the bounds, the compatibility rules (spec N2), privacy (spec N5); *Related decisions* 0055, 0056, 0018, 0033.
 - `docs/areas/README.md`: the new row; in the rows of game-catalog and game-catalog-cache, "the catalog format for the server (#26)" → "the catalog format for the server (see game-catalog-format)".
 - `docs/areas/game-catalog.md:224`, `docs/areas/game-catalog-cache.md:94`: "The catalog format for the server and the upload (#26, #42)." → "The catalog format for the server: [`game-catalog-format.md`](game-catalog-format.md); the upload (#42)."; `docs/areas/game-files.md:144`: "the catalog format (#26)" → "the catalog format ([`game-catalog-format.md`](game-catalog-format.md))".
 - `docs/ARCHITECTURE.md:19`: Contracts row → "The types shared by Companion and server: the catalog document with its reader and writer ([`areas/game-catalog-format.md`](areas/game-catalog-format.md)), and the product version"; row 24: add "the conversion of the catalog into the catalog document"; after the paragraph at line 59 one sentence: the catalog converts into the versioned catalog document of `Censio.Contracts`, which nothing sends yet (#42) (records 0055, 0056).
-- `tests/Censio.Companion.Core.Tests/Fixtures/README.md` (Tester): the linked `GameCatalog/*.xml` files, their source folder and that they are the GameData fixture, not copies.
+- `tests/Censio.Companion.Core.Tests/Fixtures/README.md` (Tester, new file): the linked `GameCatalog/*.xml` files come from `tests/Censio.GameData.Tests/Fixtures/GameCatalog/` and are described in its `README.md`; there is no `Fixtures/GameCatalog` source folder here.
 - `.squad/project.md` (the Lead reports, the orchestrator writes), in *Security areas*, line *Parsing of external input*: after "the catalog cache file)," insert "the catalog document (`CatalogDocumentReader` in `src/Censio.Contracts`)," and after "[game-catalog-cache](../docs/areas/game-catalog-cache.md)," insert "[game-catalog-format](../docs/areas/game-catalog-format.md),"; in *Integration surface*, *A new external API call or DTO*, "the ingest messages in `Censio.Contracts`" → "the catalog document and the ingest messages in `Censio.Contracts`".
 - `README.md`, `docs/USER_GUIDE.md`: none (spec, *Open questions*). No changelog exists.
 
 ## Architecture check
 
-`Censio.Contracts` keeps no project reference; `Censio.Companion.Core` already references Contracts and GameData. No guarantee of `.squad/project.md` changes: nothing is sent, stored or shown; the document stays in memory. Record 0018's rule (refuse an unsupported version) is applied, record 0033's strictness kept, record 0023's privacy kept (no content in texts or logs).
+No new project reference. No guarantee of `.squad/project.md` changes: nothing is sent, stored or shown. Records 0018 (refuse an unsupported version), 0033 (strict) and 0023 (privacy) are kept.
 
 ## Security considerations
 
-- [x] The document bound applies to the raw bytes before parsing; the string bound to the unescaped UTF-8 bytes, checked before a .NET string is created; invalid UTF-8 is refused, never replaced by U+FFFD; the writer counts the same unescaped UTF-8 bytes.
-- [x] Exceptions: `JsonException`, `InvalidOperationException`, `ArgumentException` of the reader and serializer are mapped to a kind with its fixed text; none of their messages reaches a result. Nothing in this feature logs or shows a text yet.
-- Depth: at most 64 (the reader's default), deeper is *malformed*. Memory: the input, one rented 64 KiB buffer and the model.
-- The SHA-256 is an identity of the image, not a security control (record 0055).
+- [x] The document bound applies to the raw bytes before parsing, the string bound to the unescaped UTF-8 bytes before a .NET string exists, the count bounds before deserializing; invalid UTF-8 is refused, never replaced; the writer counts the same.
+- [x] `JsonException`, `InvalidOperationException` and `ArgumentException` are mapped to a kind with its fixed text; no exception message reaches a result.
+- Depth at most 64. Memory: the input (at most 16 MiB), one rented 64 KiB buffer and the model at the bounds (fact 11).
+- The SHA-256 is an identity, not a security control (record 0055).
 
 ## Decision records
 
@@ -172,4 +170,18 @@ All by the Dev once the code is green, unless noted:
 
 ## Out of scope / follow-ups
 
-Sending, storing and showing the catalog and the images (#27, #42), as the spec's *Out of scope* lists. No follow-up issue.
+Sending, storing and showing the catalog and the images (#27, #42), as the spec's *Out of scope* lists. For #42: the receiving side must bound a message's size while receiving it, before the reader runs, and how many documents it reads at once. No follow-up issue.
+
+## Challenge
+
+- DA 1 (minor): accepted; the converter keeps an entry only when its GUID is not `0` and `catalog.Find` returns it; new AC1 test; spec AC1 amended.
+- DA 2 (minor): accepted; the writer refuses another schema version as *unsupported version*, own AC4 test; spec AC4 amended.
+- DA 3 (minor): accepted; the Tester creates the fixture README (task 8).
+
+## Security review
+
+- 1 (blocking, model memory): resolved. Step 2 counts entries (16,384), names per entry (16) and region types per entry (32) before deserializing; the document bound drops to 16 MiB. The real catalog has 1,040 entries and 2 names. Spec E5 and AC7 amended; tests at bound and bound plus one, and one that a count is refused before deserialization; fact 11 measures the peak.
+- 2: `InvalidOperationException` → *malformed*; `schemaVersion` found with `ValueTextEquals` at depth 1; AC4 rows.
+- 3: ASCII-only rules in *Approach*; AC6 rows; spec E4 says ASCII digits.
+- 4: `AsSpan(0, MaxStringBytes)`, `clearArray: true`.
+- 5: noted under *Out of scope / follow-ups*. Facts confirmed by Security are merged into fact 9.

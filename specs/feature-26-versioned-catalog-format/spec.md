@@ -45,7 +45,7 @@ name, region type or reference):
 
 The reader takes the document as UTF-8 bytes and checks in this order; the first failing step decides the kind: (1)
 the document's length (E5); (2) the whole document is well-formed JSON, each string's length checked before it is
-decoded (E1, E5); (3) `schemaVersion` (E2, E3); (4) the structure of version 1 (E2); (5) the value rules of version 1
+decoded and the counts of E5 before anything is deserialized (E1, E5); (3) `schemaVersion` (E2, E3); (4) the structure of version 1 (E2); (5) the value rules of version 1
 (E4).
 
 - E1: Not JSON, truncated, invalid UTF-8 or a lone surrogate, content after the document: *malformed*.
@@ -58,19 +58,21 @@ decoded (E1, E5); (3) `schemaVersion` (E2, E3); (4) the structure of version 1 (
   document holds (properties of a later version included), as long as steps 1 and 2 pass.
 - E4: GUID `0`, a GUID on two entries, a region entry without a region GUID or with `0`, a
   region GUID on another kind, an empty name, a language tag that is not a lowercase BCP 47 tag of at most 35
-  characters (a primary subtag of 2 or 3 letters `a`–`z`, then subtags of 1 to 8 letters `a`–`z` or digits, each after
-  one `-`; `pt-br` is valid, `pt-BR` and `EN` are not), an empty region type, an icon reference that is not 64
-  lowercase hex digits, a game version that is not four numbers of 0 to 65,535 without leading zeros joined by `.` and
-  not all zero: *invalid*. Any other non-zero signed 32-bit GUID, negative ones included, is valid (the fixture has
+  characters (a primary subtag of 2 or 3 letters `a`–`z`, then subtags of 1 to 8 letters `a`–`z` or digits `0`–`9`, each
+  after one `-`; `pt-br` is valid, `pt-BR` and `EN` are not), an empty region type, an icon reference that is not 64
+  lowercase hex digits, a game version that is not four numbers of ASCII digits, 0 to 65,535, without leading zeros or
+  signs, joined by `.` and not all zero: *invalid*. Any other non-zero signed 32-bit GUID, negative ones included, is valid (the fixture has
   them).
-- E5: A document above 64 MiB (67,108,864 bytes), or a string whose UTF-8 form is above 65,536 bytes (the cache's
-  string bound, [`game-catalog-cache.md`](../../docs/areas/game-catalog-cache.md)): *too large*.
+- E5: A document above 16 MiB (16,777,216 bytes); a string whose UTF-8 form is above 65,536 bytes (the cache's
+  string bound, [`game-catalog-cache.md`](../../docs/areas/game-catalog-cache.md)); more than 16,384 entries, more
+  than 16 names in one entry or more than 32 region types in one entry (the real catalog: 1,040 entries, 2 names, a
+  few region types): *too large*.
 - E6: A catalog with no entries, an entry with no name in any language (*nameless*) or in one only (*incomplete*):
   valid; the names object then lists only the languages with a name.
 - E7: The writer given a document that breaks a rule of E4 or a bound of E5, or a string that is no well-formed
   Unicode text (*invalid*), refuses it with that kind and writes
   nothing: the writer never produces a document the reader refuses. The conversion of S1 never gives such a document
-  for GUIDs (it leaves out `0` and repeats).
+  for GUIDs (it keeps only the entries a lookup finds).
 
 ## Non-functional requirements
 
@@ -94,8 +96,8 @@ decoded (E1, E5); (3) `schemaVersion` (E2, E3); (4) the structure of version 1 (
 
 - AC1: Converting a catalog with its icon set and build gives the document of S1: schema version 1, the game version
   (`null` for *unknown*), the entries in catalog order with every field of S1, the SHA-256 reference of each entry's
-  icon, one reference for a shared image, and none without an icon or without an icon set; an entry of GUID `0` is
-  left out and the second entry of a repeated GUID too, and the result is accepted by the writer (S1, S2, E7).
+  icon, one reference for a shared image, and none without an icon or without an icon set; an entry of GUID `0`, the
+  second entry of a repeated GUID and an entry of an ambiguous GUID are left out, and the result is accepted by the writer (S1, S2, E7).
 - AC2: A document written and read back equals the original in every field and order, and writing it again gives
   identical bytes, with reflection-based serialization switched off; the cases include names in two, one and no
   language, non-ASCII names, negative GUIDs and region GUIDs, region types *not stated*, *none* and a list, a game
@@ -106,13 +108,13 @@ decoded (E1, E5); (3) `schemaVersion` (E2, E3); (4) the structure of version 1 (
 - AC4: A document with `schemaVersion` 0, 2 or -1 is refused as *unsupported version* with its text naming that
   number, also when it holds a property unknown to version 1; a missing `schemaVersion`, `1.0`, `1e0`, `"1"`,
   2147483648 or a repeated `schemaVersion` is *malformed*, and so is a truncated document with `"schemaVersion": 2`
-  (step 2 before step 3) (S4, E2, E3, N2).
+  (step 2 before step 3); the writer refuses `SchemaVersion` 2 as *unsupported version* (S4, E2, E3, E7, N2).
 - AC5: Each case of E1 and E2 is refused as *malformed*, a GUID of 2147483648 and of `5.0` included (S5, E1, E2, N1).
 - AC6: Each case of E4 is refused as *invalid*, the language tags `EN`, `pt-BR`, `e` and one of 36 characters
   included, while `en`, `de` and `pt-br` are accepted (S5, E4, N1).
-- AC7: A document of 67,108,865 bytes and one with a string of 65,537 bytes of UTF-8 are refused as *too large*; a
-  document of exactly 67,108,864 bytes and a string of exactly 65,536 bytes are not refused for their size; only the
-  kinds are asserted. The writer refuses a document of E4 or E5 with that kind and writes nothing (E5, E7).
+- AC7: Each bound of E5 plus one (16,777,217 bytes, a string of 65,537 bytes, 16,385 entries, 17 names, 33 region
+  types) is refused as *too large*, the count bounds before deserialization; each bound exactly is not refused for
+  its size; only the kinds are asserted. The writer refuses a document of E4 or E5 with that kind and writes nothing (E5, E7).
 - AC8: Every refusal returns its kind and the fixed text of the table, never an exception and never a name, region
   type or reference of the document (S5, N1, N5).
 
@@ -126,19 +128,16 @@ decoded (E1, E5); (3) `schemaVersion` (E2, E3); (4) the structure of version 1 (
 
 ## Open questions
 
-- Does the document hold the PNG data? Answered: no; it holds a content reference per icon (the issue names "icon
-  references"), so an upload can skip images the server already has (#42), and the image data stays out of a
-  document of names. The plan's decision record states the options.
-- Accept unknown properties for forward compatibility? Answered: no; strict reading with a version raised on every
-  change (records 0018, 0033); a mismatched pair is refused (N2).
-- README and user guide (issue's *Documentation*)? Answered: no change; nothing a tester can try changes. The area
-  document describes the format.
+- PNG data in the document? Answered: no, a content reference (record
+  [0055](../../docs/decisions/0055-catalog-document-refers-to-icons-by-content-hash.md)).
+- Unknown properties accepted? Answered: no (record
+  [0056](../../docs/decisions/0056-catalog-document-read-strictly-by-exact-schema-version.md)).
+- README and user guide? Answered: no change; nothing a tester can try changes.
 
 ## Area documents
 
 - New `docs/areas/game-catalog-format.md`: everything above as rules, with an example of invented values.
-- `docs/areas/game-catalog.md` and `docs/areas/game-catalog-cache.md`: *Not here* points to the new area instead of
-  #26; the areas index gets its row.
+- `game-catalog.md`, `game-catalog-cache.md`, `game-files.md` and the index point to it.
 
 ## Challenge
 
@@ -152,3 +151,11 @@ decoded (E1, E5); (3) `schemaVersion` (E2, E3); (4) the structure of version 1 (
   kinds only.
 - 6 (minor, placement): accepted; N6, AC3. The Companion's tests copy only their own fixtures today, so the plan adds
   the link.
+
+## Amendments
+
+| Criterion | Change | Reason | Step | Decided by |
+| --------- | ------ | ------ | ---- | ---------- |
+| AC1 | an entry of an ambiguous GUID is left out too | `GameCatalog` can hold an entry of an ambiguous GUID that `Find` does not answer | 2 | Lead |
+| AC4 | the writer refuses another schema version as *unsupported version* | the writer never writes what the reader refuses | 2 | Lead |
+| AC7 | document bound 16 MiB, count bounds for entries, names and region types | Security: a 64 MiB document could hold over 500 MB of model | 2 | Lead |
