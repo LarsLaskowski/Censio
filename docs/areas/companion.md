@@ -4,7 +4,7 @@
 
 The Companion process on Windows: its tray icon, tooltip and menu, how it exits, how many instances run, the
 version it shows, its command line (recording the pipe and replaying a recording), starting and stopping a recording
-from the menu, the optional start with Windows, the diagnostics window with the last tick, the game installation line, the folders it opens, its settings file, its log file, and the release ZIP it ships in. The user who starts the Companion relies on it.
+from the menu, the optional start with Windows, the menu entry for the diagnostics window, the game installation line, the folders it opens, its settings file, and the release ZIP it ships in. The window itself is in [`companion-diagnostics.md`](companion-diagnostics.md) and the log file in [`companion-log.md`](companion-log.md). The user who starts the Companion relies on it.
 
 ## Behavior
 
@@ -112,60 +112,6 @@ described in the other sections.
 - The catalog cache lies in `%LOCALAPPDATA%\Censio\Cache` (file `catalog.bin`, [`game-catalog-cache.md`](game-catalog-cache.md)):
   fixed, without a menu entry, created at the first write, private like the recordings folder, and kept when the Companion is removed.
 
-### Diagnostics window
-
-`Open diagnostics` opens one window, titled `Censio Companion: Diagnostics`, with the latest closed tick (record
-[0038](../decisions/0038-diagnostics-window-flat-table-of-rows-made-on-demand.md)). It shows every value as the game
-sent it: GUIDs are raw numbers where the catalog has no name for them; icons are shown where the game's files give one.
-
-- **Header**, top to bottom: `Status: <status text>`; `Last tick: <time>, <n> islands` or `Last tick: none`, exactly the
-  text of the menu entry of the same name (*Tray icon and menu*); and, once a tick exists, `Game time: <game time>`, with
-  ` (no data yet)` appended when every island of the tick has no entries. Before the first tick, and with an invalid
-  command line, the header holds `Status:` and `Last tick: none` only, and the table is empty.
-- **Table**, 17 columns left to right: `Region` (session GUID), `Island` (island ID), `Area` (area index), `Session ID`,
-  `Name` (area name), `Good` (product GUID), `Generation`, `Consumption`, `Delta`, `Perfect generation`, `Perfect
-  consumption`, `Buildings`, `Maintenance`, `Income`, `Profit`, `Productivity (sum)`, `Productivity (avg)`. Rows follow
-  the tick: islands in the order the tick holds them, the goods of an island in frame order, the region and island
-  columns repeated on every row of the island. An island without entries has one row with `(no entries)` in `Good` and
-  the value columns empty. The table cannot be sorted, edited or copied.
-- **Numbers** are culture-independent, also on a German Windows: integers in decimal with a leading `-` when negative,
-  floats with the decimal point `.`, no digit grouping, as the shortest text that reads back as the same 32-bit value
-  (`0.1`, `-2.5`, `1E+38`), negative zero as `-0`, and `NaN`, `Infinity`, `-Infinity`.
-- **Catalog names:** once the catalog is ready, the `Region` and `Good` cells of a GUID the catalog names read `<English
-  name> / <German name> (<GUID>)`; with one name only (an incomplete entry) `<name> (<GUID>)`. A GUID the catalog cannot
-  name (unknown, nameless, ambiguous), GUID `0` and every cell while no catalog is ready show the bare number. The names
-  pass the rule of the log (*Log*) and a name over 4,096 UTF-16 characters is cut there, ending in `…`; a name of
-  exactly 4,096 is kept whole. Buildings and workforce have no column.
-- **Icons:** once the icons are built ([`game-catalog-icons.md`](game-catalog-icons.md)), the `Region` and `Good` cells show
-  the icon of the cell's GUID before the text: an image of 20 by 20 device-independent pixels, then a gap of 4, then the
-  text, vertically centred. In the `Region` column the icon sits on a dark round backdrop of that size (the game's region
-  icons are light glyphs); the `Good` icon has none. A GUID without an icon (none, unknown, a problem of the icon, GUID `0`) and every cell while
-  no icons are built show the text alone, without the image's place, backdrop or gap.
-  The names are published first: the window shows them as soon as the catalog is ready and adds the icons when they are
-  built, and a new build of the catalog removes the icons until the new ones are ready. Each distinct icon is decoded once, at twice the size of the
-  cell (sharp up to 200 % display scaling), and shared by the rows that show it. The icons are held in memory and written only to the catalog cache ([`game-catalog-cache.md`](game-catalog-cache.md)): the window writes nothing of them to disk, nothing of them is logged or sent, and a screenshot holds the game's icons.
-- **Area names** (the `Name` column) pass the rule of the log (*Log*): each control character, format character, line
-  separator, paragraph separator (the categories Cc, Cf, Zl, Zp) and unpaired surrogate is shown as one `?`, nothing
-  else is changed (combining marks, right-to-left letters and spaces stay as sent), and an area name is never cut, also
-  at the longest pipe string of 255 bytes. Each cell is its own text, so a name cannot reorder another cell.
-- **Update:** the window follows each closed tick, each change of the status text, and the next local midnight (when
-  `Last tick:` changes from `HH:mm:ss` to the dated form). At most one update waits at a time; with ticks closing faster
-  than the window shows them (a replay with `--speed max`) intermediate ticks may be skipped and the window always ends
-  with the latest tick. The scroll position (vertical and horizontal) is kept as far as the new table reaches.
-- **Kept tick:** opening the window shows the latest closed tick at once, also one that closed while no window was open
-  (the connection and the replay keep it, [`pipe-connection.md`](pipe-connection.md), *Latest tick*).
-- **Close and single window:** the close button and Alt+F4 close only the window; the icon, the connection, a running
-  recording or replay, the tooltip and the menu go on. `Open diagnostics` with a window open brings that window to the
-  front (restored when minimized) and opens no second one; after a close it opens a new one. `Exit` closes the window with
-  the icon and keeps its 2-second bound with the window open.
-- **Read path:** handing a closed tick to the window only stores it and signals; its text is made on the window's thread,
-  never on the thread that reads the pipe or the recording. Receive times, states, ticks and recorded frames are the same
-  with the window open, closed or stalled.
-- **Memory:** the window makes text only for the rows on screen. At most three ticks are referenced: the open one, the
-  kept one and the one shown; a replaced or a closed window references none.
-- **Privacy:** the window shows island names, economic data and the game's icons on screen only. Nothing of it is written to disk, logged
-  or sent anywhere, and the window adds no log line. A screenshot holds the savegame's island names.
-
 ### Start with Windows
 
 - Off by default: the Companion writes nothing about autostart until the entry is clicked (not at start, not when the menu opens). The entry is the string value `Censio Companion` under `HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run`, in the user's own hive; no other key or user is touched and no administrator rights are needed.
@@ -173,7 +119,7 @@ sent it: GUIDs are raw numbers where the catalog has no name for them; icons are
 - A click on an unchecked entry writes that command; a click on a checked entry deletes the value `Censio Companion`. The Companion starts with Windows the same way as when started by hand, without a command line argument, so it neither records nor replays.
 - The path of the exe is used only when it is a full path of at most 200 characters without `"` or `%`. For any other path (a folder with `%` in its name, a very long one) the click changes nothing and the change warning is logged; the entry stays unchecked.
 - Moving the exe, or starting a new version from another folder, leaves the old command behind; the entry then shows unchecked. To remove it, start any copy of the exe and click the entry (it replaces the stale command with this exe's), then click it again (it deletes the value), or delete the value under the key above in the Registry Editor; switching it off in Windows' startup apps list does not delete it.
-- Turning it on and off is logged (*Log*). The Companion does not read or change the switch of Windows' startup apps list (`Settings > Apps > Startup`): a value switched off there is still checked in the menu, and the player switches it on again in that list.
+- Turning it on and off is logged ([`companion-log.md`](companion-log.md)). The Companion does not read or change the switch of Windows' startup apps list (`Settings > Apps > Startup`): a value switched off there is still checked in the menu, and the player switches it on again in that list.
 
 ### Settings file
 
@@ -191,63 +137,7 @@ sent it: GUIDs are raw numbers where the catalog has no name for them; icons are
   (also in different case), or when it cannot be read (locked, access denied, a folder of that name). A name that
   cannot be decoded (invalid UTF-8 or a lone surrogate) makes the whole file invalid, even under an unknown key;
   invalid bytes in a comment or in another key's value are accepted.
-- The reason is logged as a warning (*Log*); no automatic search follows an invalid file.
-
-### Log
-
-- The Companion writes a log to `%LOCALAPPDATA%\Censio\Logs\companion-<yyyyMMdd>.log` (the local date). The folder
-  is fixed. Information and above is logged; there is no setting.
-- A file that would pass 10 MiB (10,485,760 bytes) with the next line is continued in
-  `companion-<yyyyMMdd>-<n>.log` with `n` from 2 up to 9999 (beyond that lines are dropped); a new local day starts a
-  new file, and a Companion started again on the same day continues the day's highest-numbered file. When a new file
-  is created, only the 10 newest log files are kept, newest by the date and then `n` in the name. Only top-level files
-  whose whole name is exactly `companion-<yyyyMMdd>.log` or `companion-<yyyyMMdd>-<n>.log` (`n` from 2, no leading
-  zero, ASCII digits only, case-insensitive) are ever deleted, other files in the folder never; a symbolic link is
-  deleted as a link, not its target.
-- A line is `<yyyy-MM-ddTHH:mm:ss.fffzzz> <level> <message>`: local time with UTC offset, the level `INF`, `WRN`, `ERR`
-  or `CRT`, and the message; an exception follows on the lines after it, each indented by two spaces.
-- It logs: the start with the version and the mode (`Normal`, `Record`, `Replay`, `Invalid`); each change of the
-  connection state with the error kind, the Windows error code and the received version (only changes, never a line
-  per skipped frame); recording started and stopped at the click, its file name (the name only) when the file is
-  created, a recording failure and the failure of a stopped recording; the result of the game installation search at every start (found with its source, build and folder, or the warning of its failure; [`game-installation.md`](game-installation.md), *Log*), where the folder and the settings file path are logged as written and may hold the Windows user name; the catalog (below); a replay's start (the file name only), its
-  end and its problem reason; a folder that could not be opened; the autostart turned on (`Autostart enabled`) or off (`Autostart disabled`) and, as warnings, `Could not read the autostart setting` (once until a read succeeds again, so a blocked registry does not log at every menu opening) and `Could not change the autostart setting`, with the exception where there is one and never the exe path; an unexpected error of a background task; and `Exit`.
-- **Catalog lines** ([`game-catalog.md`](game-catalog.md)), none with a name or text, only GUIDs, kinds, archive paths and
-  counts: `Catalog built: <n> entries; <i> inherited assets left out; <d> unknown region types dropped`
-  (Information); `Catalog failed: <kind>` (Warning; the kinds `ArchiveUnreadable`, `FileMissing`, `FileUnreadable`,
-  `MalformedFile`); for each catalog file that another archive also lists, `Catalog: <archive> also lists <path>; the
-  copy in config.rda is used` (Warning), and `Catalog: <c> other archives could not be checked for copies` (Warning,
-  only when `c` is above 0); and for every closed tick once a catalog is published, `Catalog cannot name <role> <GUID>:
-  <problem>` (Information) with the role `Region` (the session GUID), `Good`, `Workforce` or `Building` and the problem
-  `Unknown`, `Incomplete`, `Nameless` or `Ambiguous`. Each (role, GUID) is logged once per published catalog, GUID `0` never, live or
-  replayed, whether or not the diagnostics window is open; after 1,000 such lines one line, `Catalog: more than 1000
-  GUIDs cannot be named; further ones are not logged for this catalog`, ends them. A catalog that replaces another (a
-  re-extraction after a game update) starts its own set and its own limit. Ticks closed before a catalog is published
-  are not checked, except the latest one at that moment, which is checked unless no connection or replay has started
-  yet.
-- **Cache lines** ([`game-catalog-cache.md`](game-catalog-cache.md)), none with a name or an image:
-  `Catalog cache not used: <missing|game changed|Companion changed>` (Information, at the start before the extraction);
-  `Catalog cache not used: invalid` and `Catalog check failed; the current catalog is kept` (Warnings);
-  `Catalog cache not written` (Warning, with the exception, which may hold the cache path and so the Windows user name);
-  `Catalog extracted in <t> s (names <a> s, icons <b> s)` (Information, after the icon line of the extraction, also when the
-  icons failed, not when the catalog failed); and `Catalog loaded from cache in <t> s: <n> entries, <g> goods and <r> regions
-  with an icon` (Information; the only catalog line of a cache load). Durations have one decimal and a decimal point. A
-  check that finds the game unchanged writes nothing.
-- **Icon lines** ([`game-catalog-icons.md`](game-catalog-icons.md)), written after the catalog line of the same extraction, none
-  with a name, an entry path or image data: `Catalog icons: <g> goods and <r> regions with an icon; without one: <a> not
-  named, <m> missing, <u> unreadable` (Information; the counts are of entries) and `Catalog icons failed: <kind>
-  (<archive>)` (Warning; the kinds `ArchiveMissing`, `ArchiveUnreadable`, `DuplicateArchiveNumber` and `IconSetTooLarge`,
-  the archive as a path relative to `maindata`, `maindata` itself when the listing failed). One of them is written per extraction, and
-  none while the catalog fails, no game is found or the catalog is loaded from the cache.
-- The log holds no pipe content (figure name, island names, values): recording files and folders are logged by name only.
-- Text that came from outside (a replay file name, exception texts) is sanitized: each control character, format
-  character, line or paragraph separator and unpaired surrogate becomes one `?`, so a text cannot add a line or hide
-  characters. A message is cut at 2,048 characters and an exception text at 16,384, each with `…` appended when cut.
-- **Exception texts are logged as given and may contain the profile path, and so the Windows user name.** A user
-  checks a log for it before sharing it.
-- The writer works in the background: a line waits in a queue of at most 1,048,576 characters (counted per line) and a
-  line that does not fit is dropped. If the log folder or file cannot be created or written, or the folder is not a
-  full path, the lines are lost and nothing else changes, with no message. At `Exit` the queue gets 0.5 second.
-- A second Companion in the same session ends at once and writes no log line.
+- The reason is logged as a warning ([`companion-log.md`](companion-log.md)); no automatic search follows an invalid file.
 
 ### Replay
 
@@ -280,8 +170,8 @@ sent it: GUIDs are raw numbers where the catalog has no name for them; icons are
 ## Limits and errors
 
 - The Companion shows no error message or dialog; a connection problem shows only as a status text, a recording
-  problem as `(recording failed)`, a replay problem as `Replay error`, and details go to the log (*Log*).
-- A folder that cannot be opened, or a log that cannot be written, changes nothing else and shows no message.
+  problem as `(recording failed)`, a replay problem as `Replay error`, and details go to the log ([`companion-log.md`](companion-log.md)).
+- A folder that cannot be opened, or a log that cannot be written, changes nothing else and shows no message (the writer rules are in [`companion-log.md`](companion-log.md)).
 - A game folder that is missing or wrong, or a settings file that cannot be used, shows only as the `Game:` line of the menu, with the detail in the log.
 - A read failure (access denied, a policy, a value that is not a string): the entry is shown unchecked and stays clickable, and `Could not read the autostart setting` is logged once until a read succeeds again. If the value cannot be written or deleted, a click changes nothing, `Could not change the autostart setting` is logged and the player gets no message; the next opening shows the state read then. A policy that stops Windows from starting the user's startup programs while the value can still be written is not visible: the menu shows the state of the value only. A switch-off in Windows' startup apps list is not read: the entry stays checked while Windows does not start the Companion, and the player switches it on in that list; a click deletes the value, and a later click writes it again with Windows' switch-off still in place. An exe started from inside the ZIP runs from a temporary folder, so the entry registers that path and nothing starts at sign-in once Windows cleans the folder.
 - Manual runs on Windows confirmed the behavior above (issues #13, #14 and #15, and the Product Manager's run on
@@ -298,9 +188,6 @@ sent it: GUIDs are raw numbers where the catalog has no name for them; icons are
 - [`decisions/0017-companion-tray-app-autostart-and-connect.md`](../decisions/0017-companion-tray-app-autostart-and-connect.md) — the autostart is a per-user Run value written on the player's click.
 - [`decisions/0027-companion-zip-self-contained-single-file-unsigned.md`](../decisions/0027-companion-zip-self-contained-single-file-unsigned.md) — self-contained single-file exe in a ZIP, not signed.
 - [`decisions/0036-pipe-recording-raw-frames-and-replay-on-a-recorded-clock.md`](../decisions/0036-pipe-recording-raw-frames-and-replay-on-a-recorded-clock.md) — recordings hold the raw frames, written off the read path; a replay feeds them back on a recorded clock.
-- [`decisions/0037-companion-log-through-the-logging-abstraction-to-own-rotating-file.md`](../decisions/0037-companion-log-through-the-logging-abstraction-to-own-rotating-file.md) — the Companion logs through .NET's logging abstraction into its own rotating text file.
-- [`decisions/0038-diagnostics-window-flat-table-of-rows-made-on-demand.md`](../decisions/0038-diagnostics-window-flat-table-of-rows-made-on-demand.md) — the diagnostics window is a flat table whose rows are made on demand from the latest tick, kept whole.
-
 - [`decisions/0048-catalog-names-shown-in-the-diagnostics-window-unresolved-guids-logged-once.md`](../decisions/0048-catalog-names-shown-in-the-diagnostics-window-unresolved-guids-logged-once.md) — names in the diagnostics window, unresolved GUIDs logged once.
 - [`decisions/0044-game-installation-found-through-ubisoft-connect-or-the-settings-file.md`](../decisions/0044-game-installation-found-through-ubisoft-connect-or-the-settings-file.md) — the installation comes from Ubisoft Connect or the settings file.
 - [`decisions/0045-companion-settings-in-a-json-file-under-local-app-data.md`](../decisions/0045-companion-settings-in-a-json-file-under-local-app-data.md) — the settings are a hand-edited JSON file, never written by the Companion.
@@ -312,5 +199,7 @@ sent it: GUIDs are raw numbers where the catalog has no name for them; icons are
 - Opening the pipe, the connection states and the retry rules: [`pipe-connection.md`](pipe-connection.md).
 - The recording file, its writing and failures, and the replay rules: [`pipe-recording.md`](pipe-recording.md).
 - Finding the game installation: [`game-installation.md`](game-installation.md).
+- The diagnostics window: [`companion-diagnostics.md`](companion-diagnostics.md).
+- The log file, its lines and its writer: [`companion-log.md`](companion-log.md).
 - Building the catalog: [`game-catalog.md`](game-catalog.md); the icons: [`game-catalog-icons.md`](game-catalog-icons.md); the cache: [`game-catalog-cache.md`](game-catalog-cache.md).
 - Reading the game files: [`game-files.md`](game-files.md); the connection to the server, a settings window (later issues).

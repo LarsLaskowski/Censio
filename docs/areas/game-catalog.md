@@ -139,9 +139,9 @@ Rules apply in this order to every defining asset; the first that fits decides.
 
 - The Companion checks the GUIDs of ticks closed after a catalog is published, and the latest tick at that moment, unless
   no tick source (connection or replay) has started yet; ticks closed earlier are not checked
-  ([`companion.md`](companion.md), *Log*). A catalog is published when its names are ready or when it is loaded from the cache,
+  ([`companion-log.md`](companion-log.md)). A catalog is published when its names are ready or when it is loaded from the cache,
   so a re-extraction checks the latest tick against its new catalog and restarts the reporting.
-- Each published catalog has its own `Catalog cannot name` lines and 1,000-line limit ([`companion.md`](companion.md), *Log*).
+- Each published catalog has its own `Catalog cannot name` lines and 1,000-line limit ([`companion-log.md`](companion-log.md)).
 
 ### Failures
 
@@ -220,5 +220,5 @@ Rules apply in this order to every defining asset; the first that fits decides.
   [`game-installation.md`](game-installation.md).
 - The icons of goods and regions: [`game-catalog-icons.md`](game-catalog-icons.md); the catalog cache:
   [`game-catalog-cache.md`](game-catalog-cache.md).
-- The tray line, the diagnostics cells and icons, the check of tick GUIDs and the log lines: [`companion.md`](companion.md).
+- The tray line: [`companion.md`](companion.md); the diagnostics cells and icons: [`companion-diagnostics.md`](companion-diagnostics.md); the check of tick GUIDs and the log lines: [`companion-log.md`](companion-log.md).
 - The catalog format for the server and the upload (#26, #42).

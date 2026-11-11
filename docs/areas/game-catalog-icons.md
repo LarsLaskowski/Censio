@@ -44,7 +44,7 @@ conversion) hold the reasoning.
 - **Reasons** (per good or region entry without an icon): *not named* (the asset has no `IconFilename`), *missing* (the
   value gives no path, or no icon archive lists it) and *unreadable* (the archive that wins lists the path more than
   once, the entry cannot be read or is above its bound, or the DDS file is refused). Each reason is counted and logged
-  as a number of entries ([`companion.md`](companion.md), *Log*), with the goods and regions that have an icon.
+  as a number of entries ([`companion-log.md`](companion-log.md)), with the goods and regions that have an icon.
 - **Failure kinds** (the icons are then withheld as a whole; the names are not touched). The result holds the kind and
   the relative path of the archive concerned, never an exception text or content:
 
@@ -100,4 +100,4 @@ conversion) hold the reasoning.
   [`game-installation.md`](game-installation.md).
 - The catalog the icons belong to (kinds, names, the `IconFilename` read from the assets): [`game-catalog.md`](game-catalog.md);
   the cache that holds the icons across starts: [`game-catalog-cache.md`](game-catalog-cache.md).
-- The diagnostics cells and icons and the log lines: [`companion.md`](companion.md).
+- The diagnostics cells and icons: [`companion-diagnostics.md`](companion-diagnostics.md); the log lines: [`companion-log.md`](companion-log.md).

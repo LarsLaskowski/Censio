@@ -87,7 +87,7 @@ archives again.
 
 ## Not here
 
-- The cache folder and the cache log lines: [`companion.md`](companion.md); the build of the game, which is part of the key:
+- The cache folder: [`companion.md`](companion.md); the cache log lines: [`companion-log.md`](companion-log.md); the build of the game, which is part of the key:
   [`game-installation.md`](game-installation.md).
 - Building the catalog and the check of tick GUIDs against it: [`game-catalog.md`](game-catalog.md); finding and converting
   the icons: [`game-catalog-icons.md`](game-catalog-icons.md).

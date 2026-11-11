@@ -133,7 +133,7 @@ members (English, no `<remarks>`); `.ConfigureAwait(false)` in library/service c
 - External input (pipe frames, recording lines) is read into typed results with a kind, never through exceptions,
   and a reader fails closed (record 0033, `docs/areas/pipe.md`).
 - The Companion logs through `ILogger` with `[LoggerMessage]` methods in `CompanionLog`; what may be logged is in
-  `docs/areas/companion.md` (*Log*).
+  `docs/areas/companion-log.md`.
 - `#endregion` repeats the region's name (`#endregion // Methods`).
 <!-- project:end code-style -->
 
