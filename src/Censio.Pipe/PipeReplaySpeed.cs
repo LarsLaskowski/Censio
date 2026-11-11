@@ -21,15 +21,26 @@ public readonly record struct PipeReplaySpeed
 
     #endregion // Constants
 
+    #region Fields
+
+    /// <summary>
+    /// The divisor a pause is scaled by, parsed from the same text as the factor, or <c>null</c> at maximum speed.
+    /// </summary>
+    private readonly decimal? _divisor;
+
+    #endregion // Fields
+
     #region Constructors
 
     /// <summary>
     /// Initializes a new instance of the <see cref="PipeReplaySpeed"/> struct.
     /// </summary>
     /// <param name="factor">The speed factor, or <c>null</c> for maximum speed</param>
-    private PipeReplaySpeed(double? factor)
+    /// <param name="divisor">The divisor a pause is scaled by, or <c>null</c> for maximum speed</param>
+    private PipeReplaySpeed(double? factor, decimal? divisor)
     {
         Factor = factor;
+        _divisor = divisor;
     }
 
     #endregion // Constructors
@@ -39,12 +50,12 @@ public readonly record struct PipeReplaySpeed
     /// <summary>
     /// Gets the replay at the recorded speed.
     /// </summary>
-    public static PipeReplaySpeed RealTime => new(1d);
+    public static PipeReplaySpeed RealTime => new(1d, 1m);
 
     /// <summary>
     /// Gets the replay without waiting.
     /// </summary>
-    public static PipeReplaySpeed Maximum => new(null);
+    public static PipeReplaySpeed Maximum => new(null, null);
 
     /// <summary>
     /// Gets the speed factor, or <c>null</c> at maximum speed.
@@ -72,12 +83,15 @@ public readonly record struct PipeReplaySpeed
             return true;
         }
 
-        if (double.TryParse(text, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var factor) == false || (factor >= MinFactor && factor <= MaxFactor) == false)
+        if (double.TryParse(text, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var factor) == false
+            || (factor >= MinFactor && factor <= MaxFactor) == false
+            || decimal.TryParse(text, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var divisor) == false
+            || divisor <= 0m)
         {
             return false;
         }
 
-        speed = new PipeReplaySpeed(factor);
+        speed = new PipeReplaySpeed(factor, divisor);
 
         return true;
     }
@@ -89,12 +103,12 @@ public readonly record struct PipeReplaySpeed
     /// <returns>The time to wait</returns>
     public TimeSpan Scale(TimeSpan recordedPause)
     {
-        if (Factor is not { } factor || recordedPause <= TimeSpan.Zero)
+        if (_divisor is not { } divisor || recordedPause <= TimeSpan.Zero)
         {
             return TimeSpan.Zero;
         }
 
-        var scaled = Math.Round(recordedPause.Ticks / (decimal)factor);
+        var scaled = Math.Round(recordedPause.Ticks / divisor);
 
         return scaled >= long.MaxValue ? TimeSpan.MaxValue : TimeSpan.FromTicks((long)scaled);
     }

@@ -184,7 +184,7 @@ public static partial class CompanionLog
     /// </summary>
     /// <param name="logger">The logger</param>
     /// <param name="folder">The folder</param>
-    [LoggerMessage(Level = LogLevel.Warning, Message = "The game folder {Folder} in the settings file is not an Anno 117 installation; expected the folder that holds maindata\\\\config.rda and bin\\\\win64\\\\anno117.exe")]
+    [LoggerMessage(Level = LogLevel.Warning, Message = "The game folder {Folder} in the settings file is not an Anno 117 installation; expected the folder that holds maindata\\config.rda and bin\\win64\\anno117.exe")]
     public static partial void GameSettingsFolderNotInstallation(ILogger logger, string folder);
 
     /// <summary>
