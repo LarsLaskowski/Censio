@@ -141,5 +141,5 @@ an archive. The largest entry counts are 21,028 (`zz_patchfiles_300`), 46,110 (`
 ## Not here
 
 - Finding the installation folder ([`game-installation.md`](game-installation.md)), building the catalog and
-  finding and converting the icons ([`game-catalog-icons.md`](game-catalog-icons.md)), the catalog cache ([`game-catalog-cache.md`](game-catalog-cache.md)); the catalog format (#26).
+  finding and converting the icons ([`game-catalog-icons.md`](game-catalog-icons.md)), the catalog cache ([`game-catalog-cache.md`](game-catalog-cache.md)); the catalog format ([`game-catalog-format.md`](game-catalog-format.md)).
 - The log of the Companion and what may be logged: [`companion-log.md`](companion-log.md).

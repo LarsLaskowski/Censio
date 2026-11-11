@@ -91,4 +91,4 @@ archives again.
   [`game-installation.md`](game-installation.md).
 - Building the catalog and the check of tick GUIDs against it: [`game-catalog.md`](game-catalog.md); finding and converting
   the icons: [`game-catalog-icons.md`](game-catalog-icons.md).
-- The catalog format for the server and the upload (#26, #42).
+- The catalog format for the server: [`game-catalog-format.md`](game-catalog-format.md); the upload (#42).
