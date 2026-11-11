@@ -388,6 +388,28 @@ public sealed class AnonymiserCommandTests
     }
 
     /// <summary>
+    /// Not exactly two arguments print the usage and exit with the usage code even when the run is already cancelled.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    [TestCategory("AC2")]
+    public async Task AnonymiserCommandWrongArgumentCountWithCancelledTokenPrintsUsage()
+    {
+        // Arrange
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.CancellationToken);
+
+        await cancellation.CancelAsync();
+
+        // Act
+        var run = await RunAsync([Path.Combine(_root, "file1.jsonl")], cancellation.Token);
+
+        // Assert
+        Assert.AreEqual(AnonymiserCommand.UsageCode, run.Code, "A wrong argument count should exit with 2 although the run is cancelled");
+        Assert.AreEqual(Usage + Environment.NewLine, run.Error, "The usage should be printed on standard error although the run is cancelled");
+        Assert.AreEqual(string.Empty, run.Output, "Nothing should be printed on standard output");
+    }
+
+    /// <summary>
     /// A cancelled run prints that it was cancelled and leaves no output and no temporary file.
     /// </summary>
     /// <returns>The task</returns>
