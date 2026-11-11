@@ -13,19 +13,58 @@ internal sealed class CatalogEntryKindJsonConverter : JsonConverter<CatalogEntry
     /// <inheritdoc />
     public override CatalogEntryKind Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
-        // Skeleton: removed with the implementation
-#pragma warning disable RH2003
-        throw new NotImplementedException();
-#pragma warning restore RH2003
+        if (reader.TokenType != JsonTokenType.String)
+        {
+            throw new JsonException();
+        }
+
+        if (reader.ValueTextEquals("region"u8))
+        {
+            return CatalogEntryKind.Region;
+        }
+
+        if (reader.ValueTextEquals("good"u8))
+        {
+            return CatalogEntryKind.Good;
+        }
+
+        if (reader.ValueTextEquals("workforce"u8))
+        {
+            return CatalogEntryKind.Workforce;
+        }
+
+        if (reader.ValueTextEquals("building"u8))
+        {
+            return CatalogEntryKind.Building;
+        }
+
+        throw new JsonException();
     }
 
     /// <inheritdoc />
     public override void Write(Utf8JsonWriter writer, CatalogEntryKind value, JsonSerializerOptions options)
     {
-        // Skeleton: removed with the implementation
-#pragma warning disable RH2003
-        throw new NotImplementedException();
-#pragma warning restore RH2003
+        switch (value)
+        {
+            case CatalogEntryKind.Region:
+                writer.WriteStringValue("region"u8);
+                break;
+
+            case CatalogEntryKind.Good:
+                writer.WriteStringValue("good"u8);
+                break;
+
+            case CatalogEntryKind.Workforce:
+                writer.WriteStringValue("workforce"u8);
+                break;
+
+            case CatalogEntryKind.Building:
+                writer.WriteStringValue("building"u8);
+                break;
+
+            default:
+                throw new JsonException();
+        }
     }
 
     #endregion // JsonConverter

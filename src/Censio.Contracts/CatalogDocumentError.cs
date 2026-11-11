@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace Censio.Contracts;
 
 /// <summary>
@@ -19,6 +21,49 @@ public sealed class CatalogDocumentError
     }
 
     #endregion // Constructors
+
+    #region Methods
+
+    /// <summary>
+    /// Creates the refusal of a malformed document.
+    /// </summary>
+    /// <returns>The error</returns>
+    internal static CatalogDocumentError CreateMalformed()
+    {
+        return new CatalogDocumentError(CatalogDocumentErrorKind.Malformed, "Catalog document is malformed");
+    }
+
+    /// <summary>
+    /// Creates the refusal of a schema version that is not supported.
+    /// </summary>
+    /// <param name="version">The schema version found</param>
+    /// <returns>The error</returns>
+    internal static CatalogDocumentError CreateUnsupportedVersion(int version)
+    {
+        return new CatalogDocumentError(CatalogDocumentErrorKind.UnsupportedVersion,
+                                        string.Create(CultureInfo.InvariantCulture,
+                                                      $"Catalog schema version {version} is not supported; supported: {CatalogDocument.CurrentSchemaVersion}"));
+    }
+
+    /// <summary>
+    /// Creates the refusal of a document that breaks a value rule.
+    /// </summary>
+    /// <returns>The error</returns>
+    internal static CatalogDocumentError CreateInvalid()
+    {
+        return new CatalogDocumentError(CatalogDocumentErrorKind.Invalid, "Catalog document breaks a rule of schema version 1");
+    }
+
+    /// <summary>
+    /// Creates the refusal of a document that exceeds a size bound.
+    /// </summary>
+    /// <returns>The error</returns>
+    internal static CatalogDocumentError CreateTooLarge()
+    {
+        return new CatalogDocumentError(CatalogDocumentErrorKind.TooLarge, "Catalog document exceeds a size bound");
+    }
+
+    #endregion // Methods
 
     #region Properties
 
