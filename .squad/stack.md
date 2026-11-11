@@ -6,7 +6,13 @@ profile and owned by this repository: keep it true when the build changes.
 
 ## Toolchain
 
-- .NET SDK `10.0.x` (target framework `net10.0`), solution `Censio.slnx`.
+- .NET SDK of `global.json` (`10.0.404`, the newest SDK of the major; `rollForward` `latestFeature`: the newest
+  installed feature band of that major, never the next major), target framework `net10.0` (`net10.0-windows` for
+  `Censio.Companion`), solution `Censio.slnx`. Several majors may be installed side by side (a machine, CI); the
+  repository is built for one: every project's target framework, `global.json` and every .NET image name the same
+  major, which `dotnet_major.py` checks in the *Analyzer gate*, and a new project gets it from the SDK `global.json`
+  selects. Dependabot keeps the SDK, the packages and the images current within that major; the move to the next one
+  (target frameworks, `global.json`, the ASP.NET Core and EF Core packages, the images) is one change of its own.
 - .NET tools: `reihitsu-format` (`Reihitsu.Cli`) and `dotnet-sonarscanner` are pinned in
   `.config/dotnet-tools.json` and restored with `dotnet tool restore`; CI runs both and the *Format* commands below run the formatter through the manifest (`dotnet tool run`), so every machine uses the pinned version. The formatter stays on
   the same release line (major.minor) as the **Reihitsu.Analyzer** version pinned in `Directory.Packages.props`,
@@ -58,8 +64,12 @@ underscores in member names, a region for an interface implementation named afte
 
 `docker:S8431` (tag and digest in one `FROM`) is excluded for `src/Censio.Server/Dockerfile` only, through `sonar.issue.ignore.multicriteria` in the *Begin SonarQube analysis* step of `.github/workflows/ci.yml`, whose analysis the *Sonar gate* reads (record 0010): the digest pins the base and the tag is what Dependabot updates.
 
-SonarQube Cloud's own quality profile can still report `S####` rules the local default profile does not,
-and its non-Roslyn checks (hotspots, taint analysis, duplication) have no local equivalent: the *Sonar gate*
+SonarAnalyzer.CSharp runs only the rules of *Sonar way core* by default. The rules the project's SonarQube Cloud C#
+profile adds (*Sonar way comprehensive*: S3776, S1192, S107, …), and the core rules it switches off, are set in the
+`squad:sonar-rules` block of `.editorconfig`, which `python3 .squad/tools/sonar-rules.py` writes from the two
+profiles (`--check` reports a block out of date; severity `SONAR_RULES_SEVERITY` in `squad_settings.py`): the
+*Analyzer gate* reports them in a changed file, so no rule of the profile is "one no local analyzer reports". Its
+non-Roslyn checks (hotspots, taint analysis, duplication) have no local equivalent: the *Sonar gate*
 below reports their issues and hotspots and the quality gate, duplication included, on the draft pull request.
 
 Own browser scripts (`wwwroot/js/*.js`, no Node build) have no local analyzer: SonarQube Cloud's JavaScript
@@ -83,12 +93,12 @@ branches through its API. A private project needs a SonarQube credential: a netw
 environment for `sonarcloud.io` and `*.sonarcloud.io` (the agent proxy attaches the token to those requests, so no
 session or member sees it), or else `SONAR_TOKEN` in the environment, which every process of the session can
 read. A finding of a rule no local analyzer reports is noted in this section, in the same change, instead of a
-squad lesson. `csharpsquid:S3776` (cognitive complexity above 15 in one method) is such a rule: no local analyzer
-reports it, so split a long method with nested branches into private methods while writing it. `csharpsquid:S1192`
-(a string literal repeated four times or more in one file) is such a rule too: name a repeated literal with a private
-constant while writing the code. `csharpsquid:S107` (a method with more than seven parameters) is such a rule too: bundle
-related arguments into a small type (a record or a readonly struct with XML documentation) while writing the signature,
-rather than adding parameters to a method that already has seven.
+squad lesson. `csharpsquid:S3776` (cognitive complexity above 15 in one method), `csharpsquid:S1192` (a string literal
+repeated four times or more in one file) and `csharpsquid:S107` (a method with more than seven parameters) are not
+such rules any more: the `squad:sonar-rules` block lets the *Analyzer gate* report them in a changed file. Write to
+them from the start all the same: split a long method with nested branches into private methods, name a repeated
+literal with a private constant, and bundle related arguments into a small type (a record or a readonly struct with
+XML documentation) rather than adding parameters to a method that already has seven.
 
 ## Image build check
 
@@ -182,10 +192,13 @@ Constructors store their arguments and never throw: a test harness builds these 
 fail.
 The `Skeleton` body above is the default. A zero-value stub is allowed only where it would break a test that
 exists and passes today: the new tests must still fail on the stub, and the Dev reports it as a deviation.
-A private member or parameter that nothing calls or reads yet fails the *Analyzer gate* as S1144 (unused private member) or
-S1172 (unused parameter). Wrap exactly those members in `#pragma warning disable S1144, S1172` /
-`#pragma warning restore S1144, S1172` with the comment `// Skeleton: removed with the implementation`; the Dev lists
-each pragma in its report and removes it in mode `implement`, and the Reviewer blocks one that is still there.
+A skeleton raises diagnostics by construction, which the zero-diagnostic rule does not count against it: S1144
+(unused private member), S1172 (unused parameter), S4487 (a private field assigned but not read yet), S2325 (a member
+that does not use instance data yet), CS0067 (an event never raised yet), CS0649 (a field never assigned yet) and
+RH2003 (`NotImplementedException`). Wrap exactly the members that raise one in `#pragma warning disable <the ids the
+build reports>` / `#pragma warning restore <the same ids>` with the comment `// Skeleton: removed with the
+implementation` — no other id; the Dev lists each pragma in its report and removes it in mode `implement`, and the
+Reviewer blocks one that is still there.
 
 ## Dependencies
 
