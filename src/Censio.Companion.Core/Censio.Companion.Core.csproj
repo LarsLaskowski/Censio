@@ -7,6 +7,4 @@
     <ProjectReference Include="..\Censio.Pipe\Censio.Pipe.csproj" />
     <ProjectReference Include="..\Censio.GameData\Censio.GameData.csproj" />
   </ItemGroup>
-  <ItemGroup>
-  </ItemGroup>
 </Project>
