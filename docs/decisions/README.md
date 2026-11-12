@@ -119,4 +119,7 @@ once in the [area document](../areas/README.md) of the record's area, and the re
 | [0055](0055-catalog-document-refers-to-icons-by-content-hash.md) | The catalog document refers to each icon by the SHA-256 of its PNG and carries no image data | Accepted | 2026-11-11 |
 | [0056](0056-catalog-document-read-strictly-by-exact-schema-version.md) | The catalog document is read strictly, by exactly the schema versions a reader lists | Accepted | 2026-11-11 |
 | [0057](0057-ci-format-check-and-pinned-tools.md) | CI checks the format, and the formatter and the scanner are pinned in the tool manifest | Accepted | 2026-11-12 |
+| [0058](0058-contract-read-strictly-by-exact-version-with-a-frozen-hello.md) | The contract is read strictly by exact version; the hello and its refusal keep one form for every version | Proposed | 2026-11-12 |
+| [0059](0059-contract-messages-carry-a-companion-assigned-identity-and-their-profile.md) | Contract messages carry an identity the Companion assigns and the profile they were taken under | Proposed | 2026-11-12 |
+| [0060](0060-contract-message-bound-caps-ticks-below-the-pipes-limits.md) | One byte bound per contract message caps a tick below the pipe's limits; images and catalog travel as Base64 | Proposed | 2026-11-12 |
 <!-- project:end index -->

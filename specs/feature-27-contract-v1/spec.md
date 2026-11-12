@@ -1,7 +1,7 @@
 # Spec: JSON contract v1 between Companion and server
 
 Source: Issue #27
-Status: Draft
+Status: Approved by Lead
 
 ## Problem
 
@@ -62,11 +62,13 @@ content: no token, profile, island name, catalog content or image data.
 - E2: A message that is not JSON, is truncated, has an unknown message type, an unknown, repeated or missing property or a
   wrong JSON type is refused as *malformed*: `Contract message is malformed`.
 - E3: A message that breaks a value rule of version 1 (a tick without islands, an island key twice in one tick, an icon
-  image whose PNG data does not hash to its reference, a string that is no well-formed Unicode text, an empty profile
+  image whose PNG data does not hash to its reference, a string that is no well-formed Unicode text (the reader finds
+  an escaped lone surrogate already in its syntax pass: *malformed*, as the catalog reader does), an empty profile
   name, a profile or message identity that is not a UUID or is the all-zero UUID, a catalog identity that is not 64
   lowercase hex digits) is refused as
   *invalid*: `Contract message breaks a rule of contract version 1`. The writer refuses the same and writes nothing.
-- E4: A message above a size or count bound is refused as *too large*: `Contract message exceeds a size bound`.
+- E4: A message above a size or count bound is refused as *too large*: `Contract message exceeds a size bound`. A tick
+  whose message would exceed the byte bound is refused so by the writer and not sent; reporting it is #40's and #41's.
 - E5: A catalog document inside a catalog upload that the catalog reader refuses refuses the upload with the catalog's
   own kind and text (e.g. `Catalog schema version 2 is not supported; supported: 1`); ticks are unaffected.
 - E6: A float the game sent that is not a finite number (NaN or an infinity, [`pipe.md`](../../docs/areas/pipe.md),
@@ -80,11 +82,11 @@ content: no token, profile, island name, catalog content or image data.
 
 - N1: Reading back what was written gives an equal message, every value exact (float32 values bit for bit, the receive
   time to its full precision, 64-bit integers without rounding); the same message always gives the same bytes.
-- N2: The bounds admit every tick the assembler can deliver ([`pipe.md`](../../docs/areas/pipe.md), *Limits and errors*:
-  256 islands, 524,288 entries and map pairs, names of 255 wire bytes, which U+FFFD replacement can make 765 UTF-8
-  bytes), every catalog document the catalog writer writes and every icon PNG the icon reader keeps; the plan states
-  each bound, the byte bound of a tick message (about 100 MB at the pipe's limits) and the peak memory a read of the
-  largest message measured, for Security to weigh.
+- N2: The bounds admit every catalog document the catalog writer writes, every icon PNG the icon reader keeps, and
+  every tick within the pipe's island, entry-and-pair and map limits ([`pipe.md`](../../docs/areas/pipe.md), *Limits and
+  errors*; names of 255 wire bytes, which U+FFFD replacement makes up to 765 UTF-8 bytes) whose message stays within one
+  byte bound per message. That bound is far above the largest recorded tick, but below a tick at the pipe's entry limit
+  (about 200 MB): the plan states it and the memory a read of the largest message measured, for Security to weigh.
 - N3: The reader runs on untrusted input and is strict like the catalog reader (record
   [0056](../../docs/decisions/0056-catalog-document-read-strictly-by-exact-schema-version.md)): it checks size before
   syntax, syntax before version, version before structure, structure before values, and returns a typed result.
@@ -111,8 +113,10 @@ content: no token, profile, island name, catalog content or image data.
 - AC6: The reader refuses each case of E2, E3 and E4 with its kind and exact text, throws for none, and no refusal text
   contains the token, a profile or island name, catalog content or image data; the writer refuses the cases of E3 and
   E4 and writes nothing (E2, E3, E4, N3, N5).
-- AC7: A tick at the pipe's tick limits, a catalog document at the catalog's bounds and an icon PNG at the icon reader's
-  bound, and an island name of 255 U+FFFD characters, are written and read back; one unit above a contract bound is refused as *too large* (E4, N2).
+- AC7: A tick at the pipe's island and entry-and-pair limits whose message fits the byte bound, a message at exactly the
+  byte bound, a catalog document at the catalog's bounds and an icon PNG at the icon reader's
+  bound, and an island name of 255 U+FFFD characters, are written and read back; one unit above a contract bound is
+  refused as *too large*, by the reader and the writer (E4, N2).
 - AC8: A catalog upload whose catalog document the catalog reader refuses is refused with the catalog's kind and text
   (E5).
 - AC9: Two session ends taken separately are written with different identities and their own receive times; writing a
@@ -164,3 +168,7 @@ content: no token, profile, island name, catalog content or image data.
 7. (minor) Where the conversion lives. Accepted: in scope, in `Censio.Companion.Core` (*Out of scope*, AC3).
 8. (minor) Tick byte bound and memory. Accepted: N2 makes the plan state both for Security.
 9. (minor) #41's gap. Accepted: silence is the gap, no message (*Out of scope*).
+10. (Lead, while planning) N2 asked bounds for a tick at the pipe's entry limit: such a message is about 200 MB (scratch
+    measurement, [plan.md](plan.md), *Verified facts*), more than a server on a NAS should read from one message. N2, E4
+    and AC7 now cap a tick by the message byte bound, over 30 times the largest recorded tick; record 0060 holds the
+    options.
