@@ -341,20 +341,12 @@ public sealed class PipeMessageParserTests
     public void PipeMessageParserNegativeCountReturnsMalformed(int position)
     {
         // Arrange
-        byte[] frame;
-
-        if (position == 0)
-        {
-            frame = CreateStatistics(-1).Build();
-        }
-        else if (position == 1)
-        {
-            frame = CreateStatistics(1).EntryFields(1).Int32Value(-1).Int32Value(0).Build();
-        }
-        else
-        {
-            frame = CreateStatistics(1).EntryFields(1).Int32Value(0).Int32Value(-1).Build();
-        }
+        var frame = position switch
+                    {
+                        0 => CreateStatistics(-1).Build(),
+                        1 => CreateStatistics(1).EntryFields(1).Int32Value(-1).Int32Value(0).Build(),
+                        _ => CreateStatistics(1).EntryFields(1).Int32Value(0).Int32Value(-1).Build(),
+                    };
 
         // Act and Assert
         ParseMalformed(frame);
@@ -371,20 +363,12 @@ public sealed class PipeMessageParserTests
     public void PipeMessageParserCountBeyondFrameReturnsMalformed(int position)
     {
         // Arrange
-        byte[] frame;
-
-        if (position == 0)
-        {
-            frame = CreateStatistics(1000).Entry(1, _noPairs, _noPairs).Build();
-        }
-        else if (position == 1)
-        {
-            frame = CreateStatistics(1).EntryFields(1).Int32Value(1000).Int32Value(1).Int32Value(1).Build();
-        }
-        else
-        {
-            frame = CreateStatistics(1).EntryFields(1).Int32Value(0).Int32Value(1000).Int32Value(1).Int32Value(1).Build();
-        }
+        var frame = position switch
+                    {
+                        0 => CreateStatistics(1000).Entry(1, _noPairs, _noPairs).Build(),
+                        1 => CreateStatistics(1).EntryFields(1).Int32Value(1000).Int32Value(1).Int32Value(1).Build(),
+                        _ => CreateStatistics(1).EntryFields(1).Int32Value(0).Int32Value(1000).Int32Value(1).Int32Value(1).Build(),
+                    };
 
         // Act and Assert
         ParseMalformed(frame);

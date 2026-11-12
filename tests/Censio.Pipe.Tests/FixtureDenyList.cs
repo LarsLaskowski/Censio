@@ -283,6 +283,35 @@ public sealed class FixtureDenyList
     }
 
     /// <summary>
+    /// Checks that the original's line is readable and of the same kind as the fixture's line.
+    /// </summary>
+    /// <param name="report">The report</param>
+    /// <param name="fixture">The fixture file name</param>
+    /// <param name="line">The fixture's line</param>
+    /// <param name="originalLine">The original's line</param>
+    /// <returns><c>true</c> if the original can still be compared, <c>false</c> if it is dropped</returns>
+    private static bool MatchesOriginal(FixtureDenyListReport report, string fixture, PipeRecordingLine line, PipeRecordingLine originalLine)
+    {
+        if (originalLine.Kind == PipeRecordingLineKind.Problem)
+        {
+            report.AddFinding($"{fixture}: the original is missing or unreadable");
+
+            return false;
+        }
+
+        if (originalLine.Kind != line.Kind)
+        {
+            report.AddFinding(originalLine.Kind == PipeRecordingLineKind.Frame
+                                  ? $"{fixture}: the original has more lines"
+                                  : string.Create(CultureInfo.InvariantCulture, $"{fixture}: line {line.LineNumber}: the original has no matching frame"));
+
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
     /// Reads one line of the deny list.
     /// </summary>
     /// <param name="line">The line</param>
@@ -418,20 +447,8 @@ public sealed class FixtureDenyList
                 return;
             }
 
-            if (originalLine?.Kind == PipeRecordingLineKind.Problem)
+            if (originalLine is not null && MatchesOriginal(report, fixture, line, originalLine) == false)
             {
-                report.AddFinding($"{fixture}: the original is missing or unreadable");
-
-                original = null;
-                originalLine = null;
-            }
-
-            if (originalLine is not null && originalLine.Kind != line.Kind)
-            {
-                report.AddFinding(originalLine.Kind == PipeRecordingLineKind.Frame
-                                      ? $"{fixture}: the original has more lines"
-                                      : string.Create(CultureInfo.InvariantCulture, $"{fixture}: line {line.LineNumber}: the original has no matching frame"));
-
                 original = null;
             }
 

@@ -122,6 +122,30 @@ internal sealed class CatalogDocumentScanner
 
     #endregion // Properties
 
+    #region Static methods
+
+    /// <summary>
+    /// The marker of an entry's property name that the scanner follows.
+    /// </summary>
+    /// <param name="reader">The reader, positioned on the property name</param>
+    /// <returns><see cref="NamesMarker" />, <see cref="RegionTypesMarker" />, or 0 for any other property</returns>
+    private static int EntryPropertyMarker(ref Utf8JsonReader reader)
+    {
+        if (reader.ValueTextEquals("names"u8))
+        {
+            return NamesMarker;
+        }
+
+        if (reader.ValueTextEquals("regionTypes"u8))
+        {
+            return RegionTypesMarker;
+        }
+
+        return 0;
+    }
+
+    #endregion // Static methods
+
     #region Methods
 
     /// <summary>
@@ -346,14 +370,7 @@ internal sealed class CatalogDocumentScanner
         {
             case JsonTokenType.PropertyName:
                 {
-                    if (reader.ValueTextEquals("names"u8))
-                    {
-                        _entryProperty = NamesMarker;
-                    }
-                    else
-                    {
-                        _entryProperty = reader.ValueTextEquals("regionTypes"u8) ? RegionTypesMarker : 0;
-                    }
+                    _entryProperty = EntryPropertyMarker(ref reader);
                 }
                 break;
 
