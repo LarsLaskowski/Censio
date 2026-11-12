@@ -102,3 +102,4 @@ otherwise), one line each: the double, where it lives and what it stands in for;
 - `RegExportUbisoftInstallRecords` (`tests/Censio.Companion.Core.Tests/RegExportUbisoftInstallRecords.cs`) — an `IUbisoftInstallRecords` over a `reg export` file, for the sample in `Fixtures/GameInstallation/`.
 - `NonSeekableStream` (`tests/Censio.GameData.Tests/NonSeekableStream.cs`) — a forward-only stream of unknown length; `TrackingStream` (`tests/Censio.GameData.Tests/TrackingStream.cs`) — a memory stream that logs its disposal.
 - `DdsFileBuilder` (`tests/Censio.GameData.Tests/DdsFileBuilder.cs`) — builds synthetic and patched BC7 DDS files and their expected pixels in code, no game icon.
+- `ForeignContractMessage` (`tests/Censio.Contracts.Tests/ForeignContractMessage.cs`) — a `ContractMessage` of no contract type, for the rules' and writer's refusal of an unknown message.

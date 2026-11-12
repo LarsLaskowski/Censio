@@ -726,6 +726,35 @@ public sealed class ContractReaderTests
     }
 
     /// <summary>
+    /// A Base64 text one character above the bound of 23,767,724 characters after unescaping is too large, also where the
+    /// character is an escape and the bytes it decodes to stay within the binary bound; the message stays below the byte bound.
+    /// </summary>
+    /// <param name="notation">The message that holds the Base64 text</param>
+    /// <param name="find">The Base64 text of the message to replace</param>
+    /// <param name="escape">The escape inserted into the Base64 text of the binary bound</param>
+    [TestMethod]
+    [TestCategory("AC7")]
+    [DataRow(IconImageNotation, PngBase64, """\n""")]
+    [DataRow(CatalogUploadNotation, CatalogBase64, """\n""")]
+    [DataRow(IconImageNotation, PngBase64, """\u0020""")]
+    public void ContractReaderBase64AboveCharacterBoundIsTooLarge(string notation, string find, string escape)
+    {
+        // Arrange
+        var base64 = Convert.ToBase64String(BinaryOfLength(ContractReader.MaxBinaryBytes));
+        var text = string.Concat(base64.AsSpan(0, 4), escape, base64.AsSpan(4));
+        var json = Encoding.UTF8.GetBytes(Substitute(notation, find, text));
+
+        // Act
+        var result = ContractReader.Read(json);
+
+        // Assert
+        Assert.AreEqual(23767724, base64.Length, "The Base64 text of the binary bound should be at the character bound");
+        Assert.StartsWith("\\", escape, "The escape should still hold its backslash");
+        Assert.IsLessThan(ContractReader.MaxMessageBytes, json.Length, "The message should stay below the byte bound");
+        AssertRefusal(result, ContractErrorKind.TooLarge, TooLargeText, $"{find} with {escape}");
+    }
+
+    /// <summary>
     /// An island name of 255 replacement characters written as escapes (765 bytes, 1,530 raw) is read whole.
     /// </summary>
     [TestMethod]
@@ -1106,6 +1135,8 @@ public sealed class ContractReaderTests
         yield return ("Base64 not canonical", Utf8(Substitute(IconImageNotation, PngBase64, "iVBORx==")));
         yield return ("Base64 URL alphabet", Utf8(Substitute(IconImageNotation, PngBase64, "iVBOR-==")));
         yield return ("Base64 with a line break", [.. Utf8(IconImageNotation[..IconImageNotation.IndexOf("Rw==", StringComparison.Ordinal)]), 0x0A, .. Utf8(IconImageNotation[IconImageNotation.IndexOf("Rw==", StringComparison.Ordinal)..])]);
+        yield return ("invalid UTF-8 in a Base64 png", [.. Utf8(IconImageNotation[..IconImageNotation.IndexOf("Rw==", StringComparison.Ordinal)]), 0xC3, 0x28, .. Utf8(IconImageNotation[IconImageNotation.IndexOf("Rw==", StringComparison.Ordinal)..])]);
+        yield return ("missing icons a string", Utf8(Substitute(AcknowledgementNotation, $"['{Icon}']", $"'{Icon}'")));
         yield return ("Base64 png a number", Utf8(Substitute(IconImageNotation, $"'{PngBase64}'", "7")));
         yield return ("Base64 document with a space", Utf8(Substitute(CatalogUploadNotation, "eyJzY2hl", "eyJz Y2hl")));
         yield return ("Base64 document without padding", Utf8($"{{'type':'catalogUpload','contractVersion':1,'id':'{Id}','document':'{Base64("not json").TrimEnd('=')}'}}"));
@@ -1154,6 +1185,8 @@ public sealed class ContractReaderTests
         yield return ("receive time with a zero offset", Substitute(TickNotation, Time, "2026-11-12T10:20:30.1234567+00:00"));
         yield return ("receive time without zone", Substitute(TickNotation, Time, "2026-11-12T10:20:30.1234567"));
         yield return ("receive time no time", Substitute(TickNotation, Time, "yesterday"));
+        yield return ("receive time with a space for the T", Substitute(TickNotation, Time, "2026-11-12 10:20:30.1234567Z"));
+        yield return ("receive time with a letter for a digit", Substitute(TickNotation, Time, "2026-11-12T10:2a:30.1234567Z"));
         yield return ("receive time of a day that does not exist", Substitute(TickNotation, Time, "2026-02-30T10:20:30.1234567Z"));
         yield return ("tick without islands", Substitute(TickNotation, $"[{IslandNotation}]", "[]"));
         yield return ("island key twice", Substitute(TickNotation, $"[{IslandNotation}]", $"[{IslandNotation},{IslandNotation.Replace("'sessionId':2,'name':'Isle'", "'sessionId':3,'name':'Other'", StringComparison.Ordinal)}]"));
