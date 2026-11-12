@@ -1,5 +1,3 @@
-using System.Diagnostics.CodeAnalysis;
-
 namespace Censio.GameData;
 
 /// <summary>
@@ -13,7 +11,6 @@ internal sealed class RdaWindowStream : Stream
     /// <summary>
     /// The stream the window lies in.
     /// </summary>
-    [SuppressMessage("Usage", "CA2213:Disposable fields should be disposed", Justification = "The window does not own the stream it lies in; the archive that opened it disposes it")]
     private readonly Stream _inner;
 
     /// <summary>
@@ -25,6 +22,11 @@ internal sealed class RdaWindowStream : Stream
     /// The length of the window in bytes.
     /// </summary>
     private readonly long _length;
+
+    /// <summary>
+    /// Whether the inner stream stays open when the window is disposed.
+    /// </summary>
+    private readonly bool _leaveOpen;
 
     /// <summary>
     /// The number of bytes read from the window so far.
@@ -41,11 +43,13 @@ internal sealed class RdaWindowStream : Stream
     /// <param name="inner">The stream the window lies in</param>
     /// <param name="start">The position of the first byte of the window</param>
     /// <param name="length">The length of the window in bytes</param>
-    public RdaWindowStream(Stream inner, long start, long length)
+    /// <param name="leaveOpen">Whether the inner stream stays open when the window is disposed</param>
+    public RdaWindowStream(Stream inner, long start, long length, bool leaveOpen)
     {
         _inner = inner;
         _start = start;
         _length = length;
+        _leaveOpen = leaveOpen;
     }
 
     #endregion // Constructors
@@ -117,6 +121,17 @@ internal sealed class RdaWindowStream : Stream
     public override void Write(byte[] buffer, int offset, int count)
     {
         throw new NotSupportedException();
+    }
+
+    /// <inheritdoc />
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing && _leaveOpen == false)
+        {
+            _inner.Dispose();
+        }
+
+        base.Dispose(disposing);
     }
 
     #endregion // Stream

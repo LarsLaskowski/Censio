@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Text;
 
@@ -16,8 +15,7 @@ namespace Censio.Companion.Core.Tests;
 /// Tests for <see cref="PipeConnection" />.
 /// </summary>
 [TestClass]
-[SuppressMessage("Design", "CA1001:Types that own disposable fields should be disposable", Justification = "The asynchronous TestCleanup stops the runs and then disposes the fields after every test")]
-public sealed class PipeConnectionTests
+public sealed class PipeConnectionTests : IDisposable
 {
     #region Fields
 
@@ -104,7 +102,7 @@ public sealed class PipeConnectionTests
     #region Methods
 
     /// <summary>
-    /// Stops every run of the test and waits until it has ended.
+    /// Stops every run of the test and waits until it has ended, before MSTest disposes the test class.
     /// </summary>
     /// <returns>The task</returns>
     [TestCleanup]
@@ -112,9 +110,6 @@ public sealed class PipeConnectionTests
     {
         await _stop.CancelAsync();
         await Task.WhenAll(_runs).WaitAsync(_guard, TestContext.CancellationToken);
-
-        _stop.Dispose();
-        _tickArrived.Dispose();
     }
 
     /// <summary>
@@ -2345,4 +2340,15 @@ public sealed class PipeConnectionTests
     }
 
     #endregion // Methods
+
+    #region IDisposable
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        _stop.Dispose();
+        _tickArrived.Dispose();
+    }
+
+    #endregion // IDisposable
 }

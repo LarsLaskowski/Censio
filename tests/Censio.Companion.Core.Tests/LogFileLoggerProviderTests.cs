@@ -597,6 +597,34 @@ public sealed class LogFileLoggerProviderTests
     }
 
     /// <summary>
+    /// The dispose releases the open log file, so it can be opened without sharing afterwards.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    public async Task LogFileLoggerProviderDisposeReleasesOpenFile()
+    {
+        // Arrange
+        var provider = new LogFileLoggerProvider(Folder, _clock);
+        var logger = provider.CreateLogger("Censio");
+        var path = Path.Combine(Folder, "companion-20261102.log");
+
+        Write(logger, LogLevel.Information, "first");
+
+        await FlushAsync(provider);
+
+        // Act
+        provider.Dispose();
+
+        var exception = Record(() =>
+                               {
+                                   using var stream = new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+                               });
+
+        // Assert
+        Assert.IsNull(exception, $"The log file should be released by the dispose, but opening it threw: {exception?.Message}");
+    }
+
+    /// <summary>
     /// A second dispose of the provider does nothing.
     /// </summary>
     [TestMethod]

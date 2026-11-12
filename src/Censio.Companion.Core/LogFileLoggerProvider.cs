@@ -1,4 +1,3 @@
-using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using System.Threading.Channels;
 
@@ -78,7 +77,6 @@ public sealed class LogFileLoggerProvider : ILoggerProvider
     /// <summary>
     /// The open file, only used by the writer.
     /// </summary>
-    [SuppressMessage("Usage", "CA2213:Disposable fields should be disposed", Justification = "Only the writer task uses the file; it closes it through CloseStream when it ends")]
     private FileStream? _stream;
 
     /// <summary>
@@ -353,9 +351,11 @@ public sealed class LogFileLoggerProvider : ILoggerProvider
         _queue.Writer.TryComplete();
 
         // A writer blocked on a stalled disk cannot be interrupted: wait only briefly so that Exit stays within its budget.
+        // Only an ended writer has let go of the file; a stalled one closes it itself once its write returns.
         if (_writer.Wait(TimeSpan.FromMilliseconds(100), CancellationToken.None))
         {
             _stop.Dispose();
+            _stream?.Dispose();
         }
     }
 
