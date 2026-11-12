@@ -394,6 +394,132 @@ public sealed class IngestTokenSetupTests
     }
 
     /// <summary>
+    /// A token at the bounds of E10 is read: 1,024 characters, a file of 65,536 bytes, and the first and last visible ASCII
+    /// characters.
+    /// </summary>
+    /// <param name="label">The name of the case</param>
+    /// <param name="token">The token, or <c>null</c> for 1,024 characters</param>
+    /// <param name="fileLength">The length of the file in bytes, the token padded with trailing spaces</param>
+    [TestMethod]
+    [TestCategory("AC8")]
+    [DataRow("1,024 characters", null, 1024)]
+    [DataRow("1,024 characters in 65,536 bytes", null, 65536)]
+    [DataRow("first and last visible character", "!~", 2)]
+    public void IngestTokenSetupTryCreateAccessFileAtBoundsReadsToken(string label, string? token, int fileLength)
+    {
+        // Arrange
+        var dataDirectory = CreateTemporaryDirectory();
+        var tokenFile = Path.Combine(dataDirectory, IngestTokenSetup.TokenFileName);
+        var expectedToken = token ?? new string('M', IngestTokenSetup.MaxTokenLength);
+
+        File.WriteAllBytes(tokenFile, Encoding.ASCII.GetBytes(expectedToken.PadRight(fileLength)));
+
+        var logger = new RecordingLogger();
+
+        // Act
+        var access = IngestTokenSetup.TryCreateAccess(CreateConfiguration(dataDirectory, null), logger);
+
+        // Assert
+        Assert.AreEqual(fileLength, new FileInfo(tokenFile).Length, $"The file should have the length of its row: {label}");
+        Assert.IsNotNull(access, $"The start should go on: {label}");
+        Assert.IsTrue(access.IsTokenRequired, $"The access should require a token: {label}");
+        Assert.IsTrue(access.IsTokenAccepted(expectedToken), $"The access should accept the token of the file: {label}");
+        Assert.IsFalse(access.IsTokenAccepted(expectedToken[..^1]), $"The access should refuse a shorter token: {label}");
+        Assert.HasCount(1, logger.Entries, $"Exactly one entry should be logged: {label}");
+        Assert.AreEqual(LogLevel.Information, logger.Entries[0].Level, $"The entry should be information: {label}");
+        Assert.AreEqual($"The ingest token is read from '{tokenFile}'.", logger.Entries[0].Message, $"The entry should carry the exact S2 text: {label}");
+    }
+
+    /// <summary>
+    /// A token file of 65,537 bytes stops the start, even when its content trims to a valid token.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC8")]
+    public void IngestTokenSetupTryCreateAccessFileAboveSizeBoundStops()
+    {
+        // Arrange
+        var dataDirectory = CreateTemporaryDirectory();
+        var tokenFile = Path.Combine(dataDirectory, IngestTokenSetup.TokenFileName);
+        var bytes = Encoding.ASCII.GetBytes("MARKER".PadRight(65537));
+
+        File.WriteAllBytes(tokenFile, bytes);
+
+        var logger = new RecordingLogger();
+
+        // Act
+        var access = IngestTokenSetup.TryCreateAccess(CreateConfiguration(dataDirectory, null), logger);
+
+        // Assert
+        Assert.IsNull(access, "The start should stop");
+        Assert.HasCount(1, logger.Entries, "Exactly one entry should be logged");
+        Assert.AreEqual(LogLevel.Critical, logger.Entries[0].Level, "The entry should be critical");
+        Assert.AreEqual($"The ingest token file '{tokenFile}' holds no valid token (1 to 1,024 visible ASCII characters); the server stops.", logger.Entries[0].Message, "The entry should carry the exact E10 text");
+        Assert.DoesNotContain("MARKER", $"{logger.Entries[0].Message} {logger.Entries[0].Exception}", "The entry should hold no file content");
+        Assert.AreSequenceEqual(bytes, File.ReadAllBytes(tokenFile), "The token file should stay as it was");
+    }
+
+    /// <summary>
+    /// A token file that cannot be read (another process holds it exclusively) stops the start with one critical line that
+    /// carries the exception and no token text.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC8")]
+    public void IngestTokenSetupTryCreateAccessUnreadableFileStops()
+    {
+        // Arrange
+        var dataDirectory = CreateTemporaryDirectory();
+        var tokenFile = Path.Combine(dataDirectory, IngestTokenSetup.TokenFileName);
+
+        File.WriteAllText(tokenFile, "MARKERTOKEN");
+
+        var logger = new RecordingLogger();
+        IngestAccess? access;
+
+        // Act
+        using (new FileStream(tokenFile, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+        {
+            access = IngestTokenSetup.TryCreateAccess(CreateConfiguration(dataDirectory, null), logger);
+        }
+
+        // Assert
+        Assert.IsNull(access, "The start should stop");
+        Assert.HasCount(1, logger.Entries, "Exactly one entry should be logged");
+        Assert.AreEqual(LogLevel.Critical, logger.Entries[0].Level, "The entry should be critical");
+        Assert.AreEqual($"The ingest token file '{tokenFile}' cannot be read; the server stops.", logger.Entries[0].Message, "The entry should carry the exact E10 text");
+        Assert.IsNotNull(logger.Entries[0].Exception, "The entry should carry the exception");
+        Assert.DoesNotContain("MARKER", $"{logger.Entries[0].Message} {logger.Entries[0].Exception}", "The entry should hold no file content");
+        Assert.AreEqual("MARKERTOKEN", File.ReadAllText(tokenFile), "The token file should stay as it was");
+    }
+
+    /// <summary>
+    /// A temporary file that cannot be written or deleted (its path is taken by a directory) stops the start with one
+    /// critical line that carries the exception, and no token file is created.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC8")]
+    public void IngestTokenSetupTryCreateAccessTemporaryPathTakenStops()
+    {
+        // Arrange
+        var dataDirectory = CreateTemporaryDirectory();
+        var tokenFile = Path.Combine(dataDirectory, IngestTokenSetup.TokenFileName);
+
+        Directory.CreateDirectory(Path.Combine(dataDirectory, TemporaryFileName));
+
+        var logger = new RecordingLogger();
+
+        // Act
+        var access = IngestTokenSetup.TryCreateAccess(CreateConfiguration(dataDirectory, null), logger);
+
+        // Assert
+        Assert.IsNull(access, "The start should stop");
+        Assert.HasCount(1, logger.Entries, "Exactly one entry should be logged");
+        Assert.AreEqual(LogLevel.Critical, logger.Entries[0].Level, "The entry should be critical");
+        Assert.AreEqual($"The ingest token file '{tokenFile}' cannot be created; the server stops. Make the data directory writable for the user the server runs as.", logger.Entries[0].Message, "The entry should carry the exact E10 text");
+        Assert.IsNotNull(logger.Entries[0].Exception, "The entry should carry the exception");
+        Assert.IsFalse(File.Exists(tokenFile), "No token file should be created");
+    }
+
+    /// <summary>
     /// A token file that cannot be created stops the start with one critical line carrying the exception, and leaves
     /// neither a token file nor its temporary file behind.
     /// </summary>
