@@ -31,7 +31,8 @@ every other refusal. Until #30 an accepted message is acknowledged and not kept.
 
 ## Consequences
 
-- `missingIcons` of a catalog upload comes from the catalog the reader already built; the read's memory stays the one
-  measured in `contract.md`, plus the retained catalog until the reply is written.
+- `missingIcons` of a catalog upload comes from the catalog the reader already built, so there is no second read: the
+  peak is the reader's own plus the `missingIcons` list and the written reply, measured in `ingest.md` (*Memory of a
+  catalog upload*).
 - A Companion that sends malformed messages loses its connection; its writer refuses what the reader refuses.
 - #30 changes what an acknowledgement promises: stored, not only checked.

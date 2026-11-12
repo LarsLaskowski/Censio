@@ -120,7 +120,7 @@ first:
 | Case | Close status | Reply before |
 | ---- | ------------ | ------------ |
 | After a `helloRefused` | 1000 | the `helloRefused` message |
-| Message over its bound (hello 32,768 bytes, later 25,165,824 bytes) or refused as *too large* | 1009 | none |
+| Message over its bound (hello 32,768 bytes, later 25,165,824 bytes), or a later message the reader refuses as *too large* | 1009 | none |
 | Binary frame | 1003 | none |
 | Every other case of the first message and of the message phase that closes | 1008 | none |
 | The server stops | 1001 | none |
