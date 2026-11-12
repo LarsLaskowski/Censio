@@ -4,7 +4,8 @@
 
 The JSON contract version 1 between the Companion and the server: the ten messages, their wire form, the version rule
 and the frozen hello, identities, the reader's checks in order, the bounds, the refusal texts and what never crosses.
-The server and the Companion rely on it; nothing sends or receives these messages yet.
+The server and the Companion rely on it. The server's endpoint reads and answers these messages ([`ingest.md`](ingest.md));
+the Companion does not send them yet (#40).
 
 ## Behavior
 
@@ -100,7 +101,12 @@ Examples with invented values (shortened where marked):
 ### The reader's checks
 
 The reader (`ContractReader`) takes the bytes of one message and returns the message or a typed refusal, never an
-exception. It decides in this order, the first failing step deciding:
+exception. A refusal of a tick, session start, session end, catalog upload or icon image that is decided after the
+message was built (the value rules or the catalog document, step 5) also returns that message's `id`, unless it is all zero, so an
+endpoint can acknowledge the refusal by it; every other refusal, and every refusal of a server-to-Companion type,
+returns none. An accepted catalog upload also returns the catalog document it read in step 5 (no second read), and the
+catalog error *unsupported version* carries the schema version found, which an acknowledgement names as
+`refusedVersion`. It decides in this order, the first failing step deciding:
 
 1. An input above 25,165,824 bytes is *too large*, before it is parsed.
 2. One syntax pass over the tokens: well-formed JSON of valid UTF-8, the root an object, at most 64 levels, nothing after
@@ -211,8 +217,9 @@ input.
 - The reader does not check the direction: the endpoint refuses a server-to-Companion type from a Companion.
 - The endpoint bounds the first, unauthenticated message to 32 KiB, above the largest valid hello (four strings of at most
   1,024 bytes, each at most 6,144 bytes raw when escaped).
-- It bounds a WebSocket message at the message bound and the number of reads it runs at once: with the token off, N
-  connections can each hold about 159 MiB at the peak of a catalog upload.
+- It bounds a WebSocket message at the message bound and reads past 32 KiB only on the one accepted Companion's
+  connection, so at most one read of the size above runs at a time, with the token off as well; the memory of an
+  accepted catalog upload is measured in [`ingest.md`](ingest.md), *Memory of a catalog upload*.
 - PNG data is carried, hashed and bounded, not validated as PNG: whoever serves it to a browser (#42) checks it.
 
 ## Related decisions
@@ -223,11 +230,12 @@ input.
 - [`decisions/0018`](../decisions/0018-pipe-parsed-in-companion-versioned-json-contract.md) — the Companion parses, the server reads a versioned contract.
 - [`decisions/0041`](../decisions/0041-profile-selected-in-the-companion-figure-name-only-a-hint.md) — the figure name never crosses.
 - [`decisions/0056`](../decisions/0056-catalog-document-read-strictly-by-exact-schema-version.md) — the catalog document inside an upload.
+- [`decisions/0063`](../decisions/0063-refused-contract-messages-acknowledged-by-id-or-the-connection-closed.md) — the reader returns the `id` of a refused message and the catalog of an accepted upload.
 
 ## Not here
 
-- Sending and receiving the messages, the endpoint, the buffer and the resend (#28, #40, #41); uploading the catalog and
-  the icons (#42).
+- The server's endpoint, its token and what it answers to each message: [`ingest.md`](ingest.md).
+- The Companion's sending, the buffer and the resend (#40, #41); uploading the catalog and the icons (#42).
 - The catalog document itself: [`game-catalog-format.md`](game-catalog-format.md).
 - The pipe's frames and ticks: [`pipe.md`](pipe.md).
 - The code: `ContractReader`, `ContractWriter` and the message types in `src/Censio.Contracts`, the conversion of pipe
