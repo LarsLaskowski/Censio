@@ -214,6 +214,25 @@ public sealed class ContractReaderTests
                                                                                     ["catalog too large"] = () => CatalogUploadJson("catalog too large")
                                                                                 };
 
+    /// <summary>
+    /// The messages of the cases without a refused <c>id</c>, built on demand: the name of the case and the builder of its
+    /// JSON text.
+    /// </summary>
+    private static readonly Dictionary<string, Func<string>> _noRefusedIdInputs = new()
+                                                                                  {
+                                                                                      ["tick game time as text"] = () => Substitute(TickNotation, "'gameTime':42", "'gameTime':'42'"),
+                                                                                      ["tick without game time"] = () => Substitute(TickNotation, "'gameTime':42,", string.Empty),
+                                                                                      ["tick id null"] = () => Substitute(TickNotation, $"'{Id}'", "null"),
+                                                                                      ["tick island name too long"] = () => Substitute(TickNotation, "'Isle'", $"'{new string('a', 766)}'"),
+                                                                                      ["tick version 2"] = () => Substitute(TickNotation, "'contractVersion':1", "'contractVersion':2"),
+                                                                                      ["tick id all zero"] = () => Substitute(TickNotation, Id, ZeroId),
+                                                                                      ["tick id no UUID"] = () => Substitute(TickNotation, Id, "tick-a"),
+                                                                                      ["tick id uppercase"] = () => Substitute(TickNotation, Id, Profile.ToUpperInvariant()),
+                                                                                      ["catalog upload id all zero"] = () => Substitute(CatalogUploadJson("catalog invalid"), Id, ZeroId),
+                                                                                      ["acknowledgement with valid id"] = () => Substitute(AcknowledgementNotation, $"['{Icon}']", "['XYZ']"),
+                                                                                      ["hello profile all zero"] = () => Substitute(HelloNotation, Profile, ZeroId)
+                                                                                  };
+
     #endregion // Fields
 
     #region Properties
@@ -323,6 +342,29 @@ public sealed class ContractReaderTests
             yield return new object[] { "catalog malformed", ContractErrorKind.CatalogRefused };
             yield return new object[] { "catalog invalid", ContractErrorKind.CatalogRefused };
             yield return new object[] { "catalog too large", ContractErrorKind.CatalogRefused };
+        }
+    }
+
+    /// <summary>
+    /// Gets the refused messages that return no <c>id</c>: malformed, too large, of another version, with an unusable
+    /// <c>id</c>, a server-to-Companion type with a valid <c>id</c> and a hello. The name of the case (a key of
+    /// <see cref="_noRefusedIdInputs" />) and the kind it is refused with.
+    /// </summary>
+    private static IEnumerable<object[]> NoRefusedIdRows
+    {
+        get
+        {
+            yield return new object[] { "tick game time as text", ContractErrorKind.Malformed };
+            yield return new object[] { "tick without game time", ContractErrorKind.Malformed };
+            yield return new object[] { "tick id null", ContractErrorKind.Malformed };
+            yield return new object[] { "tick island name too long", ContractErrorKind.TooLarge };
+            yield return new object[] { "tick version 2", ContractErrorKind.UnsupportedVersion };
+            yield return new object[] { "tick id all zero", ContractErrorKind.Invalid };
+            yield return new object[] { "tick id no UUID", ContractErrorKind.Invalid };
+            yield return new object[] { "tick id uppercase", ContractErrorKind.Invalid };
+            yield return new object[] { "catalog upload id all zero", ContractErrorKind.Invalid };
+            yield return new object[] { "acknowledgement with valid id", ContractErrorKind.Invalid };
+            yield return new object[] { "hello profile all zero", ContractErrorKind.Invalid };
         }
     }
 
@@ -856,6 +898,31 @@ public sealed class ContractReaderTests
         Assert.IsNotNull(result.Error, $"The message should be refused: {label}");
         Assert.AreEqual(kind, result.Error.Kind, $"The message should be refused with the kind of its row: {label}");
         Assert.AreEqual(Guid.Parse(Id, CultureInfo.InvariantCulture), result.RefusedId, $"The refusal should return the id of the message: {label}");
+        Assert.IsNull(result.CatalogDocument, $"A refused message should return no catalog document: {label}");
+    }
+
+    /// <summary>
+    /// A malformed, too large or other-version message, a message with an unusable <c>id</c>, a server-to-Companion type
+    /// with a valid <c>id</c> and a hello return no <c>id</c>, so the server never acknowledges them (spec E5, E6).
+    /// </summary>
+    /// <param name="label">The name of the case</param>
+    /// <param name="kind">The kind it is refused with</param>
+    [TestMethod]
+    [TestCategory("AC10")]
+    [DynamicData(nameof(NoRefusedIdRows))]
+    public void ContractReaderReadMalformedMessageReturnsNoRefusedId(string label, ContractErrorKind kind)
+    {
+        // Arrange
+        var json = Encoding.UTF8.GetBytes(_noRefusedIdInputs[label]());
+
+        // Act
+        var result = ContractReader.Read(json);
+
+        // Assert
+        Assert.IsNull(result.Message, $"A refused message should return no message: {label}");
+        Assert.IsNotNull(result.Error, $"The message should be refused: {label}");
+        Assert.AreEqual(kind, result.Error.Kind, $"The message should be refused with the kind of its row: {label}");
+        Assert.IsNull(result.RefusedId, $"The refusal should return no id: {label}");
         Assert.IsNull(result.CatalogDocument, $"A refused message should return no catalog document: {label}");
     }
 

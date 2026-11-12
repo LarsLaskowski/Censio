@@ -1171,6 +1171,11 @@ public sealed class CatalogDocumentReaderTests
         Assert.IsNotNull(result.Error, "The document should be refused: " + context);
         Assert.AreEqual(kind, result.Error.Kind, "The refusal should have the expected kind: " + context);
         Assert.AreEqual(text, result.Error.Text, "The refusal should have the fixed text of its kind: " + context);
+
+        if (kind != CatalogDocumentErrorKind.UnsupportedVersion)
+        {
+            Assert.IsNull(result.Error.Version, "Only an unsupported version should carry a version: " + context);
+        }
     }
 
     /// <summary>
