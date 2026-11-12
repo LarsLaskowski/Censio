@@ -40,7 +40,7 @@ public class PipeRecorder : IAsyncDisposable
     /// <summary>
     /// The lock that starts the writer once.
     /// </summary>
-    private readonly object _writerLock = new();
+    private readonly Lock _writerLock = new();
 
     /// <summary>
     /// The bytes counted for the entries not yet flushed.
