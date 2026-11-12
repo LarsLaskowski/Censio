@@ -7,20 +7,28 @@ profile and owned by this repository: keep it true when the build changes.
 ## Toolchain
 
 - .NET SDK of `global.json` (the newest SDK of the major, which Dependabot raises; `rollForward` `latestFeature`: the newest
-  installed feature band of that major, never the next major), target framework `net11.0` (`net11.0-windows` for
-  `Censio.Companion`), solution `Censio.slnx`. Several majors may be installed side by side (a machine, CI); the
+  installed feature band of that major, never the next major), target framework `net11.0` (set once in `Directory.Build.props`;
+  `net11.0-windows` in the project file of `Censio.Companion`), solution `Censio.slnx`. Several majors may be installed side by side (a machine, CI); the
   repository is built for one: every project's target framework, `global.json` and every .NET image name the same
   major, which `dotnet_major.py` checks in the *Analyzer gate*, and a new project gets it from the SDK `global.json`
-  selects. Dependabot keeps the SDK, the packages and the images current within that major; the move to the next one
+  selects. Dependabot keeps the SDK, the packages and the images current within that major (it reads an image only
+  where a `FROM` line names it itself, as both `FROM` lines of `src/Censio.Server/Dockerfile` do); the move to the next one
   (target frameworks, `global.json`, the Microsoft.Extensions and ASP.NET Core packages, the images) is one change of its
   own.
 - .NET tools: `reihitsu-format` (`Reihitsu.Cli`) and `dotnet-sonarscanner` are pinned in
-  `.config/dotnet-tools.json` and restored with `dotnet tool restore`; CI runs both and the *Format* commands below run the formatter through the manifest (`dotnet tool run`), so every machine uses the pinned version. The formatter stays on
-  the same release line (major.minor) as the **Reihitsu.Analyzer** version pinned in `Directory.Packages.props`,
-  which CI enforces (*Check tool versions*); otherwise the formatter can revert code the analyzer considers
+  `.config/dotnet-tools.json` and restored with `dotnet tool restore`; CI runs both and the *Format* commands below run the formatter through the manifest (`dotnet tool run`), so every machine uses the pinned version. The formatter stays at
+  the same version as the **Reihitsu.Analyzer** pinned in `Directory.Packages.props`, which `dotnet_config.py` checks
+  in the *Analyzer gate* (CI checks the release line, *Check tool versions*); otherwise the formatter can revert code the analyzer considers
   correct. Dependabot raises both in one grouped NuGet pull request.
 - Analyzers in every project via `Directory.Build.props`: **Reihitsu.Analyzer**, **SonarAnalyzer.CSharp**
   (the Sonar C# rules locally, so SonarQube issues surface before the push) and the MSTest analyzers.
+- One build structure in every .NET repository of the template: `Directory.Build.props` sets the target framework
+  and `Nullable`, `ImplicitUsings`, `GenerateDocumentationFile`, `TreatWarningsAsErrors`, `EnforceCodeStyleInBuild`
+  and `AnalysisLevel` `latest-recommended` for every project, and no project file sets one again (only a platform of
+  the same major, `net11.0-windows` in `Censio.Companion`) or gives a package a version; there is no rule set, no rule
+  in `NoWarn` and no assembly-wide `SuppressMessage`, and text files are checked out with CRLF (`.gitattributes`;
+  shell scripts and the Dockerfile keep LF). `dotnet_config.py` checks all of it in the *Analyzer gate*, also with
+  `--lint-only`; the values of the target framework, the SDK and the packages are the project's.
 - The SessionStart hook `.claude/hooks/session-start.sh` restores the tool manifest (the pinned formatter the commands below run through `dotnet tool run`, and the scanner CI uses), sets `DOTNET_ROOT` and restores the solution in
   remote sessions.
 
@@ -65,11 +73,21 @@ underscores in member names, a region for an interface implementation named afte
 
 `docker:S8431` (tag and digest in one `FROM`) is excluded for `src/Censio.Server/Dockerfile` only, through `sonar.issue.ignore.multicriteria` in the *Begin SonarQube analysis* step of `.github/workflows/ci.yml`, whose analysis the *Sonar gate* reads (record 0010): the digest pins the base and the tag is what Dependabot updates.
 
+The C# rules and their severities are the template's, the same in every .NET repository: `python3
+.squad/tools/dotnet-rules.py` writes its baseline (`.squad/dotnet-rules.editorconfig`, the stricter setting of the
+repositories winning) into the `squad:dotnet-rules` blocks of `.editorconfig` (`--check` reports them out of date).
+No section of every C# file sets a rule or a code-style option outside the blocks; the project's own sections of paths
+(generated code, migrations) come after them. A rule the code does not meet yet goes into `DOTNET_RULES_PENDING` in
+`squad_settings.py` with the issue that brings the code up to it: it is written as `suggestion`, which the *Analyzer
+gate* still reports in a changed file, and the entry goes once the issue is done.
+
 SonarAnalyzer.CSharp runs only the rules of *Sonar way core* by default. The rules the project's SonarQube Cloud C#
 profile adds (*Sonar way comprehensive*: S3776, S1192, S107, …), and the core rules it switches off, are set in the
 `squad:sonar-rules` block of `.editorconfig`, which `python3 .squad/tools/sonar-rules.py` writes from the two
-profiles (`--check` reports a block out of date; severity `SONAR_RULES_SEVERITY` in `squad_settings.py`): the
-*Analyzer gate* reports them in a changed file, so no rule of the profile is "one no local analyzer reports". Its
+profiles at `error` (`--check` reports a block out of date; a pending rule at `suggestion`), except the rules the
+dotnet-rules baseline already sets, which keep the baseline's severity: the
+*Analyzer gate* reports them in a changed file, so no rule of the profile is "one no local analyzer reports". A Sonar
+rule the projects keep off is switched off in the baseline, since the built-in profile cannot be changed (S1125). Its
 non-Roslyn checks (hotspots, taint analysis, duplication) have no local equivalent: the *Sonar gate*
 below reports their issues and hotspots and the quality gate, duplication included, on the draft pull request.
 
@@ -213,6 +231,9 @@ itself with a lock (`obj/analyzer-check.lock`), plain builds do not.
 
 ## Known pitfalls
 
+- `reihitsu-format` (1.2.0) turns an expression-bodied local function back into a block body, which the baseline's
+  `csharp_style_expression_bodied_local_functions` (IDE0061) asks for the other way round; the option is pending
+  (#167) until the formatter and the baseline agree, so leave such a local function as the formatter writes it.
 - `reihitsu-format` asks for confirmation for more than 25 files; `--force` skips the prompt, which a
   non-interactive session cannot answer.
 - `reihitsu-format` rewrites a `\u` escape in a C# string literal into the character it names, so a literal

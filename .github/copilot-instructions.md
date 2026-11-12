@@ -114,8 +114,10 @@ The solution is `Censio.slnx`; `docs/ARCHITECTURE.md` lists the projects and the
 <!-- stack:end configuration -->
 <!-- project:begin configuration -->
 - `Censio.Companion` targets `net11.0-windows` (WPF and Windows Forms) with `EnableWindowsTargeting` and the
-  `RuntimeIdentifier` `win-x64`, so it builds on Linux; every other project targets `net11.0` (record 0004,
-  *Known pitfalls* in `.squad/stack.md`).
+  `RuntimeIdentifier` `win-x64` in its own project file, so it builds on Linux; every other project takes `net11.0`
+  from `Directory.Build.props` (record 0004, *Known pitfalls* in `.squad/stack.md`).
+- Text files are checked out with CRLF (`.gitattributes`, `end_of_line = crlf` in `.editorconfig`); shell scripts
+  and the server's Dockerfile keep LF.
 - The product version is the one build property `Version` in `Directory.Build.props` (`0.0.0` on `main`), set
   only by the release build (record 0005); no project sets a version of its own.
 - `Censio.Server` requests the Blazor web assets itself with `RequiresAspNetWebAssets` (record 0007).
