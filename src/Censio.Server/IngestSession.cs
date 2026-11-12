@@ -248,7 +248,7 @@ public sealed partial class IngestSession : IDisposable
             return ContractAcknowledgementRefusal.Invalid;
         }
 
-        return error.CatalogError?.Kind switch
+        return error.CatalogError!.Kind switch
                {
                    CatalogDocumentErrorKind.Malformed => ContractAcknowledgementRefusal.CatalogMalformed,
                    CatalogDocumentErrorKind.UnsupportedVersion => ContractAcknowledgementRefusal.CatalogUnsupportedVersion,
