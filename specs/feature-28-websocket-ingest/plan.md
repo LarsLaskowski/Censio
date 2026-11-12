@@ -212,7 +212,17 @@ Existing test code that calls a changed signature: none (the changed constructor
 `Program` with a data directory, which now also creates `ingest-token` there — its key-ring assertions are unaffected;
 Tester checks in step 5 and adapts if not).
 
-Files no unit test can cover: none (the `Program.cs` lines run under `CensioServerFactory`).
+Files no unit test can cover: none as a whole (the `Program.cs` lines run under `CensioServerFactory`). Two branches of
+`src/Censio.Server/IngestTokenSetup.cs` stay uncovered, accepted by the Lead in step 6 without a coverage exclusion
+(the *Coverage gate* passes with them):
+
+- The `UnauthorizedAccessException` handler of the token-file read. The tests run as root on Linux, where a
+  permission-denied file is still readable. A directory named `ingest-token` would throw this exception, but
+  `File.Exists` sends it to the generation path instead. Faking the exception would need a file-access seam in
+  production code just for this one branch. The handler is identical to the `IOException` handler beside it, which is
+  covered: it logs the same `Critical` line and returns `null`.
+- The Windows arm of `OperatingSystem.IsWindows()` in `WriteTemporaryFile`. It is an empty block, kept so CA1416 does
+  not flag `UnixCreateMode`, and no Windows test run exists (the Companion's Windows shell has no test project either).
 
 ## Areas
 
