@@ -1,6 +1,6 @@
 # 0058: The contract is read strictly by exact version; the hello and its refusal keep one form for every version
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-12
 - **Area:** contract
 - **Source:** Issue #27

@@ -1,6 +1,6 @@
 # 0060: One byte bound per contract message caps a tick below the pipe's limits; images and catalog travel as Base64
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-12
 - **Area:** contract
 - **Source:** Issue #27

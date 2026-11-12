@@ -1,6 +1,6 @@
 # 0059: Contract messages carry an identity the Companion assigns and the profile they were taken under
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-12
 - **Area:** contract
 - **Source:** Issue #27
