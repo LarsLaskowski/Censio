@@ -62,7 +62,7 @@ once in the [area document](../areas/README.md) of the record's area, and the re
 <!-- project:begin index -->
 | #    | Title | Status | Date |
 | ---- | ----- | ------ | ---- |
-| [0001](0001-quality-gates-before-the-pull-request.md) | Quality gates before the pull request | Accepted | 2026-10-30 |
+| [0001](0001-quality-gates-before-the-pull-request.md) | Quality gates before the pull request | Superseded by 0057 | 2026-10-30 |
 | [0002](0002-squad-working-records-off-main.md) | Squad working records stay off main, and product PRs never change the squad | Superseded by 0040 | 2026-10-30 |
 | [0003](0003-squash-merge-pull-requests.md) | Squash-merge pull requests | Superseded by 0040 | 2026-10-30 |
 | [0004](0004-companion-shell-and-linux-build.md) | Companion logic in a platform-neutral project; the Windows shell builds on Linux | Accepted | 2026-10-30 |
@@ -118,4 +118,5 @@ once in the [area document](../areas/README.md) of the record's area, and the re
 | [0054](0054-censio-moves-to-every-current-dotnet-major.md) | Censio moves to every current .NET major, STS and LTS alike | Accepted | 2026-11-11 |
 | [0055](0055-catalog-document-refers-to-icons-by-content-hash.md) | The catalog document refers to each icon by the SHA-256 of its PNG and carries no image data | Accepted | 2026-11-11 |
 | [0056](0056-catalog-document-read-strictly-by-exact-schema-version.md) | The catalog document is read strictly, by exactly the schema versions a reader lists | Accepted | 2026-11-11 |
+| [0057](0057-ci-format-check-and-pinned-tools.md) | CI checks the format, and the formatter and the scanner are pinned in the tool manifest | Accepted | 2026-11-12 |
 <!-- project:end index -->
