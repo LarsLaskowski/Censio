@@ -235,9 +235,9 @@ itself with a lock (`obj/analyzer-check.lock`), plain builds do not.
 
 ## Known pitfalls
 
-- `reihitsu-format` (1.2.0) turns an expression-bodied local function back into a block body, which the baseline's
-  `csharp_style_expression_bodied_local_functions` (IDE0061) asks for the other way round; the option is pending
-  (#167) until the formatter and the baseline agree, so leave such a local function as the formatter writes it.
+- `reihitsu-format` (1.2.0) turns an expression-bodied local function back into a block body, as the baseline's
+  `csharp_style_expression_bodied_local_functions = false` (IDE0061) asks too, so leave such a local function as the
+  formatter writes it.
 - `reihitsu-format` asks for confirmation for more than 25 files; `--force` skips the prompt, which a
   non-interactive session cannot answer.
 - `reihitsu-format` rewrites a `\u` escape in a C# string literal into the character it names, so a literal
