@@ -1,6 +1,6 @@
 # 0061: The ingest token is generated into a file of the data directory and compared by its hash
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-12
 - **Area:** ingest
 - **Source:** Issue #28

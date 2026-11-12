@@ -1,6 +1,6 @@
 # 0062: A second Companion is refused; a silent connection is found by WebSocket pings
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-12
 - **Area:** ingest
 - **Source:** Issue #28

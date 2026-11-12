@@ -1,6 +1,6 @@
 # 0063: A refused contract message is acknowledged by its id when the reader yields one, else the connection closes
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-12
 - **Area:** ingest
 - **Source:** Issue #28

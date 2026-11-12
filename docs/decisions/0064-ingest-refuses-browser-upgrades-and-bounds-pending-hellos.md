@@ -1,6 +1,6 @@
 # 0064: The ingest endpoint refuses browser upgrades and bounds connections waiting for their hello
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-12
 - **Area:** ingest
 - **Source:** Issue #28
