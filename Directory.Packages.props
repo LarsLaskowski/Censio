@@ -7,12 +7,12 @@
   <ItemGroup>
     <!-- Code analysis (every project); reihitsu.cli in .config/dotnet-tools.json stays at the analyzer's version -->
     <PackageVersion Include="Reihitsu.Analyzer" Version="1.2.0" />
-    <PackageVersion Include="SonarAnalyzer.CSharp" Version="10.35.0.4138" />
+    <PackageVersion Include="SonarAnalyzer.CSharp" Version="10.36.0.15337" />
     <PackageVersion Include="MSTest.Analyzers" Version="4.5.2" />
     <!-- Tests (every project whose name ends in .Tests) -->
     <PackageVersion Include="MSTest.TestFramework" Version="4.5.2" />
     <PackageVersion Include="MSTest.TestAdapter" Version="4.5.2" />
-    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.11.0" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.12.0" />
     <PackageVersion Include="coverlet.collector" Version="10.1.0" />
     <!-- Test projects that need them -->
     <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="11.0.0" />
