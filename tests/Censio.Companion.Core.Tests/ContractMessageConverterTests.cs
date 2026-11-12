@@ -67,6 +67,23 @@ public sealed class ContractMessageConverterTests
     }
 
     /// <summary>
+    /// An undefined pipe state has no contract pipe state and is rejected.
+    /// </summary>
+    [TestMethod]
+    public void ContractMessageConverterStatusOfUndefinedPipeStateThrows()
+    {
+        // Arrange
+        var state = (PipeConnectionState)99;
+
+        // Act
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(() => ContractMessageConverter.ToStatus(state), "An undefined pipe state should be rejected");
+
+        // Assert
+        Assert.AreEqual("state", exception.ParamName, "The exception should name the parameter");
+        Assert.AreEqual(state, exception.ActualValue, "The exception should carry the undefined state");
+    }
+
+    /// <summary>
     /// A pipe tick converts to a contract tick that carries every island with key, session ID and name, every entry with
     /// its eleven values and both maps, the receive time and the game time, exact, also after a write and a read.
     /// </summary>
