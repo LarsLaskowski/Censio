@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Censio.Contracts;
 
 /// <summary>
@@ -22,6 +24,13 @@ public abstract class ContractMessage
     /// Gets the type of the message.
     /// </summary>
     public abstract ContractMessageType Type { get; }
+
+    /// <summary>
+    /// Gets the contract version written to the wire, the second property of every message.
+    /// </summary>
+    [JsonInclude]
+    [JsonPropertyOrder(-1)]
+    internal int ContractVersion { get; } = ContractReader.CurrentVersion;
 
     #endregion // Properties
 }

@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Censio.Contracts;
 
 /// <summary>
@@ -32,6 +34,7 @@ public sealed class ContractHello : ContractMessage
     #region ContractMessage
 
     /// <inheritdoc />
+    [JsonPropertyOrder(-2)]
     public override ContractMessageType Type => ContractMessageType.Hello;
 
     #endregion // ContractMessage

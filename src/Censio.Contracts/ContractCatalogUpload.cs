@@ -1,3 +1,6 @@
+using System.Security.Cryptography;
+using System.Text.Json.Serialization;
+
 namespace Censio.Contracts;
 
 /// <summary>
@@ -25,18 +28,17 @@ public sealed class ContractCatalogUpload : ContractMessage
     /// Computes the identity of the document.
     /// </summary>
     /// <returns>The SHA-256 of the document as 64 lowercase hexadecimal characters</returns>
-#pragma warning disable RH2003, S2325 // Skeleton: removed with the implementation
     public string ComputeIdentity()
     {
-        throw new NotImplementedException();
+        return Convert.ToHexStringLower(SHA256.HashData(Document.Span));
     }
-#pragma warning restore RH2003, S2325 // Skeleton: removed with the implementation
 
     #endregion // Methods
 
     #region ContractMessage
 
     /// <inheritdoc />
+    [JsonPropertyOrder(-2)]
     public override ContractMessageType Type => ContractMessageType.CatalogUpload;
 
     #endregion // ContractMessage

@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Censio.Contracts;
 
 /// <summary>
@@ -35,18 +37,30 @@ public sealed class ContractAcknowledgement : ContractMessage
     /// Gets the fixed text of the refusal.
     /// </summary>
     /// <returns>The text, or <c>null</c> when the message was accepted</returns>
-#pragma warning disable RH2003, S2325 // Skeleton: removed with the implementation
     public string? GetRefusalText()
     {
-        throw new NotImplementedException();
+        var version = RefusedVersion.GetValueOrDefault();
+
+        return Refusal switch
+               {
+                   null => null,
+                   ContractAcknowledgementRefusal.Malformed => ContractError.MalformedText,
+                   ContractAcknowledgementRefusal.UnsupportedVersion => ContractError.GetUnsupportedVersionText(version),
+                   ContractAcknowledgementRefusal.TooLarge => ContractError.TooLargeText,
+                   ContractAcknowledgementRefusal.CatalogMalformed => CatalogDocumentError.CreateMalformed().Text,
+                   ContractAcknowledgementRefusal.CatalogUnsupportedVersion => CatalogDocumentError.CreateUnsupportedVersion(version).Text,
+                   ContractAcknowledgementRefusal.CatalogInvalid => CatalogDocumentError.CreateInvalid().Text,
+                   ContractAcknowledgementRefusal.CatalogTooLarge => CatalogDocumentError.CreateTooLarge().Text,
+                   _ => ContractError.InvalidText
+               };
     }
-#pragma warning restore RH2003, S2325 // Skeleton: removed with the implementation
 
     #endregion // Methods
 
     #region ContractMessage
 
     /// <inheritdoc />
+    [JsonPropertyOrder(-2)]
     public override ContractMessageType Type => ContractMessageType.Acknowledgement;
 
     #endregion // ContractMessage
