@@ -20,7 +20,7 @@ the spec leaves to it.
 | 5 | Tick limits: 256 islands, 524,288 entries and pairs; a map at most 1,024 pairs, repeated GUIDs summed | `docs/areas/pipe.md`, *Limits and errors*, *Frame layout* | confirmed |
 | 6 | Largest recorded tick: 24 islands, 1,934 entries and pairs, frames ≤ 4,946 bytes | `docs/protocol.md`, *Sizes* | confirmed |
 | 7 | A worst-case entry (extreme values, empty maps) is 380 JSON bytes; a tick at the pipe's entry limit is about 200 MB | scratch program (S.T.J, the property names of *Approach*): 380 × 524,288 | confirmed |
-| 8 | The largest read is a catalog upload (document 16,061,648 bytes, message 21,415,634 bytes): about 133.3 MiB managed with the model alive, peak working set 291.5 MiB. The worst tick is one of minimal entries (91,017 entries in 25,508,794 bytes): 49.2 MiB managed, peak 216.7 MiB; a tick of 524,288 pairs read straight into the maps (4.2 MB): 39.3 MiB | to verify: the same three cases on the real `ContractReader.Read`, Dev, step 6, commands and output into `contract.md`; so far the reviewers' scratch measurements on .NET 11 (plan review) | unverified |
+| 8 | The largest read is a catalog upload (document 16,635,093 bytes, message 22,180,226 bytes): peak managed 158.8 MiB, input included, peak working set 196.5 MiB. A tick of minimal entries at the bound (91,761 entries, 25,165,389 bytes): 70.6 MiB managed, peak working set 121.0 MiB; a tick of 524,288 pairs (4,241,243 bytes): 40.2 MiB and 88.7 MiB | the Dev's measurement of the real `ContractReader.Read` in step 6, commands and output in `contract.md`; the reviewers' earlier scratch figures are replaced | confirmed |
 | 9 | An icon PNG is at most about 16.8 MB: side ≤ 2,048, RGBA 8 bit, one filter byte per row, zlib | `GameIconReader.MaxIconSide`, `DdsReader.Read(…, MaxIconSide)`, `PngWriter.cs` (`ZLibStream`); 2,048 × 8,193 = 16,779,264 + deflate's stored-block overhead (arithmetic); the 17,825,792 bound leaves over 1 MB | confirmed |
 | 10 | Base64 of 17,825,792 bytes is 23,767,724 characters; of the catalog's 16,777,216 bytes 22,369,624; both fit 25,165,824 with the envelope | arithmetic | confirmed |
 | 11 | The catalog reader is strict, returns a typed error with fixed texts, and its error factories are internal to `Censio.Contracts` | `CatalogDocumentError.cs` (`internal static Create…`), `game-catalog-format.md` | confirmed |
@@ -112,7 +112,7 @@ maps and `missingIcons` are written sorted, so the same message gives the same b
 | Bound | Value | Measured |
 | ----- | ----- | -------- |
 | Message | 25,165,824 bytes (24 MiB) | before parsing |
-| `png`, `document` | 23,767,724 characters, decoded at most 17,825,792 bytes (`document` then also the catalog's 16 MiB) | after unescaping |
+| `png`, `document` | 23,767,724 characters, decoded at most 17,825,792 bytes (`document` then also the catalog's 16 MiB) | on the raw token, before unescaping: an escape is refused in these strings anyway, so a raw token over the bound is *too large*, an escaped one within it *malformed* |
 | Token, versions, profile name | 1,024 UTF-8 bytes | after unescaping |
 | Island name | 765 UTF-8 bytes | after unescaping |
 | Islands per tick / entries and pairs per tick / pairs per map | 256 / 524,288 / 1,024 | counted in step 2 |
@@ -259,11 +259,11 @@ name field. `Censio.Contracts` keeps no project reference (0056).
   `ArgumentException`, `FormatException` from deserialization like `CatalogDocumentReader` and returns *malformed*.
   `ArgumentNullException` for a null message in the writer and converter only.
 - PNG data is carried, hashed and bounded, not validated as PNG: whoever serves it to a browser (#42) checks it.
-- Memory: input plus model, fact 8 (largest: a catalog upload, about 133 MiB managed). For #28, in `contract.md` and
+- Memory: input plus model, fact 8 (largest: a catalog upload, about 159 MiB managed at its peak). For #28, in `contract.md` and
   record 0060: the reader does not check direction (the endpoint refuses a server-to-Companion type from a Companion);
   the endpoint bounds the first, unauthenticated message to 32 KiB, above the largest valid hello (four strings of
   at most 1,024 bytes, each at most 6,144 bytes raw when escaped); it bounds a WebSocket message at the message bound and the reads it runs at
-  once (N connections × about 133 MiB with the token off).
+  once (N connections × about 159 MiB managed with the token off).
 - The token, profile and island names appear in no error, text or `ToString`.
 
 ## Decision records
@@ -301,3 +301,13 @@ The Devil's Advocate's major objections are items 1–3 of the joint review; ans
    `contract.md` says so.
 10. Guidance for #28. Accepted: *Security considerations*, record 0060 *Consequences*, `contract.md`.
 11. Byte order mark. Accepted: step 2 and AC6.
+
+## Decisions after G1
+
+- The `png` and `document` bound is checked on the raw token length (the code's `CheckBinary`, pinned by a test): kept,
+  since an escape is refused in these strings in any case and the raw check comes before any unescaping; the bound
+  table says so, and `contract.md` states the two kinds (Dev).
+- The writer does not run `CatalogDocumentReader` on a catalog upload's document: kept as planned. AC6 makes the writer
+  refuse the cases of E3 and E4, not E5; the document's bytes come from `CatalogDocumentWriter`, which refuses what the
+  catalog reader refuses, and the server's refusal reaches the Companion as a catalog acknowledgement kind. `contract.md`
+  says that the writer checks the document's size and identity only and expects the catalog writer's bytes (Dev).
