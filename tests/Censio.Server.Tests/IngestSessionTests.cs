@@ -756,6 +756,30 @@ public sealed class IngestSessionTests : IDisposable
     }
 
     /// <summary>
+    /// A reply the writer refuses (a <c>helloAccepted</c> with an empty server version) is never sent: the connection is
+    /// aborted, both places are freed and the log holds no token or message content.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC10")]
+    public async Task IngestSessionRunAsyncUnwritableReplyAbortsWithoutReply()
+    {
+        // Arrange
+        var (run, client, _) = StartSession(IngestAccess.CreateForToken(Token), string.Empty);
+
+        // Act
+        await IngestClient.SendAsync(client, IngestClient.Hello(Token));
+        await IngestClient.GuardAsync(run);
+
+        // Assert
+        await Assert.ThrowsAsync<WebSocketException>(() => IngestClient.ReceiveAsync(client), "The connection should be aborted without a reply");
+        Assert.AreEqual(IngestConnections.MaxPendingHellos, CountFreePendingPlaces(), "The pending place should be left");
+        Assert.IsTrue(_connections.TryTakeCompanion(), "The Companion's place should be released");
+        Assert.DoesNotContain(entry => entry.Level > LogLevel.Information, _logger.Entries.ToList(), "No warning or error should be logged");
+        AssertNoMarkerInLog();
+    }
+
+    /// <summary>
     /// A peer that never answers the server's close and keeps sending frames is cut off once 2 seconds pass on the clock.
     /// </summary>
     /// <param name="label">The name of the case</param>
@@ -1076,6 +1100,17 @@ public sealed class IngestSessionTests : IDisposable
     /// <returns>The session's run, the client socket and the server's end of the connection</returns>
     private (Task Run, WebSocket Client, InMemoryDuplexStream ServerStream) StartSession(IngestAccess access)
     {
+        return StartSession(access, ServerVersion);
+    }
+
+    /// <summary>
+    /// Starts a session with a server version on a new connection, taking its pending place first as the endpoint does.
+    /// </summary>
+    /// <param name="access">The access of the session</param>
+    /// <param name="serverVersion">The version of the server the session reports</param>
+    /// <returns>The session's run, the client socket and the server's end of the connection</returns>
+    private (Task Run, WebSocket Client, InMemoryDuplexStream ServerStream) StartSession(IngestAccess access, string serverVersion)
+    {
         var (serverStream, clientStream) = InMemoryDuplexStream.CreatePair();
 
         var server = WebSocket.CreateFromStream(serverStream,
@@ -1094,7 +1129,7 @@ public sealed class IngestSessionTests : IDisposable
         _disposables.AddRange([client, server, clientStream, serverStream]);
         _connections.TryEnterPendingHello();
 
-        var session = new IngestSession(server, access, _connections, _timeProvider, _logger, ServerVersion);
+        var session = new IngestSession(server, access, _connections, _timeProvider, _logger, serverVersion);
 
         return (session.RunAsync(_stopping.Token), client, serverStream);
     }
