@@ -179,13 +179,15 @@ dotnet build -c Release
 dotnet bin/Release/net11.0/measure.dll gen catalog       catalog.json
 dotnet bin/Release/net11.0/measure.dll gen minimal-tick  minimal-tick.json
 dotnet bin/Release/net11.0/measure.dll gen pairs-tick    pairs-tick.json
-dotnet bin/Release/net11.0/measure.dll run catalog.json      # likewise minimal-tick.json and pairs-tick.json
+dotnet bin/Release/net11.0/measure.dll gen four-pairs-tick four-pairs-tick.json
+dotnet bin/Release/net11.0/measure.dll run catalog.json      # likewise minimal-tick.json, pairs-tick.json and four-pairs-tick.json
 ```
 
 | Case | Input | Read time | Model retained | Peak managed (input included) | Allocated during read | Peak working set |
 | ---- | ----- | --------- | -------------- | ----------------------------- | --------------------- | ---------------- |
 | Catalog upload: document of 16,635,093 bytes (16,384 entries with 16 names), message of 22,180,226 bytes | 22,180,226 bytes | 432 to 503 ms | 48.0 MiB (69.2 MiB with the input) | 158.8 MiB | 137.6 MiB | 196.5 MiB |
-| Tick of 91,761 minimal entries (all floats `null`, empty maps) in 256 islands | 25,165,389 bytes | 718 to 889 ms | 26.3 MiB (50.4 MiB with the input) | 70.6 MiB | 46.4 MiB | 121.0 MiB |
+| Tick of 91,761 minimal entries (all floats `null`, empty maps) in 256 islands (not the worst tick) | 25,165,389 bytes | 718 to 889 ms | 26.3 MiB (50.4 MiB with the input) | 70.6 MiB | 46.4 MiB | 121.0 MiB |
+| Tick of 84,655 entries with four workforce pairs each (338,620 pairs), in 256 islands | 25,165,410 bytes | 713 to 790 ms | 39.9 MiB (63.9 MiB with the input) | 91.7 MiB | 67.5 MiB | 141.5 MiB |
 | Tick of 524,288 entries and pairs, read straight into the maps | 4,241,243 bytes | 265 ms | 19.1 MiB (23.2 MiB with the input) | 40.2 MiB | 36.1 MiB | 88.7 MiB |
 
 Output of the runs (the first: catalog; peak managed sampled every millisecond):
@@ -201,7 +203,8 @@ peak working set       : 196.5 MiB
 ```
 
 The largest read is therefore a catalog upload: about 159 MiB of managed memory at its peak with the input, 197 MiB of
-working set.
+working set. The worst tick at the bound is one of entries with a few pairs each: about 92 MiB at its peak with the
+input.
 
 ### Security considerations for the endpoint (#28)
 
