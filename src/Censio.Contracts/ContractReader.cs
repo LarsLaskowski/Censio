@@ -104,7 +104,7 @@ public static class ContractReader
 
         if (ruleKind is not null)
         {
-            return Refuse(ContractError.Create(ruleKind.Value));
+            return new ContractReadResult(null, ContractError.Create(ruleKind.Value), GetRefusedId(message));
         }
 
         return message is ContractCatalogUpload upload ? CheckCatalog(upload) : new ContractReadResult(message, null);
@@ -141,7 +141,29 @@ public static class ContractReader
     {
         var catalog = CatalogDocumentReader.Read(upload.Document.Span);
 
-        return catalog.Error is null ? new ContractReadResult(upload, null) : Refuse(ContractError.CreateCatalogRefused(catalog.Error));
+        return catalog.Error is null
+                   ? new ContractReadResult(upload, null, null, catalog.Document)
+                   : new ContractReadResult(null, ContractError.CreateCatalogRefused(catalog.Error), GetRefusedId(upload));
+    }
+
+    /// <summary>
+    /// Gets the usable <c>id</c> of a built message that carries one.
+    /// </summary>
+    /// <param name="message">The message</param>
+    /// <returns>The <c>id</c>, or <c>null</c> when the type carries none or the <c>id</c> is all zero</returns>
+    private static Guid? GetRefusedId(ContractMessage message)
+    {
+        var id = message switch
+                 {
+                     ContractTick tick => tick.Id,
+                     ContractSessionStart sessionStart => sessionStart.Id,
+                     ContractSessionEnd sessionEnd => sessionEnd.Id,
+                     ContractCatalogUpload catalogUpload => catalogUpload.Id,
+                     ContractIconImage iconImage => iconImage.Id,
+                     _ => Guid.Empty
+                 };
+
+        return id == Guid.Empty ? null : id;
     }
 
     /// <summary>

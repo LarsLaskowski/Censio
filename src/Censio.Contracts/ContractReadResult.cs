@@ -12,10 +12,14 @@ public sealed class ContractReadResult
     /// </summary>
     /// <param name="message">The message read, or <c>null</c></param>
     /// <param name="error">The error, or <c>null</c></param>
-    internal ContractReadResult(ContractMessage? message, ContractError? error)
+    /// <param name="refusedId">The <c>id</c> of a refused message the reader built, or <c>null</c></param>
+    /// <param name="catalogDocument">The catalog document of an accepted catalog upload, or <c>null</c></param>
+    internal ContractReadResult(ContractMessage? message, ContractError? error, Guid? refusedId = null, CatalogDocument? catalogDocument = null)
     {
         Message = message;
         Error = error;
+        RefusedId = refusedId;
+        CatalogDocument = catalogDocument;
     }
 
     #endregion // Constructors

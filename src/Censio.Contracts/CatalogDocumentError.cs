@@ -14,10 +14,12 @@ public sealed class CatalogDocumentError
     /// </summary>
     /// <param name="kind">The kind of the refusal</param>
     /// <param name="text">The fixed text of the refusal</param>
-    internal CatalogDocumentError(CatalogDocumentErrorKind kind, string text)
+    /// <param name="version">The schema version found for an unsupported version, or <c>null</c></param>
+    internal CatalogDocumentError(CatalogDocumentErrorKind kind, string text, int? version = null)
     {
         Kind = kind;
         Text = text;
+        Version = version;
     }
 
     #endregion // Constructors
@@ -42,7 +44,8 @@ public sealed class CatalogDocumentError
     {
         return new CatalogDocumentError(CatalogDocumentErrorKind.UnsupportedVersion,
                                         string.Create(CultureInfo.InvariantCulture,
-                                                      $"Catalog schema version {version} is not supported; supported: {CatalogDocument.CurrentSchemaVersion}"));
+                                                      $"Catalog schema version {version} is not supported; supported: {CatalogDocument.CurrentSchemaVersion}"),
+                                        version);
     }
 
     /// <summary>
