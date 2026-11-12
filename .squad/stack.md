@@ -134,7 +134,9 @@ image, because no `.razor` file existed at restore time). A Blazor project there
 scripts without any `.razor` file present (`Censio.Server`, record 0007); the script below stays unchanged. Where Docker runs, build the image. Where it does not
 (the sandbox), reproduce the Dockerfile's order in a scratch directory; every change to a `.csproj`,
 `Directory.*.props`, a `.razor` or other content item, a static web asset or the Dockerfile runs it before the
-review:
+review. The image build needs `.squad/dotnet-rules.globalconfig`, which `Directory.Build.props` names: a Dockerfile
+that copies files by name copies it into the build stage, and a `.dockerignore` that leaves out `.squad/` lets it in
+(`dotnet_config.py` checks both):
 
 ```bash
 scratch="$(mktemp -d)"
