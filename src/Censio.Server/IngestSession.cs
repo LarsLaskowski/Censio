@@ -316,13 +316,23 @@ public sealed partial class IngestSession : IDisposable
 
         if (Interlocked.CompareExchange(ref _helloPhase, PhaseDecided, PhaseOpen) != PhaseOpen)
         {
-            await DiscardUntilClosedAsync(buffer).ConfigureAwait(false);
+            if (isMessage || closeStatus is not null)
+            {
+                await DiscardUntilClosedAsync(buffer).ConfigureAwait(false);
+            }
 
             return false;
         }
 
         _helloTimer?.Dispose();
         LeavePendingHello();
+
+        if (isMessage && Volatile.Read(ref _closing) != 0)
+        {
+            await DiscardUntilClosedAsync(buffer).ConfigureAwait(false);
+
+            return false;
+        }
 
         if (isMessage == false)
         {
@@ -427,6 +437,13 @@ public sealed partial class IngestSession : IDisposable
                 return;
             }
 
+            if (Volatile.Read(ref _closing) != 0)
+            {
+                await DiscardUntilClosedAsync(buffer).ConfigureAwait(false);
+
+                return;
+            }
+
             var status = await HandleMessageAsync(buffer, length).ConfigureAwait(false);
 
             if (status is not null)
@@ -518,16 +535,6 @@ public sealed partial class IngestSession : IDisposable
 
         while (true)
         {
-            if (Volatile.Read(ref _closing) != 0)
-            {
-                if (await DiscardFrameAsync(buffer).ConfigureAwait(false))
-                {
-                    return (false, 0, null);
-                }
-
-                continue;
-            }
-
             var received = await _webSocket.ReceiveAsync(buffer.AsMemory(length, bound + 1 - length), CancellationToken.None).ConfigureAwait(false);
 
             if (received.MessageType != WebSocketMessageType.Text)
@@ -544,12 +551,7 @@ public sealed partial class IngestSession : IDisposable
 
             if (received.EndOfMessage)
             {
-                if (Volatile.Read(ref _closing) == 0)
-                {
-                    return (true, length, null);
-                }
-
-                length = 0;
+                return (true, length, null);
             }
         }
     }
@@ -573,14 +575,11 @@ public sealed partial class IngestSession : IDisposable
     /// <returns>A task that completes when the peer has closed</returns>
     private async Task DiscardUntilClosedAsync(byte[] buffer)
     {
-        while (true)
-        {
-            var (isMessage, _, closeStatus) = await ReadMessageAsync(buffer, buffer.Length - 1).ConfigureAwait(false);
+        var closed = false;
 
-            if (isMessage == false && closeStatus is null)
-            {
-                return;
-            }
+        while (closed == false)
+        {
+            closed = await DiscardFrameAsync(buffer).ConfigureAwait(false);
         }
     }
 
