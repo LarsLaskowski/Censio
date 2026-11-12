@@ -350,7 +350,7 @@ public static class GameIconReader
 
         using var archive = opened.Archive;
 
-        long total = icons.Values.Distinct().Sum(icon => (long)icon.Png.Length);
+        var total = icons.Values.Distinct().Sum(icon => (long)icon.Png.Length);
 
         foreach (var source in wanted)
         {
