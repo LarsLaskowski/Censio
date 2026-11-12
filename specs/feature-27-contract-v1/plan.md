@@ -15,19 +15,21 @@ the spec leaves to it.
 | - | ----- | -------- | ------ |
 | 1 | #10 and #26 are built; both issues closed | `src/Censio.Pipe/PipeTickAssembler.cs`, `PipeTick.cs`; `src/Censio.Contracts/CatalogDocumentReader.cs`, `CatalogDocumentWriter.cs`; `gh api …/issues/10`, `/26`: `closed` | confirmed |
 | 2 | A closed tick has a receive time and a game time; session events carry no time and no data besides the figure name | `PipeTick.cs` (`GameTime`, `ReceiveTime`); `PipeTickResult.cs` (`FromSessionStart(headline)`, `SessionEnd` field-less) | confirmed |
-| 3 | An entry has a product GUID, 11 values (7 float32, 4 int32) and two int-to-int maps | `src/Censio.Pipe/ProductionEntry.cs` | confirmed |
+| 3 | An entry has a product GUID, 11 values (8 float32: generation, consumption, delta, perfect generation, perfect consumption, income, summed and average productivity; 3 int32: building count, maintenance, profit) and two int-to-int maps | `src/Censio.Pipe/ProductionEntry.cs` | confirmed |
 | 4 | Floats are delivered as read, NaN included; a string is at most 255 wire bytes, each invalid sequence U+FFFD (≤ 765 UTF-8 bytes) | `docs/areas/pipe.md` lines 30–33 | confirmed |
 | 5 | Tick limits: 256 islands, 524,288 entries and pairs; a map at most 1,024 pairs, repeated GUIDs summed | `docs/areas/pipe.md`, *Limits and errors*, *Frame layout* | confirmed |
 | 6 | Largest recorded tick: 24 islands, 1,934 entries and pairs, frames ≤ 4,946 bytes | `docs/protocol.md`, *Sizes* | confirmed |
 | 7 | A worst-case entry (extreme values, empty maps) is 380 JSON bytes; a tick at the pipe's entry limit is about 200 MB | scratch program (S.T.J, the property names of *Approach*): 380 × 524,288 | confirmed |
-| 8 | Reading a 24 MiB worst-case tick (65,467 entries, 256 names of 255 U+FFFD) holds about 40 MiB managed after the read, input included; a 14 MB pair-heavy tick at the full 524,288 units about 127 MiB (pairs as arrays); peak working set 163 and 170 MiB, the generator included | to verify: peak working set of `ContractReader.Read` on both inputs, Dev, step 6, written into `contract.md`; so far a scratch measurement (`Utf8JsonReader` pass plus S.T.J deserialize, .NET 11, workstation GC) | unverified |
+| 8 | The largest read is a catalog upload (document 16,061,648 bytes, message 21,415,634 bytes): about 133.3 MiB managed with the model alive, peak working set 291.5 MiB. The worst tick is one of minimal entries (91,017 entries in 25,508,794 bytes): 49.2 MiB managed, peak 216.7 MiB; a tick of 524,288 pairs read straight into the maps (4.2 MB): 39.3 MiB | to verify: the same three cases on the real `ContractReader.Read`, Dev, step 6, commands and output into `contract.md`; so far the reviewers' scratch measurements on .NET 11 (plan review) | unverified |
 | 9 | An icon PNG is at most about 16.8 MB: side ≤ 2,048, RGBA 8 bit, one filter byte per row, zlib | `GameIconReader.MaxIconSide`, `DdsReader.Read(…, MaxIconSide)`, `PngWriter.cs` (`ZLibStream`); 2,048 × 8,193 = 16,779,264 + deflate's stored-block overhead (arithmetic); the 17,825,792 bound leaves over 1 MB | confirmed |
 | 10 | Base64 of 17,825,792 bytes is 23,767,724 characters; of the catalog's 16,777,216 bytes 22,369,624; both fit 25,165,824 with the envelope | arithmetic | confirmed |
 | 11 | The catalog reader is strict, returns a typed error with fixed texts, and its error factories are internal to `Censio.Contracts` | `CatalogDocumentError.cs` (`internal static Create…`), `game-catalog-format.md` | confirmed |
 | 12 | The catalog writer gives the same bytes for the same catalog, so its SHA-256 identifies it | `game-catalog-format.md`, *Writing* | confirmed |
 | 13 | `CatalogDocumentJsonContext` already uses `AllowDuplicateProperties = false`, `UnmappedMemberHandling.Disallow`, `RespectNullableAnnotations` | `src/Censio.Contracts/CatalogDocumentJsonContext.cs` | confirmed |
-| 14 | `Utf8JsonReader` refuses a number outside float32 range (`TryGetSingle` false) and reads `-0` back as negative zero | to verify: AC2 and AC6 test cases, Tester, step 5 (S.T.J documentation, not run) | unverified |
-| 15 | S.T.J Base64 reading refuses whitespace and non-canonical padding | to verify: AC6 case, Tester, step 5; if it accepts, the Dev adds the check | unverified |
+| 14 | `Utf8JsonReader.TryGetSingle` and `Deserialize<float>` return ±infinity for `1e39`, `-1e39`, `3.4028236E+38` (no float32-range option exists); `-0` stays negative zero; `1e-50` reads as 0 | reviewers' scratch runs on .NET 11 (plan review); the earlier claim of this row was refuted, so the reader adds its own check | confirmed |
+| 15 | S.T.J Base64 reading accepts spaces, CR/LF and `\u` escapes inside the string, and refuses non-canonical or missing padding | reviewers' scratch runs on .NET 11 (plan review); the reader adds its own alphabet check | confirmed |
+| 16a | A null element of a collection passes deserialization (`"islands":[null]` gives a list holding null) | reviewers' scratch run (plan review); `CatalogDocumentRules.ContainsNull` guards the same for the catalog | confirmed |
+| 16b | The assembler hands each read with its stamp to a read observer; a session result carries no time | `PipeTickAssembler.cs` lines 28, 80, 220–237; `PipeTickResult.cs` | confirmed |
 | 16 | `Censio.Companion.Core` references `Censio.Contracts` and `Censio.Pipe`; the Contracts tests reference only Contracts | the `.csproj` files | confirmed |
 | 17 | Records 0055 and 0056 are released (v0.2.0), so this feature adds records and edits none | `git ls-remote --tags origin`: `v0.2.0` at `abc3527`, after #163 | confirmed |
 | 18 | A WebSocket close reason is at most 123 bytes | RFC 6455, 5.5 (control payload ≤ 125, 2 bytes status) | confirmed |
@@ -40,11 +42,11 @@ the spec leaves to it.
 | AC1 | `ContractMessageConverterStatusMapsEveryPipeState` | `tests/Censio.Companion.Core.Tests/ContractMessageConverterTests.cs` |
 | AC2 | `ContractWriterTickRoundTripsEveryValueExact`, `ContractWriterTickEdgeValuesRoundTripExact` (repeated product GUID, empty islands, all islands empty, empty name, negative GUIDs, game time `long.MinValue`/`MaxValue`, floats `-0`, subnormal, `float.MaxValue`, receive time with 7 fractional digits) | `ContractWriterTests.cs` |
 | AC2 | `ContractMessageConverterTickCarriesEveryValueOfThePipeTick` | `ContractMessageConverterTests.cs` |
-| AC3 | `ContractMessageConverterNonFiniteFloatCrossesAsNoValue` (NaN, +∞, −∞ in each float field, through write and read) | `ContractMessageConverterTests.cs` |
+| AC3 | `ContractMessageConverterNonFiniteFloatCrossesAsNoValue` (NaN, +∞, −∞ in each of the eight float fields, through write and read) | `ContractMessageConverterTests.cs` |
 | AC4 | `ContractReaderSessionStartWithTextIsMalformed`, `ContractWriterTickAndSessionEventsKeepTheirProfile` | `ContractReaderTests.cs`, `ContractWriterTests.cs` |
-| AC5 | `ContractReaderOtherVersionIsUnsupportedVersion` (0, 2, −1, `int.MaxValue`, also with a body malformed under version 1), `ContractReaderHelloOfOtherVersionIsRefusedWithItsVersion`, `ContractReaderFutureServerRefusalReadsVersionsBack` (version 2, received 1, supported `[2]`), `ContractReaderOtherVersionRefusalOfUnknownFormIsUnsupportedVersion` | `tests/Censio.Contracts.Tests/ContractReaderTests.cs` |
+| AC5 | `ContractReaderOtherVersionIsUnsupportedVersion` (0, 2, −1, `int.MaxValue`, also with a body that breaks version 1's structure only: an unknown property, a wrong JSON type), `ContractReaderHelloOfOtherVersionIsRefusedWithItsVersion`, `ContractReaderFutureServerRefusalReadsVersionsBack` (version 2, received 1, supported `[2]`), `ContractReaderOtherVersionRefusalOfUnknownFormIsUnsupportedVersion` | `tests/Censio.Contracts.Tests/ContractReaderTests.cs` |
 | AC6 | `ContractReaderMalformedInputIsMalformed`, `ContractReaderRuleBreakIsInvalid`, `ContractReaderRefusalTextHoldsNoContent`, `ContractWriterRuleBreakIsRefusedAndWritesNothing` (cases: *Approach*, *Reader*) | `ContractReaderTests.cs`, `ContractWriterTests.cs` |
-| AC7 | `ContractWriterTickAtPipeCountLimitsRoundTrips`, `ContractReaderMessageAtByteBoundIsRead` (padded with JSON whitespace), `ContractReaderInputAboveByteBoundIsTooLarge`, `ContractReaderCountAboveBoundIsTooLarge`, `ContractWriterTickAboveByteBoundIsTooLarge`, `ContractWriterIconAtBinaryBoundRoundTrips`, `ContractWriterCatalogAtCatalogBoundRoundTrips`, `ContractWriterIslandNameOfReplacementCharactersRoundTrips` | `ContractReaderTests.cs`, `ContractWriterTests.cs` |
+| AC7 | `ContractWriterTickAtPipeCountLimitsRoundTrips`, `ContractReaderMessageAtByteBoundIsRead` (padded with JSON whitespace), `ContractReaderInputAboveByteBoundIsTooLarge`, `ContractReaderCountAboveBoundIsTooLarge` (also with `type` last and `islands` first, and in a message of another type), `ContractWriterTickAboveByteBoundIsTooLarge`, `ContractWriterIconAtBinaryBoundRoundTrips`, `ContractWriterCatalogAtCatalogBoundRoundTrips`, `ContractWriterIslandNameOfReplacementCharactersRoundTrips` | `ContractReaderTests.cs`, `ContractWriterTests.cs` |
 | AC8 | `ContractReaderCatalogUploadWithRefusedDocumentIsCatalogRefused` (catalog version 2 with text `Catalog schema version 2 is not supported; supported: 1`, malformed, invalid, too large) | `ContractReaderTests.cs` |
 | AC9 | `ContractMessageConverterSessionEventsTakenSeparatelyGetDifferentIdentities`, `ContractMessageConverterSessionEventCarriesItsReceiveTime`, `ContractWriterWritingAgainKeepsTheIdentity` | `ContractMessageConverterTests.cs`, `ContractWriterTests.cs` |
 
@@ -84,15 +86,26 @@ maps and `missingIcons` are written sorted, so the same message gives the same b
 
 1. Input over 25,165,824 bytes: *too large*, before parsing.
 2. One syntax pass (`Utf8JsonReader`, like `CatalogDocumentScanner`): well-formed JSON, root an object, depth ≤ 64,
-   nothing after it, valid UTF-8, no lone surrogate also when escaped; each string's raw length is checked before it is
-   unescaped and its unescaped UTF-8 length after, against its bound; the counts are checked before anything is built;
-   root `contractVersion` present once as an int32 integer without fraction or exponent, root `type` once as a string.
-   A failure is *malformed*, a bound *too large*.
+   nothing after it, valid UTF-8, no byte order mark, no lone surrogate also when escaped; each string and property name
+   has its raw length checked before it is unescaped and its unescaped UTF-8 length after, against the bound of its
+   position. Positions are matched by property path on unescaped names (`ValueTextEquals`), at every position whatever
+   `type` holds and wherever `type` stands (it may come last): root `png` and `document` take the Base64 bound,
+   `islands[].name` 765 bytes, every other string and every property name 1,024 bytes. Counts are taken by path the
+   same way (root `islands`, `islands[].entries`, the two maps of an entry, root `supportedVersions` and `missingIcons`)
+   and checked before anything is built. A number at one of the eight float positions of an entry that does not parse
+   to a finite float32 (`1e39`, also written as an integer) is refused here. Root `contractVersion` is present once as an int32 integer without fraction or exponent,
+   root `type` once as a string. A failure is *malformed*, a bound *too large*; size and counts are thus decided
+   before the version, as in the catalog reader.
 3. `contractVersion` ≠ 1: a `helloRefused` of exactly the frozen form is read by the rules below and returned; anything
    else is *unsupported version* with the number found.
 4. Structure of the type: deserialize with a source-generated context of the catalog's strict options (no unknown,
-   repeated or missing property, exact case, JSON types, integer ranges, `byte` 0–255, float32 range, canonical Base64
-   without whitespace). Unknown `type`: *malformed*.
+   repeated or missing property, exact case, JSON types, integer ranges, `byte` 0–255). Unknown `type`: *malformed*.
+   Own converters, each signalling failure as `JsonException`: a `float?` converter that refuses a number not finite
+   as float32; a map converter that reads each pair straight into the dictionary, exactly two int32 numbers per pair,
+   no array per pair; Base64 for `png` and `document` checked before decoding: the raw token holds no escape and only
+   the Base64 alphabet with canonical padding. A `null` element in `islands`, `entries`, `supportedVersions` or
+   `missingIcons` is *malformed* (a check like `CatalogDocumentRules.ContainsNull`, before any value rule), so no
+   `NullReferenceException` can leave the reader.
 5. Value rules: *invalid*. Then a `catalogUpload`'s decoded document goes through `CatalogDocumentReader.Read`; its
    refusal is *catalog refused* with the catalog error and its text.
 
@@ -112,8 +125,9 @@ distinct ascending positive values; `refusedVersion` set exactly for the two *un
 `missingIcons` 64 lowercase hex, strictly ascending, empty for a refusal.
 
 *Malformed* cases for AC6: not JSON, truncated, unknown type, unknown/repeated/missing property, wrong JSON type, content
-after the root, depth 65, an escaped lone surrogate, Base64 with whitespace or wrong padding, a number outside float32,
-a `byte` of 256. *Invalid*: each value rule above. Lone-surrogate inputs live in raw string literals (`.squad/team.md`,
+after the root, depth 65, a UTF-8 byte order mark, an escaped lone surrogate, Base64 with a space, with an escaped
+`\n`, with wrong padding, the numbers `1e39`, `-1e39`, `3.4028236E+38`, a `byte` of 256, a map pair of one or three
+numbers, `"islands":[null]`, `"entries":[null]`, `"missingIcons":[null]`. *Invalid*: each value rule above. Lone-surrogate inputs live in raw string literals (`.squad/team.md`,
 *Escapes in files*); the test fails if the backslash is lost because the input then is a different, valid string.
 
 **Texts.** `Contract message is malformed`, `Contract version <n> is not supported; supported: 1`,
@@ -127,7 +141,8 @@ context. A tick over the message bound is *too large*.
 
 **Converter** (`ContractMessageConverter`, `Censio.Companion.Core`): a pipe tick to a contract tick with a new
 `Guid.NewGuid()` id, every non-finite float as `null`, maps as they are (the writer sorts); session events with a new id
-and the receive time the caller gives; the six `PipeConnectionState` values one to one. The message types are classes,
+and the receive time the caller gives, which is the read stamp of the session message: the caller (#40) takes it from
+the assembler's read observer (fact 16b), since a session result carries no time, never the conversion or send time; the six `PipeConnectionState` values one to one. The message types are classes,
 not records, so no generated `ToString` prints the token or a name.
 
 ## Options considered
@@ -212,7 +227,9 @@ All by the Dev, against the green code:
 - `docs/areas/contract.md` (new, from `docs/areas/_template.md`): the wire form with one example of invented values per
   message, the frozen form and the version-first rule, identities and acknowledgement meaning (accepted or refused: the
   Companion may discard; no answer: resend), the reader's order, the bound table with the measured memory of fact 8,
-  texts, what never crosses (figure name, pipe errors, close reason), privacy (token, profile and island names private,
+  texts, what never crosses (figure name, pipe errors, close reason), that a session event's receive time is the read
+  stamp of its pipe message, the three memory measurements with their commands and output (fact 8), the guidance for
+  #28 of *Security considerations*, privacy (token, profile and island names private,
   no refusal text or log line holds them); links records 0058–0060, 0018, 0041, 0056.
 - `docs/areas/README.md`: the row of `contract` (*Areas*).
 - `docs/areas/game-catalog-format.md`, *Not here*: "Sending … (#27, #42)" becomes the upload's messages in
@@ -242,7 +259,11 @@ name field. `Censio.Contracts` keeps no project reference (0056).
   `ArgumentException`, `FormatException` from deserialization like `CatalogDocumentReader` and returns *malformed*.
   `ArgumentNullException` for a null message in the writer and converter only.
 - PNG data is carried, hashed and bounded, not validated as PNG: whoever serves it to a browser (#42) checks it.
-- Memory: input plus model, fact 8; the endpoint bounds the WebSocket message at the same size (#28).
+- Memory: input plus model, fact 8 (largest: a catalog upload, about 133 MiB managed). For #28, in `contract.md` and
+  record 0060: the reader does not check direction (the endpoint refuses a server-to-Companion type from a Companion);
+  the endpoint bounds the first, unauthenticated message to 32 KiB, above the largest valid hello (four strings of
+  at most 1,024 bytes, each at most 6,144 bytes raw when escaped); it bounds a WebSocket message at the message bound and the reads it runs at
+  once (N connections × about 133 MiB with the token off).
 - The token, profile and island names appear in no error, text or `ToString`.
 
 ## Decision records
@@ -257,3 +278,26 @@ Their links to `areas/contract.md` and the area name `contract` resolve once the
 ## Out of scope / follow-ups
 
 Spec, *Out of scope*. No follow-up issue: #28, #40, #41, #42 exist and consume this contract.
+
+## Challenge
+
+The Devil's Advocate's major objections are items 1–3 of the joint review; answered under *Security review*.
+
+## Security review
+
+1. Fact 14 false. Accepted: fact corrected; step 2 refuses a number that is not a finite float32, step 4's `float?`
+   converter again; AC6 keeps `1e39`, `-1e39`, `3.4028236E+38`.
+2. Null elements. Accepted: step 4 refuses them as *malformed*; three cases added to AC6.
+3. Fact 8 measured the wrong message. Accepted: fact 8 holds the reviewers' three figures; the Dev measures all three
+   on the real reader (tasks row 4) and writes commands and output into `contract.md`.
+4. Bounds by path at every position; order. Accepted: step 2; the count test gains `type` last; AC5 uses structural
+   breaks only; `contract.md` states the order.
+5. Default string bound. Accepted: 1,024 bytes for every other string and property name; the Base64 bound at root
+   `png` and `document` only; unescaped name matching.
+6. Map converter. Accepted: step 4; all converters fail with `JsonException`.
+7. Fact 15 false. Accepted: the Base64 check is unconditional; a space and an escaped `\n` added to AC6.
+8. Fact 3 wrong. Accepted: eight floats, three integers; AC3 covers the eight.
+9. Session receive time. Accepted: the read stamp from the assembler's observer, supplied by the caller (#40);
+   `contract.md` says so.
+10. Guidance for #28. Accepted: *Security considerations*, record 0060 *Consequences*, `contract.md`.
+11. Byte order mark. Accepted: step 2 and AC6.

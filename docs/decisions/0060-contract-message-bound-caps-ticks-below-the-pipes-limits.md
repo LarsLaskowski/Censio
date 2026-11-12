@@ -36,4 +36,7 @@ refused by the writer as *too large*. The bounds and the measured memory are in 
 ## Consequences
 
 - A tick over the bound is lost and reported by the Companion (#40, #41); revisit when a recording comes near it.
-- The endpoint (#28) bounds a WebSocket message at the same size before the reader sees it.
+- The largest read is a catalog upload, about 133 MiB managed (`contract.md`); a tick at the bound about 49 MiB.
+- For the endpoint (#28): it bounds a WebSocket message at the same size before the reader sees it, the first,
+  unauthenticated message at 32 KiB (a hello), and the reads it runs at once, since with the token off N connections
+  can hold N × about 133 MiB; the reader does not check direction, so the endpoint refuses a server-to-Companion type.
