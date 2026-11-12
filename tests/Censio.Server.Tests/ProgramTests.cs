@@ -296,7 +296,7 @@ public sealed class ProgramTests
 
         var port = ((IPEndPoint)blocker.LocalEndpoint).Port;
         var entryPoint = typeof(Program).Assembly.EntryPoint!;
-        string[] arguments = [$"--{DataProtectionSetup.DataDirectoryKey}={dataDirectory}", $"--urls=http://127.0.0.1:{port}"];
+        string[] arguments = [$"--{DataProtectionSetup.DataDirectoryKey}={dataDirectory}", $"--urls=http://127.0.0.1:{port}", $"--applicationName={typeof(Program).Assembly.GetName().Name}"];
 
         // Act
         var exitCode = await Task.Run(() => entryPoint.Invoke(null, [arguments]), TestContext.CancellationToken).WaitAsync(TimeSpan.FromSeconds(30), TestContext.CancellationToken);
