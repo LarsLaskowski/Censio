@@ -1,0 +1,26 @@
+using System.Text.Json.Serialization;
+
+namespace Censio.Contracts;
+
+/// <summary>
+/// The state of the Companion's pipe connection.
+/// </summary>
+public sealed class ContractStatus : ContractMessage
+{
+    #region Properties
+
+    /// <summary>
+    /// Gets the pipe state.
+    /// </summary>
+    public required ContractPipeState PipeState { get; init; }
+
+    #endregion // Properties
+
+    #region ContractMessage
+
+    /// <inheritdoc />
+    [JsonPropertyOrder(-2)]
+    public override ContractMessageType Type => ContractMessageType.Status;
+
+    #endregion // ContractMessage
+}
