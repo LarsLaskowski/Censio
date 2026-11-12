@@ -11,7 +11,7 @@ public sealed class FakeFileVersionReader : IFileVersionReader
     /// <summary>
     /// The versions by full file path.
     /// </summary>
-    private readonly Dictionary<string, Version?> _versions = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, Version?> _versions = [with(StringComparer.Ordinal)];
 
     /// <summary>
     /// The paths asked for, in order.

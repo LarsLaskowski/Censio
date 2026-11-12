@@ -72,11 +72,6 @@ internal sealed class CatalogDocumentScanner
     private bool _versionBad;
 
     /// <summary>
-    /// The schema version found.
-    /// </summary>
-    private int _version;
-
-    /// <summary>
     /// Whether the last property of the root is <c>entries</c> and its value has not begun.
     /// </summary>
     private bool _entriesPending;
@@ -123,9 +118,33 @@ internal sealed class CatalogDocumentScanner
     /// <summary>
     /// Gets the schema version found by <see cref="Scan" />.
     /// </summary>
-    internal int Version => _version;
+    internal int Version { get; private set; }
 
     #endregion // Properties
+
+    #region Static methods
+
+    /// <summary>
+    /// The marker of an entry's property name that the scanner follows.
+    /// </summary>
+    /// <param name="reader">The reader, positioned on the property name</param>
+    /// <returns><see cref="NamesMarker" />, <see cref="RegionTypesMarker" />, or 0 for any other property</returns>
+    private static int EntryPropertyMarker(ref Utf8JsonReader reader)
+    {
+        if (reader.ValueTextEquals("names"u8))
+        {
+            return NamesMarker;
+        }
+
+        if (reader.ValueTextEquals("regionTypes"u8))
+        {
+            return RegionTypesMarker;
+        }
+
+        return 0;
+    }
+
+    #endregion // Static methods
 
     #region Methods
 
@@ -237,7 +256,7 @@ internal sealed class CatalogDocumentScanner
 
             if (type == JsonTokenType.Number && reader.TryGetInt32(out var version))
             {
-                _version = version;
+                Version = version;
             }
             else
             {
@@ -351,14 +370,7 @@ internal sealed class CatalogDocumentScanner
         {
             case JsonTokenType.PropertyName:
                 {
-                    if (reader.ValueTextEquals("names"u8))
-                    {
-                        _entryProperty = NamesMarker;
-                    }
-                    else
-                    {
-                        _entryProperty = reader.ValueTextEquals("regionTypes"u8) ? RegionTypesMarker : 0;
-                    }
+                    _entryProperty = EntryPropertyMarker(ref reader);
                 }
                 break;
 

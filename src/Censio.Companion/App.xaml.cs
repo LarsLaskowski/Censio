@@ -15,7 +15,7 @@ namespace Censio.Companion;
 /// <summary>
 /// The Companion application.
 /// </summary>
-public partial class App : Application
+public sealed partial class App : Application, IDisposable
 {
     #region Fields
 
@@ -113,6 +113,11 @@ public partial class App : Application
     /// Whether the application is exiting
     /// </summary>
     private volatile bool _exiting;
+
+    /// <summary>
+    /// Whether the application is disposed
+    /// </summary>
+    private int _disposed;
 
     #endregion // Fields
 
@@ -490,6 +495,23 @@ public partial class App : Application
     /// <inheritdoc />
     protected override void OnExit(ExitEventArgs e)
     {
+        Dispose();
+
+        base.OnExit(e);
+    }
+
+    #endregion // Application
+
+    #region IDisposable
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        {
+            return;
+        }
+
         _exiting = true;
 
         if (_logProvider is not null)
@@ -513,15 +535,14 @@ public partial class App : Application
             var flush = Task.Run(() => provider.FlushAsync(TimeSpan.FromMilliseconds(500)), CancellationToken.None);
 
             flush.Wait(TimeSpan.FromMilliseconds(500), CancellationToken.None);
-            provider.Dispose();
         }
+
+        _logProvider?.Dispose();
 
         _images?.Dispose();
         _connectionCancellation?.Dispose();
         _guard?.Dispose();
-
-        base.OnExit(e);
     }
 
-    #endregion // Application
+    #endregion // IDisposable
 }

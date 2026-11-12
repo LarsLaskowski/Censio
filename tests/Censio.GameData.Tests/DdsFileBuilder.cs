@@ -160,7 +160,7 @@ public static class DdsFileBuilder
     /// <returns>The red, green, blue and alpha values</returns>
     public static byte[] BlockColor(int index)
     {
-        return [(byte)(index * 20 + 1), (byte)(index * 20 + 3), (byte)(index * 20 + 5), (byte)(255 - index * 2)];
+        return [(byte)((index * 20) + 1), (byte)((index * 20) + 3), (byte)((index * 20) + 5), (byte)(255 - (index * 2))];
     }
 
     /// <summary>
@@ -229,9 +229,9 @@ public static class DdsFileBuilder
         {
             for (var column = 0; column < width; column++)
             {
-                var color = BlockColor(row / BlockSide * blocksPerRow + column / BlockSide);
+                var color = BlockColor((row / BlockSide * blocksPerRow) + (column / BlockSide));
 
-                color.CopyTo(rgba, (row * width + column) * 4);
+                color.CopyTo(rgba, ((row * width) + column) * 4);
             }
         }
 

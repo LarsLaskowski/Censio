@@ -4,7 +4,7 @@
 - **Date:** 2026-11-06
 - **Area:** —
 - **Source:** Squad refreshed from Squad-Spec-Repository-Template
-- **Supersedes:** 0002, 0003 (the released process records of earlier template versions it retires)
+- **Supersedes:** 0001 (its quality gates; its decision for issue #3 continues in 0057), 0002, 0003 (the released process records of earlier template versions it retires)
 
 ## Context
 

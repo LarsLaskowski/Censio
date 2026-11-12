@@ -24,6 +24,11 @@ internal sealed class RdaWindowStream : Stream
     private readonly long _length;
 
     /// <summary>
+    /// Whether the inner stream stays open when the window is disposed.
+    /// </summary>
+    private readonly bool _leaveOpen;
+
+    /// <summary>
     /// The number of bytes read from the window so far.
     /// </summary>
     private long _consumed;
@@ -38,11 +43,13 @@ internal sealed class RdaWindowStream : Stream
     /// <param name="inner">The stream the window lies in</param>
     /// <param name="start">The position of the first byte of the window</param>
     /// <param name="length">The length of the window in bytes</param>
-    public RdaWindowStream(Stream inner, long start, long length)
+    /// <param name="leaveOpen">Whether the inner stream stays open when the window is disposed</param>
+    public RdaWindowStream(Stream inner, long start, long length, bool leaveOpen)
     {
         _inner = inner;
         _start = start;
         _length = length;
+        _leaveOpen = leaveOpen;
     }
 
     #endregion // Constructors
@@ -114,6 +121,17 @@ internal sealed class RdaWindowStream : Stream
     public override void Write(byte[] buffer, int offset, int count)
     {
         throw new NotSupportedException();
+    }
+
+    /// <inheritdoc />
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing && _leaveOpen == false)
+        {
+            _inner.Dispose();
+        }
+
+        base.Dispose(disposing);
     }
 
     #endregion // Stream

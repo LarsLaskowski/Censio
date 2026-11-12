@@ -1,5 +1,6 @@
-# Line endings follow .editorconfig (end_of_line = lf): LF in the repository and in every checkout
-* text=auto eol=lf
+# CRLF line endings in every checkout, as .editorconfig and the Reihitsu analyzer expect (the line ending of every
+# .NET repository of the template)
+* text=auto eol=crlf
 
 # Binary assets
 *.png binary
@@ -7,6 +8,11 @@
 *.ico binary
 *.woff binary
 *.woff2 binary
+# reg export writes UTF-16 LE with NUL bytes; no line-end conversion may touch it
+*.reg binary
 
 # Shell scripts must keep LF, otherwise bash fails on the carriage returns
 *.sh text eol=lf
+
+# The Dockerfile is parsed inside a Linux build; keep LF so no carriage return reaches a RUN command
+Dockerfile text eol=lf

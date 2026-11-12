@@ -1,7 +1,4 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <TargetFramework>net11.0</TargetFramework>
-  </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Censio.Anonymiser\Censio.Anonymiser.csproj" />
     <ProjectReference Include="..\..\src\Censio.Pipe\Censio.Pipe.csproj" />

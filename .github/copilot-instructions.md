@@ -98,18 +98,26 @@ The solution is `Censio.slnx`; `docs/ARCHITECTURE.md` lists the projects and the
 ## Project configuration
 
 <!-- stack:begin configuration -->
-- **Target framework** as set in the project files (see `.squad/stack.md`); **nullable reference types**, **implicit usings**, and
-  **documentation XML** generation are all enabled.
+- **Target framework** set once in `Directory.Build.props` (a project file names only a platform of the same major,
+  `net11.0-windows`), with **nullable reference types**, **implicit usings**, **documentation XML**,
+  `TreatWarningsAsErrors`, `EnforceCodeStyleInBuild` and `AnalysisLevel` `latest-recommended` for every project;
+  `dotnet_config.py` checks the build structure in the *Analyzer gate* (`.squad/stack.md`).
 - **Central Package Management** via `Directory.Packages.props`; never put versions in individual
   `.csproj` files.
 - **Reihitsu.Analyzer** and **SonarAnalyzer.CSharp** are dev dependencies in every project (via
   `Directory.Build.props`).
+- **Analyzer rules** and their severities come from the template, the same in every .NET repository: the
+  `squad:dotnet-rules` and `squad:sonar-rules` blocks of `.editorconfig`, written by `.squad/tools/dotnet-rules.py`
+  and `sonar-rules.py`; never set them outside the blocks (a rule the code does not meet yet: `DOTNET_RULES_PENDING`,
+  `.squad/stack.md`, *Analyzer gate*).
 - **Solution format** is `.slnx` (XML-based) at the repository root.
 <!-- stack:end configuration -->
 <!-- project:begin configuration -->
 - `Censio.Companion` targets `net11.0-windows` (WPF and Windows Forms) with `EnableWindowsTargeting` and the
-  `RuntimeIdentifier` `win-x64`, so it builds on Linux; every other project targets `net11.0` (record 0004,
-  *Known pitfalls* in `.squad/stack.md`).
+  `RuntimeIdentifier` `win-x64` in its own project file, so it builds on Linux; every other project takes `net11.0`
+  from `Directory.Build.props` (record 0004, *Known pitfalls* in `.squad/stack.md`).
+- Text files are checked out with CRLF (`.gitattributes`, `end_of_line = crlf` in `.editorconfig`); shell scripts
+  and the server's Dockerfile keep LF.
 - The product version is the one build property `Version` in `Directory.Build.props` (`0.0.0` on `main`), set
   only by the release build (record 0005); no project sets a version of its own.
 - `Censio.Server` requests the Blazor web assets itself with `RequiresAspNetWebAssets` (record 0007).

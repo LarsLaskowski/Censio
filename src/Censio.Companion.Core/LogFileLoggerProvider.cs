@@ -42,11 +42,6 @@ public sealed class LogFileLoggerProvider : ILoggerProvider
     private readonly string _folder;
 
     /// <summary>
-    /// The time provider.
-    /// </summary>
-    private readonly TimeProvider _timeProvider;
-
-    /// <summary>
     /// Whether the folder is a full path.
     /// </summary>
     private readonly bool _usable;
@@ -106,7 +101,7 @@ public sealed class LogFileLoggerProvider : ILoggerProvider
     public LogFileLoggerProvider(string folder, TimeProvider timeProvider)
     {
         _folder = folder;
-        _timeProvider = timeProvider;
+        TimeProvider = timeProvider;
         _usable = Path.IsPathFullyQualified(folder);
         _writer = Task.Run(RunWriterAsync, CancellationToken.None);
     }
@@ -118,7 +113,7 @@ public sealed class LogFileLoggerProvider : ILoggerProvider
     /// <summary>
     /// Gets the time provider.
     /// </summary>
-    internal TimeProvider TimeProvider => _timeProvider;
+    internal TimeProvider TimeProvider { get; }
 
     #endregion // Properties
 
@@ -140,7 +135,7 @@ public sealed class LogFileLoggerProvider : ILoggerProvider
 
         try
         {
-            await marker.Task.WaitAsync(timeout, _timeProvider, CancellationToken.None).ConfigureAwait(false);
+            await marker.Task.WaitAsync(timeout, TimeProvider, CancellationToken.None).ConfigureAwait(false);
         }
         catch (TimeoutException)
         {
@@ -356,9 +351,11 @@ public sealed class LogFileLoggerProvider : ILoggerProvider
         _queue.Writer.TryComplete();
 
         // A writer blocked on a stalled disk cannot be interrupted: wait only briefly so that Exit stays within its budget.
+        // Only an ended writer has let go of the file; a stalled one closes it itself once its write returns.
         if (_writer.Wait(TimeSpan.FromMilliseconds(100), CancellationToken.None))
         {
             _stop.Dispose();
+            _stream?.Dispose();
         }
     }
 

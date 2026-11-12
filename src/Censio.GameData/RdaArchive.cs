@@ -534,7 +534,7 @@ public sealed class RdaArchive : IDisposable
 
         try
         {
-            using var window = new RdaWindowStream(stream, start, stored);
+            using var window = new RdaWindowStream(stream, start, stored, true);
             using var zlib = new ZLibStream(window, CompressionMode.Decompress);
 
             var filled = 0;

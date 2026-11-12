@@ -117,12 +117,12 @@ public sealed class PngWriterTests
 
         for (var index = 0; index < rgba.Length; index++)
         {
-            rgba[index] = (byte)(index * 31 + index / 4 * 7 + 5);
+            rgba[index] = (byte)((index * 31) + (index / 4 * 7) + 5);
         }
 
         for (var pixel = 0; pixel < width * height; pixel++)
         {
-            rgba[pixel * 4 + 3] = AlphaOf(pixel);
+            rgba[(pixel * 4) + 3] = AlphaOf(pixel);
         }
 
         return rgba;
@@ -157,7 +157,7 @@ public sealed class PngWriterTests
 
         for (var row = 0; row < height; row++)
         {
-            rgba.AsSpan(row * stride, stride).CopyTo(scanlines.AsSpan(row * (stride + 1) + 1));
+            rgba.AsSpan(row * stride, stride).CopyTo(scanlines.AsSpan((row * (stride + 1)) + 1));
         }
 
         return scanlines;

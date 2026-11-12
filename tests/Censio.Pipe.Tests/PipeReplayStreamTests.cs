@@ -1179,7 +1179,7 @@ public sealed class PipeReplayStreamTests
     /// <returns>The frame</returns>
     private static byte[] VersionFrame(int version)
     {
-        return new PipeFrameBuilder().Byte(0).Int32(version).Build();
+        return new PipeFrameBuilder().Byte(0).Int32Value(version).Build();
     }
 
     /// <summary>
@@ -1189,7 +1189,7 @@ public sealed class PipeReplayStreamTests
     /// <returns>The frame</returns>
     private static byte[] SessionStartFrame(string headline)
     {
-        return new PipeFrameBuilder().Byte(1).String(headline).Build();
+        return new PipeFrameBuilder().Byte(1).StringValue(headline).Build();
     }
 
     /// <summary>
@@ -1210,11 +1210,11 @@ public sealed class PipeReplayStreamTests
     /// <returns>The frame</returns>
     private static byte[] IslandFrame(int sessionGuid, long timestamp, bool withEntry = true)
     {
-        var builder = new PipeFrameBuilder().Byte(3).Byte(7).Byte(1).Byte(0).Int32(sessionGuid).String("Ostia").Int64(timestamp);
+        var builder = new PipeFrameBuilder().Byte(3).Byte(7).Byte(1).Byte(0).Int32Value(sessionGuid).StringValue("Ostia").Int64Value(timestamp);
 
         return withEntry
-                   ? builder.Int32(1).Entry(sessionGuid + 10, [new(1, 2)], [new(3, 4)]).Build()
-                   : builder.Int32(0).Build();
+                   ? builder.Int32Value(1).Entry(sessionGuid + 10, [new(1, 2)], [new(3, 4)]).Build()
+                   : builder.Int32Value(0).Build();
     }
 
     /// <summary>

@@ -518,7 +518,7 @@ public sealed class CatalogDocumentReaderTests
     /// <summary>
     /// Any non-zero signed 32-bit GUID, negative ones included, is accepted, also as region GUID.
     /// </summary>
-    /// <param name="guid">The GUID of the entry</param>
+    /// <param name="entryGuid">The GUID of the entry</param>
     /// <param name="regionGuid">The region GUID of the entry</param>
     [TestMethod]
     [TestCategory("AC6")]
@@ -526,17 +526,17 @@ public sealed class CatalogDocumentReaderTests
     [DataRow(int.MinValue, int.MinValue)]
     [DataRow(int.MaxValue, int.MaxValue)]
     [DataRow(1, -1)]
-    public void CatalogDocumentReaderReadAcceptsNegativeGuid(int guid, int regionGuid)
+    public void CatalogDocumentReaderReadAcceptsNegativeGuid(int entryGuid, int regionGuid)
     {
         // Arrange
-        var json = Utf8($"{{'schemaVersion':1,'gameVersion':null,'entries':[{{'guid':{guid},'kind':'region','names':{{'en':'Wood'}},'regionGuid':{regionGuid},'regionTypes':null,'icon':null}}]}}");
+        var json = Utf8($"{{'schemaVersion':1,'gameVersion':null,'entries':[{{'guid':{entryGuid},'kind':'region','names':{{'en':'Wood'}},'regionGuid':{regionGuid},'regionTypes':null,'icon':null}}]}}");
 
         // Act
         var result = CatalogDocumentReader.Read(json);
 
         // Assert
         Assert.IsNull(result.Error, "A non-zero GUID should be accepted");
-        Assert.AreEqual(guid, result.Document!.Entries[0].AssetGuid, "The GUID should be read unchanged");
+        Assert.AreEqual(entryGuid, result.Document!.Entries[0].AssetGuid, "The GUID should be read unchanged");
         Assert.AreEqual(regionGuid, result.Document.Entries[0].RegionGuid, "The region GUID should be read unchanged");
     }
 

@@ -26,7 +26,7 @@ public sealed class PipeMessageParserTests
     {
         get
         {
-            var version = new PipeFrameBuilder().Byte(0).Int32(2).Build();
+            var version = new PipeFrameBuilder().Byte(0).Int32Value(2).Build();
 
             for (var length = 1; length < version.Length; length++)
             {
@@ -51,17 +51,17 @@ public sealed class PipeMessageParserTests
         {
             var statistics = CreateStatistics(2).Entry(10, [new(1, 2), new(1, 3)], [new(3, 4)]).Entry(11, _noPairs, _noPairs).Build();
 
-            yield return ["version", new PipeFrameBuilder().Byte(0).Int32(2).Build(), 5];
-            yield return ["version with trailing bytes", new PipeFrameBuilder().Byte(0).Int32(2).Raw(0xAA, 0xBB).Build(), 5];
-            yield return ["session start", new PipeFrameBuilder().Byte(1).String("abc").Build(), 5];
-            yield return ["session start with trailing bytes", new PipeFrameBuilder().Byte(1).String("abc").Raw(0xAA).Build(), 5];
-            yield return ["empty session start", new PipeFrameBuilder().Byte(1).String(string.Empty).Build(), 2];
+            yield return ["version", new PipeFrameBuilder().Byte(0).Int32Value(2).Build(), 5];
+            yield return ["version with trailing bytes", new PipeFrameBuilder().Byte(0).Int32Value(2).Raw(0xAA, 0xBB).Build(), 5];
+            yield return ["session start", new PipeFrameBuilder().Byte(1).StringValue("abc").Build(), 5];
+            yield return ["session start with trailing bytes", new PipeFrameBuilder().Byte(1).StringValue("abc").Raw(0xAA).Build(), 5];
+            yield return ["empty session start", new PipeFrameBuilder().Byte(1).StringValue(string.Empty).Build(), 2];
             yield return ["session end", new PipeFrameBuilder().Byte(2).Build(), 1];
             yield return ["session end with trailing bytes", new PipeFrameBuilder().Byte(2).Raw(0xAA, 0xBB, 0xCC).Build(), 1];
             yield return ["statistics", statistics, statistics.Length];
             yield return ["statistics with trailing bytes", Concat(statistics, [0xAA, 0xBB]), statistics.Length];
             yield return ["empty frame", Array.Empty<byte>(), 0];
-            yield return ["unknown type", new PipeFrameBuilder().Byte(9).Int32(2).Build(), 0];
+            yield return ["unknown type", new PipeFrameBuilder().Byte(9).Int32Value(2).Build(), 0];
             yield return ["truncated version", new PipeFrameBuilder().Byte(0).Raw(2, 0).Build(), 0];
             yield return ["truncated statistics", statistics[..^1], 0];
         }
@@ -78,7 +78,7 @@ public sealed class PipeMessageParserTests
     public void PipeMessageParserVersionFrameReturnsVersionMessage()
     {
         // Arrange
-        var frame = new PipeFrameBuilder().Byte(0).Int32(2).Build();
+        var frame = new PipeFrameBuilder().Byte(0).Int32Value(2).Build();
 
         // Act
         var message = ParseMessage<VersionMessage>(frame);
@@ -96,7 +96,7 @@ public sealed class PipeMessageParserTests
     {
         // Arrange
         var headline = new string('h', 200);
-        var frame = new PipeFrameBuilder().Byte(1).String(headline).Build();
+        var frame = new PipeFrameBuilder().Byte(1).StringValue(headline).Build();
 
         // Act
         var message = ParseMessage<SessionStartMessage>(frame);
@@ -275,7 +275,7 @@ public sealed class PipeMessageParserTests
     public void PipeMessageParserUnknownTypeReturnsUnknownType(byte type)
     {
         // Arrange
-        var frame = new PipeFrameBuilder().Byte(type).Int32(1).Build();
+        var frame = new PipeFrameBuilder().Byte(type).Int32Value(1).Build();
 
         // Act
         var result = PipeMessageParser.Parse(frame);
@@ -341,20 +341,12 @@ public sealed class PipeMessageParserTests
     public void PipeMessageParserNegativeCountReturnsMalformed(int position)
     {
         // Arrange
-        byte[] frame;
-
-        if (position == 0)
-        {
-            frame = CreateStatistics(-1).Build();
-        }
-        else if (position == 1)
-        {
-            frame = CreateStatistics(1).EntryFields(1).Int32(-1).Int32(0).Build();
-        }
-        else
-        {
-            frame = CreateStatistics(1).EntryFields(1).Int32(0).Int32(-1).Build();
-        }
+        var frame = position switch
+                    {
+                        0 => CreateStatistics(-1).Build(),
+                        1 => CreateStatistics(1).EntryFields(1).Int32Value(-1).Int32Value(0).Build(),
+                        _ => CreateStatistics(1).EntryFields(1).Int32Value(0).Int32Value(-1).Build(),
+                    };
 
         // Act and Assert
         ParseMalformed(frame);
@@ -371,20 +363,12 @@ public sealed class PipeMessageParserTests
     public void PipeMessageParserCountBeyondFrameReturnsMalformed(int position)
     {
         // Arrange
-        byte[] frame;
-
-        if (position == 0)
-        {
-            frame = CreateStatistics(1000).Entry(1, _noPairs, _noPairs).Build();
-        }
-        else if (position == 1)
-        {
-            frame = CreateStatistics(1).EntryFields(1).Int32(1000).Int32(1).Int32(1).Build();
-        }
-        else
-        {
-            frame = CreateStatistics(1).EntryFields(1).Int32(0).Int32(1000).Int32(1).Int32(1).Build();
-        }
+        var frame = position switch
+                    {
+                        0 => CreateStatistics(1000).Entry(1, _noPairs, _noPairs).Build(),
+                        1 => CreateStatistics(1).EntryFields(1).Int32Value(1000).Int32Value(1).Int32Value(1).Build(),
+                        _ => CreateStatistics(1).EntryFields(1).Int32Value(0).Int32Value(1000).Int32Value(1).Int32Value(1).Build(),
+                    };
 
         // Act and Assert
         ParseMalformed(frame);
@@ -401,7 +385,7 @@ public sealed class PipeMessageParserTests
     {
         // Arrange
         var frame = inPairs
-                        ? CreateStatistics(1).EntryFields(1).Int32(int.MaxValue).Raw(new byte[64]).Build()
+                        ? CreateStatistics(1).EntryFields(1).Int32Value(int.MaxValue).Raw(new byte[64]).Build()
                         : CreateStatistics(int.MaxValue).Raw(new byte[64]).Build();
 
         Assert.IsLessThan(1024, frame.Length, "The frame should be under 1 KiB");
@@ -427,7 +411,7 @@ public sealed class PipeMessageParserTests
     public void PipeMessageParserTrailingBytesReturnsMessage()
     {
         // Arrange
-        var versionFrame = new PipeFrameBuilder().Byte(0).Int32(2).Raw(9, 9, 9).Build();
+        var versionFrame = new PipeFrameBuilder().Byte(0).Int32Value(2).Raw(9, 9, 9).Build();
         var statisticsFrame = CreateStatistics(0).Raw(1, 2, 3).Build();
 
         // Act
@@ -466,7 +450,7 @@ public sealed class PipeMessageParserTests
     public void PipeMessageParserStringKeptAsDelivered(string text)
     {
         // Arrange
-        var frame = new PipeFrameBuilder().Byte(1).String(text).Build();
+        var frame = new PipeFrameBuilder().Byte(1).StringValue(text).Build();
 
         // Act
         var message = ParseMessage<SessionStartMessage>(frame);
@@ -573,7 +557,7 @@ public sealed class PipeMessageParserTests
     /// <returns>The builder positioned at the first entry</returns>
     private static PipeFrameBuilder CreateStatistics(int entryCount)
     {
-        return new PipeFrameBuilder().Byte(3).Byte(200).Byte(255).Byte(128).Int32(-77).String("Area").Int64(123456789012L).Int32(entryCount);
+        return new PipeFrameBuilder().Byte(3).Byte(200).Byte(255).Byte(128).Int32Value(-77).StringValue("Area").Int64Value(123456789012L).Int32Value(entryCount);
     }
 
     /// <summary>

@@ -5,20 +5,6 @@ namespace Censio.GameData;
 /// </summary>
 public sealed class GameIconSet
 {
-    #region Fields
-
-    /// <summary>
-    /// The icons by asset GUID.
-    /// </summary>
-    private readonly IReadOnlyDictionary<int, GameIcon> _icons;
-
-    /// <summary>
-    /// The reasons assets have no icon, by asset GUID.
-    /// </summary>
-    private readonly IReadOnlyDictionary<int, GameIconProblem> _problems;
-
-    #endregion // Fields
-
     #region Constructors
 
     /// <summary>
@@ -30,8 +16,8 @@ public sealed class GameIconSet
     /// <param name="regionsWithIcon">The number of regions that have an icon</param>
     public GameIconSet(IReadOnlyDictionary<int, GameIcon> icons, IReadOnlyDictionary<int, GameIconProblem> problems, int goodsWithIcon, int regionsWithIcon)
     {
-        _icons = icons;
-        _problems = problems;
+        Icons = icons;
+        Problems = problems;
         GoodsWithIcon = goodsWithIcon;
         RegionsWithIcon = regionsWithIcon;
     }
@@ -43,12 +29,12 @@ public sealed class GameIconSet
     /// <summary>
     /// Gets the icons by asset GUID.
     /// </summary>
-    public IReadOnlyDictionary<int, GameIcon> Icons => _icons;
+    public IReadOnlyDictionary<int, GameIcon> Icons { get; }
 
     /// <summary>
     /// Gets the reasons assets have no icon, by asset GUID.
     /// </summary>
-    public IReadOnlyDictionary<int, GameIconProblem> Problems => _problems;
+    public IReadOnlyDictionary<int, GameIconProblem> Problems { get; }
 
     /// <summary>
     /// Gets the number of goods that have an icon.
@@ -63,7 +49,7 @@ public sealed class GameIconSet
     /// <summary>
     /// Gets the bytes of the distinct PNG files together.
     /// </summary>
-    public long PngBytes => _icons.Values.Distinct().Sum(icon => (long)icon.Png.Length);
+    public long PngBytes => Icons.Values.Distinct().Sum(icon => (long)icon.Png.Length);
 
     #endregion // Properties
 
@@ -76,7 +62,7 @@ public sealed class GameIconSet
     /// <returns>The icon, or <c>null</c> when the asset has none</returns>
     public GameIcon? Find(int assetGuid)
     {
-        return _icons.GetValueOrDefault(assetGuid);
+        return Icons.GetValueOrDefault(assetGuid);
     }
 
     /// <summary>
@@ -86,12 +72,12 @@ public sealed class GameIconSet
     /// <returns>The problem, or <see cref="GameIconProblem.None" /> when the asset has an icon</returns>
     public GameIconProblem Check(int assetGuid)
     {
-        if (_icons.ContainsKey(assetGuid))
+        if (Icons.ContainsKey(assetGuid))
         {
             return GameIconProblem.None;
         }
 
-        return _problems.GetValueOrDefault(assetGuid, GameIconProblem.NoEntry);
+        return Problems.GetValueOrDefault(assetGuid, GameIconProblem.NoEntry);
     }
 
     /// <summary>
@@ -101,7 +87,7 @@ public sealed class GameIconSet
     /// <returns>The number of assets with the problem</returns>
     public int Count(GameIconProblem problem)
     {
-        return _problems.Values.Count(value => value == problem);
+        return Problems.Values.Count(value => value == problem);
     }
 
     #endregion // Methods

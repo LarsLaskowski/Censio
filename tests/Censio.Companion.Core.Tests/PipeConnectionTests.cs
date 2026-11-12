@@ -15,7 +15,7 @@ namespace Censio.Companion.Core.Tests;
 /// Tests for <see cref="PipeConnection" />.
 /// </summary>
 [TestClass]
-public sealed class PipeConnectionTests
+public sealed class PipeConnectionTests : IDisposable
 {
     #region Fields
 
@@ -102,7 +102,7 @@ public sealed class PipeConnectionTests
     #region Methods
 
     /// <summary>
-    /// Stops every run of the test and waits until it has ended.
+    /// Stops every run of the test and waits until it has ended, before MSTest disposes the test class.
     /// </summary>
     /// <returns>The task</returns>
     [TestCleanup]
@@ -110,9 +110,6 @@ public sealed class PipeConnectionTests
     {
         await _stop.CancelAsync();
         await Task.WhenAll(_runs).WaitAsync(_guard, TestContext.CancellationToken);
-
-        _stop.Dispose();
-        _tickArrived.Dispose();
     }
 
     /// <summary>
@@ -1949,7 +1946,7 @@ public sealed class PipeConnectionTests
     /// <returns>The bytes</returns>
     private static byte[] VersionFrame(int version)
     {
-        return new PipeFrameBuilder().Byte((byte)PipeMessageType.Version).Int32(version).BuildWithPrefix();
+        return new PipeFrameBuilder().Byte((byte)PipeMessageType.Version).Int32Value(version).BuildWithPrefix();
     }
 
     /// <summary>
@@ -1958,7 +1955,7 @@ public sealed class PipeConnectionTests
     /// <returns>The bytes</returns>
     private static byte[] SessionStartFrame()
     {
-        return new PipeFrameBuilder().Byte((byte)PipeMessageType.SessionStart).String("Head").BuildWithPrefix();
+        return new PipeFrameBuilder().Byte((byte)PipeMessageType.SessionStart).StringValue("Head").BuildWithPrefix();
     }
 
     /// <summary>
@@ -1980,10 +1977,10 @@ public sealed class PipeConnectionTests
                                      .Byte(1)
                                      .Byte(2)
                                      .Byte(0)
-                                     .Int32(-77)
-                                     .String("Area")
-                                     .Int64(123456789012L)
-                                     .Int32(1)
+                                     .Int32Value(-77)
+                                     .StringValue("Area")
+                                     .Int64Value(123456789012L)
+                                     .Int32Value(1)
                                      .Entry(10, [new(1, 2)], [new(3, 4)])
                                      .BuildWithPrefix();
     }
@@ -2343,4 +2340,15 @@ public sealed class PipeConnectionTests
     }
 
     #endregion // Methods
+
+    #region IDisposable
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        _stop.Dispose();
+        _tickArrived.Dispose();
+    }
+
+    #endregion // IDisposable
 }
