@@ -746,7 +746,6 @@ public sealed class IngestSessionTests : IDisposable
 
         // Act
         _timeProvider.Advance(_closeWait);
-        await IngestClient.SendSpacesAsync(client, 10, 1);
         await IngestClient.GuardAsync(run);
 
         // Assert
@@ -871,6 +870,70 @@ public sealed class IngestSessionTests : IDisposable
         Assert.IsEmpty(messages, "No reply should be sent");
         Assert.AreEqual(WebSocketCloseStatus.PolicyViolation, closeStatus, "The connection should be closed with 1008");
         Assert.AreEqual(IngestConnections.MaxPendingHellos, CountFreePendingPlaces(), "The pending place should be left");
+    }
+
+    /// <summary>
+    /// A hello that started in time but is completed only after the 10 seconds ran out and the 1008 close went out is not
+    /// answered.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC11")]
+    public async Task IngestSessionRunAsyncHelloCompletedAfterDeadlineIsNotAnswered()
+    {
+        // Arrange
+        var (run, client, _) = StartSession(IngestAccess.CreateForToken(Token));
+
+        var hello = IngestClient.Hello(Token);
+
+        await IngestClient.GuardAsync(_timeProvider.WaitForDelayAsync(_helloTimeout, TestContext.CancellationToken));
+        await IngestClient.SendPartAsync(client, hello[..20], false);
+        _timeProvider.Advance(_helloTimeout);
+
+        // Act
+        await IngestClient.SendPartAsync(client, hello[20..], true);
+
+        var (messages, closeStatus, closeDescription) = await IngestClient.ReceiveUntilCloseAsync(client);
+
+        await FinishAsync(client, run);
+
+        // Assert
+        Assert.IsEmpty(messages, "The late hello should not be answered");
+        Assert.AreEqual(WebSocketCloseStatus.PolicyViolation, closeStatus, "The connection should be closed with 1008");
+        Assert.AreEqual(string.Empty, closeDescription, "The close should carry an empty reason");
+        Assert.IsEmpty(_logger.Entries, "The late hello should not be logged");
+        Assert.AreEqual(IngestConnections.MaxPendingHellos, CountFreePendingPlaces(), "The pending place should be left");
+        Assert.IsTrue(_connections.TryTakeCompanion(), "The Companion's place should stay free");
+    }
+
+    /// <summary>
+    /// After the hello, a message within the byte bound that the reader refuses as too large (an island name of 766 bytes)
+    /// closes the connection with 1009 without a reply, and is counted as refused.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC10")]
+    [TestCategory("AC11")]
+    public async Task IngestSessionRunAsyncMessageOverReaderBoundCloses1009()
+    {
+        // Arrange
+        var (run, client, _) = await StartAcceptedSessionAsync();
+
+        var tick = IngestClient.Tick(Id1).Replace("'MARKERISLAND'", $"'{new string('a', 766)}'", StringComparison.Ordinal);
+
+        // Act
+        await IngestClient.SendAsync(client, tick);
+
+        var (messages, closeStatus, closeDescription) = await IngestClient.ReceiveUntilCloseAsync(client);
+
+        await FinishAsync(client, run);
+
+        // Assert
+        Assert.IsEmpty(messages, "No reply should be sent");
+        Assert.AreEqual(WebSocketCloseStatus.MessageTooBig, closeStatus, "The connection should be closed with 1009");
+        Assert.AreEqual(string.Empty, closeDescription, "The close should carry an empty reason");
+        Assert.Contains("Companion disconnected; 0 messages accepted, 1 refused.", LogMessages(), "The message should be counted as refused");
+        Assert.IsTrue(_connections.TryTakeCompanion(), "The Companion's place should be released");
     }
 
     /// <summary>
