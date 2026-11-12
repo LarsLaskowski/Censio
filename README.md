@@ -6,15 +6,15 @@ Deutsche Version: [Censio (Deutsch)](#censio-deutsch)
 
 ## Status
 
-Censio is in milestone M1. The release `v0.1.0` completes the milestone; it is on the [release page](https://github.com/LarsLaskowski/Censio/releases/tag/v0.1.0) with the Companion ZIP, and the server image is `networlddev/censio:0.1.0`. The state of `main` carries the version `0.0.0`.
+Censio is in development. The release `v0.2.0` completes milestone M3 (after `v0.1.0`, which completed milestone M1); it is on the [release page](https://github.com/LarsLaskowski/Censio/releases/tag/v0.2.0) with the Companion ZIP, and the server image is `networlddev/censio:0.2.0`. The state of `main` carries the version `0.0.0`.
 
-What `v0.1.0` can do:
+What `v0.2.0` can do:
 
 - The Companion runs on Windows as a tray icon. Its tooltip and icon show the state of the connection to the game's statistics pipe (the game needs the launch argument `/pipe`), and its menu shows the status and the last tick. It records what the game sends to a local file, from the menu or with the switch `--record` (*First recording*), and plays such a file back with `--replay <file>` ([user guide](docs/USER_GUIDE.md#first-recording-step-by-step)). `Open diagnostics` opens a window with the last tick; regions and goods are shown with their English and German names and their icons, read from your own game installation, kept in a private cache file in `%LOCALAPPDATA%\Censio\Cache` so that the next start does not read the game files again, and never sent (`Catalog: …` in the menu), islands and other values as the game sent them. It writes a log file to `%LOCALAPPDATA%\Censio\Logs`, and `Start with Windows` (off by default) starts it at sign-in.
 - Contributors can anonymise a recording with a console tool of the repository, `dotnet run --project src/Censio.Anonymiser -c Release -- <recording> <output>`, which invents the names, perturbs the amounts and shifts the times; stop the recording first, and keep raw recordings private ([user guide](docs/USER_GUIDE.md#anonymising-a-recording-contributors)).
 - The server runs as a Docker image. Its start page shows `Version <version>`, and `GET /health` answers `Healthy`.
 
-What `v0.1.0` cannot do:
+What `v0.2.0` cannot do:
 
 - Names and icons only in the diagnostics window (regions and goods): the Companion loads them from its cache or reads them from your installation at every start, and reads them again when the game was updated (it checks when the game connects), and shows a bare number (GUID) where it cannot name one, and no icon where the game's files give none (the log line `Catalog icons: …` counts them); buildings and workforce have no column yet.
 - Nothing is sent from the Companion to the server.
@@ -41,14 +41,14 @@ Not supported: arm64 hosts, Windows containers, and Windows other than Windows 1
 
 ## Server (Docker)
 
-The Censio server runs as the Docker image `networlddev/censio` (linux/amd64) on Docker Hub. Every release publishes the tag `<version>` (for example `0.1.0`) and moves the tag `latest` to the newest release. You need Docker 23 or later (Linux Docker Engine, or Docker Desktop for Windows with the WSL 2 backend and Linux containers). The commands below use the version `0.1.0`; replace it with the version you want, or with `latest`. Run the commands one at a time: a command that fails makes the next one fail too. Not yet tried: pulling and running the published image `0.1.0`.
+The Censio server runs as the Docker image `networlddev/censio` (linux/amd64) on Docker Hub. Every release publishes the tag `<version>` (for example `0.2.0`) and moves the tag `latest` to the newest release. You need Docker 23 or later (Linux Docker Engine, or Docker Desktop for Windows with the WSL 2 backend and Linux containers). The commands below use the version `0.2.0`; replace it with the version you want, or with `latest`. Run the commands one at a time: a command that fails makes the next one fail too. Not yet tried: pulling and running the published image `0.2.0`.
 
 ```text
-docker pull networlddev/censio:0.1.0
+docker pull networlddev/censio:0.2.0
 ```
 
 ```text
-docker run -d --name censio -p 8080:8080 -v censio-config:/config networlddev/censio:0.1.0
+docker run -d --name censio -p 8080:8080 -v censio-config:/config networlddev/censio:0.2.0
 ```
 
 Check that it answers (the response is `Healthy`; not yet tried: in Windows PowerShell 5.1 `curl` is an alias of `Invoke-WebRequest`, which should show `StatusCode` `200` and `Content` `Healthy` and may ask for a confirmation first) and read its log:
@@ -61,7 +61,7 @@ curl http://localhost:8080/health
 docker logs censio
 ```
 
-Open `http://localhost:8080/` for the start page; it shows `Version 0.1.0`. If a run failed, remove the container before starting it again, because its name is taken:
+Open `http://localhost:8080/` for the start page; it shows `Version 0.2.0`. If a run failed, remove the container before starting it again, because its name is taken:
 
 ```text
 docker rm -f censio
@@ -70,7 +70,7 @@ docker rm -f censio
 If port 8080 is taken on the host, Docker reports "port is already allocated"; map another host port, for example `-p 9000:8080`. The server speaks plain HTTP without a login; to reach it from the host alone, publish it on the loopback address (a published port bypasses host firewalls such as ufw and firewalld on Linux):
 
 ```text
-docker run -d --name censio -p 127.0.0.1:8080:8080 -v censio-config:/config networlddev/censio:0.1.0
+docker run -d --name censio -p 127.0.0.1:8080:8080 -v censio-config:/config networlddev/censio:0.2.0
 ```
 
 The [user guide](docs/USER_GUIDE.md) describes the data directory, NAS hosts, TLS and the limits.
@@ -99,7 +99,7 @@ Then check `http://localhost:8080/health` (`Healthy`) and `http://localhost:8080
 
 ## Companion
 
-The Companion is the Windows program that reads the statistics of the running game. Download `Censio-<version>-win-x64.zip` from the release page `https://github.com/LarsLaskowski/Censio/releases` (under *Assets* of the release). It needs Windows 10 22H2 or Windows 11, 64-bit; it needs no installed .NET, no installer and no administrator rights. Not yet tried: the ZIP of `v0.1.0` on a machine without .NET.
+The Companion is the Windows program that reads the statistics of the running game. Download `Censio-<version>-win-x64.zip` from the release page `https://github.com/LarsLaskowski/Censio/releases` (under *Assets* of the release). It needs Windows 10 22H2 or Windows 11, 64-bit; it needs no installed .NET, no installer and no administrator rights. Not yet tried: the ZIP of `v0.2.0` on a machine without .NET.
 
 1. Extract the ZIP to a folder of your choice. It holds one file, `Censio.Companion.exe`.
 2. Start `Censio.Companion.exe`. A tray icon appears; its menu shows the status, the last tick, the game installation (`Game: build <build> (Ubisoft Connect)`, found without any setting), the game catalog (`Catalog: reading`, then `Catalog: checking`, `Catalog: extracting names`, `Catalog: extracting icons, <n> entries` and `Catalog: <n> entries`, or `Catalog: <n> entries` at once from the cache; `Catalog: no game` or `Catalog: failed` otherwise, see the [user guide](docs/USER_GUIDE.md#game-catalog)), `Open diagnostics`, `Start recording`, `Open recordings folder`, `Open log folder`, `Start with Windows`, `Version <version>` and `Exit`.
@@ -122,7 +122,7 @@ Paths that cannot be used, a leftover entry after moving the exe, and the Window
 4. Play, then choose `Stop recording`.
 5. The file `recording-<yyyyMMdd-HHmmss>Z.jsonl` is in `%LOCALAPPDATA%\Censio\Recordings` (`Open recordings folder`). It is private: do not post or attach it.
 
-Not yet tried: whether `/pipe` set in Steam reaches the game through Ubisoft Connect, and the download from the release `v0.1.0`. The full walkthrough, the launcher steps, the tray states with what to do, and how to replay a recording are in the [user guide](docs/USER_GUIDE.md#first-recording-step-by-step).
+Not yet tried: whether `/pipe` set in Steam reaches the game through Ubisoft Connect, and the download from the release `v0.2.0`. The full walkthrough, the launcher steps, the tray states with what to do, and how to replay a recording are in the [user guide](docs/USER_GUIDE.md#first-recording-step-by-step).
 
 ### Build the Companion from source
 
@@ -171,15 +171,15 @@ English version: [Censio](#censio)
 
 ## Status
 
-Censio befindet sich im Meilenstein M1. Das Release `v0.1.0` schließt den Meilenstein ab; es steht mit dem Companion-ZIP auf der [Release-Seite](https://github.com/LarsLaskowski/Censio/releases/tag/v0.1.0), und das Server-Image ist `networlddev/censio:0.1.0`. Der Stand von `main` trägt die Version `0.0.0`.
+Censio ist in Entwicklung. Das Release `v0.2.0` schließt den Meilenstein M3 ab (nach `v0.1.0`, das den Meilenstein M1 abgeschlossen hat); es steht mit dem Companion-ZIP auf der [Release-Seite](https://github.com/LarsLaskowski/Censio/releases/tag/v0.2.0), und das Server-Image ist `networlddev/censio:0.2.0`. Der Stand von `main` trägt die Version `0.0.0`.
 
-Das kann `v0.1.0`:
+Das kann `v0.2.0`:
 
 - Der Companion läuft unter Windows als Tray-Symbol. Sein Tooltip und Symbol zeigen den Zustand der Verbindung zur Statistik-Pipe des Spiels (das Spiel braucht das Startargument `/pipe`), und sein Menü zeigt den Status und den letzten Tick. Er zeichnet auf, was das Spiel sendet, in eine lokale Datei, über das Menü oder mit dem Schalter `--record` (*Erste Aufzeichnung*), und spielt eine solche Datei mit `--replay <Datei>` ab ([Benutzerhandbuch](docs/USER_GUIDE.md#erste-aufzeichnung-schritt-für-schritt)). `Open diagnostics` öffnet ein Fenster mit dem letzten Tick; Regionen und Waren werden mit ihren englischen und deutschen Namen und ihren Symbolen gezeigt, die aus Ihrer eigenen Spielinstallation gelesen, in einer privaten Cache-Datei in `%LOCALAPPDATA%\Censio\Cache` aufbewahrt, damit der nächste Start die Spieldateien nicht erneut liest, und nie gesendet werden (`Catalog: …` im Menü), Inseln und die übrigen Werte so, wie das Spiel sie gesendet hat. Er schreibt eine Logdatei nach `%LOCALAPPDATA%\Censio\Logs`, und `Start with Windows` (standardmäßig aus) startet ihn bei der Anmeldung.
 - Mitwirkende können eine Aufzeichnung mit einem Konsolenwerkzeug des Repositorys anonymisieren, `dotnet run --project src/Censio.Anonymiser -c Release -- <Aufzeichnung> <Ausgabe>`; es erfindet die Namen, verändert die Beträge und verschiebt die Zeiten. Die Aufzeichnung vorher beenden, unbearbeitete Aufzeichnungen bleiben privat ([Benutzerhandbuch](docs/USER_GUIDE.md#eine-aufzeichnung-anonymisieren-für-mitwirkende)).
 - Der Server läuft als Docker-Image. Seine Startseite zeigt `Version <version>`, und `GET /health` antwortet mit `Healthy`.
 
-Das kann `v0.1.0` nicht:
+Das kann `v0.2.0` nicht:
 
 - Namen und Symbole nur im Diagnosefenster (Regionen und Waren): Der Companion lädt sie bei jedem Start aus seinem Cache oder liest sie aus Ihrer Installation und liest sie erneut, wenn das Spiel aktualisiert wurde (er prüft das, wenn das Spiel sich verbindet), und zeigt eine blanke Zahl (GUID), wo er keinen Namen findet, und kein Symbol, wo die Spieldateien keines liefern (die Logzeile `Catalog icons: …` zählt sie); Gebäude und Arbeitskräfte haben noch keine Spalte.
 - Der Companion sendet nichts an den Server.
@@ -206,14 +206,14 @@ Nicht unterstützt: arm64-Hosts, Windows-Container und Windows außer Windows 10
 
 ## Server (Docker)
 
-Der Censio-Server läuft als Docker-Image `networlddev/censio` (linux/amd64) auf Docker Hub. Jedes Release veröffentlicht den Tag `<version>` (zum Beispiel `0.1.0`) und setzt den Tag `latest` auf das neueste Release. Voraussetzung ist Docker 23 oder neuer (Docker Engine unter Linux oder Docker Desktop für Windows mit WSL-2-Backend und Linux-Containern). Die Befehle unten verwenden die Version `0.1.0`; sie durch die gewünschte Version oder durch `latest` ersetzen. Die Befehle werden einzeln ausgeführt: Schlägt ein Befehl fehl, schlägt auch der nächste fehl. Noch nicht ausprobiert: das Laden und Starten des veröffentlichten Images `0.1.0`.
+Der Censio-Server läuft als Docker-Image `networlddev/censio` (linux/amd64) auf Docker Hub. Jedes Release veröffentlicht den Tag `<version>` (zum Beispiel `0.2.0`) und setzt den Tag `latest` auf das neueste Release. Voraussetzung ist Docker 23 oder neuer (Docker Engine unter Linux oder Docker Desktop für Windows mit WSL-2-Backend und Linux-Containern). Die Befehle unten verwenden die Version `0.2.0`; sie durch die gewünschte Version oder durch `latest` ersetzen. Die Befehle werden einzeln ausgeführt: Schlägt ein Befehl fehl, schlägt auch der nächste fehl. Noch nicht ausprobiert: das Laden und Starten des veröffentlichten Images `0.2.0`.
 
 ```text
-docker pull networlddev/censio:0.1.0
+docker pull networlddev/censio:0.2.0
 ```
 
 ```text
-docker run -d --name censio -p 8080:8080 -v censio-config:/config networlddev/censio:0.1.0
+docker run -d --name censio -p 8080:8080 -v censio-config:/config networlddev/censio:0.2.0
 ```
 
 Prüfen, ob er antwortet (die Antwort lautet `Healthy`; noch nicht ausprobiert: in Windows PowerShell 5.1 ist `curl` ein Alias für `Invoke-WebRequest`, das `StatusCode` `200` und `Content` `Healthy` anzeigen sollte und vorher eine Bestätigung verlangen kann), und sein Log lesen:
@@ -226,7 +226,7 @@ curl http://localhost:8080/health
 docker logs censio
 ```
 
-Die Startseite liegt unter `http://localhost:8080/`; sie zeigt `Version 0.1.0`. Ist ein Start fehlgeschlagen, den Container vor einem neuen Start entfernen, weil sein Name belegt ist:
+Die Startseite liegt unter `http://localhost:8080/`; sie zeigt `Version 0.2.0`. Ist ein Start fehlgeschlagen, den Container vor einem neuen Start entfernen, weil sein Name belegt ist:
 
 ```text
 docker rm -f censio
@@ -235,7 +235,7 @@ docker rm -f censio
 Ist Port 8080 auf dem Host belegt, meldet Docker „port is already allocated“; dann einen anderen Host-Port abbilden, zum Beispiel `-p 9000:8080`. Der Server spricht reines HTTP ohne Login; um ihn nur vom Host aus erreichbar zu machen, ihn auf der Loopback-Adresse veröffentlichen (unter Linux umgeht ein veröffentlichter Port Host-Firewalls wie ufw und firewalld):
 
 ```text
-docker run -d --name censio -p 127.0.0.1:8080:8080 -v censio-config:/config networlddev/censio:0.1.0
+docker run -d --name censio -p 127.0.0.1:8080:8080 -v censio-config:/config networlddev/censio:0.2.0
 ```
 
 Das [Benutzerhandbuch](docs/USER_GUIDE.md#censio-benutzerhandbuch) beschreibt das Datenverzeichnis, NAS-Hosts, TLS und die Einschränkungen.
@@ -264,7 +264,7 @@ Dann `http://localhost:8080/health` (`Healthy`) und `http://localhost:8080/` wie
 
 ## Companion
 
-Der Companion ist das Windows-Programm, das die Statistik des laufenden Spiels liest. `Censio-<version>-win-x64.zip` von der Release-Seite `https://github.com/LarsLaskowski/Censio/releases` herunterladen (beim Release unter *Assets*). Er braucht Windows 10 22H2 oder Windows 11, 64 Bit; er braucht kein installiertes .NET, keinen Installer und keine Administratorrechte. Noch nicht ausprobiert: das ZIP von `v0.1.0` auf einem Rechner ohne .NET.
+Der Companion ist das Windows-Programm, das die Statistik des laufenden Spiels liest. `Censio-<version>-win-x64.zip` von der Release-Seite `https://github.com/LarsLaskowski/Censio/releases` herunterladen (beim Release unter *Assets*). Er braucht Windows 10 22H2 oder Windows 11, 64 Bit; er braucht kein installiertes .NET, keinen Installer und keine Administratorrechte. Noch nicht ausprobiert: das ZIP von `v0.2.0` auf einem Rechner ohne .NET.
 
 1. Das ZIP in einen beliebigen Ordner entpacken. Es enthält eine Datei, `Censio.Companion.exe`.
 2. `Censio.Companion.exe` starten. Ein Tray-Symbol erscheint; sein Menü zeigt den Status, den letzten Tick, die Spielinstallation (`Game: build <build> (Ubisoft Connect)`, ohne jede Einstellung gefunden), den Spielkatalog (`Catalog: reading`, dann `Catalog: checking`, `Catalog: extracting names`, `Catalog: extracting icons, <n> entries` und `Catalog: <n> entries`, oder gleich `Catalog: <n> entries` aus dem Cache; sonst `Catalog: no game` oder `Catalog: failed`, siehe [Benutzerhandbuch](docs/USER_GUIDE.md#spielkatalog)), `Open diagnostics`, `Start recording`, `Open recordings folder`, `Open log folder`, `Start with Windows`, `Version <version>` und `Exit`.
@@ -287,7 +287,7 @@ Nicht verwendbare Pfade, ein übrig gebliebener Eintrag nach dem Verschieben der
 4. Spielen, dann `Stop recording` wählen.
 5. Die Datei `recording-<yyyyMMdd-HHmmss>Z.jsonl` liegt in `%LOCALAPPDATA%\Censio\Recordings` (`Open recordings folder`). Sie ist privat: nicht posten oder anhängen.
 
-Noch nicht ausprobiert: ob ein in Steam gesetztes `/pipe` das Spiel über Ubisoft Connect erreicht, und der Download vom Release `v0.1.0`. Der ganze Ablauf, die Launcher-Schritte, die Tray-Zustände mit dem, was zu tun ist, und das Abspielen einer Aufzeichnung stehen im [Benutzerhandbuch](docs/USER_GUIDE.md#erste-aufzeichnung-schritt-für-schritt).
+Noch nicht ausprobiert: ob ein in Steam gesetztes `/pipe` das Spiel über Ubisoft Connect erreicht, und der Download vom Release `v0.2.0`. Der ganze Ablauf, die Launcher-Schritte, die Tray-Zustände mit dem, was zu tun ist, und das Abspielen einer Aufzeichnung stehen im [Benutzerhandbuch](docs/USER_GUIDE.md#erste-aufzeichnung-schritt-für-schritt).
 
 ### Companion aus dem Quellcode bauen
 

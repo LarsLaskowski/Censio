@@ -8,12 +8,12 @@ Deutsche Version: [Censio-Benutzerhandbuch](#censio-benutzerhandbuch)
 
 ### Server (Docker)
 
-The Censio server runs as the Docker image `networlddev/censio` (linux/amd64) on Docker Hub. Every release publishes the tag `<version>` (for example `0.1.0`) and moves the tag `latest` to the newest release. The versions are listed on the release page `https://github.com/LarsLaskowski/Censio/releases` and the tags on `https://hub.docker.com/r/networlddev/censio/tags`. You need Docker 23 or later (Linux Docker Engine, or Docker Desktop for Windows with the WSL 2 backend and Linux containers). The commands below use the version `0.1.0`; replace it with the version you want, or with `latest`. Run the commands one at a time: a command that fails makes the next one fail too. Not yet tried: pulling and running the published image `0.1.0`.
+The Censio server runs as the Docker image `networlddev/censio` (linux/amd64) on Docker Hub. Every release publishes the tag `<version>` (for example `0.2.0`) and moves the tag `latest` to the newest release. The versions are listed on the release page `https://github.com/LarsLaskowski/Censio/releases` and the tags on `https://hub.docker.com/r/networlddev/censio/tags`. You need Docker 23 or later (Linux Docker Engine, or Docker Desktop for Windows with the WSL 2 backend and Linux containers). The commands below use the version `0.2.0`; replace it with the version you want, or with `latest`. Run the commands one at a time: a command that fails makes the next one fail too. Not yet tried: pulling and running the published image `0.2.0`.
 
 #### Pull
 
 ```text
-docker pull networlddev/censio:0.1.0
+docker pull networlddev/censio:0.2.0
 ```
 
 `docker run` pulls a missing image itself, so this step only fetches it in advance. A failed pull leaves nothing half-installed.
@@ -23,7 +23,7 @@ docker pull networlddev/censio:0.1.0
 Start the container with a named volume for the data directory `/config`:
 
 ```text
-docker run -d --name censio -p 8080:8080 -v censio-config:/config networlddev/censio:0.1.0
+docker run -d --name censio -p 8080:8080 -v censio-config:/config networlddev/censio:0.2.0
 ```
 
 Check that it answers (the response is `Healthy`; not yet tried: in Windows PowerShell 5.1 `curl` is an alias of `Invoke-WebRequest`, which should show `StatusCode` `200` and `Content` `Healthy` and may ask for a confirmation first) and read its log:
@@ -47,13 +47,13 @@ docker rm -f censio
 Inside the container the server listens on port 8080. If port 8080 is taken on the host, Docker reports "port is already allocated"; map another host port:
 
 ```text
-docker run -d --name censio -p 9000:8080 -v censio-config:/config networlddev/censio:0.1.0
+docker run -d --name censio -p 9000:8080 -v censio-config:/config networlddev/censio:0.2.0
 ```
 
 To change the port the server itself listens on, set `ASPNETCORE_HTTP_PORTS` (the health probe follows the first port of the list; `ASPNETCORE_URLS` is not supported by the image):
 
 ```text
-docker run -d --name censio -e ASPNETCORE_HTTP_PORTS=9090 -p 9090:9090 -v censio-config:/config networlddev/censio:0.1.0
+docker run -d --name censio -e ASPNETCORE_HTTP_PORTS=9090 -p 9090:9090 -v censio-config:/config networlddev/censio:0.2.0
 ```
 
 #### Data directory and NAS hosts
@@ -63,7 +63,7 @@ docker run -d --name censio -e ASPNETCORE_HTTP_PORTS=9090 -p 9090:9090 -v censio
 On a NAS whose shares belong to another user (Unraid `nobody:users` is `99:100`, a Synology user such as `1026:100`), start the container with that user and group; replace the path with your share:
 
 ```text
-docker run -d --name censio --user 99:100 -p 8080:8080 -v /mnt/user/appdata/censio:/config networlddev/censio:0.1.0
+docker run -d --name censio --user 99:100 -p 8080:8080 -v /mnt/user/appdata/censio:/config networlddev/censio:0.2.0
 ```
 
 Or hand the directory to the image's user and start without `--user`:
@@ -73,13 +73,13 @@ chown -R 1654:1654 /mnt/user/appdata/censio
 ```
 
 ```text
-docker run -d --name censio -p 8080:8080 -v /mnt/user/appdata/censio:/config networlddev/censio:0.1.0
+docker run -d --name censio -p 8080:8080 -v /mnt/user/appdata/censio:/config networlddev/censio:0.2.0
 ```
 
 A directory the container user cannot write stops the container at start with exit code 1; `docker logs censio` then shows `The data-protection key ring cannot be stored in '/config/data-protection-keys'; the server stops. Make the data directory writable for the user the server runs as.` A value of `CENSIO__DATADIRECTORY` that is not an absolute path also stops it with exit code 1; `docker logs censio` then shows `The data directory (Censio:DataDirectory) must be an absolute path, not '<value>'; the server stops.` Pull the image on the NAS itself; `docker run` does it when the image is missing:
 
 ```text
-docker pull networlddev/censio:0.1.0
+docker pull networlddev/censio:0.2.0
 ```
 
 Building the image from source and starting it with the commands of this guide was tried on Docker Desktop for Windows in PowerShell 7. An automated check on Linux Docker Engine runs the `--user 99:100` command with a bind mount owned by `99:100`; Windows PowerShell 5.1, the other commands of this section (the `chown` remedy, the pull on the NAS), the stop at start for an unwritable directory on NAS hardware, and Unraid or Synology hardware have not been tried yet.
@@ -89,7 +89,7 @@ Building the image from source and starting it with the commands of this guide w
 Inside the image the server listens on all interfaces of the container, on plain HTTP, with no login on the start page and `/health`. The `-p` mapping decides who can reach it: `-p 8080:8080` publishes it on every interface of the host. To reach it from the host alone, bind the mapping to the loopback address:
 
 ```text
-docker run -d --name censio -p 127.0.0.1:8080:8080 -v censio-config:/config networlddev/censio:0.1.0
+docker run -d --name censio -p 127.0.0.1:8080:8080 -v censio-config:/config networlddev/censio:0.2.0
 ```
 
 On Linux a published port bypasses host firewalls such as ufw and firewalld, so restrict access with the mapping, not with the firewall. TLS is the job of a reverse proxy in front of the server; see [SECURITY.md](../SECURITY.md).
@@ -103,7 +103,7 @@ On Linux a published port bypasses host firewalls such as ufw and firewalld, so 
 
 ### Companion
 
-The Companion is the Windows program that reads the statistics of the running game. Download `Censio-<version>-win-x64.zip` from the release page `https://github.com/LarsLaskowski/Censio/releases` (under *Assets* of the release). It needs Windows 10 22H2 or Windows 11, 64-bit; it needs no installed .NET, no installer and no administrator rights. Windows other than these and arm64 are not supported. Not yet tried: the ZIP of `v0.1.0` on a machine without .NET.
+The Companion is the Windows program that reads the statistics of the running game. Download `Censio-<version>-win-x64.zip` from the release page `https://github.com/LarsLaskowski/Censio/releases` (under *Assets* of the release). It needs Windows 10 22H2 or Windows 11, 64-bit; it needs no installed .NET, no installer and no administrator rights. Windows other than these and arm64 are not supported. Not yet tried: the ZIP of `v0.2.0` on a machine without .NET.
 
 1. Extract the ZIP to a folder of your choice. It holds one file, `Censio.Companion.exe`.
 2. Start `Censio.Companion.exe`. A tray icon appears; its menu shows the status, the last tick, the game installation (`Game: …`, see *Game installation* below), the game catalog (`Catalog: …`, see *Game catalog* below), `Open diagnostics`, `Start recording`, `Open recordings folder`, `Open log folder`, `Start with Windows`, `Version <version>` and `Exit`.
@@ -250,7 +250,7 @@ Check the output before you commit it: a name or a number you know from the game
 
 ### Build from source
 
-To run a state of the repository that has not been released, build it from a checkout of this repository, with the commands run in its root directory. No edge builds are offered. In the other `docker run` commands of this guide, add `--pull never` and use the local name `censio` instead of `networlddev/censio:0.1.0`.
+To run a state of the repository that has not been released, build it from a checkout of this repository, with the commands run in its root directory. No edge builds are offered. In the other `docker run` commands of this guide, add `--pull never` and use the local name `censio` instead of `networlddev/censio:0.2.0`.
 
 #### Build the server image
 
@@ -302,7 +302,7 @@ This path leads from the download to a recording file and its replay, on Windows
 12. Replay the file from the Windows *Run* dialog as described under *Recording and replay* (copy both paths with "Copy as path", then `"<path of Censio.Companion.exe>" --replay "<path of the file>" --speed max`).
 13. The tooltip ends at `Censio Companion: Replay finished`: the file is readable. Choose `Exit`, then start `Censio.Companion.exe` as in step 3 for normal use.
 
-Tried by the Product Manager on Windows 11 (26H2) with Ubisoft Connect in German and a Companion built from source with the documented publish command, with the real game: step 5 (entering `/pipe` and choosing *Close*), recording and its file, the tray icon in the overflow area, the tooltips and tray states, and the replay with `Exit` and the *Run* dialog (steps 7 to 13 in general). Not yet tried: the download from the release `v0.1.0` (steps 1 and 2 as written), the SmartScreen dialog of step 3, whether `/pipe` set in Steam reaches the game through Ubisoft Connect (the labels of the Steam path and the English labels of the Ubisoft Connect path, *Close* included, were confirmed by the Product Manager), and the SmartScreen tip under *Companion*.
+Tried by the Product Manager on Windows 11 (26H2) with Ubisoft Connect in German and a Companion built from source with the documented publish command, with the real game: step 5 (entering `/pipe` and choosing *Close*), recording and its file, the tray icon in the overflow area, the tooltips and tray states, and the replay with `Exit` and the *Run* dialog (steps 7 to 13 in general). Not yet tried: the download from the release `v0.2.0` (steps 1 and 2 as written), the SmartScreen dialog of step 3, whether `/pipe` set in Steam reaches the game through Ubisoft Connect (the labels of the Steam path and the English labels of the Ubisoft Connect path, *Close* included, were confirmed by the Product Manager), and the SmartScreen tip under *Companion*.
 
 ## First start
 
@@ -336,12 +336,12 @@ English version: [Censio user guide](#censio-user-guide)
 
 ### Server (Docker)
 
-Der Censio-Server läuft als Docker-Image `networlddev/censio` (linux/amd64) auf Docker Hub. Jedes Release veröffentlicht den Tag `<version>` (zum Beispiel `0.1.0`) und setzt den Tag `latest` auf das neueste Release. Die Versionen stehen auf der Release-Seite `https://github.com/LarsLaskowski/Censio/releases`, die Tags auf `https://hub.docker.com/r/networlddev/censio/tags`. Voraussetzung ist Docker 23 oder neuer (Docker Engine unter Linux oder Docker Desktop für Windows mit WSL-2-Backend und Linux-Containern). Die Befehle unten verwenden die Version `0.1.0`; sie durch die gewünschte Version oder durch `latest` ersetzen. Die Befehle werden einzeln ausgeführt: Schlägt ein Befehl fehl, schlägt auch der nächste fehl. Noch nicht ausprobiert: das Laden und Starten des veröffentlichten Images `0.1.0`.
+Der Censio-Server läuft als Docker-Image `networlddev/censio` (linux/amd64) auf Docker Hub. Jedes Release veröffentlicht den Tag `<version>` (zum Beispiel `0.2.0`) und setzt den Tag `latest` auf das neueste Release. Die Versionen stehen auf der Release-Seite `https://github.com/LarsLaskowski/Censio/releases`, die Tags auf `https://hub.docker.com/r/networlddev/censio/tags`. Voraussetzung ist Docker 23 oder neuer (Docker Engine unter Linux oder Docker Desktop für Windows mit WSL-2-Backend und Linux-Containern). Die Befehle unten verwenden die Version `0.2.0`; sie durch die gewünschte Version oder durch `latest` ersetzen. Die Befehle werden einzeln ausgeführt: Schlägt ein Befehl fehl, schlägt auch der nächste fehl. Noch nicht ausprobiert: das Laden und Starten des veröffentlichten Images `0.2.0`.
 
 #### Image laden
 
 ```text
-docker pull networlddev/censio:0.1.0
+docker pull networlddev/censio:0.2.0
 ```
 
 `docker run` lädt ein fehlendes Image selbst, dieser Schritt holt es nur vorab. Ein fehlgeschlagener Pull hinterlässt nichts Halbfertiges.
@@ -351,7 +351,7 @@ docker pull networlddev/censio:0.1.0
 Den Container mit einem benannten Volume für das Datenverzeichnis `/config` starten:
 
 ```text
-docker run -d --name censio -p 8080:8080 -v censio-config:/config networlddev/censio:0.1.0
+docker run -d --name censio -p 8080:8080 -v censio-config:/config networlddev/censio:0.2.0
 ```
 
 Prüfen, ob er antwortet (die Antwort lautet `Healthy`; noch nicht ausprobiert: in Windows PowerShell 5.1 ist `curl` ein Alias für `Invoke-WebRequest`, das `StatusCode` `200` und `Content` `Healthy` anzeigen sollte und vorher eine Bestätigung verlangen kann), und sein Log lesen:
@@ -375,13 +375,13 @@ docker rm -f censio
 Im Container lauscht der Server auf Port 8080. Ist Port 8080 auf dem Host belegt, meldet Docker „port is already allocated“; dann einen anderen Host-Port abbilden:
 
 ```text
-docker run -d --name censio -p 9000:8080 -v censio-config:/config networlddev/censio:0.1.0
+docker run -d --name censio -p 9000:8080 -v censio-config:/config networlddev/censio:0.2.0
 ```
 
 Den Port, auf dem der Server selbst lauscht, ändert `ASPNETCORE_HTTP_PORTS` (der Health-Check folgt dem ersten Eintrag der Liste; `ASPNETCORE_URLS` unterstützt das Image nicht):
 
 ```text
-docker run -d --name censio -e ASPNETCORE_HTTP_PORTS=9090 -p 9090:9090 -v censio-config:/config networlddev/censio:0.1.0
+docker run -d --name censio -e ASPNETCORE_HTTP_PORTS=9090 -p 9090:9090 -v censio-config:/config networlddev/censio:0.2.0
 ```
 
 #### Datenverzeichnis und NAS-Hosts
@@ -391,7 +391,7 @@ docker run -d --name censio -e ASPNETCORE_HTTP_PORTS=9090 -p 9090:9090 -v censio
 Auf einem NAS, dessen Freigaben einem anderen Benutzer gehören (Unraid `nobody:users` ist `99:100`, ein Synology-Benutzer etwa `1026:100`), den Container mit diesem Benutzer und dieser Gruppe starten; den Pfad durch die eigene Freigabe ersetzen:
 
 ```text
-docker run -d --name censio --user 99:100 -p 8080:8080 -v /mnt/user/appdata/censio:/config networlddev/censio:0.1.0
+docker run -d --name censio --user 99:100 -p 8080:8080 -v /mnt/user/appdata/censio:/config networlddev/censio:0.2.0
 ```
 
 Oder das Verzeichnis dem Benutzer des Images übergeben und ohne `--user` starten:
@@ -401,13 +401,13 @@ chown -R 1654:1654 /mnt/user/appdata/censio
 ```
 
 ```text
-docker run -d --name censio -p 8080:8080 -v /mnt/user/appdata/censio:/config networlddev/censio:0.1.0
+docker run -d --name censio -p 8080:8080 -v /mnt/user/appdata/censio:/config networlddev/censio:0.2.0
 ```
 
 Ein Verzeichnis, das der Container-Benutzer nicht beschreiben kann, stoppt den Container beim Start mit Exit-Code 1; `docker logs censio` zeigt dann `The data-protection key ring cannot be stored in '/config/data-protection-keys'; the server stops. Make the data directory writable for the user the server runs as.` Ein Wert von `CENSIO__DATADIRECTORY`, der kein absoluter Pfad ist, stoppt ihn ebenfalls mit Exit-Code 1; `docker logs censio` zeigt dann `The data directory (Censio:DataDirectory) must be an absolute path, not '<value>'; the server stops.` Das Image auf dem NAS selbst laden; `docker run` tut das, wenn das Image fehlt:
 
 ```text
-docker pull networlddev/censio:0.1.0
+docker pull networlddev/censio:0.2.0
 ```
 
 Das Bauen des Images aus dem Quellcode und sein Start mit den Befehlen dieser Anleitung wurde unter Docker Desktop für Windows in PowerShell 7 ausprobiert. Eine automatische Prüfung unter Docker Engine für Linux führt den Befehl mit `--user 99:100` und einem Bind-Mount aus, der `99:100` gehört; Windows PowerShell 5.1, die übrigen Befehle dieses Abschnitts (die `chown`-Abhilfe, das Laden auf dem NAS), der Stopp beim Start für ein nicht beschreibbares Verzeichnis auf NAS-Hardware sowie Unraid- oder Synology-Hardware wurden noch nicht ausprobiert.
@@ -417,7 +417,7 @@ Das Bauen des Images aus dem Quellcode und sein Start mit den Befehlen dieser An
 Im Image lauscht der Server auf allen Schnittstellen des Containers, über reines HTTP und ohne Login für Startseite und `/health`. Die `-p`-Abbildung entscheidet, wer ihn erreicht: `-p 8080:8080` veröffentlicht ihn auf jeder Schnittstelle des Hosts. Um ihn nur vom Host aus erreichbar zu machen, die Abbildung an die Loopback-Adresse binden:
 
 ```text
-docker run -d --name censio -p 127.0.0.1:8080:8080 -v censio-config:/config networlddev/censio:0.1.0
+docker run -d --name censio -p 127.0.0.1:8080:8080 -v censio-config:/config networlddev/censio:0.2.0
 ```
 
 Unter Linux umgeht ein veröffentlichter Port Host-Firewalls wie ufw und firewalld; den Zugriff deshalb über die Abbildung beschränken, nicht über die Firewall. TLS ist Aufgabe eines Reverse Proxys vor dem Server; siehe [SECURITY.md](../SECURITY.md).
@@ -431,7 +431,7 @@ Unter Linux umgeht ein veröffentlichter Port Host-Firewalls wie ufw und firewal
 
 ### Companion
 
-Der Companion ist das Windows-Programm, das die Statistik des laufenden Spiels liest. `Censio-<version>-win-x64.zip` von der Release-Seite `https://github.com/LarsLaskowski/Censio/releases` herunterladen (beim Release unter *Assets*). Er braucht Windows 10 22H2 oder Windows 11, 64 Bit; er braucht kein installiertes .NET, keinen Installer und keine Administratorrechte. Anderes Windows und arm64 werden nicht unterstützt. Noch nicht ausprobiert: das ZIP von `v0.1.0` auf einem Rechner ohne .NET.
+Der Companion ist das Windows-Programm, das die Statistik des laufenden Spiels liest. `Censio-<version>-win-x64.zip` von der Release-Seite `https://github.com/LarsLaskowski/Censio/releases` herunterladen (beim Release unter *Assets*). Er braucht Windows 10 22H2 oder Windows 11, 64 Bit; er braucht kein installiertes .NET, keinen Installer und keine Administratorrechte. Anderes Windows und arm64 werden nicht unterstützt. Noch nicht ausprobiert: das ZIP von `v0.2.0` auf einem Rechner ohne .NET.
 
 1. Das ZIP in einen beliebigen Ordner entpacken. Es enthält eine Datei, `Censio.Companion.exe`.
 2. `Censio.Companion.exe` starten. Ein Tray-Symbol erscheint; sein Menü zeigt den Status, den letzten Tick, die Spielinstallation (`Game: …`, siehe *Spielinstallation* unten), den Spielkatalog (`Catalog: …`, siehe *Spielkatalog* unten), `Open diagnostics`, `Start recording`, `Open recordings folder`, `Open log folder`, `Start with Windows`, `Version <version>` und `Exit`.
@@ -578,7 +578,7 @@ Die Ausgabe vor dem Einchecken prüfen: Ein Name oder eine Zahl, die Sie aus dem
 
 ### Aus dem Quellcode bauen
 
-Um einen Stand des Repositorys auszuführen, der nicht veröffentlicht ist, ihn aus einem Checkout dieses Repositorys bauen; die Befehle laufen in dessen Hauptverzeichnis. Edge-Builds werden nicht angeboten. In den übrigen `docker run`-Befehlen dieser Anleitung `--pull never` ergänzen und den lokalen Namen `censio` statt `networlddev/censio:0.1.0` verwenden.
+Um einen Stand des Repositorys auszuführen, der nicht veröffentlicht ist, ihn aus einem Checkout dieses Repositorys bauen; die Befehle laufen in dessen Hauptverzeichnis. Edge-Builds werden nicht angeboten. In den übrigen `docker run`-Befehlen dieser Anleitung `--pull never` ergänzen und den lokalen Namen `censio` statt `networlddev/censio:0.2.0` verwenden.
 
 #### Server-Image bauen
 
@@ -630,7 +630,7 @@ Dieser Weg führt vom Download bis zu einer Aufzeichnungsdatei und ihrem Abspiel
 12. Die Datei im Windows-Dialog *Ausführen* abspielen, wie unter *Aufzeichnen und Abspielen* beschrieben (beide Pfade mit „Als Pfad kopieren“ kopieren, dann `"<Pfad der Censio.Companion.exe>" --replay "<Pfad der Datei>" --speed max`).
 13. Der Tooltip endet bei `Censio Companion: Replay finished`: Die Datei ist lesbar. `Exit` wählen und `Censio.Companion.exe` wie in Schritt 3 für den normalen Betrieb starten.
 
-Vom Product Manager unter Windows 11 (26H2) mit deutschem Ubisoft Connect und einem Companion, aus dem Quellcode mit dem dokumentierten Publish-Befehl gebaut, mit dem echten Spiel ausprobiert: Schritt 5 (Eintragen von `/pipe` und *Schließen*), die Aufzeichnung und ihre Datei, das Tray-Symbol im Überlaufbereich, die Tooltips und Tray-Zustände und das Abspielen mit `Exit` und dem Dialog *Ausführen* (Schritte 7 bis 13 im Allgemeinen). Noch nicht ausprobiert: der Download vom Release `v0.1.0` (die Schritte 1 und 2 wie beschrieben), der SmartScreen-Dialog von Schritt 3, ob ein in Steam gesetztes `/pipe` das Spiel über Ubisoft Connect erreicht (die Bezeichnungen des Steam-Wegs und die englischen Bezeichnungen des Ubisoft-Connect-Wegs, *Close* eingeschlossen, hat der Product Manager bestätigt) und der SmartScreen-Tipp unter *Companion*.
+Vom Product Manager unter Windows 11 (26H2) mit deutschem Ubisoft Connect und einem Companion, aus dem Quellcode mit dem dokumentierten Publish-Befehl gebaut, mit dem echten Spiel ausprobiert: Schritt 5 (Eintragen von `/pipe` und *Schließen*), die Aufzeichnung und ihre Datei, das Tray-Symbol im Überlaufbereich, die Tooltips und Tray-Zustände und das Abspielen mit `Exit` und dem Dialog *Ausführen* (Schritte 7 bis 13 im Allgemeinen). Noch nicht ausprobiert: der Download vom Release `v0.2.0` (die Schritte 1 und 2 wie beschrieben), der SmartScreen-Dialog von Schritt 3, ob ein in Steam gesetztes `/pipe` das Spiel über Ubisoft Connect erreicht (die Bezeichnungen des Steam-Wegs und die englischen Bezeichnungen des Ubisoft-Connect-Wegs, *Close* eingeschlossen, hat der Product Manager bestätigt) und der SmartScreen-Tipp unter *Companion*.
 
 ## Erster Start
 
