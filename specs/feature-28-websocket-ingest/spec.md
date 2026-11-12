@@ -1,7 +1,7 @@
 # Spec: WebSocket ingest endpoint with shared token
 
 Source: Issue #28
-Status: Draft
+Status: Approved by Lead
 
 ## Problem
 
@@ -40,7 +40,7 @@ only from the operator's Companion and survive any input.
 
 - E1: A hello with a wrong token or `token` `null` while the token is required: reply `helloRefused` `tokenRefused`
   with `receivedVersion` 1 and `supportedVersions` `[1]`, then the server closes the connection; log warning `Companion refused: token refused.`
-- E2: A first message of a contract version other than 1, whatever its type and token: reply `helloRefused`
+- E2: A first message of a contract version other than 1, whatever its type (a refused hello reply aside, E4) and token: reply `helloRefused`
   `unsupportedVersion` with `receivedVersion` and `supportedVersions` `[1]`, then close; checked before the token and the
   second-Companion rule; log warning `Companion refused: unsupported contract version <n>.`
 - E3: A valid hello while another Companion is connected: reply `helloRefused` `companionConnected` with
@@ -49,7 +49,7 @@ only from the operator's Companion and survive any input.
 - E4: A first message that is not a readable version-1 hello (malformed, another type, a binary frame, over 32 KiB), or a
   first message not complete within 10 seconds of the upgrade (a hello sent in slow parts included): closed without a reply (close statuses below).
 - E5: After the hello, a message of a Companion-to-server type other than hello the contract reader refuses as *invalid* or with a catalog kind, whose `id` is a valid
-  UUID: an `acknowledgement` with that `id` and the refusal kind, `refusedVersion` `null`, `missingIcons` empty; the
+  UUID: an `acknowledgement` with that `id` and the refusal kind, `refusedVersion` the catalog's schema version for `catalogUnsupportedVersion`, else `null`, `missingIcons` empty; the
   connection stays open.
 - E6: After the hello, a message whose `id` cannot be read (*malformed*, *too large*, *unsupported version*, *invalid*
   with an unusable `id`), a server-to-Companion type, a second hello or a binary frame: closed without a reply. The type is decided
@@ -57,7 +57,9 @@ only from the operator's Companion and survive any input.
   over 25,165,824 bytes is not read past that bound.
 - E7: A Companion that vanishes without closing (network loss, sleep): the server sends a WebSocket ping every 15
   seconds, and a connection from which no frame at all arrives (pong, message or part of one) for 60 seconds is closed;
-  the next hello is then accepted. Silence is counted in frames, not contract messages.
+  the next hello is then accepted. Silence is counted in frames, not contract messages. Limit: a ping
+  still unanswered when a message begins is answered only after that message, so such a message must end within the
+  60 seconds; otherwise the Companion reconnects and resends.
 - E8: More than 16 connections at once that have not completed their hello: a further `/ingest` request is answered `503`
   with an empty body. Accepted risk: any host that reaches `/ingest` can hold these 16 places by reopening connections and
   so keep the real Companion out, with the token required as well (no rate limiting, *Out of scope*).
@@ -156,10 +158,8 @@ binary frame; 1008 for every other case of E4 and E6.
 
 ## Area documents
 
-- `docs/areas/ingest.md` (new area, index row): the endpoint `/ingest`, the hello and its checks in order, the token's
-  file, generation, rotation and switch, the single-Companion rule and silent connections, acknowledgements, bounds,
-  times, pings and silent connections, close statuses, log lines and what they never hold, and the accepted risk of E8
-  beside the missing rate limit.
+- `docs/areas/ingest.md` (new area, index row): everything of S1 to S7, E1 to E13 and N1 to N6, the accepted risk of E8
+  included.
 - `docs/areas/server.md`: `/ingest` among the open routes, the setting, the token file; *Not here* points to ingest.
 - `docs/ARCHITECTURE.md` (*Data flow*, *Security model*, the server row): the endpoint, the token required by default and
   the `RequireToken` switch with its risk, linking `ingest.md` (record 0019, *Consequences*).
@@ -186,6 +186,4 @@ All seven objections accepted.
    server-to-Companion type or a second hello is closed with 1008 and never acknowledged; AC10 names both.
 6. Documents of record 0019's *Consequences*: accepted. `docs/ARCHITECTURE.md`, `.squad/project.md` and `SECURITY.md` are
    listed under *Area documents* with the switch and its risk; `server.md`'s *Not here* was listed already.
-7. Icon references of a catalog upload: accepted for the plan; the behavior of S4 stays. The plan collects the references
-   without a second full catalog read held beside the first, or states the extra memory against N1 and `contract.md`
-   (*Memory of a read*).
+7. Icon references of a catalog upload: accepted; settled in `plan.md` (*Approach*), S4 unchanged.

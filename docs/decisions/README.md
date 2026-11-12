@@ -122,4 +122,8 @@ once in the [area document](../areas/README.md) of the record's area, and the re
 | [0058](0058-contract-read-strictly-by-exact-version-with-a-frozen-hello.md) | The contract is read strictly by exact version; the hello and its refusal keep one form for every version | Accepted | 2026-11-12 |
 | [0059](0059-contract-messages-carry-a-companion-assigned-identity-and-their-profile.md) | Contract messages carry an identity the Companion assigns and the profile they were taken under | Accepted | 2026-11-12 |
 | [0060](0060-contract-message-bound-caps-ticks-below-the-pipes-limits.md) | One byte bound per contract message caps a tick below the pipe's limits; images and catalog travel as Base64 | Accepted | 2026-11-12 |
+| [0061](0061-ingest-token-generated-into-a-file-of-the-data-directory.md) | The ingest token is generated into a file of the data directory and compared by its hash | Proposed | 2026-11-12 |
+| [0062](0062-one-companion-second-refused-silence-found-by-websocket-pings.md) | A second Companion is refused; a silent connection is found by WebSocket pings | Proposed | 2026-11-12 |
+| [0063](0063-refused-contract-messages-acknowledged-by-id-or-the-connection-closed.md) | A refused contract message is acknowledged by its id when the reader yields one, else the connection closes | Proposed | 2026-11-12 |
+| [0064](0064-ingest-refuses-browser-upgrades-and-bounds-pending-hellos.md) | The ingest endpoint refuses browser upgrades and bounds connections waiting for their hello | Proposed | 2026-11-12 |
 <!-- project:end index -->
