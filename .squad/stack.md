@@ -134,7 +134,9 @@ image, because no `.razor` file existed at restore time). A Blazor project there
 scripts without any `.razor` file present (`Censio.Server`, record 0007); the script below stays unchanged. Where Docker runs, build the image. Where it does not
 (the sandbox), reproduce the Dockerfile's order in a scratch directory; every change to a `.csproj`,
 `Directory.*.props`, a `.razor` or other content item, a static web asset or the Dockerfile runs it before the
-review:
+review. The image build needs `.squad/dotnet-rules.globalconfig`, which `Directory.Build.props` names: a Dockerfile
+that copies files by name copies it into the build stage, and a `.dockerignore` that leaves out `.squad/` lets it in
+(`dotnet_config.py` checks both):
 
 ```bash
 scratch="$(mktemp -d)"
@@ -148,7 +150,7 @@ ls "$scratch"/publish/wwwroot/_framework/blazor.web*.js \
   || { echo "publish output lacks wwwroot/_framework/blazor.web*.js (see docs/decisions/0007)" >&2; false; }
 ```
 
-Keep the first copy equal to the `COPY` lines before `RUN dotnet restore` in the Dockerfile and the second to the `COPY .editorconfig` and `COPY src/` lines after it. A `--no-restore`
+Keep the first copy equal to the `COPY` lines before `RUN dotnet restore` in the Dockerfile and the second to the `COPY .editorconfig`, `COPY .squad/dotnet-rules.globalconfig` and `COPY src/` lines after it. A `--no-restore`
 publish that fails, or an output that is missing, is the defect the CI release build would report after the
 PR is open.
 
