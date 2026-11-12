@@ -724,6 +724,38 @@ public sealed class IngestSessionTests : IDisposable
     }
 
     /// <summary>
+    /// A message that arrives after the server's stop closed the connection with 1001 is not answered: a hello while the
+    /// hello phase is open, or a tick after an accepted hello.
+    /// </summary>
+    /// <param name="hellos">The number of hellos accepted before the stop (0 or 1)</param>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC10")]
+    [DataRow(0)]
+    [DataRow(1)]
+    public async Task IngestSessionRunAsyncMessageAfterStopIsNotAnswered(int hellos)
+    {
+        // Arrange
+        var (run, client, _) = hellos == 0 ? StartSession(IngestAccess.CreateForToken(Token)) : await StartAcceptedSessionAsync();
+
+        await _stopping.CancelAsync();
+
+        var (messages, closeStatus, closeDescription) = await IngestClient.ReceiveUntilCloseAsync(client);
+
+        // Act
+        await IngestClient.SendAsync(client, hellos == 0 ? IngestClient.Hello(Token) : IngestClient.Tick(Id1));
+        await FinishAsync(client, run);
+
+        // Assert
+        Assert.IsEmpty(messages, $"No reply should be sent: {hellos} hellos");
+        Assert.AreEqual(WebSocketCloseStatus.EndpointUnavailable, closeStatus, $"The connection should be closed with 1001: {hellos} hellos");
+        Assert.AreEqual(string.Empty, closeDescription, $"The close should carry an empty reason: {hellos} hellos");
+        Assert.AreEqual(hellos, LogMessages().Count(message => message == "Companion connected."), $"Only the hello before the stop should be logged as connected: {hellos} hellos");
+        Assert.AreEqual(IngestConnections.MaxPendingHellos, CountFreePendingPlaces(), $"The pending place should be left: {hellos} hellos");
+        Assert.IsTrue(_connections.TryTakeCompanion(), $"The Companion's place should be free: {hellos} hellos");
+    }
+
+    /// <summary>
     /// A peer that never answers the server's close and keeps sending frames is cut off once 2 seconds pass on the clock.
     /// </summary>
     /// <param name="label">The name of the case</param>

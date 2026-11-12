@@ -45,7 +45,7 @@ Feature: see [spec.md](spec.md).
 | AC7 | `IngestTokenSetupTryCreateAccessRequireTokenFalseReturnsOpenAccess` (DataRows `false`, `FALSE`), `IngestTokenSetupTryCreateAccessRequireTokenFalseTouchesNoFile`, `IngestTokenSetupTryCreateAccessRequireTokenTrueOrUnsetRequiresToken`, `IngestTokenSetupTryCreateAccessInvalidRequireTokenStops` (DataRows `""`, `no`, `0`, ` true`), `IngestAccessIsTokenAcceptedOpenAcceptsAnyToken` | `IngestTokenSetupTests.cs`, `IngestAccessTests.cs` |
 | AC8 | `IngestTokenSetupTryCreateAccessInvalidFileStops` (DataRows: empty, white space only, 1,025 characters, a space inside, a byte above `~`), `IngestTokenSetupTryCreateAccessUnwritableDirectoryStops` (asserts neither `ingest-token` nor its temporary file is left), `IngestTokenSetupTryCreateAccessWithoutDataDirectoryRefusesAll`, `ProgramStartWithInvalidTokenFileExitsWithCodeOne` | `IngestTokenSetupTests.cs`, `ProgramTests.cs` |
 | AC9 | `IngestSessionRunAsyncAcceptedMessagesAcknowledgedInOrder`, `IngestSessionRunAsyncCatalogUploadListsSortedDistinctIcons`, `IngestSessionRunAsyncStatusGetsNoReply`, `IngestSessionRunAsyncOnCloseLogsCounts` | `IngestSessionTests.cs` |
-| AC10 | `IngestSessionRunAsyncInvalidMessageWithIdAcknowledgesRefusal`, `IngestSessionRunAsyncCatalogRefusalAcknowledgesCatalogKind` (DataRows: the four catalog kinds), `IngestSessionRunAsyncUnreadableMessageClosesConnection` (DataRows: malformed, version 2, invalid `id`, `helloAccepted`, `acknowledgement` with a valid `id`, second hello), `IngestSessionRunAsyncBinaryFrameCloses1003`, `IngestSessionRunAsyncMessageOverReaderBoundCloses1009` (a tick whose island name has 766 bytes), `IngestSessionRunAsyncOnStoppingCloses1001`, `IngestSessionRunAsyncPeerNeverAnswersCloseEndsAfterCloseWait` (DataRows: after `tokenRefused`, after a 1008 in the message phase; the peer keeps sending frames; ends when the fake clock passes 2 s), `IngestEndpointAfterRefusedMessageHealthStillAnswers`, `ContractReaderReadInvalidMessageReturnsRefusedId`, `ContractReaderReadMalformedMessageReturnsNoRefusedId`, `ContractReaderReadCatalogUploadReturnsCatalogDocument`, `CatalogDocumentReaderReadUnsupportedVersionReturnsVersion` | `IngestSessionTests.cs`, `IngestEndpointTests.cs`, `tests/Censio.Contracts.Tests/ContractReaderTests.cs`, `CatalogDocumentReaderTests.cs` |
+| AC10 | `IngestSessionRunAsyncInvalidMessageWithIdAcknowledgesRefusal`, `IngestSessionRunAsyncCatalogRefusalAcknowledgesCatalogKind` (DataRows: the four catalog kinds), `IngestSessionRunAsyncUnreadableMessageClosesConnection` (DataRows: malformed, version 2, invalid `id`, `helloAccepted`, `acknowledgement` with a valid `id`, second hello), `IngestSessionRunAsyncBinaryFrameCloses1003`, `IngestSessionRunAsyncMessageOverReaderBoundCloses1009` (a tick whose island name has 766 bytes), `IngestSessionRunAsyncUnwritableReplyAbortsWithoutReply`, `IngestSessionRunAsyncOnStoppingCloses1001`, `IngestSessionRunAsyncPeerNeverAnswersCloseEndsAfterCloseWait` (DataRows: after `tokenRefused`, after a 1008 in the message phase; the peer keeps sending frames; ends when the fake clock passes 2 s), `IngestEndpointAfterRefusedMessageHealthStillAnswers`, `ContractReaderReadInvalidMessageReturnsRefusedId`, `ContractReaderReadMalformedMessageReturnsNoRefusedId`, `ContractReaderReadCatalogUploadReturnsCatalogDocument`, `CatalogDocumentReaderReadUnsupportedVersionReturnsVersion` | `IngestSessionTests.cs`, `IngestEndpointTests.cs`, `tests/Censio.Contracts.Tests/ContractReaderTests.cs`, `CatalogDocumentReaderTests.cs` |
 | AC11 | `IngestSessionRunAsyncOversizedHelloCloses1009`, `IngestSessionRunAsyncOversizedMessageReadsNoFurther`, `IngestSessionRunAsyncHelloAfterTenSecondsCloses1008`, `IngestSessionRunAsyncTrickledHelloPastDeadlineCloses1008`, `IngestSessionRunAsyncHelloCompletedAfterDeadlineIsNotAnswered` (the rest of the hello arrives after the 1008, the peer then answers the close: no reply, pending place free), `IngestEndpointSeventeenthPendingConnectionReturns503`, `IngestEndpointPlainRequestReturns400` (DataRows `GET`, `POST`), `IngestEndpointAcceptFailureLeavesPendingPlace`, `IngestEndpointUpgradeWithOriginReturns403`, `IngestConnectionsTryEnterPendingHelloSeventeenthReturnsFalse` | `IngestSessionTests.cs`, `IngestEndpointTests.cs`, `IngestConnectionsTests.cs` |
 | AC12 | manual: Reviewer, step 8, against the documentation updates below (English and German sections, the configuration table row) | — |
 
@@ -227,15 +227,27 @@ In `src/Censio.Server/IngestTokenSetup.cs`:
 
 In `src/Censio.Server/IngestSession.cs` (G3):
 
-- The abort when `ContractWriter` refuses a reply. Every reply is built from values the reader or the server has
-  already checked (a read `id`, sorted 64-hex references within 16,384, the build version, `[1]`), so the writer never
-  refuses one. The writer returns a result rather than throwing, so the branch stays as a fail-closed guard.
 - The suppressed send in `SendAsync` when a close was decided between the session's check of `_closing` and the send
   lock. This is a race between the stopping token or the deadline and the session's own loop, and no test can order it
   without a seam inside the lock.
-- The early return of `OnHelloTimeout` when the hello was already decided. The session disposes the timer when it
-  decides, so on the fake clock the callback never runs afterwards. Only a real timer that has already started its
-  callback reaches the branch.
+- The early return of `OnHelloTimeout` when the hello was already decided. The callback must already be running in
+  the window between the hello phase's own compare-exchange and its disposal of the timer. On the fake clock the
+  callback never runs after disposal, so only a real timer reaches the branch.
+- The `catch` in `CloseAsync`, reached when `CloseOutputAsync` throws because the socket is already aborted or gone.
+  `CloseAsync` runs once per session, so this needs the connection to break between the decision to close and the send
+  of the close frame. That is a race no test can order without a seam in the socket. The catch only swallows the
+  exception: the pending receive then ends the session.
+- Partial branches of null-conditional timer disposal: `_helloTimer?` where the hello is decided, and the timers in
+  `EndAsync` and `Dispose`. A timer is null only in a session that never started or never closed, and disposal is
+  idempotent. No test is needed.
+
+Ordered in step 6 instead of accepted:
+
+- A refused write by `ContractWriter` (abort, no reply) is covered by `IngestSessionRunAsyncUnwritableReplyAbortsWithoutReply`
+  (Tester): a session built with an empty `serverVersion` aborts the connection and sends no `helloAccepted`. The test
+  pins the fail-closed wiring, even though every real reply is built from values that were already checked.
+- The null arm of `error.CatalogError?.Kind` in `MapRefusal` is unreachable, because a *catalog refused* error always
+  carries its catalog error (`ContractError.CreateCatalogRefused`). The Dev removes the null-conditional.
 
 ## Areas
 
