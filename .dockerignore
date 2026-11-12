@@ -6,6 +6,7 @@
 .github/
 .claude/
 .squad/
+!.squad/dotnet-rules.globalconfig
 specs/
 tests/
 docs/
