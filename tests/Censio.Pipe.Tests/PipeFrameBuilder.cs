@@ -72,7 +72,7 @@ public sealed class PipeFrameBuilder
     /// </summary>
     /// <param name="value">The value</param>
     /// <returns>This builder</returns>
-    public PipeFrameBuilder Int32(int value)
+    public PipeFrameBuilder Int32Value(int value)
     {
         return Raw(RawLength(value));
     }
@@ -82,7 +82,7 @@ public sealed class PipeFrameBuilder
     /// </summary>
     /// <param name="value">The value</param>
     /// <returns>This builder</returns>
-    public PipeFrameBuilder Int64(long value)
+    public PipeFrameBuilder Int64Value(long value)
     {
         var buffer = new byte[sizeof(long)];
 
@@ -96,7 +96,7 @@ public sealed class PipeFrameBuilder
     /// </summary>
     /// <param name="value">The value</param>
     /// <returns>This builder</returns>
-    public PipeFrameBuilder Float32(float value)
+    public PipeFrameBuilder Float32Value(float value)
     {
         var buffer = new byte[sizeof(float)];
 
@@ -110,7 +110,7 @@ public sealed class PipeFrameBuilder
     /// </summary>
     /// <param name="value">The text, at most 255 UTF-8 bytes</param>
     /// <returns>This builder</returns>
-    public PipeFrameBuilder String(string value)
+    public PipeFrameBuilder StringValue(string value)
     {
         var encoded = Encoding.UTF8.GetBytes(value);
 
@@ -124,11 +124,11 @@ public sealed class PipeFrameBuilder
     /// <returns>This builder</returns>
     public PipeFrameBuilder Map(IReadOnlyCollection<KeyValuePair<int, int>> pairs)
     {
-        Int32(pairs.Count);
+        Int32Value(pairs.Count);
 
         foreach (var pair in pairs)
         {
-            Int32(pair.Key).Int32(pair.Value);
+            Int32Value(pair.Key).Int32Value(pair.Value);
         }
 
         return this;
@@ -157,16 +157,16 @@ public sealed class PipeFrameBuilder
     /// <returns>This builder</returns>
     public PipeFrameBuilder EntryFields(int productGuid)
     {
-        Int32(productGuid);
+        Int32Value(productGuid);
 
         for (var index = 1; index <= 5; index++)
         {
-            Float32(productGuid + (index / 4f));
+            Float32Value(productGuid + (index / 4f));
         }
 
-        Int32(productGuid + 6).Int32(productGuid + 7).Float32(productGuid + 8.5f).Int32(productGuid + 9);
+        Int32Value(productGuid + 6).Int32Value(productGuid + 7).Float32Value(productGuid + 8.5f).Int32Value(productGuid + 9);
 
-        return Float32(productGuid + 10.25f).Float32(productGuid + 11.75f);
+        return Float32Value(productGuid + 10.25f).Float32Value(productGuid + 11.75f);
     }
 
     /// <summary>

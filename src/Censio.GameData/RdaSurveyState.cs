@@ -10,12 +10,12 @@ internal sealed class RdaSurveyState
     /// <summary>
     /// Gets the matching XML entries: path to the size and the archives that hold it.
     /// </summary>
-    public Dictionary<string, (long Size, List<string> Archives)> Matching { get; } = new(StringComparer.Ordinal);
+    public Dictionary<string, (long Size, List<string> Archives)> Matching { get; } = [with(StringComparer.Ordinal)];
 
     /// <summary>
     /// Gets the folders of icon entries: folder to one archive name per entry.
     /// </summary>
-    public Dictionary<string, List<string>> IconFolders { get; } = new(StringComparer.Ordinal);
+    public Dictionary<string, List<string>> IconFolders { get; } = [with(StringComparer.Ordinal)];
 
     /// <summary>
     /// Gets the entries of the language archives that are not media.

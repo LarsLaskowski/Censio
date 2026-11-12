@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Text;
 
@@ -15,6 +16,7 @@ namespace Censio.Companion.Core.Tests;
 /// Tests for <see cref="PipeConnection" />.
 /// </summary>
 [TestClass]
+[SuppressMessage("Design", "CA1001:Types that own disposable fields should be disposable", Justification = "The asynchronous TestCleanup stops the runs and then disposes the fields after every test")]
 public sealed class PipeConnectionTests
 {
     #region Fields
@@ -1949,7 +1951,7 @@ public sealed class PipeConnectionTests
     /// <returns>The bytes</returns>
     private static byte[] VersionFrame(int version)
     {
-        return new PipeFrameBuilder().Byte((byte)PipeMessageType.Version).Int32(version).BuildWithPrefix();
+        return new PipeFrameBuilder().Byte((byte)PipeMessageType.Version).Int32Value(version).BuildWithPrefix();
     }
 
     /// <summary>
@@ -1958,7 +1960,7 @@ public sealed class PipeConnectionTests
     /// <returns>The bytes</returns>
     private static byte[] SessionStartFrame()
     {
-        return new PipeFrameBuilder().Byte((byte)PipeMessageType.SessionStart).String("Head").BuildWithPrefix();
+        return new PipeFrameBuilder().Byte((byte)PipeMessageType.SessionStart).StringValue("Head").BuildWithPrefix();
     }
 
     /// <summary>
@@ -1980,10 +1982,10 @@ public sealed class PipeConnectionTests
                                      .Byte(1)
                                      .Byte(2)
                                      .Byte(0)
-                                     .Int32(-77)
-                                     .String("Area")
-                                     .Int64(123456789012L)
-                                     .Int32(1)
+                                     .Int32Value(-77)
+                                     .StringValue("Area")
+                                     .Int64Value(123456789012L)
+                                     .Int32Value(1)
                                      .Entry(10, [new(1, 2)], [new(3, 4)])
                                      .BuildWithPrefix();
     }

@@ -49,12 +49,12 @@ public sealed class FixtureDenyList
     /// <summary>
     /// The full path of each fixture's original, by fixture file name.
     /// </summary>
-    private readonly Dictionary<string, string> _originals = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string> _originals = [with(StringComparer.Ordinal)];
 
     /// <summary>
     /// The line number of each original line, by fixture file name.
     /// </summary>
-    private readonly Dictionary<string, int> _originalLines = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, int> _originalLines = [with(StringComparer.Ordinal)];
 
     /// <summary>
     /// The numbers of the lines that are not understood.

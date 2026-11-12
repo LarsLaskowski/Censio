@@ -61,16 +61,6 @@ public sealed class DiagnosticsView : IReadOnlyList<DiagnosticsRow>, IList
                                                 ];
 
     /// <summary>
-    /// The lines of the header.
-    /// </summary>
-    private readonly IReadOnlyList<string> _headerLines;
-
-    /// <summary>
-    /// The tick the view shows.
-    /// </summary>
-    private readonly PipeTick? _tick;
-
-    /// <summary>
     /// The catalog that names the GUIDs, or <c>null</c> if none.
     /// </summary>
     private readonly GameCatalog? _catalog;
@@ -84,11 +74,6 @@ public sealed class DiagnosticsView : IReadOnlyList<DiagnosticsRow>, IList
     /// The index of the first row of each island; an island without entries has one row.
     /// </summary>
     private readonly int[] _firstRows;
-
-    /// <summary>
-    /// The number of rows.
-    /// </summary>
-    private readonly int _count;
 
     #endregion // Fields
 
@@ -104,8 +89,8 @@ public sealed class DiagnosticsView : IReadOnlyList<DiagnosticsRow>, IList
     private DiagnosticsView(IReadOnlyList<string> headerLines, PipeTick? tick, GameCatalog? catalog, GameIconSet? icons)
     {
         _icons = icons;
-        _headerLines = headerLines;
-        _tick = tick;
+        HeaderLines = headerLines;
+        Tick = tick;
         _catalog = catalog;
 
         var islands = tick?.Islands ?? [];
@@ -119,7 +104,7 @@ public sealed class DiagnosticsView : IReadOnlyList<DiagnosticsRow>, IList
         }
 
         _firstRows = firstRows;
-        _count = count;
+        Count = count;
     }
 
     #endregion // Constructor
@@ -134,12 +119,12 @@ public sealed class DiagnosticsView : IReadOnlyList<DiagnosticsRow>, IList
     /// <summary>
     /// Gets the lines of the header.
     /// </summary>
-    public IReadOnlyList<string> HeaderLines => _headerLines;
+    public IReadOnlyList<string> HeaderLines { get; }
 
     /// <summary>
     /// Gets the tick the view shows, or <c>null</c> if none.
     /// </summary>
-    public PipeTick? Tick => _tick;
+    public PipeTick? Tick { get; }
 
     #endregion // Properties
 
@@ -251,7 +236,7 @@ public sealed class DiagnosticsView : IReadOnlyList<DiagnosticsRow>, IList
             islandIndex = ~islandIndex - 1;
         }
 
-        var island = _tick!.Islands[islandIndex];
+        var island = Tick!.Islands[islandIndex];
         var entryIndex = index - _firstRows[islandIndex];
         var key = island.Key;
         var cells = new string[_columns.Length];
@@ -309,7 +294,7 @@ public sealed class DiagnosticsView : IReadOnlyList<DiagnosticsRow>, IList
     /// <returns>The index of the row, or -1 if it is not a row of this view</returns>
     private int FindIndex(object? value)
     {
-        if (value is not DiagnosticsRow row || row.Index < 0 || row.Index >= _count)
+        if (value is not DiagnosticsRow row || row.Index < 0 || row.Index >= Count)
         {
             return -1;
         }
@@ -322,7 +307,7 @@ public sealed class DiagnosticsView : IReadOnlyList<DiagnosticsRow>, IList
     #region IReadOnlyCollection
 
     /// <inheritdoc />
-    public int Count => _count;
+    public int Count { get; }
 
     #endregion // IReadOnlyCollection
 
@@ -335,7 +320,7 @@ public sealed class DiagnosticsView : IReadOnlyList<DiagnosticsRow>, IList
         get
         {
             ArgumentOutOfRangeException.ThrowIfNegative(index);
-            ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(index, _count);
+            ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(index, Count);
 
             return CreateRow(index);
         }
@@ -348,7 +333,7 @@ public sealed class DiagnosticsView : IReadOnlyList<DiagnosticsRow>, IList
     /// <inheritdoc />
     public IEnumerator<DiagnosticsRow> GetEnumerator()
     {
-        for (var rowIndex = 0; rowIndex < _count; rowIndex++)
+        for (var rowIndex = 0; rowIndex < Count; rowIndex++)
         {
             yield return CreateRow(rowIndex);
         }
@@ -375,7 +360,7 @@ public sealed class DiagnosticsView : IReadOnlyList<DiagnosticsRow>, IList
     {
         ArgumentNullException.ThrowIfNull(array);
 
-        for (var rowIndex = 0; rowIndex < _count; rowIndex++)
+        for (var rowIndex = 0; rowIndex < Count; rowIndex++)
         {
             array.SetValue(CreateRow(rowIndex), index + rowIndex);
         }

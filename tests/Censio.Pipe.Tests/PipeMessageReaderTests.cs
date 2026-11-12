@@ -570,7 +570,7 @@ public sealed class PipeMessageReaderTests
     /// <returns>The bytes</returns>
     private static byte[] VersionFrame(int version)
     {
-        return new PipeFrameBuilder().Byte(0).Int32(version).BuildWithPrefix();
+        return new PipeFrameBuilder().Byte(0).Int32Value(version).BuildWithPrefix();
     }
 
     /// <summary>
@@ -592,17 +592,17 @@ public sealed class PipeMessageReaderTests
                                                .Byte(200)
                                                .Byte(255)
                                                .Byte(128)
-                                               .Int32(-77)
-                                               .String("Area")
-                                               .Int64(123456789012L)
-                                               .Int32(1)
+                                               .Int32Value(-77)
+                                               .StringValue("Area")
+                                               .Int64Value(123456789012L)
+                                               .Int32Value(1)
                                                .Entry(10, [new(1, 2)], [new(3, 4)])
                                                .BuildWithPrefix();
 
         return
         [
             .. VersionFrame(2),
-            .. new PipeFrameBuilder().Byte(1).String("Head").BuildWithPrefix(),
+            .. new PipeFrameBuilder().Byte(1).StringValue("Head").BuildWithPrefix(),
             .. statistics,
             .. SessionEndFrame()
         ];

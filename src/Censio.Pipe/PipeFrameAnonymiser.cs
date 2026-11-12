@@ -283,7 +283,7 @@ internal sealed class PipeFrameAnonymiser
     /// <param name="position">The position of the map; behind it afterwards</param>
     private static void CopyMap(BinaryWriter writer, ReadOnlySpan<byte> frame, ref int position)
     {
-        var length = sizeof(int) + (BinaryPrimitives.ReadInt32LittleEndian(frame.Slice(position)) * 2 * sizeof(int));
+        var length = sizeof(int) + (BinaryPrimitives.ReadInt32LittleEndian(frame[position..]) * 2 * sizeof(int));
 
         writer.Write(frame.Slice(position, length));
         position += length;
@@ -633,7 +633,7 @@ internal sealed class PipeFrameAnonymiser
     /// <param name="position">The position of the map; behind it afterwards</param>
     private void WriteWorkforce(BinaryWriter writer, ReadOnlySpan<byte> frame, ref int position)
     {
-        var count = BinaryPrimitives.ReadInt32LittleEndian(frame.Slice(position));
+        var count = BinaryPrimitives.ReadInt32LittleEndian(frame[position..]);
         var sums = new Dictionary<int, long>();
 
         writer.Write(count);
@@ -641,8 +641,8 @@ internal sealed class PipeFrameAnonymiser
 
         for (var index = 0; index < count; index++)
         {
-            var guid = BinaryPrimitives.ReadInt32LittleEndian(frame.Slice(position));
-            var amount = BinaryPrimitives.ReadInt32LittleEndian(frame.Slice(position + sizeof(int)));
+            var guid = BinaryPrimitives.ReadInt32LittleEndian(frame[position..]);
+            var amount = BinaryPrimitives.ReadInt32LittleEndian(frame[(position + sizeof(int))..]);
             var upwards = _random.NextDouble() >= UpwardsFrom;
             var magnitude = _random.NextDouble();
             var changed = Perturb(amount, upwards, magnitude);

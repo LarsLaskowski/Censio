@@ -304,7 +304,7 @@ public sealed class FixtureDenyListTests
     /// <returns>The frame</returns>
     private static byte[] SessionStart(string headline)
     {
-        return new PipeFrameBuilder().Byte(1).String(headline).Build();
+        return new PipeFrameBuilder().Byte(1).StringValue(headline).Build();
     }
 
     /// <summary>
@@ -315,7 +315,7 @@ public sealed class FixtureDenyListTests
     /// <returns>The frame</returns>
     private static byte[] Island(string name, byte[] entry)
     {
-        return new PipeFrameBuilder().Byte(3).Byte(7).Byte(1).Byte(0).Int32(1).String(name).Int64(100).Int32(1).Raw(entry).Build();
+        return new PipeFrameBuilder().Byte(3).Byte(7).Byte(1).Byte(0).Int32Value(1).StringValue(name).Int64Value(100).Int32Value(1).Raw(entry).Build();
     }
 
     /// <summary>
@@ -344,7 +344,7 @@ public sealed class FixtureDenyListTests
     /// <returns>The bytes of the entry</returns>
     private static byte[] ZeroEntry()
     {
-        return new PipeFrameBuilder().Int32(10).Raw(new byte[44]).Int32(0).Int32(0).Build();
+        return new PipeFrameBuilder().Int32Value(10).Raw(new byte[44]).Int32Value(0).Int32Value(0).Build();
     }
 
     /// <summary>

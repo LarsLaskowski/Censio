@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace Censio.GameData;
 
 /// <summary>
@@ -11,6 +13,7 @@ internal sealed class RdaWindowStream : Stream
     /// <summary>
     /// The stream the window lies in.
     /// </summary>
+    [SuppressMessage("Usage", "CA2213:Disposable fields should be disposed", Justification = "The window does not own the stream it lies in; the archive that opened it disposes it")]
     private readonly Stream _inner;
 
     /// <summary>

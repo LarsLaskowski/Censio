@@ -11,7 +11,7 @@ public sealed class FakeStartupEntryStore : IStartupEntryStore
     /// <summary>
     /// The stored commands by name.
     /// </summary>
-    private readonly Dictionary<string, string> _commands = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, string> _commands = [with(StringComparer.OrdinalIgnoreCase)];
 
     /// <summary>
     /// The names read, in order.

@@ -257,7 +257,7 @@ public sealed class PipeRecordingSession
         {
             var recording = State == PipeRecordingState.Recording;
 
-            if ((start ?? recording == false) == recording)
+            if ((start ?? (recording == false)) == recording)
             {
                 return;
             }

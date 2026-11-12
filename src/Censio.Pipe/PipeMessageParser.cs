@@ -234,7 +234,7 @@ public static class PipeMessageParser
             return false;
         }
 
-        map = new Dictionary<int, int>(pairCount);
+        map = [with(pairCount)];
 
         for (var index = 0; index < pairCount; index++)
         {
@@ -336,7 +336,7 @@ public static class PipeMessageParser
             return false;
         }
 
-        value = BinaryPrimitives.ReadInt32LittleEndian(frame.Slice(position));
+        value = BinaryPrimitives.ReadInt32LittleEndian(frame[position..]);
         position += sizeof(int);
 
         return true;
@@ -358,7 +358,7 @@ public static class PipeMessageParser
             return false;
         }
 
-        value = BinaryPrimitives.ReadInt64LittleEndian(frame.Slice(position));
+        value = BinaryPrimitives.ReadInt64LittleEndian(frame[position..]);
         position += sizeof(long);
 
         return true;
@@ -380,7 +380,7 @@ public static class PipeMessageParser
             return false;
         }
 
-        value = BinaryPrimitives.ReadSingleLittleEndian(frame.Slice(position));
+        value = BinaryPrimitives.ReadSingleLittleEndian(frame[position..]);
         position += sizeof(float);
 
         return true;

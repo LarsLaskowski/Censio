@@ -438,7 +438,7 @@ public sealed class AnonymiserCommandTests
     /// <returns>The frame</returns>
     private static byte[] SessionStart(string headline)
     {
-        return new PipeFrameBuilder().Byte(1).String(headline).Build();
+        return new PipeFrameBuilder().Byte(1).StringValue(headline).Build();
     }
 
     /// <summary>
@@ -451,10 +451,10 @@ public sealed class AnonymiserCommandTests
                                      .Byte(7)
                                      .Byte(1)
                                      .Byte(0)
-                                     .Int32(1)
-                                     .String("Ostia")
-                                     .Int64(100)
-                                     .Int32(1)
+                                     .Int32Value(1)
+                                     .StringValue("Ostia")
+                                     .Int64Value(100)
+                                     .Int32Value(1)
                                      .Entry(10, [new(1, 20)], [new(3, 4)])
                                      .Build();
     }

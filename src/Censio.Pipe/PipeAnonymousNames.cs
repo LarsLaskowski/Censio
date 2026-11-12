@@ -22,27 +22,27 @@ internal sealed class PipeAnonymousNames
     /// <summary>
     /// The original names of both kinds, compared ignoring case.
     /// </summary>
-    private readonly HashSet<string> _originals = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _originals = [with(StringComparer.OrdinalIgnoreCase)];
 
     /// <summary>
     /// The island names added, compared exactly.
     /// </summary>
-    private readonly HashSet<string> _islandSet = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _islandSet = [with(StringComparer.Ordinal)];
 
     /// <summary>
     /// The figure names added, compared exactly.
     /// </summary>
-    private readonly HashSet<string> _figureSet = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _figureSet = [with(StringComparer.Ordinal)];
 
     /// <summary>
     /// The invented names of the islands by original name.
     /// </summary>
-    private readonly Dictionary<string, string> _inventedIslands = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string> _inventedIslands = [with(StringComparer.Ordinal)];
 
     /// <summary>
     /// The invented names of the figures by original name.
     /// </summary>
-    private readonly Dictionary<string, string> _inventedFigures = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string> _inventedFigures = [with(StringComparer.Ordinal)];
 
     #endregion // Fields
 

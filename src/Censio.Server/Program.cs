@@ -7,7 +7,9 @@ builder.Services.AddRazorComponents()
 builder.Services.AddHealthChecks();
 builder.Services.AddCensioDataProtection();
 
-await using var app = builder.Build();
+var app = builder.Build();
+
+await using var appLifetime = app.ConfigureAwait(false);
 
 if (DataProtectionSetup.TryCreateKeyRing(app.Services, app.Configuration, app.Logger) == false)
 {
@@ -20,6 +22,6 @@ app.MapHealthChecks("/health");
 app.MapRazorComponents<Censio.Server.Components.App>()
    .AddInteractiveServerRenderMode();
 
-await app.RunAsync();
+await app.RunAsync().ConfigureAwait(false);
 
 return 0;

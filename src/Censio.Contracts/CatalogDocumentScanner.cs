@@ -72,11 +72,6 @@ internal sealed class CatalogDocumentScanner
     private bool _versionBad;
 
     /// <summary>
-    /// The schema version found.
-    /// </summary>
-    private int _version;
-
-    /// <summary>
     /// Whether the last property of the root is <c>entries</c> and its value has not begun.
     /// </summary>
     private bool _entriesPending;
@@ -123,7 +118,7 @@ internal sealed class CatalogDocumentScanner
     /// <summary>
     /// Gets the schema version found by <see cref="Scan" />.
     /// </summary>
-    internal int Version => _version;
+    internal int Version { get; private set; }
 
     #endregion // Properties
 
@@ -237,7 +232,7 @@ internal sealed class CatalogDocumentScanner
 
             if (type == JsonTokenType.Number && reader.TryGetInt32(out var version))
             {
-                _version = version;
+                Version = version;
             }
             else
             {

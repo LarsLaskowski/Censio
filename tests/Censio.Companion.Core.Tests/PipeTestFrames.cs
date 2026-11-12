@@ -19,7 +19,7 @@ public static class PipeTestFrames
     /// <returns>The frame</returns>
     public static byte[] Version(int version)
     {
-        return new PipeFrameBuilder().Byte((byte)PipeMessageType.Version).Int32(version).Build();
+        return new PipeFrameBuilder().Byte((byte)PipeMessageType.Version).Int32Value(version).Build();
     }
 
     /// <summary>
@@ -29,7 +29,7 @@ public static class PipeTestFrames
     /// <returns>The frame</returns>
     public static byte[] SessionStart(string headline)
     {
-        return new PipeFrameBuilder().Byte((byte)PipeMessageType.SessionStart).String(headline).Build();
+        return new PipeFrameBuilder().Byte((byte)PipeMessageType.SessionStart).StringValue(headline).Build();
     }
 
     /// <summary>
@@ -53,10 +53,10 @@ public static class PipeTestFrames
                                      .Byte(7)
                                      .Byte(1)
                                      .Byte(0)
-                                     .Int32(sessionGuid)
-                                     .String("Ostia")
-                                     .Int64(timestamp)
-                                     .Int32(1)
+                                     .Int32Value(sessionGuid)
+                                     .StringValue("Ostia")
+                                     .Int64Value(timestamp)
+                                     .Int32Value(1)
                                      .Entry(sessionGuid + 10, [new(1, 2)], [new(3, 4)])
                                      .Build();
     }
@@ -77,25 +77,25 @@ public static class PipeTestFrames
                                             .Byte(sessionId)
                                             .Byte(key.IslandId)
                                             .Byte(key.AreaIndex)
-                                            .Int32(key.SessionGuid)
-                                            .String(name)
-                                            .Int64(timestamp)
-                                            .Int32(entries.Length);
+                                            .Int32Value(key.SessionGuid)
+                                            .StringValue(name)
+                                            .Int64Value(timestamp)
+                                            .Int32Value(entries.Length);
 
         foreach (var entry in entries)
         {
-            builder.Int32(entry.ProductGuid)
-                   .Float32(entry.Generation)
-                   .Float32(entry.Consumption)
-                   .Float32(entry.Delta)
-                   .Float32(entry.PerfectGeneration)
-                   .Float32(entry.PerfectConsumption)
-                   .Int32(entry.BuildingCount)
-                   .Int32(entry.Maintenance)
-                   .Float32(entry.Income)
-                   .Int32(entry.Profit)
-                   .Float32(entry.SummedProductivity)
-                   .Float32(entry.AverageProductivity)
+            builder.Int32Value(entry.ProductGuid)
+                   .Float32Value(entry.Generation)
+                   .Float32Value(entry.Consumption)
+                   .Float32Value(entry.Delta)
+                   .Float32Value(entry.PerfectGeneration)
+                   .Float32Value(entry.PerfectConsumption)
+                   .Int32Value(entry.BuildingCount)
+                   .Int32Value(entry.Maintenance)
+                   .Float32Value(entry.Income)
+                   .Int32Value(entry.Profit)
+                   .Float32Value(entry.SummedProductivity)
+                   .Float32Value(entry.AverageProductivity)
                    .Map(entry.WorkforceAmounts)
                    .Map(entry.BuildingAmounts);
         }

@@ -199,7 +199,7 @@ public sealed class PipeReplaySpeedTests
     [TestMethod]
     [DataRow(long.MaxValue)]
     [DataRow(long.MaxValue / 5)]
-    [DataRow(long.MaxValue / 10 + 1)]
+    [DataRow((long.MaxValue / 10) + 1)]
     public void PipeReplaySpeedScaleSaturatesAtMaximum(long pauseTicks)
     {
         // Arrange

@@ -32,7 +32,7 @@ internal sealed class GameIconImageConverter : IValueConverter
     /// <summary>
     /// The decoded images by icon
     /// </summary>
-    private static readonly ConditionalWeakTable<GameIcon, BitmapImage?> _images = new();
+    private static readonly ConditionalWeakTable<GameIcon, BitmapImage?> _images = [];
 
     #endregion // Fields
 

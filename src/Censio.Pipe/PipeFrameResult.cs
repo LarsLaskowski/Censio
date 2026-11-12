@@ -5,15 +5,6 @@ namespace Censio.Pipe;
 /// </summary>
 public sealed class PipeFrameResult
 {
-    #region Fields
-
-    /// <summary>
-    /// The shared end-of-stream result.
-    /// </summary>
-    private static readonly PipeFrameResult _endResult = new(PipeFrameResultKind.EndOfStream, ReadOnlyMemory<byte>.Empty, null);
-
-    #endregion // Fields
-
     #region Constructors
 
     /// <summary>
@@ -36,7 +27,7 @@ public sealed class PipeFrameResult
     /// <summary>
     /// Gets the end-of-stream result.
     /// </summary>
-    public static PipeFrameResult End => _endResult;
+    public static PipeFrameResult End { get; } = new(PipeFrameResultKind.EndOfStream, ReadOnlyMemory<byte>.Empty, null);
 
     /// <summary>
     /// Gets the outcome.

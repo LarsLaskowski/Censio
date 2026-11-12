@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Windows;
 using System.Windows.Threading;
 
@@ -15,6 +16,7 @@ namespace Censio.Companion;
 /// <summary>
 /// The Companion application.
 /// </summary>
+[SuppressMessage("Design", "CA1001:Types that own disposable fields should be disposable", Justification = "A WPF Application is not disposable; OnExit disposes the fields when the application ends")]
 public partial class App : Application
 {
     #region Fields

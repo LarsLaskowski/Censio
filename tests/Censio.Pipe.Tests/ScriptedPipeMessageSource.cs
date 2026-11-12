@@ -28,11 +28,6 @@ public sealed class ScriptedPipeMessageSource : IPipeMessageSource
     /// </summary>
     private int _readCount;
 
-    /// <summary>
-    /// A value indicating whether the token of a pending read was cancelled.
-    /// </summary>
-    private bool _tokenCancelled;
-
     #endregion // Fields
 
     #region Properties
@@ -60,9 +55,11 @@ public sealed class ScriptedPipeMessageSource : IPipeMessageSource
         {
             lock (_lock)
             {
-                return _tokenCancelled;
+                return field;
             }
         }
+
+        private set;
     }
 
     #endregion // Properties
@@ -156,7 +153,7 @@ public sealed class ScriptedPipeMessageSource : IPipeMessageSource
                                    {
                                        lock (_lock)
                                        {
-                                           _tokenCancelled = true;
+                                           TokenCancelled = true;
                                        }
 
                                        read.Completion.TrySetCanceled(cancellationToken);

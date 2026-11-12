@@ -130,7 +130,8 @@ csharp_style_expression_bodied_accessors = when_on_single_line:error
 csharp_style_expression_bodied_constructors = false:error
 csharp_style_expression_bodied_indexers = when_on_single_line:error
 csharp_style_expression_bodied_lambdas = when_on_single_line:error
-csharp_style_expression_bodied_local_functions = when_on_single_line:error
+# pending: #167 (DOTNET_RULES_PENDING)
+csharp_style_expression_bodied_local_functions = when_on_single_line:suggestion
 csharp_style_expression_bodied_methods = false:silent
 csharp_style_expression_bodied_operators = when_on_single_line:error
 csharp_style_expression_bodied_properties = when_on_single_line:error
@@ -555,7 +556,8 @@ dotnet_diagnostic.S107.severity = warning
 # == false is the binding style; off in the source, since the built-in Sonar way comprehensive profile of SonarQube Cloud cannot switch it off (#338)
 dotnet_diagnostic.S1125.severity = none
 dotnet_diagnostic.S1192.severity = warning
-dotnet_diagnostic.S3776.severity = warning
+# pending: #166 (DOTNET_RULES_PENDING)
+dotnet_diagnostic.S3776.severity = suggestion
 dotnet_diagnostic.S8949.severity = error
 
 # Diagnostics: SYSLIB
