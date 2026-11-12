@@ -6,6 +6,7 @@ builder.Services.AddRazorComponents()
                 .AddInteractiveServerComponents();
 builder.Services.AddHealthChecks();
 builder.Services.AddCensioDataProtection();
+builder.Services.AddCensioIngest();
 
 var app = builder.Build();
 
@@ -16,9 +17,18 @@ if (DataProtectionSetup.TryCreateKeyRing(app.Services, app.Configuration, app.Lo
     return 1;
 }
 
+var ingestAccess = IngestTokenSetup.TryCreateAccess(app.Configuration, app.Logger);
+
+if (ingestAccess is null)
+{
+    return 1;
+}
+
+app.UseWebSockets();
 app.UseAntiforgery();
 app.MapStaticAssets();
 app.MapHealthChecks("/health");
+app.MapCensioIngest(ingestAccess);
 app.MapRazorComponents<Censio.Server.Components.App>()
    .AddInteractiveServerRenderMode();
 

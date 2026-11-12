@@ -58,7 +58,7 @@ docker run -d --name censio -e ASPNETCORE_HTTP_PORTS=9090 -p 9090:9090 -v censio
 
 #### Data directory and NAS hosts
 
-`/config` is the directory for the server's data; it holds the data-protection key ring in `/config/data-protection-keys`. The image sets `CENSIO__DATADIRECTORY=/config`; point it to another absolute path with `-e CENSIO__DATADIRECTORY=<path>`. It cannot be switched off in the image: `docker run -e` cannot unset it and an empty value stops the start. The image declares no `VOLUME`, so every command above passes `-v`. A named volume (`censio-config`) is the default and the only form on Docker Desktop for Windows. The container never starts as root: it runs as user `1654`.
+`/config` is the directory for the server's data; it holds the data-protection key ring in `/config/data-protection-keys` and the ingest token in `/config/ingest-token` (*Ingest endpoint and token*). The image sets `CENSIO__DATADIRECTORY=/config`; point it to another absolute path with `-e CENSIO__DATADIRECTORY=<path>`. It cannot be switched off in the image: `docker run -e` cannot unset it and an empty value stops the start. The image declares no `VOLUME`, so every command above passes `-v`. A named volume (`censio-config`) is the default and the only form on Docker Desktop for Windows. The container never starts as root: it runs as user `1654`.
 
 On a NAS whose shares belong to another user (Unraid `nobody:users` is `99:100`, a Synology user such as `1026:100`), start the container with that user and group; replace the path with your share:
 
@@ -93,6 +93,40 @@ docker run -d --name censio -p 127.0.0.1:8080:8080 -v censio-config:/config netw
 ```
 
 On Linux a published port bypasses host firewalls such as ufw and firewalld, so restrict access with the mapping, not with the firewall. TLS is the job of a reverse proxy in front of the server; see [SECURITY.md](../SECURITY.md).
+
+#### Ingest endpoint and token
+
+The server of the state of `main` and of later releases (not the image `0.2.0`) takes a Companion's data on the WebSocket endpoint `ws://<host>:8080/ingest`, where `<host>` is the machine that runs Docker and `8080` the published port; there is no TLS on it (*Network and TLS*). No Companion sends data yet, and the server keeps and shows nothing it receives. Tried with the server started outside Docker on Linux: the creation of the token file with mode `0600`, its reading at the next start, and the refusals below. Not yet tried: the commands of this section in a container and on NAS hardware, and reading the file through a NAS share.
+
+- **The token.** It is required by default. At its first start the server generates a token of 43 characters and stores it in `/config/ingest-token`; the log shows `An ingest token was generated and stored in '/config/ingest-token'.` At every later start it reads the same file (`The ingest token is read from '/config/ingest-token'.`). The log never holds the token.
+- **Reading it.** The file has mode `0600` and belongs to the container user (`1654`, or the `--user` of the NAS section above), so a NAS share or a file browser, which runs as another user, cannot read it. Read it in the container, or as root on the host in the folder you mounted as `/config`:
+
+```text
+docker exec censio cat /config/ingest-token
+```
+
+  The file has no line break at its end. Enter the token in the Companion, and keep it private: never post it in an issue (*Reporting problems*). Where the server runs on Windows without Docker, the file takes the access rules of its folder instead of the mode `0600`.
+- **Rotating it.** Delete the file and start the server again; it generates a new token, and a Companion that still presents the old one is refused (`Companion refused: token refused.`). The server reads the file only at its start, so the file can be deleted while the container runs or after it was stopped (stop, delete, start): in the running container, and then restart it, or as root on the host in the mounted folder. Then read the new token and enter it in the Companion. Not yet tried:
+
+```text
+docker exec censio rm /config/ingest-token
+```
+
+```text
+docker restart censio
+```
+
+- **Switching it off.** The setting `Censio:Ingest:RequireToken` (`CENSIO__INGEST__REQUIRETOKEN`) is `true` by default. Starting with `-e CENSIO__INGEST__REQUIRETOKEN=false` switches the token off: the server then neither reads nor creates the file, logs the warning `The ingest token is switched off: anyone who reaches the server can send data.`, and accepts any Companion. Anyone who reaches the server can then send it data, and the first to connect keeps the Companion's place. Use it only on a network where every host is trusted. Any value other than `true` or `false` stops the start.
+- **One Companion.** The server accepts one Companion at a time; a second one is refused (`Companion refused: another Companion is connected.`) until the first has closed its connection or the server has found it silent: it pings every 15 seconds and closes a connection that has not answered within 35 seconds, within 60 seconds of its last frame (measured worst case 56.2 seconds).
+- **Limits.** A host that reaches the port can keep opening connections that never send a hello, 16 at a time, and so keep the real Companion out for as long as it does; restrict who reaches the port with the `-p` mapping or a reverse proxy. Every refused hello writes one log line, and without a rate limit a client that reconnects in a loop can make the log grow; Docker's default log driver does not rotate it. A message of the Companion may be at most 24 MiB.
+
+The server stops at start with exit code 1 and one `Critical` line in `docker logs censio` when the token is required and:
+
+- the file cannot be read: `The ingest token file '/config/ingest-token' cannot be read; the server stops.` Make it readable for the container user, or delete it for a new token.
+- the file holds no valid token (empty, longer than 1,024 characters, or a character outside the visible ASCII characters, for example a space inside): `The ingest token file '/config/ingest-token' holds no valid token (1 to 1,024 visible ASCII characters); the server stops.` Delete it for a new token.
+- the file cannot be created: `The ingest token file '/config/ingest-token' cannot be created; the server stops. Make the data directory writable for the user the server runs as.`
+
+A value of `CENSIO__INGEST__REQUIRETOKEN` other than `true` or `false` (any case, also the empty string) stops it with `The setting Censio:Ingest:RequireToken must be true or false; the server stops.` Without a data directory (a server started outside the image without `Censio:DataDirectory`) the token cannot be stored: the server starts, logs `No ingest token without a data directory (Censio:DataDirectory); every Companion is refused.` and refuses every Companion. The rules in full are in [`docs/areas/ingest.md`](areas/ingest.md).
 
 #### Limits
 
@@ -306,13 +340,13 @@ Tried by the Product Manager on Windows 11 (26H2) with Ubisoft Connect in German
 
 ## First start
 
-Server: open `http://localhost:8080/`; the start page shows the heading `Censio` and the line `Version <version>`. `curl http://localhost:8080/health` answers `Healthy`, and after a few seconds `docker ps` shows the container as `(healthy)`. The first start creates the first data-protection key, and ASP.NET Core logs the warning `No XML encryptor configured` once (see *Limits*).
+Server: open `http://localhost:8080/`; the start page shows the heading `Censio` and the line `Version <version>`. `curl http://localhost:8080/health` answers `Healthy`, and after a few seconds `docker ps` shows the container as `(healthy)`. The first start creates the first data-protection key, and ASP.NET Core logs the warning `No XML encryptor configured` once (see *Limits*). The server of the state of `main` also creates the ingest token and logs `An ingest token was generated and stored in '/config/ingest-token'.` (see *Ingest endpoint and token*).
 
 Companion: the program opens no window until you choose `Open diagnostics`, and shows a taskbar button only while that window is open. One icon appears in the notification area with the tooltip `Censio Companion: <state>` (the states are listed under *Connecting to the game* above); its menu holds the greyed-out status, last tick, game installation (`Game: …`, see *Game installation* above) and game catalog (`Catalog: …`, see *Game catalog* above), `Open diagnostics`, `Start recording` (or `Stop recording`), `Open recordings folder`, `Open log folder`, `Start with Windows` (checked while it is on), `Version <version>` (greyed out) and `Exit`, which removes the icon and ends the program within 2 seconds. The icon is a grey ring, a green circle or a red triangle by state. A second start in the same Windows session does nothing: it ends at once without a message and writes no log line, and the first keeps running. Windows SmartScreen asks once at the first start (see *Companion* above).
 
 ## Data and logs
 
-Server: the data directory is `/config` in the Docker image. It holds the data-protection key ring in `/config/data-protection-keys`; the keys are unencrypted, so keep the directory and its backups private. The server writes its log to the console; read it with `docker logs censio`. Log times are UTC. The settings are listed in the [README](../README.md#configuration).
+Server: the data directory is `/config` in the Docker image. It holds the data-protection key ring in `/config/data-protection-keys` and the ingest token in `/config/ingest-token`; the keys and the token are unencrypted, so keep the directory and its backups private. The server logs no token. The server writes its log to the console; read it with `docker logs censio`. Log times are UTC. The settings are listed in the [README](../README.md#configuration).
 
 Companion: it stores game data only in the catalog cache `%LOCALAPPDATA%\Censio\Cache\catalog.bin` (the names and icons of your game, saved after a complete extraction, never sent, and kept when you remove the Companion, so delete the folder by hand; it holds temporary files only for the moment of a save, and the Companion deletes leftovers older than a day), and the diagnostics window stores nothing (it shows the last tick on screen only and writes nothing to disk or to the log). It writes recording files to `%LOCALAPPDATA%\Censio\Recordings` only while a recording runs (`--record` or `Start recording`); they hold the data of your game as it was sent, stay on your computer and are never deleted by the program, so delete them by hand (*Recording and replay*). It also writes a log to `%LOCALAPPDATA%\Censio\Logs`: one file per day, `companion-<yyyyMMdd>.log` (a file that grows past 10 MiB continues in `companion-<yyyyMMdd>-2.log` and so on). The Companion keeps the 10 newest of these files and deletes older ones; it deletes no other file in the folder. The menu entries `Open recordings folder` and `Open log folder` open both folders in Explorer. Only when you turn `Start with Windows` on does it write one value `Censio Companion` under `HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run` (your account only), and it deletes that value when you turn it off; the log then holds `Autostart enabled` or `Autostart disabled`, and a warning if the setting could not be read or changed (no file path). A line holds the local time, the level and the message: the start, every change of the connection state, recording started and stopped, the names of recording files, replay start and end, the result of the game installation search (the source, the build and the game folder, or the reason it failed; see *Game installation*), the result of the catalog (entry count, or the failure kind), whether the cache was used, loaded or written, the durations of an extraction or a cache load, the counts of its icons and the GUIDs it cannot name (see *Game catalog*), and problems. The log holds no game data, no game name and no icon, but the game folder at every start and an error text can contain a file path, and so your Windows user name; check a log before you share it. The Companion also reads, but never writes, the optional settings file `%LOCALAPPDATA%\Censio\settings.json` and Ubisoft Connect's install records in the registry.
 
@@ -386,7 +420,7 @@ docker run -d --name censio -e ASPNETCORE_HTTP_PORTS=9090 -p 9090:9090 -v censio
 
 #### Datenverzeichnis und NAS-Hosts
 
-`/config` ist das Verzeichnis für die Daten des Servers; es enthält den Data-Protection-Schlüsselring in `/config/data-protection-keys`. Das Image setzt `CENSIO__DATADIRECTORY=/config`; mit `-e CENSIO__DATADIRECTORY=<Pfad>` lässt es sich auf einen anderen absoluten Pfad setzen. Im Image abschalten lässt es sich nicht: `docker run -e` kann es nicht entfernen, und ein leerer Wert stoppt den Start. Das Image deklariert kein `VOLUME`, deshalb geben alle Befehle oben `-v` an. Ein benanntes Volume (`censio-config`) ist der Standard und unter Docker Desktop für Windows die einzige Form. Der Container startet nie als root: Er läuft als Benutzer `1654`.
+`/config` ist das Verzeichnis für die Daten des Servers; es enthält den Data-Protection-Schlüsselring in `/config/data-protection-keys` und das Ingest-Token in `/config/ingest-token` (*Ingest-Endpunkt und Token*). Das Image setzt `CENSIO__DATADIRECTORY=/config`; mit `-e CENSIO__DATADIRECTORY=<Pfad>` lässt es sich auf einen anderen absoluten Pfad setzen. Im Image abschalten lässt es sich nicht: `docker run -e` kann es nicht entfernen, und ein leerer Wert stoppt den Start. Das Image deklariert kein `VOLUME`, deshalb geben alle Befehle oben `-v` an. Ein benanntes Volume (`censio-config`) ist der Standard und unter Docker Desktop für Windows die einzige Form. Der Container startet nie als root: Er läuft als Benutzer `1654`.
 
 Auf einem NAS, dessen Freigaben einem anderen Benutzer gehören (Unraid `nobody:users` ist `99:100`, ein Synology-Benutzer etwa `1026:100`), den Container mit diesem Benutzer und dieser Gruppe starten; den Pfad durch die eigene Freigabe ersetzen:
 
@@ -421,6 +455,40 @@ docker run -d --name censio -p 127.0.0.1:8080:8080 -v censio-config:/config netw
 ```
 
 Unter Linux umgeht ein veröffentlichter Port Host-Firewalls wie ufw und firewalld; den Zugriff deshalb über die Abbildung beschränken, nicht über die Firewall. TLS ist Aufgabe eines Reverse Proxys vor dem Server; siehe [SECURITY.md](../SECURITY.md).
+
+#### Ingest-Endpunkt und Token
+
+Der Server des Stands von `main` und späterer Releases (nicht das Image `0.2.0`) nimmt die Daten eines Companions auf dem WebSocket-Endpunkt `ws://<Host>:8080/ingest` entgegen; `<Host>` ist der Rechner, auf dem Docker läuft, und `8080` der veröffentlichte Port; TLS gibt es dort nicht (*Netzwerk und TLS*). Noch kein Companion sendet Daten, und der Server speichert und zeigt nichts von dem, was er empfängt. Ausprobiert mit dem Server, der außerhalb von Docker unter Linux gestartet wurde: das Anlegen der Token-Datei mit Modus `0600`, ihr Lesen beim nächsten Start und die Ablehnungen unten. Noch nicht ausprobiert: die Befehle dieses Abschnitts in einem Container und auf NAS-Hardware sowie das Lesen der Datei über eine NAS-Freigabe.
+
+- **Das Token.** Es wird standardmäßig verlangt. Beim ersten Start erzeugt der Server ein Token aus 43 Zeichen und speichert es in `/config/ingest-token`; das Log zeigt `An ingest token was generated and stored in '/config/ingest-token'.` Bei jedem späteren Start liest er dieselbe Datei (`The ingest token is read from '/config/ingest-token'.`). Das Log enthält das Token nie.
+- **Lesen.** Die Datei hat den Modus `0600` und gehört dem Container-Benutzer (`1654` oder dem `--user` des NAS-Abschnitts oben); eine NAS-Freigabe oder ein Dateibrowser, die als ein anderer Benutzer laufen, können sie deshalb nicht lesen. Im Container lesen oder als root auf dem Host in dem Ordner, den Sie als `/config` eingebunden haben:
+
+```text
+docker exec censio cat /config/ingest-token
+```
+
+  Die Datei hat am Ende keinen Zeilenumbruch. Das Token im Companion eintragen und privat halten: nie in einem Issue posten (*Probleme melden*). Läuft der Server unter Windows ohne Docker, übernimmt die Datei die Zugriffsregeln ihres Ordners statt des Modus `0600`.
+- **Erneuern.** Die Datei löschen und den Server neu starten; er erzeugt ein neues Token, und ein Companion, der noch das alte vorlegt, wird abgelehnt (`Companion refused: token refused.`). Der Server liest die Datei nur beim Start, deshalb kann sie gelöscht werden, während der Container läuft oder nachdem er gestoppt wurde (stoppen, löschen, starten): im laufenden Container, und ihn danach neu starten, oder als root auf dem Host im eingebundenen Ordner. Danach das neue Token lesen und im Companion eintragen. Noch nicht ausprobiert:
+
+```text
+docker exec censio rm /config/ingest-token
+```
+
+```text
+docker restart censio
+```
+
+- **Abschalten.** Die Einstellung `Censio:Ingest:RequireToken` (`CENSIO__INGEST__REQUIRETOKEN`) ist standardmäßig `true`. Ein Start mit `-e CENSIO__INGEST__REQUIRETOKEN=false` schaltet das Token ab: Der Server liest und erzeugt die Datei dann nicht, schreibt die Warnung `The ingest token is switched off: anyone who reaches the server can send data.` ins Log und nimmt jeden Companion an. Jeder, der den Server erreicht, kann ihm dann Daten senden, und wer sich als Erster verbindet, belegt den Platz des Companions. Nur in einem Netz verwenden, in dem jedem Host vertraut wird. Jeder andere Wert als `true` oder `false` stoppt den Start.
+- **Ein Companion.** Der Server nimmt einen Companion zur Zeit an; ein zweiter wird abgelehnt (`Companion refused: another Companion is connected.`), bis der erste seine Verbindung geschlossen hat oder der Server ihn als stumm erkannt hat: Er sendet alle 15 Sekunden einen Ping und schließt eine Verbindung, die innerhalb von 35 Sekunden nicht geantwortet hat, innerhalb von 60 Sekunden nach ihrem letzten Frame (gemessener schlechtester Fall 56,2 Sekunden).
+- **Einschränkungen.** Ein Host, der den Port erreicht, kann ständig neue Verbindungen öffnen, die nie ein Hello senden, 16 gleichzeitig, und so den echten Companion aussperren, solange er das tut; wer den Port erreicht, mit der `-p`-Abbildung oder einem Reverse Proxy beschränken. Jedes abgelehnte Hello schreibt eine Logzeile, und ohne Ratenbegrenzung kann ein Client, der in einer Schleife neu verbindet, das Log wachsen lassen; Dockers Standard-Logtreiber rotiert es nicht. Eine Nachricht des Companions darf höchstens 24 MiB groß sein.
+
+Der Server stoppt beim Start mit Exit-Code 1 und einer `Critical`-Zeile in `docker logs censio`, wenn das Token verlangt wird und:
+
+- die Datei nicht gelesen werden kann: `The ingest token file '/config/ingest-token' cannot be read; the server stops.` Sie für den Container-Benutzer lesbar machen oder für ein neues Token löschen.
+- die Datei kein gültiges Token enthält (leer, länger als 1.024 Zeichen oder ein Zeichen außerhalb der sichtbaren ASCII-Zeichen, zum Beispiel ein Leerzeichen mittendrin): `The ingest token file '/config/ingest-token' holds no valid token (1 to 1,024 visible ASCII characters); the server stops.` Sie für ein neues Token löschen.
+- die Datei nicht angelegt werden kann: `The ingest token file '/config/ingest-token' cannot be created; the server stops. Make the data directory writable for the user the server runs as.`
+
+Ein Wert von `CENSIO__INGEST__REQUIRETOKEN` außer `true` oder `false` (in beliebiger Schreibweise, auch die leere Zeichenkette) stoppt ihn mit `The setting Censio:Ingest:RequireToken must be true or false; the server stops.` Ohne Datenverzeichnis (ein außerhalb des Images ohne `Censio:DataDirectory` gestarteter Server) kann das Token nicht gespeichert werden: Der Server startet, schreibt `No ingest token without a data directory (Censio:DataDirectory); every Companion is refused.` ins Log und lehnt jeden Companion ab. Die Regeln im Einzelnen stehen in [`docs/areas/ingest.md`](areas/ingest.md) (auf Englisch).
 
 #### Einschränkungen
 
@@ -634,13 +702,13 @@ Vom Product Manager unter Windows 11 (26H2) mit deutschem Ubisoft Connect und ei
 
 ## Erster Start
 
-Server: `http://localhost:8080/` öffnen; die Startseite zeigt die Überschrift `Censio` und die Zeile `Version <version>`. `curl http://localhost:8080/health` antwortet mit `Healthy`, und nach wenigen Sekunden zeigt `docker ps` den Container als `(healthy)`. Beim ersten Start wird der erste Data-Protection-Schlüssel angelegt, und ASP.NET Core meldet einmal die Warnung `No XML encryptor configured` (siehe *Einschränkungen*).
+Server: `http://localhost:8080/` öffnen; die Startseite zeigt die Überschrift `Censio` und die Zeile `Version <version>`. `curl http://localhost:8080/health` antwortet mit `Healthy`, und nach wenigen Sekunden zeigt `docker ps` den Container als `(healthy)`. Beim ersten Start wird der erste Data-Protection-Schlüssel angelegt, und ASP.NET Core meldet einmal die Warnung `No XML encryptor configured` (siehe *Einschränkungen*). Der Server des Stands von `main` legt außerdem das Ingest-Token an und schreibt `An ingest token was generated and stored in '/config/ingest-token'.` ins Log (siehe *Ingest-Endpunkt und Token*).
 
 Companion: Das Programm öffnet kein Fenster, bis Sie `Open diagnostics` wählen, und zeigt nur solange dieses Fenster offen ist eine Schaltfläche in der Taskleiste. Im Infobereich erscheint ein Symbol mit dem Tooltip `Censio Companion: <Zustand>` (die Zustände stehen oben unter *Verbindung zum Spiel*); sein Menü enthält den ausgegrauten Status, letzten Tick, die Spielinstallation (`Game: …`, siehe *Spielinstallation* oben) und den Spielkatalog (`Catalog: …`, siehe *Spielkatalog* oben), `Open diagnostics`, `Start recording` (oder `Stop recording`), `Open recordings folder`, `Open log folder`, `Start with Windows` (mit Häkchen, solange es eingeschaltet ist), `Version <version>` (ausgegraut) und `Exit`, das das Symbol entfernt und das Programm innerhalb von 2 Sekunden beendet. Das Symbol ist je nach Zustand ein grauer Ring, ein grüner Kreis oder ein rotes Dreieck. Ein zweiter Start in derselben Windows-Sitzung tut nichts: Er endet sofort ohne Meldung und schreibt keine Logzeile, und der erste läuft weiter. Windows SmartScreen fragt beim ersten Start einmal nach (siehe *Companion* oben).
 
 ## Daten und Logs
 
-Server: Das Datenverzeichnis ist im Docker-Image `/config`. Es enthält den Data-Protection-Schlüsselring in `/config/data-protection-keys`; die Schlüssel sind unverschlüsselt, deshalb das Verzeichnis und seine Sicherungen privat halten. Der Server schreibt sein Log auf die Konsole; Lesen mit `docker logs censio`. Die Logzeiten sind UTC. Die Einstellungen stehen in der [README](../README.md#konfiguration).
+Server: Das Datenverzeichnis ist im Docker-Image `/config`. Es enthält den Data-Protection-Schlüsselring in `/config/data-protection-keys` und das Ingest-Token in `/config/ingest-token`; die Schlüssel und das Token sind unverschlüsselt, deshalb das Verzeichnis und seine Sicherungen privat halten. Der Server schreibt kein Token ins Log. Der Server schreibt sein Log auf die Konsole; Lesen mit `docker logs censio`. Die Logzeiten sind UTC. Die Einstellungen stehen in der [README](../README.md#konfiguration).
 
 Companion: Er speichert Spieldaten nur im Katalog-Cache `%LOCALAPPDATA%\Censio\Cache\catalog.bin` (die Namen und Symbole Ihres Spiels, nach einer vollständigen Extraktion gespeichert, nie gesendet und beim Entfernen des Companions behalten, also den Ordner von Hand löschen; er enthält temporäre Dateien nur für den Augenblick eines Speicherns, und der Companion löscht Reste, die älter als ein Tag sind), und das Diagnosefenster speichert nichts (es zeigt den letzten Tick nur auf dem Bildschirm und schreibt nichts auf die Platte oder ins Log). Aufzeichnungsdateien schreibt er nach `%LOCALAPPDATA%\Censio\Recordings` nur, solange eine Aufzeichnung läuft (`--record` oder `Start recording`); sie enthalten die Daten des eigenen Spiels, wie sie gesendet wurden, bleiben auf dem Rechner und werden vom Programm nie gelöscht, also von Hand löschen (*Aufzeichnen und Abspielen*). Außerdem schreibt er ein Log nach `%LOCALAPPDATA%\Censio\Logs`: eine Datei pro Tag, `companion-<yyyyMMdd>.log` (wird eine Datei über 10 MiB groß, wird das Log in `companion-<yyyyMMdd>-2.log` und weiteren Dateien fortgesetzt). Der Companion behält die 10 neuesten dieser Dateien und löscht ältere; andere Dateien im Ordner löscht er nicht. Die Menüeinträge `Open recordings folder` und `Open log folder` öffnen beide Ordner im Explorer. Nur wenn Sie `Start with Windows` einschalten, schreibt er einen Wert `Censio Companion` unter `HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run` (nur Ihr Konto), und er löscht diesen Wert beim Ausschalten; das Log enthält dann `Autostart enabled` oder `Autostart disabled` und eine Warnung, wenn die Einstellung nicht gelesen oder geändert werden konnte (ohne Dateipfad). Eine Zeile enthält die lokale Zeit, die Stufe und die Meldung: den Start, jede Änderung des Verbindungszustands, Aufzeichnung gestartet und beendet, die Namen der Aufzeichnungsdateien, Beginn und Ende eines Abspielens, das Ergebnis der Suche nach der Spielinstallation (die Quelle, der Build und der Spieleordner oder der Grund des Scheiterns; siehe *Spielinstallation*), das Ergebnis des Katalogs (Anzahl der Einträge oder die Fehlerart), ob der Cache benutzt, geladen oder geschrieben wurde, die Dauer einer Extraktion oder eines Cache-Ladens, die Anzahlen seiner Symbole und die GUIDs, die er nicht benennen kann (siehe *Spielkatalog*), und Probleme. Das Log enthält keine Spieldaten, keine Spielnamen und keine Symbole, aber der Spieleordner bei jedem Start und ein Fehlertext können einen Dateipfad und damit den Windows-Benutzernamen enthalten; prüfen Sie ein Log, bevor Sie es weitergeben. Der Companion liest außerdem die optionale Einstellungsdatei `%LOCALAPPDATA%\Censio\settings.json` und die Installationseinträge von Ubisoft Connect in der Registry, schreibt sie aber nie.
 

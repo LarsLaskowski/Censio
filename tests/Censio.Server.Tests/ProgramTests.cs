@@ -1,3 +1,5 @@
+using System.Net;
+using System.Net.Sockets;
 using System.Text.RegularExpressions;
 
 using Censio.Contracts;
@@ -271,6 +273,37 @@ public sealed class ProgramTests
 
         Assert.AreEqual("payload", restored, "The second instance should unprotect the payload of the first one");
         Assert.HasCount(1, keyFiles, "The second start should create no further key file");
+    }
+
+    /// <summary>
+    /// A token file that holds no valid token stops the start with exit code 1 before the server listens: the listen
+    /// address is taken by another socket, so a start that went on to listen would fail with an exception instead.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC8")]
+    public async Task ProgramStartWithInvalidTokenFileExitsWithCodeOne()
+    {
+        // Arrange
+        var dataDirectory = CreateTemporaryDirectory();
+        var tokenFile = Path.Combine(dataDirectory, IngestTokenSetup.TokenFileName);
+
+        await File.WriteAllTextAsync(tokenFile, "not a valid token", TestContext.CancellationToken);
+
+        using var blocker = new TcpListener(IPAddress.Loopback, 0);
+
+        blocker.Start();
+
+        var port = ((IPEndPoint)blocker.LocalEndpoint).Port;
+        var entryPoint = typeof(Program).Assembly.EntryPoint!;
+        string[] arguments = [$"--{DataProtectionSetup.DataDirectoryKey}={dataDirectory}", $"--urls=http://127.0.0.1:{port}", $"--applicationName={typeof(Program).Assembly.GetName().Name}"];
+
+        // Act
+        var exitCode = await Task.Run(() => entryPoint.Invoke(null, [arguments]), TestContext.CancellationToken).WaitAsync(TimeSpan.FromSeconds(30), TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(1, exitCode, "The start should end with exit code 1");
+        Assert.AreEqual("not a valid token", await File.ReadAllTextAsync(tokenFile, TestContext.CancellationToken), "The token file should stay as it was");
     }
 
     /// <summary>

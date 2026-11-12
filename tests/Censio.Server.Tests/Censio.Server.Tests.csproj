@@ -1,6 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\Censio.Pipe.Tests\RecordingTimeProvider.cs" Link="RecordingTimeProvider.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Censio.Server\Censio.Server.csproj" />

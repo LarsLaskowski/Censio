@@ -18,8 +18,8 @@ protected, the concrete types, files or endpoints, and a link to the area docume
 (`- Session tokens: issued in src/Auth/, checked by every /api route — [Sessions](../docs/areas/sessions.md)`); no
 limits, patterns or sequences.
 
-- Ingest token and Companion authentication: the WebSocket ingest of `src/Censio.Server` (not built yet, #28) — [record 0019](../docs/decisions/0019-websocket-transport-with-shared-token.md); its area document comes with #28.
-- Network exposure: the server's listener and its routes reachable without login (`/`, `/health`, the Blazor hub, static assets) in `src/Censio.Server/Program.cs` and `src/Censio.Server/Dockerfile` — [server](../docs/areas/server.md).
+- Ingest token and Companion authentication: the WebSocket endpoint `/ingest` and its token (`IngestEndpoint`, `IngestSession`, `IngestConnections`, `IngestTokenSetup`, `IngestAccess` in `src/Censio.Server`, the file `ingest-token` in the data directory) — [ingest](../docs/areas/ingest.md), [record 0019](../docs/decisions/0019-websocket-transport-with-shared-token.md).
+- Network exposure: the server's listener and its routes reachable without login (`/`, `/health`, `/ingest`, the Blazor hub, static assets) in `src/Censio.Server/Program.cs` and `src/Censio.Server/Dockerfile` — [server](../docs/areas/server.md).
 - Data-protection key ring: `DataProtectionSetup` under the data directory — [server](../docs/areas/server.md), *Data directory and key ring*.
 - Local pipe connection: `NamedPipeConnector` and `PipeEndpoint` open the game's pipe read-only at identification level — [pipe-connection](../docs/areas/pipe-connection.md), *Opening*.
 - Parsing of external input: all of `src/Censio.Pipe` and `src/Censio.GameData` (pipe stream, recordings and their anonymiser, game archives and what is read from them, the catalog cache file), the catalog document (`CatalogDocumentReader` in `src/Censio.Contracts`), the settings file (`CompanionSettings`), Ubisoft Connect's install records (`RegistryUbisoftInstallRecords`, `GameInstallationSearch`), the contract messages (`ContractReader` in `src/Censio.Contracts`, read by the server and the Companion; see [`docs/areas/contract.md`](../docs/areas/contract.md)) — [pipe](../docs/areas/pipe.md), [pipe-recording](../docs/areas/pipe-recording.md), [game-files](../docs/areas/game-files.md), [game-catalog](../docs/areas/game-catalog.md), [game-catalog-icons](../docs/areas/game-catalog-icons.md), [game-catalog-cache](../docs/areas/game-catalog-cache.md), [game-catalog-format](../docs/areas/game-catalog-format.md), [game-installation](../docs/areas/game-installation.md), [companion](../docs/areas/companion.md) (*Settings file*).
@@ -35,7 +35,7 @@ Deliberate behavior that must not change without the Product Manager. One line e
 a link to its decision record where it was a real choice, and a link to the area document that states it.
 
 - Plain HTTP with TLS at a reverse proxy; the start page and `/health` need no login, `/health` reveals only its status — [record 0006](../docs/decisions/0006-server-plain-http-and-open-health.md), [server](../docs/areas/server.md).
-- The server stores data from a Companion only with the shared ingest token, which only an explicit setting switches off — [record 0019](../docs/decisions/0019-websocket-transport-with-shared-token.md); its area document comes with #28.
+- The server stores data from a Companion only with the shared ingest token, which only the setting `Censio:Ingest:RequireToken` `false` switches off — [record 0019](../docs/decisions/0019-websocket-transport-with-shared-token.md), [ingest](../docs/areas/ingest.md).
 - History in SQLite in the data directory: full resolution for 7 days, then hourly averages kept without limit, deletable per profile — [record 0021](../docs/decisions/0021-sqlite-history-with-retention.md); its area document comes with #29 and #35.
 - Unsent ticks wait in a bounded local buffer and are delivered in order; beyond the bound the oldest are dropped and shown as a gap, never as zeros — [record 0031](../docs/decisions/0031-bounded-local-tick-buffer-gaps-accepted.md); its area document comes with #41.
 
@@ -45,7 +45,7 @@ What the Reviewer checks when the diff introduces or changes a thing of this kin
 change with it.
 
 **A new or changed configuration option** touches:
-- the key and its validation: `Censio:DataDirectory` in `DataProtectionSetup`; the Companion's switches in `CompanionCommandLine`; the option `gameFolder` in `CompanionSettings`
+- the key and its validation: `Censio:DataDirectory` in `DataProtectionSetup`; `Censio:Ingest:RequireToken` in `IngestTokenSetup`; the Companion's switches in `CompanionCommandLine`; the option `gameFolder` in `CompanionSettings`
 - registration and binding: `src/Censio.Server/Program.cs`, `src/Censio.Companion/App.xaml.cs`
 - the defaults: `src/Censio.Server/appsettings.json` and the `ENV` lines of `src/Censio.Server/Dockerfile`
 - the configuration table in `README.md` (key, environment variable, default; English, then German) and the user guide
@@ -94,7 +94,9 @@ otherwise), one line each: the double, where it lives and what it stands in for;
 - `FailingTextWriter` (`tests/Censio.Anonymiser.Tests/FailingTextWriter.cs`) — a `TextWriter` whose writes throw `IOException` and are counted, for a standard output that cannot be written.
 - `FakeTimeProvider` (`Microsoft.Extensions.TimeProvider.Testing`) — the clock of every timing test; a test library, not a mocking library.
 - `BackwardsFakeTimeProvider` (`tests/Censio.Pipe.Tests/BackwardsFakeTimeProvider.cs`) — models a system clock set back (checked by a scratch run).
-- `RecordingTimeProvider` (`tests/Censio.Pipe.Tests/RecordingTimeProvider.cs`) — a `FakeTimeProvider` that records and awaits its timers, for replay and retry waits.
+- `RecordingTimeProvider` (`tests/Censio.Pipe.Tests/RecordingTimeProvider.cs`, linked into the Companion and Server tests) — a `FakeTimeProvider` that records and awaits its timers, for replay and retry waits and the ingest session's hello deadline and close wait.
+- `InMemoryDuplexStream` (`tests/Censio.Server.Tests/InMemoryDuplexStream.cs`) — one end of an in-memory connection of two pipes with back pressure, counting bytes read, for real `WebSocket` pairs in the ingest session tests.
+- `FailingWebSocketFeature` (`tests/Censio.Server.Tests/FailingWebSocketFeature.cs`) — an `IHttpWebSocketFeature` that marks every request as an upgrade and fails every accept, for the ingest endpoint's accept failure.
 - `FakeDiagnosticsWindow` (`tests/Censio.Companion.Core.Tests/FakeDiagnosticsWindow.cs`) — an `IDiagnosticsWindow` that records what it shows, for the diagnostics session.
 - `FakeStartupEntryStore` (`tests/Censio.Companion.Core.Tests/FakeStartupEntryStore.cs`) — models the store contract of `RegistryStartupEntryStore` (checked against the .NET 11 `RegistryKey` source), for the autostart.
 - `FakeUbisoftInstallRecords` (`tests/Censio.Companion.Core.Tests/FakeUbisoftInstallRecords.cs`) — an `IUbisoftInstallRecords` of fixed records or a thrown exception, counting its reads.

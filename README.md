@@ -21,6 +21,8 @@ What `v0.2.0` cannot do:
 - The web application shows no game data and there is no history.
 - The Companion has no settings, such as a server address or a token.
 
+Not yet released (the state of `main`): the server takes a Companion's data on the WebSocket endpoint `ws://<host>:8080/ingest`, only from a Companion that presents the ingest token the server generated into `/config/ingest-token` (the setting `Censio:Ingest:RequireToken` switches the token off, at the risk that anyone who reaches the server can send data). It keeps and shows nothing it receives yet, and no Companion sends anything yet.
+
 ## Getting Censio
 
 - Releases: once a release exists, it is listed on `https://github.com/LarsLaskowski/Censio/releases` with the Companion ZIP under *Assets*; the Docker image of the same version is published on Docker Hub as `networlddev/censio:<version>`.
@@ -73,7 +75,13 @@ If port 8080 is taken on the host, Docker reports "port is already allocated"; m
 docker run -d --name censio -p 127.0.0.1:8080:8080 -v censio-config:/config networlddev/censio:0.2.0
 ```
 
-The [user guide](docs/USER_GUIDE.md) describes the data directory, NAS hosts, TLS and the limits.
+The server of the state of `main` and of later releases (not the image `0.2.0`) takes a Companion's data on the WebSocket endpoint `ws://<host>:8080/ingest` and accepts it only with an ingest token. The server generates the token at its first start and stores it in the file `/config/ingest-token` (mode `0600`, owned by the container user); it never writes it to the log. Read it with the command below, enter it in the Companion, and rotate it by stopping the server, deleting the file and starting the server again. Not yet tried: these commands in a container and on NAS hardware.
+
+```text
+docker exec censio cat /config/ingest-token
+```
+
+The [user guide](docs/USER_GUIDE.md) describes the data directory, the token, NAS hosts, TLS and the limits.
 
 ### Build the server from source
 
@@ -138,8 +146,9 @@ The folder `publish` then holds only `Censio.Companion.exe`. Start it on Windows
 
 | Setting | Environment variable | Default | Meaning |
 | ------- | -------------------- | ------- | ------- |
-| `Censio:DataDirectory` | `CENSIO__DATADIRECTORY` | unset outside the Docker image, `/config` in the image | Absolute path of the server's data directory; it holds the data-protection keys in `data-protection-keys`. |
+| `Censio:DataDirectory` | `CENSIO__DATADIRECTORY` | unset outside the Docker image, `/config` in the image | Absolute path of the server's data directory; it holds the data-protection keys in `data-protection-keys` and the ingest token in the file `ingest-token`. |
 | `ASPNETCORE_HTTP_PORTS` | `ASPNETCORE_HTTP_PORTS` | `8080` in the Docker image; outside it the server listens on `http://localhost:5000` | Port the server listens on inside the Docker image. |
+| `Censio:Ingest:RequireToken` | `CENSIO__INGEST__REQUIRETOKEN` | `true` | Whether the endpoint `/ingest` requires the ingest token (`true`, the default) or accepts any Companion (`false`, any case). With `false` the server logs a warning and anyone who reaches it can send data: use it only on a network where every host is trusted. Any other value, the empty string included, stops the start. |
 
 The Companion has one optional setting, in the file `%LOCALAPPDATA%\Censio\settings.json`. It is read once at start and never written by the Companion; create it by hand only if the menu does not show your game (`Game: not found`), for example for a Steam copy:
 
@@ -185,6 +194,8 @@ Das kann `v0.2.0` nicht:
 - Der Companion sendet nichts an den Server.
 - Die Webanwendung zeigt keine Spieldaten, und es gibt keinen Verlauf.
 - Der Companion hat keine Einstellungen, etwa eine Serveradresse oder ein Token.
+
+Noch nicht veröffentlicht (der Stand von `main`): Der Server nimmt die Daten eines Companions auf dem WebSocket-Endpunkt `ws://<Host>:8080/ingest` entgegen, und zwar nur von einem Companion, der das Ingest-Token vorlegt, das der Server in `/config/ingest-token` erzeugt hat (die Einstellung `Censio:Ingest:RequireToken` schaltet das Token ab, mit dem Risiko, dass jeder, der den Server erreicht, Daten senden kann). Er speichert und zeigt noch nichts von dem, was er empfängt, und noch kein Companion sendet etwas.
 
 ## Censio beziehen
 
@@ -238,7 +249,13 @@ Ist Port 8080 auf dem Host belegt, meldet Docker „port is already allocated“
 docker run -d --name censio -p 127.0.0.1:8080:8080 -v censio-config:/config networlddev/censio:0.2.0
 ```
 
-Das [Benutzerhandbuch](docs/USER_GUIDE.md#censio-benutzerhandbuch) beschreibt das Datenverzeichnis, NAS-Hosts, TLS und die Einschränkungen.
+Der Server des Stands von `main` und späterer Releases (nicht das Image `0.2.0`) nimmt die Daten eines Companions auf dem WebSocket-Endpunkt `ws://<Host>:8080/ingest` entgegen und akzeptiert sie nur mit einem Ingest-Token. Der Server erzeugt das Token beim ersten Start und speichert es in der Datei `/config/ingest-token` (Modus `0600`, Eigentümer ist der Container-Benutzer); ins Log schreibt er es nie. Es wird mit dem Befehl unten gelesen und im Companion eingetragen, und es wird erneuert, indem der Server gestoppt, die Datei gelöscht und der Server neu gestartet wird. Noch nicht ausprobiert: diese Befehle in einem Container und auf NAS-Hardware.
+
+```text
+docker exec censio cat /config/ingest-token
+```
+
+Das [Benutzerhandbuch](docs/USER_GUIDE.md#censio-benutzerhandbuch) beschreibt das Datenverzeichnis, das Token, NAS-Hosts, TLS und die Einschränkungen.
 
 ### Server aus dem Quellcode bauen
 
@@ -303,8 +320,9 @@ Der Ordner `publish` enthält danach nur `Censio.Companion.exe`. Unter Windows s
 
 | Einstellung | Umgebungsvariable | Standard | Bedeutung |
 | ----------- | ----------------- | -------- | --------- |
-| `Censio:DataDirectory` | `CENSIO__DATADIRECTORY` | außerhalb des Docker-Images nicht gesetzt, im Image `/config` | Absoluter Pfad des Datenverzeichnisses des Servers; es enthält die Data-Protection-Schlüssel in `data-protection-keys`. |
+| `Censio:DataDirectory` | `CENSIO__DATADIRECTORY` | außerhalb des Docker-Images nicht gesetzt, im Image `/config` | Absoluter Pfad des Datenverzeichnisses des Servers; es enthält die Data-Protection-Schlüssel in `data-protection-keys` und das Ingest-Token in der Datei `ingest-token`. |
 | `ASPNETCORE_HTTP_PORTS` | `ASPNETCORE_HTTP_PORTS` | `8080` im Docker-Image; außerhalb lauscht der Server auf `http://localhost:5000` | Port, auf dem der Server im Docker-Image lauscht. |
+| `Censio:Ingest:RequireToken` | `CENSIO__INGEST__REQUIRETOKEN` | `true` | Ob der Endpunkt `/ingest` das Ingest-Token verlangt (`true`, der Standard) oder jeden Companion annimmt (`false`, in beliebiger Schreibweise). Mit `false` schreibt der Server eine Warnung ins Log, und jeder, der ihn erreicht, kann Daten senden: nur in einem Netz verwenden, in dem jedem Host vertraut wird. Jeder andere Wert, auch die leere Zeichenkette, stoppt den Start. |
 
 Der Companion hat eine optionale Einstellung, in der Datei `%LOCALAPPDATA%\Censio\settings.json`. Sie wird einmal beim Start gelesen und vom Companion nie geschrieben; von Hand nur anlegen, wenn das Menü Ihr Spiel nicht zeigt (`Game: not found`), zum Beispiel bei einer Steam-Kopie:
 
