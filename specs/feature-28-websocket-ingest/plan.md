@@ -45,8 +45,8 @@ Feature: see [spec.md](spec.md).
 | AC7 | `IngestTokenSetupTryCreateAccessRequireTokenFalseReturnsOpenAccess` (DataRows `false`, `FALSE`), `IngestTokenSetupTryCreateAccessRequireTokenFalseTouchesNoFile`, `IngestTokenSetupTryCreateAccessRequireTokenTrueOrUnsetRequiresToken`, `IngestTokenSetupTryCreateAccessInvalidRequireTokenStops` (DataRows `""`, `no`, `0`, ` true`), `IngestAccessIsTokenAcceptedOpenAcceptsAnyToken` | `IngestTokenSetupTests.cs`, `IngestAccessTests.cs` |
 | AC8 | `IngestTokenSetupTryCreateAccessInvalidFileStops` (DataRows: empty, white space only, 1,025 characters, a space inside, a byte above `~`), `IngestTokenSetupTryCreateAccessUnwritableDirectoryStops` (asserts neither `ingest-token` nor its temporary file is left), `IngestTokenSetupTryCreateAccessWithoutDataDirectoryRefusesAll`, `ProgramStartWithInvalidTokenFileExitsWithCodeOne` | `IngestTokenSetupTests.cs`, `ProgramTests.cs` |
 | AC9 | `IngestSessionRunAsyncAcceptedMessagesAcknowledgedInOrder`, `IngestSessionRunAsyncCatalogUploadListsSortedDistinctIcons`, `IngestSessionRunAsyncStatusGetsNoReply`, `IngestSessionRunAsyncOnCloseLogsCounts` | `IngestSessionTests.cs` |
-| AC10 | `IngestSessionRunAsyncInvalidMessageWithIdAcknowledgesRefusal`, `IngestSessionRunAsyncCatalogRefusalAcknowledgesCatalogKind` (DataRows: the four catalog kinds), `IngestSessionRunAsyncUnreadableMessageClosesConnection` (DataRows: malformed, version 2, invalid `id`, `helloAccepted`, `acknowledgement` with a valid `id`, second hello), `IngestSessionRunAsyncBinaryFrameCloses1003`, `IngestSessionRunAsyncOnStoppingCloses1001`, `IngestSessionRunAsyncPeerNeverAnswersCloseEndsAfterCloseWait` (DataRows: after `tokenRefused`, after a 1008 in the message phase; the peer keeps sending frames; ends when the fake clock passes 2 s), `IngestEndpointAfterRefusedMessageHealthStillAnswers`, `ContractReaderReadInvalidMessageReturnsRefusedId`, `ContractReaderReadMalformedMessageReturnsNoRefusedId`, `ContractReaderReadCatalogUploadReturnsCatalogDocument`, `CatalogDocumentReaderReadUnsupportedVersionReturnsVersion` | `IngestSessionTests.cs`, `IngestEndpointTests.cs`, `tests/Censio.Contracts.Tests/ContractReaderTests.cs`, `CatalogDocumentReaderTests.cs` |
-| AC11 | `IngestSessionRunAsyncOversizedHelloCloses1009`, `IngestSessionRunAsyncOversizedMessageReadsNoFurther`, `IngestSessionRunAsyncHelloAfterTenSecondsCloses1008`, `IngestSessionRunAsyncTrickledHelloPastDeadlineCloses1008`, `IngestEndpointSeventeenthPendingConnectionReturns503`, `IngestEndpointPlainRequestReturns400` (DataRows `GET`, `POST`), `IngestEndpointAcceptFailureLeavesPendingPlace`, `IngestEndpointUpgradeWithOriginReturns403`, `IngestConnectionsTryEnterPendingHelloSeventeenthReturnsFalse` | `IngestSessionTests.cs`, `IngestEndpointTests.cs`, `IngestConnectionsTests.cs` |
+| AC10 | `IngestSessionRunAsyncInvalidMessageWithIdAcknowledgesRefusal`, `IngestSessionRunAsyncCatalogRefusalAcknowledgesCatalogKind` (DataRows: the four catalog kinds), `IngestSessionRunAsyncUnreadableMessageClosesConnection` (DataRows: malformed, version 2, invalid `id`, `helloAccepted`, `acknowledgement` with a valid `id`, second hello), `IngestSessionRunAsyncBinaryFrameCloses1003`, `IngestSessionRunAsyncMessageOverReaderBoundCloses1009` (a tick whose island name has 766 bytes), `IngestSessionRunAsyncOnStoppingCloses1001`, `IngestSessionRunAsyncPeerNeverAnswersCloseEndsAfterCloseWait` (DataRows: after `tokenRefused`, after a 1008 in the message phase; the peer keeps sending frames; ends when the fake clock passes 2 s), `IngestEndpointAfterRefusedMessageHealthStillAnswers`, `ContractReaderReadInvalidMessageReturnsRefusedId`, `ContractReaderReadMalformedMessageReturnsNoRefusedId`, `ContractReaderReadCatalogUploadReturnsCatalogDocument`, `CatalogDocumentReaderReadUnsupportedVersionReturnsVersion` | `IngestSessionTests.cs`, `IngestEndpointTests.cs`, `tests/Censio.Contracts.Tests/ContractReaderTests.cs`, `CatalogDocumentReaderTests.cs` |
+| AC11 | `IngestSessionRunAsyncOversizedHelloCloses1009`, `IngestSessionRunAsyncOversizedMessageReadsNoFurther`, `IngestSessionRunAsyncHelloAfterTenSecondsCloses1008`, `IngestSessionRunAsyncTrickledHelloPastDeadlineCloses1008`, `IngestSessionRunAsyncHelloCompletedAfterDeadlineIsNotAnswered` (the rest of the hello arrives after the 1008, the peer then answers the close: no reply, pending place free), `IngestEndpointSeventeenthPendingConnectionReturns503`, `IngestEndpointPlainRequestReturns400` (DataRows `GET`, `POST`), `IngestEndpointAcceptFailureLeavesPendingPlace`, `IngestEndpointUpgradeWithOriginReturns403`, `IngestConnectionsTryEnterPendingHelloSeventeenthReturnsFalse` | `IngestSessionTests.cs`, `IngestEndpointTests.cs`, `IngestConnectionsTests.cs` |
 | AC12 | manual: Reviewer, step 8, against the documentation updates below (English and German sections, the configuration table row) | — |
 
 ## Approach
@@ -212,9 +212,10 @@ Existing test code that calls a changed signature: none (the changed constructor
 `Program` with a data directory, which now also creates `ingest-token` there — its key-ring assertions are unaffected;
 Tester checks in step 5 and adapts if not).
 
-Files no unit test can cover: none as a whole (the `Program.cs` lines run under `CensioServerFactory`). Two branches of
-`src/Censio.Server/IngestTokenSetup.cs` stay uncovered, accepted by the Lead in step 6 without a coverage exclusion
-(the *Coverage gate* passes with them):
+Files no unit test can cover: none as a whole (the `Program.cs` lines run under `CensioServerFactory`). The branches
+below stay uncovered, accepted by the Lead in step 6 without a coverage exclusion (the *Coverage gate* passes with them).
+
+In `src/Censio.Server/IngestTokenSetup.cs`:
 
 - The `UnauthorizedAccessException` handler of the token-file read. The tests run as root on Linux, where a
   permission-denied file is still readable. A directory named `ingest-token` would throw this exception, but
@@ -223,6 +224,18 @@ Files no unit test can cover: none as a whole (the `Program.cs` lines run under 
   covered: it logs the same `Critical` line and returns `null`.
 - The Windows arm of `OperatingSystem.IsWindows()` in `WriteTemporaryFile`. It is an empty block, kept so CA1416 does
   not flag `UnixCreateMode`, and no Windows test run exists (the Companion's Windows shell has no test project either).
+
+In `src/Censio.Server/IngestSession.cs` (G3):
+
+- The abort when `ContractWriter` refuses a reply. Every reply is built from values the reader or the server has
+  already checked (a read `id`, sorted 64-hex references within 16,384, the build version, `[1]`), so the writer never
+  refuses one. The writer returns a result rather than throwing, so the branch stays as a fail-closed guard.
+- The suppressed send in `SendAsync` when a close was decided between the session's check of `_closing` and the send
+  lock. This is a race between the stopping token or the deadline and the session's own loop, and no test can order it
+  without a seam inside the lock.
+- The early return of `OnHelloTimeout` when the hello was already decided. The session disposes the timer when it
+  decides, so on the fake clock the callback never runs afterwards. Only a real timer that has already started its
+  callback reaches the branch.
 
 ## Areas
 
