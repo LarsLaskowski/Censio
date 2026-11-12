@@ -16,6 +16,11 @@ if (DataProtectionSetup.TryCreateKeyRing(app.Services, app.Configuration, app.Lo
     return 1;
 }
 
+if (IngestTokenSetup.TryCreateAccess(app.Configuration, app.Logger) is null)
+{
+    return 1;
+}
+
 app.UseAntiforgery();
 app.MapStaticAssets();
 app.MapHealthChecks("/health");

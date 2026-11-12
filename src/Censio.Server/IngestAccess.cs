@@ -1,3 +1,6 @@
+using System.Security.Cryptography;
+using System.Text;
+
 namespace Censio.Server;
 
 /// <summary>
@@ -5,6 +8,30 @@ namespace Censio.Server;
 /// </summary>
 public sealed class IngestAccess
 {
+    #region Fields
+
+    /// <summary>
+    /// The SHA-256 hash of the accepted token, or <c>null</c> when no token is accepted.
+    /// </summary>
+    private readonly byte[]? _tokenHash;
+
+    #endregion // Fields
+
+    #region Constructors
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="IngestAccess" /> class.
+    /// </summary>
+    /// <param name="isTokenRequired">A value indicating whether a token is required</param>
+    /// <param name="tokenHash">The SHA-256 hash of the accepted token, or <c>null</c> when none is accepted</param>
+    private IngestAccess(bool isTokenRequired, byte[]? tokenHash)
+    {
+        IsTokenRequired = isTokenRequired;
+        _tokenHash = tokenHash;
+    }
+
+    #endregion // Constructors
+
     #region Properties
 
     /// <summary>
@@ -16,16 +43,13 @@ public sealed class IngestAccess
 
     #region Methods
 
-    // Skeleton: removed with the implementation
-#pragma warning disable RH2003, S2325
-
     /// <summary>
     /// Creates an access that accepts every token, including none.
     /// </summary>
     /// <returns>The access</returns>
     public static IngestAccess CreateOpen()
     {
-        throw new NotImplementedException();
+        return new IngestAccess(false, null);
     }
 
     /// <summary>
@@ -34,7 +58,7 @@ public sealed class IngestAccess
     /// <returns>The access</returns>
     public static IngestAccess CreateRefusingAll()
     {
-        throw new NotImplementedException();
+        return new IngestAccess(true, null);
     }
 
     /// <summary>
@@ -44,7 +68,7 @@ public sealed class IngestAccess
     /// <returns>The access</returns>
     public static IngestAccess CreateForToken(string token)
     {
-        throw new NotImplementedException();
+        return new IngestAccess(true, Hash(token));
     }
 
     /// <summary>
@@ -54,9 +78,28 @@ public sealed class IngestAccess
     /// <returns><c>true</c> when the token is accepted</returns>
     public bool IsTokenAccepted(string? presentedToken)
     {
-        throw new NotImplementedException();
+        if (IsTokenRequired == false)
+        {
+            return true;
+        }
+
+        if (_tokenHash is null || presentedToken is null)
+        {
+            return false;
+        }
+
+        return CryptographicOperations.FixedTimeEquals(_tokenHash, Hash(presentedToken));
     }
-#pragma warning restore RH2003, S2325
+
+    /// <summary>
+    /// Hashes a token.
+    /// </summary>
+    /// <param name="token">The token</param>
+    /// <returns>The SHA-256 hash of the token's UTF-8 bytes</returns>
+    private static byte[] Hash(string token)
+    {
+        return SHA256.HashData(Encoding.UTF8.GetBytes(token));
+    }
 
     #endregion // Methods
 }
