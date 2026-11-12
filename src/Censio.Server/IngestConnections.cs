@@ -14,10 +14,21 @@ public sealed class IngestConnections
 
     #endregion // Constants
 
-    #region Methods
+    #region Fields
 
-    // Skeleton: removed with the implementation
-#pragma warning disable RH2003, S2325
+    /// <summary>
+    /// The number of connections that wait for their hello.
+    /// </summary>
+    private int _pendingHellos;
+
+    /// <summary>
+    /// A value indicating whether a Companion holds its place (0 free, 1 taken).
+    /// </summary>
+    private int _companionTaken;
+
+    #endregion // Fields
+
+    #region Methods
 
     /// <summary>
     /// Tries to count a connection that waits for its hello.
@@ -25,7 +36,20 @@ public sealed class IngestConnections
     /// <returns><c>true</c> when the connection was counted</returns>
     public bool TryEnterPendingHello()
     {
-        throw new NotImplementedException();
+        while (true)
+        {
+            var current = Volatile.Read(ref _pendingHellos);
+
+            if (current >= MaxPendingHellos)
+            {
+                return false;
+            }
+
+            if (Interlocked.CompareExchange(ref _pendingHellos, current + 1, current) == current)
+            {
+                return true;
+            }
+        }
     }
 
     /// <summary>
@@ -33,7 +57,7 @@ public sealed class IngestConnections
     /// </summary>
     public void LeavePendingHello()
     {
-        throw new NotImplementedException();
+        Interlocked.Decrement(ref _pendingHellos);
     }
 
     /// <summary>
@@ -42,7 +66,7 @@ public sealed class IngestConnections
     /// <returns><c>true</c> when the place was taken</returns>
     public bool TryTakeCompanion()
     {
-        throw new NotImplementedException();
+        return Interlocked.CompareExchange(ref _companionTaken, 1, 0) == 0;
     }
 
     /// <summary>
@@ -50,10 +74,8 @@ public sealed class IngestConnections
     /// </summary>
     public void ReleaseCompanion()
     {
-        throw new NotImplementedException();
+        Volatile.Write(ref _companionTaken, 0);
     }
-
-#pragma warning restore RH2003, S2325
 
     #endregion // Methods
 }
