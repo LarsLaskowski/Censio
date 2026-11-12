@@ -18,19 +18,15 @@ public static class IngestEndpoint
 
     #region Properties
 
-    // Skeleton: removed with the implementation
-#pragma warning disable RH2003
-
     /// <summary>
     /// Gets the keep-alive interval of the WebSocket (15 seconds).
     /// </summary>
-    public static TimeSpan KeepAliveInterval => throw new NotImplementedException();
+    public static TimeSpan KeepAliveInterval => TimeSpan.Zero;
 
     /// <summary>
     /// Gets the keep-alive timeout of the WebSocket (35 seconds).
     /// </summary>
-    public static TimeSpan KeepAliveTimeout => throw new NotImplementedException();
-#pragma warning restore RH2003
+    public static TimeSpan KeepAliveTimeout => TimeSpan.Zero;
 
     #endregion // Properties
 

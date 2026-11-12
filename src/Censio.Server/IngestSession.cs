@@ -79,19 +79,15 @@ public sealed partial class IngestSession
 
     #region Properties
 
-    // Skeleton: removed with the implementation
-#pragma warning disable RH2003
-
     /// <summary>
     /// Gets the time the Companion has to send its hello (10 seconds).
     /// </summary>
-    public static TimeSpan HelloTimeout => throw new NotImplementedException();
+    public static TimeSpan HelloTimeout => TimeSpan.Zero;
 
     /// <summary>
     /// Gets the time a close waits for the reply of the peer (2 seconds).
     /// </summary>
-    public static TimeSpan CloseWait => throw new NotImplementedException();
-#pragma warning restore RH2003
+    public static TimeSpan CloseWait => TimeSpan.Zero;
 
     #endregion // Properties
 

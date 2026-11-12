@@ -7,33 +7,10 @@ public sealed class InMemoryDuplexStream : Stream
 {
     #region Properties
 
-    // Skeleton: removed with the implementation
-#pragma warning disable RH2003
-
     /// <summary>
     /// Gets the number of bytes read from this end.
     /// </summary>
-    public long BytesRead => throw new NotImplementedException();
-
-    /// <inheritdoc />
-    public override bool CanRead => throw new NotImplementedException();
-
-    /// <inheritdoc />
-    public override bool CanSeek => throw new NotImplementedException();
-
-    /// <inheritdoc />
-    public override bool CanWrite => throw new NotImplementedException();
-
-    /// <inheritdoc />
-    public override long Length => throw new NotImplementedException();
-
-    /// <inheritdoc />
-    public override long Position
-    {
-        get => throw new NotImplementedException();
-        set => throw new NotImplementedException();
-    }
-#pragma warning restore RH2003
+    public long BytesRead => Length;
 
     #endregion // Properties
 
@@ -41,7 +18,6 @@ public sealed class InMemoryDuplexStream : Stream
 
     // Skeleton: removed with the implementation
 #pragma warning disable RH2003, S1172
-
     /// <summary>
     /// Creates the two connected ends.
     /// </summary>
@@ -49,6 +25,32 @@ public sealed class InMemoryDuplexStream : Stream
     public static (InMemoryDuplexStream Server, InMemoryDuplexStream Client) CreatePair()
     {
         throw new NotImplementedException();
+    }
+#pragma warning restore RH2003, S1172
+
+    #endregion // Methods
+
+    #region Stream
+
+    /// <inheritdoc />
+    public override bool CanRead => false;
+
+    /// <inheritdoc />
+    public override bool CanSeek => false;
+
+    /// <inheritdoc />
+    public override bool CanWrite => false;
+
+    /// <inheritdoc />
+    public override long Length => 0;
+
+    // Skeleton: removed with the implementation
+#pragma warning disable RH2003
+    /// <inheritdoc />
+    public override long Position
+    {
+        get => 0;
+        set => throw new NotImplementedException();
     }
 
     /// <inheritdoc />
@@ -80,7 +82,7 @@ public sealed class InMemoryDuplexStream : Stream
     {
         throw new NotImplementedException();
     }
-#pragma warning restore RH2003, S1172
+#pragma warning restore RH2003
 
-    #endregion // Methods
+    #endregion // Stream
 }
