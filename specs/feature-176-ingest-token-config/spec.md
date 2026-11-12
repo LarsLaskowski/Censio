@@ -44,13 +44,15 @@ configured path.
 
 - E1: The configured file does not exist, or cannot be read (no permission for the user the server runs as, the path
   is a directory): `The ingest token file named by Censio:Ingest:TokenFile cannot be read; the server stops.` The
-  server never creates the file.
+  server never creates the file. The line carries no exception or other text that holds the path (a .NET file
+  exception's message names it).
 - E2: The configured file holds no valid token. A valid token has 32 to 1,024 characters, all visible ASCII (`!` to
   `~`), after trimming surrounding space, tab, carriage return and line feed, so the line break that secret files
   often end with is accepted. The file is read up to 65,536 bytes. Invalid are: an empty file, fewer than 32 or more
   than 1,024 characters, an inner space or another character outside that range, and a file over 65,536 bytes. The
   line is `The ingest token file named by Censio:Ingest:TokenFile holds no valid token (32 to 1,024 visible ASCII characters); the server stops.`
-- E3: The setting's value is not an absolute path, the empty string included:
+- E3: The setting's value is not an absolute path by the rule `Censio:DataDirectory` uses (fully qualified), the empty
+  string included:
   `The setting Censio:Ingest:TokenFile must be an absolute path; the server stops.` The value is not logged, because an
   operator may have put the token itself into the setting by mistake.
 - E4: The setting is set (any value) and `Censio:Ingest:RequireToken` is `false`:
@@ -94,7 +96,8 @@ configured path.
   `RequireToken` value is reported with its existing line first (E4, E5).
 - AC6: Without the setting, an `ingest-token` in the data directory with fewer than 32 characters, or another invalid
   token, stops the start with the line of E6. A generated token is still accepted at the next start (S5, E6, N5).
-- AC7: In each case of AC1 to AC6, no log line holds the token or the configured path (N2).
+- AC7: In each case of AC1 to AC6, no log line holds the token or the configured path, neither in its message nor in an
+  attached exception (N2).
 
 ## Out of scope
 
@@ -123,7 +126,7 @@ configured path.
 - `RequireToken` `false` with a configured file? Answered: the start stops (E4). Ignoring the file would run the server
   open although the operator configured a token.
 - How is it documented? Answered: with `docker run`, as the user guide does (record 0026, no compose file): a read-only
-  bind mount of a host file the container user `1654` can read, for example
+  bind mount of a host file the user the container runs as can read, for example
   `-v <host file>:/run/secrets/censio-ingest-token:ro`. Other secret stores are named only as sources of such a file.
 
 ## Area documents
@@ -134,3 +137,22 @@ configured path.
   *Accepted risks*: the configured file's access rules are the operator's.
 - [`docs/areas/server.md`](../../docs/areas/server.md), *Data directory and key ring*: `ingest-token` is kept only
   when the token is required and the setting is unset. A data directory is not needed when the setting is set.
+
+## Challenge
+
+- 1 (major, target hosts of the documented procedure): accepted. The host list is the Product Manager's to give
+  (`.squad/routing.md`, *Operator environments and documented procedures*); escalated with this revision, and the answer
+  becomes scenarios and criteria before the plan. Meanwhile the documentation answer names "the user the container
+  runs as" instead of `1654`, since the user guide runs the container as `99:100` or `1026:100` on NAS hosts.
+- 2 (exception text holds the path): accepted. E1 now says the line carries no exception or text holding the path, and
+  AC7 covers an attached exception.
+- 3 (meaning of "absolute path"): accepted. E3 now names the rule of `Censio:DataDirectory` (fully qualified).
+- 4 (record 0061): accepted. 0061 is unreleased, so the plan edits it in place, with the file-only choice and the
+  minimum of 32 characters; no superseding record.
+- 5 (documentation list): accepted for the plan. *Area documents* lists only `docs/areas/`; the plan names the new row
+  of both README configuration tables, the `Censio:DataDirectory` rows (English and German), `SECURITY.md`, the user
+  guide's token section and start failures (range, no-data-directory warning) in both languages, `docs/ARCHITECTURE.md`
+  and `.squad/project.md`.
+- 6 (tests that encode the old minimum): accepted for the plan. The plan assigns the Tester to replace the `!~` row and
+  the "1 to 1,024" texts in `IngestTokenSetupTests` with a 32-character row holding `!` and `~` and a 31-character
+  refused row for both sources.
