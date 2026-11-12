@@ -10,6 +10,7 @@ COPY src/Censio.Server.Data/Censio.Server.Data.csproj src/Censio.Server.Data/
 RUN dotnet restore src/Censio.Server/Censio.Server.csproj
 
 COPY .editorconfig ./
+COPY .squad/dotnet-rules.globalconfig .squad/
 COPY src/ src/
 
 ARG VERSION=0.0.0

@@ -142,7 +142,7 @@ git ls-files -z -- 'global.json' 'Directory.Build.props' 'Directory.Packages.pro
   'src/Censio.Server/Censio.Server.csproj' 'src/Censio.Contracts/Censio.Contracts.csproj' \
   'src/Censio.Server.Data/Censio.Server.Data.csproj' | xargs -0 -I{} cp --parents {} "$scratch"
 (cd "$scratch" && dotnet restore src/Censio.Server/Censio.Server.csproj)
-git ls-files -z -- '.editorconfig' 'src' | xargs -0 -I{} cp --parents {} "$scratch"
+git ls-files -z -- '.editorconfig' '.squad/dotnet-rules.globalconfig' 'src' | xargs -0 -I{} cp --parents {} "$scratch"
 (cd "$scratch" && dotnet publish src/Censio.Server/Censio.Server.csproj -c Release --no-restore -o ./publish)
 ls "$scratch"/publish/wwwroot/_framework/blazor.web*.js \
   || { echo "publish output lacks wwwroot/_framework/blazor.web*.js (see docs/decisions/0007)" >&2; false; }
