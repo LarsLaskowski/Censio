@@ -9,7 +9,7 @@ builder.Services.AddCensioDataProtection();
 
 var app = builder.Build();
 
-await using var appLifetime = app.ConfigureAwait(false);
+await using var appDisposal = app.ConfigureAwait(false);
 
 if (DataProtectionSetup.TryCreateKeyRing(app.Services, app.Configuration, app.Logger) == false)
 {
