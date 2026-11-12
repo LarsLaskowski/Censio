@@ -180,6 +180,32 @@ public sealed class CatalogDocumentReaderTests
     }
 
     /// <summary>
+    /// The refusal of an unsupported schema version carries the version found, so the server can name it in its
+    /// acknowledgement (spec E5).
+    /// </summary>
+    /// <param name="version">The schema version of the document</param>
+    [TestMethod]
+    [TestCategory("AC10")]
+    [DataRow(0)]
+    [DataRow(2)]
+    [DataRow(-1)]
+    [DataRow(int.MaxValue)]
+    [DataRow(int.MinValue)]
+    public void CatalogDocumentReaderReadUnsupportedVersionReturnsVersion(int version)
+    {
+        // Arrange
+        var json = Utf8($"{{'schemaVersion':{version},'gameVersion':null,'entries':[]}}");
+
+        // Act
+        var result = CatalogDocumentReader.Read(json);
+
+        // Assert
+        Assert.IsNotNull(result.Error, $"The document should be refused: version {version}");
+        Assert.AreEqual(CatalogDocumentErrorKind.UnsupportedVersion, result.Error.Kind, $"The document should be refused as unsupported: version {version}");
+        Assert.AreEqual(version, result.Error.Version, $"The refusal should carry the version found: version {version}");
+    }
+
+    /// <summary>
     /// A document of another version is unsupported whatever else it holds, a property of a later version included.
     /// </summary>
     /// <param name="document">The document in single-quote notation</param>

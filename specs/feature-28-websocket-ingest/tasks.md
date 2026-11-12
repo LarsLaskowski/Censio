@@ -5,7 +5,7 @@ Plan: [plan.md](plan.md)
 | # | Group | Task | Files | Criteria | Depends on | Owner | Done |
 | - | ----- | ---- | ----- | -------- | ---------- | ----- | ---- |
 | 1 | G1 | Skeleton: `RefusedId` (`Guid`), `CatalogDocument` on `ContractReadResult`, `Version` (`int`) on `CatalogDocumentError` | `src/Censio.Contracts/ContractReadResult.cs`, `CatalogDocumentError.cs` | AC10 | — | Dev | [x] |
-| 2 | G1 | Tests first: refused `id`, no `id` for malformed, catalog document, catalog error version | `tests/Censio.Contracts.Tests/ContractReaderTests.cs`, `CatalogDocumentReaderTests.cs` | AC10 | 1 | Tester | [ ] |
+| 2 | G1 | Tests first: refused `id`, no `id` for malformed, catalog document, catalog error version | `tests/Censio.Contracts.Tests/ContractReaderTests.cs`, `CatalogDocumentReaderTests.cs` | AC10 | 1 | Tester | [x] |
 | 3 | G1 | Reader keeps the built message's `id` and the catalog; catalog error carries its version | `src/Censio.Contracts/ContractReader.cs`, `ContractReadResult.cs`, `CatalogDocumentError.cs`, `CatalogDocumentReader.cs` | AC10 | 2 | Dev | [ ] |
 | 4 | G2 | Skeleton: `static` `partial` `IngestTokenSetup` (`string` constants, `TryCreateAccess`, `GenerateToken`), `sealed` `IngestAccess` (`CreateOpen`, `CreateRefusingAll`, `CreateForToken`, `bool` `IsTokenRequired`, `IsTokenAccepted`) | `src/Censio.Server/IngestTokenSetup.cs`, `IngestAccess.cs` | AC1, AC7, AC8 | 3 | Dev | [ ] |
 | 5 | G2 | Tests first: token file, switch, failures, comparison, no token in logs; `Program` exit code | `tests/Censio.Server.Tests/IngestTokenSetupTests.cs`, `IngestAccessTests.cs`, `ProgramTests.cs` | AC1, AC3, AC4, AC7, AC8 | 4 | Tester | [ ] |

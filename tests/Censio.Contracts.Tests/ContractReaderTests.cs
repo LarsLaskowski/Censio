@@ -198,6 +198,22 @@ public sealed class ContractReaderTests
                                                                                     ["catalog too large"] = () => new byte[CatalogDocumentReader.MaxDocumentBytes + 1]
                                                                                 };
 
+    /// <summary>
+    /// The messages of the refused <c>id</c> cases, built on demand: the name of the case and the builder of its JSON text.
+    /// </summary>
+    private static readonly Dictionary<string, Func<string>> _refusedIdInputs = new()
+                                                                                {
+                                                                                    ["tick receive time without fraction"] = () => Substitute(TickNotation, Time, "2026-11-12T10:20:30Z"),
+                                                                                    ["tick without islands"] = () => Substitute(TickNotation, $"[{IslandNotation}]", "[]"),
+                                                                                    ["session start profile all zero"] = () => Substitute(SessionStartNotation, Profile, ZeroId),
+                                                                                    ["session end profile no UUID"] = () => Substitute(SessionEndNotation, Profile, "profile-a"),
+                                                                                    ["icon reference not the PNG hash"] = () => Substitute(IconImageNotation, PngReference, Icon),
+                                                                                    ["catalog version 2"] = () => CatalogUploadJson("catalog version 2"),
+                                                                                    ["catalog malformed"] = () => CatalogUploadJson("catalog malformed"),
+                                                                                    ["catalog invalid"] = () => CatalogUploadJson("catalog invalid"),
+                                                                                    ["catalog too large"] = () => CatalogUploadJson("catalog too large")
+                                                                                };
+
     #endregion // Fields
 
     #region Properties
@@ -286,6 +302,27 @@ public sealed class ContractReaderTests
             yield return new object[] { "catalog malformed", CatalogDocumentErrorKind.Malformed, "Catalog document is malformed" };
             yield return new object[] { "catalog invalid", CatalogDocumentErrorKind.Invalid, "Catalog document breaks a rule of schema version 1" };
             yield return new object[] { "catalog too large", CatalogDocumentErrorKind.TooLarge, "Catalog document exceeds a size bound" };
+        }
+    }
+
+    /// <summary>
+    /// Gets the Companion-to-server messages the reader builds and then refuses in its rules or catalog step, each with the
+    /// valid <c>id</c> <see cref="Id" />: the name of the case (a key of <see cref="_refusedIdInputs" />) and the kind it is
+    /// refused with.
+    /// </summary>
+    private static IEnumerable<object[]> RefusedIdRows
+    {
+        get
+        {
+            yield return new object[] { "tick receive time without fraction", ContractErrorKind.Invalid };
+            yield return new object[] { "tick without islands", ContractErrorKind.Invalid };
+            yield return new object[] { "session start profile all zero", ContractErrorKind.Invalid };
+            yield return new object[] { "session end profile no UUID", ContractErrorKind.Invalid };
+            yield return new object[] { "icon reference not the PNG hash", ContractErrorKind.Invalid };
+            yield return new object[] { "catalog version 2", ContractErrorKind.CatalogRefused };
+            yield return new object[] { "catalog malformed", ContractErrorKind.CatalogRefused };
+            yield return new object[] { "catalog invalid", ContractErrorKind.CatalogRefused };
+            yield return new object[] { "catalog too large", ContractErrorKind.CatalogRefused };
         }
     }
 
@@ -795,6 +832,75 @@ public sealed class ContractReaderTests
         Assert.IsNotNull(result.Error!.CatalogError, $"The catalog error should be returned: {label}");
         Assert.AreEqual(catalogKind, result.Error.CatalogError.Kind, $"The catalog error should have the catalog's kind: {label}");
         Assert.AreEqual(text, result.Error.CatalogError.Text, $"The catalog error should have the catalog's text: {label}");
+    }
+
+    /// <summary>
+    /// A tick, session start, session end, icon image or catalog upload the reader built and then refused as invalid or with
+    /// a catalog kind returns its <c>id</c>, so the server can acknowledge the refusal (spec E5).
+    /// </summary>
+    /// <param name="label">The name of the case</param>
+    /// <param name="kind">The kind it is refused with</param>
+    [TestMethod]
+    [TestCategory("AC10")]
+    [DynamicData(nameof(RefusedIdRows))]
+    public void ContractReaderReadInvalidMessageReturnsRefusedId(string label, ContractErrorKind kind)
+    {
+        // Arrange
+        var json = Encoding.UTF8.GetBytes(_refusedIdInputs[label]());
+
+        // Act
+        var result = ContractReader.Read(json);
+
+        // Assert
+        Assert.IsNull(result.Message, $"A refused message should return no message: {label}");
+        Assert.IsNotNull(result.Error, $"The message should be refused: {label}");
+        Assert.AreEqual(kind, result.Error.Kind, $"The message should be refused with the kind of its row: {label}");
+        Assert.AreEqual(Guid.Parse(Id, CultureInfo.InvariantCulture), result.RefusedId, $"The refusal should return the id of the message: {label}");
+        Assert.IsNull(result.CatalogDocument, $"A refused message should return no catalog document: {label}");
+    }
+
+    /// <summary>
+    /// An accepted catalog upload returns the catalog document the reader read, with every field of its entry.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC10")]
+    public void ContractReaderReadCatalogUploadReturnsCatalogDocument()
+    {
+        // Arrange
+        var document = Json($"{{'schemaVersion':1,'gameVersion':'1.2.3.4','entries':[{{'guid':5,'kind':'region','names':{{'en':'Wood','de':'Holz'}},'regionGuid':7,'regionTypes':['Coast','Land'],'icon':'{Icon}'}}]}}");
+        var json = Utf8($"{{'type':'catalogUpload','contractVersion':1,'id':'{Id}','document':'{Base64(document)}'}}");
+
+        // Act
+        var result = ContractReader.Read(json);
+
+        // Assert
+        var upload = AssertRead<ContractCatalogUpload>(result, "catalog upload with one entry");
+
+        Assert.AreEqual(Guid.Parse(Id, CultureInfo.InvariantCulture), upload.Id, "The upload should keep its id");
+        Assert.IsNull(result.RefusedId, "An accepted message should return no refused id");
+        Assert.IsNotNull(result.CatalogDocument, "An accepted catalog upload should return its catalog document");
+        Assert.AreEqual(1, result.CatalogDocument.SchemaVersion, "The schema version of the catalog should be returned");
+        Assert.AreEqual("1.2.3.4", result.CatalogDocument.GameVersion, "The game version of the catalog should be returned");
+        Assert.HasCount(1, result.CatalogDocument.Entries, "The entry of the catalog should be returned");
+
+        var entry = result.CatalogDocument.Entries[0];
+
+        Assert.AreEqual(5, entry.AssetGuid, "The GUID of the entry should be returned");
+        Assert.AreEqual(CatalogEntryKind.Region, entry.Kind, "The kind of the entry should be returned");
+        Assert.AreEqual("Wood", entry.Names["en"], "The English name of the entry should be returned");
+        Assert.AreEqual("Holz", entry.Names["de"], "The German name of the entry should be returned");
+        Assert.AreEqual(7, entry.RegionGuid, "The region GUID of the entry should be returned");
+        Assert.AreEqual(Icon, entry.IconReference, "The icon reference of the entry should be returned");
+    }
+
+    /// <summary>
+    /// Builds a catalog upload with the valid <c>id</c> <see cref="Id" /> around a catalog document the catalog reader refuses.
+    /// </summary>
+    /// <param name="label">The name of the refused catalog document</param>
+    /// <returns>The JSON text of the upload</returns>
+    private static string CatalogUploadJson(string label)
+    {
+        return Json($"{{'type':'catalogUpload','contractVersion':1,'id':'{Id}','document':'{Convert.ToBase64String(_refusedCatalogs[label]())}'}}");
     }
 
     /// <summary>
