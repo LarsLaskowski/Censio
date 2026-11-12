@@ -144,6 +144,6 @@ No refusal text and no log line holds its content.
 
 - Building the catalog: [`game-catalog.md`](game-catalog.md); the icons: [`game-catalog-icons.md`](game-catalog-icons.md);
   the cache: [`game-catalog-cache.md`](game-catalog-cache.md).
-- Sending, receiving, storing and showing the catalog and the images (#27, #42).
+- The messages that carry the catalog and the images: [`contract.md`](contract.md); sending, storing and showing them (#42).
 - The code: `CatalogDocumentReader` and `CatalogDocumentWriter` in `src/Censio.Contracts`, the conversion in
   `src/Censio.Companion.Core`.
