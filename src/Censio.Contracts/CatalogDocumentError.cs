@@ -77,5 +77,10 @@ public sealed class CatalogDocumentError
     /// </summary>
     public string Text { get; }
 
+    /// <summary>
+    /// Gets the schema version found for an unsupported version, or <c>null</c> for every other kind.
+    /// </summary>
+    public int? Version { get; }
+
     #endregion // Properties
 }

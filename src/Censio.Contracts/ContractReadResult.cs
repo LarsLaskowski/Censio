@@ -32,5 +32,15 @@ public sealed class ContractReadResult
     /// </summary>
     public ContractError? Error { get; }
 
+    /// <summary>
+    /// Gets the <c>id</c> of a message the reader built before refusing it, or <c>null</c> when none was built or the <c>id</c> is all zero.
+    /// </summary>
+    public Guid? RefusedId { get; }
+
+    /// <summary>
+    /// Gets the catalog document of an accepted catalog upload, or <c>null</c> for every other result.
+    /// </summary>
+    public CatalogDocument? CatalogDocument { get; }
+
     #endregion // Properties
 }
