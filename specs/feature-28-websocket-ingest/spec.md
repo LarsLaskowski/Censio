@@ -58,8 +58,8 @@ only from the operator's Companion and survive any input.
 - E7: A Companion that vanishes without closing (network loss, sleep): the server sends a WebSocket ping every 15
   seconds, and a connection from which no frame at all arrives (pong, message or part of one) for 60 seconds is closed;
   the next hello is then accepted. Silence is counted in frames, not contract messages. Limit: a ping
-  still unanswered when a message begins is answered only after that message, so such a message must end within the
-  60 seconds; otherwise the Companion reconnects and resends.
+  still unanswered when a message begins may be answered only after that message, so such a message must end within
+  35 seconds of the ping; otherwise the Companion reconnects and resends.
 - E8: More than 16 connections at once that have not completed their hello: a further `/ingest` request is answered `503`
   with an empty body. Accepted risk: any host that reaches `/ingest` can hold these 16 places by reopening connections and
   so keep the real Companion out, with the token required as well (no rate limiting, *Out of scope*).
