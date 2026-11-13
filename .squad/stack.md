@@ -39,7 +39,8 @@ profile and owned by this repository: keep it true when the build changes.
   `Censio.Anonymiser` (a contributor console tool, not released) and `Censio.Companion` (the Windows tray shell,
   `net11.0-windows`, no test project).
 - Tests: `tests/<Project>.Tests/`, one test class per type under test in `{TypeUnderTest}Tests.cs`,
-  placed flat in the test project. Anonymised recordings used as fixtures lie in `tests/<Project>.Tests/Fixtures/`
+  placed flat in the test project; every test project has a `MSTestSettings.cs` with `[assembly: DoNotParallelize]`
+  (MSTEST0001), and a new test project adds the same file. Anonymised recordings used as fixtures lie in `tests/<Project>.Tests/Fixtures/`
   with a `README.md`.
 
 ## Commands
