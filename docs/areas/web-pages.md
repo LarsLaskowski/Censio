@@ -36,7 +36,7 @@ logged. Users of the web application rely on it.
 - The islands of a profile are those of its island list ([`server-state.md`](server-state.md)), plus those of the
   latest tick; each is shown under the name the island list holds, otherwise the name of the latest tick.
 - A region is named by the catalog entry of its smallest session GUID, in the shown language, else in the other
-  language, else `Region <session GUID>`. Two regions whose shown names are equal (ignoring letter case) get their GUID
+  language, else `Region <region GUID>`; a session without a catalog region entry is `Region <session GUID>`. Two regions whose shown names are equal (ignoring letter case) get their GUID
   appended in parentheses.
 - The regions are ordered by shown name (ordinal, letter case ignored), ties by GUID. The name is a link to the island
   list.
@@ -113,7 +113,7 @@ logged. Users of the web application rely on it.
 
 | Case | English | German |
 | ---- | ------- | ------ |
-| no profile, a profile without a stored tick, or a tick without islands | `No data yet. The pages fill once the Companion sends data.` | `Noch keine Daten. Die Seiten füllen sich, sobald der Companion Daten sendet.` |
+| no profile, a profile without a stored tick, or a profile none of whose ticks carried an island | `No data yet. The pages fill once the Companion sends data.` | `Noch keine Daten. Die Seiten füllen sich, sobald der Companion Daten sendet.` |
 | an address that names a profile, region or island that is unknown or malformed | `Not found.` | `Nicht gefunden.` |
 | a read of a profile that is not held, with nothing shown yet | `Loading…` | `Wird geladen…` |
 | a failed read | `The data cannot be read right now. Reload the page to try again.` | `Die Daten können gerade nicht gelesen werden. Laden Sie die Seite neu, um es erneut zu versuchen.` |
