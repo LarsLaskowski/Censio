@@ -4,6 +4,9 @@
     <RequiresAspNetWebAssets>true</RequiresAspNetWebAssets>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="MudBlazor" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\Censio.Contracts\Censio.Contracts.csproj" />
     <ProjectReference Include="..\Censio.Server.Data\Censio.Server.Data.csproj" />
   </ItemGroup>

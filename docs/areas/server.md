@@ -22,7 +22,8 @@ the Docker health probe rely on it.
 ### Start page
 
 - `GET /` answers `200` with an HTML page titled `Censio`, with the heading `Censio` and the line
-  `Version <version>`, in the interactive server render mode. The page loads the Blazor script under
+  `Version <version>`, shown in the frame of [`web-ui.md`](web-ui.md), in the interactive server render mode. The
+  version line stays a bare `<p>` of its own line, which the release check reads. The page loads the Blazor script under
   `_framework/blazor.web` (a fingerprinted name is possible), which the server serves.
 - `<version>` is the informational version the server was built with: `0.0.0` without a version, otherwise the
   build property `Version` exactly as passed (`-p:Version=<v>`), without a source-revision suffix.
@@ -121,7 +122,8 @@ the Docker health probe rely on it.
 
 ## Limits and errors
 
-- The server reads no request body and takes no input on `/` or `/health`; what `/ingest` reads is in [`ingest.md`](ingest.md).
+- The server reads no request body and takes no input on `/health`; on `/` it reads the two preference cookies and the
+  `Accept-Language` header and handles unknown values as [`web-ui.md`](web-ui.md) says; what `/ingest` reads is in [`ingest.md`](ingest.md).
 - If the port is taken, the server ends with the ASP.NET Core startup error in the console; it has no handling of
   its own.
 - A data directory that is not an absolute path, or a key directory the server cannot create or write, stops the
@@ -146,4 +148,4 @@ the Docker health probe rely on it.
 
 - The Companion's WebSocket ingest, its token and the `Censio:Ingest:RequireToken` switch: [`ingest.md`](ingest.md).
 - The database: its file, schema, start failures and storing rules: [`server-data.md`](server-data.md).
-- Web layout and theming (#31).
+- The web UI's frame, themes and languages: [`web-ui.md`](web-ui.md).

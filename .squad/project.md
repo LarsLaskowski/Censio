@@ -19,7 +19,7 @@ protected, the concrete types, files or endpoints, and a link to the area docume
 limits, patterns or sequences.
 
 - Ingest token and Companion authentication: the WebSocket endpoint `/ingest` and its token (`IngestEndpoint`, `IngestSession`, `IngestConnections`, `IngestTokenSetup`, `IngestAccess` in `src/Censio.Server`, the file `ingest-token` in the data directory, the setting `Censio:Ingest:TokenFile` and the file it names) — [ingest](../docs/areas/ingest.md), [record 0019](../docs/decisions/0019-websocket-transport-with-shared-token.md).
-- Network exposure: the server's listener and its routes reachable without login (`/`, `/health`, `/ingest`, the Blazor hub, static assets) in `src/Censio.Server/Program.cs` and `src/Censio.Server/Dockerfile` — [server](../docs/areas/server.md).
+- Network exposure: the server's listener and its routes reachable without login (`/`, `/health`, `/ingest`, the Blazor hub, static assets) in `src/Censio.Server/Program.cs` and `src/Censio.Server/Dockerfile`; the preference cookies and `Accept-Language` read on `/` (`UiPreferences`, `App.razor`) — [server](../docs/areas/server.md), [web-ui](../docs/areas/web-ui.md).
 - Data-protection key ring: `DataProtectionSetup` under the data directory — [server](../docs/areas/server.md), *Data directory and key ring*.
 - Server database: the file, its side files and folders, owner-only (`ServerDatabase`, `DatabaseSetup`), and the in-memory state of the stored data (`ServerState`, `ServerStateSetup`) — [server-data](../docs/areas/server-data.md), [server-state](../docs/areas/server-state.md).
 - Local pipe connection: `NamedPipeConnector` and `PipeEndpoint` open the game's pipe read-only at identification level — [pipe-connection](../docs/areas/pipe-connection.md), *Opening*.
@@ -73,6 +73,8 @@ change with it.
 - `TrayMenu`, `TrayMenuEntryKind`, `TraySnapshot` or `TrayIconLook` in `Censio.Companion.Core`, and `TrayIcon` / `TrayIconImages` in `Censio.Companion`
 - `docs/areas/companion.md` (*Tray icon and menu*), the menu list in `README.md` and the tooltip table in the user guide (English and German)
 
+**A new page or UI text** touches: `UiTexts` (English and German) and its tests, the navigation in `MainLayout.razor`, `docs/areas/web-ui.md` (*Texts*), the user guide.
+
 **A new log message** touches:
 - `CompanionLog` (a `LoggerMessage` method) and the list of what is logged in `docs/areas/companion-log.md`
 
@@ -99,6 +101,8 @@ otherwise), one line each: the double, where it lives and what it stands in for;
 - `FakeTimeProvider` (`Microsoft.Extensions.TimeProvider.Testing`) — the clock of every timing test; a test library, not a mocking library.
 - `BackwardsFakeTimeProvider` (`tests/Censio.Pipe.Tests/BackwardsFakeTimeProvider.cs`) — models a system clock set back (checked by a scratch run).
 - `RecordingTimeProvider` (`tests/Censio.Pipe.Tests/RecordingTimeProvider.cs`, linked into the Companion and Server tests) — a `FakeTimeProvider` that records and awaits its timers.
+- `RecordingLoggerProvider` (`tests/Censio.Server.Data.Tests/`, linked into the Server tests) — an `ILoggerProvider` writing every category into one `RecordingLogger`.
+- `CascadedLanguageProbe` (`tests/Censio.Server.Tests/CascadedLanguageProbe.cs`) — a page stand-in that renders its cascaded `UiLanguage` and `UiTexts.HomeEntry`, for what pages receive from `MainLayout`.
 - `InMemoryDuplexStream` (`tests/Censio.Server.Tests/InMemoryDuplexStream.cs`) — one end of an in-memory connection with back pressure, for real `WebSocket` pairs in the ingest session tests.
 - `FailingWebSocketFeature` (`tests/Censio.Server.Tests/FailingWebSocketFeature.cs`) — an `IHttpWebSocketFeature` whose every accept fails.
 - `FakeDiagnosticsWindow` (`tests/Censio.Companion.Core.Tests/FakeDiagnosticsWindow.cs`) — an `IDiagnosticsWindow` that records what it shows.

@@ -132,4 +132,6 @@ once in the [area document](../areas/README.md) of the record's area, and the re
 | [0068](0068-ingest-acknowledges-a-message-only-after-it-is-stored.md) | The ingest acknowledges a message only after it is stored; a failed write closes the connection unacknowledged | Accepted | 2026-11-13 |
 | [0069](0069-current-state-of-the-newest-profiles-held-in-memory-and-restored-at-start.md) | The current state of the two profiles with the newest ticks is held in memory, restored at start and announced off the ingest's path | Accepted | 2026-11-13 |
 | [0070](0070-hello-names-the-stored-catalog-only-when-all-its-icons-are-stored.md) | The hello reply names the stored catalog only when all its icons are stored | Accepted | 2026-11-13 |
+| [0071](0071-web-ui-choices-kept-in-browser-cookies-written-by-a-script.md) | The web UI's theme and language are kept in two browser cookies written by a script and read when the page is rendered | Accepted | 2026-11-13 |
+| [0072](0072-web-ui-texts-from-an-own-table-without-culture-data.md) | The web UI's texts come from an own table per language, without .NET culture data | Accepted | 2026-11-13 |
 <!-- project:end index -->

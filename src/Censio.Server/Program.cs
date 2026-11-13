@@ -1,10 +1,15 @@
 using Censio.Server;
 using Censio.Server.Data;
 
+using MudBlazor.Services;
+
 var builder = WebApplication.CreateBuilder(args);
+
+builder.WebHost.UseStaticWebAssets();
 
 builder.Services.AddRazorComponents()
                 .AddInteractiveServerComponents();
+builder.Services.AddMudServices();
 builder.Services.AddHealthChecks();
 builder.Services.AddCensioDataProtection();
 builder.Services.AddCensioIngest();
