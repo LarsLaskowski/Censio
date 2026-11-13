@@ -1,6 +1,6 @@
 # 0070: The hello reply names the stored catalog only when all its icons are stored
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-13
 - **Area:** ingest
 - **Source:** Issue #30

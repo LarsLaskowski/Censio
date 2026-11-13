@@ -1,6 +1,6 @@
 # 0068: The ingest acknowledges a message only after it is stored; a failed write closes the connection unacknowledged
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-13
 - **Area:** ingest
 - **Source:** Issue #30

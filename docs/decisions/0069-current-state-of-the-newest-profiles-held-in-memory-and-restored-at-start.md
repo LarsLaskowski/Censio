@@ -1,6 +1,6 @@
 # 0069: The current state of the two profiles with the newest ticks is held in memory, restored at start and announced off the ingest's path
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-13
 - **Area:** server-state
 - **Source:** Issue #30
