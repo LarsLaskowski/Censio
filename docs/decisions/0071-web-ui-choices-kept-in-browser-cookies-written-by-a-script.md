@@ -1,6 +1,6 @@
 # 0071: The web UI's theme and language are kept in two browser cookies written by a script and read when the page is rendered
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-13
 - **Area:** web-ui
 - **Source:** Issue #31

@@ -1,6 +1,6 @@
 # 0072: The web UI's texts come from an own table per language, without .NET culture data
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-13
 - **Area:** web-ui
 - **Source:** Issue #31
