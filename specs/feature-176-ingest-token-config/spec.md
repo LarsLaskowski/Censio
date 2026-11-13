@@ -33,6 +33,11 @@ one path, and it is not documented. Record 0061 is unreleased: tag `v0.2.0` poin
   starts, then it uses the configured file. It does not log the warning that every Companion is refused.
 - S4: Given the operator changed the token in the configured file, when the server is restarted, then the new token is
   required and the old one is refused. The server reads the file only at its start.
+- S6: Given an operator on Linux Docker Engine with the token in a host file that the user the container runs as can
+  read, when they follow the user guide, then one `docker run` command mounts the file read-only (for example
+  `-v <host file>:/run/secrets/censio-ingest-token:ro`) and sets `CENSIO__INGEST__TOKENFILE` to the mounted path.
+  The guide names Unraid, Synology and Docker Desktop for Windows as "not yet tried", and says that their operators keep
+  the generated `ingest-token`.
 - S5: Given the setting is not set, when the server starts, then it behaves as today
   ([`ingest.md`](../../docs/areas/ingest.md), *Token*), except for the minimum length (E6).
 
@@ -79,6 +84,10 @@ configured path.
 - N5: Compatibility: #28 is unreleased, so the minimum of 32 characters for `ingest-token` (E6) breaks no released
   installation.
 
+- N6: Target hosts of the documented procedure, as the Product Manager answered (option (a)): Linux Docker Engine only,
+  with `docker run` and a read-only bind mount. The documentation says nothing about other hosts or NAS container UIs
+  beyond "not yet tried".
+
 ## Acceptance criteria
 
 - AC1: With `Censio:Ingest:TokenFile` set to the absolute path of a readable file that holds a valid token, the server
@@ -96,6 +105,8 @@ configured path.
   `RequireToken` value is reported with its existing line first (E4, E5).
 - AC6: Without the setting, an `ingest-token` in the data directory with fewer than 32 characters, or another invalid
   token, stops the start with the line of E6. A generated token is still accepted at the next start (S5, E6, N5).
+- AC8: `docs/USER_GUIDE.md` (English and German) documents the setting as S6 states, and a manual dry run on Linux Docker
+  Engine confirms its statements (S6, N6).
 - AC7: In each case of AC1 to AC6, no log line holds the token or the configured path, neither in its message nor in an
   attached exception (N2).
 
@@ -107,6 +118,7 @@ configured path.
 - An estimate of a token's strength beyond its length; the documentation recommends a generated value, for example
   `openssl rand -base64 32`.
 - The Companion's side of the token (#40).
+- A procedure for Unraid, Synology, Docker Desktop for Windows or a NAS container UI (N6).
 
 ## Open questions
 
@@ -125,9 +137,8 @@ configured path.
   configured token never switches the token off (record 0019).
 - `RequireToken` `false` with a configured file? Answered: the start stops (E4). Ignoring the file would run the server
   open although the operator configured a token.
-- How is it documented? Answered: with `docker run`, as the user guide does (record 0026, no compose file): a read-only
-  bind mount of a host file the user the container runs as can read, for example
-  `-v <host file>:/run/secrets/censio-ingest-token:ro`. Other secret stores are named only as sources of such a file.
+- How is it documented, and for which hosts? Answered: the Product Manager chose option (a), Linux Docker Engine only
+  (S6, N6, AC8). Compose and other secret stores are named only as sources of such a file.
 
 ## Area documents
 
@@ -140,10 +151,12 @@ configured path.
 
 ## Challenge
 
-- 1 (major, target hosts of the documented procedure): accepted. The host list is the Product Manager's to give
-  (`.squad/routing.md`, *Operator environments and documented procedures*); escalated with this revision, and the answer
-  becomes scenarios and criteria before the plan. Meanwhile the documentation answer names "the user the container
-  runs as" instead of `1654`, since the user guide runs the container as `99:100` or `1026:100` on NAS hosts.
+- 1 (major, target hosts of the documented procedure): accepted. The Product Manager chose option (a): Linux Docker
+  Engine only, with one `docker run` example and a read-only bind mount. Unraid, Synology and Docker Desktop for
+  Windows are named "not yet tried", and their operators keep the generated `ingest-token`. This is recorded as S6, N6
+  and AC8, with a dry run on Linux Docker Engine. The procedure names "the user the container runs as" instead of
+  `1654`, because the user guide runs the container as `99:100` or `1026:100` on NAS hosts. The PM made no
+  statement about NAS container UIs, so the spec claims nothing about them.
 - 2 (exception text holds the path): accepted. E1 now says the line carries no exception or text holding the path, and
   AC7 covers an attached exception.
 - 3 (meaning of "absolute path"): accepted. E3 now names the rule of `Censio:DataDirectory` (fully qualified).
