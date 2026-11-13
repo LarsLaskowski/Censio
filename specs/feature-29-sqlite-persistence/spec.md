@@ -1,0 +1,159 @@
+# Spec: SQLite persistence for the server
+
+Source: Issue #29
+Status: Draft
+
+## Problem
+
+The server reads every message of the Companion and keeps none of it ([`ingest.md`](../../docs/areas/ingest.md),
+*Messages after the hello*): a restart loses everything, and #30 (state per profile, restore after restart), #35
+(history and retention), #32 (pages) and #42 (catalog and icons) have nowhere to put their data. Record
+[0021](../../docs/decisions/0021-sqlite-history-with-retention.md) chose one SQLite file in the data directory, so the
+operator runs no database server and backs the data up with the directory. This feature creates that database, keeps
+its schema current across versions, and gives the server one place to store and read profiles, islands, ticks, the
+catalog and icons. Writing what the ingest receives, showing it and the retention are the later issues' work.
+
+## Scenarios
+
+- S1: Given the Docker image with an empty `/config`, when the server starts, then it creates `/config/censio.db` with
+  the current schema, logs `The database '/config/censio.db' was created.` and then listens.
+- S2: Given a database a previous start created, when the server starts again (also in a recreated container that keeps
+  `/config`), then it opens that file, keeps everything stored in it and logs `The database '<file>' was opened.`
+- S3: Given a database of an earlier schema (written by an earlier Censio version, or an empty file), when the server
+  starts, then it brings the database to the current schema, keeps the data already stored and logs
+  `The database '<file>' was updated to the current schema.`
+- S4: Given the setting `Censio:Database:File` (`CENSIO__DATABASE__FILE`) with an absolute path, when the server
+  starts, then the database is that file instead of `<data directory>/censio.db`, its folder is created when missing,
+  and no data directory is needed for it (#39 puts it under the local app data folder; a NAS operator keeps it on a
+  local disk while `/config` is a share).
+- S5: Given neither `Censio:DataDirectory` nor `Censio:Database:File` (a plain `dotnet run`), when the server starts,
+  then it logs the warning
+  `No database file without a data directory (Censio:DataDirectory) or Censio:Database:File; data is kept in memory and lost when the server stops.`,
+  keeps its database in memory, writes no database file and otherwise behaves as with a file.
+- S6: Given a profile identity and name (from a hello, record
+  [0041](../../docs/decisions/0041-profile-selected-in-the-companion-figure-name-only-a-hint.md)), when the server
+  stores it, then an unknown identity becomes a new profile and a known one keeps its identity and takes the new name;
+  the server lists the stored profiles with identity and name.
+- S7: Given an accepted tick message, when the server stores it, then a later read returns every value the message
+  carried ([`contract.md`](../../docs/areas/contract.md), *Wire form*): identity, profile, receive time, game time, and
+  per island its key, session ID and name with every entry's values and maps. The islands of a profile are listed by
+  their key (session GUID, island ID, area index, [`pipe.md`](../../docs/areas/pipe.md), *Island key*), each with the name
+  of the tick with the latest receive time that carried it.
+- S8: Given stored ticks of two profiles, when the server asks for the latest tick of one profile, then it gets that
+  profile's tick with the latest receive time, never one of the other profile.
+- S9: Given an accepted catalog upload, when the server stores it, then it reads back the document's bytes and its
+  catalog identity (the SHA-256 of those bytes, as the hello reply names it); a later catalog replaces it. Given icon
+  images, it stores each PNG under its reference and, for a list of references, answers which ones it does not hold.
+
+## Errors and edge cases
+
+Every start failure is one `Critical` log line, exit code 1, before the server listens, after the key ring and the
+ingest token checks ([`server.md`](../../docs/areas/server.md), [`ingest.md`](../../docs/areas/ingest.md), *Start
+failures*); the database file is neither deleted nor replaced.
+
+- E1: `Censio:Database:File` not an absolute path, the empty string included:
+  `The database file (Censio:Database:File) must be an absolute path, not '<value>'; the server stops.`
+- E2: The file or its folder cannot be created, opened or written (no permission, read-only mount):
+  `The database '<file>' cannot be opened or written; the server stops. Make its folder writable for the user the server runs as.`
+- E3: The file is not a SQLite database or is damaged:
+  `The file '<file>' is not a readable database; the server stops.`
+- E4: The database holds a schema newer than this version knows (an older image started on a newer database):
+  `The database '<file>' was written by a newer Censio version; the server stops. Start that version or a newer one.`
+  The file is left unchanged.
+- E5: Bringing the database to the current schema fails:
+  `The database '<file>' cannot be updated to the current schema; the server stops.` The database keeps the schema
+  and data it had before the start.
+- E6: A tick whose identity is already stored (a resend, record
+  [0059](../../docs/decisions/0059-contract-messages-carry-a-companion-assigned-identity-and-their-profile.md)) is
+  reported as already stored and changes nothing; the same holds for an icon whose reference is stored.
+- E7: A float the message carried as `null` reads back as `null`, never as zero; negative zero reads back negative; an
+  island a tick did not carry has no values in that tick (a gap, never zeros, record
+  [0031](../../docs/decisions/0031-bounded-local-tick-buffer-gaps-accepted.md)).
+- E8: A write that fails while the server runs (disk full, file removed) stores nothing of that message and is reported
+  to the caller as a failure; what the ingest then answers is #30's.
+- E9: A tick of an unknown profile identity is refused by the store with a typed result, not stored.
+
+## Non-functional requirements
+
+- N1: New configuration: `Censio:Database:File` (`CENSIO__DATABASE__FILE`), unset by default; unset, the database is
+  `<data directory>/censio.db` (`/config/censio.db` in the image, which needs no new `ENV` line).
+- N2: Privacy: profile and island names are private ([`contract.md`](../../docs/areas/contract.md), *What never
+  crosses*); no log line of this feature holds a name, a value of a tick, a catalog or an icon, only the database path.
+  The server stores no figure name (record 0041). On Linux the server creates the database file, the files SQLite keeps
+  beside it while it runs, and a folder it creates, readable by their owner only.
+- N3: A tick is stored whole or not at all, also when the server stops during the write; a read during a write sees the
+  state before or after it.
+- N4: A tick at the contract's bounds (256 islands, 524,288 entries and map pairs, [`contract.md`](../../docs/areas/contract.md),
+  *Bounds*) is stored and read back; the time to store such a tick and a tick of an anonymised fixture, and the file's
+  growth per fixture tick, are measured and stated in the area document.
+- N5: The data layer is tested against real SQLite (the issue's criterion), never a hand-written stand-in for the
+  database; tests use no real recording beyond the anonymised fixtures (record 0029).
+- N6: One server process per database file (record [0020](../../docs/decisions/0020-one-companion-per-server-with-savegame-profiles.md)).
+  SQLite's locking is unreliable on network file systems: the documentation advises a local disk.
+
+## Acceptance criteria
+
+- AC1: A start with a data directory and no database file creates `censio.db` there with the current schema and logs
+  the line of S1 (S1).
+- AC2: A start on a database at the current schema keeps all stored data and logs the line of S2; a start on an
+  existing database of an earlier schema, an empty file included, brings it to the current schema with its data kept and
+  logs the line of S3 (S2, S3).
+- AC3: With `Censio:Database:File` set to an absolute path the server uses that file, creates its missing folder and
+  needs no data directory; a value that is not absolute stops the start as E1 (S4, E1, N1).
+- AC4: Without a data directory and without the setting the server logs the warning of S5, starts, writes no database
+  file, and stores and reads as with a file until it stops (S5).
+- AC5: Each failure of E2 to E5 stops the start with its line, exit code 1 and before listening; after E4 and E5 the
+  file's schema and data are those of before the start (E2, E3, E4, E5).
+- AC6: On Linux the database file, its side files and a folder the server creates are owner-only, and no log line of
+  this feature holds a profile or island name or a stored value (N2).
+- AC7: A stored profile is listed with identity and name; storing a known identity with another name keeps one profile
+  with the new name (S6).
+- AC8: A stored tick reads back with every value of the message equal, floats bit for bit with `null` and negative zero
+  kept; the profile's islands are listed by key with the latest name; a tick of an unknown profile is refused; a known
+  tick identity changes nothing and is reported as already stored; AC7 to AC11 run against real SQLite (S7, E6, E7, E9, N5).
+- AC9: The latest tick of a profile is its tick with the latest receive time, also when ticks of another profile were
+  stored later (S8).
+- AC10: A stored catalog reads back byte for byte with its identity and is replaced by a later one; a stored icon reads
+  back by its reference, storing it again changes nothing, and the missing-references query returns exactly the
+  references not stored (S9, E6).
+- AC11: A write that fails stores nothing of its message and returns a failure, and a tick at the contract's bounds is
+  stored and read back (E8, N3, N4).
+- AC12: `README.md` (configuration table) and `docs/USER_GUIDE.md` (*Data directory and NAS hosts*, *First start*, *Data
+  and logs*), English then German, name the database file and the setting, the start failures, the local-disk advice,
+  a backup by copying the file while the server is stopped, and that nothing received is stored yet until #30; the
+  measurements of N4 stand in the area document (N4, N6).
+
+## Out of scope
+
+- Writing ingested messages into the database, the in-memory live state and its restore (#30); pages (#32); retention,
+  hourly averages and deleting a profile's history (#35); sending the catalog (#42).
+- Session events: the issue lists no entity for them; #30 decides whether it needs one.
+- Pruning icons no catalog refers to, and keeping older catalogs.
+- A backup made by the server before a schema update: no schema is released yet.
+- A database server other than SQLite (record 0021).
+
+## Open questions
+
+- Q1: The issue lists an entity for **settings**; no issue, record or code says which settings the server keeps in its
+  database (operator settings come from configuration, the theme is kept per browser, #31). Not answered: escalated
+  to the Product Manager, with the recommendation to leave it out until the first feature that stores a setting adds it.
+- Q2: Where is the database without a data directory? Answered: in memory with a warning (Lead decision) (S5), as the ingest
+  token warns and degrades without one ([`ingest.md`](../../docs/areas/ingest.md), *Token*); the image always sets
+  `/config`, and local mode (#39) sets a path.
+- Q3: Is the catalog kept per profile (#30's scope says "catalog per profile")? Answered: no, per server (from the contract). A
+  catalog upload carries no profile and the hello reply names one server-wide catalog identity
+  ([`contract.md`](../../docs/areas/contract.md)).
+- Q4: Does the database path need a setting of its own beside the data directory? Answered: yes; the issue says
+  "configurable", record [0011](../../docs/decisions/0011-data-protection-key-ring-in-the-data-directory.md) keeps a
+  separate path possible, and a NAS share is no safe place for SQLite (N6).
+- Q5: How do failures at start behave? Answered: they stop the start (Lead decision) as an unwritable key ring does (record 0011),
+  so a container never reports `healthy` without its store.
+
+## Area documents
+
+- New area `server-data` (`docs/areas/server-data.md`, with its index row): where the database lies and the setting,
+  what happens at start (created, opened, updated, in memory), the start failures with their lines, what is stored (profiles,
+  islands, ticks, catalog, icons) and the rules of E6 to E9, file modes and privacy, one server per file and the local
+  disk, the measurements of N4.
+- `server.md`: the data directory also holds `censio.db`; the image's `/config/censio.db`; link to `server-data`.
+- `ingest.md` stays as is: it still stores nothing until #30.
