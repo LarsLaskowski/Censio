@@ -24,7 +24,7 @@ image, and every resource comes from the server itself ([`areas/web-ui.md`](../a
 ## Decision
 
 Option 2: `/icons/{reference}` serves a stored icon whose bytes start with the PNG signature and an `IHDR` chunk, as
-`image/png` with `nosniff` and an immutable cache lifetime, one read at a time; anything else is `404`
+`image/png` with `nosniff`, a content security policy that allows nothing and an immutable cache lifetime, one read at a time; anything else is `404`
 ([`areas/web-pages.md`](../areas/web-pages.md)).
 
 ## Consequences

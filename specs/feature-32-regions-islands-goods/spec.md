@@ -47,7 +47,7 @@ each island produces and consumes, how old the data is, or whether the Companion
   Laden Sie die Seite neu, um es erneut zu versuchen.`
 - E9: More than 100 profiles: the switch lists the first 100 in its order and then the disabled line
   `<n> more profiles` / `<n> weitere Profile`.
-- E10: An island with more than 500 goods: the table shows the first 500 in its order and the line
+- E10: An island with more than 500 goods: the table shows the first 500 entries of the tick, ordered by name, and the line
   `Showing 500 of <n> goods.` / `500 von <n> Waren angezeigt.`
 - E11: A stored icon that is not a PNG image (it does not start with the PNG signature followed by an `IHDR` chunk; it is
   not decoded further) shows as no icon and is not served.

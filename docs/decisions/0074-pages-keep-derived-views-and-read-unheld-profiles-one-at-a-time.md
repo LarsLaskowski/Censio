@@ -25,7 +25,7 @@ Blazor Server keeps its component state for as long as it is open.
 ## Decision
 
 Option 3: reads of profiles that are not held pass one gate of one place, and a page keeps a view of figures, names
-and at most 500 rows, holding no reference to a profile state once the view is built
+and at most 500 rows, holding no reference to a profile state once the view is built; a page that closes cancels its waiting or running read
 ([`areas/web-pages.md`](../areas/web-pages.md)).
 
 ## Consequences
