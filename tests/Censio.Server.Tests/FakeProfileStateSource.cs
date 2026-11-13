@@ -119,6 +119,16 @@ public sealed class FakeProfileStateSource : IProfileStateSource, IDisposable
     }
 
     /// <summary>
+    /// Forgets the held and the stored state of a profile, so that the source holds no reference to it any more.
+    /// </summary>
+    /// <param name="profileId">The profile identity</param>
+    public void Forget(Guid profileId)
+    {
+        _held.TryRemove(profileId, out _);
+        _stored.TryRemove(profileId, out _);
+    }
+
+    /// <summary>
     /// Lets the held reads end.
     /// </summary>
     public void ReleaseReads()

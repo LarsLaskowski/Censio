@@ -249,6 +249,55 @@ public sealed class ProgramTests
     }
 
     /// <summary>
+    /// The region overview of the real host without any profile shows the no-data text inside the frame.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC9")]
+    public async Task ProgramGetRegionsShowsNoDataInFrame()
+    {
+        // Arrange
+        using var factory = new CensioServerFactory("Production");
+        using var client = factory.CreateClient();
+
+        // Act
+        using var response = await client.GetAsync("/regions", TestContext.CancellationToken);
+        var body = await response.Content.ReadAsStringAsync(TestContext.CancellationToken);
+
+        // Assert
+        var document = ParseHtml(body);
+
+        Assert.AreEqual(HttpStatusCode.OK, response.StatusCode, "The region overview should answer 200");
+        Assert.AreEqual(1, CountLabel(document, "Open or close the navigation"), "The overview should be shown inside the frame");
+        Assert.Contains("No data yet. The pages fill once the Companion sends data.", document.QuerySelector(".mud-main-content")?.TextContent ?? string.Empty, "The overview should show the no-data text inside the frame");
+    }
+
+    /// <summary>
+    /// A malformed profile in the address of the real host shows the not-found text inside the frame, without echoing the
+    /// address.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC9")]
+    public async Task ProgramGetMalformedProfileShowsNotFoundInFrame()
+    {
+        // Arrange
+        using var factory = new CensioServerFactory("Production");
+        using var client = factory.CreateClient();
+
+        // Act
+        using var response = await client.GetAsync("/profiles/q7malformedq7/regions", TestContext.CancellationToken);
+        var body = await response.Content.ReadAsStringAsync(TestContext.CancellationToken);
+
+        // Assert
+        var document = ParseHtml(body);
+
+        Assert.AreEqual(1, CountLabel(document, "Open or close the navigation"), "The page should be shown inside the frame");
+        Assert.Contains("Not found.", document.QuerySelector(".mud-main-content")?.TextContent ?? string.Empty, "A malformed profile should show the not-found text inside the frame");
+        Assert.DoesNotContain("q7malformedq7", body, "The page should not echo the address");
+    }
+
+    /// <summary>
     /// A first visit shows the frame in the light theme with the English texts, the navigation open and the start page's
     /// entry marked.
     /// </summary>

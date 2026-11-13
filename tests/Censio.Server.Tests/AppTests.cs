@@ -2,7 +2,7 @@ using Bunit;
 
 using Censio.Server.Components;
 
-using MudBlazor.Services;
+using TestContext = Microsoft.VisualStudio.TestTools.UnitTesting.TestContext;
 
 namespace Censio.Server.Tests;
 
@@ -12,6 +12,28 @@ namespace Censio.Server.Tests;
 [TestClass]
 public sealed class AppTests
 {
+    #region Constructors
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="AppTests" /> class.
+    /// </summary>
+    /// <param name="testContext">The test context</param>
+    public AppTests(TestContext testContext)
+    {
+        TestContext = testContext;
+    }
+
+    #endregion // Constructors
+
+    #region Properties
+
+    /// <summary>
+    /// Gets the test context.
+    /// </summary>
+    public TestContext TestContext { get; }
+
+    #endregion // Properties
+
     #region Methods
 
     /// <summary>
@@ -24,13 +46,10 @@ public sealed class AppTests
     public async Task AppRenderWithoutHttpContextShowsEnglishDocumentInLightTheme()
     {
         // Arrange
-        await using var context = new BunitContext();
-
-        context.JSInterop.Mode = JSRuntimeMode.Loose;
-        context.Services.AddMudServices();
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken);
 
         // Act
-        var app = context.Render<App>();
+        var app = host.Context.Render<App>();
 
         // Assert
         Assert.AreEqual("en", app.Find("html").GetAttribute("lang"), "The document language should be English without a request");
