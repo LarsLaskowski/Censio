@@ -40,3 +40,4 @@ are quoted in full.
 | 2026-11-13 15:57 | 6 Coverage skipped (G5) | Orchestrator | skipped — G5 is documentation only; the full coverage gate runs in the step-7 stamp. |
 | 2026-11-13 15:57 | 6 Documentation | Orchestrator | written in 6 Implement (G5) |
 | 2026-11-13 16:00 | 7 Gate stamp | Orchestrator | PASS on 90a50c1dddca9928a0e14a18ec717ca5ea0fb8df (tier security): Format check pass; Analyzer gate pass; Test with coverage pass; Coverage gate pass; decision-check.py pass; scope-check.py pass · figure-check.py 0 hit(s) |
+| 2026-11-13 16:00 | 7 Manual test | Orchestrator | No Product Manager test: the plan names the stand-in for AC12 — the Reviewer reads README.md, USER_GUIDE.md and server-data.md against the criterion in step 8; the N4 figures were measured by the Dev (task 12). The Dev also tried the created/opened lines and mode 600 by hand on a real image build. |
