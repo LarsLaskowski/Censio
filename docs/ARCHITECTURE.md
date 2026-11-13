@@ -20,7 +20,7 @@ except the Windows shell:
 | `Censio.Pipe` | Framing and parsing the statistics pipe into typed messages and assembling them into ticks, recording frames to a file and replaying it, and anonymising a recording ([`areas/pipe.md`](areas/pipe.md), [`areas/pipe-recording.md`](areas/pipe-recording.md)) | — |
 | `Censio.GameData` | Reading the game files (the RDA archives), building the catalog of names from them and reading the goods' and regions' icons from the UI archives (BC7 to PNG by own code) ([`areas/game-files.md`](areas/game-files.md), [`areas/game-catalog.md`](areas/game-catalog.md), [`areas/game-catalog-icons.md`](areas/game-catalog-icons.md), [`areas/game-catalog-cache.md`](areas/game-catalog-cache.md)) | — |
 | `Censio.Server.Data` | Persistence of the server: the SQLite database with EF Core migrations, and the store for profiles, ticks, islands, the catalog and icons ([`areas/server-data.md`](areas/server-data.md)) | Contracts |
-| `Censio.Server` | Web host, UI, the ingest endpoint with its token ([`areas/ingest.md`](areas/ingest.md)), the current state per profile ([`areas/server-state.md`](areas/server-state.md)); later the history | Contracts, Server.Data |
+| `Censio.Server` | Web host, UI (frame, themes and languages, [`areas/web-ui.md`](areas/web-ui.md)), the ingest endpoint with its token ([`areas/ingest.md`](areas/ingest.md)), the current state per profile ([`areas/server-state.md`](areas/server-state.md)); later the history | Contracts, Server.Data |
 | `Censio.Companion.Core` | The Companion's platform-neutral logic (tray menu and snapshot, single-instance rule, pipe connection state machine, command line, recording session and replay runner, tooltip texts, diagnostics window content and session, the log file writer, the autostart rules, the game installation search and the settings file, the catalog and icon loading, the catalog cache, the conversion of the catalog into the catalog document and the check of tick GUIDs) | Contracts, Pipe, GameData |
 | `Censio.Anonymiser` | Contributor console tool that anonymises a recording; not released ([`areas/pipe-recording.md`](areas/pipe-recording.md), *Anonymising*) | Pipe |
 | `Censio.Companion` | The Windows tray shell (WPF application, Windows Forms tray icon, the diagnostics window (with the icons shown as images), the registry store of the autostart value, the registry reader of Ubisoft Connect's install records and the file version reader); no test project | Companion.Core |
@@ -71,7 +71,7 @@ variables and is validated at startup. The server generates the ingest token int
 
 ## Security model
 
-Untrusted input: the statistics pipe, the game files, the Companion's settings file, Ubisoft Connect's install records and the WebSocket ingest. The ingest token authenticates the
+Untrusted input: the statistics pipe, the game files, the Companion's settings file, Ubisoft Connect's install records, the WebSocket ingest and the browser's preference cookies and language header. The ingest token authenticates the
 Companion; cache and recording paths are never derived from external input unchecked. Kept in sync with
 `SECURITY.md` and the *Security areas* in `.squad/project.md`.
 
