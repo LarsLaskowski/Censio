@@ -21,7 +21,7 @@ REAL or NUMERIC affinity that is a whole number as an integer, so `-0.0` reads b
    decodes whole ticks, and the blob is a format of its own to read strictly.
 2. **Rows per island, entry and map pair, written through EF Core's change tracker** — queryable; half a million tracked
    entities per tick cost time and memory far beyond the message itself.
-3. **The same rows, written by prepared commands on the context's connection in one transaction** (chosen) — queryable,
+3. **The same rows, written by prepared commands on the database's kept connection in one transaction** (chosen) — queryable,
    one statement per row without tracking, atomic.
 
 For the floats: **REAL columns** lose negative zero; **REAL values in a column without affinity** keep it but rest on

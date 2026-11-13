@@ -59,8 +59,8 @@ dotnet tool run dotnet-ef migrations add <Name> --project src/Censio.Server.Data
 A model change without a migration fails the test `CensioDbContextFactoryCreateDbContextHasNoPendingModelChanges`. The
 server applies the pending migrations of a database at start as one script in one transaction, so a migration that EF
 Core would run outside a transaction (a step it marks `TransactionSuppressed`) is refused at start: every test that
-creates a database then fails with `UpdateFailed`, and `ServerDatabaseMigrationsRunInsideTransaction` names the
-migration. Such a migration needs a decision record first. The files in `Migrations/` are generated code: do not edit
+creates a database then fails with `UpdateFailed`, and the exception attached to that result names the
+migration (`The migration <id> runs a step outside of a transaction`). Such a migration needs a decision record first. The files in `Migrations/` are generated code: do not edit
 them by hand.
 
 ### Automated checks

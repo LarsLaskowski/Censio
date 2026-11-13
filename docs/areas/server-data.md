@@ -31,7 +31,7 @@ before the update only reads an existing file:
 
 1. Without a file name, an in-memory database is opened and brought to the current schema; the kind is *in memory*.
 2. A missing folder is created and a missing file is created empty, then SQLite opens it in read-write mode and never
-   creates it itself. On Linux the folder the server creates has mode `0700` and the file `0600`; the files SQLite keeps
+   creates it itself. On Linux the folder that holds the file has mode `0700` when the server creates it (missing folders above it take the process's default mode) and the file `0600`; the files SQLite keeps
    beside it (`-wal`, `-shm`) take the file's mode. An existing file or folder keeps its mode. On Windows the file takes
    its folder's rules.
 3. The file is classified. A file without any table of its own, or holding only EF Core's two bookkeeping tables

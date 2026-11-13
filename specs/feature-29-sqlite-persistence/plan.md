@@ -330,4 +330,3 @@ Verdict APPROVED; each note decided:
 - N5: accepted; `I29-AC6` also checks `-wal` and `-shm` when present.
 - N6: taken; the publish line gets `-p:UseAppHost=false`, as the image starts `dotnet Censio.Server.dll` and needs no
   apphost.
-
