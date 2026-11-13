@@ -1,3 +1,4 @@
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -8,15 +9,28 @@ namespace Censio.Server.Data;
 /// </summary>
 public sealed class ServerDatabase : IDisposable
 {
+    #region Fields
+
+    /// <summary>
+    /// The connection kept open for the lifetime of the database.
+    /// </summary>
+    private readonly SqliteConnection _keeper;
+
+    #endregion // Fields
+
     #region Constructors
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ServerDatabase"/> class.
     /// </summary>
     /// <param name="databaseFile">The full path of the database file, or <see langword="null"/> for an in-memory database</param>
-    internal ServerDatabase(string? databaseFile)
+    /// <param name="keeper">The connection kept open for the lifetime of the database</param>
+    /// <param name="contextOptions">The options of the contexts over the database</param>
+    internal ServerDatabase(string? databaseFile, SqliteConnection keeper, DbContextOptions<CensioDbContext> contextOptions)
     {
         DatabaseFile = databaseFile;
+        ContextOptions = contextOptions;
+        _keeper = keeper;
     }
 
     #endregion // Constructors
@@ -27,6 +41,11 @@ public sealed class ServerDatabase : IDisposable
     /// Gets the full path of the database file, or <see langword="null"/> for an in-memory database.
     /// </summary>
     public string? DatabaseFile { get; }
+
+    /// <summary>
+    /// Gets the options of the contexts over the database.
+    /// </summary>
+    internal DbContextOptions<CensioDbContext> ContextOptions { get; }
 
     #endregion // Properties
 
@@ -57,12 +76,10 @@ public sealed class ServerDatabase : IDisposable
     /// <param name="configureContext">Further configuration of the context options</param>
     /// <param name="cancellationToken">The cancellation token</param>
     /// <returns>The result of opening</returns>
-#pragma warning disable S1172, RH2003 // Skeleton: removed with the implementation
     public static Task<ServerDatabaseOpenResult> OpenAsync(string? databaseFile, ILoggerFactory loggerFactory, Action<DbContextOptionsBuilder> configureContext, CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        return ServerDatabaseOpener.OpenAsync(databaseFile, loggerFactory, configureContext, cancellationToken);
     }
-#pragma warning restore S1172, RH2003 // Skeleton: removed with the implementation
 
     #endregion // Methods
 
@@ -71,7 +88,7 @@ public sealed class ServerDatabase : IDisposable
     /// <inheritdoc/>
     public void Dispose()
     {
-        // Skeleton: nothing is opened yet, so nothing is released
+        ServerDatabaseOpener.Release(_keeper);
     }
 
     #endregion // IDisposable
