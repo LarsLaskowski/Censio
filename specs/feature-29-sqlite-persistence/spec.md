@@ -1,7 +1,7 @@
 # Spec: SQLite persistence for the server
 
 Source: Issue #29
-Status: Draft
+Status: Approved by Lead
 
 ## Problem
 
@@ -55,7 +55,7 @@ failures*); the database file is neither deleted nor replaced.
   `The database file (Censio:Database:File) must be an absolute path, not '<value>'; the server stops.`
 - E2: The file or its folder cannot be created, opened or written (no permission, read-only mount):
   `The database '<file>' cannot be opened or written; the server stops. Make its folder writable for the user the server runs as.`
-- E3: The file is not a SQLite database, is damaged, or is a SQLite database Censio did not write (it holds tables but
+- E3: The file is not a SQLite database, is damaged where the start reads it, or is a SQLite database Censio did not write (it holds tables but
   no record of Censio's schema versions); the file is left unchanged:
   `The file '<file>' is not a readable Censio database; the server stops.`
 - E4: The database holds a schema newer than this version knows (an older image started on a newer database):
@@ -149,9 +149,8 @@ failures*); the database file is neither deleted nor replaced.
 - Q2: Where is the database without a data directory? Answered: in memory with a warning (Lead decision) (S5), as the ingest
   token warns and degrades without one ([`ingest.md`](../../docs/areas/ingest.md), *Token*); the image always sets
   `/config`, and local mode (#39) sets a path.
-- Q3: Is the catalog kept per profile (#30's scope says "catalog per profile")? Answered: no, per server (from the contract). A
-  catalog upload carries no profile and the hello reply names one server-wide catalog identity
-  ([`contract.md`](../../docs/areas/contract.md)).
+- Q3: Is the catalog kept per profile (#30 says "catalog per profile")? Answered: no, per server: a catalog upload
+  carries no profile and the hello reply names one catalog identity ([`contract.md`](../../docs/areas/contract.md)).
 - Q4: Does the database path need its own setting? Answered: yes; the issue says "configurable", and a NAS share is no
   safe place for SQLite (N6).
 - Q5: How do failures at start behave? Answered: they stop the start (Lead decision), as an unwritable key ring does
@@ -164,7 +163,7 @@ failures*); the database file is neither deleted nor replaced.
   islands, ticks, catalog, icons) and the rules of E6 to E9, the latest-tick rule of S8, how N3 holds in memory, file
   modes and privacy, one server per file and the local disk, the measurements of N4.
 - `server.md`: the data directory also holds `censio.db`; the image's `/config/censio.db`; link to `server-data`.
-- `ingest.md` stays as is: it still stores nothing until #30.
+- `ingest.md` stays as is until #30.
 
 ## Challenge
 
