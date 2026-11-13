@@ -1,7 +1,7 @@
 # Spec: Layout, theming and navigation with MudBlazor
 
 Source: Issue #31
-Status: Draft
+Status: Approved by Lead
 
 ## Problem
 
@@ -16,9 +16,9 @@ player who keeps the page open next to the game in the evening wants it dark, an
   name `Censio`, a button that opens and closes the navigation, a disabled profile switch, a theme switch and a
   language switch; the navigation is open and lists the start page (`Home` / `Startseite`); the page uses the light
   theme; the start page still shows the heading `Censio` and the line `Version <version>`.
-- S2: Given that browser, when its language list names German before English (any German variant such as `de`,
-  `de-DE`, `de-AT`), then every text of the frame is German; when it names English first, or neither of the two,
-  every text is English.
+- S2: Given that browser, when its language list ranks German above English (any German variant such as `de`,
+  `de-DE`, `de-AT`; ranked by weight, highest first, equal weights by position, weight 0 excluded), then every text of
+  the frame is German; when it ranks English first, or names neither, every text is English.
 - S3: Given the light theme, when the user presses the theme switch, then the page turns dark at once, without a
   reload; pressing it again turns it light.
 - S4: Given the dark theme was chosen, when the user reloads the page, closes and reopens the browser, or opens
@@ -27,8 +27,8 @@ player who keeps the page open next to the game in the evening wants it dark, an
 - S5: Given English texts, when the user chooses `Deutsch` in the language switch, then every text of the frame and
   the page turns German at once, without a reload; choosing `English` turns them back. The choice survives a reload
   and a browser restart as in S4 and overrides the browser's language list from then on.
-- S6: Given any theme and language, when the user points at or focuses the profile switch, then it reads
-  `Profile` / `Profil` and cannot be opened; it shows no profile name and no other stored data.
+- S6: Given any theme and language, the profile switch shows the visible text `Profile` / `Profil` and cannot be
+  opened or focused; it shows no profile name and no other stored data.
 - S7: Given the navigation is open, when the user presses the navigation button, then it closes and the page uses
   the freed width; pressing it again opens it. Choosing an entry of the navigation opens that page, and the entry of
   the page shown is marked.
@@ -67,7 +67,8 @@ The frame's texts, exactly:
 - N1: Contrast, in both themes, for every text and control of the frame and the start page, checked against
   WCAG 2.1 level AA: text against its background at least 4.5:1, large text (at least 24 px, or 18.66 px bold) at
   least 3:1, the boundaries and icons of controls and the focus indicator at least 3:1 against their surroundings.
-  A disabled control is exempt by WCAG, but the profile switch's label still meets 4.5:1.
+  A disabled control is exempt by WCAG, but the profile switch's label colour is set explicitly to meet 4.5:1, not
+  taken from the disabled colour.
 - N2: Every resource the page loads (styles, scripts, fonts, icons) comes from the Censio server itself: no content
   delivery network and no font host, so a browser without internet access shows the same page and no third party
   learns that a page was opened.
@@ -92,16 +93,17 @@ The frame's texts, exactly:
   the theme switch and the language switch, an open navigation with the start page's entry marked, the light theme
   (also when the operating system prefers dark), the title `Censio`, the heading `Censio` and `Version <version>`
   in the release check's markup (S1, S7, N5).
-- AC2: Without a stored choice, the language is German exactly when a German variant comes before English in the
-  browser's language list, otherwise English; the page's `lang` attribute names it (S2, N4, E1).
+- AC2: Without a stored choice, the language is German exactly when a German variant ranks above English in the
+  browser's language list by the order of S2, otherwise English; the page's `lang` attribute names it (S2, N4, E1).
 - AC3: The theme switch turns the open page from light to dark and back without a reload, and its accessible name
   is the one of the table for the theme shown (S3).
 - AC4: After a dark theme was chosen, the HTML the server sends for `/` on the next request of that browser is
   already in the dark theme (no light first paint), also after a browser restart (S4, N3).
 - AC5: Choosing `Deutsch` or `English` changes every text of the frame and the `lang` attribute without a reload,
   and the server's next HTML for that browser is in that language, whatever its language list says (S5, N4, N3).
-- AC6: Every text of the frame in both languages is exactly the one of the table in *Scenarios*, and the German
-  texts render in the Docker image (S1, S5, N6).
+- AC6: Every text of the frame in both languages is exactly the one of the table in *Scenarios*, and both languages
+  render without culture data: the server's tests run with invariant globalization, as the Docker image does (S1, S5,
+  N6).
 - AC7: The profile switch is disabled, reads `Profile` / `Profil`, cannot be opened and holds no profile name (S6,
   N7).
 - AC8: The navigation button closes and opens the navigation, and the content takes the freed width, in the desktop
@@ -145,25 +147,22 @@ The frame's texts, exactly:
   language choice and its default, how long a choice is kept and where, the treatment of an unknown stored value, the
   frame's texts in both languages, that every resource comes from the server itself, desktop browsers only.
 - `docs/areas/server.md`: *Start page* says the page is shown in the frame of `web-ui.md` and keeps title, heading
-  and version line; *Not here* points at `web-ui.md` instead of "#31"; the index row's "web theming" likewise.
+  and version line; *Limits and errors* no longer says `/` takes no input: it reads the stored choice and the
+  browser's language header, handled as E2 says; *Not here* points at `web-ui.md` instead of "#31"; the index row's
+  "web theming" likewise.
+- `README.md` and `docs/USER_GUIDE.md` describe the theme and language switches, English then German, for external
+  testers (the issue's *Documentation*).
 
-## Challenge notes
+## Challenge
 
-Spec challenge (mode `spec`) of /home/user/Censio/specs/feature-31-mudblazor-layout-theming/spec.md, against issue #31 and its comment (record 0041).
+Spec challenge: no major objection; four minor notes, all accepted.
 
-The spec's main claims hold up against the code:
-- **The start page today:** `MainLayout.razor` renders only `@Body`, `Home.razor` holds just the title, heading and version line, and `App.razor` hard-codes `<html lang="en">`.
-- **N5 release check:** `.github/scripts/release-check.sh:313` really does extract the version with `sed 's|.*<p>Version \([^<]*\)</p>.*|\1|p'`, so the bare `<p>Version …</p>` must stay as it is.
-- **N6 culture data:** `docs/areas/server.md` (*Docker image*) does say the runtime image runs with invariant globalization and no ICU.
-- **No MudBlazor yet:** `Directory.Packages.props` has no MudBlazor, so the feature does not already exist.
-- **N7 and record 0006:** record 0006 (Consequences, line 47-48) only revisits its choice for "game data or a state-changing action on a page", and N7 stays inside that.
-
-No objection is major. Four are minor:
-
-1. **minor: S2 / AC2 – "names German before English" leaves weighted language lists undefined.** Browsers send the language list as the `Accept-Language` header, which can carry weights (`q` values). A header like `en;q=0.5, de` or `de;q=0, en` puts the two languages in a different order by position than by weight. An implementation that compares positions and one that sorts by weight (as ASP.NET Core's `AcceptLanguageHeaderRequestCultureProvider` does) would both pass AC2 as written but answer differently. Instruction for the Lead: state in S2/AC2 that the order is by `q` weight, highest first (ties by position), and that `q=0` excludes a language. The Tester covers one weighted header in each direction.
-
-2. **minor: S6 / AC7 / N1 – a "disabled" profile switch cannot be focused or hovered as S6 describes.** A disabled `<button>` is taken out of the tab order. MudBlazor's disabled buttons also get `pointer-events: none` and the theme's low-contrast disabled colour (about 38 % opacity). So "when the user points at or focuses the profile switch, then it reads `Profile`" fails on any build that uses the `disabled` attribute. N1's 4.5:1 for its label fails with MudBlazor's default disabled palette. Instruction for the Lead: make `Profile` / `Profil` the switch's visible text, drop "points at or focuses" from S6, and state that the label's colour is set explicitly to meet 4.5:1 rather than taken from the disabled palette. The alternative is to state that the control is `aria-disabled` and stays focusable; either way, pick one.
-
-3. **minor: *Area documents* misses a statement it contradicts, and the documentation the issue asks for.** `docs/areas/server.md`, *Limits and errors*, says "The server reads no request body and takes no input on `/` or `/health`". With this feature, `/` reads the stored theme/language value (a cookie, since AC4 needs it on the request) and `Accept-Language`. `/` is also listed under *Network exposure* in the security areas of `.squad/project.md`. The issue's *Documentation* section asks for README and user guide text (English, then German, in each file) so that external testers can try the feature, and the spec does not mention it. Instruction for the Lead: add to *Area documents* that this `server.md` line changes to name the stored choice and the language header as the input `/` reads, linking E2's handling. Also add one line saying `README.md` and `docs/USER_GUIDE.md` describe the theme and language switches in both languages.
-
-4. **minor: N6 / AC6 – "the German texts render in the Docker image" has no stated check outside the image.** Under invariant globalization, `new CultureInfo("de-DE")` throws `CultureNotFoundException` by default (`PredefinedCulturesOnly`). A build that does its localization through `CultureInfo` / `IStringLocalizer` could therefore pass every unit test on a machine with ICU and still fail in the image. S5's switch without a reload also cannot rely on the request's culture, which is fixed for the open page. Instruction for the Lead: phrase AC6 so that it is checked without Docker. The German texts must not depend on culture data (for example, the server's tests run one case with `System.Globalization.Invariant` set). Alternatively, name the image check as AC6's verification, with an owner.
+1. S2 / AC2 leave weighted language lists undefined — accepted: S2 ranks by weight, highest first, equal weights by
+   position, weight 0 excluded; AC2 refers to that order. The plan's tests cover a weighted list in each direction.
+2. A disabled profile switch cannot be pointed at or focused, and its label takes the low-contrast disabled colour —
+   accepted: S6 drops "points at or focuses", the text is visible and the control not focusable; N1 sets the
+   label's colour explicitly to meet 4.5:1.
+3. *Area documents* missed `server.md`'s "takes no input on `/`" and the README and user guide — accepted: both are
+   listed.
+4. AC6 "renders in the Docker image" had no check outside the image — accepted: AC6 now says both languages render
+   without culture data, checked by running the server's tests with invariant globalization as the image does.
