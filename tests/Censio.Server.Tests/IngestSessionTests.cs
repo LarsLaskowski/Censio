@@ -1178,6 +1178,38 @@ public sealed class IngestSessionTests : IDisposable
     }
 
     /// <summary>
+    /// A tick refused invalid and a catalog upload refused catalogInvalid are acknowledged with their refusal and store
+    /// nothing: no tick, no catalog, no change of the complete catalog and no follower told.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC3")]
+    public async Task IngestSessionRunAsyncRefusedMessagesStoreNothing()
+    {
+        // Arrange
+        var (_, client, _) = await StartAcceptedSessionAsync();
+
+        var completeBefore = _state.CompleteCatalogIdentity;
+        var (notices, told) = Follow(1);
+
+        // Act
+        await SendAllAsync(client, [InvalidTick(Id1), IngestClient.CatalogUpload(Id2, _refusedCatalogs["catalog invalid"]()), TickOfOtherProfile(Id3)]);
+
+        var replies = await ReceiveMessagesAsync(client, 3);
+
+        // Assert
+        await told.WaitAsync(_followerBound, TestContext.CancellationToken);
+
+        AssertAcknowledgement(replies[0], Id1, ContractAcknowledgementRefusal.Invalid, null, []);
+        AssertAcknowledgement(replies[1], Id2, ContractAcknowledgementRefusal.CatalogInvalid, null, []);
+        AssertAcknowledgement(replies[2], Id3, null, null, []);
+        Assert.IsNull(await _store.ReadTickAsync(Guid.Parse(Id1), TestContext.CancellationToken), "The refused tick should not be stored");
+        Assert.IsNull(await _store.ReadCatalogAsync(TestContext.CancellationToken), "The refused catalog should not be stored");
+        Assert.AreEqual(completeBefore, _state.CompleteCatalogIdentity, "The complete catalog should not change");
+        Assert.AreSequenceEqual(new[] { $"Profile {OtherProfile}" }, notices.ToList(), "No follower should be told of the refused messages, only of the later tick");
+    }
+
+    /// <summary>
     /// An accepted hello stores its profile with its name before helloAccepted is sent.
     /// </summary>
     /// <returns>A task that completes when the test is done</returns>
@@ -1250,6 +1282,38 @@ public sealed class IngestSessionTests : IDisposable
         // Assert
         AssertHelloRefused(messages[0], ContractHelloRefusal.CompanionConnected, 1);
         Assert.AreSequenceEqual(new[] { $"{IngestClient.Profile} {HelloProfileName}" }, DescribeProfiles(await _store.ListProfilesAsync(TestContext.CancellationToken), null), "The refused hello should not rename the connected profile");
+    }
+
+    /// <summary>
+    /// A hello refused tokenRefused and a hello refused unsupportedVersion, the latter with the stored token, store no
+    /// profile.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC5")]
+    public async Task IngestSessionRunAsyncRefusedHelloStoresNothing()
+    {
+        // Arrange
+        var (tokenRun, tokenClient, _) = StartSession(IngestAccess.CreateForToken(Token));
+        var (versionRun, versionClient, _) = StartSession(IngestAccess.CreateForToken(Token));
+
+        // Act
+        await IngestClient.SendAsync(tokenClient, IngestClient.Hello(LastCharacterChanged));
+
+        var (tokenMessages, _, _) = await IngestClient.ReceiveUntilCloseAsync(tokenClient);
+
+        await FinishAsync(tokenClient, tokenRun);
+        await IngestClient.SendAsync(versionClient, IngestClient.Hello(Token, 2));
+
+        var (versionMessages, _, _) = await IngestClient.ReceiveUntilCloseAsync(versionClient);
+
+        await FinishAsync(versionClient, versionRun);
+
+        // Assert
+        AssertHelloRefused(tokenMessages[0], ContractHelloRefusal.TokenRefused, 1);
+        AssertHelloRefused(versionMessages[0], ContractHelloRefusal.UnsupportedVersion, 2);
+        Assert.IsEmpty(await _store.ListProfilesAsync(TestContext.CancellationToken), "No refused hello should store a profile");
+        Assert.IsEmpty(_state.Profiles, "No refused hello should add a profile to the state");
     }
 
     /// <summary>
@@ -1391,6 +1455,33 @@ public sealed class IngestSessionTests : IDisposable
         AssertOneStoreFailureLogged();
         Assert.ContainsSingle(message => message == "Companion connected.", LogMessages(), "Only the second Companion should be logged as connected");
         Assert.DoesNotContain(message => message.StartsWith("Companion disconnected", StringComparison.Ordinal), LogMessages(), "The failed hello should log no disconnect line");
+    }
+
+    /// <summary>
+    /// A hello whose profile store ends with an exception other than a SQLite failure (the database is disposed, as at a
+    /// stop) gets no reply, and the session's end frees the Companion's place and its pending place without logging a
+    /// connected or a disconnect line.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public async Task IngestSessionRunAsyncHelloStoreExceptionFreesPlace()
+    {
+        // Arrange
+        _disposables.OfType<ServerDatabase>().Single().Dispose();
+
+        var (run, client, _) = StartSession(IngestAccess.CreateForToken(Token));
+
+        // Act
+        await IngestClient.SendAsync(client, IngestClient.Hello(Token));
+        await IngestClient.GuardAsync(run);
+
+        // Assert
+        await Assert.ThrowsAsync<WebSocketException>(() => IngestClient.ReceiveAsync(client), "The connection should end without a reply");
+        Assert.IsTrue(_connections.TryTakeCompanion(), "The Companion's place should be released");
+        Assert.AreEqual(IngestConnections.MaxPendingHellos, CountFreePendingPlaces(), "The pending place should be left");
+        Assert.DoesNotContain("Companion connected.", LogMessages(), "The hello should not be logged as connected");
+        Assert.DoesNotContain(message => message.StartsWith("Companion disconnected", StringComparison.Ordinal), LogMessages(), "The hello should log no disconnect line");
     }
 
     /// <summary>

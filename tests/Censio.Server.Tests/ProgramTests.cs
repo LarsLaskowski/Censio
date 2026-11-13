@@ -410,6 +410,40 @@ public sealed class ProgramTests
     }
 
     /// <summary>
+    /// A start whose database opens but whose stored state cannot be read (the tick table renamed) ends with exit code 1
+    /// before the server listens.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC9")]
+    public async Task ProgramStartWithUnreadableStateExitsWithCodeOne()
+    {
+        // Arrange
+        var dataDirectory = CreateTemporaryDirectory();
+        var databaseFile = Path.Combine(dataDirectory, DatabaseSetup.DatabaseFileName);
+        var opened = await ServerDatabase.OpenAsync(databaseFile, NullLoggerFactory.Instance, TestContext.CancellationToken);
+
+        opened.Database?.Dispose();
+        SqliteConnection.ClearAllPools();
+        RenameTicks(databaseFile);
+
+        using var blocker = new TcpListener(IPAddress.Loopback, 0);
+
+        blocker.Start();
+
+        var port = ((IPEndPoint)blocker.LocalEndpoint).Port;
+        var entryPoint = typeof(Program).Assembly.EntryPoint!;
+        string[] arguments = [$"--{DataProtectionSetup.DataDirectoryKey}={dataDirectory}", $"--urls=http://127.0.0.1:{port}", $"--applicationName={typeof(Program).Assembly.GetName().Name}"];
+
+        // Act
+        var exitCode = await Task.Run(() => entryPoint.Invoke(null, [arguments]), TestContext.CancellationToken).WaitAsync(TimeSpan.FromSeconds(30), TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(ServerDatabaseOpenKind.Created, opened.Kind, "The database should be created before the test breaks its state");
+        Assert.AreEqual(1, exitCode, "The start should end with exit code 1");
+    }
+
+    /// <summary>
     /// The committed settings files set no listen address.
     /// </summary>
     /// <param name="environment">The hosting environment</param>
@@ -478,6 +512,29 @@ public sealed class ProgramTests
         using var factory = new CensioServerFactory("Production", settings);
 
         return factory.Services.GetRequiredService<IDataProtectionProvider>().CreateProtector("Censio.Tests.Restart").Unprotect(protectedPayload);
+    }
+
+    /// <summary>
+    /// Renames the tick table of a database file over a connection of its own, so that the state cannot be restored.
+    /// </summary>
+    /// <param name="databaseFile">The database file</param>
+    private static void RenameTicks(string databaseFile)
+    {
+        var builder = new SqliteConnectionStringBuilder
+                      {
+                          DataSource = databaseFile,
+                          Mode = SqliteOpenMode.ReadWrite,
+                          Pooling = false
+                      };
+
+        using var connection = new SqliteConnection(builder.ToString());
+
+        connection.Open();
+
+        using var command = connection.CreateCommand();
+
+        command.CommandText = "ALTER TABLE \"Ticks\" RENAME TO \"TicksMoved\";";
+        command.ExecuteNonQuery();
     }
 
     /// <summary>
