@@ -51,7 +51,9 @@ internal static class TickReader
     /// <returns>The tick, or <see langword="null"/> when none matches</returns>
     public static async Task<ContractTick?> ReadAsync(SqliteConnection connection, string sql, Guid value, CancellationToken cancellationToken)
     {
-        using var transaction = await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+#pragma warning disable S6966 // The async overload has no deferred form and begins an immediate (write) transaction
+        using var transaction = connection.BeginTransaction(true);
+#pragma warning restore S6966
 
         long number;
         Guid id;
@@ -169,7 +171,10 @@ internal static class TickReader
                 entries[islandRow] = list;
             }
 
-            var maps = pairs.GetValueOrDefault(reader.GetInt64(0));
+            if (pairs.TryGetValue(reader.GetInt64(0), out var maps) == false)
+            {
+                maps = ([], []);
+            }
 
             list.Add(new ContractTickEntry
                      {
@@ -185,8 +190,8 @@ internal static class TickReader
                          BuildingCount = reader.GetInt32(11),
                          Maintenance = reader.GetInt32(12),
                          Profit = reader.GetInt32(13),
-                         WorkforceAmounts = maps.Workforce ?? [],
-                         BuildingAmounts = maps.Buildings ?? []
+                         WorkforceAmounts = maps.Workforce,
+                         BuildingAmounts = maps.Buildings
                      });
         }
 
