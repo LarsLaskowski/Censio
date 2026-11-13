@@ -168,6 +168,30 @@ public sealed class ServerStore
                                                       cancellationToken);
     }
 
+#pragma warning disable S2325, RH2003 // Skeleton: removed with the implementation
+    /// <summary>
+    /// Reads the profile row, its latest tick and its islands in one read transaction.
+    /// </summary>
+    /// <param name="profileId">The profile identity</param>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>The state, or <see langword="null"/> when the profile is unknown</returns>
+    public Task<StoredProfileState?> ReadProfileStateAsync(Guid profileId, CancellationToken cancellationToken)
+    {
+        throw new NotImplementedException();
+    }
+
+    /// <summary>
+    /// Lists the profiles with ticks, the one with the newest latest tick first.
+    /// </summary>
+    /// <param name="count">The maximum number of profiles</param>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>The profile identities</returns>
+    public Task<IReadOnlyList<Guid>> ListLatestProfilesAsync(int count, CancellationToken cancellationToken)
+    {
+        throw new NotImplementedException();
+    }
+#pragma warning restore S2325, RH2003
+
     /// <summary>
     /// Stores the catalog, replacing an earlier one.
     /// </summary>
