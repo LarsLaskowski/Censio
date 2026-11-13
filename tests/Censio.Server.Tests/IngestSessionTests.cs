@@ -1150,8 +1150,9 @@ public sealed class IngestSessionTests : IDisposable
     }
 
     /// <summary>
-    /// Session events and status messages store nothing: the hello's profile stays listed as it was and gets no tick, and
-    /// no follower is told of them.
+    /// Session events and status messages store nothing: the hello's profile stays listed as it was and gets no tick, no
+    /// follower is told of a profile change for them, and the status tells the followers only of the Companion's new pipe
+    /// state.
     /// </summary>
     /// <returns>A task that completes when the test is done</returns>
     [TestMethod]
@@ -1160,7 +1161,7 @@ public sealed class IngestSessionTests : IDisposable
     {
         // Arrange
         var (_, client, _) = await StartAcceptedSessionAsync();
-        var (notices, told) = Follow(1);
+        var (notices, told) = Follow(2);
 
         // Act
         await SendAllAsync(client, [IngestClient.SessionStart(Id1), IngestClient.Status(), IngestClient.SessionEnd(Id2), TickOfOtherProfile(Id3)]);
@@ -1174,7 +1175,7 @@ public sealed class IngestSessionTests : IDisposable
         Assert.AreSequenceEqual(new[] { $"{helloProfile} {HelloProfileName}" }, DescribeProfiles(await _store.ListProfilesAsync(TestContext.CancellationToken), helloProfile), "The hello's profile should stay listed as the hello stored it");
         Assert.IsNull(await _store.ReadLatestTickAsync(helloProfile, TestContext.CancellationToken), "The session events should store no tick");
         Assert.AreSequenceEqual(new[] { Guid.Parse(OtherProfile) }, (await _store.ListLatestProfilesAsync(10, TestContext.CancellationToken)).ToList(), "Only the later tick's profile should have a tick");
-        Assert.AreSequenceEqual(new[] { $"Profile {OtherProfile}" }, notices.ToList(), "No follower should be told of the session events or the status");
+        Assert.AreSequenceEqual(new[] { "Companion <no profile>", $"Profile {OtherProfile}" }, notices.Order(StringComparer.Ordinal).ToList(), "The followers should be told only of the status's pipe state and of the later tick, not of a profile change for the session events or the status");
     }
 
     /// <summary>
@@ -1526,6 +1527,124 @@ public sealed class IngestSessionTests : IDisposable
     }
 
     /// <summary>
+    /// An accepted hello sets the Companion connected without a pipe state, and a status sets the pipe state it reports.
+    /// </summary>
+    /// <param name="wireName">The pipe state as the status names it</param>
+    /// <param name="pipeState">The expected pipe state</param>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC8")]
+    [DataRow("waitingForGame", ContractPipeState.WaitingForGame)]
+    [DataRow("connected", ContractPipeState.Connected)]
+    [DataRow("receiving", ContractPipeState.Receiving)]
+    [DataRow("pipeBusy", ContractPipeState.PipeBusy)]
+    [DataRow("protocolMismatch", ContractPipeState.ProtocolMismatch)]
+    [DataRow("error", ContractPipeState.Error)]
+    public async Task IngestSessionStatusSetsCompanionState(string wireName, ContractPipeState pipeState)
+    {
+        // Arrange
+        var (_, client, _) = await StartAcceptedSessionAsync();
+
+        var afterHello = DescribeCompanion(_state.CompanionState);
+
+        // Act
+        await SendAllAsync(client, [StatusOf(wireName), IngestClient.Tick(Id1)]);
+
+        var (reply, _, _) = await IngestClient.ReceiveAsync(client);
+
+        // Assert
+        AssertAcknowledgement(reply, Id1, null, null, []);
+        Assert.AreEqual(DescribeCompanion(true, null), afterHello, "After the hello the Companion should be connected without a pipe state");
+        Assert.AreEqual(DescribeCompanion(true, pipeState), DescribeCompanion(_state.CompanionState), "The status should set the Companion's pipe state");
+    }
+
+    /// <summary>
+    /// When the connected Companion's session ends, the Companion state is not connected and without a pipe state before its
+    /// place is free: a next Companion that takes the place at once finds the state of the first one cleared.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC8")]
+    public async Task IngestSessionDisconnectClearsCompanionBeforePlaceIsFree()
+    {
+        // Arrange
+        var (run, client, _) = await StartAcceptedSessionAsync();
+
+        await SendAllAsync(client, [StatusOf("receiving"), IngestClient.Tick(Id1)]);
+        await IngestClient.ReceiveAsync(client);
+
+        var connectedBefore = DescribeCompanion(_state.CompanionState);
+        var atFreePlace = WatchFreePlace();
+
+        // Act
+        await FinishAsync(client, run);
+
+        // Assert
+        Assert.AreEqual(DescribeCompanion(true, ContractPipeState.Receiving), connectedBefore, "The Companion should be connected with its pipe state before its session ends, or the test would prove less");
+        Assert.AreEqual(DescribeCompanion(false, null), await atFreePlace.WaitAsync(_followerBound, TestContext.CancellationToken), "The state should be cleared when the place becomes free");
+        Assert.AreEqual(DescribeCompanion(false, null), DescribeCompanion(_state.CompanionState), "The state should stay cleared after the session ended");
+    }
+
+    /// <summary>
+    /// A hello refused companionConnected leaves the connected Companion's state as it is when its session ends.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC8")]
+    public async Task IngestSessionRunAsyncRefusedHelloLeavesCompanionState()
+    {
+        // Arrange
+        var (_, firstClient, _) = await StartAcceptedSessionAsync();
+
+        await SendAllAsync(firstClient, [StatusOf("waitingForGame"), IngestClient.Tick(Id1)]);
+        await IngestClient.ReceiveAsync(firstClient);
+
+        var (secondRun, secondClient, _) = StartSession(IngestAccess.CreateForToken(Token));
+
+        // Act
+        await IngestClient.SendAsync(secondClient, IngestClient.Hello(Token));
+
+        var (messages, _, _) = await IngestClient.ReceiveUntilCloseAsync(secondClient);
+
+        await FinishAsync(secondClient, secondRun);
+
+        // Assert
+        AssertHelloRefused(messages[0], ContractHelloRefusal.CompanionConnected, 1);
+        Assert.AreEqual(DescribeCompanion(true, ContractPipeState.WaitingForGame), DescribeCompanion(_state.CompanionState), "The refused session should leave the connected Companion's state");
+    }
+
+    /// <summary>
+    /// Builds a status message with a pipe state.
+    /// </summary>
+    /// <param name="wireName">The pipe state as the contract names it</param>
+    /// <returns>The status message in single-quote notation</returns>
+    private static string StatusOf(string wireName)
+    {
+        return IngestClient.Status().Replace("'receiving'", $"'{wireName}'", StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Describes a Companion state as text.
+    /// </summary>
+    /// <param name="isConnected">Whether a Companion is connected</param>
+    /// <param name="pipeState">The pipe state, or <see langword="null" /></param>
+    /// <returns>The text</returns>
+    private static string DescribeCompanion(bool isConnected, ContractPipeState? pipeState)
+    {
+        return $"connected {isConnected} pipe {pipeState?.ToString() ?? "<none>"}";
+    }
+
+    /// <summary>
+    /// Describes a Companion state as text.
+    /// </summary>
+    /// <param name="companion">The Companion state</param>
+    /// <returns>The text</returns>
+    private static string DescribeCompanion(CompanionConnection companion)
+    {
+        return DescribeCompanion(companion.IsConnected, companion.PipeState);
+    }
+
+    /// <summary>
     /// Builds a hello with the stored token for a profile identity and name.
     /// </summary>
     /// <param name="profileId">The profile identity</param>
@@ -1742,6 +1861,34 @@ public sealed class IngestSessionTests : IDisposable
         Assert.IsInstanceOfType<ContractHelloAccepted>(reply, "The hello with the stored token should be accepted");
 
         return session;
+    }
+
+    /// <summary>
+    /// Takes the Companion's place on a thread of its own the moment it becomes free, as a next Companion would, and
+    /// describes the Companion state seen right then.
+    /// </summary>
+    /// <returns>The task that completes with the description once the place was taken</returns>
+    private Task<string> WatchFreePlace()
+    {
+        var guard = CancellationTokenSource.CreateLinkedTokenSource(TestContext.CancellationToken);
+
+        _disposables.Add(guard);
+        guard.CancelAfter(_followerBound);
+
+        var token = guard.Token;
+
+        return Task.Factory.StartNew(() =>
+                                     {
+                                         while (_connections.TryTakeCompanion() == false)
+                                         {
+                                             token.ThrowIfCancellationRequested();
+                                         }
+
+                                         return DescribeCompanion(_state.CompanionState);
+                                     },
+                                     token,
+                                     TaskCreationOptions.LongRunning,
+                                     TaskScheduler.Default);
     }
 
     /// <summary>
