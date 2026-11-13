@@ -6,8 +6,9 @@ The server's WebSocket endpoint for the Companion: the route and its HTTP refusa
 the ingest token (file, a file named by configuration, generation, rotation, the switch that turns it off, comparison), one Companion at a time and
 how a silent connection is found, what the server answers to each message, the closes, the bounds and times, the log
 lines and what never reaches a log. The operator who starts the server and the Companion that connects (#40) rely on it.
-The messages themselves, their reader and the refusal texts are in [`contract.md`](contract.md); nothing received is
-stored or shown yet (#30, #32).
+The messages themselves, their reader and the refusal texts are in [`contract.md`](contract.md). A message is stored
+before it is acknowledged (record 0068), the state kept from it is in [`server-state.md`](server-state.md), and nothing
+is shown yet (#32).
 
 ## Behavior
 
@@ -37,8 +38,12 @@ arrives in parts, and at most 32,768 bytes. The server decides in this order:
 5. A valid hello while another Companion is connected is answered `helloRefused` `companionConnected` with the same
    two values, then closed; the connected Companion is not affected. Log line
    `Companion refused: another Companion is connected.`
-6. Otherwise the server answers `helloAccepted` with its product version and `catalogIdentity` `null` (the server
-   has no catalog yet, #42) and logs `Companion connected.`
+6. Otherwise the server stores the hello's profile identity with its name (a new profile is created, a known one
+   renamed; [`server-state.md`](server-state.md)), answers `helloAccepted` with its product version and logs
+   `Companion connected.` The `catalogIdentity` is the stored catalog's identity only when every icon the catalog
+   refers to is stored, else `null` (record 0070). If the profile cannot be stored, the hello gets no reply, the
+   connection is closed with 1011 (*Closes*), the error line of *Log lines* is logged, neither `Companion connected.`
+   nor a disconnect line follows, and the Companion's place is free again; a refused hello stores nothing.
 
 ### Token
 
@@ -85,7 +90,10 @@ arrives in parts, and at most 32,768 bytes. The server decides in this order:
 ### One Companion and silent connections
 
 - Exactly one Companion is connected at a time; a second valid hello is refused (step 5), not allowed to replace the
-  first (record 0062). After the first connection closes, or is closed as silent, a new hello is accepted.
+  first (record 0062). After the first connection closes, or is closed as silent, a new hello is accepted. The place is
+  freed when the session ends, so while a message of a connection that is already closed is still being stored (up to
+  about 3 seconds at the bounds, *Messages after the hello*) a hello is refused `companionConnected`; the Companion
+  reconnects as after any refusal.
 - The server sends a WebSocket ping every 15 seconds and aborts a connection whose ping is not answered by a pong within
   35 seconds. A ping is sent only after 15 seconds in which no data arrived, so a connection that receives bytes does
   not get one. The measured worst case from the last received frame to the abort of a connection that vanished is
@@ -108,11 +116,18 @@ first:
 - A hello, `helloAccepted`, `helloRefused` or `acknowledgement` (a second hello, or a server-to-Companion type), is
   closed with status 1008 and never acknowledged, even when it carries a valid `id`.
 - A `status` message is accepted and gets no reply.
-- A tick, session start, session end, icon image or catalog upload the reader accepts is answered, in order, with an
-  `acknowledgement` naming its `id`, `refusal` `null`, `refusedVersion` `null`. For a catalog upload `missingIcons`
-  lists every distinct icon reference of its document, sorted; as the server keeps no icons yet, every one is missing;
-  for the other types the list is empty. The server keeps nothing it accepts (#30): an acknowledgement says that the
-  message was read and checked.
+- A tick, icon image or catalog upload the reader accepts is stored, and only then answered, in order, with an
+  `acknowledgement` naming its `id`, `refusal` `null`, `refusedVersion` `null`: an acknowledgement says that the message
+  is stored (record 0068). A message already stored (a resend after a lost acknowledgement) is acknowledged the same way
+  and changes nothing: a tick is a resend when its `id` is stored, an icon image when its `reference` is stored, a
+  catalog upload when the SHA-256 of its document equals the stored catalog's. For a catalog upload `missingIcons`
+  lists exactly the distinct icon references of its document, sorted, that have no stored icon, a resend included; for
+  the other types the list is empty. A later catalog upload replaces the earlier one, whatever its age.
+- A session start or session end the reader accepts is answered the same way and stores nothing; a `status` message and
+  these change no state.
+- A message whose storing fails (disk full, file removed) is not acknowledged: the connection is closed with 1011 and an
+  empty reason, the error line of *Log lines* is logged and the message counts as refused. The Companion reconnects and
+  resends it.
 - A message of one of these five types that the reader refuses as *invalid* or with a catalog kind, whose `id` is a
   valid UUID, is answered with an `acknowledgement` naming that `id` and the refusal kind (`invalid`,
   `catalogMalformed`, `catalogUnsupportedVersion`, `catalogInvalid`, `catalogTooLarge`), `refusedVersion` the
@@ -132,6 +147,7 @@ first:
 | Case | Close status | Reply before |
 | ---- | ------------ | ------------ |
 | After a `helloRefused` | 1000 | the `helloRefused` message |
+| A message or a hello's profile could not be stored | 1011 | none |
 | Message over its bound (hello 32,768 bytes, later 25,165,824 bytes), or a later message the reader refuses as *too large* | 1009 | none |
 | Binary frame | 1003 | none |
 | Every other case of the first message and of the message phase that closes | 1008 | none |
@@ -161,7 +177,8 @@ read at a time.
 
 ### Log lines
 
-Besides the lines named above: the category of the session lines is `Censio.Server.Ingest`. No line holds the token,
+Besides the lines named above: a message or a hello's profile that could not be stored logs, at `Error` and with the
+exception, `A message could not be stored; the connection is closed.`; the category of the session lines is `Censio.Server.Ingest`. No line holds the token,
 a profile or island name, a Companion version or any other content of a message, no remote address, and no path or value
 of `Censio:Ingest:TokenFile`; the only value
 taken from a message is the found contract version number. A first message that closes the connection without a
@@ -216,6 +233,7 @@ unset, none of the file checks runs.
 - **The configured file's access rules.** The server neither checks nor changes the mode or owner of the file named by
   `Censio:Ingest:TokenFile`; who can read it is the operator's decision (a swarm secret is `0444`). A FIFO at that path
   blocks the start until it is written.
+- **Growth by a token holder.** Every stored tick, icon and profile stays until retention (#35): a Companion with the token, or anyone with the token switched off, can grow the database file, the profile list and a profile's island list (up to 256 new islands per tick) without a bound, and the server holds the profile list and the island lists of the held profiles in memory.
 - **A leaked token file.** On Windows the file takes its folder's access rules, and a share that exposes the data
   directory exposes the token.
 
@@ -318,13 +336,16 @@ the peak, so the figures of both documents stand for their own input.
 - [`decisions/0063`](../decisions/0063-refused-contract-messages-acknowledged-by-id-or-the-connection-closed.md) — a refused message is acknowledged by its id when the reader yields one, else the connection closes.
 - [`decisions/0064`](../decisions/0064-ingest-refuses-browser-upgrades-and-bounds-pending-hellos.md) — browser upgrades are refused, pending hellos are bounded.
 - [`decisions/0006`](../decisions/0006-server-plain-http-and-open-health.md) — plain HTTP, no web login.
+- [`decisions/0068`](../decisions/0068-ingest-acknowledges-a-message-only-after-it-is-stored.md) — a message is acknowledged only after it is stored; a failed store closes the connection with 1011.
+- [`decisions/0070`](../decisions/0070-hello-names-the-stored-catalog-only-when-all-its-icons-are-stored.md) — the hello names the catalog only when all its icons are stored.
 
 ## Not here
 
 - The messages, their reader and writer, bounds of the message fields and the refusal texts: [`contract.md`](contract.md).
 - The catalog document inside an upload: [`game-catalog-format.md`](game-catalog-format.md).
-- Storing, showing and replaying what arrives (#29, #30, #32), the server's catalog and icons (#42), the Companion's
-  sender, buffer and resend (#40, #41, #34).
+- The state kept from what arrives: [`server-state.md`](server-state.md); the database: [`server-data.md`](server-data.md).
+- Showing and replaying what arrives (#32), the Companion's sender, buffer and resend (#40, #41, #34), the catalog and
+  icons it uploads (#42).
 - The server's HTTP surface, the data directory and the Docker image: [`server.md`](server.md).
 - The code: `IngestTokenSetup`, `IngestAccess`, `IngestConnections`, `IngestSession` and `IngestEndpoint` in
   `src/Censio.Server`.

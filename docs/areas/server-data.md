@@ -4,9 +4,9 @@
 
 The server's database: its file, the setting that names it and the in-memory case, what happens at start and the start
 failures, what is stored and the rules of storing and reading it, file modes, privacy, one server per file and the
-measurements. Operators who run the server and the later features that store and show data (#30, #32, #35, #42) rely on
-it. As of this feature nothing the server receives is stored yet: the ingest keeps its behavior ([`ingest.md`](ingest.md))
-until #30 writes into the store.
+measurements. Operators who run the server and the later features that show and prune data (#32, #35, #42) rely on it.
+The ingest writes into the store ([`ingest.md`](ingest.md)): it stores a tick, a catalog or an icon before it
+acknowledges it, and the server reads its state back from the store at start ([`server-state.md`](server-state.md)).
 
 ## Behavior
 
@@ -51,6 +51,8 @@ before the update only reads an existing file:
    reported stored survives a power loss.
 7. The result kind is *created* for a file this start created, *updated* when versions were applied to an existing file
    (an empty file included), *opened* otherwise.
+8. After the database is open and before the server listens, the current state is restored from it
+   ([`server-state.md`](server-state.md), *Restore at start*); a failure there stops the start with exit code 1.
 
 A failed start releases what it opened. The database file is never deleted or replaced.
 
@@ -98,6 +100,10 @@ bit for bit, negative zero included, and a missing value never reads back as zer
   (receive time, storing order) is not older than the one stored. A tick reads back with every value of the message equal,
   the islands and entries in their stored positions and the maps ascending by GUID. An island a tick did not carry has no
   values in that tick: a gap, never zeros.
+- **Profile state.** The store reads a profile's row, its latest tick and its island list in one deferred read
+  transaction, so the three agree, and gives nothing for an unknown profile. It lists the profiles with ticks, the one
+  whose latest tick is the newest first, by the order of *Latest tick*, at most as many as asked for. The server's state
+  is built from these two reads ([`server-state.md`](server-state.md)).
 - **Latest tick.** The latest tick of a profile is the one with the latest receive time and, among equal receive times, the
   one stored last; a tick stored later with an earlier receive time is not the latest, and another profile's ticks never
   count. The islands of a profile are listed by their key, each with the name of the tick with the latest receive time
@@ -127,8 +133,8 @@ The exception behind the second, third and last line is attached to the entry fo
 before an update.
 
 - A write that fails while the server runs (disk full, file removed) stores nothing of that message and is reported to the
-  caller as a failure with the exception; what the ingest then answers is #30's. Damage beyond the header surfaces this
-  way, not at start.
+  caller as a failure with the exception; the ingest then does not acknowledge the message and closes the connection
+  with 1011 ([`ingest.md`](ingest.md)). Damage beyond the header surfaces this way, not at start.
 - A read that fails surfaces as the provider's exception; the store does not wrap it.
 - A restored backup must be readable by the server's user only (on Linux `chmod 600 censio.db`): a restored copy keeps
   the mode the copy had, and the files SQLite keeps beside it take the file's mode.
@@ -145,6 +151,9 @@ tick with `ServerStore.StoreTickAsync`. The figures are an order of magnitude, n
 | Fixture, 33 ticks of 21,091 entries in total, at most 682 entries per tick | median 10 to 25 ms, minimum about 1 ms, maximum 22 to 64 ms (three runs; the first is the coldest) | latest tick 1 to 12 ms | 77,079 bytes per tick (2,543,616 bytes for 33 ticks above the empty file of 81,920 bytes) |
 | At the bounds: 256 islands of 512 entries, 131,072 entries and 393,216 pairs (524,288 together) | 2.6 to 2.9 s | 1.0 to 1.3 s | 22.1 MiB |
 
+The file grows with every stored tick until retention (#35): about 77 KB per real tick, which at one tick every two
+minutes is about 55 MB a day, and 22.1 MiB at the bounds.
+
 ## Related decisions
 
 - [`decisions/0021-sqlite-history-with-retention.md`](../decisions/0021-sqlite-history-with-retention.md) — one SQLite file in the data directory; retention comes with #35.
@@ -155,6 +164,6 @@ tick with `ServerStore.StoreTickAsync`. The figures are an order of magnitude, n
 ## Not here
 
 - The data directory and the Docker image: [`server.md`](server.md).
-- What the ingest accepts and answers: [`ingest.md`](ingest.md); writing received messages into the store (#30).
+- What the ingest accepts and answers and when it stores: [`ingest.md`](ingest.md); the state kept from the store: [`server-state.md`](server-state.md).
 - The contract's messages and bounds: [`contract.md`](contract.md); the catalog document: [`game-catalog-format.md`](game-catalog-format.md).
 - Retention, hourly averages and deleting a profile's history (#35); pages (#32).
