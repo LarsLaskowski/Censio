@@ -1,3 +1,33 @@
 @inherits LayoutComponentBase
 
-@Body
+<div class="censio-frame">
+    <MudThemeProvider Theme="_mudTheme" IsDarkMode="_theme == UiTheme.Dark" />
+    <MudPopoverProvider />
+    <MudLayout>
+        <MudAppBar Elevation="1">
+            <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" aria-label="@_texts.NavigationButton" OnClick="ToggleDrawer" />
+            <MudText Typo="Typo.h6">Censio</MudText>
+            <MudSpacer />
+            <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.Person" Disabled="true" Style="color: var(--mud-palette-appbar-text) !important">@_texts.ProfileSwitch</MudButton>
+            <MudMenu Icon="@Icons.Material.Filled.Translate" Color="Color.Inherit" AriaLabel="@_texts.LanguageSwitch" AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight">
+                <MudMenuItem OnClick="() => ChooseLanguageAsync(UiLanguage.English)">@UiTexts.LanguageName(UiLanguage.English)</MudMenuItem>
+                <MudMenuItem OnClick="() => ChooseLanguageAsync(UiLanguage.German)">@UiTexts.LanguageName(UiLanguage.German)</MudMenuItem>
+            </MudMenu>
+            <MudIconButton Icon="@(_theme == UiTheme.Dark ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)" Color="Color.Inherit" aria-label="@(_theme == UiTheme.Dark ? _texts.SwitchToLightTheme : _texts.SwitchToDarkTheme)" OnClick="ToggleThemeAsync" />
+        </MudAppBar>
+        <MudDrawer @bind-Open="_drawerOpen" Variant="DrawerVariant.Persistent" ClipMode="DrawerClipMode.Always">
+            <MudNavMenu>
+                <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home">@_texts.HomeEntry</MudNavLink>
+            </MudNavMenu>
+        </MudDrawer>
+        <MudMainContent>
+            <MudContainer>
+                <CascadingValue Value="_language">
+                    <CascadingValue Value="_texts">
+                        @Body
+                    </CascadingValue>
+                </CascadingValue>
+            </MudContainer>
+        </MudMainContent>
+    </MudLayout>
+</div>

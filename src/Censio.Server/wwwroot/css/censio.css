@@ -1,0 +1,8 @@
+.censio-frame :focus-visible {
+    outline: 2px solid var(--mud-palette-primary);
+    outline-offset: 2px;
+}
+
+.censio-frame .mud-appbar :focus-visible {
+    outline-color: var(--mud-palette-appbar-text);
+}
