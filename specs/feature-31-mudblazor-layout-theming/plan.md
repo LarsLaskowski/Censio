@@ -277,3 +277,71 @@ ingest are untouched. The server stores nothing new. The browser loads nothing f
 ## Out of scope / follow-ups
 
 As the spec's *Out of scope*. No follow-up issue.
+
+## Security notes
+
+## Security review, mode plan: feature #31 (MudBlazor layout, theming, cookies)
+
+I read `/home/user/Censio/specs/feature-31-mudblazor-layout-theming/spec.md` and `plan.md` together with `.squad/project.md` (*Security areas*, *Guarantees*), `SECURITY.md`, `docs/areas/server.md`, records 0006 and 0071, and the current `Program.cs`, `App.razor`, `Routes.razor`, `MainLayout.razor`, `Dockerfile`, `ci.yml` and `Directory.Packages.props`.
+
+### Tier and areas
+
+- **Tier:** `security` is correct. The change makes `/` read browser input (two cookies and `Accept-Language`) and adds public static assets. Both fall under Network exposure.
+- **Areas touched:** the list is complete for what the change touches: network exposure, the CI workflow, dependencies and build configuration.
+  - The `ci.yml` edit adds one constant glob to `sonar.coverage.exclusions`. It does not change permissions, triggers, secrets or actions.
+  - The Dockerfile is unchanged. It restores only `Censio.Server.csproj`, so bUnit and its transitive packages never reach the image.
+
+### Measurements I ran (scratch dir `/tmp/claude-0/-home-user-Censio/6d822a6b-f162-5c8b-bc14-2bd9b78c38fb/scratchpad`)
+
+1. **N2 and fact 4, no remote host in MudBlazor's assets.**
+   - I downloaded `mudblazor.9.13.0.nupkg` and `bunit.2.15.2.nupkg` from `api.nuget.org/v3-flatcontainer` and unzipped them.
+   - Command: `grep -oE '(https?:)?//[A-Za-z0-9.-]+\.[a-z]{2,}…' MudBlazor.min.css MudBlazor.min.js`
+   - Output: only `https://github.com/MudBlazor/MudBlazor/blob/master/LICENSE` and `https://mudblazor.com/`, once in each file (comments).
+   - `@import` and `url(...)` in the CSS: no match.
+   - In the JS, `localStorage`, `sessionStorage`, `document.cookie`, `fetch(`, `XMLHttpRequest`, `sendBeacon`, `eval(` and `new Function` have no match. `prefers-color-scheme` appears once. MudBlazor only uses it when the layout calls its system-dark-mode API, and the plan says it never does.
+   - Result: fact 4 confirmed.
+2. **Licences and dependencies.**
+   - Both nuspecs: `<license type="expression">MIT</license>`.
+   - MudBlazor has no `net11.0` group. Its `net10.0` group depends on `Microsoft.AspNetCore.Components`, `Components.Web` and `Microsoft.Extensions.Localization`, all 10.0.1.
+   - bUnit has a `net11.0` group (fact 8 confirmed).
+   - I restored a scratch `Microsoft.NET.Sdk.Web` net11.0 project with both packages and `NuGetAuditMode=all`, `NuGetAuditLevel=low`.
+     - `dotnet list package --include-transitive`: the framework packages are pruned. The only transitive packages left are AngleSharp 1.10.1, AngleSharp.Css 1.4.1, AngleSharp.Diffing 1.1.1, and `Components.WebAssembly`, `Components.WebAssembly.Authentication` and `JSInterop.WebAssembly` at 11.0.0 (all from bUnit, test project only).
+     - `dotnet list package --vulnerable --include-transitive`: "has no vulnerable packages given the current sources".
+3. **Cookie and header reading.**
+   - I built a scratch console project against `Microsoft.AspNetCore.App` 11.0 that sets the `Cookie` header on a `DefaultHttpContext` and reads `Request.Cookies["censio-theme"]`. Output:
+     - `censio-theme=%64ark` -> `dark`
+     - `censio-theme=%0Adark` -> `\ndark`
+     - `censio-theme=dark; censio-theme=light` -> `light`
+     - `censio-theme="dark"` -> `"dark"`
+     - `censio-theme=%zz` -> `%zz`
+   - `StringWithQualityHeaderValue.TryParseList` output:
+     - `de;q=abc, en` -> ok=True, values `abc:` and `en:`
+     - `de;q=2, en` -> ok=True, values `2:` and `en:`
+     - empty -> ok=False
+     - `TryParseStrictList` rejects both invalid lists.
+
+### Findings
+
+The design is sound for this project's attack surface:
+- A cookie value is only compared whole and ordinally against constants.
+- Nothing read from a cookie or header is echoed, logged or stored.
+- `lang`, `document.cookie` and the interop arguments are constants, so no XSS path exists.
+- The root-component parameters are enums.
+- No new endpoint, redirect, CORS rule or listener is added.
+- Record 0006's revisit condition (game data or a state-changing action on a page) is not reached.
+
+**F1 (non-blocking): the plan claims "nothing is decoded", but ASP.NET Core percent-decodes cookie values (measurement 3).**
+- Where: plan.md *Security considerations*, "Limits: … nothing is decoded."
+- Effect: `censio-theme=%64ark` is read as `dark`. That is harmless, since the decoded value is still matched whole against the four constants. But `web-ui.md` would state a false rule, and AC9's HTTP test could check only the raw form of a value.
+- Smallest fix:
+  - Replace "nothing is decoded" with "the values are compared after ASP.NET Core's percent-decoding of cookie values (`%64ark` reads as `dark`)", and carry that sentence into `docs/areas/web-ui.md`'s unknown-value rule.
+  - In the AC9 HTTP test, send `%0Adark` and `%3Cscript%3E` encoded and assert that neither the raw nor the decoded form is in the body or a log entry.
+- Recommendation: fix now (plan text and test note).
+
+**F2 (non-blocking, a correctness note for the Tester): `TryParseList` almost never returns false (measurement 3).**
+- It re-tokenizes an invalid entry instead of failing: `de;q=abc, en` gives the values `abc` and `en`. The plan's "unparsable: English" branch is therefore reached only for an empty header.
+- The outcome is still the safe default (English), so there is no security effect. But the AC2 DataRow "an unparsable header" should expect what the parser actually does.
+- Smallest fix: the plan's *Approach* says "`TryParseList` (lenient: an invalid entry yields no `de`/`en` match)" and the DataRow uses `de;q=abc, en` → English.
+- Recommendation: fix now (one sentence).
+
+Facts 9, 10 and 11 are still unverified, but none of them carries a security property. N2 is the only library-behavior claim this review depends on, and measurement 1 verifies it.
