@@ -131,12 +131,15 @@ failures*); the database file is neither deleted nor replaced.
 - Pruning icons no catalog refers to, and keeping older catalogs.
 - A backup made by the server before a schema update: no schema is released yet.
 - A database server other than SQLite (record 0021).
+- Settings: the issue lists an entity for them, but no setting is stored in the database yet; the first feature that
+  stores one adds it with its own migration (Q1).
 
 ## Open questions
 
 - Q1: The issue lists an entity for **settings**; no issue, record or code says which settings the server keeps in its
-  database (operator settings come from configuration, the theme is kept per browser, #31). Not answered: escalated
-  to the Product Manager, with the recommendation to leave it out until the first feature that stores a setting adds it.
+  database (operator settings come from configuration, the theme is kept per browser, #31). Answered: left out of #29
+  (Product Manager); the first feature that stores a setting in the database adds it with its own migration (*Out of
+  scope*).
 - Q2: Where is the database without a data directory? Answered: in memory with a warning (Lead decision) (S5), as the ingest
   token warns and degrades without one ([`ingest.md`](../../docs/areas/ingest.md), *Token*); the image always sets
   `/config`, and local mode (#39) sets a path.
