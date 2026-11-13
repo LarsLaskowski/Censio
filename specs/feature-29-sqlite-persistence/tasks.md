@@ -19,7 +19,7 @@ Orchestrator, from the text its member reports), in the last group.
 | 6 | G2 | Implement the store (write gate, prepared commands, reads) | `src/Censio.Server.Data/ServerStore.cs` and internals | AC4, AC6, AC7, AC8, AC9, AC10, AC11 | 5 | Dev | [x] |
 | 7 | G3 | Skeleton: the static partial class DatabaseSetup (DatabaseFileKey, DatabaseFileName, TryOpenAsync, ReportOpenResult) | `src/Censio.Server/DatabaseSetup.cs` | AC1, AC2, AC3, AC4, AC5 | 3 | Dev | [x] |
 | 8 | G3 | Tests first: `DatabaseSetupTests`, new `ProgramTests` | `tests/Censio.Server.Tests/DatabaseSetupTests.cs`, `tests/Censio.Server.Tests/ProgramTests.cs` | AC1, AC2, AC3, AC4, AC5 | 7 | Tester | [x] |
-| 9 | G3 | Implement `DatabaseSetup`; call it in `Program.cs` after the ingest token; EF log level in `appsettings.json` | `src/Censio.Server/DatabaseSetup.cs`, `Program.cs`, `appsettings.json` | AC1, AC2, AC3, AC4, AC5 | 8 | Dev | [ ] |
+| 9 | G3 | Implement `DatabaseSetup`; call it in `Program.cs` after the ingest token; EF log level in `appsettings.json` | `src/Censio.Server/DatabaseSetup.cs`, `Program.cs`, `appsettings.json` | AC1, AC2, AC3, AC4, AC5 | 8 | Dev | [x] |
 | 10 | G4 | No new API. Dockerfile restore and publish with `-r linux-musl-x64 --self-contained false`, the publish also `-p:UseAppHost=false`; *Image build check* with the publish size before and after | `src/Censio.Server/Dockerfile` | AC1 | 9 | Dev | [ ] |
 | 11 | G4 | `image-check.sh` cases `I29-AC1`, `I29-AC2`, `I29-AC6` (CI only) | `.github/scripts/image-check.sh` | AC1, AC2, AC6 | 10 | Dev | [ ] |
 | 12 | G4 | Measure N4 (a tick at the bounds and a fixture tick: store time, file growth per fixture tick) with a scratch program outside the repository | — | AC12 | 6 | Dev | [ ] |
