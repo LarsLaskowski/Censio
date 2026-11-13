@@ -4,7 +4,7 @@
 
 The server's HTTP surface: the address it listens on, the start page, the health check, the ingest route and what is open
 without login, how unknown paths and plain HTTP are treated, the version it shows, the data directory with its
-data-protection key ring and ingest token file, and the Docker image it ships in. Operators who run the server and
+data-protection key ring, ingest token file and database file, the order of the start checks, and the Docker image it ships in. Operators who run the server and
 the Docker health probe rely on it.
 
 ## Behavior
@@ -68,9 +68,17 @@ the Docker health probe rely on it.
   with the exception and exits with code 1 before it listens. ASP.NET Core logs its own `Error` entry about the
   refused write before the `Critical` one. A failure of another kind is not handled by the server.
 
+### Database file and start order
+
+- The data directory also holds the database file `<data directory>/censio.db`, unless `Censio:Database:File` names
+  another absolute path (or, without a data directory, the database is kept in memory); its rules and start failures
+  are in [`server-data.md`](server-data.md).
+- The start checks run in this order, each failure stopping the start with exit code 1 before the server listens: the
+  key ring, the ingest token, the database. The database is held until the server stops.
+
 ### Docker image
 
-- The image `networlddev/censio` is built from `src/Censio.Server/Dockerfile`, for linux/amd64 only. Build stage:
+- The image `networlddev/censio` is built from `src/Censio.Server/Dockerfile`, for linux/amd64 only. The publish targets `linux-musl-x64` and is framework-dependent, so the image carries the one native SQLite library of that runtime and no application host. Build stage:
   `mcr.microsoft.com/dotnet/sdk:11.0.100-alpine3.24-amd64`; runtime stage:
   `mcr.microsoft.com/dotnet/aspnet:11.0.0-alpine3.24-amd64`; both are pinned by their amd64 manifest digest. It
   contains only the published server.
@@ -82,7 +90,7 @@ the Docker health probe rely on it.
   non-root user; the application files are readable by every UID.
 - `/config` exists in the image, owned by 1654, and is the data directory: the image sets
   `CENSIO__DATADIRECTORY=/config`, so the key ring lies in `/config/data-protection-keys` (*Data directory and key
-  ring*) and the ingest token in `/config/ingest-token` unless `Censio:Ingest:TokenFile` names another file ([`ingest.md`](ingest.md)). The image declares no `VOLUME`. The setting can be pointed to another absolute path but not disabled
+  ring*) the database in `/config/censio.db` and the ingest token in `/config/ingest-token` unless `Censio:Ingest:TokenFile` names another file ([`ingest.md`](ingest.md)). The image declares no `VOLUME`. The setting can be pointed to another absolute path but not disabled
   (`docker run -e` cannot unset an image `ENV`, and an empty value stops the start). A directory the runtime user
   cannot write (a bind mount owned by another UID, a named volume combined with another `--user`) stops the
   container at start with exit code 1; it is made writable by starting with `--user <uid>:<gid>` of the
@@ -117,7 +125,8 @@ the Docker health probe rely on it.
 - If the port is taken, the server ends with the ASP.NET Core startup error in the console; it has no handling of
   its own.
 - A data directory that is not an absolute path, or a key directory the server cannot create or write, stops the
-  start with exit code 1 and a `Critical` log line (*Data directory and key ring*).
+  start with exit code 1 and a `Critical` log line (*Data directory and key ring*); the database's start failures do the
+  same ([`server-data.md`](server-data.md)).
 - Request paths and hosts are not logged at the default levels (`Microsoft.AspNetCore` logs warnings only).
 
 ## Related decisions
@@ -131,8 +140,10 @@ the Docker health probe rely on it.
 - [`decisions/0012-release-pre-release-first-and-secret-free-builds.md`](../decisions/0012-release-pre-release-first-and-secret-free-builds.md) — releases run as pre-release first, artifacts are built without secrets and `latest` is set by digest at the promotion.
 - [`decisions/0026-server-image-linux-amd64-on-docker-hub-no-compose.md`](../decisions/0026-server-image-linux-amd64-on-docker-hub-no-compose.md) — linux/amd64 only, on Docker Hub, no compose file.
 - [`decisions/0061-ingest-token-generated-into-a-file-of-the-data-directory.md`](../decisions/0061-ingest-token-generated-into-a-file-of-the-data-directory.md) — the ingest token lives in a file of the data directory or in a file named by `Censio:Ingest:TokenFile`.
+- [`decisions/0065-database-schema-kept-by-migrations-applied-at-start.md`](../decisions/0065-database-schema-kept-by-migrations-applied-at-start.md), [`0066`](../decisions/0066-database-file-setting-and-in-memory-without-data-directory.md) — the database file in the data directory, set by `Censio:Database:File`, in memory without either.
 
 ## Not here
 
 - The Companion's WebSocket ingest, its token and the `Censio:Ingest:RequireToken` switch: [`ingest.md`](ingest.md).
+- The database: its file, schema, start failures and storing rules: [`server-data.md`](server-data.md).
 - Web layout and theming (#31).

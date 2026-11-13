@@ -45,6 +45,24 @@ For detailed rules on how unit tests are structured and named, see [`UNIT_TESTS.
 **Unit tests are mandatory for newly written code** — see the checklist there before opening a pull
 request.
 
+### Changing the database schema
+
+The server's schema is kept by EF Core migrations in `src/Censio.Server.Data/Migrations/` (record
+[0065](decisions/0065-database-schema-kept-by-migrations-applied-at-start.md)). After a change to the model in
+`CensioDbContext` or the row classes, add a migration with the pinned tool from the repository root:
+
+```shell
+dotnet tool restore
+dotnet tool run dotnet-ef migrations add <Name> --project src/Censio.Server.Data
+```
+
+A model change without a migration fails the test `CensioDbContextFactoryCreateDbContextHasNoPendingModelChanges`. The
+server applies the pending migrations of a database at start as one script in one transaction, so a migration that EF
+Core would run outside a transaction (a step it marks `TransactionSuppressed`) is refused at start: every test that
+creates a database then fails with `UpdateFailed`, and `ServerDatabaseMigrationsRunInsideTransaction` names the
+migration. Such a migration needs a decision record first. The files in `Migrations/` are generated code: do not edit
+them by hand.
+
 ### Automated checks
 
 - **CI** (`.github/workflows/ci.yml`, job `build`): runs on every push to `main` and every pull request against

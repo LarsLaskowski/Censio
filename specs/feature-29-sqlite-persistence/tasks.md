@@ -23,7 +23,7 @@ Orchestrator, from the text its member reports), in the last group.
 | 10 | G4 | No new API. Dockerfile restore and publish with `-r linux-musl-x64 --self-contained false`, the publish also `-p:UseAppHost=false`; *Image build check* with the publish size before and after | `src/Censio.Server/Dockerfile` | AC1 | 9 | Dev | [x] |
 | 11 | G4 | `image-check.sh` cases `I29-AC1`, `I29-AC2`, `I29-AC6` (CI only) | `.github/scripts/image-check.sh` | AC1, AC2, AC6 | 10 | Dev | [x] |
 | 12 | G4 | Measure N4 (a tick at the bounds and a fixture tick: store time, file growth per fixture tick) with a scratch program outside the repository | — | AC12 | 6 | Dev | [x] |
-| 13 | G5 | No new API. `docs/areas/server-data.md` and its index row; `docs/areas/server.md` and the server row of the index | `docs/areas/*` | AC12 | 6, 9, 12 | Dev | [ ] |
-| 14 | G5 | `docs/ARCHITECTURE.md`, `SECURITY.md`, `docs/CONTRIBUTING.md` | as named | AC12 | 13 | Dev | [ ] |
-| 15 | G5 | `README.md` and `docs/USER_GUIDE.md`, English then German | as named | AC12 | 13 | Dev | [ ] |
-| 16 | G5 | `.squad/project.md` (security area, integration surface, guarantee, test doubles) and `.squad/stack.md` (tool, *Image build check*), from the reported text | `.squad/project.md`, `.squad/stack.md` | AC12 | 13 | Orchestrator | [ ] |
+| 13 | G5 | No new API. `docs/areas/server-data.md` and its index row; `docs/areas/server.md` and the server row of the index | `docs/areas/*` | AC12 | 6, 9, 12 | Dev | [x] |
+| 14 | G5 | `docs/ARCHITECTURE.md`, `SECURITY.md`, `docs/CONTRIBUTING.md` | as named | AC12 | 13 | Dev | [x] |
+| 15 | G5 | `README.md` and `docs/USER_GUIDE.md`, English then German | as named | AC12 | 13 | Dev | [x] |
+| 16 | G5 | `.squad/project.md` (security area, integration surface, guarantee, test doubles) and `.squad/stack.md` (tool, *Image build check*), from the reported text | `.squad/project.md`, `.squad/stack.md` | AC12 | 13 | Orchestrator | [x] |
