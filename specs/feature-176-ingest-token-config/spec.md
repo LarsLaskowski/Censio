@@ -5,20 +5,15 @@ Status: Draft
 
 ## Problem
 
-The server takes its ingest token only from the file `ingest-token` in its data directory. It generates the file on the
-first start, or reads one the operator wrote there before the start (`IngestTokenSetup.TryCreateAccess`,
-`src/Censio.Server/IngestTokenSetup.cs` lines 73 to 90; [`ingest.md`](../../docs/areas/ingest.md), *Token*). Operators
-who keep their secrets in Docker or compose secrets, or in an orchestrator's secret store, get the secret as a file at
-a path of their choosing, usually `/run/secrets/<name>`. The server cannot read the token there. Today an operator
-can only copy the secret into the data directory, which the documentation does not describe ("There is no other way to
-set or change it"). Also, a token the operator writes by hand may be a single character: the file rule asks only for 1
-to 1,024 visible ASCII characters.
+The server takes its ingest token only from `ingest-token` in its data directory, generated at the first start or
+written there by hand before it ([`ingest.md`](../../docs/areas/ingest.md), *Token*; `IngestTokenSetup.cs` lines 73 to
+90). Operators who keep secrets in Docker or compose secrets or an orchestrator's store get them as a file at a path of
+their own, usually `/run/secrets/<name>`, which the server cannot read. A hand-written token may be one character long.
 
-Claims of the issue checked against the code: generation, comparison by hash and the file rule (`ParseToken`, lines
-152 to 175) are confirmed. "Operators cannot hand the server a token of their own" is partly refuted: a valid
-`ingest-token` written into the data directory before the start is used unchanged (line 85). That only works at that
-one path, and it is not documented. Record 0061 is unreleased: tag `v0.2.0` points to `abc3527`, which comes before
-`6a7ca74`.
+Issue claims checked: generation, comparison by hash and the rule of 1 to 1,024 visible ASCII characters (`ParseToken`,
+lines 152 to 175) are confirmed. "Operators cannot hand the server a token of their own" is partly refuted: a valid
+hand-written `ingest-token` is used (line 85), but only at that path and undocumented. Record 0061 is unreleased
+(`v0.2.0` is at `abc3527`, before `6a7ca74`).
 
 ## Scenarios
 
@@ -31,44 +26,38 @@ one path, and it is not documented. Record 0061 is unreleased: tag `v0.2.0` poin
   that presents the old token is refused.
 - S3: Given the setting is set and no data directory is set (a server started outside the image), when the server
   starts, then it uses the configured file. It does not log the warning that every Companion is refused.
-- S4: Given the operator changed the token in the configured file, when the server is restarted, then the new token is
-  required and the old one is refused. The server reads the file only at its start.
+- S4: Given the token in the configured file changed, when the server restarts, then only the new token is accepted;
+  the file is read at start only.
+- S5: Given the setting is not set, when the server starts, then it behaves as today
+  ([`ingest.md`](../../docs/areas/ingest.md), *Token*), except for the minimum length (E6).
 - S6: Given an operator on Linux Docker Engine with the token in a host file that the user the container runs as can
   read, when they follow the user guide, then one `docker run` command mounts the file read-only (for example
   `-v <host file>:/run/secrets/censio-ingest-token:ro`) and sets `CENSIO__INGEST__TOKENFILE` to the mounted path.
-  The guide names Unraid, Synology and Docker Desktop for Windows as "not yet tried", and says that their operators keep
-  the generated `ingest-token`.
-- S5: Given the setting is not set, when the server starts, then it behaves as today
-  ([`ingest.md`](../../docs/areas/ingest.md), *Token*), except for the minimum length (E6).
+  Unraid, Synology and Docker Desktop for Windows are named "not yet tried"; their operators keep the generated
+  `ingest-token`.
 
 ## Errors and edge cases
 
-Each case below stops the start before the server listens, with exit code 1 and one `Critical` line, after the
-data-protection key ring, as the existing token start failures do. No line holds the token, the setting's value or the
-configured path.
+Each case stops the start as the existing token start failures do ([`ingest.md`](../../docs/areas/ingest.md), *Start
+failures*), with the line given.
 
 - E1: The configured file does not exist, or cannot be read (no permission for the user the server runs as, the path
   is a directory): `The ingest token file named by Censio:Ingest:TokenFile cannot be read; the server stops.` The
-  server never creates the file. The line carries no exception or other text that holds the path (a .NET file
-  exception's message names it).
-- E2: The configured file holds no valid token. A valid token has 32 to 1,024 characters, all visible ASCII (`!` to
-  `~`), after trimming surrounding space, tab, carriage return and line feed, so the line break that secret files
-  often end with is accepted. The file is read up to 65,536 bytes. Invalid are: an empty file, fewer than 32 or more
-  than 1,024 characters, an inner space or another character outside that range, and a file over 65,536 bytes. The
-  line is `The ingest token file named by Censio:Ingest:TokenFile holds no valid token (32 to 1,024 visible ASCII characters); the server stops.`
+  server never creates the file. The line carries no exception text, which would name the path.
+- E2: The configured file holds no valid token by the rule of `ingest-token` (65,536 bytes read, surrounding white space
+  trimmed, so a trailing line break is accepted, visible ASCII only) with a length of 32 to 1,024 characters: `The ingest token file named by Censio:Ingest:TokenFile holds no valid token (32 to 1,024 visible ASCII characters); the server stops.`
 - E3: The setting's value is not an absolute path by the rule `Censio:DataDirectory` uses (fully qualified), the empty
   string included:
-  `The setting Censio:Ingest:TokenFile must be an absolute path; the server stops.` The value is not logged, because an
-  operator may have put the token itself into the setting by mistake.
+  `The setting Censio:Ingest:TokenFile must be an absolute path; the server stops.` The value may be a token put there
+  by mistake and is not logged.
 - E4: The setting is set (any value) and `Censio:Ingest:RequireToken` is `false`:
   `The settings Censio:Ingest:TokenFile and Censio:Ingest:RequireToken false exclude each other; the server stops.`
   The server does not run open while a token is configured.
 - E5: `Censio:Ingest:RequireToken` holds neither `true` nor `false`: the existing line of that case is logged, also when
   the token file setting is set. That check comes first.
-- E6: Without the setting, the data directory's `ingest-token` holds fewer than 32 characters: the start stops as for
-  any other invalid token in that file. The line now names the range 32 to 1,024
-  (`The ingest token file '<file>' holds no valid token (32 to 1,024 visible ASCII characters); the server stops.`).
-  A generated token has 43 characters and is not affected.
+- E6: Without the setting, an `ingest-token` of fewer than 32 characters is invalid too, and its line names the range
+  32 to 1,024 (`The ingest token file '<file>' holds no valid token (32 to 1,024 visible ASCII characters); the server stops.`).
+  A generated token (43 characters) is not affected.
 - E7: The configured path is a symbolic link, as orchestrators mount secrets: the link is followed.
 
 ## Non-functional requirements
@@ -77,16 +66,12 @@ configured path.
   `appsettings.json` and in the image. Without it, behavior is unchanged apart from E6.
 - N2: The token is never logged. The path of the configured file and the setting's value are not logged either (E3):
   a token that begins with `/` is an absolute path on Linux.
-- N3: The comparison is unchanged: the server keeps only the SHA-256 of the token and compares it in fixed time
-  (record 0061).
+- N3: The comparison by hash in fixed time is unchanged (record 0061).
 - N4: The server neither checks nor changes the mode or the owner of the configured file. Its access rules are the
   operator's, for example the mode `0444` of a swarm secret.
-- N5: Compatibility: #28 is unreleased, so the minimum of 32 characters for `ingest-token` (E6) breaks no released
-  installation.
-
-- N6: Target hosts of the documented procedure, as the Product Manager answered (option (a)): Linux Docker Engine only,
-  with `docker run` and a read-only bind mount. The documentation says nothing about other hosts or NAS container UIs
-  beyond "not yet tried".
+- N5: #28 is unreleased, so the minimum for `ingest-token` (E6) breaks no released installation.
+- N6: The documented procedure targets Linux Docker Engine only (Product Manager, option (a)); other hosts and NAS
+  container UIs are only named "not yet tried".
 
 ## Acceptance criteria
 
@@ -105,10 +90,10 @@ configured path.
   `RequireToken` value is reported with its existing line first (E4, E5).
 - AC6: Without the setting, an `ingest-token` in the data directory with fewer than 32 characters, or another invalid
   token, stops the start with the line of E6. A generated token is still accepted at the next start (S5, E6, N5).
-- AC8: `docs/USER_GUIDE.md` (English and German) documents the setting as S6 states, and a manual dry run on Linux Docker
-  Engine confirms its statements (S6, N6).
 - AC7: In each case of AC1 to AC6, no log line holds the token or the configured path, neither in its message nor in an
   attached exception (N2).
+- AC8: `docs/USER_GUIDE.md` (English and German) documents the setting as S6 states, and a manual dry run on Linux Docker
+  Engine confirms its statements (S6, N6).
 
 ## Out of scope
 
@@ -122,23 +107,17 @@ configured path.
 
 ## Open questions
 
-- Which source wins when both exist? Answered: the setting. With it, the server ignores `ingest-token` and never
-  touches it (S2). The setting is the operator's explicit choice, and writing nothing into the data directory keeps the
-  secret in one place.
-- An environment value or a file path? Answered: a file path only. A value in the environment is visible in
-  `docker inspect`, in the process environment (`/proc/<pid>/environ`) and in a NAS UI's container settings.
-  Docker, compose and swarm secrets and orchestrators' secret stores deliver files, and those are the operators
-  #176 names. A direct value would be the weaker way to reach the same result.
-- Validation and minimum length? Answered: the file rule, plus a minimum of 32 characters for every token, the data
-  directory's file included (E2, E6). Strength cannot be measured from one value, but length bounds the worst
-  hand-chosen tokens. A generated token (43 characters) and a value from `openssl rand -base64 32` (44) both pass.
-- Logging and an invalid value? Answered: the token, the value and the path are never logged (N2), and every invalid
-  case stops the start before the server listens (E1 to E4), as an invalid token file does today. A missing or empty
-  configured token never switches the token off (record 0019).
-- `RequireToken` `false` with a configured file? Answered: the start stops (E4). Ignoring the file would run the server
-  open although the operator configured a token.
-- How is it documented, and for which hosts? Answered: the Product Manager chose option (a), Linux Docker Engine only
-  (S6, N6, AC8). Compose and other secret stores are named only as sources of such a file.
+- Which source wins? Answered: the setting; `ingest-token` is then ignored and untouched (S2), so the secret stays in
+  one place.
+- An environment value or a file path? Answered: a file path only. An environment value shows in `docker inspect`, the
+  process environment and NAS container settings, and the secret stores #176 names deliver files.
+- Validation and minimum? Answered: the file rule plus 32 characters for every token (E2, E6). Length cannot prove
+  strength but bounds the worst hand-chosen tokens; `openssl rand -base64 32` (44) passes.
+- Logging and an invalid value? Answered: nothing of the token, value or path is logged (N2); every invalid case stops
+  the start (E1 to E4); a missing or empty configured token never switches the token off (record 0019).
+- `RequireToken` `false` with the setting? Answered: the start stops (E4) rather than run open.
+- Which hosts does the documentation cover? Answered: the Product Manager chose option (a), Linux Docker Engine only
+  (S6, N6, AC8).
 
 ## Area documents
 
@@ -151,21 +130,16 @@ configured path.
 
 ## Challenge
 
-- 1 (major, target hosts of the documented procedure): accepted. The Product Manager chose option (a): Linux Docker
-  Engine only, with one `docker run` example and a read-only bind mount. Unraid, Synology and Docker Desktop for
-  Windows are named "not yet tried", and their operators keep the generated `ingest-token`. This is recorded as S6, N6
-  and AC8, with a dry run on Linux Docker Engine. The procedure names "the user the container runs as" instead of
-  `1654`, because the user guide runs the container as `99:100` or `1026:100` on NAS hosts. The PM made no
-  statement about NAS container UIs, so the spec claims nothing about them.
+- 1 (major, target hosts): accepted. Escalated; the Product Manager chose option (a), recorded as S6, N6 and AC8 with a
+  dry run on Linux Docker Engine. The procedure names "the user the container runs as", not `1654` (NAS hosts run
+  `99:100` or `1026:100`), and claims nothing about NAS container UIs.
 - 2 (exception text holds the path): accepted. E1 now says the line carries no exception or text holding the path, and
   AC7 covers an attached exception.
 - 3 (meaning of "absolute path"): accepted. E3 now names the rule of `Censio:DataDirectory` (fully qualified).
 - 4 (record 0061): accepted. 0061 is unreleased, so the plan edits it in place, with the file-only choice and the
   minimum of 32 characters; no superseding record.
-- 5 (documentation list): accepted for the plan. *Area documents* lists only `docs/areas/`; the plan names the new row
-  of both README configuration tables, the `Censio:DataDirectory` rows (English and German), `SECURITY.md`, the user
-  guide's token section and start failures (range, no-data-directory warning) in both languages, `docs/ARCHITECTURE.md`
-  and `.squad/project.md`.
-- 6 (tests that encode the old minimum): accepted for the plan. The plan assigns the Tester to replace the `!~` row and
-  the "1 to 1,024" texts in `IngestTokenSetupTests` with a 32-character row holding `!` and `~` and a 31-character
-  refused row for both sources.
+- 5 (documentation list): accepted for the plan, which names the new row and the `Censio:DataDirectory` rows of both
+  README tables, `SECURITY.md`, the user guide's token section and start failures in both languages,
+  `docs/ARCHITECTURE.md` and `.squad/project.md`.
+- 6 (tests of the old minimum): accepted for the plan: the Tester replaces the `!~` row and the "1 to 1,024" texts in
+  `IngestTokenSetupTests` with a 32-character row holding `!` and `~` and a refused 31-character row for both sources.
