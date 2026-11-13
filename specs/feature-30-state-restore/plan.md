@@ -306,3 +306,134 @@ All by the Dev, against the code as built:
 - Pages, DI registration of the state for pages, the profile switch and the connection banner: #31, #32.
 - Session events stored, retention, deleting a profile and its held state: #35.
 - The Companion's sending, buffer and catalog upload: #40, #41, #42.
+
+## Challenge notes
+
+Devil's Advocate, plan mode, feature #30 (specs/feature-30-state-restore). I read `plan.md`, `spec.md`, `tasks.md`, the issue (REST) and the code. The plan holds up on the main points:
+- Facts 1, 2, 6–11 and 17–18 match the code.
+- WAL is on (`ServerDatabaseOpener.cs:409`), so on-demand reads do not wait on a 3 s write.
+- The contract enforces UTC receive times (`ContractRules.cs:209`) and distinct island keys (`:421`), so the in-memory merge can match the store's rule in `TickWriter.cs:106-108`.
+
+There are no major objections. Each minor one below is written as an instruction.
+
+**Minor objections**
+
+1. **minor — the AC3 test case for session events cannot pass on a correct build.** The plan says session start, session end and `status` "leave `ListProfilesAsync` empty". But the plan has the hello store its profile before `helloAccepted` (Approach, *Hello*; AC5), and no event can be sent before an accepted hello (`IngestSession.cs:189-191`). So the list always holds the hello's profile.
+   *Instruction (Tester):* assert that after the events and `status` the profile list holds only the hello's profile, unchanged. Assert that the profile named by the events gets no tick (`ListLatestProfilesAsync` empty, `ReadLatestTickAsync` null) and that no follower is called.
+
+2. **minor — the AC3 "acknowledged only after it is stored" test would also pass on a wrong build.** The plan reads the tick back through a second store after the acknowledgement arrives. If the server acknowledged first and stored second, that read would still usually find the tick, because a small tick stores in milliseconds. Also, `ServerDatabase.Gate` is internal and only visible to `Censio.Server.Data.Tests` (`Censio.Server.Data.csproj:10`), so the server tests cannot use it to hold the store back.
+   *Instruction (Tester):* use a file database. Hold a write lock from a second connection (`BEGIN IMMEDIATE`) while the tick is sent, assert that no acknowledgement arrives while the lock is held, release it, then assert the acknowledgement arrives and the tick can be read. The same test needs a file database for the fact-16 triggers in AC7, because the plan's session factory (`IngestSessionTests.cs:1132`) uses an in-memory database that a second connection cannot reach.
+
+3. **minor — reading a newly held profile back from the database adds a full tick read to every acknowledgement and raises the memory peak.** In `StoreTickAsync`, the plan re-reads a whole state with `ReadProfileStateAsync` in two cases: P is not held but its tick is newer than the oldest held one, and P is held but the tick is older. That read happens before the acknowledgement. At the bounds it costs 1.0–1.3 s on top of the 2.6–2.9 s store (`server-data.md:146`), which breaks the "about 3 s" of spec E14/N3. It also holds a fourth bound tick for a moment: the incoming one, its copy read back, and the two held ones.
+   In both cases the tick to hold is already known:
+   - P not held: the incoming tick is P's latest, because P's stored latest is older than the oldest held one.
+   - P held, tick older: P's held tick stays.
+
+   Only the island list can change (fact 10).
+   *Instruction (Dev):*
+   - In both cases, read only `ListIslandsAsync(P)` after the commit. The ingest is the only writer, so the island list matches the tick.
+   - Measure fact 14 as the peak during a swap (incoming tick plus two held ones), not just two held ticks, and put that figure in `server-state.md`.
+
+4. **minor — ties at restore can come out in the wrong order.** "Restore assigns sequences in the list's order", but `ListLatestProfilesAsync` returns the newest first. Counting up in that order gives the newest held profile the lower sequence. When two held profiles have equal receive times, a third profile's tick at that same time would then push out the wrong one, against N2/AC10.
+   *Instruction (Dev):* assign ascending sequences from the oldest held profile to the newest, and start the live counter above them. The Tester adds the equal-receive-time case to the restore test of AC10, not only after a tick.
+
+5. **minor — the order of `ServerState.Profiles` may differ before and after a restart.** Restore fills the list from `ListProfilesAsync` (`ORDER BY "Id"`, `ServerStore.cs:71`). The plan does not say where a profile that arrives by hello or tick goes in the list. If it is appended, the AC1 comparison "equal profiles" fails on order alone.
+   *Instruction (Dev):* keep `Profiles` ordered by `Id` as the store orders it. Return it, the held states and the missing-icon set as immutable snapshots replaced whole under the `Lock`, because #32's pages read them from other threads.
+
+6. **minor — a failure after a catalog is written leaves memory and the database out of step.** `StoreCatalogAsync` writes the catalog (`ServerStore.cs:177-190`, commits on its own), then calls `FindMissingIconsAsync`. If that read throws a `SqliteException`, the plan returns `Failed` and replaces nothing. Until the next upload or restart, `CompleteCatalogIdentity` can name the old catalog while the database holds the new one, and no follower is told.
+   *Instruction (Dev):* when the write was `Stored` but the missing-icon read failed, mark the held catalog unusable before returning `Failed` (so `CompleteCatalogIdentity` is `null` and the Companion uploads again) and notify `Catalog`. The Tester covers it with a second connection that holds the `Icons` table back.
+
+7. **minor — the documentation list misses sentences that become false.** Neither the Documentation updates nor task 10 name these, and each states that nothing is stored:
+   - `docs/USER_GUIDE.md:99`: "the server stores and shows nothing it receives".
+   - `docs/USER_GUIDE.md:365`: "Nothing the server receives is stored yet (#30)".
+   - The German counterpart at `docs/USER_GUIDE.md:743`: "Noch wird nichts gespeichert … (#30)", and the German text that matches line 99.
+   - The ingest row in `docs/areas/README.md:46`: "storing and showing data (#30, #32)".
+   - `docs/areas/ingest.md:114`: "The server keeps nothing it accepts (#30)".
+
+   *Instruction (Dev):* rewrite each of these in task 10.
+
+Relevant files: /home/user/Censio/specs/feature-30-state-restore/plan.md, /home/user/Censio/src/Censio.Server/IngestSession.cs, /home/user/Censio/src/Censio.Server.Data/ServerStore.cs, /home/user/Censio/src/Censio.Server.Data/TickWriter.cs, /home/user/Censio/docs/USER_GUIDE.md
+
+## Security notes
+
+## Security plan review: feature #30 (specs/feature-30-state-restore), round 1
+
+I read `/home/user/Censio/specs/feature-30-state-restore/spec.md`, `plan.md`, `tasks.md`, records 0068 and 0069, `docs/areas/ingest.md`, `docs/areas/server-data.md`, `docs/areas/contract.md` (*Bounds*, *Memory of a read*), `SECURITY.md`, and the code in `src/Censio.Server/IngestSession.cs`, `IngestEndpoint.cs`, `Program.cs`, `src/Censio.Server.Data/ServerStore.cs` and `TickReader.cs`.
+
+**Tier:** `security` is right. It covers the first writes of untrusted input, the authenticated hello now storing data, and the memory bound the plan calls a control.
+
+### What holds
+- The profile is stored only after the token check and `TryTakeCompanion`. A refused hello writes nothing.
+- Close 1011 has an empty reason. A `SqliteException` only reaches the operator's log, never the socket.
+- The new log lines (E3, E4, E13, E10, the start count) carry no message content. SQLite error texts name tables and constraints, not parameter values.
+- Icons are content-addressed: the reader checks that the SHA-256 of the PNG equals `reference`, and the store uses `INSERT OR IGNORE`, so one icon cannot overwrite another.
+- The catalog resend check compares SHA-256 identities. A stored document the reader refuses at restore is treated as unusable, not trusted.
+- Stores are atomic: one immediate transaction each, and cancellation rolls back. E6 holds.
+
+### Blocking
+
+**B1. The N2 memory bound leaves out each held profile's island list, and the unbounded growth the plan accepts is not written down anywhere.**
+- Evidence:
+  - The plan (Approach, `ServerState` "Holds"; Security considerations, lines 285–288) and record 0069 (*Consequences*: "two latest ticks plus the profile list and the catalog's missing-icon references") both describe a bounded held state.
+  - But `StoredProfileState.Islands` is the profile's whole island list (`ServerStore.ListIslandsAsync`, no limit).
+  - Island rows build up per key (session GUID, island ID, area index) over all ticks (`server-data.md`, *What is stored*).
+  - One tick may add 256 new keys, each with a name of up to 765 UTF-8 bytes (`contract.md`, *Bounds*).
+  - So a token holder, or anyone when the token is off, can grow a held profile's islands by about 0.4 MB per small tick without limit. That memory is held, copied on every merge, loaded at restore and loaded on every on-demand read. N2 ("bounded whatever the number of stored profiles") and the area document would state a bound that does not exist.
+- A related gap: the plan calls the unbounded profile list and database growth "an accepted risk of a token holder, as disk growth already is". No document records disk growth as an accepted risk today, because nothing was stored before this change. The Documentation updates only mention growth in README and the user guide.
+- Smallest fix (documentation only; no cap needed, since real games have a finite set of islands):
+  - **Plan, Security considerations, and record 0069 Consequences:** say the held state is two latest ticks plus each held profile's full island list plus the profile list plus the missing-icon set. The island lists and the profile list are unbounded in count.
+  - **`server-state.md` *Memory*:** state the same.
+  - **`ingest.md` *Accepted risks*:** add a new entry, verbatim: "**Growth by a token holder.** Every stored tick, icon and profile stays until retention (#35): a Companion with the token, or anyone with the token switched off, can grow the database file, the profile list and a profile's island list (up to 256 new islands per tick) without a bound, and the server holds the profile list and the island lists of the held profiles in memory."
+  - **`SECURITY.md`, the `RequireToken` `false` sentence:** extend it to "anyone who reaches the server can then send data, which the server stores, and fill its database file".
+
+**B2. No test checks that a refused hello or a refused message stores nothing.**
+- This is the first change that writes to the store. The plan's *Architecture check* says the guarantee "stores data only with the shared ingest token" is unchanged ("every write follows an accepted hello"), but no test in the AC table checks it.
+- Fix: add cases under AC5/AC3 in `IngestSessionTests.cs`:
+  - A hello refused with `tokenRefused`, and one refused with `unsupportedVersion`, leave `ListProfilesAsync` empty.
+  - A second hello refused with `companionConnected`, with a valid token, the connected profile's id and another name, does not rename that profile.
+  - A tick the reader refuses as `invalid` (with a valid id), and a catalog upload refused as `catalogInvalid`, are acknowledged with their refusal and store nothing: no tick, no catalog row, `CompleteCatalogIdentity` unchanged, no follower called.
+
+### Non-blocking (my recommendation: fix now unless stated)
+
+1. **The Companion place can leak if the hello store throws something other than a `SqliteException`.**
+   - The plan keeps `_companionTaken` false until the store succeeds, but `TryTakeCompanion` has already run. An `OperationCanceledException` at stop, an `ObjectDisposedException` from the gate, or an `InvalidOperationException` goes to the `RunAsync` catch, and then `EndAsync` never calls `ReleaseCompanion` (`IngestSession.cs:194-202`, `:730-734`).
+   - At stop this does no harm. Otherwise every later hello is refused `companionConnected` until a restart.
+   - Fix: record that the place was taken right after `TryTakeCompanion`, release it in `EndAsync` from that flag, and keep the disconnect line on a separate "hello accepted" flag.
+
+2. **Fact 14 should measure the peak of the store path, not the steady state.**
+   - Fact 14 measures "a `ServerState` holding two bound ticks" in the `CreateBoundTick` shape. During `StoreTickAsync` for an unheld profile, or for an older tick, these are alive at once: two held states, the session's 24 MiB buffer and the incoming tick's reader model, and the state re-read from the database before the swap.
+   - The worst retained tick shape is the four-pairs tick (43.3 MiB retained, `contract.md`), not necessarily `CreateBoundTick`.
+   - Fix: change fact 14's text to measure the peak managed memory of `StoreTickAsync` of a worst-shape tick for an unheld profile while two worst-shape ticks are held, and state that figure in `server-state.md`.
+
+3. **On-demand reads have no concurrency bound.**
+   - `ServerState.ReadProfileStateAsync` for an unheld profile costs over a second and a whole tick model at the bounds. #32's pages need no login (`server.md`), so parallel page requests for old profiles could pile up these reads.
+   - It is unused in this change. Fix now: one sentence in `server-state.md` and record 0069's Consequences: "Reads on demand are not limited in number; a caller reachable without login (#32) must serialize or bound them." Or serialize them in `ServerState` with a `SemaphoreSlim(1)`.
+
+4. **The AC7 failure injection needs a file database.**
+   - The trigger needs a second connection on a file. The plan's session factory uses an in-memory `ServerDatabase` (plan, *Test files*), so the AC7 tests must build theirs over a temporary file.
+   - I checked the engine behaviour once (fact 16; below).
+
+5. **`TryRestoreAsync` only catches `SqliteException`.**
+   - A stored value that fails conversion (`GetGuid`, `GetByte`) would crash the start with an unhandled exception instead of the E4 line and exit code 1.
+   - Reaching this needs write access to the owner-only file, which `SECURITY.md` puts out of scope. My recommendation: a linked issue, or leave it.
+
+6. **Security areas touched could add one entry.**
+   - Restore runs `CatalogDocumentReader.Read` again on the stored, externally supplied document. That is a new use of the parser in "Parsing of external input", with no change to the reader.
+   - The plan's Security considerations already discuss it. Fix: add "Parsing of external input (the catalog reader re-reads the stored document at restore; reader unchanged)".
+
+### Measurement run (fact 16, the SQLite engine side)
+Script: `/tmp/claude-0/-home-user-Censio/d173ea8b-e94c-5e17-99f4-f472f6438c1a/scratchpad/f16/f16.py`. Setup: WAL mode; a long-lived connection A; connection B creates `BEFORE INSERT` triggers with `RAISE(ABORT, 'injected')` on `Profiles` and `Ticks`; A then runs the store's statement shapes inside `BEGIN IMMEDIATE`.
+
+Command: `python3 -I f16.py t.db` (Python's SQLite 3.53.1, not the e_sqlite3 bundle the server uses). Output:
+```
+upsert known profile -> IntegrityError injected SQLITE_CONSTRAINT_TRIGGER
+upsert new profile -> IntegrityError injected SQLITE_CONSTRAINT_TRIGGER
+insert or ignore profile -> IntegrityError injected SQLITE_CONSTRAINT_TRIGGER
+insert tick returning -> IntegrityError injected SQLITE_CONSTRAINT_TRIGGER
+[(b'p1', 'Rome')]
+```
+The trigger fires for the upsert (both the known-profile and new-profile paths), for `INSERT OR IGNORE`, and for the tick insert with `RETURNING`. The earlier name is kept. Microsoft.Data.Sqlite turns any error code into a `SqliteException`.
+
+Not run:
+- Fact 14 (memory): it is not a precondition for approval. The bound is structural (two held profiles), and the figure is the Dev's, which I will check in the diff review against non-blocking 2.
+- Fact 15: a test technique the Tester verifies in step 5.
