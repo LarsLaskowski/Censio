@@ -1,10 +1,13 @@
+using System.Collections.Concurrent;
 using System.Net.WebSockets;
+using System.Security.Cryptography;
 using System.Text;
 
 using Censio.Contracts;
 using Censio.Pipe.Tests;
 using Censio.Server.Data;
 
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -60,6 +63,41 @@ public sealed class IngestSessionTests : IDisposable
     private const string Id5 = "11111111-2222-4333-8444-555555555555";
 
     /// <summary>
+    /// The identity of the sixth message.
+    /// </summary>
+    private const string Id6 = "11111111-2222-4333-8444-555555555556";
+
+    /// <summary>
+    /// A profile identity other than the one of <see cref="IngestClient.Hello" />.
+    /// </summary>
+    private const string OtherProfile = "bbbbbbbb-cccc-4ddd-8eee-ffffffffffff";
+
+    /// <summary>
+    /// The profile name of <see cref="IngestClient.Hello" />.
+    /// </summary>
+    private const string HelloProfileName = "MARKERPROFILE";
+
+    /// <summary>
+    /// The error line of a message that cannot be stored (spec E3).
+    /// </summary>
+    private const string StoreFailureLine = "A message could not be stored; the connection is closed.";
+
+    /// <summary>
+    /// The trigger that makes every insert of a tick fail.
+    /// </summary>
+    private const string FailTicksSql = "CREATE TRIGGER \"FailTicks\" BEFORE INSERT ON \"Ticks\" BEGIN SELECT RAISE(ABORT, 'test write failure'); END;";
+
+    /// <summary>
+    /// The trigger that makes every insert of a profile fail.
+    /// </summary>
+    private const string FailProfilesSql = "CREATE TRIGGER \"FailProfiles\" BEFORE INSERT ON \"Profiles\" BEGIN SELECT RAISE(ABORT, 'test write failure'); END;";
+
+    /// <summary>
+    /// The statement that removes the trigger of <see cref="FailProfilesSql" />.
+    /// </summary>
+    private const string DropFailProfilesSql = "DROP TRIGGER \"FailProfiles\";";
+
+    /// <summary>
     /// The all-zero identity.
     /// </summary>
     private const string ZeroId = "00000000-0000-0000-0000-000000000000";
@@ -112,6 +150,17 @@ public sealed class IngestSessionTests : IDisposable
     /// The time a close waits for the peer's close.
     /// </summary>
     private static readonly TimeSpan _closeWait = TimeSpan.FromSeconds(2);
+
+    /// <summary>
+    /// The time the test gives a held write lock to let an acknowledgement through that a store-first session never sends;
+    /// a correct session passes whatever its length.
+    /// </summary>
+    private static readonly TimeSpan _lockedWindow = TimeSpan.FromMilliseconds(500);
+
+    /// <summary>
+    /// The longest the test waits for a follower.
+    /// </summary>
+    private static readonly TimeSpan _followerBound = TimeSpan.FromSeconds(10);
 
     /// <summary>
     /// The catalog documents the catalog reader refuses, built on demand: the name of the case and its builder.
@@ -172,6 +221,31 @@ public sealed class IngestSessionTests : IDisposable
     /// </summary>
     private readonly CancellationTokenSource _stopping = new();
 
+    /// <summary>
+    /// The temporary directories of the running test, deleted afterwards.
+    /// </summary>
+    private readonly List<string> _temporaryDirectories = [];
+
+    /// <summary>
+    /// The logger of the server state, apart from the sessions' logger.
+    /// </summary>
+    private readonly ConcurrentRecordingLogger _stateLogger = new();
+
+    /// <summary>
+    /// The database file of the running test, or <see langword="null" /> while the state is in memory.
+    /// </summary>
+    private string? _databaseFile;
+
+    /// <summary>
+    /// The store under the server state of the sessions.
+    /// </summary>
+    private ServerStore _store = null!;
+
+    /// <summary>
+    /// The server state every session of the test stores through.
+    /// </summary>
+    private ServerState _state = null!;
+
     #endregion // Fields
 
     #region Constructors
@@ -221,6 +295,16 @@ public sealed class IngestSessionTests : IDisposable
     #endregion // Properties
 
     #region Methods
+
+    /// <summary>
+    /// Opens the in-memory database and the restored state the sessions of the test share.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous operation</returns>
+    [TestInitialize]
+    public Task InitializeAsync()
+    {
+        return OpenStateAsync(null);
+    }
 
     /// <summary>
     /// A version-1 hello with the stored token is answered helloAccepted with the server's version and no catalog identity,
@@ -995,6 +1079,422 @@ public sealed class IngestSessionTests : IDisposable
     }
 
     /// <summary>
+    /// A tick is acknowledged only after it is stored: while another connection holds the write lock no acknowledgement
+    /// arrives, and once the lock is released the acknowledgement arrives and the tick reads back.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC3")]
+    public async Task IngestSessionRunAsyncAcknowledgesTickOnlyWhenStored()
+    {
+        // Arrange
+        await UseDatabaseFileAsync();
+
+        var (_, client, _) = await StartAcceptedSessionAsync();
+
+        Task<(ContractMessage? Message, WebSocketCloseStatus? CloseStatus, string? CloseDescription)> receive;
+        Task first;
+
+        // Act
+        using (HoldWriteLock())
+        {
+            await IngestClient.SendAsync(client, IngestClient.Tick(Id1));
+            receive = IngestClient.ReceiveAsync(client);
+            first = await Task.WhenAny(receive, Task.Delay(_lockedWindow, TestContext.CancellationToken));
+        }
+
+        var (reply, _, _) = await receive;
+
+        // Assert
+        Assert.AreNotSame(receive, first, "No acknowledgement should arrive while the tick cannot be stored");
+        AssertAcknowledgement(reply, Id1, null, null, []);
+        Assert.IsNotNull(await _store.ReadTickAsync(Guid.Parse(Id1), TestContext.CancellationToken), "The acknowledged tick should be stored");
+    }
+
+    /// <summary>
+    /// A resent tick (same id), icon (same reference) and catalog (same document) are acknowledged without a refusal, the
+    /// catalog with the reference still without an icon, and no follower is told of them.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC3")]
+    [TestCategory("AC6")]
+    public async Task IngestSessionRunAsyncResentMessagesAcknowledgedWithoutChange()
+    {
+        // Arrange
+        var (_, client, _) = await StartAcceptedSessionAsync();
+        var (stored, storedIcon) = IconMessage(Id2, "png stored");
+        var (missing, _) = IconMessage(Id6, "png missing");
+        var (_, resentIcon) = IconMessage(Id4, "png stored");
+
+        var document = CatalogJson(stored, missing);
+
+        await SendAllAsync(client, [IngestClient.Tick(Id1), storedIcon, IngestClient.CatalogUpload(Id3, document)]);
+        await ReceiveMessagesAsync(client, 3);
+
+        var (notices, told) = Follow(1);
+
+        // Act
+        await SendAllAsync(client, [IngestClient.Tick(Id1), resentIcon, IngestClient.CatalogUpload(Id5, document), TickOfOtherProfile(Id6)]);
+
+        var replies = await ReceiveMessagesAsync(client, 4);
+
+        // Assert
+        await told.WaitAsync(_followerBound, TestContext.CancellationToken);
+
+        AssertAcknowledgement(replies[0], Id1, null, null, []);
+        AssertAcknowledgement(replies[1], Id4, null, null, []);
+        AssertAcknowledgement(replies[2], Id5, null, null, [missing]);
+        AssertAcknowledgement(replies[3], Id6, null, null, []);
+        Assert.AreSequenceEqual(new[] { $"Profile {OtherProfile}" }, notices.ToList(), "No follower should be told of the resends, only of the later tick");
+    }
+
+    /// <summary>
+    /// Session events and status messages store nothing: the hello's profile stays listed as it was and gets no tick, and
+    /// no follower is told of them.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC3")]
+    public async Task IngestSessionRunAsyncSessionEventsAndStatusStoreNothing()
+    {
+        // Arrange
+        var (_, client, _) = await StartAcceptedSessionAsync();
+        var (notices, told) = Follow(1);
+
+        // Act
+        await SendAllAsync(client, [IngestClient.SessionStart(Id1), IngestClient.Status(), IngestClient.SessionEnd(Id2), TickOfOtherProfile(Id3)]);
+        await ReceiveMessagesAsync(client, 3);
+
+        // Assert
+        await told.WaitAsync(_followerBound, TestContext.CancellationToken);
+
+        var helloProfile = Guid.Parse(IngestClient.Profile);
+
+        Assert.AreSequenceEqual(new[] { $"{helloProfile} {HelloProfileName}" }, DescribeProfiles(await _store.ListProfilesAsync(TestContext.CancellationToken), helloProfile), "The hello's profile should stay listed as the hello stored it");
+        Assert.IsNull(await _store.ReadLatestTickAsync(helloProfile, TestContext.CancellationToken), "The session events should store no tick");
+        Assert.AreSequenceEqual(new[] { Guid.Parse(OtherProfile) }, (await _store.ListLatestProfilesAsync(10, TestContext.CancellationToken)).ToList(), "Only the later tick's profile should have a tick");
+        Assert.AreSequenceEqual(new[] { $"Profile {OtherProfile}" }, notices.ToList(), "No follower should be told of the session events or the status");
+    }
+
+    /// <summary>
+    /// An accepted hello stores its profile with its name before helloAccepted is sent.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC5")]
+    public async Task IngestSessionRunAsyncHelloStoresProfileBeforeHelloAccepted()
+    {
+        // Arrange
+        var (_, client, _) = StartSession(IngestAccess.CreateForToken(Token));
+
+        var expected = new[] { $"{IngestClient.Profile} {HelloProfileName}" };
+
+        // Act
+        await IngestClient.SendAsync(client, IngestClient.Hello(Token));
+
+        var (reply, _, _) = await IngestClient.ReceiveAsync(client);
+
+        var stored = DescribeProfiles(await _store.ListProfilesAsync(TestContext.CancellationToken), null);
+
+        // Assert
+        Assert.IsInstanceOfType<ContractHelloAccepted>(reply, "The hello should be accepted");
+        Assert.AreSequenceEqual(expected, stored, "The profile should be stored with its name when helloAccepted arrives");
+        Assert.AreSequenceEqual(expected, DescribeProfiles(_state.Profiles, null), "The state should list the profile with its name");
+    }
+
+    /// <summary>
+    /// An accepted hello with a known profile identity and another name renames the profile.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC5")]
+    public async Task IngestSessionRunAsyncHelloWithKnownProfileRenamesIt()
+    {
+        // Arrange
+        await _state.StoreProfileAsync(Guid.Parse(IngestClient.Profile), "Rome", TestContext.CancellationToken);
+
+        var (_, client, _) = StartSession(IngestAccess.CreateForToken(Token));
+
+        // Act
+        await IngestClient.SendAsync(client, HelloAs(IngestClient.Profile, "Roma"));
+
+        var (reply, _, _) = await IngestClient.ReceiveAsync(client);
+
+        // Assert
+        Assert.IsInstanceOfType<ContractHelloAccepted>(reply, "The hello should be accepted");
+        Assert.AreSequenceEqual(new[] { $"{IngestClient.Profile} Roma" }, DescribeProfiles(await _store.ListProfilesAsync(TestContext.CancellationToken), null), "The known profile should take the hello's name");
+    }
+
+    /// <summary>
+    /// A hello refused companionConnected, with a valid token, the connected profile's identity and another name, renames
+    /// nothing.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC5")]
+    public async Task IngestSessionRunAsyncCompanionConnectedHelloRenamesNothing()
+    {
+        // Arrange
+        await StartAcceptedSessionAsync();
+
+        var (secondRun, secondClient, _) = StartSession(IngestAccess.CreateForToken(Token));
+
+        // Act
+        await IngestClient.SendAsync(secondClient, HelloAs(IngestClient.Profile, "Another name"));
+
+        var (messages, _, _) = await IngestClient.ReceiveUntilCloseAsync(secondClient);
+
+        await FinishAsync(secondClient, secondRun);
+
+        // Assert
+        AssertHelloRefused(messages[0], ContractHelloRefusal.CompanionConnected, 1);
+        Assert.AreSequenceEqual(new[] { $"{IngestClient.Profile} {HelloProfileName}" }, DescribeProfiles(await _store.ListProfilesAsync(TestContext.CancellationToken), null), "The refused hello should not rename the connected profile");
+    }
+
+    /// <summary>
+    /// helloAccepted names the stored catalog only once every icon it refers to is stored: not before a catalog, not
+    /// after a catalog with one of its two icons on the next connection, whose re-upload lists the missing reference, and
+    /// on the connection after both icons are stored.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC6")]
+    public async Task IngestSessionRunAsyncHelloNamesCatalogOnlyWhenAllIconsStored()
+    {
+        // Arrange
+        var (firstReference, firstIcon) = IconMessage(Id2, "png first");
+        var (secondReference, secondIcon) = IconMessage(Id4, "png second");
+
+        var document = CatalogJson(firstReference, secondReference);
+        var (beforeCatalog, firstReplies) = await RunAcceptedSessionAsync([IngestClient.CatalogUpload(Id1, document), firstIcon]);
+        var (afterOneIcon, secondReplies) = await RunAcceptedSessionAsync([IngestClient.CatalogUpload(Id3, document), secondIcon]);
+        var (run, client, _) = StartSession(IngestAccess.CreateForToken(Token));
+
+        // Act
+        await IngestClient.SendAsync(client, IngestClient.Hello(Token));
+
+        var (reply, _, _) = await IngestClient.ReceiveAsync(client);
+
+        await FinishAsync(client, run);
+
+        // Assert
+        Assert.IsNull(beforeCatalog.CatalogIdentity, "No catalog should be named before one is stored");
+        AssertAcknowledgement(firstReplies[0], Id1, null, null, new[] { firstReference, secondReference }.Order(StringComparer.Ordinal).ToArray());
+        Assert.IsNull(afterOneIcon.CatalogIdentity, "No catalog should be named while one of its icons is missing");
+        AssertAcknowledgement(secondReplies[0], Id3, null, null, [secondReference]);
+        Assert.AreEqual(Convert.ToHexStringLower(SHA256.HashData(document)), Assert.IsInstanceOfType<ContractHelloAccepted>(reply, "The hello should be accepted").CatalogIdentity, "The catalog should be named once all its icons are stored");
+    }
+
+    /// <summary>
+    /// A catalog upload's acknowledgement lists only the references without a stored icon, distinct and ordinally sorted.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC6")]
+    public async Task IngestSessionRunAsyncCatalogUploadListsOnlyIconsNotStored()
+    {
+        // Arrange
+        var (_, client, _) = await StartAcceptedSessionAsync();
+        var (stored, storedIcon) = IconMessage(Id1, "png stored");
+
+        await IngestClient.SendAsync(client, storedIcon);
+        await IngestClient.ReceiveAsync(client);
+
+        // Act
+        await IngestClient.SendAsync(client, IngestClient.CatalogUpload(Id2, CatalogJson(IconB, stored, IconA, IconB)));
+
+        var (reply, _, _) = await IngestClient.ReceiveAsync(client);
+
+        // Assert
+        AssertAcknowledgement(reply, Id2, null, null, [IconA, IconB]);
+    }
+
+    /// <summary>
+    /// A tick whose storing fails is not acknowledged: the connection is closed with 1011 and an empty reason, the error is
+    /// logged with its exception, the tick counts as refused and the Companion's place is freed.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public async Task IngestSessionRunAsyncTickStoreFailureCloses1011WithoutAcknowledgement()
+    {
+        // Arrange
+        await UseDatabaseFileAsync();
+
+        var (run, client, _) = await StartAcceptedSessionAsync();
+
+        ExecuteOnFile(FailTicksSql);
+
+        // Act
+        await IngestClient.SendAsync(client, IngestClient.Tick(Id1));
+
+        var (messages, closeStatus, closeDescription) = await IngestClient.ReceiveUntilCloseAsync(client);
+
+        await FinishAsync(client, run);
+
+        // Assert
+        Assert.IsEmpty(messages, "The tick should not be acknowledged");
+        Assert.AreEqual(WebSocketCloseStatus.InternalServerError, closeStatus, "The connection should be closed with 1011");
+        Assert.AreEqual(string.Empty, closeDescription, "The close should carry an empty reason");
+        AssertOneStoreFailureLogged();
+        Assert.Contains("Companion disconnected; 0 messages accepted, 1 refused.", LogMessages(), "The tick should be counted as refused");
+        Assert.IsNull(await _store.ReadTickAsync(Guid.Parse(Id1), TestContext.CancellationToken), "The tick should not be stored");
+        Assert.IsTrue(_connections.TryTakeCompanion(), "The Companion's place should be released");
+    }
+
+    /// <summary>
+    /// A hello whose profile cannot be stored gets no reply, is closed with 1011, logs only the error and frees the place
+    /// once: a second Companion is accepted while the failed connection waits for its close, and after the failed session
+    /// ends a third is still refused companionConnected.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public async Task IngestSessionRunAsyncHelloProfileStoreFailureCloses1011AndFreesPlace()
+    {
+        // Arrange
+        await UseDatabaseFileAsync();
+        ExecuteOnFile(FailProfilesSql);
+
+        var (failedRun, failedClient, _) = StartSession(IngestAccess.CreateForToken(Token));
+
+        await IngestClient.SendAsync(failedClient, IngestClient.Hello(Token));
+
+        var (messages, closeStatus, closeDescription) = await IngestClient.ReceiveUntilCloseAsync(failedClient);
+
+        ExecuteOnFile(DropFailProfilesSql);
+
+        var (_, secondClient, _) = StartSession(IngestAccess.CreateForToken(Token));
+
+        await IngestClient.SendAsync(secondClient, IngestClient.Hello(Token));
+
+        var (secondReply, _, _) = await IngestClient.ReceiveAsync(secondClient);
+
+        await FinishAsync(failedClient, failedRun);
+
+        var (thirdRun, thirdClient, _) = StartSession(IngestAccess.CreateForToken(Token));
+
+        // Act
+        await IngestClient.SendAsync(thirdClient, IngestClient.Hello(Token));
+
+        var (thirdMessages, _, _) = await IngestClient.ReceiveUntilCloseAsync(thirdClient);
+
+        await FinishAsync(thirdClient, thirdRun);
+
+        // Assert
+        Assert.IsEmpty(messages, "The hello whose profile cannot be stored should get no reply");
+        Assert.AreEqual(WebSocketCloseStatus.InternalServerError, closeStatus, "The connection should be closed with 1011");
+        Assert.AreEqual(string.Empty, closeDescription, "The close should carry an empty reason");
+        Assert.IsInstanceOfType<ContractHelloAccepted>(secondReply, "A second Companion should be accepted while the failed connection waits for its close");
+        AssertHelloRefused(thirdMessages[0], ContractHelloRefusal.CompanionConnected, 1);
+        AssertOneStoreFailureLogged();
+        Assert.ContainsSingle(message => message == "Companion connected.", LogMessages(), "Only the second Companion should be logged as connected");
+        Assert.DoesNotContain(message => message.StartsWith("Companion disconnected", StringComparison.Ordinal), LogMessages(), "The failed hello should log no disconnect line");
+    }
+
+    /// <summary>
+    /// A follower that blocks delays no acknowledgement: the tick is acknowledged while its follower is still blocked.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC8")]
+    public async Task IngestSessionRunAsyncBlockingFollowerDelaysNoAcknowledgement()
+    {
+        // Arrange
+        var (_, client, _) = await StartAcceptedSessionAsync();
+
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        using var release = new ManualResetEventSlim(false);
+
+        _state.Changed += (_, _) =>
+                          {
+                              entered.TrySetResult();
+                              release.Wait(_followerBound, TestContext.CancellationToken);
+                          };
+
+        // Act
+        ContractMessage? reply;
+
+        try
+        {
+            await IngestClient.SendAsync(client, IngestClient.Tick(Id1));
+
+            (reply, _, _) = await IngestClient.ReceiveAsync(client);
+
+            await entered.Task.WaitAsync(_followerBound, TestContext.CancellationToken);
+        }
+        finally
+        {
+            release.Set();
+        }
+
+        // Assert
+        AssertAcknowledgement(reply, Id1, null, null, []);
+    }
+
+    /// <summary>
+    /// Builds a hello with the stored token for a profile identity and name.
+    /// </summary>
+    /// <param name="profileId">The profile identity</param>
+    /// <param name="name">The profile name</param>
+    /// <returns>The hello in single-quote notation</returns>
+    private static string HelloAs(string profileId, string name)
+    {
+        return IngestClient.Hello(Token)
+                           .Replace(IngestClient.Profile, profileId, StringComparison.Ordinal)
+                           .Replace($"'{HelloProfileName}'", $"'{name}'", StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Builds a tick of <see cref="OtherProfile" />.
+    /// </summary>
+    /// <param name="id">The identity of the message</param>
+    /// <returns>The tick in single-quote notation</returns>
+    private static string TickOfOtherProfile(string id)
+    {
+        return IngestClient.Tick(id).Replace(IngestClient.Profile, OtherProfile, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Builds an icon image whose PNG bytes hold a text, with the reference the contract requires (their SHA-256).
+    /// </summary>
+    /// <param name="id">The identity of the message</param>
+    /// <param name="content">The text of the PNG bytes</param>
+    /// <returns>The reference and the icon image in single-quote notation</returns>
+    private static (string Reference, string Notation) IconMessage(string id, string content)
+    {
+        var png = Encoding.UTF8.GetBytes(content);
+        var reference = Convert.ToHexStringLower(SHA256.HashData(png));
+
+        return (reference, $"{{'type':'iconImage','contractVersion':1,'id':'{id}','reference':'{reference}','png':'{Convert.ToBase64String(png)}'}}");
+    }
+
+    /// <summary>
+    /// Builds a catalog document with one entry per icon reference.
+    /// </summary>
+    /// <param name="icons">The icon references</param>
+    /// <returns>The bytes of the document</returns>
+    private static byte[] CatalogJson(params string[] icons)
+    {
+        var entries = icons.Select((icon, index) => $"{{'guid':{index + 1},'kind':'good','names':{{}},'regionGuid':null,'regionTypes':null,'icon':'{icon}'}}");
+
+        return Encoding.UTF8.GetBytes(IngestClient.Json($"{{'schemaVersion':1,'gameVersion':null,'entries':[{string.Join(',', entries)}]}}"));
+    }
+
+    /// <summary>
+    /// Describes listed profiles as text, in the order given.
+    /// </summary>
+    /// <param name="profiles">The profiles</param>
+    /// <param name="only">The one profile to describe, or <see langword="null" /> for all</param>
+    /// <returns>The lines</returns>
+    private static List<string> DescribeProfiles(IReadOnlyList<StoredProfile> profiles, Guid? only)
+    {
+        return [.. profiles.Where(profile => only is null || profile.Id == only).Select(profile => $"{profile.Id} {profile.Name ?? "<no name>"}")];
+    }
+
+    /// <summary>
     /// Builds a tick that breaks a value rule (a receive time without fraction) but has a valid id.
     /// </summary>
     /// <param name="id">The identity of the message</param>
@@ -1131,11 +1631,7 @@ public sealed class IngestSessionTests : IDisposable
         _disposables.AddRange([client, server, clientStream, serverStream]);
         _connections.TryEnterPendingHello();
 
-        var database = ServerDatabase.OpenAsync(null, NullLoggerFactory.Instance, _stopping.Token).GetAwaiter().GetResult().Database!;
-
-        _disposables.Add(database);
-
-        var session = new IngestSession(server, access, _connections, new ServerState(new ServerStore(database), _logger), _timeProvider, _logger, serverVersion);
+        var session = new IngestSession(server, access, _connections, _state, _timeProvider, _logger, serverVersion);
 
         return (session.RunAsync(_stopping.Token), client, serverStream);
     }
@@ -1199,6 +1695,147 @@ public sealed class IngestSessionTests : IDisposable
         Assert.DoesNotContain(text => text.Contains("MARKER", StringComparison.Ordinal), _logger.Entries.Select(entry => $"{entry.Message} {entry.Exception}").ToList(), "No log line should hold the token or message content");
     }
 
+    /// <summary>
+    /// Asserts that the session logged exactly one error: the line of a message that cannot be stored, with the SQLite
+    /// exception.
+    /// </summary>
+    private void AssertOneStoreFailureLogged()
+    {
+        var errors = _logger.Entries.Where(entry => entry.Level == LogLevel.Error).ToList();
+
+        Assert.AreSequenceEqual(new[] { StoreFailureLine }, errors.Select(entry => entry.Message).ToList(), "The failed store should be logged once as an error");
+        Assert.IsInstanceOfType<SqliteException>(errors[0].Exception, "The error should carry the SQLite exception");
+    }
+
+    /// <summary>
+    /// Adds a follower of the state that records each notice it is told.
+    /// </summary>
+    /// <param name="expected">The number of notices after which the returned task completes</param>
+    /// <returns>The notices and the task that completes once the expected number was told</returns>
+    private (ConcurrentQueue<string> Notices, Task Told) Follow(int expected)
+    {
+        var notices = new ConcurrentQueue<string>();
+        var told = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        _state.Changed += (_, change) =>
+                          {
+                              notices.Enqueue($"{change.Kind} {change.ProfileId?.ToString() ?? "<no profile>"}");
+
+                              if (notices.Count >= expected)
+                              {
+                                  told.TrySetResult();
+                              }
+                          };
+
+        return (notices, told.Task);
+    }
+
+    /// <summary>
+    /// Runs a whole accepted session: the hello, the messages with their acknowledgements, and the close.
+    /// </summary>
+    /// <param name="messages">The messages after the hello, each acknowledged</param>
+    /// <returns>The helloAccepted and the acknowledgements</returns>
+    private async Task<(ContractHelloAccepted Accepted, List<ContractMessage?> Replies)> RunAcceptedSessionAsync(string[] messages)
+    {
+        var (run, client, _) = StartSession(IngestAccess.CreateForToken(Token));
+
+        await IngestClient.SendAsync(client, IngestClient.Hello(Token)).ConfigureAwait(false);
+
+        var (reply, _, _) = await IngestClient.ReceiveAsync(client).ConfigureAwait(false);
+
+        await SendAllAsync(client, messages).ConfigureAwait(false);
+
+        var replies = await ReceiveMessagesAsync(client, messages.Length).ConfigureAwait(false);
+
+        await FinishAsync(client, run).ConfigureAwait(false);
+
+        return (Assert.IsInstanceOfType<ContractHelloAccepted>(reply, "The hello should be accepted"), replies);
+    }
+
+    /// <summary>
+    /// Opens a database (a file, or in memory), a store and a restored state that the sessions started afterwards share.
+    /// </summary>
+    /// <param name="databaseFile">The database file, or <see langword="null" /> for in memory</param>
+    /// <returns>A task that represents the asynchronous operation</returns>
+    private async Task OpenStateAsync(string? databaseFile)
+    {
+        var opened = await ServerDatabase.OpenAsync(databaseFile, NullLoggerFactory.Instance, TestContext.CancellationToken).ConfigureAwait(false);
+        var database = opened.Database ?? throw new InvalidOperationException($"The database could not be opened: {opened.Kind}", opened.Failure);
+
+        _disposables.Add(database);
+        _databaseFile = databaseFile;
+        _store = new ServerStore(database);
+        _state = new ServerState(_store, _stateLogger);
+
+        await _state.RestoreAsync(TestContext.CancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Replaces the in-memory state by one over a database file in a new temporary directory, for a test that needs a
+    /// second connection to the file.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous operation</returns>
+    private Task UseDatabaseFileAsync()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "censio-ingest-session-tests-" + Guid.NewGuid().ToString("N"));
+
+        Directory.CreateDirectory(directory);
+        _temporaryDirectories.Add(directory);
+
+        return OpenStateAsync(Path.Combine(directory, "censio.db"));
+    }
+
+    /// <summary>
+    /// Opens a connection of its own, without the pool, to the database file of the test.
+    /// </summary>
+    /// <returns>The opened connection</returns>
+    private SqliteConnection OpenRawConnection()
+    {
+        var builder = new SqliteConnectionStringBuilder
+                      {
+                          DataSource = _databaseFile ?? throw new InvalidOperationException("The test should use a database file"),
+                          Mode = SqliteOpenMode.ReadWrite,
+                          Pooling = false
+                      };
+        var connection = new SqliteConnection(builder.ToString());
+
+        connection.Open();
+
+        return connection;
+    }
+
+    /// <summary>
+    /// Runs a statement over a connection of its own to the database file of the test.
+    /// </summary>
+    /// <param name="sql">The constant statement</param>
+    private void ExecuteOnFile(string sql)
+    {
+        using var connection = OpenRawConnection();
+        using var command = connection.CreateCommand();
+
+#pragma warning disable CA2100 // Constant statements of this class only
+        command.CommandText = sql;
+#pragma warning restore CA2100
+
+        command.ExecuteNonQuery();
+    }
+
+    /// <summary>
+    /// Takes the write lock of the database file over a connection of its own, until the returned connection is disposed.
+    /// </summary>
+    /// <returns>The connection that holds the lock</returns>
+    private SqliteConnection HoldWriteLock()
+    {
+        var connection = OpenRawConnection();
+
+        using var command = connection.CreateCommand();
+
+        command.CommandText = "BEGIN IMMEDIATE;";
+        command.ExecuteNonQuery();
+
+        return connection;
+    }
+
     #endregion // Methods
 
     #region IDisposable
@@ -1211,6 +1848,13 @@ public sealed class IngestSessionTests : IDisposable
         foreach (var disposable in _disposables)
         {
             disposable.Dispose();
+        }
+
+        SqliteConnection.ClearAllPools();
+
+        foreach (var directory in _temporaryDirectories.Where(Directory.Exists))
+        {
+            Directory.Delete(directory, true);
         }
 
         _stopping.Dispose();
