@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -6,6 +7,8 @@ using Censio.Contracts;
 
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
+
+using SQLitePCL;
 
 namespace Censio.Server.Data.Tests;
 
@@ -104,6 +107,38 @@ public sealed class ServerStoreTests : IDisposable
     /// </summary>
     private const string CreatePauseTriggerSql = "CREATE TEMP TRIGGER \"PauseTickWrite\" AFTER INSERT ON main.\"Islands\" BEGIN SELECT " + PauseFunctionName + "(); END;";
 
+    /// <summary>
+    /// The name of the SQL function that commits a write over another connection while a read of the store runs.
+    /// </summary>
+    private const string WriteBetweenFunctionName = "censio_test_write_between";
+
+    /// <summary>
+    /// The temporary views, on a pooled read connection only, that shadow the profile, tick and island tables and commit
+    /// the write of <see cref="WriteBetweenFunctionName" /> at the first row a read takes from one of them.
+    /// </summary>
+    private const string CreateWriteBetweenViewsSql = "CREATE TEMP VIEW \"Profiles\" AS SELECT * FROM main.\"Profiles\" WHERE " + WriteBetweenFunctionName + "(\"Id\") = 0;"
+                                                      + "CREATE TEMP VIEW \"Ticks\" AS SELECT * FROM main.\"Ticks\" WHERE " + WriteBetweenFunctionName + "(\"ProfileId\") = 0;"
+                                                      + "CREATE TEMP VIEW \"Islands\" AS SELECT * FROM main.\"Islands\" WHERE " + WriteBetweenFunctionName + "(\"ProfileId\") = 0;";
+
+    /// <summary>
+    /// The write committed while a read runs: the profile renamed, its older tick made the latest, its islands renamed.
+    /// </summary>
+    private const string WriteBetweenSql = "BEGIN IMMEDIATE;"
+                                           + "UPDATE \"Profiles\" SET \"Name\" = $name WHERE \"Id\" = $profile;"
+                                           + "UPDATE \"Ticks\" SET \"ReceiveTicks\" = $receive WHERE \"Id\" = $tick;"
+                                           + "UPDATE \"Islands\" SET \"Name\" = $name WHERE \"ProfileId\" = $profile;"
+                                           + "COMMIT;";
+
+    /// <summary>
+    /// The island name of the latest tick of the one-transaction test.
+    /// </summary>
+    private const string LatestIslandName = "Name of the latest tick";
+
+    /// <summary>
+    /// The island name only the older tick of the one-transaction test carries.
+    /// </summary>
+    private const string OlderIslandName = "Island of the older tick";
+
     #endregion // Constants
 
     #region Fields
@@ -133,6 +168,17 @@ public sealed class ServerStoreTests : IDisposable
     /// The islands <see cref="ServerStoreListIslandsGivesNameOfLatestReceiveTime" /> expects: key and latest name.
     /// </summary>
     private static readonly string[] _expectedLatestIslands = ["1/1/0 Name at three", "2/2/0 Second island"];
+
+    /// <summary>
+    /// The islands <see cref="ServerStoreReadProfileStateAsyncReadsNameTickAndIslands" /> expects: key and latest name.
+    /// </summary>
+    private static readonly string[] _expectedStateIslands = ["-5/255/255 " + IslandName + " é€中", "1/1/0 Second island", "3/3/0 Island only of an older tick"];
+
+    /// <summary>
+    /// The profiles <see cref="ServerStoreListLatestProfilesAsyncOrdersByLatestTick" /> stores, in the order it expects
+    /// them listed: by the receive time of their latest tick, then by the storing order of that tick.
+    /// </summary>
+    private static readonly string[] _latestProfileOrder = ["D", "B", "C", "A"];
 
     /// <summary>
     /// The temporary directories of the running test, deleted afterwards.
@@ -759,6 +805,152 @@ public sealed class ServerStoreTests : IDisposable
     }
 
     /// <summary>
+    /// The state of a profile, read through a new connection after the store is reopened, holds its name, its latest
+    /// tick by receive time with every value bit for bit (not an older tick stored later), and its islands with the name
+    /// of their latest receive time, an island only an older tick carried included and another profile's islands not.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC1")]
+    [TestCategory("AC10")]
+    public async Task ServerStoreReadProfileStateAsyncReadsNameTickAndIslands()
+    {
+        // Arrange
+        var databaseFile = CreateDatabaseFile();
+        var profileId = Guid.NewGuid();
+        var latest = CreateEveryValueTick(profileId);
+        var writer = await OpenStoreAsync(databaseFile);
+
+        await writer.StoreProfileAsync(profileId, ProfileName, TestContext.CancellationToken);
+        await StoreTicksAsync(writer,
+                              latest,
+                              CreateTick(profileId, 3, CreateIsland(1, "Name of an older tick", CreateEntry(1)), CreateIsland(3, "Island only of an older tick", CreateEntry(2))),
+                              CreateTick(Guid.NewGuid(), 9, CreateIsland(4, "Island of another profile", CreateEntry(1))));
+        CloseDatabases();
+
+        var reader = await OpenStoreAsync(databaseFile);
+
+        // Act
+        var state = await reader.ReadProfileStateAsync(profileId, TestContext.CancellationToken);
+
+        // Assert
+        Assert.IsNotNull(state, "The state of a stored profile should be read");
+        Assert.AreEqual(DescribeProfile(profileId, ProfileName), DescribeProfile(state.Profile.Id, state.Profile.Name), "The state should hold the profile's identity and name");
+        Assert.AreSequenceEqual(DescribeTick(latest), DescribeTick(state.LatestTick), "The state should hold the tick with the latest receive time, every value bit for bit");
+        Assert.AreSequenceEqual(_expectedStateIslands, DescribeIslands(state.Islands), "The state should hold each island of the profile once with the name of its latest receive time");
+    }
+
+    /// <summary>
+    /// A write committed while the state of a profile is read, which renames the profile and its islands and makes another
+    /// tick its latest, is not seen in any part of the state: name, latest tick and islands are read in one transaction.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC10")]
+    public async Task ServerStoreReadProfileStateAsyncWriteDuringReadIsNotSeen()
+    {
+        // Arrange
+        var databaseFile = CreateDatabaseFile();
+        var store = await OpenStoreAsync(databaseFile);
+        var profileId = Guid.NewGuid();
+        var latest = CreateTick(profileId, 5, CreateIsland(1, LatestIslandName, CreateEntry(1)));
+        var older = CreateTick(profileId, 3, CreateIsland(1, "Name of an older tick", CreateEntry(2)), CreateIsland(2, OlderIslandName, CreateEntry(3)));
+
+        await store.StoreProfileAsync(profileId, ProfileName, TestContext.CancellationToken);
+        await StoreTicksAsync(store, latest, older);
+
+        var written = CommitWriteDuringNextRead(_databases[^1], databaseFile, profileId, older.Id);
+
+        // Act
+        var state = await store.ReadProfileStateAsync(profileId, TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(1, written.Value, "The write should have been committed while the state was read, or the checks below would prove nothing");
+        Assert.IsNotNull(state, "The state of a stored profile should be read");
+        Assert.AreEqual(DescribeProfile(profileId, ProfileName), DescribeProfile(state.Profile.Id, state.Profile.Name), "The name should be the one before the write");
+        Assert.AreSequenceEqual(DescribeTick(latest), DescribeTick(state.LatestTick), "The latest tick should be the one before the write");
+        Assert.AreSequenceEqual(new[] { "1/1/0 " + LatestIslandName, "2/2/0 " + OlderIslandName }, DescribeIslands(state.Islands), "The island names should be the ones before the write");
+    }
+
+    /// <summary>
+    /// The state of a profile a hello stored without any tick holds its name, no tick and no island.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC10")]
+    public async Task ServerStoreReadProfileStateAsyncOfProfileWithoutTickHasNoTickOrIsland()
+    {
+        // Arrange
+        var store = await OpenStoreAsync(CreateDatabaseFile());
+        var profileId = Guid.NewGuid();
+
+        await store.StoreProfileAsync(profileId, ProfileName, TestContext.CancellationToken);
+        await store.StoreTickAsync(CreateTick(Guid.NewGuid(), 1, CreateIsland(1, IslandName, CreateEntry(1))), TestContext.CancellationToken);
+
+        // Act
+        var state = await store.ReadProfileStateAsync(profileId, TestContext.CancellationToken);
+
+        // Assert
+        Assert.IsNotNull(state, "The state of a stored profile should be read");
+        Assert.AreEqual(DescribeProfile(profileId, ProfileName), DescribeProfile(state.Profile.Id, state.Profile.Name), "The state should hold the profile's identity and name");
+        Assert.IsNull(state.LatestTick, "A profile without a tick should have no latest tick");
+        Assert.IsEmpty(state.Islands, "A profile without a tick should have no island");
+    }
+
+    /// <summary>
+    /// Without a database file, the state of a profile the store does not hold is none.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC10")]
+    public async Task ServerStoreReadProfileStateAsyncInMemoryOfUnknownProfileReturnsNull()
+    {
+        // Arrange
+        var store = await OpenInMemoryStoreAsync();
+
+        await store.StoreTickAsync(CreateTick(Guid.NewGuid(), 1, CreateIsland(1, IslandName, CreateEntry(1))), TestContext.CancellationToken);
+
+        // Act
+        var state = await store.ReadProfileStateAsync(Guid.NewGuid(), TestContext.CancellationToken);
+
+        // Assert
+        Assert.IsNull(state, "An unknown profile should have no state");
+    }
+
+    /// <summary>
+    /// The profiles with ticks are listed by the receive time of their latest tick, newest first, of equal receive times
+    /// the one whose latest tick was stored later first; an older tick stored later, a rename and a profile without a
+    /// tick change nothing, and at most the asked number is listed.
+    /// </summary>
+    /// <param name="count">The maximum number of profiles asked for</param>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC10")]
+    [DataRow(10)]
+    [DataRow(3)]
+    public async Task ServerStoreListLatestProfilesAsyncOrdersByLatestTick(int count)
+    {
+        // Arrange
+        var store = await OpenStoreAsync(CreateDatabaseFile());
+        var profiles = _latestProfileOrder.ToDictionary(letter => letter, _ => Guid.NewGuid());
+
+        await StoreTicksAsync(store,
+                              CreateTick(profiles["A"], 1, CreateIsland(1, IslandName, CreateEntry(1))),
+                              CreateTick(profiles["B"], 3, CreateIsland(1, IslandName, CreateEntry(1))),
+                              CreateTick(profiles["C"], 1, CreateIsland(1, IslandName, CreateEntry(1))),
+                              CreateTick(profiles["D"], 3, CreateIsland(1, IslandName, CreateEntry(1))),
+                              CreateTick(profiles["A"], 0, CreateIsland(1, IslandName, CreateEntry(1))));
+        await store.StoreProfileAsync(profiles["A"], OtherProfileName, TestContext.CancellationToken);
+        await store.StoreProfileAsync(Guid.NewGuid(), ProfileName, TestContext.CancellationToken);
+
+        // Act
+        var latest = await store.ListLatestProfilesAsync(count, TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreSequenceEqual(_latestProfileOrder.Take(count).ToList(), NameProfiles(latest, profiles), "The profiles with ticks should be listed by their latest tick, newest first, at most the asked number");
+    }
+
+    /// <summary>
     /// Gives the receive time some seconds after the base receive time.
     /// </summary>
     /// <param name="seconds">The seconds</param>
@@ -1230,6 +1422,80 @@ public sealed class ServerStoreTests : IDisposable
 
         command.CommandText = CreatePauseTriggerSql;
         command.ExecuteNonQuery();
+    }
+
+    /// <summary>
+    /// Gives the letters of listed profiles, or the identity of one the test did not store.
+    /// </summary>
+    /// <param name="profileIds">The listed profile identities</param>
+    /// <param name="profiles">The stored profiles by letter</param>
+    /// <returns>The letters</returns>
+    private static List<string> NameProfiles(IReadOnlyList<Guid> profileIds, Dictionary<string, Guid> profiles)
+    {
+        var letters = profiles.ToDictionary(pair => pair.Value, pair => pair.Key);
+
+        return profileIds.Select(profileId => letters.GetValueOrDefault(profileId, profileId.ToString())).ToList();
+    }
+
+    /// <summary>
+    /// Prepares the next read of the store over a pooled connection of a database file so that, at the first row it
+    /// takes from the profile, tick or island table, a write over another connection renames the profile and its
+    /// islands and makes an older tick the latest one, and commits.
+    /// </summary>
+    /// <param name="database">The database whose connection string the store's reads use</param>
+    /// <param name="databaseFile">The database file</param>
+    /// <param name="profileId">The profile identity</param>
+    /// <param name="olderTickId">The identity of the older tick that the write makes the latest one</param>
+    /// <returns>Holds 1 once the write is committed</returns>
+    private static StrongBox<int> CommitWriteDuringNextRead(ServerDatabase database, string databaseFile, Guid profileId, Guid olderTickId)
+    {
+        var written = new StrongBox<int>();
+
+        using var connection = new SqliteConnection(database.Connection.ConnectionString);
+
+        connection.Open();
+
+        // Registered on the native handle, not through the connection, which removes its own functions when it returns
+        // the handle to the pool; the store's next read takes that handle with the views and this function
+        raw.sqlite3_create_function(connection.Handle,
+                                    WriteBetweenFunctionName,
+                                    1,
+                                    null,
+                                    (context, _, _) =>
+                                    {
+                                        if (Interlocked.CompareExchange(ref written.Value, 1, 0) == 0)
+                                        {
+                                            WriteBetween(databaseFile, profileId, olderTickId);
+                                        }
+
+                                        raw.sqlite3_result_int(context, 0);
+                                    });
+
+        using var command = connection.CreateCommand();
+
+        command.CommandText = CreateWriteBetweenViewsSql;
+        command.ExecuteNonQuery();
+
+        return written;
+    }
+
+    /// <summary>
+    /// Commits the write of <see cref="WriteBetweenSql" /> over a connection of its own.
+    /// </summary>
+    /// <param name="databaseFile">The database file</param>
+    /// <param name="profileId">The profile identity</param>
+    /// <param name="olderTickId">The identity of the older tick that the write makes the latest one</param>
+    private static void WriteBetween(string databaseFile, Guid profileId, Guid olderTickId)
+    {
+        Execute(databaseFile,
+                command =>
+                {
+                    command.CommandText = WriteBetweenSql;
+                    command.Parameters.AddWithValue("$name", OtherProfileName);
+                    command.Parameters.AddWithValue("$profile", profileId);
+                    command.Parameters.AddWithValue("$receive", ReceiveTime(9).UtcTicks);
+                    command.Parameters.AddWithValue("$tick", olderTickId);
+                });
     }
 
     /// <summary>
