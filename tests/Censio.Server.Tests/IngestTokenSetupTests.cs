@@ -967,6 +967,39 @@ public sealed class IngestTokenSetupTests
     }
 
     /// <summary>
+    /// A switch value other than true or false stops the start with only the existing line of an invalid switch,
+    /// whether or not the token file setting names a valid file.
+    /// </summary>
+    /// <param name="requireToken">The value of the switch</param>
+    /// <param name="configureValidFile">Whether the token file setting names a valid file; otherwise it is unset</param>
+    [TestMethod]
+    [TestCategory("AC5")]
+    [TestCategory("AC7")]
+    [DataRow("yes", true)]
+    [DataRow("", true)]
+    [DataRow("yes", false)]
+    [DataRow("", false)]
+    public void IngestTokenSetupTryCreateAccessTokenFileWithInvalidRequireTokenReportsSwitch(string requireToken, bool configureValidFile)
+    {
+        // Arrange
+        var dataDirectory = CreateTemporaryDirectory();
+        var tokenFile = configureValidFile ? CreateConfiguredTokenFile(Encoding.ASCII.GetBytes(ConfiguredToken)) : null;
+        var logger = new RecordingLogger();
+
+        // Act
+        var access = IngestTokenSetup.TryCreateAccess(CreateConfiguration(dataDirectory, requireToken, tokenFile), logger);
+
+        // Assert
+        Assert.IsNull(access, $"The start should stop: '{requireToken}', valid file {configureValidFile}");
+        Assert.HasCount(1, logger.Entries, $"Exactly one entry should be logged: '{requireToken}', valid file {configureValidFile}");
+        Assert.AreEqual(LogLevel.Critical, logger.Entries[0].Level, $"The entry should be critical: '{requireToken}', valid file {configureValidFile}");
+        Assert.AreEqual(InvalidSwitchText, logger.Entries[0].Message, $"The entry should carry the exact E5 text: '{requireToken}', valid file {configureValidFile}");
+        Assert.IsNull(logger.Entries[0].Exception, $"The entry should carry no exception: '{requireToken}', valid file {configureValidFile}");
+        Assert.IsEmpty(Directory.GetFileSystemEntries(dataDirectory), $"No token file should be created in the data directory: '{requireToken}', valid file {configureValidFile}");
+        AssertNoMarker(logger, requireToken);
+    }
+
+    /// <summary>
     /// Creates a configuration with the data directory and the switch.
     /// </summary>
     /// <param name="dataDirectory">The data directory, or <c>null</c> for none</param>
