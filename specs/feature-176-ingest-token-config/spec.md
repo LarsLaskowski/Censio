@@ -1,7 +1,7 @@
 # Spec: Ingest token from a file named by configuration
 
 Source: Issue #176
-Status: Draft
+Status: Approved by Product Manager
 
 ## Problem
 
