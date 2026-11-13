@@ -3,4 +3,7 @@
     <ProjectReference Include="..\..\src\Censio.Server.Data\Censio.Server.Data.csproj" />
     <ProjectReference Include="..\..\src\Censio.Contracts\Censio.Contracts.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\Censio.Server.Tests\RecordingLogger.cs" Link="RecordingLogger.cs" />
+  </ItemGroup>
 </Project>
