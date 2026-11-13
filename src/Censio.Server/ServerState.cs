@@ -60,6 +60,11 @@ public sealed partial class ServerState : IProfileStateSource
                                             };
 
     /// <summary>
+    /// The state of the Companion's connection, replaced whole under the lock.
+    /// </summary>
+    private CompanionConnection _companion = CompanionConnection.Disconnected;
+
+    /// <summary>
     /// The last storing sequence. Guarded by the gate.
     /// </summary>
     private long _sequence;
@@ -122,16 +127,31 @@ public sealed partial class ServerState : IProfileStateSource
     /// <summary>
     /// Gets the state of the Companion's connection.
     /// </summary>
-#pragma warning disable S2325 // Skeleton: removed with the implementation
-    public CompanionConnection CompanionState => NotImplemented<CompanionConnection>();
-#pragma warning restore S2325
+    public CompanionConnection CompanionState
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _companion;
+            }
+        }
+    }
 
     /// <summary>
     /// Gets the identity of the profile whose latest tick is the newest, or <see langword="null"/> when none is held.
     /// </summary>
-#pragma warning disable S2325 // Skeleton: removed with the implementation
-    public Guid? NewestProfile => NotImplemented<Guid?>();
-#pragma warning restore S2325
+    public Guid? NewestProfile
+    {
+        get
+        {
+            var held = GetSnapshot().Held;
+
+            return held.Count == 0
+                       ? null
+                       : held.MaxBy(pair => (pair.Value.ReceiveTicks, pair.Value.Sequence)).Key;
+        }
+    }
 
     #endregion // Properties
 
@@ -342,7 +362,7 @@ public sealed partial class ServerState : IProfileStateSource
                             {
                                 Identity = identity,
                                 MissingIcons = [.. missing],
-                                Lookup = null
+                                Lookup = PageCatalog.From(document)
                             });
 
                 return new CatalogStoreResult
@@ -371,33 +391,35 @@ public sealed partial class ServerState : IProfileStateSource
     /// <summary>
     /// Sets the Companion as connected.
     /// </summary>
-#pragma warning disable S2325, RH2003 // Skeleton: removed with the implementation
     public void SetCompanionConnected()
     {
-        throw new NotImplementedException();
+        SwapCompanion(new CompanionConnection
+                      {
+                          IsConnected = true,
+                          PipeState = null
+                      });
     }
-#pragma warning restore S2325, RH2003
 
     /// <summary>
     /// Sets the state of the Companion's pipe.
     /// </summary>
     /// <param name="pipeState">The pipe state</param>
-#pragma warning disable S1172, S2325, RH2003 // Skeleton: removed with the implementation
     public void SetCompanionPipeState(ContractPipeState pipeState)
     {
-        throw new NotImplementedException();
+        SwapCompanion(new CompanionConnection
+                      {
+                          IsConnected = true,
+                          PipeState = pipeState
+                      });
     }
-#pragma warning restore S1172, S2325, RH2003
 
     /// <summary>
     /// Sets the Companion as disconnected.
     /// </summary>
-#pragma warning disable S2325, RH2003 // Skeleton: removed with the implementation
     public void SetCompanionDisconnected()
     {
-        throw new NotImplementedException();
+        SwapCompanion(CompanionConnection.Disconnected);
     }
-#pragma warning restore S2325, RH2003
 
     /// <summary>
     /// Reads the bytes of a stored icon.
@@ -451,18 +473,6 @@ public sealed partial class ServerState : IProfileStateSource
             _writeGate.Release();
         }
     }
-
-    /// <summary>
-    /// Raises the skeleton's exception for a property.
-    /// </summary>
-    /// <typeparam name="T">The type of the property</typeparam>
-    /// <returns>Never returns</returns>
-#pragma warning disable RH2003 // Skeleton: removed with the implementation
-    private static T NotImplemented<T>()
-    {
-        throw new NotImplementedException();
-    }
-#pragma warning restore RH2003
 
     /// <summary>
     /// Gets the distinct references of the icons of a catalog document, ordinally sorted.
@@ -663,6 +673,25 @@ public sealed partial class ServerState : IProfileStateSource
     }
 
     /// <summary>
+    /// Replaces the state of the Companion's connection and tells the followers, when it changed.
+    /// </summary>
+    /// <param name="companion">The new state</param>
+    private void SwapCompanion(CompanionConnection companion)
+    {
+        lock (_lock)
+        {
+            if (_companion.IsConnected == companion.IsConnected && _companion.PipeState == companion.PipeState)
+            {
+                return;
+            }
+
+            _companion = companion;
+        }
+
+        Notify(ServerStateChangeKind.Companion, null);
+    }
+
+    /// <summary>
     /// Tells each follower of a change on a thread-pool work item of its own.
     /// </summary>
     /// <param name="kind">The kind of the change</param>
@@ -726,7 +755,7 @@ public sealed partial class ServerState : IProfileStateSource
                {
                    Identity = catalog.Identity,
                    MissingIcons = [.. missing],
-                   Lookup = null
+                   Lookup = PageCatalog.From(document)
                };
     }
 
@@ -876,17 +905,22 @@ public sealed partial class ServerState : IProfileStateSource
     #region IProfileStateSource
 
     /// <inheritdoc/>
-#pragma warning disable S2325 // Skeleton: removed with the implementation
-    public CatalogHold Catalog => NotImplemented<CatalogHold>();
-#pragma warning restore S2325
+    public CatalogHold Catalog => GetSnapshot().Catalog;
 
     /// <inheritdoc/>
-#pragma warning disable S1172, S2325, RH2003 // Skeleton: removed with the implementation
     public bool TryGetHeld(Guid profileId, out StoredProfileState? state)
     {
-        throw new NotImplementedException();
+        if (GetSnapshot().Held.TryGetValue(profileId, out var held))
+        {
+            state = held.State;
+
+            return true;
+        }
+
+        state = null;
+
+        return false;
     }
-#pragma warning restore S1172, S2325, RH2003
 
     /// <inheritdoc/>
     public async Task<ProfileStateRead> ReadProfileStateAsync(Guid profileId, CancellationToken cancellationToken)

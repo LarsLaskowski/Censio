@@ -412,6 +412,7 @@ public sealed partial class IngestSession : IDisposable
 
         _helloAccepted = true;
         LogCompanionAccepted(_logger);
+        _state.SetCompanionConnected();
 
         return await SendAsync(new ContractHelloAccepted
                                {
@@ -493,8 +494,9 @@ public sealed partial class IngestSession : IDisposable
 
         if (read.Message is { } message)
         {
-            if (message is ContractStatus)
+            if (message is ContractStatus status)
             {
+                _state.SetCompanionPipeState(status.PipeState);
                 _acceptedCount++;
 
                 return null;
@@ -801,6 +803,11 @@ public sealed partial class IngestSession : IDisposable
     {
         if (Interlocked.Exchange(ref _placeTaken, 0) == 1)
         {
+            if (_helloAccepted)
+            {
+                _state.SetCompanionDisconnected();
+            }
+
             _connections.ReleaseCompanion();
         }
     }
