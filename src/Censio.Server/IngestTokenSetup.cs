@@ -16,9 +16,19 @@ public static partial class IngestTokenSetup
     public const string RequireTokenKey = "Censio:Ingest:RequireToken";
 
     /// <summary>
+    /// The configuration key that names the token file instead of the one in the data directory.
+    /// </summary>
+    public const string TokenFileKey = "Censio:Ingest:TokenFile";
+
+    /// <summary>
     /// The name of the token file in the data directory.
     /// </summary>
     public const string TokenFileName = "ingest-token";
+
+    /// <summary>
+    /// The minimum length of a token in bytes.
+    /// </summary>
+    public const int MinTokenLength = 32;
 
     /// <summary>
     /// The maximum length of a token in bytes.
@@ -63,11 +73,25 @@ public static partial class IngestTokenSetup
             return null;
         }
 
+        var configuredFile = configuration[TokenFileKey];
+
         if (string.Equals(requireToken, "false", StringComparison.OrdinalIgnoreCase))
         {
+            if (configuredFile is not null)
+            {
+                LogTokenFileExcludesSwitch(logger);
+
+                return null;
+            }
+
             LogSwitchedOff(logger);
 
             return IngestAccess.CreateOpen();
+        }
+
+        if (configuredFile is not null)
+        {
+            return ReadConfiguredToken(logger, configuredFile);
         }
 
         var dataDirectory = configuration[DataProtectionSetup.DataDirectoryKey];
@@ -100,6 +124,44 @@ public static partial class IngestTokenSetup
     }
 
     /// <summary>
+    /// Reads the token of the file named by the configuration, logging no path and no exception.
+    /// </summary>
+    /// <param name="logger">The logger.</param>
+    /// <param name="configuredFile">The configured value.</param>
+    /// <returns>The access, or <c>null</c> when the value is no absolute path, the file cannot be read or holds no valid token.</returns>
+    private static IngestAccess? ReadConfiguredToken(ILogger logger, string configuredFile)
+    {
+        if (Path.IsPathFullyQualified(configuredFile) == false)
+        {
+            LogTokenFileNotAbsolute(logger);
+
+            return null;
+        }
+
+        var content = ReadBounded(configuredFile, out _);
+
+        if (content is null)
+        {
+            LogConfiguredTokenFileNotReadable(logger);
+
+            return null;
+        }
+
+        var token = ParseToken(content);
+
+        if (token is null)
+        {
+            LogConfiguredTokenFileInvalid(logger);
+
+            return null;
+        }
+
+        LogConfiguredTokenRead(logger);
+
+        return IngestAccess.CreateForToken(token);
+    }
+
+    /// <summary>
     /// Reads the token of the existing token file.
     /// </summary>
     /// <param name="logger">The logger.</param>
@@ -107,25 +169,11 @@ public static partial class IngestTokenSetup
     /// <returns>The access, or <c>null</c> when the file cannot be read or holds no valid token.</returns>
     private static IngestAccess? ReadToken(ILogger logger, string tokenFile)
     {
-        byte[] content;
+        var content = ReadBounded(tokenFile, out var failure);
 
-        try
+        if (content is null)
         {
-            using var stream = new FileStream(tokenFile, FileMode.Open, FileAccess.Read, FileShare.Read);
-            var buffer = new byte[MaxFileBytes + 1];
-            var length = stream.ReadAtLeast(buffer, buffer.Length, false);
-
-            content = buffer[..length];
-        }
-        catch (IOException exception)
-        {
-            LogTokenFileNotReadable(logger, exception, tokenFile);
-
-            return null;
-        }
-        catch (UnauthorizedAccessException exception)
-        {
-            LogTokenFileNotReadable(logger, exception, tokenFile);
+            LogTokenFileNotReadable(logger, failure!, tokenFile);
 
             return null;
         }
@@ -145,6 +193,32 @@ public static partial class IngestTokenSetup
     }
 
     /// <summary>
+    /// Reads at most one byte more than the maximum size of a token file.
+    /// </summary>
+    /// <param name="file">The full path of the file.</param>
+    /// <param name="failure">The caught exception when the file cannot be read; otherwise <c>null</c>.</param>
+    /// <returns>The content, or <c>null</c> when the file cannot be read.</returns>
+    private static byte[]? ReadBounded(string file, out Exception? failure)
+    {
+        try
+        {
+            using var stream = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.Read);
+            var buffer = new byte[MaxFileBytes + 1];
+            var length = stream.ReadAtLeast(buffer, buffer.Length, false);
+
+            failure = null;
+
+            return buffer[..length];
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            failure = exception;
+
+            return null;
+        }
+    }
+
+    /// <summary>
     /// Extracts the token of a file's content.
     /// </summary>
     /// <param name="content">The content of the file.</param>
@@ -158,7 +232,7 @@ public static partial class IngestTokenSetup
 
         var token = content.AsSpan().Trim(" \t\r\n"u8);
 
-        if (token.IsEmpty || token.Length > MaxTokenLength)
+        if (token.Length < MinTokenLength || token.Length > MaxTokenLength)
         {
             return null;
         }
@@ -290,6 +364,41 @@ public static partial class IngestTokenSetup
     private static partial void LogNoDataDirectory(ILogger logger);
 
     /// <summary>
+    /// Logs that the token was read from the configured file.
+    /// </summary>
+    /// <param name="logger">The logger.</param>
+    [LoggerMessage(Level = LogLevel.Information, Message = "The ingest token is read from the file named by Censio:Ingest:TokenFile.")]
+    private static partial void LogConfiguredTokenRead(ILogger logger);
+
+    /// <summary>
+    /// Logs that the configured token file cannot be read.
+    /// </summary>
+    /// <param name="logger">The logger.</param>
+    [LoggerMessage(Level = LogLevel.Critical, Message = "The ingest token file named by Censio:Ingest:TokenFile cannot be read; the server stops.")]
+    private static partial void LogConfiguredTokenFileNotReadable(ILogger logger);
+
+    /// <summary>
+    /// Logs that the configured token file holds no valid token.
+    /// </summary>
+    /// <param name="logger">The logger.</param>
+    [LoggerMessage(Level = LogLevel.Critical, Message = "The ingest token file named by Censio:Ingest:TokenFile holds no valid token (32 to 1,024 visible ASCII characters); the server stops.")]
+    private static partial void LogConfiguredTokenFileInvalid(ILogger logger);
+
+    /// <summary>
+    /// Logs that the configured token file is no absolute path.
+    /// </summary>
+    /// <param name="logger">The logger.</param>
+    [LoggerMessage(Level = LogLevel.Critical, Message = "The setting Censio:Ingest:TokenFile must be an absolute path; the server stops.")]
+    private static partial void LogTokenFileNotAbsolute(ILogger logger);
+
+    /// <summary>
+    /// Logs that a configured token file and the switched-off token exclude each other.
+    /// </summary>
+    /// <param name="logger">The logger.</param>
+    [LoggerMessage(Level = LogLevel.Critical, Message = "The settings Censio:Ingest:TokenFile and Censio:Ingest:RequireToken false exclude each other; the server stops.")]
+    private static partial void LogTokenFileExcludesSwitch(ILogger logger);
+
+    /// <summary>
     /// Logs that the token file cannot be read.
     /// </summary>
     /// <param name="logger">The logger.</param>
@@ -303,7 +412,7 @@ public static partial class IngestTokenSetup
     /// </summary>
     /// <param name="logger">The logger.</param>
     /// <param name="tokenFile">The token file.</param>
-    [LoggerMessage(Level = LogLevel.Critical, Message = "The ingest token file '{TokenFile}' holds no valid token (1 to 1,024 visible ASCII characters); the server stops.")]
+    [LoggerMessage(Level = LogLevel.Critical, Message = "The ingest token file '{TokenFile}' holds no valid token (32 to 1,024 visible ASCII characters); the server stops.")]
     private static partial void LogTokenFileInvalid(ILogger logger, string tokenFile);
 
     /// <summary>

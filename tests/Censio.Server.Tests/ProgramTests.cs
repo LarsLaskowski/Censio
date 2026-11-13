@@ -307,6 +307,37 @@ public sealed class ProgramTests
     }
 
     /// <summary>
+    /// A token file setting that names a missing file stops the start with exit code 1 before the server listens, and
+    /// neither the configured file nor a token file in the data directory is created: the listen address is taken by
+    /// another socket, so a start that went on to listen would fail with an exception instead.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC2")]
+    public async Task ProgramStartWithMissingTokenFileExitsWithCodeOne()
+    {
+        // Arrange
+        var dataDirectory = CreateTemporaryDirectory();
+        var configuredFile = Path.Combine(CreateTemporaryDirectory(), "token");
+
+        using var blocker = new TcpListener(IPAddress.Loopback, 0);
+
+        blocker.Start();
+
+        var port = ((IPEndPoint)blocker.LocalEndpoint).Port;
+        var entryPoint = typeof(Program).Assembly.EntryPoint!;
+        string[] arguments = [$"--{DataProtectionSetup.DataDirectoryKey}={dataDirectory}", $"--{IngestTokenSetup.TokenFileKey}={configuredFile}", $"--urls=http://127.0.0.1:{port}", $"--applicationName={typeof(Program).Assembly.GetName().Name}"];
+
+        // Act
+        var exitCode = await Task.Run(() => entryPoint.Invoke(null, [arguments]), TestContext.CancellationToken).WaitAsync(TimeSpan.FromSeconds(30), TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(1, exitCode, "The start should end with exit code 1");
+        Assert.IsFalse(File.Exists(configuredFile), "The configured file should not be created");
+        Assert.IsFalse(File.Exists(Path.Combine(dataDirectory, IngestTokenSetup.TokenFileName)), "No token file should be created in the data directory");
+    }
+
+    /// <summary>
     /// The committed settings files set no listen address.
     /// </summary>
     /// <param name="environment">The hosting environment</param>
