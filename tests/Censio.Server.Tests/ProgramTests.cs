@@ -46,6 +46,11 @@ public sealed class ProgramTests
     private static readonly Regex _blazorScript = new("<script[^>]*\\ssrc=\"([^\"]*_framework/blazor\\.web(\\.[A-Za-z0-9]+)?\\.js)\"", RegexOptions.None, TimeSpan.FromSeconds(5));
 
     /// <summary>
+    /// The expression the release check applies to each line of the start page (<c>sed 's|.*&lt;p&gt;Version \([^&lt;]*\)&lt;/p&gt;.*|\1|p'</c>).
+    /// </summary>
+    private static readonly Regex _releaseCheckVersion = new("^.*<p>Version ([^<]*)</p>.*$", RegexOptions.None, TimeSpan.FromSeconds(5));
+
+    /// <summary>
     /// The temporary directories of the running test, deleted afterwards.
     /// </summary>
     private readonly List<string> _temporaryDirectories = [];
@@ -276,6 +281,34 @@ public sealed class ProgramTests
         Assert.Contains("active", homeEntry?.ClassList.ToArray() ?? [], "The start page's entry should be marked");
         Assert.Contains(PaletteBackground(UiTheme.Light), body, "The page should carry the light palette");
         Assert.DoesNotContain(PaletteBackground(UiTheme.Dark), body, "The page should not carry the dark palette");
+    }
+
+    /// <summary>
+    /// The release check's expression finds the product version on exactly one line of the start page in the frame.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC1")]
+    public async Task ProgramGetRootShowsVersionInReleaseCheckMarkup()
+    {
+        // Arrange
+        using var factory = new CensioServerFactory("Production");
+        using var client = factory.CreateClient();
+        var expectedVersion = ProductVersion.Read(typeof(Program).Assembly);
+
+        // Act
+        var (status, body) = await GetRootAsync(client, null, null);
+
+        // Assert
+        var versions = body.Split('\n')
+                           .Select(line => _releaseCheckVersion.Match(line))
+                           .Where(match => match.Success)
+                           .Select(match => match.Groups[1].Value)
+                           .ToList();
+
+        Assert.AreEqual(HttpStatusCode.OK, status, "The start page should answer 200");
+        Assert.IsNotNull(ParseHtml(body).QuerySelector(".mud-appbar"), "The start page should be shown in the frame");
+        Assert.AreSequenceEqual(new[] { expectedVersion }, versions, "The release check's expression should find the product version on exactly one line");
     }
 
     /// <summary>
