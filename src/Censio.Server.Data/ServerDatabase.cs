@@ -9,15 +9,6 @@ namespace Censio.Server.Data;
 /// </summary>
 public sealed class ServerDatabase : IDisposable
 {
-    #region Fields
-
-    /// <summary>
-    /// The connection kept open for the lifetime of the database.
-    /// </summary>
-    private readonly SqliteConnection _keeper;
-
-    #endregion // Fields
-
     #region Constructors
 
     /// <summary>
@@ -25,12 +16,10 @@ public sealed class ServerDatabase : IDisposable
     /// </summary>
     /// <param name="databaseFile">The full path of the database file, or <see langword="null"/> for an in-memory database</param>
     /// <param name="keeper">The connection kept open for the lifetime of the database</param>
-    /// <param name="contextOptions">The options of the contexts over the database</param>
-    internal ServerDatabase(string? databaseFile, SqliteConnection keeper, DbContextOptions<CensioDbContext> contextOptions)
+    internal ServerDatabase(string? databaseFile, SqliteConnection keeper)
     {
         DatabaseFile = databaseFile;
-        ContextOptions = contextOptions;
-        _keeper = keeper;
+        Connection = keeper;
     }
 
     #endregion // Constructors
@@ -43,9 +32,14 @@ public sealed class ServerDatabase : IDisposable
     public string? DatabaseFile { get; }
 
     /// <summary>
-    /// Gets the options of the contexts over the database.
+    /// Gets the connection kept open for the lifetime of the database, the one every write runs on.
     /// </summary>
-    internal DbContextOptions<CensioDbContext> ContextOptions { get; }
+    internal SqliteConnection Connection { get; }
+
+    /// <summary>
+    /// Gets the gate that serializes the writes, and in memory the reads.
+    /// </summary>
+    internal SemaphoreSlim Gate { get; } = new(1, 1);
 
     #endregion // Properties
 
@@ -88,7 +82,8 @@ public sealed class ServerDatabase : IDisposable
     /// <inheritdoc/>
     public void Dispose()
     {
-        ServerDatabaseOpener.Release(_keeper);
+        ServerDatabaseOpener.Release(Connection);
+        Gate.Dispose();
     }
 
     #endregion // IDisposable

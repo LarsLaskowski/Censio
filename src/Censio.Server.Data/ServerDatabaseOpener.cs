@@ -254,7 +254,7 @@ internal static class ServerDatabaseOpener
 
         var kind = ResolveKind(databaseFile, created, pending.Count);
 
-        return new ServerDatabaseOpenResult(kind, databaseFile, new ServerDatabase(databaseFile, keeper, options), null);
+        return new ServerDatabaseOpenResult(kind, databaseFile, new ServerDatabase(databaseFile, keeper), null);
     }
 
     /// <summary>
