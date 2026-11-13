@@ -110,8 +110,8 @@ The frame's texts, exactly:
   browsers of N8 (S7, E6, N8).
 - AC9: A stored value that is not a known theme or language leads to the defaults of AC1 and AC2, a `200` answer, and
   appears neither in the page nor in a log line (E2, N3).
-- AC10: Every text-background pair and control boundary of the palette of both themes meets the contrast levels of
-  N1 (N1).
+- AC10: Every text-background pair, control boundary and focus indicator of both themes meets the contrast levels of
+  N1 against the surfaces it lies on (app bar, navigation, background, surface) (N1).
 - AC11: The HTML of `/` and every resource it loads come from the server's own origin; no `link`, `script`, `img`
   or `@import` names another host (N2).
 - AC12: An unknown path answers `404` with an empty body and `/health` answers `Healthy`, as before (E5).

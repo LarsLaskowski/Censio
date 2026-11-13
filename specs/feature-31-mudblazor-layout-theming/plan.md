@@ -32,21 +32,25 @@ A feature: [spec.md](spec.md).
 | 13 | The Docker image runs without ICU; `new CultureInfo("de")` throws there by default | `server.md`, *Docker image*; .NET's `PredefinedCulturesOnly` default under invariant mode | confirmed |
 | 14 | No web page shows Companion data or offers a server action today | `Home.razor`; `server-state.md` line 10 "No page shows the state yet" | confirmed |
 | 15 | The palette below meets N1 | WCAG 2.1 relative luminance computed for every pair of the table (scratch script); lowest text pair 5.91:1, lowest line pair 3.71:1 | confirmed |
+| 16 | MudBlazor removes focus outlines (`button:focus{outline:none}`, `a:focus-visible{outline:none}`, `.mud-button-root{outline:0}`) and shows focus only as a faint background tint | `MudBlazor.min.css` 9.13.0; Devil's Advocate M1 measured the tint at 1.05:1 on the light app bar | confirmed |
+| 17 | ASP.NET Core percent-decodes cookie values (`%64ark` reads as `dark`, `%0Adark` as a line feed and `dark`) | Security's scratch measurement on `DefaultHttpContext`, .NET 11 (*Security review*) | confirmed |
+| 18 | `StringWithQualityHeaderValue.TryParseList` is lenient: `de;q=abc, en` succeeds with the values `abc` and `en`; only an empty header fails | Security's scratch measurement (*Security review*) | confirmed |
+| 19 | A header entry without `q` has `Quality` null | `StringWithQualityHeaderValue.Quality` is `double?` | confirmed |
 
 ## Tests per criterion
 
 | AC | Test(s) | Test file |
 | -- | ------- | --------- |
 | AC1 | `ProgramGetRootShowsFrameInLightThemeWithEnglishTexts`, `ProgramGetRootShowsVersionInReleaseCheckMarkup`; existing `ProgramGetRootReturnsStartPageWithTitleHeadingAndVersion` | `tests/Censio.Server.Tests/ProgramTests.cs` |
-| AC2 | `UiPreferencesReadLanguageWithoutStoredValueFollowsLanguageList` (DataRows: `de-DE,en;q=0.8`, `en-US,de`, `fr,de`, `fr`, empty, null, `en;q=0.5, de`, `de;q=0, en`, `de;q=0`, `*`, `DE-at`, `de;q=0.5, en;q=0.5`, an unparsable header); `ProgramGetRootWithGermanLanguageListShowsGermanTexts` | `UiPreferencesTests.cs`, `ProgramTests.cs` |
+| AC2 | `UiPreferencesReadLanguageWithoutStoredValueFollowsLanguageList` (DataRows: `de-DE,en;q=0.8`, `en-US,de`, `fr,de`, `fr`, empty, null, `en;q=0.5, de`, `de;q=0, en`, `de;q=0`, `*`, `DE-at`, `de;q=0.5, en;q=0.5`, `de;q=abc, en` → English (fact 18), `;` → English); `ProgramGetRootWithGermanLanguageListShowsGermanTexts` | `UiPreferencesTests.cs`, `ProgramTests.cs` |
 | AC3 | `MainLayoutThemeSwitchTogglesDarkModeWithoutReload` | `MainLayoutTests.cs` |
-| AC4 | `ProgramGetRootWithDarkCookieRendersDarkPalette`; `MainLayoutThemeSwitchStoresChoice`; manual: kept after a browser restart (below) | `ProgramTests.cs`, `MainLayoutTests.cs` |
-| AC5 | `MainLayoutLanguageSwitchChangesTextsAndDocumentLanguage`, `MainLayoutLanguageSwitchStoresChoice`; `ProgramGetRootWithLanguageCookieOverridesLanguageList` | `MainLayoutTests.cs`, `ProgramTests.cs` |
+| AC4 | `ProgramGetRootWithDarkCookieRendersDarkPalette`; `MainLayoutThemeSwitchStoresChoice`, `MainLayoutThemeSwitchWhenStoreFailsKeepsThemeAndLogsKindOnly`; manual: kept after a browser restart (below) | `ProgramTests.cs`, `MainLayoutTests.cs` |
+| AC5 | `MainLayoutLanguageSwitchChangesTextsAndDocumentLanguage`, `MainLayoutLanguageSwitchStoresChoice`, `MainLayoutLanguageSwitchCascadesCurrentLanguageToPage`; `ProgramGetRootWithLanguageCookieOverridesLanguageList` | `MainLayoutTests.cs`, `ProgramTests.cs` |
 | AC6 | `UiTextsForLanguageReturnsSpecTexts` (one DataRow per table cell); the server test project runs with `InvariantGlobalization` | `UiTextsTests.cs` |
 | AC7 | `MainLayoutProfileSwitchIsDisabledWithLabelOnly` | `MainLayoutTests.cs` |
 | AC8 | `MainLayoutNavigationButtonClosesAndOpensDrawer`; manual: the content takes the freed width (below) | `MainLayoutTests.cs` |
-| AC9 | `UiPreferencesReadThemeWithUnknownValueReturnsLight`, `UiPreferencesReadLanguageWithUnknownStoredValueFollowsLanguageList` (DataRows: `DARK`, `fr`, `De`, ` dark`, `dark;x`, 4,000 `a`, `<script>`, `%0Adark`); `ProgramGetRootWithUnknownCookiesShowsDefaultsWithoutEcho` | `UiPreferencesTests.cs`, `ProgramTests.cs` |
-| AC10 | `CensioThemeCreatePalettesMeetContrastLevels` (both palettes; text pairs 4.5, line and icon pairs 3.0) | `CensioThemeTests.cs` |
+| AC9 | `UiPreferencesReadThemeWithUnknownValueReturnsLight`, `UiPreferencesReadLanguageWithUnknownStoredValueFollowsLanguageList` (DataRows: `DARK`, `fr`, `De`, ` dark`, `dark;x`, 4,000 `a`, `<script>`, a line feed then `dark`); `ProgramGetRootWithUnknownCookiesShowsDefaultsWithoutEcho` | `UiPreferencesTests.cs`, `ProgramTests.cs` |
+| AC10 | `CensioThemeCreatePalettesMeetContrastLevels` (both palettes; text pairs 4.5, line, icon and focus pairs 3.0); manual: the rendered focus ring (below) | `CensioThemeTests.cs` |
 | AC11 | `ProgramGetRootLoadsResourcesOnlyFromOwnOrigin` | `ProgramTests.cs` |
 | AC12 | existing `ProgramGetUnknownPathReturnsNotFound`, `ProgramGetHealthReturnsHealthyPlainText` | `ProgramTests.cs` |
 
@@ -58,18 +62,25 @@ Test notes for the Tester:
 - AC4's HTTP test sends `Cookie: censio-theme=dark` and asserts the dark palette's background variable (fact 10) and
   the absence of the light one; AC5's sends `censio-language=de` with `Accept-Language: en` and asserts `lang="de"` and
   `Startseite`.
-- AC9's HTTP test sends unknown values for both cookies, expects `200`, `lang="en"`, the light background, the body
-  not containing any sent value, and no log entry containing it: the server tests link
+- AC9's HTTP test sends unknown values for both cookies, among them `%0Adark` and `%3Cscript%3E` percent-encoded
+  (fact 17), expects `200`, `lang="en"`, the light background, neither the raw nor the decoded form of any sent value
+  in the body, and no log entry containing either: the server tests link
   `tests/Censio.Server.Data.Tests/RecordingLoggerProvider.cs` (as they link `RecordingTimeProvider.cs`) and add it
   through `WithWebHostBuilder(... ConfigureLogging ...)`.
 - AC11: every `href` and `src` of `link`, `script` and `img` in the body is a relative path (no scheme, no `//`); each
-  answers `200`, and no style sheet among them contains `@import`, `url(http` or `url(//`.
+  answers `200`, and no style sheet among them contains `@import`, `url(http` or `url(//`; `css/censio.css` is among
+  them.
 - The `MainLayout` tests use bUnit's `BunitContext` with `AddMudServices()` and loose JavaScript interop, render
   `MainLayout` with a `Body` and the cascading `UiTheme` and `UiLanguage` start values, and assert the interop calls
   `censio.storePreference` (`censio-theme`/`dark`, `censio-language`/`de`) and `censio.setDocumentLanguage` (`de`).
   AC3 asserts `MudThemeProvider.IsDarkMode` and the button's `aria-label` from the table; AC8 asserts the drawer's
   `Open` state; AC7 asserts the `disabled` attribute, the exact visible text and that the layout has no `ServerState`
-  dependency (it renders with none registered).
+  dependency (it renders with none registered). The store-failure test sets bUnit's interop for
+  `censio.storePreference` to throw a `JSException`, asserts the theme still switched and exactly one `Debug` entry
+  naming `theme` and not `dark` (a `RecordingLoggerProvider` in the bUnit services). The cascade test renders as
+  `Body` a small test component, `CascadedLanguageProbe` (`tests/Censio.Server.Tests/CascadedLanguageProbe.cs`, a
+  `ComponentBase` that renders its cascaded `UiLanguage` and `UiTexts.HomeEntry`), and asserts `German` and
+  `Startseite` after the switch.
 - Manual (Product Manager, before step 9, on a local run of the branch head with
   `dotnet run --project src/Censio.Server -c Release` and Chrome or Edge): choose dark and German, close and reopen the
   browser, reload — dark and German from the first paint (AC4, AC5); close the navigation — the content widens (AC8);
@@ -90,12 +101,13 @@ in the props and `Censio.Server.Tests.csproj`, which also sets `InvariantGlobali
 `_content/MudBlazor/MudBlazor.min.js` and `js/censio.js` through `@Assets[...]`, and passes both values to
 `<Routes @rendermode="InteractiveServer" Theme=… Language=… />` (enums serialize as root parameters). No font link.
 
-**Routes.razor** cascades `Theme` and `Language` (by type) around the router.
+**Routes.razor** cascades `Theme` and `Language` (by type) around the router: the start values for `MainLayout`.
 
 **UiPreferences** (static): `ReadTheme` returns `Dark` only for the ordinal value `dark`, else `Light`.
 `ReadLanguage` returns the stored language for the ordinal values `en` and `de`; otherwise it parses the header with
-`StringWithQualityHeaderValue.TryParseList` (`Microsoft.Net.Http.Headers`) — unparsable or empty: `English` — orders
-the entries by quality descending, stable by position, drops quality 0, and takes the first whose primary subtag
+`StringWithQualityHeaderValue.TryParseList` (`Microsoft.Net.Http.Headers`) — the parser is lenient (fact 18): an invalid entry yields a value that is neither `de` nor `en`, and a failed or
+empty parse gives `English` — orders
+the entries by `Quality ?? 1.0` descending, stable by position (fact 19), drops quality 0, and takes the first whose primary subtag
 (before the first `-`) is `de` or `en`, case-insensitive; none: `English`. No value is logged, echoed or stored on the
 server. The header's size is bounded by Kestrel's request-header limit; no own bound.
 
@@ -104,10 +116,12 @@ server. The header's size is bounded by Kestrel's request-header limit; no own b
 localization (record 0072).
 
 **MainLayout.razor** holds the current theme, language and drawer state, starting from the cascaded values, and
-cascades the current `UiTexts` to the page. Layout, top to bottom:
+cascades the **current** `UiLanguage` and `UiTexts` (by type) around `@Body`; that inner cascade hides Routes' start
+value, so a page always receives the language shown. Layout, top to bottom, all inside one `div` with the class
+`censio-frame` (the focus rule below):
 
 - `MudThemeProvider` (`Theme` = `CensioTheme.Create()` once per layout, `IsDarkMode` from the state; never asks for the
-  system preference), `MudPopoverProvider`.
+  system preference), `MudPopoverProvider` (inside the `div`, so the language menu's items get the focus rule).
 - `MudLayout` with a `MudAppBar` (elevation 1): the navigation `MudIconButton` (menu icon, `aria-label` from the
   table); `MudText` `Typo.h6` `Censio`; `MudSpacer`; the profile placeholder; the language `MudMenu` (translate icon,
   `AriaLabel` from the table, items `English` and `Deutsch`); the theme `MudIconButton` (dark-mode icon in the light
@@ -120,13 +134,22 @@ cascades the current `UiTexts` to the page. Layout, top to bottom:
 
 A theme click flips the state, calls `censio.storePreference("censio-theme", "light"|"dark")` and re-renders; a
 language choice sets the state, calls `censio.storePreference("censio-language", "en"|"de")` and
-`censio.setDocumentLanguage("en"|"de")`. A failed interop call (connection lost, E4) is caught as
-`JSDisconnectedException` or `JSException` and ignored: the open page keeps the new state, and nothing is stored or
-logged.
+`censio.setDocumentLanguage("en"|"de")`. A failed interop call (connection lost, E4) is caught with
+`catch (Exception exception) when (exception is JSException or JSDisconnectedException or OperationCanceledException)`
+and logged once by `UiLog.PreferenceNotStored` (`Debug`, category `Censio.Server.WebUi`, message
+`The browser did not store the {Preference} choice.` with `theme` or `language`, never the value or the exception
+text); the open page keeps the new state. A catch with a statement satisfies S108 and S2486.
 
 **wwwroot/js/censio.js** (new): `window.censio = { storePreference(name, value), setDocumentLanguage(tag) }`; the first
 writes `name=value; Max-Age=31536000; Path=/; SameSite=Lax` to `document.cookie`, the second sets
 `document.documentElement.lang`. Both receive only the constants above. No `catch` (Sonar `javascript:S2486`).
+
+**wwwroot/css/censio.css** (new, linked in `App.razor` through `@Assets["css/censio.css"]` after MudBlazor's style
+sheet): `.censio-frame :focus-visible { outline: 2px solid var(--mud-palette-primary); outline-offset: 2px; }` and
+`.censio-frame .mud-appbar :focus-visible { outline-color: var(--mud-palette-appbar-text); }`. Their specificity
+(0,2,0 and 0,3,0) beats MudBlazor's outline removals (fact 16) without `!important`; the outline lies outside the
+control, on the app bar, the drawer, the background or a surface, which AC10's focus pairs cover (the marked nav entry
+included, since the ring lies outside its tint).
 
 **Home.razor** keeps `<PageTitle>Censio</PageTitle>`, writes `<h1 class="mud-typography mud-typography-h3">Censio</h1>`
 and keeps `<p>Version @…</p>` bare and on one line (N5, fact 2).
@@ -156,7 +179,8 @@ and keeps `<p>Version @…</p>` bare and on one line (N5, fact 2).
 AC10's pairs, both palettes — text 4.5:1: TextPrimary and TextSecondary on Background and Surface, AppbarText on
 AppbarBackground, DrawerText on DrawerBackground, Primary on Background, Surface and DrawerBackground (the marked nav
 entry), PrimaryContrastText on Primary, SecondaryContrastText on Secondary, Secondary on Background and Surface;
-3:1: DrawerIcon on DrawerBackground, ActionDefault and LinesInputs on Background and Surface.
+3:1: DrawerIcon on DrawerBackground, ActionDefault and LinesInputs on Background and Surface; focus ring 3:1:
+AppbarText on AppbarBackground, Primary on DrawerBackground, Background and Surface (all already above 6.6:1).
 
 ## Options considered
 
@@ -169,6 +193,8 @@ entry), PrimaryContrastText on Primary, SecondaryContrastText on Secondary, Seco
   no unit test; bUnit is a test library like `FakeTimeProvider`, not a mocking library.
 - Fonts served by the server (a bundled Roboto or a serif) — lost against system fonts: a font file adds a licence and
   bytes for a desktop-only UI (record 0032) where Segoe UI and Georgia are present.
+- MudBlazor's focus tint alone (no own style sheet) — lost: 1.05:1 on the app bar (M1); an outline with palette
+  variables keeps one rule for both themes.
 - Drawer `Responsive` (MudBlazor's default, an overlay on narrow windows) — lost: the phone layout is #53, and
   `Persistent` gives the freed width AC8 asks for.
 
@@ -179,8 +205,8 @@ entry), PrimaryContrastText on Primary, SecondaryContrastText on Secondary, Seco
 | Censio.Server | `UiTheme.cs`, `UiLanguage.cs`, `UiPreferences.cs`, `UiTexts.cs`, `CensioTheme.cs` | new |
 | Censio.Server | `Components/App.razor`, `Routes.razor`, `_Imports.razor`, `Layout/MainLayout.razor`, `Pages/Home.razor` | rewritten as *Approach* says |
 | Censio.Server | `Program.cs`, `Censio.Server.csproj` | `AddMudServices()`; package reference |
-| Censio.Server | `wwwroot/js/censio.js` | new |
-| build | `Directory.Packages.props`; `tests/Censio.Server.Tests/Censio.Server.Tests.csproj` | MudBlazor, bunit; bunit reference, `InvariantGlobalization`, link of `RecordingLoggerProvider.cs` |
+| Censio.Server | `wwwroot/js/censio.js`, `wwwroot/css/censio.css`, `UiLog.cs` | new |
+| build | `Directory.Packages.props`; `tests/Censio.Server.Tests/Censio.Server.Tests.csproj` | MudBlazor, bunit; bunit reference, `InvariantGlobalization`, link of `RecordingLoggerProvider.cs`; new test component `CascadedLanguageProbe.cs` |
 | CI | `.github/workflows/ci.yml` line 71 | `sonar.coverage.exclusions` gains `src/Censio.Server/wwwroot/js/**` |
 
 ## Signatures (for the Dev's skeleton)
@@ -200,6 +226,9 @@ Namespace `Censio.Server` for the C# types; the enums' members are Light and Dar
   - the read-only text properties `UiTexts.NavigationButton`, `UiTexts.HomeEntry`, `UiTexts.ProfileSwitch`,
     `UiTexts.SwitchToDarkTheme`, `UiTexts.SwitchToLightTheme`, `UiTexts.LanguageSwitch`
 - `public static class CensioTheme` with `public static MudTheme Create()`
+- `public static class UiLog` (partial) with
+  `public static partial void PreferenceNotStored(ILogger logger, string preference)` (attribute LoggerMessage, as
+  *Approach* says)
 - the component parameters (attribute Parameter) `Routes.Theme` and `Routes.Language`, and the cascading parameters
   (attribute CascadingParameter, by type) `MainLayout.InitialTheme` and `MainLayout.InitialLanguage`, all public
   properties with getter and setter
@@ -210,7 +239,7 @@ step 6). Names checked against *Writing code*: no nested type, and neither enum 
 ## Test files
 
 `tests/Censio.Server.Tests/UiPreferencesTests.cs`, `UiTextsTests.cs`, `CensioThemeTests.cs`, `MainLayoutTests.cs`
-(new), `ProgramTests.cs` (new tests added).
+(new), `ProgramTests.cs` (new tests added); the test component `CascadedLanguageProbe.cs` (new).
 
 Existing test code that calls a changed signature: none. `ProgramTests`' existing start-page tests keep their inputs and
 must pass unchanged.
@@ -234,8 +263,10 @@ All by the Dev, after the code is green:
 
 - `docs/areas/web-ui.md` (new, from `_template.md`) with its index row in `docs/areas/README.md`: the behavior of
   *Approach* as rules, the palette table and contrast levels, typography, cookie names, values, `Max-Age` 365 days,
-  `Path=/`, `SameSite=Lax`, the language ranking, the unknown-value rule, the text table; links records 0025, 0071,
-  0072.
+  `Path=/`, `SameSite=Lax`, the language ranking (absent weight counts as 1), the unknown-value rule (values compared
+  after ASP.NET Core's percent-decoding: `%64ark` reads as `dark`), the focus ring, the text table, that pages receive
+  the current language and texts as cascaded values, the `Debug` line of a choice the browser did not store; links
+  records 0025, 0071, 0072.
 - `docs/areas/server.md`: *Start page* (shown in the frame of `web-ui.md`, title, heading and version line kept, the
   version line stays a bare `<p>` for the release check), *Limits and errors* (`/` reads the two cookies and
   `Accept-Language`, see `web-ui.md`), *Not here* and the area index row's "web theming" point at `web-ui`.
@@ -248,7 +279,8 @@ All by the Dev, after the code is green:
   preference cookies and `Accept-Language` read on `/` (`UiPreferences`, `App.razor`) — [web-ui](../docs/areas/web-ui.md)";
   *Integration surface* gains "**A new page or UI text** touches: `UiTexts` (English and German) and its tests, the
   navigation in `MainLayout.razor`, `docs/areas/web-ui.md` (*Texts*), the user guide". *Test doubles*:
-  `RecordingLoggerProvider` "linked into the Server tests" (Tester reports this line).
+  `RecordingLoggerProvider` "linked into the Server tests" and a line for `CascadedLanguageProbe` (Tester reports
+  both).
 - Records 0071 and 0072: the Lead sets `Area: web-ui` once the index row exists (`tasks.md`).
 
 ## Architecture check
@@ -260,13 +292,14 @@ ingest are untouched. The server stores nothing new. The browser loads nothing f
 ## Security considerations
 
 - [x] Limits: the cookie values are compared whole and ordinally against four constants, no length limit needed; the
-  header is bounded by Kestrel's request-header limit before parsing; nothing is decoded.
-- [x] Exceptions: none reaches the user. `TryParseList` does not throw; interop failures are caught and ignored; an
-  unparsable header gives English.
+  header is bounded by Kestrel's request-header limit before parsing; the cookie values are compared after ASP.NET
+  Core's percent-decoding (fact 17), so `%64ark` counts as `dark`, harmlessly.
+- [x] Exceptions: none reaches the user. `TryParseList` does not throw; interop failures are caught and logged at
+  `Debug` with the preference kind only; a failed parse gives English.
 - Nothing read from a cookie or header is echoed, logged or stored; the only values written to `document.cookie` and
   `lang` are constants. The cookies are not `HttpOnly` (a script writes them) and not `Secure` (plain HTTP, record
   0006); they carry no identity. `SameSite=Lax`.
-- New public static assets: MudBlazor's CSS and script and `js/censio.js`, served by `MapStaticAssets` like the Blazor
+- New public static assets: MudBlazor's CSS and script, `js/censio.js` and `css/censio.css`, served by `MapStaticAssets` like the Blazor
   script, no directory listing. No new endpoint, header, CORS rule or listener.
 
 ## Decision records
@@ -278,70 +311,28 @@ ingest are untouched. The server stores nothing new. The browser loads nothing f
 
 As the spec's *Out of scope*. No follow-up issue.
 
-## Security notes
+## Challenge
 
-## Security review, mode plan: feature #31 (MudBlazor layout, theming, cookies)
+Devil's Advocate, one major and four minor objections, all accepted.
 
-I read `/home/user/Censio/specs/feature-31-mudblazor-layout-theming/spec.md` and `plan.md` together with `.squad/project.md` (*Security areas*, *Guarantees*), `SECURITY.md`, `docs/areas/server.md`, records 0006 and 0071, and the current `Program.cs`, `App.razor`, `Routes.razor`, `MainLayout.razor`, `Dockerfile`, `ci.yml` and `Directory.Packages.props`.
+- M1 (major), no visible focus indicator: MudBlazor removes outlines and its tint reaches 1.05:1 — accepted:
+  `wwwroot/css/censio.css` adds a 2 px `:focus-visible` outline in the palette's primary colour, the app bar text
+  colour on the app bar (*Approach*, fact 16); AC10 in `spec.md` now names the focus indicator, its pairs are in the
+  contrast test; AC11's test includes the file; *Affected projects*, `web-ui.md` list it.
+- m1, an empty catch breaks S108 and S2486 — accepted: the filtered catch logs `UiLog.PreferenceNotStored` at `Debug`
+  with the preference kind only; a bUnit test pins it under AC4.
+- m2, an absent weight is null and would sort last — accepted: ranking by `Quality ?? 1.0`, then position (fact 19).
+- m3, `TryParseList` is lenient — accepted: the DataRows are `de;q=abc, en` and `;`, both English (fact 18).
+- m4, pages would receive the start language — accepted: `MainLayout` cascades the current `UiLanguage` and `UiTexts`
+  around the body; a test with `CascadedLanguageProbe` pins it under AC5; `web-ui.md` says which values pages use.
 
-### Tier and areas
+## Security review
 
-- **Tier:** `security` is correct. The change makes `/` read browser input (two cookies and `Accept-Language`) and adds public static assets. Both fall under Network exposure.
-- **Areas touched:** the list is complete for what the change touches: network exposure, the CI workflow, dependencies and build configuration.
-  - The `ci.yml` edit adds one constant glob to `sonar.coverage.exclusions`. It does not change permissions, triggers, secrets or actions.
-  - The Dockerfile is unchanged. It restores only `Censio.Server.csproj`, so bUnit and its transitive packages never reach the image.
+Security's plan review: tier and areas confirmed, MudBlazor's assets and both packages measured (no remote host, MIT,
+no known vulnerability), two non-blocking notes, both taken.
 
-### Measurements I ran (scratch dir `/tmp/claude-0/-home-user-Censio/6d822a6b-f162-5c8b-bc14-2bd9b78c38fb/scratchpad`)
-
-1. **N2 and fact 4, no remote host in MudBlazor's assets.**
-   - I downloaded `mudblazor.9.13.0.nupkg` and `bunit.2.15.2.nupkg` from `api.nuget.org/v3-flatcontainer` and unzipped them.
-   - Command: `grep -oE '(https?:)?//[A-Za-z0-9.-]+\.[a-z]{2,}…' MudBlazor.min.css MudBlazor.min.js`
-   - Output: only `https://github.com/MudBlazor/MudBlazor/blob/master/LICENSE` and `https://mudblazor.com/`, once in each file (comments).
-   - `@import` and `url(...)` in the CSS: no match.
-   - In the JS, `localStorage`, `sessionStorage`, `document.cookie`, `fetch(`, `XMLHttpRequest`, `sendBeacon`, `eval(` and `new Function` have no match. `prefers-color-scheme` appears once. MudBlazor only uses it when the layout calls its system-dark-mode API, and the plan says it never does.
-   - Result: fact 4 confirmed.
-2. **Licences and dependencies.**
-   - Both nuspecs: `<license type="expression">MIT</license>`.
-   - MudBlazor has no `net11.0` group. Its `net10.0` group depends on `Microsoft.AspNetCore.Components`, `Components.Web` and `Microsoft.Extensions.Localization`, all 10.0.1.
-   - bUnit has a `net11.0` group (fact 8 confirmed).
-   - I restored a scratch `Microsoft.NET.Sdk.Web` net11.0 project with both packages and `NuGetAuditMode=all`, `NuGetAuditLevel=low`.
-     - `dotnet list package --include-transitive`: the framework packages are pruned. The only transitive packages left are AngleSharp 1.10.1, AngleSharp.Css 1.4.1, AngleSharp.Diffing 1.1.1, and `Components.WebAssembly`, `Components.WebAssembly.Authentication` and `JSInterop.WebAssembly` at 11.0.0 (all from bUnit, test project only).
-     - `dotnet list package --vulnerable --include-transitive`: "has no vulnerable packages given the current sources".
-3. **Cookie and header reading.**
-   - I built a scratch console project against `Microsoft.AspNetCore.App` 11.0 that sets the `Cookie` header on a `DefaultHttpContext` and reads `Request.Cookies["censio-theme"]`. Output:
-     - `censio-theme=%64ark` -> `dark`
-     - `censio-theme=%0Adark` -> `\ndark`
-     - `censio-theme=dark; censio-theme=light` -> `light`
-     - `censio-theme="dark"` -> `"dark"`
-     - `censio-theme=%zz` -> `%zz`
-   - `StringWithQualityHeaderValue.TryParseList` output:
-     - `de;q=abc, en` -> ok=True, values `abc:` and `en:`
-     - `de;q=2, en` -> ok=True, values `2:` and `en:`
-     - empty -> ok=False
-     - `TryParseStrictList` rejects both invalid lists.
-
-### Findings
-
-The design is sound for this project's attack surface:
-- A cookie value is only compared whole and ordinally against constants.
-- Nothing read from a cookie or header is echoed, logged or stored.
-- `lang`, `document.cookie` and the interop arguments are constants, so no XSS path exists.
-- The root-component parameters are enums.
-- No new endpoint, redirect, CORS rule or listener is added.
-- Record 0006's revisit condition (game data or a state-changing action on a page) is not reached.
-
-**F1 (non-blocking): the plan claims "nothing is decoded", but ASP.NET Core percent-decodes cookie values (measurement 3).**
-- Where: plan.md *Security considerations*, "Limits: … nothing is decoded."
-- Effect: `censio-theme=%64ark` is read as `dark`. That is harmless, since the decoded value is still matched whole against the four constants. But `web-ui.md` would state a false rule, and AC9's HTTP test could check only the raw form of a value.
-- Smallest fix:
-  - Replace "nothing is decoded" with "the values are compared after ASP.NET Core's percent-decoding of cookie values (`%64ark` reads as `dark`)", and carry that sentence into `docs/areas/web-ui.md`'s unknown-value rule.
-  - In the AC9 HTTP test, send `%0Adark` and `%3Cscript%3E` encoded and assert that neither the raw nor the decoded form is in the body or a log entry.
-- Recommendation: fix now (plan text and test note).
-
-**F2 (non-blocking, a correctness note for the Tester): `TryParseList` almost never returns false (measurement 3).**
-- It re-tokenizes an invalid entry instead of failing: `de;q=abc, en` gives the values `abc` and `en`. The plan's "unparsable: English" branch is therefore reached only for an empty header.
-- The outcome is still the safe default (English), so there is no security effect. But the AC2 DataRow "an unparsable header" should expect what the parser actually does.
-- Smallest fix: the plan's *Approach* says "`TryParseList` (lenient: an invalid entry yields no `de`/`en` match)" and the DataRow uses `de;q=abc, en` → English.
-- Recommendation: fix now (one sentence).
-
-Facts 9, 10 and 11 are still unverified, but none of them carries a security property. N2 is the only library-behavior claim this review depends on, and measurement 1 verifies it.
+- F1, cookie values are percent-decoded, so "nothing is decoded" was false — fixed: *Security considerations* and
+  `web-ui.md` state the comparison after decoding (fact 17); AC9's HTTP test sends `%0Adark` and `%3Cscript%3E`
+  encoded and checks the raw and decoded forms.
+- F2, `TryParseList` almost never fails — fixed: *Approach* says so and the AC2 DataRow is `de;q=abc, en` → English
+  (fact 18).
