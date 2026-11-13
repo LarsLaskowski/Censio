@@ -1,4 +1,5 @@
 using Censio.Server;
+using Censio.Server.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -31,11 +32,18 @@ if (database is null)
     return 1;
 }
 
+var state = new ServerState(new ServerStore(database), app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Censio.Server.State"));
+
+if (await ServerStateSetup.TryRestoreAsync(state, database.DatabaseFile, app.Logger, app.Lifetime.ApplicationStopping).ConfigureAwait(false) == false)
+{
+    return 1;
+}
+
 app.UseWebSockets();
 app.UseAntiforgery();
 app.MapStaticAssets();
 app.MapHealthChecks("/health");
-app.MapCensioIngest(ingestAccess);
+app.MapCensioIngest(ingestAccess, state);
 app.MapRazorComponents<Censio.Server.Components.App>()
    .AddInteractiveServerRenderMode();
 

@@ -143,29 +143,79 @@ public sealed class ServerStore
     /// <returns>The islands</returns>
     public Task<IReadOnlyList<StoredIsland>> ListIslandsAsync(Guid profileId, CancellationToken cancellationToken)
     {
-        return ReadAsync<IReadOnlyList<StoredIsland>>(async connection =>
-                                                      {
-                                                          var islands = new List<StoredIsland>();
+        return ReadAsync(connection => ReadIslandsAsync(connection, profileId, cancellationToken), cancellationToken);
+    }
 
-                                                          using var command = CreateCommand(connection,
-                                                                                            "SELECT \"SessionGuid\", \"IslandId\", \"AreaIndex\", \"Name\" FROM \"Islands\" WHERE \"ProfileId\" = $profile ORDER BY \"SessionGuid\", \"IslandId\", \"AreaIndex\";",
-                                                                                            ("$profile", profileId));
-                                                          using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+    /// <summary>
+    /// Reads the profile row, its latest tick and its islands in one read transaction.
+    /// </summary>
+    /// <param name="profileId">The profile identity</param>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>The state, or <see langword="null"/> when the profile is unknown</returns>
+    public Task<StoredProfileState?> ReadProfileStateAsync(Guid profileId, CancellationToken cancellationToken)
+    {
+        return ReadAsync(async connection =>
+                         {
+#pragma warning disable S6966 // The async overload has no deferred form and begins an immediate (write) transaction
+                             using var transaction = connection.BeginTransaction(true);
+#pragma warning restore S6966
 
-                                                          while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-                                                          {
-                                                              islands.Add(new StoredIsland
-                                                                          {
-                                                                              SessionGuid = reader.GetInt32(0),
-                                                                              IslandId = reader.GetByte(1),
-                                                                              AreaIndex = reader.GetByte(2),
-                                                                              Name = reader.GetString(3)
-                                                                          });
-                                                          }
+                             StoredProfile profile;
 
-                                                          return islands;
-                                                      },
-                                                      cancellationToken);
+                             using (var command = CreateCommand(connection, "SELECT \"Id\", \"Name\" FROM \"Profiles\" WHERE \"Id\" = $id;", ("$id", profileId)))
+                             {
+                                 using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+
+                                 if (await reader.ReadAsync(cancellationToken).ConfigureAwait(false) == false)
+                                 {
+                                     return null;
+                                 }
+
+                                 profile = new StoredProfile
+                                           {
+                                               Id = reader.GetGuid(0),
+                                               Name = reader.IsDBNull(1) ? null : reader.GetString(1)
+                                           };
+                             }
+
+                             var latestTick = await TickReader.ReadInTransactionAsync(connection, TickReader.LatestSql, profileId, cancellationToken).ConfigureAwait(false);
+                             var islands = await ReadIslandsAsync(connection, profileId, cancellationToken).ConfigureAwait(false);
+
+                             return new StoredProfileState
+                                    {
+                                        Profile = profile,
+                                        LatestTick = latestTick,
+                                        Islands = islands
+                                    };
+                         },
+                         cancellationToken);
+    }
+
+    /// <summary>
+    /// Lists the profiles with ticks, the one with the newest latest tick first.
+    /// </summary>
+    /// <param name="count">The maximum number of profiles</param>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>The profile identities</returns>
+    public Task<IReadOnlyList<Guid>> ListLatestProfilesAsync(int count, CancellationToken cancellationToken)
+    {
+        return ReadAsync<IReadOnlyList<Guid>>(async connection =>
+                                              {
+                                                  var profiles = new List<Guid>();
+
+                                                  using var command = CreateCommand(connection,
+                                                                                    "SELECT p.\"Id\" FROM \"Profiles\" p JOIN \"Ticks\" t ON t.\"Number\" = (SELECT \"Number\" FROM \"Ticks\" WHERE \"ProfileId\" = p.\"Id\" ORDER BY \"ReceiveTicks\" DESC, \"Number\" DESC LIMIT 1) ORDER BY t.\"ReceiveTicks\" DESC, t.\"Number\" DESC LIMIT $count;",
+                                                                                    ("$count", count));
+                                                  using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+
+                                                  while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                                                  {
+                                                      profiles.Add(reader.GetGuid(0));
+                                                  }
+
+                                                  return profiles;
+                                              },
+                                              cancellationToken);
     }
 
     /// <summary>
@@ -282,6 +332,36 @@ public sealed class ServerStore
                                                     return missing;
                                                 },
                                                 cancellationToken);
+    }
+
+    /// <summary>
+    /// Reads the islands of a profile on an opened connection.
+    /// </summary>
+    /// <param name="connection">The opened connection</param>
+    /// <param name="profileId">The profile identity</param>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>The islands</returns>
+    private static async Task<IReadOnlyList<StoredIsland>> ReadIslandsAsync(SqliteConnection connection, Guid profileId, CancellationToken cancellationToken)
+    {
+        var islands = new List<StoredIsland>();
+
+        using var command = CreateCommand(connection,
+                                          "SELECT \"SessionGuid\", \"IslandId\", \"AreaIndex\", \"Name\" FROM \"Islands\" WHERE \"ProfileId\" = $profile ORDER BY \"SessionGuid\", \"IslandId\", \"AreaIndex\";",
+                                          ("$profile", profileId));
+        using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            islands.Add(new StoredIsland
+                        {
+                            SessionGuid = reader.GetInt32(0),
+                            IslandId = reader.GetByte(1),
+                            AreaIndex = reader.GetByte(2),
+                            Name = reader.GetString(3)
+                        });
+        }
+
+        return islands;
     }
 
     /// <summary>

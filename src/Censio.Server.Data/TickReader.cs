@@ -55,6 +55,19 @@ internal static class TickReader
         using var transaction = connection.BeginTransaction(true);
 #pragma warning restore S6966
 
+        return await ReadInTransactionAsync(connection, sql, value, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Reads one tick inside the read transaction the caller has begun on the connection.
+    /// </summary>
+    /// <param name="connection">The opened connection with the caller's transaction</param>
+    /// <param name="sql">The statement, <see cref="ByIdSql"/> or <see cref="LatestSql"/></param>
+    /// <param name="value">The value of its parameter</param>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>The tick, or <see langword="null"/> when none matches</returns>
+    public static async Task<ContractTick?> ReadInTransactionAsync(SqliteConnection connection, string sql, Guid value, CancellationToken cancellationToken)
+    {
         long number;
         Guid id;
         Guid profileId;

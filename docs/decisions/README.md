@@ -129,4 +129,7 @@ once in the [area document](../areas/README.md) of the record's area, and the re
 | [0065](0065-database-schema-kept-by-migrations-applied-at-start.md) | The database schema is kept by EF Core migrations applied at start in one transaction; a foreign, newer or failed database stops the start | Accepted | 2026-11-13 |
 | [0066](0066-database-file-setting-and-in-memory-without-data-directory.md) | The database lies in the data directory unless `Censio:Database:File` names a file; without either it is kept in memory with a warning | Accepted | 2026-11-13 |
 | [0067](0067-ticks-stored-as-rows-with-float-bit-patterns.md) | A tick is stored as rows per island, entry and map pair in one transaction; floats keep their 32-bit pattern | Accepted | 2026-11-13 |
+| [0068](0068-ingest-acknowledges-a-message-only-after-it-is-stored.md) | The ingest acknowledges a message only after it is stored; a failed write closes the connection unacknowledged | Accepted | 2026-11-13 |
+| [0069](0069-current-state-of-the-newest-profiles-held-in-memory-and-restored-at-start.md) | The current state of the two profiles with the newest ticks is held in memory, restored at start and announced off the ingest's path | Accepted | 2026-11-13 |
+| [0070](0070-hello-names-the-stored-catalog-only-when-all-its-icons-are-stored.md) | The hello reply names the stored catalog only when all its icons are stored | Accepted | 2026-11-13 |
 <!-- project:end index -->

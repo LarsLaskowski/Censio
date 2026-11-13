@@ -1,6 +1,7 @@
 using System.Net.WebSockets;
 
 using Censio.Contracts;
+using Censio.Server.Data;
 
 namespace Censio.Server;
 
@@ -61,6 +62,11 @@ public sealed partial class IngestSession : IDisposable
     private readonly IngestConnections _connections;
 
     /// <summary>
+    /// The server state the messages are stored through.
+    /// </summary>
+    private readonly ServerState _state;
+
+    /// <summary>
     /// The time provider.
     /// </summary>
     private readonly TimeProvider _timeProvider;
@@ -96,9 +102,19 @@ public sealed partial class IngestSession : IDisposable
     private int _pendingLeft;
 
     /// <summary>
-    /// A value indicating whether the session holds the place of the Companion.
+    /// A value indicating whether the session holds the place of the Companion (0 no, 1 yes).
     /// </summary>
-    private bool _companionTaken;
+    private int _placeTaken;
+
+    /// <summary>
+    /// A value indicating whether the hello was accepted.
+    /// </summary>
+    private bool _helloAccepted;
+
+    /// <summary>
+    /// The token that signals the stop of the server, passed to every store call.
+    /// </summary>
+    private CancellationToken _stoppingToken;
 
     /// <summary>
     /// The number of accepted messages.
@@ -140,14 +156,16 @@ public sealed partial class IngestSession : IDisposable
     /// <param name="webSocket">The WebSocket of the connection</param>
     /// <param name="access">The access that checks the token</param>
     /// <param name="connections">The connection counters</param>
+    /// <param name="state">The server state the messages are stored through</param>
     /// <param name="timeProvider">The time provider</param>
     /// <param name="logger">The logger</param>
     /// <param name="serverVersion">The version of the server</param>
-    public IngestSession(WebSocket webSocket, IngestAccess access, IngestConnections connections, TimeProvider timeProvider, ILogger logger, string serverVersion)
+    public IngestSession(WebSocket webSocket, IngestAccess access, IngestConnections connections, ServerState state, TimeProvider timeProvider, ILogger logger, string serverVersion)
     {
         _webSocket = webSocket;
         _access = access;
         _connections = connections;
+        _state = state;
         _timeProvider = timeProvider;
         _logger = logger;
         _serverVersion = serverVersion;
@@ -178,6 +196,7 @@ public sealed partial class IngestSession : IDisposable
     /// <returns>The task</returns>
     public async Task RunAsync(CancellationToken stoppingToken)
     {
+        _stoppingToken = stoppingToken;
         _helloTimer = _timeProvider.CreateTimer(static state => ((IngestSession)state!).OnHelloTimeout(), this, HelloTimeout, Timeout.InfiniteTimeSpan);
 
         var registration = stoppingToken.Register(static state => ((IngestSession)state!).OnStopping(), this);
@@ -219,21 +238,6 @@ public sealed partial class IngestSession : IDisposable
                    ContractCatalogUpload upload => upload.Id,
                    _ => null
                };
-    }
-
-    /// <summary>
-    /// Lists the distinct icon references of a catalog document in ordinal order.
-    /// </summary>
-    /// <param name="document">The document, or <c>null</c></param>
-    /// <returns>The references</returns>
-    private static List<string> GetMissingIcons(CatalogDocument? document)
-    {
-        if (document is null)
-        {
-            return [];
-        }
-
-        return [.. document.Entries.Select(entry => entry.IconReference).OfType<string>().Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal)];
     }
 
     /// <summary>
@@ -304,6 +308,14 @@ public sealed partial class IngestSession : IDisposable
     /// <param name="refused">The number of refused messages.</param>
     [LoggerMessage(Level = LogLevel.Information, Message = "Companion disconnected; {Accepted} messages accepted, {Refused} refused.")]
     private static partial void LogCompanionDisconnected(ILogger logger, int accepted, int refused);
+
+    /// <summary>
+    /// Logs a message that could not be stored.
+    /// </summary>
+    /// <param name="logger">The logger.</param>
+    /// <param name="exception">The exception behind the failure.</param>
+    [LoggerMessage(Level = LogLevel.Error, Message = "A message could not be stored; the connection is closed.")]
+    private static partial void LogStoreFailed(ILogger logger, Exception? exception);
 
     /// <summary>
     /// Reads the hello and answers it.
@@ -385,13 +397,26 @@ public sealed partial class IngestSession : IDisposable
             return false;
         }
 
-        _companionTaken = true;
+        Volatile.Write(ref _placeTaken, 1);
+
+        var stored = await _state.StoreProfileAsync(hello.ProfileId, hello.ProfileName, _stoppingToken).ConfigureAwait(false);
+
+        if (stored.Outcome == ServerStoreOutcome.Failed)
+        {
+            ReleasePlace();
+            LogStoreFailed(_logger, stored.Failure);
+            await CloseAndDiscardAsync(WebSocketCloseStatus.InternalServerError, buffer).ConfigureAwait(false);
+
+            return false;
+        }
+
+        _helloAccepted = true;
         LogCompanionAccepted(_logger);
 
         return await SendAsync(new ContractHelloAccepted
                                {
                                    ServerVersion = _serverVersion,
-                                   CatalogIdentity = null
+                                   CatalogIdentity = _state.CompleteCatalogIdentity
                                }).ConfigureAwait(false);
     }
 
@@ -480,8 +505,15 @@ public sealed partial class IngestSession : IDisposable
                 return WebSocketCloseStatus.PolicyViolation;
             }
 
+            var (stored, missingIcons) = await StoreMessageAsync(message, read.CatalogDocument).ConfigureAwait(false);
+
+            if (stored == false)
+            {
+                return WebSocketCloseStatus.InternalServerError;
+            }
+
             _acceptedCount++;
-            await AcknowledgeAsync(id, null, null, GetMissingIcons(read.CatalogDocument)).ConfigureAwait(false);
+            await AcknowledgeAsync(id, null, null, missingIcons).ConfigureAwait(false);
 
             return null;
         }
@@ -502,6 +534,56 @@ public sealed partial class IngestSession : IDisposable
         }
 
         return WebSocketCloseStatus.PolicyViolation;
+    }
+
+    /// <summary>
+    /// Stores an accepted message through the state; session events store nothing.
+    /// </summary>
+    /// <param name="message">The message</param>
+    /// <param name="catalogDocument">The document of a catalog upload</param>
+    /// <returns>Whether the message is stored or needs no storing, and the references of the icons not stored yet</returns>
+    private async Task<(bool Stored, IReadOnlyList<string> MissingIcons)> StoreMessageAsync(ContractMessage message, CatalogDocument? catalogDocument)
+    {
+        ServerStoreResult result;
+        IReadOnlyList<string> missingIcons = [];
+
+        switch (message)
+        {
+            case ContractTick tick:
+                {
+                    result = await _state.StoreTickAsync(tick, _stoppingToken).ConfigureAwait(false);
+                }
+                break;
+
+            case ContractIconImage icon:
+                {
+                    result = await _state.StoreIconAsync(icon, _stoppingToken).ConfigureAwait(false);
+                }
+                break;
+
+            case ContractCatalogUpload upload when catalogDocument is not null:
+                {
+                    var catalog = await _state.StoreCatalogAsync(upload, catalogDocument, _stoppingToken).ConfigureAwait(false);
+
+                    result = catalog.Result;
+                    missingIcons = catalog.MissingIcons;
+                }
+                break;
+
+            default:
+                {
+                    return (true, missingIcons);
+                }
+        }
+
+        if (result.Outcome != ServerStoreOutcome.Failed)
+        {
+            return (true, missingIcons);
+        }
+
+        LogStoreFailed(_logger, result.Failure);
+
+        return (false, missingIcons);
     }
 
     /// <summary>
@@ -618,7 +700,7 @@ public sealed partial class IngestSession : IDisposable
             return false;
         }
 
-        await _sendLock.WaitAsync().ConfigureAwait(false);
+        await _sendLock.WaitAsync(CancellationToken.None).ConfigureAwait(false);
 
         try
         {
@@ -653,7 +735,7 @@ public sealed partial class IngestSession : IDisposable
 
         try
         {
-            await _sendLock.WaitAsync().ConfigureAwait(false);
+            await _sendLock.WaitAsync(CancellationToken.None).ConfigureAwait(false);
 
             try
             {
@@ -713,6 +795,17 @@ public sealed partial class IngestSession : IDisposable
     }
 
     /// <summary>
+    /// Releases the place of the Companion, at most once per session.
+    /// </summary>
+    private void ReleasePlace()
+    {
+        if (Interlocked.Exchange(ref _placeTaken, 0) == 1)
+        {
+            _connections.ReleaseCompanion();
+        }
+    }
+
+    /// <summary>
     /// Releases everything the session holds and logs its end.
     /// </summary>
     /// <returns>A task that completes when the session has ended</returns>
@@ -727,9 +820,10 @@ public sealed partial class IngestSession : IDisposable
 
         _closeWaitTimer?.Dispose();
 
-        if (_companionTaken)
+        ReleasePlace();
+
+        if (_helloAccepted)
         {
-            _connections.ReleaseCompanion();
             LogCompanionDisconnected(_logger, _acceptedCount, _refusedCount);
         }
     }
