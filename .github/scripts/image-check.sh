@@ -7,6 +7,7 @@
 set -euo pipefail
 
 dockerfile="src/Censio.Server/Dockerfile"
+missing="missing"
 work="${RUNNER_TEMP:-$(mktemp -d)}"
 containers=()
 declare -A started
@@ -197,16 +198,16 @@ wait_http "AC2" "http://127.0.0.1:18080/health"
 expect_equal "AC2 health body" "Healthy" "$(curl -fsS --max-time 3 http://127.0.0.1:18080/health)"
 page="$(curl -fsS --max-time 5 http://127.0.0.1:18080/)"
 if [[ "$page" != *"Version 0.0.0"* ]]; then
-    fail "AC2 start page" "contains 'Version 0.0.0'" "missing"
+    fail "AC2 start page" "contains 'Version 0.0.0'" "$missing"
 fi
 script_path="$(grep -oE '_framework/blazor\.web[^"]*\.js' <<< "$page" | head -n 1 || true)"
 if [[ -z "$script_path" ]]; then
-    fail "AC2 start page" "a _framework/blazor.web script path" "missing"
+    fail "AC2 start page" "a _framework/blazor.web script path" "$missing"
 fi
 curl -fsS --max-time 5 -o /dev/null "http://127.0.0.1:18080/${script_path}" \
     || fail "AC2 script" "200 for ${script_path}" "request failed"
 if ! docker logs "$main" 2>&1 | grep -E 'Now listening on:.*8080' > /dev/null; then
-    fail "AC2 log" "'Now listening on:' with 8080" "missing"
+    fail "AC2 log" "'Now listening on:' with 8080" "$missing"
 fi
 
 step "AC3: user"
@@ -228,7 +229,7 @@ fi
 
 step "I29-AC1: the first start creates /config/censio.db"
 database_file="/config/censio.db"
-docker exec "$main" test -f "$database_file" || fail "I29-AC1" "${database_file} exists after the first start" "missing"
+docker exec "$main" test -f "$database_file" || fail "I29-AC1" "${database_file} exists after the first start" "$missing"
 created_text="The database '${database_file}' was created."
 if ! docker logs "$main" 2>&1 | grep -Fq -- "$created_text"; then
     fail "I29-AC1 log" "log line '${created_text}'" "line missing"
@@ -332,7 +333,7 @@ start_container "$version_container" -p 127.0.0.1:18083:8080 "$version_image"
 wait_http "AC7" "http://127.0.0.1:18083/health"
 version_page="$(curl -fsS --max-time 5 http://127.0.0.1:18083/)"
 if [[ "$version_page" != *"Version 1.2.3"* ]]; then
-    fail "AC7 start page" "contains 'Version 1.2.3'" "missing"
+    fail "AC7 start page" "contains 'Version 1.2.3'" "$missing"
 fi
 docker rm -f "$version_container" > /dev/null
 semver_message="VERSION is not a semantic version: "
