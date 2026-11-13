@@ -193,3 +193,28 @@ changes as listed; record 0061 is linked from it already.
 ## Out of scope / follow-ups
 
 As the spec's *Out of scope*. No follow-up issue.
+
+## Challenge notes
+
+Devil's Advocate, mode plan, for specs/feature-176-ingest-token-config/ (/home/user/Censio/specs/feature-176-ingest-token-config/plan.md)
+
+The plan holds up on substance. I checked these claims against the code and found them correct:
+- Facts 1–7 match the code:
+  - `/home/user/Censio/src/Censio.Server/IngestTokenSetup.cs` lines 73–90 (one token source), 120–131 and 298–299 (the "cannot be read" line attaches the exception) and 152–175 (`ParseToken`).
+  - `/home/user/Censio/src/Censio.Server/DataProtectionSetup.cs` lines 49 and 74 (`IsPathFullyQualified`).
+  - `/home/user/Censio/src/Censio.Server/Program.cs` lines 15–25 (key ring first, then a `null` access gives exit code 1).
+- No other production code reads `ingest-token`. `Program.cs:20` is the only caller.
+- The existing tests the plan keeps still pass under the 32-character minimum:
+  - `IngestTokenSetupTests.cs:467–488` uses the 11-character "MARKERTOKEN", but the file is held with `FileShare.None`, so the read fails before `ParseToken` runs.
+  - `IngestTokenSetupTests.cs:113–128` reads a generated 43-character token.
+  - `ProgramTests.cs:289–306` uses "not a valid token", which stays invalid.
+  - `IngestEndpointTests.cs:221` and `:249` read a generated file.
+  - The rows the plan does change (`!~` at line 407, the texts at 391/456) are named correctly.
+- CI runs only on `ubuntu-latest` (`.github/workflows/ci.yml:14`), so the symbolic-link and directory rows of AC2/AC3 run where the plan expects.
+- Fact 9 (an empty environment value reaches the configuration as `""`) already has a documented precedent: `docs/areas/server.md` line 84–85 says an empty `CENSIO__DATADIRECTORY` "stops the start". The Dev's one-time check of fact 9 should confirm the same holds for the new setting.
+
+Objections:
+
+1. minor — Documentation list is incomplete. Why: four user-guide sentences say without condition that `/config` holds the ingest token, and they would be wrong once the setting is set. Instruction for the Dev: in `docs/USER_GUIDE.md`, also change lines 61 and 349 (English) and 423 and 711 (German) to say `/config/ingest-token` holds the token only when `Censio:Ingest:TokenFile` is unset. This adds to the lines 97–129 / 459–491 the plan already lists. Also read `docs/areas/server.md` line 84 (the image's `/config` "and the ingest token in `/config/ingest-token`") as part of the *Data directory and key ring* / image change.
+
+2. minor — The `docker run -v <host file>:...:ro` example of S6 behaves badly when the host file is missing. Why: with `-v`, Docker silently creates a root-owned directory at the missing host path. The container then fails with E1 because the target is a directory, and the operator is left with a directory where their token file belongs, which breaks the next attempt. Instruction for the Dev: in the user guide (English and German), either use `--mount type=bind,source=<host file>,target=/run/secrets/censio-ingest-token,readonly`, which refuses to start when the source is missing, or keep `-v` and warn that a missing host file is created as a directory that must be removed. Instruction for the Product Manager's dry run (fact 13): for the "host file removed" step, record what actually happens with the documented form: a `docker run` error with `--mount`, or the E1 line and exit code 1 plus a directory left on the host with `-v`. Write the user guide to match what is observed.
