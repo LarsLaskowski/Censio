@@ -5,42 +5,89 @@ namespace Censio.Server;
 /// </summary>
 public sealed class UiTexts
 {
-    #region Properties
+    #region Fields
 
-#pragma warning disable S2325
-    // Skeleton: removed with the implementation
+    /// <summary>
+    /// The English texts.
+    /// </summary>
+    private static readonly UiTexts _english = new("Open or close the navigation",
+                                                   "Home",
+                                                   "Profile",
+                                                   "Switch to the dark theme",
+                                                   "Switch to the light theme",
+                                                   "Language");
+
+    /// <summary>
+    /// The German texts.
+    /// </summary>
+    private static readonly UiTexts _german = new("Navigation öffnen oder schließen",
+                                                  "Startseite",
+                                                  "Profil",
+                                                  "Zum dunklen Design wechseln",
+                                                  "Zum hellen Design wechseln",
+                                                  "Sprache");
+
+    #endregion // Fields
+
+    #region Constructor
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="UiTexts" /> class.
+    /// </summary>
+    /// <param name="navigationButton">The label of the navigation button</param>
+    /// <param name="homeEntry">The text of the start page's navigation entry</param>
+    /// <param name="profileSwitch">The text of the profile switch</param>
+    /// <param name="switchToDarkTheme">The label of the button that switches to the dark theme</param>
+    /// <param name="switchToLightTheme">The label of the button that switches to the light theme</param>
+    /// <param name="languageSwitch">The label of the language menu</param>
+    private UiTexts(string navigationButton,
+                    string homeEntry,
+                    string profileSwitch,
+                    string switchToDarkTheme,
+                    string switchToLightTheme,
+                    string languageSwitch)
+    {
+        NavigationButton = navigationButton;
+        HomeEntry = homeEntry;
+        ProfileSwitch = profileSwitch;
+        SwitchToDarkTheme = switchToDarkTheme;
+        SwitchToLightTheme = switchToLightTheme;
+        LanguageSwitch = languageSwitch;
+    }
+
+    #endregion // Constructor
+
+    #region Properties
 
     /// <summary>
     /// Gets the label of the button that closes and opens the navigation.
     /// </summary>
-    public string NavigationButton => Missing();
+    public string NavigationButton { get; }
 
     /// <summary>
     /// Gets the text of the navigation entry of the start page.
     /// </summary>
-    public string HomeEntry => Missing();
+    public string HomeEntry { get; }
 
     /// <summary>
     /// Gets the text of the profile switch.
     /// </summary>
-    public string ProfileSwitch => Missing();
+    public string ProfileSwitch { get; }
 
     /// <summary>
     /// Gets the label of the button that switches to the dark theme.
     /// </summary>
-    public string SwitchToDarkTheme => Missing();
+    public string SwitchToDarkTheme { get; }
 
     /// <summary>
     /// Gets the label of the button that switches to the light theme.
     /// </summary>
-    public string SwitchToLightTheme => Missing();
+    public string SwitchToLightTheme { get; }
 
     /// <summary>
     /// Gets the label of the language menu.
     /// </summary>
-    public string LanguageSwitch => Missing();
-
-#pragma warning restore S2325
+    public string LanguageSwitch { get; }
 
     #endregion // Properties
 
@@ -53,10 +100,7 @@ public sealed class UiTexts
     /// <returns>The texts.</returns>
     public static UiTexts For(UiLanguage language)
     {
-#pragma warning disable RH2003
-        // Skeleton: removed with the implementation
-        throw new NotImplementedException();
-#pragma warning restore RH2003
+        return language == UiLanguage.German ? _german : _english;
     }
 
     /// <summary>
@@ -66,22 +110,7 @@ public sealed class UiTexts
     /// <returns>The name.</returns>
     public static string LanguageName(UiLanguage language)
     {
-#pragma warning disable RH2003
-        // Skeleton: removed with the implementation
-        throw new NotImplementedException();
-#pragma warning restore RH2003
-    }
-
-    /// <summary>
-    /// Stands in for a text until the implementation exists.
-    /// </summary>
-    /// <returns>Never returns.</returns>
-    private static string Missing()
-    {
-#pragma warning disable RH2003
-        // Skeleton: removed with the implementation
-        throw new NotImplementedException();
-#pragma warning restore RH2003
+        return language == UiLanguage.German ? "Deutsch" : "English";
     }
 
     #endregion // Methods

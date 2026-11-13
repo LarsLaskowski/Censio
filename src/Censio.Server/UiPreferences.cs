@@ -1,3 +1,5 @@
+using Microsoft.Net.Http.Headers;
+
 namespace Censio.Server;
 
 /// <summary>
@@ -17,6 +19,26 @@ public static class UiPreferences
     /// </summary>
     public const string LanguageCookieName = "censio-language";
 
+    /// <summary>
+    /// The stored value of the light theme.
+    /// </summary>
+    private const string LightValue = "light";
+
+    /// <summary>
+    /// The stored value of the dark theme.
+    /// </summary>
+    private const string DarkValue = "dark";
+
+    /// <summary>
+    /// The stored value of English.
+    /// </summary>
+    private const string EnglishValue = "en";
+
+    /// <summary>
+    /// The stored value of German.
+    /// </summary>
+    private const string GermanValue = "de";
+
     #endregion // Constants
 
     #region Methods
@@ -28,10 +50,7 @@ public static class UiPreferences
     /// <returns>The dark theme for the value <c>dark</c>; otherwise, the light theme.</returns>
     public static UiTheme ReadTheme(string? storedValue)
     {
-#pragma warning disable RH2003
-        // Skeleton: removed with the implementation
-        throw new NotImplementedException();
-#pragma warning restore RH2003
+        return string.Equals(storedValue, DarkValue, StringComparison.Ordinal) ? UiTheme.Dark : UiTheme.Light;
     }
 
     /// <summary>
@@ -42,10 +61,44 @@ public static class UiPreferences
     /// <returns>The language to show; English when none is known.</returns>
     public static UiLanguage ReadLanguage(string? storedValue, string? acceptLanguage)
     {
-#pragma warning disable RH2003
-        // Skeleton: removed with the implementation
-        throw new NotImplementedException();
-#pragma warning restore RH2003
+        if (string.Equals(storedValue, GermanValue, StringComparison.Ordinal))
+        {
+            return UiLanguage.German;
+        }
+
+        if (string.Equals(storedValue, EnglishValue, StringComparison.Ordinal))
+        {
+            return UiLanguage.English;
+        }
+
+        if (string.IsNullOrEmpty(acceptLanguage) || StringWithQualityHeaderValue.TryParseList([acceptLanguage], out var entries) == false)
+        {
+            return UiLanguage.English;
+        }
+
+        var ranked = entries.Select((entry, index) => (Entry: entry, Index: index))
+                            .Where(item => (item.Entry.Quality ?? 1.0) > 0.0)
+                            .OrderByDescending(item => item.Entry.Quality ?? 1.0)
+                            .ThenBy(item => item.Index);
+
+        foreach (var (entry, _) in ranked)
+        {
+            var tag = entry.Value.AsSpan();
+            var separator = tag.IndexOf('-');
+            var primary = separator < 0 ? tag : tag[..separator];
+
+            if (primary.Equals(GermanValue, StringComparison.OrdinalIgnoreCase))
+            {
+                return UiLanguage.German;
+            }
+
+            if (primary.Equals(EnglishValue, StringComparison.OrdinalIgnoreCase))
+            {
+                return UiLanguage.English;
+            }
+        }
+
+        return UiLanguage.English;
     }
 
     /// <summary>
@@ -55,10 +108,7 @@ public static class UiPreferences
     /// <returns>The stored value.</returns>
     public static string StoredValue(UiTheme theme)
     {
-#pragma warning disable RH2003
-        // Skeleton: removed with the implementation
-        throw new NotImplementedException();
-#pragma warning restore RH2003
+        return theme == UiTheme.Dark ? DarkValue : LightValue;
     }
 
     /// <summary>
@@ -68,10 +118,7 @@ public static class UiPreferences
     /// <returns>The stored value.</returns>
     public static string StoredValue(UiLanguage language)
     {
-#pragma warning disable RH2003
-        // Skeleton: removed with the implementation
-        throw new NotImplementedException();
-#pragma warning restore RH2003
+        return language == UiLanguage.German ? GermanValue : EnglishValue;
     }
 
     #endregion // Methods
