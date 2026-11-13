@@ -18,7 +18,7 @@ protected, the concrete types, files or endpoints, and a link to the area docume
 (`- Session tokens: issued in src/Auth/, checked by every /api route — [Sessions](../docs/areas/sessions.md)`); no
 limits, patterns or sequences.
 
-- Ingest token and Companion authentication: the WebSocket endpoint `/ingest` and its token (`IngestEndpoint`, `IngestSession`, `IngestConnections`, `IngestTokenSetup`, `IngestAccess` in `src/Censio.Server`, the file `ingest-token` in the data directory) — [ingest](../docs/areas/ingest.md), [record 0019](../docs/decisions/0019-websocket-transport-with-shared-token.md).
+- Ingest token and Companion authentication: the WebSocket endpoint `/ingest` and its token (`IngestEndpoint`, `IngestSession`, `IngestConnections`, `IngestTokenSetup`, `IngestAccess` in `src/Censio.Server`, the file `ingest-token` in the data directory, the setting `Censio:Ingest:TokenFile` and the file it names) — [ingest](../docs/areas/ingest.md), [record 0019](../docs/decisions/0019-websocket-transport-with-shared-token.md).
 - Network exposure: the server's listener and its routes reachable without login (`/`, `/health`, `/ingest`, the Blazor hub, static assets) in `src/Censio.Server/Program.cs` and `src/Censio.Server/Dockerfile` — [server](../docs/areas/server.md).
 - Data-protection key ring: `DataProtectionSetup` under the data directory — [server](../docs/areas/server.md), *Data directory and key ring*.
 - Local pipe connection: `NamedPipeConnector` and `PipeEndpoint` open the game's pipe read-only at identification level — [pipe-connection](../docs/areas/pipe-connection.md), *Opening*.
@@ -45,7 +45,7 @@ What the Reviewer checks when the diff introduces or changes a thing of this kin
 change with it.
 
 **A new or changed configuration option** touches:
-- the key and its validation: `Censio:DataDirectory` in `DataProtectionSetup`; `Censio:Ingest:RequireToken` in `IngestTokenSetup`; the Companion's switches in `CompanionCommandLine`; the option `gameFolder` in `CompanionSettings`
+- the key and its validation: `Censio:DataDirectory` in `DataProtectionSetup`; `Censio:Ingest:RequireToken` and `Censio:Ingest:TokenFile` in `IngestTokenSetup`; the Companion's switches in `CompanionCommandLine`; the option `gameFolder` in `CompanionSettings`
 - registration and binding: `src/Censio.Server/Program.cs`, `src/Censio.Companion/App.xaml.cs`
 - the defaults: `src/Censio.Server/appsettings.json` and the `ENV` lines of `src/Censio.Server/Dockerfile`
 - the configuration table in `README.md` (key, environment variable, default; English, then German) and the user guide

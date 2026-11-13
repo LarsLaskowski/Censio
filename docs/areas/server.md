@@ -55,10 +55,11 @@ the Docker health probe rely on it.
 - When the server creates the key directory on Linux, its mode is `0700`; an existing directory keeps its mode.
   ASP.NET Core creates the key files owner-only itself. The keys lie unencrypted; ASP.NET Core logs its warning
   `No XML encryptor configured` when it creates the first key.
-- With the token required (the default) and a data directory set, the server also keeps the ingest token in the file
-  `<data directory>/ingest-token`, created at the first start and read at every later one; its rules, its mode and the
-  start failures are in [`ingest.md`](ingest.md). The server creates it after the key ring, so a key ring failure
-  stops the start first.
+- With the token required (the default), a data directory set and `Censio:Ingest:TokenFile` unset, the server also
+  keeps the ingest token in the file `<data directory>/ingest-token`, created at the first start and read at every
+  later one; its rules, its mode and the start failures are in [`ingest.md`](ingest.md). The server creates it after
+  the key ring, so a key ring failure stops the start first. With `Censio:Ingest:TokenFile` set, the token comes from
+  that file instead, `ingest-token` is neither read nor created, and a data directory is not needed for the token.
 - A value that is not an absolute path (including the empty string) stops the start: the server logs one `Critical`
   entry `The data directory (Censio:DataDirectory) must be an absolute path, not '<value>'; the server stops.`,
   creates no directory and exits with code 1 before it listens.
@@ -81,7 +82,7 @@ the Docker health probe rely on it.
   non-root user; the application files are readable by every UID.
 - `/config` exists in the image, owned by 1654, and is the data directory: the image sets
   `CENSIO__DATADIRECTORY=/config`, so the key ring lies in `/config/data-protection-keys` (*Data directory and key
-  ring*) and the ingest token in `/config/ingest-token` ([`ingest.md`](ingest.md)). The image declares no `VOLUME`. The setting can be pointed to another absolute path but not disabled
+  ring*) and the ingest token in `/config/ingest-token` unless `Censio:Ingest:TokenFile` names another file ([`ingest.md`](ingest.md)). The image declares no `VOLUME`. The setting can be pointed to another absolute path but not disabled
   (`docker run -e` cannot unset an image `ENV`, and an empty value stops the start). A directory the runtime user
   cannot write (a bind mount owned by another UID, a named volume combined with another `--user`) stops the
   container at start with exit code 1; it is made writable by starting with `--user <uid>:<gid>` of the
@@ -129,7 +130,7 @@ the Docker health probe rely on it.
 - [`decisions/0011-data-protection-key-ring-in-the-data-directory.md`](../decisions/0011-data-protection-key-ring-in-the-data-directory.md) — the key ring lies in `<data directory>/data-protection-keys`; the server stops when it cannot write it.
 - [`decisions/0012-release-pre-release-first-and-secret-free-builds.md`](../decisions/0012-release-pre-release-first-and-secret-free-builds.md) — releases run as pre-release first, artifacts are built without secrets and `latest` is set by digest at the promotion.
 - [`decisions/0026-server-image-linux-amd64-on-docker-hub-no-compose.md`](../decisions/0026-server-image-linux-amd64-on-docker-hub-no-compose.md) — linux/amd64 only, on Docker Hub, no compose file.
-- [`decisions/0061-ingest-token-generated-into-a-file-of-the-data-directory.md`](../decisions/0061-ingest-token-generated-into-a-file-of-the-data-directory.md) — the ingest token lives in a file of the data directory.
+- [`decisions/0061-ingest-token-generated-into-a-file-of-the-data-directory.md`](../decisions/0061-ingest-token-generated-into-a-file-of-the-data-directory.md) — the ingest token lives in a file of the data directory or in a file named by `Censio:Ingest:TokenFile`.
 
 ## Not here
 
