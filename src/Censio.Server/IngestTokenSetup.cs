@@ -16,9 +16,19 @@ public static partial class IngestTokenSetup
     public const string RequireTokenKey = "Censio:Ingest:RequireToken";
 
     /// <summary>
+    /// The configuration key that names the token file instead of the one in the data directory.
+    /// </summary>
+    public const string TokenFileKey = "Censio:Ingest:TokenFile";
+
+    /// <summary>
     /// The name of the token file in the data directory.
     /// </summary>
     public const string TokenFileName = "ingest-token";
+
+    /// <summary>
+    /// The minimum length of a token in bytes.
+    /// </summary>
+    public const int MinTokenLength = 32;
 
     /// <summary>
     /// The maximum length of a token in bytes.
