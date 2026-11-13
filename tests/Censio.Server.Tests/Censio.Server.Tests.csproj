@@ -1,10 +1,16 @@
 <Project Sdk="Microsoft.NET.Sdk">
+  <!-- The tests run without culture data, as the Docker image does (record 0072) -->
+  <PropertyGroup>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="bunit" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="..\Censio.Pipe.Tests\RecordingTimeProvider.cs" Link="RecordingTimeProvider.cs" />
+    <Compile Include="..\Censio.Server.Data.Tests\RecordingLoggerProvider.cs" Link="RecordingLoggerProvider.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Censio.Server\Censio.Server.csproj" />
