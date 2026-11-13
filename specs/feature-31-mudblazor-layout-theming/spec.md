@@ -5,13 +5,10 @@ Status: Draft
 
 ## Problem
 
-The server's web UI is a bare start page today: the heading `Censio` and the line `Version <version>`, unstyled, in
-English only, with no frame around it (`src/Censio.Server/Components/Layout/MainLayout.razor` renders only the page
-body; [`server.md`](../../docs/areas/server.md), *Start page*). The pages of #32 and later (regions, islands, goods,
-charts) need a common frame to sit in: an app bar, a navigation, a light and a dark theme with the Censio look, and
-German or English texts, as record [0025](../../docs/decisions/0025-mudblazor-and-blazor-apexcharts-light-theme.md)
-decided. Many players read German (record [0030](../../docs/decisions/0030-documentation-language-rules.md)), and a
-player who keeps the page open next to the game in the evening wants a dark page that stays dark after a reload.
+The web UI is a bare, unstyled, English-only start page ([`server.md`](../../docs/areas/server.md), *Start page*).
+The pages of #32 and later need a common frame: app bar, navigation, a light and a dark theme with the Censio look, and
+German or English texts (record [0025](../../docs/decisions/0025-mudblazor-and-blazor-apexcharts-light-theme.md)). A
+player who keeps the page open next to the game in the evening wants it dark, and dark after a reload.
 
 ## Scenarios
 
@@ -56,11 +53,9 @@ The frame's texts, exactly:
 - E2: A stored choice the server does not know (another language code, a theme name of another version, a damaged
   or overlong value, a value with markup or control characters): treated as no choice, the default applies, the page
   answers `200` as usual, and the value is neither shown on the page nor logged.
-- E3: Two tabs of one browser: a switch in one tab changes that tab at once; the other tab keeps its look and
-  language until it is reloaded, then shows the last choice made.
-- E4: The connection to the server is lost (server restarted, network down): the page shows Blazor's reconnect
-  notice as today; a switch pressed meanwhile changes nothing, and after a reload the last choice made before the
-  loss applies.
+- E3: Two tabs of one browser: the other tab keeps its look and language until it is reloaded.
+- E4: The connection to the server is lost: a switch pressed meanwhile changes nothing; a reload shows the last
+  choice made before the loss.
 - E5: An unknown path still answers `404` with an empty body, `/health` still answers `Healthy`, and neither gets the
   frame ([`server.md`](../../docs/areas/server.md), *Plain HTTP and unknown paths*, *Health check*).
 - E6: The browser window is narrow (below the desktop width): the frame stays usable (the navigation can be closed
@@ -134,16 +129,13 @@ The frame's texts, exactly:
 
 ## Open questions
 
-- Q1: What is the Censio colour palette? The issue asks for one; nothing in the repository defines it (no brand
-  colours, logo or style sheet; the only colours are the Companion's tray icon states in
-  `src/Censio.Companion/TrayIconImages.cs`). Answered: by the Product Manager — the Lead defines the palette in the plan,
-  with an Anno 117 / Roman look (for example deep red or purple with gold on warm neutrals), checked against N1 in
-  both themes and recorded in `web-ui.md`; the Product Manager approves it at the spec approval.
-- Q2: Which language does a first visit show? Answered: the browser's language list decides between German and
-  English, English otherwise (S2) — the issue asks for both languages and names no default; English is the project's
-  first language (record 0030).
-- Q3: Does the profile switch placeholder show the profiles? Answered: no — the issue calls it a placeholder, #32
-  builds the switch, and showing stored data would reach record 0006's revisit condition (S6, N7).
+- Q1: What is the Censio colour palette? Nothing in the repository defines one. Answered: by the Product Manager —
+  the Lead defines it in the plan with an Anno 117 / Roman look (for example deep red or purple with gold on warm
+  neutrals), checked against N1 in both themes and recorded in `web-ui.md`; the Product Manager approves it.
+- Q2: Which language does a first visit show? Answered: the browser's language list, English otherwise (S2); the
+  issue names no default, and English is the project's first language (record 0030).
+- Q3: Does the profile switch placeholder show the profiles? Answered: no — #32 builds the switch, and stored data
+  on a page would reach record 0006's revisit condition (S6, N7).
 - Q4: Which typeface? Answered: the plan picks it within N1 and N2 (served by the server itself or a system font).
 
 ## Area documents
