@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Security.Cryptography;
 
 using Bunit;
+using Bunit.TestDoubles;
 
 using Censio.Contracts;
 using Censio.Server.Components.Layout;
@@ -10,6 +11,7 @@ using Censio.Server.Components.Pages;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Rendering;
 using Microsoft.AspNetCore.Components.Web;
+using Microsoft.Extensions.DependencyInjection;
 
 using TestContext = Microsoft.VisualStudio.TestTools.UnitTesting.TestContext;
 
@@ -317,6 +319,128 @@ public sealed class IslandDetailTests
     }
 
     /// <summary>
+    /// An island the profile's view lacks, or a malformed island address, shows the not-found text under the regions
+    /// heading and title, without a table and without the as-of line.
+    /// </summary>
+    /// <param name="session">The session segment of the address</param>
+    /// <param name="island">The island segment of the address</param>
+    /// <param name="area">The area segment of the address</param>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC9")]
+    [DataRow("3245", "9", "0")]
+    [DataRow("9999", "1", "0")]
+    [DataRow("3245", "1", "1")]
+    [DataRow("x7q", "1", "0")]
+    [DataRow("3245", "256", "0")]
+    [DataRow("3245", "1", "-1")]
+    public async Task IslandDetailUnknownOrMalformedIslandShowsNotFound(string session, string island, string area)
+    {
+        // Arrange
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken);
+
+        await StoreIslandAsync(host, "Isle A", PageTestHost.Entry(1001, 1f, 1f, 0f, 1, 100f));
+
+        var head = host.Context.Render<HeadOutlet>();
+
+        // Act
+        var page = RenderIsland(host, session, island, area);
+
+        // Assert
+        await page.WaitForAssertionAsync(() => Assert.Contains("Not found.", PageTestHost.Text(page), "An unknown or malformed island should show the not-found text"), PageTestHost.WaitBound);
+
+        Assert.AreEqual("Regions", page.Find("h1").TextContent.Trim(), "The heading should be the regions heading");
+        Assert.AreEqual("Censio – Regions", head.Find("title").TextContent, "The page title should be the regions title");
+        Assert.IsEmpty(page.FindAll("table"), "An unknown or malformed island should show no table");
+        Assert.DoesNotContain("As of", PageTestHost.Text(page), "A page that is not found should show no as-of line");
+    }
+
+    /// <summary>
+    /// The detail of a profile that only said hello shows the no-data text under the regions heading in the shown language.
+    /// </summary>
+    /// <param name="language">The language shown</param>
+    /// <param name="expectedHeading">The regions heading of the language</param>
+    /// <param name="expectedText">The no-data text of the spec</param>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC9")]
+    [DataRow(UiLanguage.English, "Regions", "No data yet. The pages fill once the Companion sends data.")]
+    [DataRow(UiLanguage.German, "Regionen", "Noch keine Daten. Die Seiten füllen sich, sobald der Companion Daten sendet.")]
+    public async Task IslandDetailProfileWithoutTickShowsNoDataText(UiLanguage language, string expectedHeading, string expectedText)
+    {
+        // Arrange
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken);
+
+        await host.StoreProfileAsync(_profile, "Hello only");
+
+        // Act
+        var page = RenderIsland(host, language);
+
+        // Assert
+        await page.WaitForAssertionAsync(() => Assert.Contains(expectedText, PageTestHost.Text(page), "A profile without a tick should show the no-data text"), PageTestHost.WaitBound);
+
+        Assert.AreEqual(expectedHeading, page.Find("h1").TextContent.Trim(), "The heading should be the regions heading while no island is shown");
+        Assert.IsEmpty(page.FindAll("table"), "A profile without a tick should show no table");
+    }
+
+    /// <summary>
+    /// A new island in the address of the open page shows that island's goods under its name.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public async Task IslandDetailAddressOfOtherIslandShowsItsGoods()
+    {
+        // Arrange
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken);
+
+        await host.StoreTicksAsync(PageTestHost.Tick(_profile,
+                                                     0,
+                                                     PageTestHost.Island(Session, 1, "Isle A", PageTestHost.Entry(1001, 1f, 1f, 0f, 1, 100f)),
+                                                     PageTestHost.Island(Session, 2, "Isle B", PageTestHost.Entry(1002, 2f, 1f, 1f, 4, 100f))));
+
+        var page = RenderIsland(host, UiLanguage.English);
+
+        await page.WaitForStateAsync(() => page.FindAll("tbody tr").Count == 1, PageTestHost.WaitBound);
+
+        // Act
+        page.Render(parameters => parameters.Add(detail => detail.Island, "2"));
+
+        // Assert
+        await page.WaitForAssertionAsync(() => Assert.AreEqual("Isle B", page.Find("h1").TextContent.Trim(), "The heading should name the island of the new address"), PageTestHost.WaitBound);
+
+        Assert.AreSequenceEqual(PageTestHost.Expect("|Good 1002|2.00|1.00|+1.00|4|100%"), PageTestHost.Describe(page), "The page should show the goods of the island of the new address");
+    }
+
+    /// <summary>
+    /// An icon stored while the detail is open appears in the good's icon cell without a reload.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC6")]
+    public async Task IslandDetailStoredIconAppearsLive()
+    {
+        // Arrange
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken);
+
+        await host.StoreCatalogAsync(PageTestHost.GoodEntry(1, "Wood", "Holz", IconReference(1)));
+        await StoreIslandAsync(host, "Isle A", PageTestHost.Entry(1, 1f, 1f, 0f, 1, 100f));
+
+        var page = RenderIsland(host, UiLanguage.English);
+
+        await page.WaitForStateAsync(() => page.FindAll("tbody tr").Count == 1, PageTestHost.WaitBound);
+
+        Assert.IsEmpty(page.FindAll("tbody img"), "The good should show no icon before its PNG is stored");
+
+        // Act
+        await host.StoreIconAsync(IconReference(1));
+
+        // Assert
+        await page.WaitForAssertionAsync(() => Assert.AreEqual($"/icons/{IconReference(1)}", page.Find("tbody td img").GetAttribute("src"), "The stored icon should appear without a reload"), PageTestHost.WaitBound);
+        Assert.IsEmpty(host.Context.Services.GetRequiredService<BunitNavigationManager>().History, "The update should not navigate or reload");
+    }
+
+    /// <summary>
     /// Stores a tick with the shown island (session 3245, island 1, area 0).
     /// </summary>
     /// <param name="host">The host</param>
@@ -341,6 +465,23 @@ public sealed class IslandDetailTests
                                                                  .Add(page => page.Session, "3245")
                                                                  .Add(page => page.Island, "1")
                                                                  .Add(page => page.Area, "0"));
+    }
+
+    /// <summary>
+    /// Renders the detail of an address of the profile in English.
+    /// </summary>
+    /// <param name="host">The host</param>
+    /// <param name="session">The session segment of the address</param>
+    /// <param name="island">The island segment of the address</param>
+    /// <param name="area">The area segment of the address</param>
+    /// <returns>The rendered page</returns>
+    private static IRenderedComponent<IslandDetail> RenderIsland(PageTestHost host, string session, string island, string area)
+    {
+        return host.Render<IslandDetail>(UiLanguage.English,
+                                         parameters => parameters.Add(page => page.Profile, _profile.ToString())
+                                                                 .Add(page => page.Session, session)
+                                                                 .Add(page => page.Island, island)
+                                                                 .Add(page => page.Area, area));
     }
 
     /// <summary>

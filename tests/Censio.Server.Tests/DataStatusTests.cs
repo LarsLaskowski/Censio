@@ -262,6 +262,33 @@ public sealed class DataStatusTests
     }
 
     /// <summary>
+    /// A profile notice does not render the banner again; only a Companion notice does.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC8")]
+    public async Task DataStatusProfileNoticeDoesNotRender()
+    {
+        // Arrange
+        await using var host = await CreateConnectedHostAsync();
+
+        var status = host.Render<DataStatus>(UiLanguage.English,
+                                             _ =>
+                                             {
+                                             });
+        var rendersBefore = status.RenderCount;
+
+        // Act
+        await host.StoreProfileAsync(Guid.NewGuid(), "First");
+
+        // Assert
+        host.State.SetCompanionPipeState(ContractPipeState.WaitingForGame);
+
+        await status.WaitForAssertionAsync(() => Assert.AreEqual(GameNotRunning, Banners(status), "The Companion notice should change the banner"), PageTestHost.WaitBound);
+        Assert.AreEqual(rendersBefore + 1, status.RenderCount, "Only the Companion notice should render the banner again");
+    }
+
+    /// <summary>
     /// Renders the component with the as-of time.
     /// </summary>
     /// <param name="host">The host</param>

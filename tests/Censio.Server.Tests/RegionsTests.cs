@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 
 using Bunit;
@@ -472,6 +473,185 @@ public sealed class RegionsTests
 
         Assert.AreEqual(name, PageTestHost.Rows(page)[0][0], "The region name should show its characters");
         Assert.IsEmpty(page.FindAll("tbody b, tbody i"), "The region name should not be rendered as markup");
+    }
+
+    /// <summary>
+    /// A new profile in the address while the read of the old one is in flight discards that read: the page never shows the
+    /// old profile and ends at the new one after one more read.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public async Task RegionsAddressChangedDuringReadShowsOnlyNewProfile()
+    {
+        // Arrange
+        using var source = new FakeProfileStateSource(true);
+
+        source.Store(_firstProfile, StoredRead(CreateState(_firstProfile)));
+        source.Store(_secondProfile, StoredRead(CreateState(_secondProfile)));
+
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken, source);
+
+        var page = RenderPicked(host, _firstProfile);
+        var markups = new ConcurrentQueue<string>();
+
+        page.OnMarkupUpdated += (_, _) => markups.Enqueue(page.Markup);
+
+        await source.WaitForReadAsync(PageTestHost.WaitBound, TestContext.CancellationToken);
+
+        // Act
+        page.Render(parameters => parameters.Add(regions => regions.Profile, _secondProfile.ToString()));
+        source.ReleaseReads();
+
+        // Assert
+        await page.WaitForAssertionAsync(() => Assert.AreSequenceEqual(PageTestHost.Expect(RegionLink(_secondProfile, FirstSession)), PageTestHost.RowLinks(page), "The page should show the profile of its new address"), PageTestHost.WaitBound);
+
+        Assert.AreSequenceEqual(new[] { _firstProfile, _secondProfile }, source.Reads.ToList(), "The page should read the new profile once the old read ended");
+        Assert.IsEmpty(markups.Where(markup => markup.Contains(RegionLink(_firstProfile, FirstSession), StringComparison.Ordinal)).ToList(), "The page should never show the profile of its old address");
+    }
+
+    /// <summary>
+    /// A tick of the shown profile stored while its read is in flight causes one more read once that read ended.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC6")]
+    public async Task RegionsTickDuringReadReadsOnceMore()
+    {
+        // Arrange
+        using var source = new FakeProfileStateSource(true);
+
+        source.Store(_firstProfile, StoredRead(CreateState(_firstProfile)));
+
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken, source);
+
+        var page = RenderPicked(host, _firstProfile);
+
+        await source.WaitForReadAsync(PageTestHost.WaitBound, TestContext.CancellationToken);
+
+        // Act
+        await host.StoreTicksAsync(FirstSessionTick(_firstProfile, 10, 5));
+        source.ReleaseReads();
+
+        // Assert
+        await page.WaitForAssertionAsync(() => Assert.HasCount(2, source.Reads, "The tick during the read should cause one more read"), PageTestHost.WaitBound);
+        await page.WaitForAssertionAsync(() => Assert.AreSequenceEqual(PageTestHost.Expect(RegionLink(_firstProfile, FirstSession)), PageTestHost.RowLinks(page), "The page should show its profile after the reads"), PageTestHost.WaitBound);
+        Assert.AreSequenceEqual(new[] { _firstProfile, _firstProfile }, source.Reads.ToList(), "Both reads should read the shown profile");
+    }
+
+    /// <summary>
+    /// A Companion notice changes the banner of an open page without a read; a later catalog notice reads again.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC8")]
+    public async Task RegionsCompanionNoticeChangesBannerWithoutRead()
+    {
+        // Arrange
+        using var source = new FakeProfileStateSource(false);
+
+        source.Store(_firstProfile, StoredRead(CreateState(_firstProfile)));
+
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken, source);
+
+        var page = RenderPicked(host, _firstProfile);
+
+        await page.WaitForStateAsync(() => page.FindAll("tbody tr").Count == 1, PageTestHost.WaitBound);
+
+        Assert.AreEqual("The Companion is not connected.", page.Find(".mud-alert").TextContent.Trim(), "The page should start with the banner of no Companion");
+
+        // Act
+        host.State.SetCompanionConnected();
+
+        // Assert
+        await page.WaitForAssertionAsync(() => Assert.IsEmpty(page.FindAll(".mud-alert"), "The banner should go once the Companion is connected"), PageTestHost.WaitBound);
+
+        await host.StoreCatalogAsync(PageTestHost.RegionEntry(FirstSession, 900001, "Latium", "Latium"));
+
+        await page.WaitForAssertionAsync(() => Assert.HasCount(2, source.Reads, "The catalog notice should cause one more read"), PageTestHost.WaitBound);
+        Assert.AreSequenceEqual(new[] { _firstProfile, _firstProfile }, source.Reads.ToList(), "Only the first read and the catalog's should read, never the Companion notice");
+    }
+
+    /// <summary>
+    /// A hello that renames the shown profile updates the profile line of the open page without a reload.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC6")]
+    public async Task RegionsHelloRenameUpdatesProfileLine()
+    {
+        // Arrange
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken);
+
+        await host.StoreProfileAsync(_firstProfile, "Old name");
+        await host.StoreTicksAsync(FirstSessionTick(_firstProfile, 0, 3));
+
+        var page = RenderPicked(host, _firstProfile);
+
+        await page.WaitForAssertionAsync(() => Assert.AreEqual("Old name", ProfileLine(page), "The page should show the stored profile name"), PageTestHost.WaitBound);
+
+        // Act
+        await host.StoreProfileAsync(_firstProfile, "New name");
+
+        // Assert
+        await page.WaitForAssertionAsync(() => Assert.AreEqual("New name", ProfileLine(page), "The page should show the new profile name without a reload"), PageTestHost.WaitBound);
+        Assert.IsEmpty(host.Context.Services.GetRequiredService<BunitNavigationManager>().History, "The update should not navigate or reload");
+    }
+
+    /// <summary>
+    /// A page disposed a second time does nothing, although its cancellation source is already disposed.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    public async Task RegionsDisposedTwiceDoesNothing()
+    {
+        // Arrange
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken);
+
+        await host.StoreTicksAsync(FirstSessionTick(_firstProfile, 0, 3));
+
+        var page = RenderPicked(host, _firstProfile);
+
+        await page.WaitForStateAsync(() => page.FindAll("tbody tr").Count == 1, PageTestHost.WaitBound);
+
+        var instance = page.Instance;
+
+        await host.Context.DisposeComponentsAsync();
+
+        // Act
+        var failure = Capture(instance.Dispose);
+
+        // Assert
+        Assert.IsNull(failure, "A second dispose should neither cancel nor dispose the disposed cancellation source again");
+    }
+
+    /// <summary>
+    /// Runs an action and gives the <see cref="ObjectDisposedException" /> it threw.
+    /// </summary>
+    /// <param name="action">The action</param>
+    /// <returns>The exception, or <see langword="null" /> when the action returned</returns>
+    private static ObjectDisposedException? Capture(Action action)
+    {
+        try
+        {
+            action();
+
+            return null;
+        }
+        catch (ObjectDisposedException exception)
+        {
+            return exception;
+        }
+    }
+
+    /// <summary>
+    /// Gives the text of the profile line under the heading.
+    /// </summary>
+    /// <param name="page">The rendered page</param>
+    /// <returns>The text, or an empty text while there is none</returns>
+    private static string ProfileLine(IRenderedComponent<Regions> page)
+    {
+        return page.FindAll("h1 + p").Select(line => line.TextContent.Trim()).FirstOrDefault() ?? string.Empty;
     }
 
     /// <summary>

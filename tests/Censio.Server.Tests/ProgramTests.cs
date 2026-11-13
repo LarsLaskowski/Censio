@@ -298,6 +298,28 @@ public sealed class ProgramTests
     }
 
     /// <summary>
+    /// The icon route of the real host answers a well-formed reference of an icon that is not stored with 404 and an empty
+    /// body.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC9")]
+    public async Task ProgramGetUnknownIconIsEmptyNotFound()
+    {
+        // Arrange
+        using var factory = new CensioServerFactory("Production");
+        using var client = factory.CreateClient();
+
+        // Act
+        using var response = await client.GetAsync("/icons/" + new string('a', 64), TestContext.CancellationToken);
+        var body = await response.Content.ReadAsByteArrayAsync(TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(HttpStatusCode.NotFound, response.StatusCode, "An icon that is not stored should answer 404");
+        Assert.IsEmpty(body, "The 404 answer of the icon route should have an empty body");
+    }
+
+    /// <summary>
     /// A first visit shows the frame in the light theme with the English texts, the navigation open and the start page's
     /// entry marked.
     /// </summary>

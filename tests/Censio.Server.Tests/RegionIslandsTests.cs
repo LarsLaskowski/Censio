@@ -2,6 +2,7 @@ using Bunit;
 
 using Censio.Contracts;
 using Censio.Server.Components.Pages;
+using Censio.Server.Data;
 
 using Microsoft.AspNetCore.Components.Web;
 
@@ -40,6 +41,11 @@ public sealed class RegionIslandsTests
     /// The profile of the tests.
     /// </summary>
     private static readonly Guid _profile = new("11111111-1111-4111-8111-111111111111");
+
+    /// <summary>
+    /// Another profile.
+    /// </summary>
+    private static readonly Guid _otherProfile = new("22222222-2222-4222-8222-222222222222");
 
     #endregion // Fields
 
@@ -180,6 +186,75 @@ public sealed class RegionIslandsTests
     }
 
     /// <summary>
+    /// A session the profile's view has no region for, or a malformed session, shows the not-found text under the
+    /// regions heading, without a table, without the as-of line and without echoing the address.
+    /// </summary>
+    /// <param name="session">The session segment of the address</param>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC9")]
+    [DataRow("9999")]
+    [DataRow("x7q")]
+    public async Task RegionIslandsUnknownOrMalformedSessionShowsNotFound(string session)
+    {
+        // Arrange
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken);
+
+        await host.StoreTicksAsync(PageTestHost.Tick(_profile, 0, PageTestHost.Island(Session, 1, "Alpha", PageTestHost.Entry(1, 1f, 1f, 0.5f, 1, 100f))));
+
+        var head = host.Context.Render<HeadOutlet>();
+
+        // Act
+        var page = host.Render<RegionIslands>(UiLanguage.English,
+                                              parameters => parameters.Add(islands => islands.Profile, _profile.ToString())
+                                                                      .Add(islands => islands.Session, session));
+
+        // Assert
+        await page.WaitForAssertionAsync(() => Assert.Contains("Not found.", PageTestHost.Text(page), "An unknown or malformed session should show the not-found text"), PageTestHost.WaitBound);
+
+        Assert.AreEqual("Regions", page.Find("h1").TextContent.Trim(), "The heading should be the regions heading");
+        Assert.AreEqual("Censio – Regions", head.Find("title").TextContent, "The page title should be the regions title");
+        Assert.IsEmpty(page.FindAll("table"), "An unknown or malformed session should show no table");
+        Assert.DoesNotContain("As of", PageTestHost.Text(page), "A page that is not found should show no as-of line");
+        Assert.DoesNotContain(session, PageTestHost.Text(page), "The page should not echo the address");
+    }
+
+    /// <summary>
+    /// A tick of another profile does not make the island list read again; a later catalog notice does.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC6")]
+    public async Task RegionIslandsTickOfOtherProfileReadsNothing()
+    {
+        // Arrange
+        using var source = new FakeProfileStateSource(false);
+
+        source.Store(_profile,
+                     new ProfileStateRead
+                     {
+                         State = CreateState(),
+                         Failure = null
+                     });
+
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken, source);
+
+        var page = RenderSession(host, UiLanguage.English);
+
+        await page.WaitForStateAsync(() => page.FindAll("tbody tr").Count == 1, PageTestHost.WaitBound);
+
+        // Act
+        await host.StoreTicksAsync(PageTestHost.Tick(_otherProfile, 10, PageTestHost.Island(OtherSession, 1, "Other", PageTestHost.Entry(1, 1f, 1f, 0.5f, 7, 100f))));
+        await host.StoreCatalogAsync(PageTestHost.RegionEntry(Session, 900001, "Latium", "Latium"));
+
+        // Assert
+        await page.WaitForAssertionAsync(() => Assert.HasCount(2, source.Reads, "The catalog notice should cause one more read"), PageTestHost.WaitBound);
+
+        Assert.AreSequenceEqual(new[] { _profile, _profile }, source.Reads.ToList(), "Only the first read and the catalog's should read, never the other profile's tick");
+        Assert.AreSequenceEqual(PageTestHost.Expect("Alpha|1|1|0"), PageTestHost.Describe(page), "The shown data should stay unchanged");
+    }
+
+    /// <summary>
     /// Renders the island list of the shown region.
     /// </summary>
     /// <param name="host">The host</param>
@@ -190,6 +265,32 @@ public sealed class RegionIslandsTests
         return host.Render<RegionIslands>(language,
                                           parameters => parameters.Add(page => page.Profile, _profile.ToString())
                                                                   .Add(page => page.Session, "3245"));
+    }
+
+    /// <summary>
+    /// Creates a state of the profile with one island <c>Alpha</c> in the shown region.
+    /// </summary>
+    /// <returns>The state</returns>
+    private static StoredProfileState CreateState()
+    {
+        return new StoredProfileState
+               {
+                   Profile = new StoredProfile
+                             {
+                                 Id = _profile,
+                                 Name = "First"
+                             },
+                   LatestTick = PageTestHost.Tick(_profile, 0, PageTestHost.Island(Session, 1, "Alpha", PageTestHost.Entry(1, 1f, 1f, 0.5f, 1, 100f))),
+                   Islands = [
+                                 new StoredIsland
+                                 {
+                                     SessionGuid = Session,
+                                     IslandId = 1,
+                                     AreaIndex = 0,
+                                     Name = "Alpha"
+                                 }
+                             ]
+               };
     }
 
     #endregion // Methods

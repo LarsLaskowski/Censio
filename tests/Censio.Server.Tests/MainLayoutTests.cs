@@ -414,6 +414,60 @@ public sealed class MainLayoutTests
     }
 
     /// <summary>
+    /// A hello that renames a listed profile changes its line in the profile switch without a reload.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC6")]
+    public async Task MainLayoutProfileSwitchShowsHelloRenameLive()
+    {
+        // Arrange
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken);
+
+        await host.StoreProfileAsync(_firstProfile, "Old name");
+
+        var layout = RenderLayout(host.Context, UiTheme.Light, UiLanguage.English);
+
+        await OpenProfileSwitchAsync(layout);
+
+        // Act
+        await host.StoreProfileAsync(_firstProfile, "New name");
+
+        // Assert
+        await layout.WaitForAssertionAsync(() => Assert.AreSequenceEqual(PageTestHost.Expect("New name"), ProfileItems(layout), "The renamed profile should be listed under its new name without a reload"), PageTestHost.WaitBound);
+        Assert.IsEmpty(host.Context.Services.GetRequiredService<BunitNavigationManager>().History, "The update should not navigate or reload");
+    }
+
+    /// <summary>
+    /// A tick of a listed profile keeps the profile switch's lines and links as they were.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC6")]
+    public async Task MainLayoutProfileSwitchKeepsLinesOnTickOfListedProfile()
+    {
+        // Arrange
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken);
+
+        await host.StoreProfileAsync(_firstProfile, "First");
+
+        var layout = RenderLayout(host.Context, UiTheme.Light, UiLanguage.English);
+
+        await OpenProfileSwitchAsync(layout);
+
+        var rendersBefore = layout.RenderCount;
+
+        // Act
+        await host.StoreTicksAsync(PageTestHost.Tick(_firstProfile, 0, PageTestHost.Island(3245, 1, "Isle A", PageTestHost.Entry(1, 1f, 1f, 0f, 1, 100f))));
+
+        // Assert
+        await layout.WaitForStateAsync(() => layout.RenderCount > rendersBefore, PageTestHost.WaitBound);
+
+        Assert.AreSequenceEqual(PageTestHost.Expect("First"), ProfileItems(layout), "The listed profile should keep its line");
+        Assert.AreSequenceEqual(PageTestHost.Expect(ProfileLink(_firstProfile)), ProfileItemLinks(layout), "The listed profile should keep its link");
+    }
+
+    /// <summary>
     /// A profile name with markup shows its characters in the profile switch, not markup.
     /// </summary>
     /// <returns>A task that completes when the test is done</returns>

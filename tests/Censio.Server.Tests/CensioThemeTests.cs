@@ -1,3 +1,5 @@
+using System.Globalization;
+
 using MudBlazor;
 using MudBlazor.Utilities;
 
@@ -96,6 +98,39 @@ public sealed class CensioThemeTests
         Assert.AreEqual(byte.MaxValue, foreground.A, $"{foregroundName} of the {theme} palette should be opaque");
         Assert.AreEqual(byte.MaxValue, background.A, $"{backgroundName} of the {theme} palette should be opaque");
         Assert.IsGreaterThanOrEqualTo(minimum, ContrastRatio(foreground, background), $"{foregroundName} on {backgroundName} of the {theme} palette should reach {minimum}:1");
+    }
+
+    /// <summary>
+    /// The colours of a negative and a positive delta reach the text contrast of WCAG 2.1 AA against the surface and the
+    /// background of both themes, and are opaque, so the ratio is the rendered one.
+    /// </summary>
+    /// <param name="theme">The theme whose palette is checked</param>
+    /// <param name="deltaColorName">The name of the delta colour of the palette</param>
+    /// <param name="expectedColor">The colour the plan sets, as <c>#RRGGBB</c></param>
+    /// <param name="backgroundName">The name of the background colour of the palette</param>
+    [TestMethod]
+    [TestCategory("AC10")]
+    [DataRow(UiTheme.Light, nameof(Palette.Error), "#A4161A", nameof(Palette.Surface))]
+    [DataRow(UiTheme.Light, nameof(Palette.Error), "#A4161A", nameof(Palette.Background))]
+    [DataRow(UiTheme.Light, nameof(Palette.Success), "#1B6B2F", nameof(Palette.Surface))]
+    [DataRow(UiTheme.Light, nameof(Palette.Success), "#1B6B2F", nameof(Palette.Background))]
+    [DataRow(UiTheme.Dark, nameof(Palette.Error), "#FF8A80", nameof(Palette.Surface))]
+    [DataRow(UiTheme.Dark, nameof(Palette.Error), "#FF8A80", nameof(Palette.Background))]
+    [DataRow(UiTheme.Dark, nameof(Palette.Success), "#7FD08E", nameof(Palette.Surface))]
+    [DataRow(UiTheme.Dark, nameof(Palette.Success), "#7FD08E", nameof(Palette.Background))]
+    public void CensioThemeDeltaColoursMeetTextContrast(UiTheme theme, string deltaColorName, string expectedColor, string backgroundName)
+    {
+        // Act
+        var palette = SelectPalette(CensioTheme.Create(), theme);
+
+        // Assert
+        var delta = ReadColor(palette, deltaColorName);
+        var background = ReadColor(palette, backgroundName);
+
+        Assert.AreEqual(expectedColor, string.Create(CultureInfo.InvariantCulture, $"#{delta.R:X2}{delta.G:X2}{delta.B:X2}"), $"{deltaColorName} of the {theme} palette should be the plan's colour");
+        Assert.AreEqual(byte.MaxValue, delta.A, $"{deltaColorName} of the {theme} palette should be opaque");
+        Assert.AreEqual(byte.MaxValue, background.A, $"{backgroundName} of the {theme} palette should be opaque");
+        Assert.IsGreaterThanOrEqualTo(TextContrast, ContrastRatio(delta, background), $"{deltaColorName} on {backgroundName} of the {theme} palette should reach {TextContrast}:1");
     }
 
     /// <summary>
