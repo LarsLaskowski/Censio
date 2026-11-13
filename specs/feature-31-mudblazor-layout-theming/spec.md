@@ -154,3 +154,24 @@ The frame's texts, exactly:
   frame's texts in both languages, that every resource comes from the server itself, desktop browsers only.
 - `docs/areas/server.md`: *Start page* says the page is shown in the frame of `web-ui.md` and keeps title, heading
   and version line; *Not here* points at `web-ui.md` instead of "#31"; the index row's "web theming" likewise.
+
+## Challenge notes
+
+Spec challenge (mode `spec`) of /home/user/Censio/specs/feature-31-mudblazor-layout-theming/spec.md, against issue #31 and its comment (record 0041).
+
+The spec's main claims hold up against the code:
+- **The start page today:** `MainLayout.razor` renders only `@Body`, `Home.razor` holds just the title, heading and version line, and `App.razor` hard-codes `<html lang="en">`.
+- **N5 release check:** `.github/scripts/release-check.sh:313` really does extract the version with `sed 's|.*<p>Version \([^<]*\)</p>.*|\1|p'`, so the bare `<p>Version …</p>` must stay as it is.
+- **N6 culture data:** `docs/areas/server.md` (*Docker image*) does say the runtime image runs with invariant globalization and no ICU.
+- **No MudBlazor yet:** `Directory.Packages.props` has no MudBlazor, so the feature does not already exist.
+- **N7 and record 0006:** record 0006 (Consequences, line 47-48) only revisits its choice for "game data or a state-changing action on a page", and N7 stays inside that.
+
+No objection is major. Four are minor:
+
+1. **minor: S2 / AC2 – "names German before English" leaves weighted language lists undefined.** Browsers send the language list as the `Accept-Language` header, which can carry weights (`q` values). A header like `en;q=0.5, de` or `de;q=0, en` puts the two languages in a different order by position than by weight. An implementation that compares positions and one that sorts by weight (as ASP.NET Core's `AcceptLanguageHeaderRequestCultureProvider` does) would both pass AC2 as written but answer differently. Instruction for the Lead: state in S2/AC2 that the order is by `q` weight, highest first (ties by position), and that `q=0` excludes a language. The Tester covers one weighted header in each direction.
+
+2. **minor: S6 / AC7 / N1 – a "disabled" profile switch cannot be focused or hovered as S6 describes.** A disabled `<button>` is taken out of the tab order. MudBlazor's disabled buttons also get `pointer-events: none` and the theme's low-contrast disabled colour (about 38 % opacity). So "when the user points at or focuses the profile switch, then it reads `Profile`" fails on any build that uses the `disabled` attribute. N1's 4.5:1 for its label fails with MudBlazor's default disabled palette. Instruction for the Lead: make `Profile` / `Profil` the switch's visible text, drop "points at or focuses" from S6, and state that the label's colour is set explicitly to meet 4.5:1 rather than taken from the disabled palette. The alternative is to state that the control is `aria-disabled` and stays focusable; either way, pick one.
+
+3. **minor: *Area documents* misses a statement it contradicts, and the documentation the issue asks for.** `docs/areas/server.md`, *Limits and errors*, says "The server reads no request body and takes no input on `/` or `/health`". With this feature, `/` reads the stored theme/language value (a cookie, since AC4 needs it on the request) and `Accept-Language`. `/` is also listed under *Network exposure* in the security areas of `.squad/project.md`. The issue's *Documentation* section asks for README and user guide text (English, then German, in each file) so that external testers can try the feature, and the spec does not mention it. Instruction for the Lead: add to *Area documents* that this `server.md` line changes to name the stored choice and the language header as the input `/` reads, linking E2's handling. Also add one line saying `README.md` and `docs/USER_GUIDE.md` describe the theme and language switches in both languages.
+
+4. **minor: N6 / AC6 – "the German texts render in the Docker image" has no stated check outside the image.** Under invariant globalization, `new CultureInfo("de-DE")` throws `CultureNotFoundException` by default (`PredefinedCulturesOnly`). A build that does its localization through `CultureInfo` / `IStringLocalizer` could therefore pass every unit test on a machine with ICU and still fail in the image. S5's switch without a reload also cannot rely on the request's culture, which is fixed for the open page. Instruction for the Lead: phrase AC6 so that it is checked without Docker. The German texts must not depend on culture data (for example, the server's tests run one case with `System.Globalization.Invariant` set). Alternatively, name the image check as AC6's verification, with an owner.
