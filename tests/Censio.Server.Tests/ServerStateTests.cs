@@ -1599,6 +1599,77 @@ public sealed class ServerStateTests
     }
 
     /// <summary>
+    /// A stored icon reads as its bytes.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC5")]
+    public async Task ServerStateReadIconAsyncStoredIconGivesBytes()
+    {
+        // Arrange
+        var (_, state) = await OpenRestoredAsync(null);
+
+        var icon = CreateIcon(IconReference(1));
+
+        await state.StoreIconAsync(icon, TestContext.CancellationToken);
+        await state.StoreIconAsync(CreateIcon(IconReference(2)), TestContext.CancellationToken);
+
+        // Act
+        var bytes = await state.ReadIconAsync(IconReference(1), TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreSequenceEqual(icon.Png.ToArray(), bytes ?? [], "The stored icon should read as its bytes");
+    }
+
+    /// <summary>
+    /// An icon not stored reads as nothing.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC5")]
+    public async Task ServerStateReadIconAsyncUnknownIconGivesNull()
+    {
+        // Arrange
+        var (_, state) = await OpenRestoredAsync(null);
+
+        await state.StoreIconAsync(CreateIcon(IconReference(1)), TestContext.CancellationToken);
+
+        // Act
+        var bytes = await state.ReadIconAsync(IconReference(2), TestContext.CancellationToken);
+
+        // Assert
+        Assert.IsNull(bytes, "An icon not stored should read as nothing");
+    }
+
+    /// <summary>
+    /// A cancelled read of an icon ends with the cancellation, and a later read still reads.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC5")]
+    public async Task ServerStateReadIconAsyncCancelledReadThrowsAndLeavesGate()
+    {
+        // Arrange
+        var (_, state) = await OpenRestoredAsync(null);
+
+        var icon = CreateIcon(IconReference(1));
+
+        await state.StoreIconAsync(icon, TestContext.CancellationToken);
+
+        using var cancellation = new CancellationTokenSource();
+
+        await cancellation.CancelAsync();
+
+        // Act
+        await Assert.ThrowsAsync<OperationCanceledException>(() => state.ReadIconAsync(IconReference(1), cancellation.Token), "A cancelled read should end with the cancellation");
+
+        // Assert
+        var later = await state.ReadIconAsync(IconReference(1), TestContext.CancellationToken).WaitAsync(_waitBound, TestContext.CancellationToken);
+
+        Assert.AreSequenceEqual(icon.Png.ToArray(), later ?? [], "A read after the cancelled one should read the icon");
+    }
+
+    /// <summary>
     /// Gives the receive time some seconds after the base receive time.
     /// </summary>
     /// <param name="seconds">The seconds</param>
