@@ -45,7 +45,7 @@ public sealed class ServerDatabaseTests : IDisposable
     private const string CreateHistoryTableSql = "CREATE TABLE \"__EFMigrationsHistory\" (\"MigrationId\" TEXT NOT NULL CONSTRAINT \"PK___EFMigrationsHistory\" PRIMARY KEY, \"ProductVersion\" TEXT NOT NULL);";
 
     /// <summary>
-    /// The statement that leaves a lock row behind, as an update stopped while it held EF Core's lock does.
+    /// The statement that leaves a lock row behind, as an EF Core update stopped while it held its lock does.
     /// </summary>
     private const string InsertLockRowSql = "INSERT INTO \"__EFMigrationsLock\" (\"Id\", \"Timestamp\") VALUES (1, '2026-11-13 12:00:00+00:00');";
 
@@ -228,8 +228,9 @@ public sealed class ServerDatabaseTests : IDisposable
     }
 
     /// <summary>
-    /// A file holding only EF Core's two bookkeeping tables, a lock row and no applied migration (a first update that
-    /// failed or stopped) is updated as a fresh file within the bound, not left waiting for the lock.
+    /// A file holding only EF Core's two bookkeeping tables, a lock row and no applied migration (as EF Core's own update
+    /// or its tools leave it, never the server) is updated as a fresh file within the bound, not left waiting for the
+    /// lock.
     /// </summary>
     /// <returns>A task that represents the asynchronous test</returns>
     [TestMethod]
@@ -537,8 +538,31 @@ public sealed class ServerDatabaseTests : IDisposable
     }
 
     /// <summary>
-    /// A database of an earlier schema with a lock row a stopped update left behind is updated within the bound, not
-    /// left waiting for the lock.
+    /// A new file whose first update fails in one of its steps is reported as a failed update and holds no table,
+    /// index or other schema entry afterwards, not even EF Core's bookkeeping tables.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC5")]
+    public async Task ServerDatabaseOpenNewFileWithFailingStepReportsUpdateFailedAndLeavesNoTable()
+    {
+        // Arrange
+        var databaseFile = Path.Combine(CreateTemporaryDirectory(), DatabaseFileName);
+
+        // Act
+        var result = await OpenWithTestMigrationsAsync(databaseFile, typeof(FailingTestMigration));
+
+        // Assert
+        Assert.AreEqual(ServerDatabaseOpenKind.UpdateFailed, result.Kind, "A failing step of the first update should be reported as a failed update");
+        Assert.AreEqual(databaseFile, result.DatabaseFile, "The result should name the database file");
+        Assert.IsNull(result.Database, "No database should be handed out after a failed update");
+        Assert.IsNotNull(result.Failure, "The exception behind the failure should be attached");
+        Assert.IsEmpty(ReadSchema(databaseFile), "The failed first update should leave no schema entry in the new file");
+    }
+
+    /// <summary>
+    /// A database of an earlier schema holding EF Core's lock table with a stale lock row (left by EF Core's own update
+    /// or its tools, never by the server) is updated within the bound: the start never waits on that lock.
     /// </summary>
     /// <returns>A task that represents the asynchronous test</returns>
     [TestMethod]
@@ -548,7 +572,7 @@ public sealed class ServerDatabaseTests : IDisposable
         // Arrange
         var databaseFile = await CreateCurrentSchemaDatabaseAsync();
 
-        Execute(databaseFile, command => command.CommandText = InsertLockRowSql);
+        Execute(databaseFile, command => command.CommandText = CreateLockTableSql + InsertLockRowSql);
 
         // Act
         var result = await OpenWithTestMigrationsAsync(databaseFile, typeof(AddedTableTestMigration));
