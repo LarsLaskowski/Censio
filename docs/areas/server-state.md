@@ -37,8 +37,7 @@ state again after a restart. The database itself is in [`server-data.md`](server
 ### Held profiles
 
 - The server holds the state of at most two profiles (the profiles whose latest ticks are the newest by the order of
-  *What a profile's state holds*: receive time, then storing order). The profile being played is always among them, since
-  only one Companion sends at a time. Reading a held profile needs no database read.
+  *What a profile's state holds*: receive time, then storing order). The profile being played is among them as long as its ticks are not older than the held ones; since a tick's receive time is the Companion's clock, a profile whose Companion's clock runs behind, or any profile while two others carry ticks dated in the future, is not held and is read from the database (*Reading on demand*). Reading a held profile needs no database read.
 - A tick of a profile that is held and not older than that profile's latest tick becomes its state, and the profile's
   island list takes the tick's islands with their names. A tick that is older stores and leaves the tick as it is; the
   island list is read again from the database, since the older tick can name an island the latest lacks.
@@ -118,8 +117,7 @@ The restore lines are in *Restore at start*; the line of a message that could no
   | Two held worst ticks and the incoming one, a tick of an unheld, newer profile that replaces the oldest | 125.4 MiB | 233.8 to 234.0 MiB |
   | The same, for a profile whose islands read failed earlier: the call also reads its whole stored state back (one more tick) | 125.4 MiB | 259.5 to 260.0 MiB |
 
-  Retained, a worst tick is about 41.8 MiB. The peak includes what the write path allocates and the garbage collector
-  has not collected yet; it is an order of magnitude, not a guarantee.
+  Retained, a worst tick built in code is about 41.8 MiB; read by the contract reader it retains 43.3 MiB ([`contract.md`](contract.md), *Memory of a read*). The peak includes what the write path allocates and the garbage collector has not collected yet, and a single run went higher (250.9 and 325.0 MiB in one of seven later runs); it is an order of magnitude, not a guarantee.
 - Reads on demand are not limited in number; each holds the state it reads until its caller drops it.
 
 ### Privacy

@@ -21,7 +21,8 @@ profile the user selected (record [0041](0041-profile-selected-in-the-companion-
    (1 to 12 ms for a real tick, over a second at the bounds) for every follower.
 2. **Hold every profile's state** — every read is free; memory grows with the number of profiles without a bound.
 3. **Hold the latest tick of a fixed number of profiles, those with the newest ticks; read others on demand**
-   (chosen) — the profile being played is always held, memory is bounded; a page on an old profile pays one read.
+   (chosen) — the profile being played is held while its Companion's clock is not behind the receive times of the
+   held ticks, memory is bounded; a page on any other profile pays one read.
 4. **Hold only the island values, merged across ticks per island** — survives split ticks; differs from the store's
    latest-tick rule, so a restart would change what is shown.
 

@@ -82,6 +82,7 @@ The hand-written fakes and stubs the tests reuse (no mocking library unless `doc
 otherwise), one line each: the double, where it lives and what it stands in for; how it behaves is read in its code.
 
 - `RecordingLogger` (`tests/Censio.Server.Tests/RecordingLogger.cs`, linked into the Companion tests) — an `ILogger` that keeps every entry.
+- `ConcurrentRecordingLogger` (`tests/Censio.Server.Tests/ConcurrentRecordingLogger.cs`) — an `ILogger` that keeps every entry from any thread and lets a test await an entry of a level.
 - `ExtendedMigrationsAssembly` (`tests/Censio.Server.Data.Tests/`) — an `IMigrationsAssembly` of the real migrations plus test migrations, for a test-only schema history.
 - `RecordingLoggerProvider` (`tests/Censio.Server.Data.Tests/`) — an `ILoggerProvider` writing every category into one `RecordingLogger`.
 - `ChunkedStream` (`tests/Censio.Pipe.Tests/ChunkedStream.cs`) — a chunked read-only stream with faults at an offset, for the frame reader.
