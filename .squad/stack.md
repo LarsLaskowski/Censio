@@ -258,3 +258,23 @@ itself with a lock (`obj/analyzer-check.lock`), plain builds do not.
 - The server image (`src/Censio.Server/Dockerfile`) is Alpine-based, so its tools are BusyBox: a command run
   inside it (`docker exec`, `docker run --entrypoint`) may not use GNU-only options such as `find -printf`; run
   the plain command and process its output on the host.
+- In the cloud sandbox `dockerd` is installed but not running, and outbound HTTPS goes through the agent proxy,
+  whose CA (`/root/.ccr/ca-bundle.crt`) the image's build stage does not trust: a plain
+  `docker build -f src/Censio.Server/Dockerfile .` stops in `dotnet restore` with `NU1301 ... UntrustedRoot`. The
+  *Image build check* there stays the restore-order reproduction. Where a criterion needs the image itself (a dry
+  run), start `dockerd` as root in the background from the session's shell, so it inherits `HTTPS_PROXY` and pulls
+  the base images through the proxy, wait until `docker info` answers, and build from the repository root with a
+  copy of the Dockerfile on standard input that trusts the CA in the build stage only — the repository's
+  Dockerfile stays unchanged, and the runtime stage gets neither the CA nor the proxy setting:
+
+  ```bash
+  { head -n 1 src/Censio.Server/Dockerfile
+    printf '%s\n' 'COPY --from=ccr ca-bundle.crt /usr/local/share/ccr-ca-bundle.crt' \
+      'ENV SSL_CERT_FILE=/usr/local/share/ccr-ca-bundle.crt'
+    tail -n +2 src/Censio.Server/Dockerfile; } \
+    | docker build --network host --build-arg HTTPS_PROXY="$HTTPS_PROXY" --build-context ccr=/root/.ccr \
+      -f - -t censio .
+  ```
+
+  The Dockerfile's first line is the build stage's `FROM`; `--network host` lets the build reach the proxy on
+  `127.0.0.1`. Never commit such a copy of the Dockerfile.
