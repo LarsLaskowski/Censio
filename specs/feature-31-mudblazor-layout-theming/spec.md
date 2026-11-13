@@ -136,7 +136,7 @@ The frame's texts, exactly:
 
 - Q1: What is the Censio colour palette? The issue asks for one; nothing in the repository defines it (no brand
   colours, logo or style sheet; the only colours are the Companion's tray icon states in
-  `src/Censio.Companion/TrayIconImages.cs`). Answered (Product Manager): the Lead defines the palette in the plan,
+  `src/Censio.Companion/TrayIconImages.cs`). Answered: by the Product Manager — the Lead defines the palette in the plan,
   with an Anno 117 / Roman look (for example deep red or purple with gold on warm neutrals), checked against N1 in
   both themes and recorded in `web-ui.md`; the Product Manager approves it at the spec approval.
 - Q2: Which language does a first visit show? Answered: the browser's language list decides between German and
