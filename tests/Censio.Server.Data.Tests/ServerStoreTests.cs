@@ -694,6 +694,49 @@ public sealed class ServerStoreTests : IDisposable
     }
 
     /// <summary>
+    /// A tick with an entry whose two maps are empty and an island without entries reads back with exactly those: empty
+    /// maps and no entries, between islands and entries that have them.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC8")]
+    public async Task ServerStoreStoreTickWithEmptyMapsAndIslandWithoutEntriesReadsBack()
+    {
+        // Arrange
+        var store = await OpenStoreAsync(CreateDatabaseFile());
+        var emptyMapsEntry = new ContractTickEntry
+                             {
+                                 ProductGuid = 77,
+                                 Generation = 1f,
+                                 Consumption = null,
+                                 Delta = 1f,
+                                 PerfectGeneration = null,
+                                 PerfectConsumption = null,
+                                 BuildingCount = 1,
+                                 Maintenance = 2,
+                                 Income = null,
+                                 Profit = 3,
+                                 SummedProductivity = null,
+                                 AverageProductivity = null,
+                                 WorkforceAmounts = new Dictionary<int, int>(),
+                                 BuildingAmounts = new Dictionary<int, int>()
+                             };
+        var tick = CreateTick(Guid.NewGuid(),
+                              1,
+                              CreateIsland(1, "With entries", CreateEntry(5), emptyMapsEntry),
+                              CreateIsland(2, "Without entries"),
+                              CreateIsland(3, "Last island", CreateEntry(6)));
+        var stored = await store.StoreTickAsync(tick, TestContext.CancellationToken);
+
+        // Act
+        var readBack = await store.ReadTickAsync(tick.Id, TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(ServerStoreOutcome.Stored, stored.Outcome, "The tick should be stored");
+        Assert.AreSequenceEqual(DescribeTick(tick), DescribeTick(readBack), "Empty maps and an island without entries should read back as they were sent");
+    }
+
+    /// <summary>
     /// A tick at the contract's bounds (256 islands, 524,288 entries and map pairs, island names of 765 bytes) is
     /// stored and read back with every value.
     /// </summary>

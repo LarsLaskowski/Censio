@@ -3,12 +3,15 @@ using System.Net.Sockets;
 using System.Text.RegularExpressions;
 
 using Censio.Contracts;
+using Censio.Server.Data;
 
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Configuration.Json;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Censio.Server.Tests;
 
@@ -335,6 +338,75 @@ public sealed class ProgramTests
         Assert.AreEqual(1, exitCode, "The start should end with exit code 1");
         Assert.IsFalse(File.Exists(configuredFile), "The configured file should not be created");
         Assert.IsFalse(File.Exists(Path.Combine(dataDirectory, IngestTokenSetup.TokenFileName)), "No token file should be created in the data directory");
+    }
+
+    /// <summary>
+    /// A start with a data directory creates <c>censio.db</c> there at the current schema: a later open of the file
+    /// finds nothing to apply.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC1")]
+    public async Task ProgramStartWithDataDirectoryCreatesDatabase()
+    {
+        // Arrange
+        var dataDirectory = CreateTemporaryDirectory();
+        var databaseFile = Path.Combine(dataDirectory, DatabaseSetup.DatabaseFileName);
+
+        // Act
+        using (var factory = new CensioServerFactory("Production", CreateDataDirectorySettings(dataDirectory)))
+        {
+            using var client = factory.CreateClient();
+            using var response = await client.GetAsync("/health", TestContext.CancellationToken);
+
+            Assert.AreEqual(HttpStatusCode.OK, response.StatusCode, "The health endpoint should answer 200");
+        }
+
+        SqliteConnection.ClearAllPools();
+
+        // Assert
+        Assert.IsTrue(File.Exists(databaseFile), "The start should have created censio.db in the data directory");
+
+        var reopened = await ServerDatabase.OpenAsync(databaseFile, NullLoggerFactory.Instance, TestContext.CancellationToken);
+
+        reopened.Database?.Dispose();
+        SqliteConnection.ClearAllPools();
+
+        Assert.AreEqual(ServerDatabaseOpenKind.Opened, reopened.Kind, "The created file should hold the current schema");
+    }
+
+    /// <summary>
+    /// A database file that is not a Censio database stops the start with exit code 1 before the server listens, and the
+    /// file stays as it was: the listen address is taken by another socket, so a start that went on to listen would fail
+    /// with an exception instead.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC5")]
+    public async Task ProgramStartWithUnreadableDatabaseExitsWithCodeOne()
+    {
+        // Arrange
+        const string content = "This is a plain text file and not a database, longer than the header of one hundred bytes of a SQLite file.";
+
+        var dataDirectory = CreateTemporaryDirectory();
+        var databaseFile = Path.Combine(dataDirectory, DatabaseSetup.DatabaseFileName);
+
+        await File.WriteAllTextAsync(databaseFile, content, TestContext.CancellationToken);
+
+        using var blocker = new TcpListener(IPAddress.Loopback, 0);
+
+        blocker.Start();
+
+        var port = ((IPEndPoint)blocker.LocalEndpoint).Port;
+        var entryPoint = typeof(Program).Assembly.EntryPoint!;
+        string[] arguments = [$"--{DataProtectionSetup.DataDirectoryKey}={dataDirectory}", $"--urls=http://127.0.0.1:{port}", $"--applicationName={typeof(Program).Assembly.GetName().Name}"];
+
+        // Act
+        var exitCode = await Task.Run(() => entryPoint.Invoke(null, [arguments]), TestContext.CancellationToken).WaitAsync(TimeSpan.FromSeconds(30), TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(1, exitCode, "The start should end with exit code 1");
+        Assert.AreEqual(content, await File.ReadAllTextAsync(databaseFile, TestContext.CancellationToken), "The database file should stay as it was");
     }
 
     /// <summary>
