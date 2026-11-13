@@ -88,6 +88,22 @@ public sealed class ServerStoreTests : IDisposable
     /// </summary>
     private const int BoundIconReferences = 16384;
 
+    /// <summary>
+    /// The trigger that makes SQLite itself end the transaction of a tick write, before the store rolls it back.
+    /// </summary>
+    private const string CreateRollingBackTriggerSql = "CREATE TRIGGER \"RollBackMapPairs\" BEFORE INSERT ON \"TickMapPairs\" BEGIN SELECT RAISE(ROLLBACK, '" + FailingWriteMessage + "'); END;";
+
+    /// <summary>
+    /// The name of the SQL function that holds a tick write until the test has read.
+    /// </summary>
+    private const string PauseFunctionName = "censio_test_pause";
+
+    /// <summary>
+    /// The temporary trigger, on the store's own connection only, that holds a tick write at its first island row, when
+    /// the tick, its islands, entries and map pairs are written but not committed.
+    /// </summary>
+    private const string CreatePauseTriggerSql = "CREATE TEMP TRIGGER \"PauseTickWrite\" AFTER INSERT ON main.\"Islands\" BEGIN SELECT " + PauseFunctionName + "(); END;";
+
     #endregion // Constants
 
     #region Fields
@@ -96,6 +112,22 @@ public sealed class ServerStoreTests : IDisposable
     /// The receive time the tests count their seconds from.
     /// </summary>
     private static readonly DateTimeOffset _baseReceiveTime = new(2026, 11, 13, 12, 0, 0, TimeSpan.Zero);
+
+    /// <summary>
+    /// The longest the test waits for a tick write to reach its hold and, once released, to finish.
+    /// </summary>
+    private static readonly TimeSpan _pauseBound = TimeSpan.FromSeconds(30);
+
+    /// <summary>
+    /// The longest a held tick write waits for the test's reads, a fail-safe only: reads that do not wait for the write
+    /// release it at once, reads that wait for it see it only after this bound and fail the test.
+    /// </summary>
+    private static readonly TimeSpan _holdBound = TimeSpan.FromSeconds(5);
+
+    /// <summary>
+    /// What the reads see of a tick and its profile before the tick is stored.
+    /// </summary>
+    private static readonly string[] _stateBeforeWrite = ["tick <none>", "latest <none>", "islands 0", "profiles 0"];
 
     /// <summary>
     /// The islands <see cref="ServerStoreListIslandsGivesNameOfLatestReceiveTime" /> expects: key and latest name.
@@ -571,6 +603,97 @@ public sealed class ServerStoreTests : IDisposable
     }
 
     /// <summary>
+    /// A write whose transaction SQLite ends itself in the middle of a tick stores nothing of it and returns a failure.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC11")]
+    public async Task ServerStoreStoreTickRolledBackBySqliteStoresNothingAndReportsFailed()
+    {
+        // Arrange
+        var databaseFile = CreateDatabaseFile();
+        var store = await OpenStoreAsync(databaseFile);
+        var profileId = Guid.NewGuid();
+        var tick = CreateEveryValueTick(profileId);
+
+        Execute(databaseFile, command => command.CommandText = CreateRollingBackTriggerSql);
+
+        // Act
+        var result = await store.StoreTickAsync(tick, TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(ServerStoreOutcome.Failed, result.Outcome, "A write SQLite rolled back should be reported as failed");
+        Assert.IsInstanceOfType<SqliteException>(result.Failure, "The SQLite error behind the failure should be attached");
+        Assert.IsNull(await store.ReadTickAsync(tick.Id, TestContext.CancellationToken), "Nothing of the tick should be stored");
+        Assert.IsEmpty(await store.ListProfilesAsync(TestContext.CancellationToken), "The tick's profile should not be created");
+        Assert.AreEqual("0 0 0 0", CountTickRows(databaseFile), "No row of the tick, its islands, entries or map pairs should remain");
+        Assert.AreEqual(ServerStoreOutcome.Stored, (await store.StoreProfileAsync(profileId, ProfileName, TestContext.CancellationToken)).Outcome, "The next write should begin its own transaction and be stored");
+    }
+
+    /// <summary>
+    /// Without a stored catalog, reading the catalog gives none.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC10")]
+    public async Task ServerStoreReadCatalogWithoutStoredCatalogReturnsNull()
+    {
+        // Arrange
+        var store = await OpenStoreAsync(CreateDatabaseFile());
+
+        // Act
+        var catalog = await store.ReadCatalogAsync(TestContext.CancellationToken);
+
+        // Assert
+        Assert.IsNull(catalog, "No catalog should be read when none is stored");
+    }
+
+    /// <summary>
+    /// Reads during a tick write, held after the tick, its islands, entries and map pairs are written but before it
+    /// commits, see the state before the write: no part of the tick; after the write they see the whole tick. The write
+    /// is held until the reads are done, so a read that waited for it instead would see it only after the hold's bound.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC4")]
+    public async Task ServerStoreReadDuringTickWriteSeesStateBeforeOrAfterIt()
+    {
+        // Arrange
+        var store = await OpenStoreAsync(CreateDatabaseFile());
+        var profileId = Guid.NewGuid();
+        var tick = CreateEveryValueTick(profileId);
+        var writeHeld = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        using var readsDone = new ManualResetEventSlim(false);
+
+        HoldTickWrites(_databases[^1], writeHeld, readsDone);
+
+        var write = Task.Run(() => store.StoreTickAsync(tick, TestContext.CancellationToken), TestContext.CancellationToken);
+
+        await writeHeld.Task.WaitAsync(_pauseBound, TestContext.CancellationToken);
+
+        // Act
+        List<string> during;
+
+        try
+        {
+            during = await DescribeStoredStateAsync(store, tick.Id, profileId);
+        }
+        finally
+        {
+            readsDone.Set();
+        }
+
+        var stored = await write.WaitAsync(_pauseBound, TestContext.CancellationToken);
+        var after = await store.ReadTickAsync(tick.Id, TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreSequenceEqual(_stateBeforeWrite, during, "A read during the write should see the state before it, no part of the tick");
+        Assert.AreEqual(ServerStoreOutcome.Stored, stored.Outcome, "The held write should be stored once released");
+        Assert.AreSequenceEqual(DescribeTick(tick), DescribeTick(after), "A read after the write should see the whole tick");
+    }
+
+    /// <summary>
     /// A tick at the contract's bounds (256 islands, 524,288 entries and map pairs, island names of 765 bytes) is
     /// stored and read back with every value.
     /// </summary>
@@ -1042,6 +1165,31 @@ public sealed class ServerStoreTests : IDisposable
     }
 
     /// <summary>
+    /// Holds the first tick write over a database's own connection at its first island row until the reads are done.
+    /// </summary>
+    /// <param name="database">The database whose connection the store writes over</param>
+    /// <param name="writeHeld">Completed when the write is held</param>
+    /// <param name="readsDone">Set by the test when its reads are done</param>
+    private static void HoldTickWrites(ServerDatabase database, TaskCompletionSource writeHeld, ManualResetEventSlim readsDone)
+    {
+        database.Connection.CreateFunction(PauseFunctionName,
+                                           () =>
+                                           {
+                                               if (writeHeld.TrySetResult())
+                                               {
+                                                   readsDone.Wait(_holdBound);
+                                               }
+
+                                               return 0;
+                                           });
+
+        using var command = database.Connection.CreateCommand();
+
+        command.CommandText = CreatePauseTriggerSql;
+        command.ExecuteNonQuery();
+    }
+
+    /// <summary>
     /// Creates the path of a database file in a new temporary directory.
     /// </summary>
     /// <returns>The full path of the database file, not yet created</returns>
@@ -1129,6 +1277,30 @@ public sealed class ServerStoreTests : IDisposable
         {
             await store.StoreIconAsync(CreateIcon(reference, reference), TestContext.CancellationToken);
         }
+    }
+
+    /// <summary>
+    /// Describes what the store's reads see of a tick and its profile.
+    /// </summary>
+    /// <param name="store">The store</param>
+    /// <param name="tickId">The tick identity</param>
+    /// <param name="profileId">The profile identity</param>
+    /// <returns>The tick read by identity, the latest tick of the profile, and the numbers of its islands and of profiles</returns>
+    private async Task<List<string>> DescribeStoredStateAsync(ServerStore store, Guid tickId, Guid profileId)
+    {
+        var cancellationToken = TestContext.CancellationToken;
+        var tick = await store.ReadTickAsync(tickId, cancellationToken);
+        var latest = await store.ReadLatestTickAsync(profileId, cancellationToken);
+        var islands = await store.ListIslandsAsync(profileId, cancellationToken);
+        var profiles = await store.ListProfilesAsync(cancellationToken);
+
+        return
+        [
+            "tick " + (tick is null ? "<none>" : string.Join(" | ", DescribeTick(tick))),
+            "latest " + (latest is null ? "<none>" : string.Join(" | ", DescribeTick(latest))),
+            "islands " + islands.Count.ToString(CultureInfo.InvariantCulture),
+            "profiles " + profiles.Count.ToString(CultureInfo.InvariantCulture)
+        ];
     }
 
     /// <summary>
