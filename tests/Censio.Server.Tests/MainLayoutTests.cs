@@ -35,6 +35,11 @@ public sealed class MainLayoutTests
     private const string SetDocumentLanguage = "censio.setDocumentLanguage";
 
     /// <summary>
+    /// The browser function that watches the system's colour scheme.
+    /// </summary>
+    private const string WatchDarkMode = "mudThemeProvider.watchDarkMode";
+
+    /// <summary>
     /// The accessible name of the English navigation button.
     /// </summary>
     private const string EnglishNavigationButton = "Open or close the navigation";
@@ -289,6 +294,27 @@ public sealed class MainLayoutTests
 
         // Assert
         Assert.Contains(expectedState, layout.Find(DrawerSelector).ClassList, $"The drawer should carry {expectedState} after {clicks} click(s)");
+    }
+
+    /// <summary>
+    /// The layout does not observe the system's colour scheme, so only the stored or default theme decides the palette.
+    /// </summary>
+    /// <param name="theme">The theme the page starts with</param>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC1")]
+    [DataRow(UiTheme.Light)]
+    [DataRow(UiTheme.Dark)]
+    public async Task MainLayoutRenderDoesNotWatchSystemDarkMode(UiTheme theme)
+    {
+        // Arrange
+        await using var context = CreateContext();
+
+        // Act
+        RenderLayout(context, theme, UiLanguage.English);
+
+        // Assert
+        Assert.IsEmpty(context.JSInterop.Invocations.Where(invocation => invocation.Identifier == WatchDarkMode).Select(invocation => invocation.Identifier), "The layout should not watch the system's colour scheme");
     }
 
     /// <summary>
