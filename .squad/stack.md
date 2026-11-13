@@ -15,7 +15,7 @@ profile and owned by this repository: keep it true when the build changes.
   where a `FROM` line names it itself, as both `FROM` lines of `src/Censio.Server/Dockerfile` do); the move to the next one
   (target frameworks, `global.json`, the Microsoft.Extensions and ASP.NET Core packages, the images) is one change of its
   own.
-- .NET tools: `reihitsu-format` (`Reihitsu.Cli`) and `dotnet-sonarscanner` are pinned in
+- .NET tools: `reihitsu-format` (`Reihitsu.Cli`), `dotnet-sonarscanner` and `dotnet-ef` (the migrations of `Censio.Server.Data`, `docs/CONTRIBUTING.md`) are pinned in
   `.config/dotnet-tools.json` and restored with `dotnet tool restore`; CI runs both and the *Format* commands below run the formatter through the manifest (`dotnet tool run`), so every machine uses the pinned version. The formatter stays at
   the same version as the **Reihitsu.Analyzer** pinned in `Directory.Packages.props`, which `dotnet_config.py` checks
   in the *Analyzer gate* (CI checks the release line, *Check tool versions*); otherwise the formatter can revert code the analyzer considers
@@ -145,9 +145,9 @@ scratch="$(mktemp -d)"
 git ls-files -z -- 'global.json' 'Directory.Build.props' 'Directory.Packages.props' \
   'src/Censio.Server/Censio.Server.csproj' 'src/Censio.Contracts/Censio.Contracts.csproj' \
   'src/Censio.Server.Data/Censio.Server.Data.csproj' | xargs -0 -I{} cp --parents {} "$scratch"
-(cd "$scratch" && dotnet restore src/Censio.Server/Censio.Server.csproj)
+(cd "$scratch" && dotnet restore src/Censio.Server/Censio.Server.csproj -r linux-musl-x64)
 git ls-files -z -- '.editorconfig' '.squad/dotnet-rules.globalconfig' 'src' | xargs -0 -I{} cp --parents {} "$scratch"
-(cd "$scratch" && dotnet publish src/Censio.Server/Censio.Server.csproj -c Release --no-restore -o ./publish)
+(cd "$scratch" && dotnet publish src/Censio.Server/Censio.Server.csproj -c Release --no-restore -r linux-musl-x64 --self-contained false -p:UseAppHost=false -o ./publish)
 ls "$scratch"/publish/wwwroot/_framework/blazor.web*.js \
   || { echo "publish output lacks wwwroot/_framework/blazor.web*.js (see docs/decisions/0007)" >&2; false; }
 ```

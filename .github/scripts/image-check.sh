@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 # Builds the server image and checks it the way the acceptance criteria of feature 4 describe.
-# It also checks the cases of issue 64 (named "I64-AC7a" to "I64-AC7d"): the data-protection key ring in /config.
+# It also checks the cases of issue 64 (named "I64-AC7a" to "I64-AC7d"): the data-protection key ring in /config,
+# and the cases of issue 29 ("I29-AC1", "I29-AC2", "I29-AC6"): the SQLite database in /config.
 # Run from the repository root; needs docker, curl, git, dotnet and sudo (for the NAS case).
 # Pushes nothing and logs in nowhere. Every failure prints "image-check: <case>: <expected> / <actual>".
 set -euo pipefail
 
 dockerfile="src/Censio.Server/Dockerfile"
+missing="missing"
 work="${RUNNER_TEMP:-$(mktemp -d)}"
 containers=()
 declare -A started
@@ -196,16 +198,16 @@ wait_http "AC2" "http://127.0.0.1:18080/health"
 expect_equal "AC2 health body" "Healthy" "$(curl -fsS --max-time 3 http://127.0.0.1:18080/health)"
 page="$(curl -fsS --max-time 5 http://127.0.0.1:18080/)"
 if [[ "$page" != *"Version 0.0.0"* ]]; then
-    fail "AC2 start page" "contains 'Version 0.0.0'" "missing"
+    fail "AC2 start page" "contains 'Version 0.0.0'" "$missing"
 fi
 script_path="$(grep -oE '_framework/blazor\.web[^"]*\.js' <<< "$page" | head -n 1 || true)"
 if [[ -z "$script_path" ]]; then
-    fail "AC2 start page" "a _framework/blazor.web script path" "missing"
+    fail "AC2 start page" "a _framework/blazor.web script path" "$missing"
 fi
 curl -fsS --max-time 5 -o /dev/null "http://127.0.0.1:18080/${script_path}" \
     || fail "AC2 script" "200 for ${script_path}" "request failed"
 if ! docker logs "$main" 2>&1 | grep -E 'Now listening on:.*8080' > /dev/null; then
-    fail "AC2 log" "'Now listening on:' with 8080" "missing"
+    fail "AC2 log" "'Now listening on:' with 8080" "$missing"
 fi
 
 step "AC3: user"
@@ -224,6 +226,22 @@ key_files="$(docker exec "$main" find "$key_directory" -maxdepth 1 -name 'key-*.
 if [[ -z "$key_files" ]]; then
     fail "I64-AC7a" "at least one key-*.xml in ${key_directory}" "none"
 fi
+
+step "I29-AC1: the first start creates /config/censio.db"
+database_file="/config/censio.db"
+docker exec "$main" test -f "$database_file" || fail "I29-AC1" "${database_file} exists after the first start" "$missing"
+created_text="The database '${database_file}' was created."
+if ! docker logs "$main" 2>&1 | grep -Fq -- "$created_text"; then
+    fail "I29-AC1 log" "log line '${created_text}'" "line missing"
+fi
+
+step "I29-AC6: the database file and its side files are owner-only"
+expect_equal "I29-AC6 database mode" "600" "$(docker exec "$main" stat -c %a "$database_file")"
+for side_file in "${database_file}-wal" "${database_file}-shm"; do
+    if docker exec "$main" test -e "$side_file"; then
+        expect_equal "I29-AC6 ${side_file##*/} mode" "600" "$(docker exec "$main" stat -c %a "$side_file")"
+    fi
+done
 
 step "AC5: container turns healthy"
 wait_healthy "AC5" "$main"
@@ -244,6 +262,11 @@ start_container "$reuse_container" -p 127.0.0.1:18084:8080 -v "${volume}:/config
 wait_http "I64-AC7b" "http://127.0.0.1:18084/health"
 reused_files="$(docker exec "$reuse_container" find "$key_directory" -maxdepth 1 -name 'key-*.xml' | sed 's|.*/||' | sort)"
 expect_equal "I64-AC7b key files" "$key_files" "$reused_files"
+opened_text="The database '${database_file}' was opened."
+step "I29-AC2: a new container on the same volume opens the database"
+if ! docker logs "$reuse_container" 2>&1 | grep -Fq -- "$opened_text"; then
+    fail "I29-AC2 log" "log line '${opened_text}'" "line missing"
+fi
 docker rm -f "$reuse_container" > /dev/null
 
 step "I64-AC7d: a user without write access to the key directory stops the start"
@@ -310,7 +333,7 @@ start_container "$version_container" -p 127.0.0.1:18083:8080 "$version_image"
 wait_http "AC7" "http://127.0.0.1:18083/health"
 version_page="$(curl -fsS --max-time 5 http://127.0.0.1:18083/)"
 if [[ "$version_page" != *"Version 1.2.3"* ]]; then
-    fail "AC7 start page" "contains 'Version 1.2.3'" "missing"
+    fail "AC7 start page" "contains 'Version 1.2.3'" "$missing"
 fi
 docker rm -f "$version_container" > /dev/null
 semver_message="VERSION is not a semantic version: "

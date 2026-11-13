@@ -126,4 +126,7 @@ once in the [area document](../areas/README.md) of the record's area, and the re
 | [0062](0062-one-companion-second-refused-silence-found-by-websocket-pings.md) | A second Companion is refused; a silent connection is found by WebSocket pings | Accepted | 2026-11-12 |
 | [0063](0063-refused-contract-messages-acknowledged-by-id-or-the-connection-closed.md) | A refused contract message is acknowledged by its id when the reader yields one, else the connection closes | Accepted | 2026-11-12 |
 | [0064](0064-ingest-refuses-browser-upgrades-and-bounds-pending-hellos.md) | The ingest endpoint refuses browser upgrades and bounds connections waiting for their hello | Accepted | 2026-11-12 |
+| [0065](0065-database-schema-kept-by-migrations-applied-at-start.md) | The database schema is kept by EF Core migrations applied at start in one transaction; a foreign, newer or failed database stops the start | Accepted | 2026-11-13 |
+| [0066](0066-database-file-setting-and-in-memory-without-data-directory.md) | The database lies in the data directory unless `Censio:Database:File` names a file; without either it is kept in memory with a warning | Accepted | 2026-11-13 |
+| [0067](0067-ticks-stored-as-rows-with-float-bit-patterns.md) | A tick is stored as rows per island, entry and map pair in one transaction; floats keep their 32-bit pattern | Accepted | 2026-11-13 |
 <!-- project:end index -->

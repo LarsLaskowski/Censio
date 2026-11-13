@@ -24,6 +24,13 @@ if (ingestAccess is null)
     return 1;
 }
 
+using var database = await DatabaseSetup.TryOpenAsync(app.Configuration, app.Services.GetRequiredService<ILoggerFactory>(), app.Logger, app.Lifetime.ApplicationStopping).ConfigureAwait(false);
+
+if (database is null)
+{
+    return 1;
+}
+
 app.UseWebSockets();
 app.UseAntiforgery();
 app.MapStaticAssets();
