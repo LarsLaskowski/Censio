@@ -87,6 +87,7 @@ otherwise), one line each: the double, where it lives and what it stands in for;
 - `ConcurrentRecordingLogger` (`tests/Censio.Server.Tests/ConcurrentRecordingLogger.cs`) — an `ILogger` that keeps every entry from any thread and lets a test await an entry of a level.
 - `ExtendedMigrationsAssembly` (`tests/Censio.Server.Data.Tests/`) — an `IMigrationsAssembly` of the real migrations plus test migrations, for a test-only schema history.
 - `RecordingLoggerProvider` (`tests/Censio.Server.Data.Tests/`) — an `ILoggerProvider` writing every category into one `RecordingLogger`.
+- `FakeProfileStateSource` (`tests/Censio.Server.Tests/FakeProfileStateSource.cs`) — an `IProfileStateSource` of held and stored states that records its reads, counts those in flight, can hold them until released, and can evict a profile when it is checked.
 - `ChunkedStream` (`tests/Censio.Pipe.Tests/ChunkedStream.cs`) — a chunked read-only stream with faults at an offset, for the frame reader.
 - `ChunkedClockStream` (`tests/Censio.Pipe.Tests/ChunkedClockStream.cs`) — a chunked stream with an action per read, for record-and-replay round trips.
 - `PipeFrameBuilder` (`tests/Censio.Pipe.Tests/PipeFrameBuilder.cs`, linked into the Companion tests) — builds synthetic and corrupt pipe frames.
