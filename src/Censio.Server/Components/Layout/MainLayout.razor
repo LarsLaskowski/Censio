@@ -1,7 +1,7 @@
 @inherits LayoutComponentBase
 
 <div class="censio-frame">
-    <MudThemeProvider Theme="_mudTheme" IsDarkMode="_theme == UiTheme.Dark" />
+    <MudThemeProvider Theme="_mudTheme" IsDarkMode="_theme == UiTheme.Dark" ObserveSystemDarkModeChange="false" />
     <MudPopoverProvider />
     <MudLayout>
         <MudAppBar Elevation="1">
