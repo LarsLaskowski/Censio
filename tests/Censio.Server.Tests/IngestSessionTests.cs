@@ -3,8 +3,10 @@ using System.Text;
 
 using Censio.Contracts;
 using Censio.Pipe.Tests;
+using Censio.Server.Data;
 
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Censio.Server.Tests;
 
@@ -1129,7 +1131,11 @@ public sealed class IngestSessionTests : IDisposable
         _disposables.AddRange([client, server, clientStream, serverStream]);
         _connections.TryEnterPendingHello();
 
-        var session = new IngestSession(server, access, _connections, _timeProvider, _logger, serverVersion);
+        var database = ServerDatabase.OpenAsync(null, NullLoggerFactory.Instance, _stopping.Token).GetAwaiter().GetResult().Database!;
+
+        _disposables.Add(database);
+
+        var session = new IngestSession(server, access, _connections, new ServerState(new ServerStore(database), _logger), _timeProvider, _logger, serverVersion);
 
         return (session.RunAsync(_stopping.Token), client, serverStream);
     }

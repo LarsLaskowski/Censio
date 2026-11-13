@@ -61,6 +61,13 @@ public sealed partial class IngestSession : IDisposable
     private readonly IngestConnections _connections;
 
     /// <summary>
+    /// The server state the messages are stored through.
+    /// </summary>
+#pragma warning disable S4487 // Skeleton: removed with the implementation
+    private readonly ServerState _state;
+#pragma warning restore S4487
+
+    /// <summary>
     /// The time provider.
     /// </summary>
     private readonly TimeProvider _timeProvider;
@@ -140,14 +147,16 @@ public sealed partial class IngestSession : IDisposable
     /// <param name="webSocket">The WebSocket of the connection</param>
     /// <param name="access">The access that checks the token</param>
     /// <param name="connections">The connection counters</param>
+    /// <param name="state">The server state the messages are stored through</param>
     /// <param name="timeProvider">The time provider</param>
     /// <param name="logger">The logger</param>
     /// <param name="serverVersion">The version of the server</param>
-    public IngestSession(WebSocket webSocket, IngestAccess access, IngestConnections connections, TimeProvider timeProvider, ILogger logger, string serverVersion)
+    public IngestSession(WebSocket webSocket, IngestAccess access, IngestConnections connections, ServerState state, TimeProvider timeProvider, ILogger logger, string serverVersion)
     {
         _webSocket = webSocket;
         _access = access;
         _connections = connections;
+        _state = state;
         _timeProvider = timeProvider;
         _logger = logger;
         _serverVersion = serverVersion;

@@ -2,12 +2,14 @@ using System.Net;
 using System.Net.WebSockets;
 
 using Censio.Contracts;
+using Censio.Server.Data;
 
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 
 namespace Censio.Server.Tests;
@@ -190,7 +192,12 @@ public sealed class IngestEndpointTests
 
                     return next(context);
                 });
-        app.MapCensioIngest(IngestAccess.CreateOpen());
+
+        var opened = await ServerDatabase.OpenAsync(null, NullLoggerFactory.Instance, TestContext.CancellationToken);
+
+        using var database = opened.Database ?? throw new InvalidOperationException("The in-memory database should open");
+
+        app.MapCensioIngest(IngestAccess.CreateOpen(), new ServerState(new ServerStore(database), NullLogger.Instance));
         await app.StartAsync(TestContext.CancellationToken);
 
         using var client = app.GetTestClient();
