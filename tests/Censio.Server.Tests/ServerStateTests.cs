@@ -77,6 +77,36 @@ public sealed class ServerStateTests
     /// </summary>
     private const string RepairIslandReadsSql = "DROP VIEW temp.\"Islands\";";
 
+    /// <summary>
+    /// The statement that renames the icon table back.
+    /// </summary>
+    private const string RestoreIconsSql = "ALTER TABLE \"IconsMoved\" RENAME TO \"Icons\";";
+
+    /// <summary>
+    /// The statement that renames the profile table, so that every store of a profile fails.
+    /// </summary>
+    private const string RenameProfilesSql = "ALTER TABLE \"Profiles\" RENAME TO \"ProfilesMoved\";";
+
+    /// <summary>
+    /// The statement that renames the profile table back.
+    /// </summary>
+    private const string RestoreProfilesSql = "ALTER TABLE \"ProfilesMoved\" RENAME TO \"Profiles\";";
+
+    /// <summary>
+    /// The statement that renames the catalog table, so that every store of a catalog fails.
+    /// </summary>
+    private const string RenameCatalogSql = "ALTER TABLE \"Catalog\" RENAME TO \"CatalogMoved\";";
+
+    /// <summary>
+    /// The statement that renames the catalog table back.
+    /// </summary>
+    private const string RestoreCatalogSql = "ALTER TABLE \"CatalogMoved\" RENAME TO \"Catalog\";";
+
+    /// <summary>
+    /// The statement that replaces the stored catalog document with bytes no catalog reader reads, keeping its identity.
+    /// </summary>
+    private const string BreakCatalogDocumentSql = "UPDATE \"Catalog\" SET \"Document\" = x'6E6F74206A736F6E';";
+
     #endregion // Constants
 
     #region Fields
@@ -881,6 +911,319 @@ public sealed class ServerStateTests
     }
 
     /// <summary>
+    /// A profile whose store fails gives the failure, leaves the state unchanged and tells no follower.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public async Task ServerStateStoreProfileAsyncFailureLeavesStateUnchanged()
+    {
+        // Arrange
+        var databaseFile = CreateDatabaseFile();
+        var (_, state) = await OpenRestoredAsync(databaseFile);
+
+        var profileId = Guid.NewGuid();
+
+        await StoreTicksAsync(state, CreateTick(profileId, 1, CreateIsland(1, IslandName, CreateEntry(1))));
+
+        var before = await DescribeWholeStateAsync(state);
+
+        Execute(databaseFile, RenameProfilesSql);
+
+        var (notices, told) = Follow(state, 1);
+
+        // Act
+        var result = await state.StoreProfileAsync(profileId, ProfileName, TestContext.CancellationToken);
+
+        // Assert
+        var after = await DescribeWholeStateAsync(state);
+
+        Execute(databaseFile, RestoreProfilesSql);
+
+        Assert.AreEqual(ServerStoreOutcome.Failed, result.Outcome, "The profile should not be stored");
+        Assert.IsInstanceOfType<SqliteException>(result.Failure, "The store's exception should be attached");
+        Assert.AreSequenceEqual(before, after, "The state should not change");
+        await AssertOnlyLaterTickToldAsync(state, notices, told);
+    }
+
+    /// <summary>
+    /// A tick whose store fails gives the failure, leaves the state unchanged and tells no follower.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public async Task ServerStateStoreTickAsyncFailureLeavesStateUnchanged()
+    {
+        // Arrange
+        var databaseFile = CreateDatabaseFile();
+        var (_, state) = await OpenRestoredAsync(databaseFile);
+
+        var profileId = Guid.NewGuid();
+
+        await StoreTicksAsync(state, CreateTick(profileId, 1, CreateIsland(1, IslandName, CreateEntry(1))));
+
+        var before = await DescribeWholeStateAsync(state);
+
+        Execute(databaseFile, RenameTicksSql);
+
+        var (notices, told) = Follow(state, 1);
+
+        // Act
+        var newer = await state.StoreTickAsync(CreateTick(profileId, 2, CreateIsland(2, "Island of the failed tick", CreateEntry(2))), TestContext.CancellationToken);
+        var unknown = await state.StoreTickAsync(CreateTick(Guid.NewGuid(), 3, CreateIsland(1, IslandName, CreateEntry(3))), TestContext.CancellationToken);
+
+        // Assert
+        var after = await DescribeWholeStateAsync(state);
+
+        Execute(databaseFile, RestoreTicksSql);
+
+        Assert.AreEqual(ServerStoreOutcome.Failed, newer.Outcome, "The newer tick of the held profile should not be stored");
+        Assert.IsInstanceOfType<SqliteException>(newer.Failure, "The store's exception should be attached");
+        Assert.AreEqual(ServerStoreOutcome.Failed, unknown.Outcome, "The tick of an unknown profile should not be stored");
+        Assert.AreSequenceEqual(before, after, "The state should not change: neither the held state nor the profile list");
+        await AssertOnlyLaterTickToldAsync(state, notices, told);
+    }
+
+    /// <summary>
+    /// A catalog whose store fails gives the failure without missing icons, keeps the earlier catalog and tells no
+    /// follower.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public async Task ServerStateStoreCatalogAsyncFailureKeepsEarlierCatalog()
+    {
+        // Arrange
+        var databaseFile = CreateDatabaseFile();
+        var (_, state) = await OpenRestoredAsync(databaseFile);
+        var (firstUpload, firstDocument) = CreateCatalog(1);
+        var (upload, document) = CreateCatalog(100, IconReference(1));
+
+        await state.StoreCatalogAsync(firstUpload, firstDocument, TestContext.CancellationToken);
+        Execute(databaseFile, RenameCatalogSql);
+
+        var (notices, told) = Follow(state, 1);
+
+        // Act
+        var result = await state.StoreCatalogAsync(upload, document, TestContext.CancellationToken);
+
+        // Assert
+        var complete = state.CompleteCatalogIdentity;
+
+        Execute(databaseFile, RestoreCatalogSql);
+
+        Assert.AreEqual(ServerStoreOutcome.Failed, result.Result.Outcome, "The catalog should not be stored");
+        Assert.IsInstanceOfType<SqliteException>(result.Result.Failure, "The store's exception should be attached");
+        Assert.IsEmpty(result.MissingIcons, "A failed store should list no missing icon");
+        Assert.AreEqual(firstUpload.ComputeIdentity(), complete, "The earlier catalog should stay the complete catalog");
+        await AssertOnlyLaterTickToldAsync(state, notices, told);
+    }
+
+    /// <summary>
+    /// An icon whose store fails gives the failure, leaves the icon missing from the catalog and tells no follower.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public async Task ServerStateStoreIconAsyncFailureLeavesIconMissing()
+    {
+        // Arrange
+        var databaseFile = CreateDatabaseFile();
+        var (_, state) = await OpenRestoredAsync(databaseFile);
+        var (upload, document) = CreateCatalog(1, IconReference(1));
+
+        var resend = new ContractCatalogUpload
+                     {
+                         Id = Guid.NewGuid(),
+                         Document = upload.Document
+                     };
+
+        await state.StoreCatalogAsync(upload, document, TestContext.CancellationToken);
+        Execute(databaseFile, RenameIconsSql);
+
+        var (notices, told) = Follow(state, 1);
+
+        // Act
+        var result = await state.StoreIconAsync(CreateIcon(IconReference(1)), TestContext.CancellationToken);
+
+        // Assert
+        Execute(databaseFile, RestoreIconsSql);
+
+        var resent = await state.StoreCatalogAsync(resend, document, TestContext.CancellationToken);
+
+        Assert.AreEqual(ServerStoreOutcome.Failed, result.Outcome, "The icon should not be stored");
+        Assert.IsInstanceOfType<SqliteException>(result.Failure, "The store's exception should be attached");
+        Assert.IsNull(state.CompleteCatalogIdentity, "The catalog should not be named while its icon is missing");
+        Assert.AreSequenceEqual(new[] { IconReference(1) }, resent.MissingIcons.ToList(), "The resent catalog should still list the icon whose store failed");
+        await AssertOnlyLaterTickToldAsync(state, notices, told);
+    }
+
+    /// <summary>
+    /// A stored catalog whose document cannot be read is restored without a complete catalog.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC6")]
+    public async Task ServerStateRestoreAsyncWithUnreadableCatalogNamesNoCatalog()
+    {
+        // Arrange
+        var databaseFile = CreateDatabaseFile();
+        var (_, before) = await OpenRestoredAsync(databaseFile);
+        var (upload, document) = CreateCatalog(1);
+
+        await before.StoreCatalogAsync(upload, document, TestContext.CancellationToken);
+
+        var completeBefore = before.CompleteCatalogIdentity;
+
+        CloseDatabases();
+        Execute(databaseFile, BreakCatalogDocumentSql);
+
+        var (store, after) = await OpenAsync(databaseFile);
+
+        // Act
+        await after.RestoreAsync(TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(upload.ComputeIdentity(), completeBefore, "The catalog without icons should be complete before the restart, or the restore would prove nothing");
+        Assert.AreEqual(upload.ComputeIdentity(), (await store.ReadCatalogAsync(TestContext.CancellationToken))?.Identity, "The catalog should still be stored under its identity");
+        Assert.IsNull(after.CompleteCatalogIdentity, "A catalog whose document cannot be read should not be named");
+    }
+
+    /// <summary>
+    /// A marked profile whose stored latest state cannot be read at its next tick stays unheld and marked, and enters
+    /// with its stored latest state at the tick after.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC10")]
+    public async Task ServerStateStoreTickAsyncStoredLatestReadFailureKeepsProfileMarked()
+    {
+        // Arrange
+        var databaseFile = CreateDatabaseFile();
+        var (store, state) = await OpenRestoredAsync(databaseFile);
+
+        var heldId = Guid.NewGuid();
+        var markedId = Guid.NewGuid();
+
+        await StoreTicksAsync(state, CreateTick(heldId, 20, CreateIsland(1, IslandName, CreateEntry(1))));
+        ExecutePooled(databaseFile, BreakIslandReadsSql);
+        await StoreTicksAsync(state, CreateTick(markedId, 30, CreateIsland(1, "Island of the newest tick", CreateEntry(1))));
+
+        // Act
+        var failed = await state.StoreTickAsync(CreateTick(markedId, 10, CreateIsland(2, "Island of an older tick", CreateEntry(2))), TestContext.CancellationToken);
+
+        // Assert
+        var heldAfterFailure = state.HeldProfiles.ToList();
+
+        ExecutePooled(databaseFile, RepairIslandReadsSql);
+        await StoreTicksAsync(state, CreateTick(markedId, 5, CreateIsland(3, "Island of the oldest tick", CreateEntry(3))));
+
+        var stored = await store.ReadProfileStateAsync(markedId, TestContext.CancellationToken);
+
+        Assert.AreEqual(ServerStoreOutcome.Stored, failed.Outcome, "The tick should be stored although the state cannot be read");
+        Assert.AreSequenceEqual(new[] { (LogLevel.Error, ReadFailureLine, true), (LogLevel.Error, ReadFailureLine, true) }, _logger.Entries.Select(entry => (entry.Level, entry.Message, entry.Exception is SqliteException)).ToList(), "The failed island read and the failed state read should each be logged as an error with its exception");
+        Assert.AreSequenceEqual(new[] { heldId }, heldAfterFailure, "The held profiles should stay after the failed state read");
+        Assert.AreSequenceEqual(new[] { heldId, markedId }.Order().ToList(), state.HeldProfiles.Order().ToList(), "The profile should still be marked and be held after its next tick");
+        Assert.AreSequenceEqual(DescribeState(stored), DescribeState(await ReadStateAsync(state, markedId)), "The held state should be the stored latest state, not the oldest tick");
+    }
+
+    /// <summary>
+    /// An older tick of a held profile whose islands cannot be read is stored, keeps the held state and logs the error.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC4")]
+    [TestCategory("AC10")]
+    public async Task ServerStateStoreTickAsyncOlderTickIslandReadFailureKeepsHeldState()
+    {
+        // Arrange
+        var databaseFile = CreateDatabaseFile();
+        var (_, state) = await OpenRestoredAsync(databaseFile);
+
+        var profileId = Guid.NewGuid();
+
+        await StoreTicksAsync(state, CreateTick(profileId, 20, CreateIsland(1, IslandName, CreateEntry(1))));
+
+        var before = DescribeState(await ReadStateAsync(state, profileId));
+
+        ExecutePooled(databaseFile, BreakIslandReadsSql);
+
+        // Act
+        var result = await state.StoreTickAsync(CreateTick(profileId, 10, CreateIsland(2, "Island of an older tick", CreateEntry(2))), TestContext.CancellationToken);
+
+        // Assert
+        var after = DescribeState(await ReadStateAsync(state, profileId));
+
+        ExecutePooled(databaseFile, RepairIslandReadsSql);
+
+        Assert.AreEqual(ServerStoreOutcome.Stored, result.Outcome, "The older tick should be stored although its islands cannot be read");
+        Assert.AreSequenceEqual(new[] { (LogLevel.Error, ReadFailureLine, true) }, _logger.Entries.Select(entry => (entry.Level, entry.Message, entry.Exception is SqliteException)).ToList(), "The failed island read should be logged once as an error with its exception");
+        Assert.AreSequenceEqual(before, after, "The held state should stay as it was");
+    }
+
+    /// <summary>
+    /// An icon stored while no catalog is usable names no catalog and tells the followers that the icons changed.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC6")]
+    [TestCategory("AC8")]
+    public async Task ServerStateStoreIconAsyncWithoutCatalogTellsFollowersCatalogChanged()
+    {
+        // Arrange
+        var (_, state) = await OpenRestoredAsync(null);
+        var (notices, told) = Follow(state, 1);
+
+        // Act
+        var result = await state.StoreIconAsync(CreateIcon(IconReference(1)), TestContext.CancellationToken);
+
+        // Assert
+        await told.WaitAsync(_waitBound, TestContext.CancellationToken);
+
+        Assert.AreEqual(ServerStoreOutcome.Stored, result.Outcome, "The icon should be stored");
+        Assert.IsNull(state.CompleteCatalogIdentity, "No catalog should be named without a stored catalog");
+        Assert.AreSequenceEqual(new[] { DescribeNotice(ServerStateChangeKind.Catalog, null) }, notices.ToList(), "The followers should be told that the icons changed");
+    }
+
+    /// <summary>
+    /// A marked profile whose stored latest tick has become older than every held profile's stays unheld at its next
+    /// tick, and its state still equals the store.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC10")]
+    public async Task ServerStateStoreTickAsyncMarkedProfileOlderThanHeldStaysUnheld()
+    {
+        // Arrange
+        var databaseFile = CreateDatabaseFile();
+        var (store, state) = await OpenRestoredAsync(databaseFile);
+
+        var firstId = Guid.NewGuid();
+        var secondId = Guid.NewGuid();
+        var markedId = Guid.NewGuid();
+
+        await StoreTicksAsync(state,
+                              CreateTick(firstId, 20, CreateIsland(1, IslandName, CreateEntry(1))),
+                              CreateTick(secondId, 25, CreateIsland(1, IslandName, CreateEntry(2))));
+        ExecutePooled(databaseFile, BreakIslandReadsSql);
+        await StoreTicksAsync(state, CreateTick(markedId, 30, CreateIsland(1, IslandName, CreateEntry(3))));
+        ExecutePooled(databaseFile, RepairIslandReadsSql);
+        await StoreTicksAsync(state,
+                              CreateTick(firstId, 40, CreateIsland(1, IslandName, CreateEntry(4))),
+                              CreateTick(secondId, 50, CreateIsland(1, IslandName, CreateEntry(5))));
+
+        var heldBefore = state.HeldProfiles.Order().ToList();
+
+        // Act
+        await StoreTicksAsync(state, CreateTick(markedId, 5, CreateIsland(2, "Island of an older tick", CreateEntry(6))));
+
+        // Assert
+        Assert.AreSequenceEqual(new[] { firstId, secondId }.Order().ToList(), heldBefore, "Both newer profiles should be held before the tick, or the test would prove less");
+        Assert.AreSequenceEqual(heldBefore, state.HeldProfiles.Order().ToList(), "The marked profile should not take the place of a newer one");
+        Assert.AreSequenceEqual(DescribeState(await store.ReadProfileStateAsync(markedId, TestContext.CancellationToken)), DescribeState(await ReadStateAsync(state, markedId)), "The state of the unheld profile should equal the store");
+    }
+
+    /// <summary>
     /// Gives the receive time some seconds after the base receive time.
     /// </summary>
     /// <param name="seconds">The seconds</param>
@@ -1269,6 +1612,24 @@ public sealed class ServerStateTests
 #pragma warning restore CA2100
 
         command.ExecuteNonQuery();
+    }
+
+    /// <summary>
+    /// Stores a tick of a new profile, waits until a follower added by <see cref="Follow" /> with one expected notice was
+    /// told, and asserts that the tick's notice is the only one, so that no earlier change told the follower.
+    /// </summary>
+    /// <param name="state">The state</param>
+    /// <param name="notices">The notices of the follower</param>
+    /// <param name="told">The task of the follower</param>
+    /// <returns>A task that represents the asynchronous operation</returns>
+    private async Task AssertOnlyLaterTickToldAsync(ServerState state, ConcurrentQueue<string> notices, Task told)
+    {
+        var laterProfile = Guid.NewGuid();
+
+        await StoreTicksAsync(state, CreateTick(laterProfile, 100, CreateIsland(1, IslandName, CreateEntry(1))));
+        await told.WaitAsync(_waitBound, TestContext.CancellationToken);
+
+        Assert.AreSequenceEqual(new[] { DescribeNotice(ServerStateChangeKind.Profile, laterProfile) }, notices.ToList(), "No follower should be told of the failed store, only of the later tick");
     }
 
     /// <summary>
