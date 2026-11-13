@@ -1,7 +1,7 @@
 # Spec: Regions, islands and goods with live updates
 
 Source: Issue #32
-Status: Draft
+Status: Approved by Lead
 
 ## Problem
 

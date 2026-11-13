@@ -134,4 +134,10 @@ once in the [area document](../areas/README.md) of the record's area, and the re
 | [0070](0070-hello-names-the-stored-catalog-only-when-all-its-icons-are-stored.md) | The hello reply names the stored catalog only when all its icons are stored | Accepted | 2026-11-13 |
 | [0071](0071-web-ui-choices-kept-in-browser-cookies-written-by-a-script.md) | The web UI's theme and language are kept in two browser cookies written by a script and read when the page is rendered | Accepted | 2026-11-13 |
 | [0072](0072-web-ui-texts-from-an-own-table-without-culture-data.md) | The web UI's texts come from an own table per language, without .NET culture data | Accepted | 2026-11-13 |
+| [0073](0073-islands-grouped-by-the-catalog-region-of-their-session.md) | Islands are grouped by the catalog region of their session, a session without one forms its own region | Proposed | 2026-11-13 |
+| [0074](0074-pages-keep-derived-views-and-read-unheld-profiles-one-at-a-time.md) | The pages keep only derived views and read profiles that are not held one at a time | Proposed | 2026-11-13 |
+| [0075](0075-companion-connection-and-game-state-held-in-the-server-state.md) | The Companion's connection and game state are held in memory in the server state and announced to its followers | Proposed | 2026-11-13 |
+| [0076](0076-icons-served-by-content-hash-after-a-png-header-check.md) | Icons are served by their content hash after a PNG header check | Proposed | 2026-11-13 |
+| [0077](0077-page-address-carries-the-shown-profile.md) | The page address carries the shown profile | Proposed | 2026-11-13 |
+| [0078](0078-times-shown-at-the-browsers-utc-offset.md) | Times are shown at the browser's UTC offset for the instant | Proposed | 2026-11-13 |
 <!-- project:end index -->
