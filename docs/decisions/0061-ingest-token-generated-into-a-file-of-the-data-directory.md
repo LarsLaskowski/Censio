@@ -55,5 +55,4 @@ fixed-time comparison, so neither the position of a difference nor the length sh
 - The operator needs access to the data directory (`docker exec`, the volume) to read or rotate a generated token, or to
   the configured file and a restart to change a configured one.
 - `SECURITY.md` names the file setting, not an environment variable that holds the token.
-- The documented procedure for the setting covers Linux Docker Engine only; other hosts keep the generated file.
 - Local mode (#39) sets a data directory and reads the same file, or switches the token off.
