@@ -20,3 +20,7 @@
     width: 24px;
     height: 24px;
 }
+
+.censio-frame .mud-appbar .mud-button-root:disabled {
+    color: var(--mud-palette-appbar-text) !important;
+}

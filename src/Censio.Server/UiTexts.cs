@@ -86,152 +86,152 @@ public sealed class UiTexts
     #region Properties
 
     /// <summary>
-    /// Gets the the label of the button that closes and opens the navigation.
+    /// Gets the label of the button that closes and opens the navigation.
     /// </summary>
     public required string NavigationButton { get; init; }
 
     /// <summary>
-    /// Gets the the text of the navigation entry of the start page.
+    /// Gets the text of the navigation entry of the start page.
     /// </summary>
     public required string HomeEntry { get; init; }
 
     /// <summary>
-    /// Gets the the text of the navigation entry of the region overview, also its heading.
+    /// Gets the text of the navigation entry of the region overview, also its heading.
     /// </summary>
     public required string RegionsEntry { get; init; }
 
     /// <summary>
-    /// Gets the the text of the profile switch.
+    /// Gets the text of the profile switch.
     /// </summary>
     public required string ProfileSwitch { get; init; }
 
     /// <summary>
-    /// Gets the the label of the button that switches to the dark theme.
+    /// Gets the label of the button that switches to the dark theme.
     /// </summary>
     public required string SwitchToDarkTheme { get; init; }
 
     /// <summary>
-    /// Gets the the label of the button that switches to the light theme.
+    /// Gets the label of the button that switches to the light theme.
     /// </summary>
     public required string SwitchToLightTheme { get; init; }
 
     /// <summary>
-    /// Gets the the label of the language menu.
+    /// Gets the label of the language menu.
     /// </summary>
     public required string LanguageSwitch { get; init; }
 
     /// <summary>
-    /// Gets the the format of the line that counts the profiles the switch does not list; the count is argument 0.
+    /// Gets the format of the line that counts the profiles the switch does not list; the count is argument 0.
     /// </summary>
     public required string MoreProfilesFormat { get; init; }
 
     /// <summary>
-    /// Gets the the heading of the region column.
+    /// Gets the heading of the region column.
     /// </summary>
     public required string ColumnRegion { get; init; }
 
     /// <summary>
-    /// Gets the the heading of the island count column.
+    /// Gets the heading of the island count column.
     /// </summary>
     public required string ColumnIslands { get; init; }
 
     /// <summary>
-    /// Gets the the heading of the buildings column.
+    /// Gets the heading of the buildings column.
     /// </summary>
     public required string ColumnBuildings { get; init; }
 
     /// <summary>
-    /// Gets the the heading of the produced goods column.
+    /// Gets the heading of the produced goods column.
     /// </summary>
     public required string ColumnProducedGoods { get; init; }
 
     /// <summary>
-    /// Gets the the heading of the goods in deficit column.
+    /// Gets the heading of the goods in deficit column.
     /// </summary>
     public required string ColumnGoodsInDeficit { get; init; }
 
     /// <summary>
-    /// Gets the the heading of the island column.
+    /// Gets the heading of the island column.
     /// </summary>
     public required string ColumnIsland { get; init; }
 
     /// <summary>
-    /// Gets the the heading of the good column.
+    /// Gets the heading of the good column.
     /// </summary>
     public required string ColumnGood { get; init; }
 
     /// <summary>
-    /// Gets the the heading of the production column.
+    /// Gets the heading of the production column.
     /// </summary>
     public required string ColumnProduction { get; init; }
 
     /// <summary>
-    /// Gets the the heading of the consumption column.
+    /// Gets the heading of the consumption column.
     /// </summary>
     public required string ColumnConsumption { get; init; }
 
     /// <summary>
-    /// Gets the the heading of the delta column.
+    /// Gets the heading of the delta column.
     /// </summary>
     public required string ColumnDelta { get; init; }
 
     /// <summary>
-    /// Gets the the heading of the productivity column.
+    /// Gets the heading of the productivity column.
     /// </summary>
     public required string ColumnProductivity { get; init; }
 
     /// <summary>
-    /// Gets the the text of the link to the region overview.
+    /// Gets the text of the link to the region overview.
     /// </summary>
     public required string AllRegions { get; init; }
 
     /// <summary>
-    /// Gets the the text of a page without data.
+    /// Gets the text of a page without data.
     /// </summary>
     public required string NoData { get; init; }
 
     /// <summary>
-    /// Gets the the text of an island detail without values.
+    /// Gets the text of an island detail without values.
     /// </summary>
     public required string NoIslandValues { get; init; }
 
     /// <summary>
-    /// Gets the the text of a page whose address names nothing known.
+    /// Gets the text of a page whose address names nothing known.
     /// </summary>
     public required string NotFound { get; init; }
 
     /// <summary>
-    /// Gets the the text of a page that waits for its data.
+    /// Gets the text of a page that waits for its data.
     /// </summary>
     public required string Loading { get; init; }
 
     /// <summary>
-    /// Gets the the text of a page whose read failed.
+    /// Gets the text of a page whose read failed.
     /// </summary>
     public required string ReadFailed { get; init; }
 
     /// <summary>
-    /// Gets the the format of the line under a cut goods table; the shown count is argument 0, the total argument 1.
+    /// Gets the format of the line under a cut goods table; the shown count is argument 0, the total argument 1.
     /// </summary>
     public required string ShowingGoodsFormat { get; init; }
 
     /// <summary>
-    /// Gets the the format of the as-of line; the time is argument 0.
+    /// Gets the format of the as-of line; the time is argument 0.
     /// </summary>
     public required string AsOfFormat { get; init; }
 
     /// <summary>
-    /// Gets the the banner while no Companion is connected.
+    /// Gets the banner while no Companion is connected.
     /// </summary>
     public required string CompanionNotConnected { get; init; }
 
     /// <summary>
-    /// Gets the the banner while the Companion waits for the game.
+    /// Gets the banner while the Companion waits for the game.
     /// </summary>
     public required string GameNotRunning { get; init; }
 
     /// <summary>
-    /// Gets the the banner while the Companion cannot read the statistics.
+    /// Gets the banner while the Companion cannot read the statistics.
     /// </summary>
     public required string StatisticsUnreadable { get; init; }
 
