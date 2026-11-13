@@ -7,7 +7,7 @@ COPY Directory.Packages.props ./
 COPY src/Censio.Server/Censio.Server.csproj src/Censio.Server/
 COPY src/Censio.Contracts/Censio.Contracts.csproj src/Censio.Contracts/
 COPY src/Censio.Server.Data/Censio.Server.Data.csproj src/Censio.Server.Data/
-RUN dotnet restore src/Censio.Server/Censio.Server.csproj
+RUN dotnet restore src/Censio.Server/Censio.Server.csproj -r linux-musl-x64
 
 COPY .editorconfig ./
 COPY .squad/dotnet-rules.globalconfig .squad/
@@ -22,6 +22,7 @@ RUN case "$VERSION" in \
         '(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?'; \
     then echo "VERSION is not a semantic version: $VERSION" >&2; exit 1; fi
 RUN dotnet publish src/Censio.Server/Censio.Server.csproj -c Release --no-restore \
+    -r linux-musl-x64 --self-contained false -p:UseAppHost=false \
     -o /app/publish "-p:Version=${VERSION}"
 RUN ls /app/publish/wwwroot/_framework/blazor.web*.js > /dev/null 2>&1 \
     || { echo "publish output lacks wwwroot/_framework/blazor.web*.js (see docs/decisions/0007)" >&2; exit 1; }
