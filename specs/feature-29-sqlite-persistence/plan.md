@@ -80,7 +80,9 @@ position, key, session ID, name); `TickEntries` (tick island, position, product 
    `UnixCreateMode` `0600`) before SQLite opens it, so SQLite's side files take that mode (fact 12); the connection is
    opened with mode `ReadWrite`, never `ReadWriteCreate`, from a `SqliteConnectionStringBuilder` (`DataSource` the full
    path, `Mode` `ReadWrite`), never by text concatenation. `IOException`/`UnauthorizedAccessException`: `NotWritable`.
-3. Classification over a raw connection: user tables of `sqlite_master`. `SqliteException` 26 or 11: `NotADatabase`;
+3. Classification over a raw connection: user tables of `sqlite_master` (every entry whose name does not start
+   with `sqlite_`, of any type: table, index, view, trigger; "only the two EF tables" then means exactly those two and
+   EF's indexes on them; the bookkeeping-only test adds a case with an extra view, refused as E3). `SqliteException` 26 or 11: `NotADatabase`;
    any other `SqliteException`: `NotWritable`. No user table, or only `__EFMigrationsLock` and an empty
    `__EFMigrationsHistory` (a first update that failed or stopped): fresh. Tables without `__EFMigrationsHistory`, or a first
    applied migration other than the initial one: `NotADatabase`. An applied id the migrations assembly does not list:
