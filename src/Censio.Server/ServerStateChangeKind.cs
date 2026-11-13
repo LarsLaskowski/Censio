@@ -13,5 +13,10 @@ public enum ServerStateChangeKind
     /// <summary>
     /// The catalog changed.
     /// </summary>
-    Catalog
+    Catalog,
+
+    /// <summary>
+    /// The Companion's connection or pipe state changed.
+    /// </summary>
+    Companion
 }

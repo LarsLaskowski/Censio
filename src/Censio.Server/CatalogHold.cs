@@ -5,7 +5,7 @@ namespace Censio.Server;
 /// <summary>
 /// What the state knows of the stored catalog: its identity and the references of its icons not stored yet.
 /// </summary>
-internal sealed class CatalogHold
+public sealed class CatalogHold
 {
     #region Properties
 
@@ -15,7 +15,8 @@ internal sealed class CatalogHold
     public static CatalogHold None { get; } = new()
                                               {
                                                   Identity = null,
-                                                  MissingIcons = null
+                                                  MissingIcons = null,
+                                                  Lookup = null
                                               };
 
     /// <summary>
@@ -27,6 +28,11 @@ internal sealed class CatalogHold
     /// Gets the references of the icons not stored yet, or <see langword="null"/> when the catalog is not usable.
     /// </summary>
     public required ImmutableHashSet<string>? MissingIcons { get; init; }
+
+    /// <summary>
+    /// Gets the lookup over the catalog document, or <see langword="null"/> when the catalog is not usable.
+    /// </summary>
+    public required PageCatalog? Lookup { get; init; }
 
     /// <summary>
     /// Gets a value indicating whether the catalog is usable.

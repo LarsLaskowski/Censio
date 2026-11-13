@@ -11,7 +11,7 @@ namespace Censio.Server;
 /// The state of the server: the profiles, the held profile states and the catalog, over the store.
 /// </summary>
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1001", Justification = "The semaphore is never waited on through its handle, so it holds nothing to dispose")]
-public sealed partial class ServerState
+public sealed partial class ServerState : IProfileStateSource
 {
     #region Constants
 
@@ -119,6 +119,20 @@ public sealed partial class ServerState
         }
     }
 
+    /// <summary>
+    /// Gets the state of the Companion's connection.
+    /// </summary>
+#pragma warning disable S2325 // Skeleton: removed with the implementation
+    public CompanionConnection CompanionState => NotImplemented<CompanionConnection>();
+#pragma warning restore S2325
+
+    /// <summary>
+    /// Gets the identity of the profile whose latest tick is the newest, or <see langword="null"/> when none is held.
+    /// </summary>
+#pragma warning disable S2325 // Skeleton: removed with the implementation
+    public Guid? NewestProfile => NotImplemented<Guid?>();
+#pragma warning restore S2325
+
     #endregion // Properties
 
     #region Methods
@@ -170,54 +184,6 @@ public sealed partial class ServerState
         finally
         {
             _writeGate.Release();
-        }
-    }
-
-    /// <summary>
-    /// Reads the state of a profile.
-    /// </summary>
-    /// <param name="profileId">The profile identity</param>
-    /// <param name="cancellationToken">The cancellation token</param>
-    /// <returns>The read result</returns>
-    public async Task<ProfileStateRead> ReadProfileStateAsync(Guid profileId, CancellationToken cancellationToken)
-    {
-        var snapshot = GetSnapshot();
-
-        if (snapshot.Held.TryGetValue(profileId, out var held))
-        {
-            return new ProfileStateRead
-                   {
-                       State = held.State,
-                       Failure = null
-                   };
-        }
-
-        if (FindProfile(snapshot.Profiles, profileId) < 0)
-        {
-            return new ProfileStateRead
-                   {
-                       State = null,
-                       Failure = null
-                   };
-        }
-
-        try
-        {
-            return new ProfileStateRead
-                   {
-                       State = await _store.ReadProfileStateAsync(profileId, cancellationToken).ConfigureAwait(false),
-                       Failure = null
-                   };
-        }
-        catch (SqliteException exception)
-        {
-            LogStateReadFailed(_logger, exception);
-
-            return new ProfileStateRead
-                   {
-                       State = null,
-                       Failure = exception
-                   };
         }
     }
 
@@ -375,7 +341,8 @@ public sealed partial class ServerState
                             new CatalogHold
                             {
                                 Identity = identity,
-                                MissingIcons = [.. missing]
+                                MissingIcons = [.. missing],
+                                Lookup = null
                             });
 
                 return new CatalogStoreResult
@@ -400,6 +367,50 @@ public sealed partial class ServerState
             _writeGate.Release();
         }
     }
+
+    /// <summary>
+    /// Sets the Companion as connected.
+    /// </summary>
+#pragma warning disable S2325, RH2003 // Skeleton: removed with the implementation
+    public void SetCompanionConnected()
+    {
+        throw new NotImplementedException();
+    }
+#pragma warning restore S2325, RH2003
+
+    /// <summary>
+    /// Sets the state of the Companion's pipe.
+    /// </summary>
+    /// <param name="pipeState">The pipe state</param>
+#pragma warning disable S1172, S2325, RH2003 // Skeleton: removed with the implementation
+    public void SetCompanionPipeState(ContractPipeState pipeState)
+    {
+        throw new NotImplementedException();
+    }
+#pragma warning restore S1172, S2325, RH2003
+
+    /// <summary>
+    /// Sets the Companion as disconnected.
+    /// </summary>
+#pragma warning disable S2325, RH2003 // Skeleton: removed with the implementation
+    public void SetCompanionDisconnected()
+    {
+        throw new NotImplementedException();
+    }
+#pragma warning restore S2325, RH2003
+
+    /// <summary>
+    /// Reads the bytes of a stored icon.
+    /// </summary>
+    /// <param name="reference">The icon reference</param>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>The icon bytes, or <see langword="null"/> when the icon is not stored</returns>
+#pragma warning disable S1172, S2325, RH2003 // Skeleton: removed with the implementation
+    public Task<byte[]?> ReadIconAsync(string reference, CancellationToken cancellationToken)
+    {
+        throw new NotImplementedException();
+    }
+#pragma warning restore S1172, S2325, RH2003
 
     /// <summary>
     /// Stores an icon.
@@ -428,7 +439,8 @@ public sealed partial class ServerState
                             ? new CatalogHold
                               {
                                   Identity = catalog.Identity,
-                                  MissingIcons = catalog.MissingIcons!.Remove(icon.Reference)
+                                  MissingIcons = catalog.MissingIcons!.Remove(icon.Reference),
+                                  Lookup = catalog.Lookup
                               }
                             : catalog);
 
@@ -439,6 +451,18 @@ public sealed partial class ServerState
             _writeGate.Release();
         }
     }
+
+    /// <summary>
+    /// Raises the skeleton's exception for a property.
+    /// </summary>
+    /// <typeparam name="T">The type of the property</typeparam>
+    /// <returns>Never returns</returns>
+#pragma warning disable RH2003 // Skeleton: removed with the implementation
+    private static T NotImplemented<T>()
+    {
+        throw new NotImplementedException();
+    }
+#pragma warning restore RH2003
 
     /// <summary>
     /// Gets the distinct references of the icons of a catalog document, ordinally sorted.
@@ -701,7 +725,8 @@ public sealed partial class ServerState
         return new CatalogHold
                {
                    Identity = catalog.Identity,
-                   MissingIcons = [.. missing]
+                   MissingIcons = [.. missing],
+                   Lookup = null
                };
     }
 
@@ -847,4 +872,64 @@ public sealed partial class ServerState
     }
 
     #endregion // Methods
+
+    #region IProfileStateSource
+
+    /// <inheritdoc/>
+#pragma warning disable S2325 // Skeleton: removed with the implementation
+    public CatalogHold Catalog => NotImplemented<CatalogHold>();
+#pragma warning restore S2325
+
+    /// <inheritdoc/>
+#pragma warning disable S1172, S2325, RH2003 // Skeleton: removed with the implementation
+    public bool TryGetHeld(Guid profileId, out StoredProfileState? state)
+    {
+        throw new NotImplementedException();
+    }
+#pragma warning restore S1172, S2325, RH2003
+
+    /// <inheritdoc/>
+    public async Task<ProfileStateRead> ReadProfileStateAsync(Guid profileId, CancellationToken cancellationToken)
+    {
+        var snapshot = GetSnapshot();
+
+        if (snapshot.Held.TryGetValue(profileId, out var held))
+        {
+            return new ProfileStateRead
+                   {
+                       State = held.State,
+                       Failure = null
+                   };
+        }
+
+        if (FindProfile(snapshot.Profiles, profileId) < 0)
+        {
+            return new ProfileStateRead
+                   {
+                       State = null,
+                       Failure = null
+                   };
+        }
+
+        try
+        {
+            return new ProfileStateRead
+                   {
+                       State = await _store.ReadProfileStateAsync(profileId, cancellationToken).ConfigureAwait(false),
+                       Failure = null
+                   };
+        }
+        catch (SqliteException exception)
+        {
+            LogStateReadFailed(_logger, exception);
+
+            return new ProfileStateRead
+                   {
+                       State = null,
+                       Failure = exception
+                   };
+        }
+    }
+
+    #endregion // IProfileStateSource
 }
