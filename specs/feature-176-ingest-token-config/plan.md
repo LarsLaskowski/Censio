@@ -218,3 +218,75 @@ Objections:
 1. minor — Documentation list is incomplete. Why: four user-guide sentences say without condition that `/config` holds the ingest token, and they would be wrong once the setting is set. Instruction for the Dev: in `docs/USER_GUIDE.md`, also change lines 61 and 349 (English) and 423 and 711 (German) to say `/config/ingest-token` holds the token only when `Censio:Ingest:TokenFile` is unset. This adds to the lines 97–129 / 459–491 the plan already lists. Also read `docs/areas/server.md` line 84 (the image's `/config` "and the ingest token in `/config/ingest-token`") as part of the *Data directory and key ring* / image change.
 
 2. minor — The `docker run -v <host file>:...:ro` example of S6 behaves badly when the host file is missing. Why: with `-v`, Docker silently creates a root-owned directory at the missing host path. The container then fails with E1 because the target is a directory, and the operator is left with a directory where their token file belongs, which breaks the next attempt. Instruction for the Dev: in the user guide (English and German), either use `--mount type=bind,source=<host file>,target=/run/secrets/censio-ingest-token,readonly`, which refuses to start when the source is missing, or keep `-v` and warn that a missing host file is created as a directory that must be removed. Instruction for the Product Manager's dry run (fact 13): for the "host file removed" step, record what actually happens with the documented form: a `docker run` error with `--mount`, or the E1 line and exit code 1 plus a directory left on the host with `-v`. Write the user guide to match what is observed.
+
+## Security notes
+
+I approve the plan. Every invalid value fails closed, no path or token reaches a log, and the three library behaviours the plan left unverified hold when measured. I have three non-blocking findings, listed after the checks.
+
+## Measurements (run before approving)
+
+I ran a file-based C# program `/tmp/claude-0/-home-user-Censio/bca437bd-76a4-59d8-8cc0-d6aabd37e45a/scratchpad/probe/probe.cs` with dotnet 11.0.100 as uid 0. It uses the same configuration chain as `Program.cs` (`WebApplication.CreateBuilder`) and the exact `FileStream` call from `ReadToken`.
+
+Command: `CENSIO__INGEST__TOKENFILE= dotnet run probe.cs`
+
+Output:
+```
+VALUE: "" len=0
+directory: System.UnauthorizedAccessException: Access to the path '/tmp/probe-PATHMARK-3f57.../' is denied.
+symlink-to-file: read 3 bytes
+symlink-to-missing: System.IO.FileNotFoundException: Could not find file '/tmp/probe-PATHMARK-.../dlink'.
+held-FileShare.None: System.IO.IOException: The process cannot access the file '/tmp/probe-PATHMARK-.../locked' because it is being used by another process.
+mode-000 (as uid ): read 1 bytes
+dev-zero: read 65537 bytes
+nul-char: System.ArgumentException: Null character in path. (Parameter 'path')
+IsPathFullyQualified("")=False ("/x")=True ("~/x")=False
+```
+
+What this shows:
+- **Fact 9 confirmed:** an empty environment variable reaches the configuration as `""`, not as unset. So E3 and E4 fire for `CENSIO__INGEST__TOKENFILE=`. The Dev's run of the published server stays useful but is no longer what the approval rests on.
+- **Fact 10 confirmed:** a path that is a directory throws `UnauthorizedAccessException`, which is already caught. Its message holds the full path, so leaving the exception off the E1 line is needed, not optional.
+- **Fact 11 confirmed:** a symbolic link is followed (E7). A link to a missing file gives `FileNotFoundException`, which is an `IOException`, so the E1 line.
+- **The test plan works:** a file held with `FileShare.None` makes the reader throw `IOException` on Linux in the same process. The plan rightly does not use mode `000` for the "cannot read" case, because a root test runner reads it anyway.
+
+## Checks requested
+
+- **No token or path in logs or exception text:** all five new log methods have no placeholder, and the E1 line carries no exception. The value is not logged on the E3, E4 or success paths either. AC7's `MARKER`/`PATHMARK` checks on both message and exception cover every new row. This holds for a token put in the setting by mistake that starts with `/` (a `base64` token can): it is read as a path and hits E1 with nothing logged.
+- **Fail-closed:** every invalid combination returns `null`, and `Program` exits with code 1 before `RunAsync` (`Program.cs` lines 20–25). An empty or missing configured token never opens the endpoint. With the setting present, the data-directory fallbacks are never reached, so there is no refuse-all and no generation.
+- **`RequireToken false` conflict:** the setting counts as present when it is not `null`, the empty string included, and the check runs before the switched-off path. E5 comes first. The test rows `false`, `FALSE` and `false` with `""` cover it.
+- **Symlink and directory:** both measured as above.
+- **Minimum length:** 32 to 1,024 counted in bytes after trimming, all visible ASCII, applied to both sources through the shared `ParseToken`. The generated token (43) and `openssl rand -base64 32` (44) both pass. The size bound is kept: one read of at most 65,537 bytes at start (`/dev/zero` reads exactly 65,537 bytes and is rejected).
+- **Hash comparison:** unchanged (`IngestAccess.CreateForToken`).
+- **Docs:** record 0061 matches the spec. The `SECURITY.md` and `docs/ARCHITECTURE.md` line 88 edits correctly limit the owner-only mode to the generated file.
+
+## Non-blocking findings
+
+1. **One exception type is not caught.**
+   - Plan, *Security considerations*, says: "no other exception is expected from a bounded read".
+   - Measured `nul-char` row: a value containing a NUL character throws `ArgumentException`, which neither the plan nor `src/Censio.Server/IngestTokenSetup.cs` lines 120–131 catch. JSON or a command-line argument can carry one; an environment variable cannot.
+   - It still fails closed (unhandled exception, non-zero exit), and the message does not name the path. But it is an unhandled crash, not the E1 line.
+   - Smallest fix: in the configured-file reader, also catch `ArgumentException` (or `catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException)`) and log E1, plus one test row with a `\0` value.
+   - Recommendation: fix now.
+
+2. **The ingest area document's start-failure section will contradict the new conflict rule.**
+   - `docs/areas/ingest.md` starts *Start failures* with "With the token required, the server stops…" and ends it with "With the switch `false` none of the file checks runs." The *Token* bullet for the switch says the server "neither reads nor creates the file".
+   - E4 makes all three wrong once the setting is present. The plan's *Areas* entry names "their order" but not these sentences.
+   - Smallest fix: add to the plan's *Areas* entry for ingest.md: "*Start failures*: the opening condition becomes 'With the token required, or with `Censio:Ingest:TokenFile` set'; the last sentence becomes 'With the switch `false` and the setting unset, none of the file checks runs.' *Token*, switch bullet: '…neither reads nor creates `ingest-token`; with `Censio:Ingest:TokenFile` set the start stops instead.'"
+   - Recommendation: fix now.
+
+3. **The user guide's file-permission advice invites a world-readable secret.**
+   - Plan, *Documentation updates*, USER_GUIDE bullet: "the host file must be readable by the user the container runs as".
+   - On Linux Docker Engine that user is `1654` unless `--user` is given (`src/Censio.Server/Dockerfile`, `USER 1654:1654`). Without a concrete step, operators tend to `chmod 644` the host file, which leaves the token readable by every host user. That contradicts `SECURITY.md`'s "keep the ingest token private".
+   - The documented procedure covers only Linux Docker Engine (N6), so naming the uid there does not conflict with the NAS concern from the challenge.
+   - Smallest fix, as the guide text (and its German equivalent): "Make the file readable by the container user only, for example `sudo chown 1654:1654 <host file> && sudo chmod 0400 <host file>` (use the `--user` ID instead if you set one); do not make it readable for everyone."
+   - The AC8 dry run should confirm that the container can read the file this way.
+   - Recommendation: fix now.
+
+Files reviewed:
+- /home/user/Censio/specs/feature-176-ingest-token-config/spec.md
+- /home/user/Censio/specs/feature-176-ingest-token-config/plan.md
+- /home/user/Censio/src/Censio.Server/IngestTokenSetup.cs
+- /home/user/Censio/docs/areas/ingest.md
+- /home/user/Censio/docs/decisions/0061-ingest-token-generated-into-a-file-of-the-data-directory.md
+- /home/user/Censio/SECURITY.md
+- /home/user/Censio/docs/ARCHITECTURE.md
+- /home/user/Censio/src/Censio.Server/Dockerfile
