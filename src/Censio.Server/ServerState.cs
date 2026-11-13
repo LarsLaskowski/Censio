@@ -50,6 +50,11 @@ public sealed partial class ServerState : IProfileStateSource
     private readonly HashSet<Guid> _markedProfiles = [];
 
     /// <summary>
+    /// The reader that lets one icon read at a time reach the store.
+    /// </summary>
+    private readonly IconReader _iconReader;
+
+    /// <summary>
     /// The current snapshot, replaced whole under the lock.
     /// </summary>
     private ServerStateSnapshot _snapshot = new()
@@ -82,6 +87,7 @@ public sealed partial class ServerState : IProfileStateSource
     {
         _store = store;
         _logger = logger;
+        _iconReader = new IconReader(store.ReadIconAsync);
     }
 
     #endregion // Constructors
@@ -427,12 +433,10 @@ public sealed partial class ServerState : IProfileStateSource
     /// <param name="reference">The icon reference</param>
     /// <param name="cancellationToken">The cancellation token</param>
     /// <returns>The icon bytes, or <see langword="null"/> when the icon is not stored</returns>
-#pragma warning disable S1172, S2325, RH2003 // Skeleton: removed with the implementation
     public Task<byte[]?> ReadIconAsync(string reference, CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        return _iconReader.ReadAsync(reference, cancellationToken);
     }
-#pragma warning restore S1172, S2325, RH2003
 
     /// <summary>
     /// Stores an icon.
