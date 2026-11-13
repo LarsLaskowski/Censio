@@ -36,8 +36,13 @@ server listens; followers are told of a change on the thread pool, one work item
 
 ## Consequences
 
-- The memory bound is two latest ticks plus the profile list and the catalog's missing-icon references; the figure at
-  the bounds is measured and stated in the area document.
-- A page on a third profile reads it from the database each time it asks; a failed read is reported, never shown as empty.
+- The held state is two latest ticks plus each held profile's full island list, the profile list and the catalog's
+  missing-icon references. The island lists and the profile list are unbounded in count: a token holder (anyone, with
+  the token off) can grow them, an accepted risk since a real game has a finite set of islands. The peak while a tick
+  replaces a held one is measured and stated in the area document.
+- A page on a third profile reads it from the database each time it asks; a failed read is reported, never shown as
+  empty. Reads on demand are not limited in number; a caller reachable without login (#32) must serialize or bound them.
+- A new held state takes the incoming tick and reads only the profile's island list, so no whole tick is read back
+  before an acknowledgement.
 - A follower that blocks for good keeps one thread-pool thread per change; the pages of #32 must not block.
 - Revisit when pages show several profiles at once, or when the Companion can send for several profiles.
