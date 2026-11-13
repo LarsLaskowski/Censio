@@ -31,13 +31,17 @@ released yet, so the first one can be chosen freely.
 The server keeps its schema with EF Core migrations, which it applies at start in one transaction after it has
 classified the file read-only (missing, empty, current, earlier, newer, foreign, unreadable); a newer, foreign, unreadable
 or unwritable file and a failed update stop the start and leave the file unchanged. A migration whose commands cannot
-run inside that transaction is refused by a test, so option 4 is needed only if such a migration ever becomes
-necessary. The behavior is in [`server-data.md`](../areas/server-data.md).
+run inside that transaction fails a test over every migration and is refused at start, so option 4 is needed only if
+such a migration ever becomes necessary. The behavior is in [`server-data.md`](../areas/server-data.md).
 
 ## Consequences
 
 - An older image never writes to a newer file; the operator starts the newer version or restores a copy.
 - The server makes no backup before an update: a failed update keeps the file, and a successful one is not undone.
+- EF Core keeps its lock and history tables outside the migration transaction, and a stopped update leaves the lock row,
+  on which every later update would wait forever. The start clears that row before it migrates, which is safe only
+  with one server per file ([0020](0020-one-companion-per-server-with-savegame-profiles.md)); a failed first update
+  of a new or empty file leaves the two empty tables, which the next start treats as an empty file.
 - A migration EF Core cannot run inside the transaction (a SQLite table rebuild may be one) fails that test and needs a
   decision (option 4, or a migration written by hand) when the first one comes.
 - Adding a migration needs the `dotnet-ef` tool and the design package (`docs/CONTRIBUTING.md`).

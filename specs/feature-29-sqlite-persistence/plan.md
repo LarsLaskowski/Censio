@@ -22,8 +22,9 @@ See [spec.md](spec.md): the server keeps nothing, and #30, #32, #35 and #42 need
 | 7a | A publish with `-r linux-musl-x64` carries only that runtime's native library | to verify: Dev, publish size before and after in the *Image build check* (task 10) | unverified |
 | 8 | SQLite returns `-0.0` stored in a REAL column as `0.0` (so the plan stores no float as REAL) | Devil's Advocate run on SQLite 3.53.1 (spec challenge 3) | confirmed |
 | 9 | EF Core 11's `Migrate` applies all pending migrations in one transaction and rolls back every step when one fails | to verify: Tester, `ServerDatabaseOpenFailingSecondStepReportsUpdateFailedAndKeepsFile`, step 5; fallback in *Approach* | unverified |
-| 10 | EF Core 11's SQLite migration lock (`__EFMigrationsLock`) does not hold a stale row after a failed `Migrate`, so the next start does not wait | to verify: Dev reads `SqliteHistoryRepository` of EF Core 11 in step 6; Tester's `ServerDatabaseOpenAfterUpdateFailedOpensCurrentSchema` | unverified |
-| 11 | `BEGIN IMMEDIATE` on a file SQLite opened read-only fails with `SQLITE_READONLY` | to verify: Tester, `ServerDatabaseOpenReadOnlyFileReportsNotWritable` (non-root) | unverified |
+| 10 | EF Core's SQLite lock: `AcquireDatabaseLock` creates `__EFMigrationsLock` and inserts its row outside the migration transaction, loops on `INSERT OR IGNORE` without a timeout or stale check, and deletes the row only on dispose; `__EFMigrationsHistory` is created outside the transaction too. A stopped update leaves the row, and every later `Migrate` waits forever | Devil's Advocate read of `dotnet/efcore` release/10.0 `Migrator.cs`, `SqliteHistoryRepository.cs` (plan challenge 1) | confirmed |
+| 10a | EF Core 11 keeps the lock and history behavior of fact 10 | to verify: Dev reads the same two files on the EF Core 11 tag in step 6; Tester's lock-row tests | unverified |
+| 11 | A probe that changes a page (`CREATE TABLE` in a transaction, then `ROLLBACK`) fails in a read-only file and in a read-only folder; `BEGIN IMMEDIATE` alone may pass in the folder case | to verify: Tester, `ServerDatabaseOpenReadOnlyFileReportsNotWritable` and `ServerDatabaseOpenFileInReadOnlyFolderReportsNotWritable`, non-root, step 5 | unverified |
 | 12 | SQLite creates `-wal` and `-shm` with the database file's mode | to verify: Tester, `ServerDatabaseOpenNewFileIsOwnerOnly` | unverified |
 | 13 | Reading `sqlite_master` of a text file fails with `SQLITE_NOTADB` (26), of a damaged header with 26 or `SQLITE_CORRUPT` (11), and writes nothing | to verify: Tester, the E3 tests of AC5 | unverified |
 | 14 | `IMigrationsAssembly` of EF Core 11 can be implemented by a wrapper that adds migrations (its members) | to verify: Tester reads the EF Core 11 interface before writing `ExtendedMigrationsAssembly` | unverified |
@@ -40,11 +41,11 @@ See [spec.md](spec.md): the server keeps nothing, and #30, #32, #35 and #42 need
 | AC | Test(s) | Test file |
 | -- | ------- | --------- |
 | AC1 | `ServerDatabaseOpenMissingFileCreatesCurrentSchema`; `DatabaseSetupTryOpenWithDataDirectoryCreatesDatabaseAndLogsCreated`; `ProgramStartWithDataDirectoryCreatesDatabase`; CI: `image-check.sh` case `I29-AC1` (file `/config/censio.db`, the created line in `docker logs`) | `tests/Censio.Server.Data.Tests/ServerDatabaseTests.cs`, `tests/Censio.Server.Tests/DatabaseSetupTests.cs`, `tests/Censio.Server.Tests/ProgramTests.cs` |
-| AC2 | `ServerDatabaseOpenCurrentSchemaKeepsDataAndReportsOpened`; `ServerDatabaseOpenEarlierSchemaWithDataUpdatesAndKeepsData`; `ServerDatabaseOpenEmptyFileReportsUpdated`; `DatabaseSetupReportOpenResultLogsLinePerSuccessKind` (data rows Opened, Updated); CI: `image-check.sh` case `I29-AC2` (second start logs the opened line) | `ServerDatabaseTests.cs`, `DatabaseSetupTests.cs` |
+| AC2 | `ServerDatabaseOpenCurrentSchemaKeepsDataAndReportsOpened`; `ServerDatabaseOpenEarlierSchemaWithDataUpdatesAndKeepsData`; `ServerDatabaseOpenEmptyFileReportsUpdated`; `ServerDatabaseOpenBookkeepingTablesOnlyFileUpdatesWithinBound`; `DatabaseSetupReportOpenResultLogsLinePerSuccessKind` (data rows Opened, Updated); CI: `image-check.sh` case `I29-AC2` (second start logs the opened line) | `ServerDatabaseTests.cs`, `DatabaseSetupTests.cs` |
 | AC3 | `DatabaseSetupTryOpenWithDatabaseFileUsesItWithoutDataDirectory`; `DatabaseSetupTryOpenWithDatabaseFileCreatesMissingFolder`; `DatabaseSetupTryOpenWithRelativeDatabaseFileLogsCriticalAndReturnsNull` (`relative/censio.db`, empty) | `DatabaseSetupTests.cs` |
 | AC4 | `DatabaseSetupTryOpenWithoutDataDirectoryLogsWarningAndWritesNoFile`; `ServerStoreInMemoryStoresAndReadsTick` | `DatabaseSetupTests.cs`, `tests/Censio.Server.Data.Tests/ServerStoreTests.cs` |
-| AC5 | `ServerDatabaseOpenFolderBelowFileReportsNotWritable`; `ServerDatabaseOpenReadOnlyFileReportsNotWritable`; `ServerDatabaseOpenTextFileReportsNotADatabaseAndKeepsFile`; `ServerDatabaseOpenDamagedHeaderReportsNotADatabaseAndKeepsFile`; `ServerDatabaseOpenForeignSqliteFileReportsNotADatabaseAndKeepsFile`; `ServerDatabaseOpenUnknownAppliedMigrationReportsNewerSchemaAndKeepsFile`; `ServerDatabaseOpenFailingSecondStepReportsUpdateFailedAndKeepsFile`; `ServerDatabaseOpenSuppressedTransactionReportsUpdateFailedAndKeepsFile`; `ServerDatabaseOpenAfterUpdateFailedOpensCurrentSchema`; `DatabaseSetupReportOpenResultLogsCriticalLinePerFailureKind`; `ProgramStartWithUnreadableDatabaseExitsWithCodeOne` | `ServerDatabaseTests.cs`, `DatabaseSetupTests.cs`, `ProgramTests.cs` |
-| AC6 | `ServerDatabaseOpenNewFileIsOwnerOnly` (Linux: file, `-wal`, `-shm`, created folder); `ServerStoreLogsNoNameOrValue`; CI: `image-check.sh` case `I29-AC6` (mode of `/config/censio.db` is `600`) | `ServerDatabaseTests.cs`, `ServerStoreTests.cs` |
+| AC5 | `ServerDatabaseOpenFolderBelowFileReportsNotWritable`; `ServerDatabaseOpenReadOnlyFileReportsNotWritable`; `ServerDatabaseOpenFileInReadOnlyFolderReportsNotWritable` (existing empty file, folder `0500`, file unchanged); `ServerDatabaseOpenTextFileReportsNotADatabaseAndKeepsFile`; `ServerDatabaseOpenDamagedHeaderReportsNotADatabaseAndKeepsFile`; `ServerDatabaseOpenForeignSqliteFileReportsNotADatabaseAndKeepsFile`; `ServerDatabaseOpenUnknownAppliedMigrationReportsNewerSchemaAndKeepsFile`; `ServerDatabaseOpenFailingSecondStepReportsUpdateFailedAndKeepsFile`; `ServerDatabaseOpenSuppressedTransactionReportsUpdateFailedAndKeepsFile`; `ServerDatabaseOpenAfterUpdateFailedOpensCurrentSchema`; `ServerDatabaseOpenEarlierSchemaWithLockRowUpdatesWithinBound`; `ServerDatabaseOpenBookkeepingTablesOnlyFileUpdatesWithinBound` (lock row seeded, 30-second bound); `ServerDatabaseMigrationsRunInsideTransaction` (every migration of the real assembly: no command `TransactionSuppressed`); `DatabaseSetupReportOpenResultLogsCriticalLinePerFailureKind`; `ProgramStartWithUnreadableDatabaseExitsWithCodeOne` | `ServerDatabaseTests.cs`, `DatabaseSetupTests.cs`, `ProgramTests.cs` |
+| AC6 | `ServerDatabaseOpenNewFileIsOwnerOnly` (Linux: file, `-wal`, `-shm`, created folder); `ServerStoreLogsNoNameOrValue` (logging at `Trace` through `StoreProfileAsync`, a stored tick, every read and a failing write); CI: `image-check.sh` case `I29-AC6` (mode `600` of `/config/censio.db`, and of `-wal` and `-shm` when present) | `ServerDatabaseTests.cs`, `ServerStoreTests.cs` |
 | AC7 | `ServerStoreStoreProfileListsIdentityAndName`; `ServerStoreStoreKnownProfileWithNewNameKeepsOneProfile`; `ServerStoreStoreTickOfUnknownProfileListsProfileWithoutName`; `ServerStoreStoreProfileNamesProfileCreatedByTick` | `ServerStoreTests.cs` |
 | AC8 | `ServerStoreStoreTickReadsBackEveryValueFromNewConnection`; `ServerStoreListIslandsGivesNameOfLatestReceiveTime`; `ServerStoreStoreKnownTickIdReportsAlreadyStoredAndChangesNothing` | `ServerStoreTests.cs` |
 | AC9 | `ServerStoreReadLatestTickIgnoresOtherProfile`; `ServerStoreReadLatestTickWithEqualReceiveTimesGivesStoredLast`; `ServerStoreReadLatestTickIgnoresEarlierReceiveTimeStoredLater` | `ServerStoreTests.cs` |
@@ -61,7 +62,8 @@ migration is generated into `src/Censio.Server.Data/Migrations/` with `dotnet to
 InitialSchema --project src/Censio.Server.Data`, through an internal `IDesignTimeDbContextFactory`; a section
 `[src/Censio.Server.Data/Migrations/**.cs]` with `generated_code = true` follows the paths block of `.editorconfig`.
 `appsettings.json` sets `Microsoft.EntityFrameworkCore` to `Warning`. The Dockerfile restores and publishes with
-`-r linux-musl-x64 --self-contained false`, so the image carries one native SQLite instead of 31 (fact 7).
+`-r linux-musl-x64 --self-contained false`, the publish also with `-p:UseAppHost=false` (the entry point is `dotnet
+Censio.Server.dll`), so the image carries one native SQLite instead of 31 (fact 7).
 
 **Schema** (internal `CensioDbContext`, entities configured in `OnModelCreating`, no public `DbSet`): `Profiles` (id,
 name nullable); `Ticks` (number = rowid, id unique, profile, receive time as UTC ticks INTEGER, game time); `Islands`
@@ -76,17 +78,20 @@ position, key, session ID, name); `TickEntries` (tick island, position, product 
    kind `InMemory`.
 2. A missing folder is created (Linux `0700`), a missing file is created empty with `FileMode.CreateNew` (Linux
    `UnixCreateMode` `0600`) before SQLite opens it, so SQLite's side files take that mode (fact 12); the connection is
-   opened with mode `ReadWrite`, never `ReadWriteCreate`. `IOException`/`UnauthorizedAccessException`: `NotWritable`.
+   opened with mode `ReadWrite`, never `ReadWriteCreate`, from a `SqliteConnectionStringBuilder` (`DataSource` the full
+   path, `Mode` `ReadWrite`), never by text concatenation. `IOException`/`UnauthorizedAccessException`: `NotWritable`.
 3. Classification over a raw connection: user tables of `sqlite_master`. `SqliteException` 26 or 11: `NotADatabase`;
-   any other `SqliteException`: `NotWritable`. No user table: fresh. Tables without `__EFMigrationsHistory`, or a first
+   any other `SqliteException`: `NotWritable`. No user table, or only `__EFMigrationsLock` and an empty
+   `__EFMigrationsHistory` (a first update that failed or stopped): fresh. Tables without `__EFMigrationsHistory`, or a first
    applied migration other than the initial one: `NotADatabase`. An applied id the migrations assembly does not list:
    `NewerSchema`.
-4. Write probe `BEGIN IMMEDIATE; ROLLBACK` (fact 11): failure `NotWritable`.
+4. Write probe: `BEGIN IMMEDIATE`, `CREATE TABLE` of a probe table, `ROLLBACK` (fact 11): failure `NotWritable`.
 5. Pending migrations: the commands of each are generated first (`IMigrationsSqlGenerator`); one with
    `TransactionSuppressed` gives `UpdateFailed` without running anything (record 0065), then `Database.MigrateAsync`;
-   any exception `UpdateFailed`. If fact 9 is refuted, the Dev runs the generated script
-   (`MigrationsSqlGenerationOptions.NoTransactions`) in one own `SqliteTransaction` instead and reports the deviation; if
-   fact 10 is refuted, the opener deletes a lock row before migrating (one process per file, N6).
+   any exception `UpdateFailed`. Before `MigrateAsync` the opener deletes every row of `__EFMigrationsLock` when the
+   table exists, unconditionally (fact 10; one process per file, N6). If fact 9 is refuted, the Dev runs the generated
+   script (`MigrationsSqlGenerationOptions.NoTransactions`) in one own `SqliteTransaction` instead and reports the
+   deviation. After a failed first update of a new or empty file the two bookkeeping tables remain (spec E5).
 6. `PRAGMA journal_mode=WAL` (file only); synchronous stays `FULL`, so a tick reported stored survives a power loss.
 7. Kind: file created in step 2 `Created`; migrations applied to an existing file `Updated`; otherwise `Opened`.
    A failed open disposes what it opened and clears the connection pool.
@@ -103,7 +108,9 @@ IGNORE` the profile without a name; insert the tick, its islands, entries and pa
 `Failed` with the exception (E8); cancellation propagates. `StoreProfileAsync` upserts the name. Reads use a new
 context with `AsNoTracking` or a data reader; a tick reads back in stored positions, maps rebuilt ascending. Latest
 tick: `ORDER BY` receive time, then tick number, descending. `FindMissingIconsAsync` returns the missing references
-distinct and ordinally sorted. A read failure surfaces as the provider's exception (no criterion asks otherwise; the
+distinct and ordinally sorted; it passes the references either as parameters, one per reference, chunked below SQLite's
+32,766 (a catalog upload names at most 16,384, `contract.md`, *Bounds*), or as one JSON parameter through `json_each` on a
+raw command, never as SQL text; the area document states which. A read failure surfaces as the provider's exception (no criterion asks otherwise; the
 area document says so).
 
 **Server** (`DatabaseSetup`). File: `Censio:Database:File` when set (not fully qualified, the empty string included:
@@ -118,7 +125,8 @@ Log line layout: one line each, exactly the spec's texts; no other new user-visi
 **Image.** The project files and the Dockerfile change, so the Dev runs the *Image build check* (restore-order
 reproduction with `-r linux-musl-x64`) and states the publish size before and after (fact 7). `image-check.sh` gets
 the cases `I29-AC1` (after the first start `/config/censio.db` exists and `docker logs` holds the created line),
-`I29-AC2` (the container started again on the volume logs the opened line) and `I29-AC6` (`stat -c %a` gives `600`),
+`I29-AC2` (the container started again on the volume logs the opened line) and `I29-AC6` (`stat -c %a` gives `600` for
+`/config/censio.db`, and for `-wal` and `-shm` when present),
 which only CI runs (AC1, AC2, AC6 in the image, and the native library on Alpine).
 
 ## Options considered
@@ -222,8 +230,9 @@ All by the Dev, once the code is green, against the code:
 
 - `docs/areas/server-data.md` (new, from the template) and its row in `docs/areas/README.md` (until then
   `decision-check.py` reports the area of records 0065 to 0067 as unknown); the contents of the spec's *Area documents*, the open order above, a read failure
-  surfacing as an exception, side files taking the file's mode, damage beyond the header surfacing as E8, the N4
-  measurements with their command.
+  surfacing as an exception, side files taking the file's mode, a restored backup to be made owner-only (`chmod 600`),
+  damage beyond the header surfacing as E8, the two bookkeeping tables a failed first update leaves and the lock row
+  the start clears, how `FindMissingIconsAsync` passes references, the N4 measurements with their command.
 - `docs/areas/server.md`: *Scope*, *Data directory and key ring*, *Docker image*, *Limits and errors*, *Related
   decisions*; and the server row of `docs/areas/README.md` (it names what the data directory holds).
 - `docs/ARCHITECTURE.md`: the project table (`Censio.Server.Data`: SQLite store with EF Core migrations, references
@@ -231,10 +240,12 @@ All by the Dev, once the code is green, against the code:
   *Security model* (an owner-only file with private names), *Deployment* (`/config/censio.db`), records 0065 to 0067.
 - `README.md` and `docs/USER_GUIDE.md`, English then German, as AC12 says: the configuration table (`Censio:Database:File`,
   and the data directory row, which lists what it holds), *Data directory and NAS hosts*, *First start* (the created
-  line), *Data and logs* (the file, its privacy, a backup by copying it while the server is stopped, the local disk).
+  line), *Data and logs* (the file, its privacy, a backup by copying it while the server is stopped, then: a restored
+  copy must be readable by the server's user only, `chmod 600 censio.db` on Linux, as the files SQLite keeps beside it
+  take its mode; the local disk).
 - `SECURITY.md`: the database file in *Deployment Security Considerations* and *Scope*.
 - `docs/CONTRIBUTING.md`: adding a migration with `dotnet tool run dotnet-ef`, and that one EF Core cannot run inside
-  the transaction is refused at start (record 0065).
+  the transaction fails `ServerDatabaseMigrationsRunInsideTransaction` and is refused at start (record 0065).
 - `.squad/project.md` (the Dev reports the text, the orchestrator writes it): under *Security areas* the line below;
   the configuration option list of the integration surface (`Censio:Database:File` in `DatabaseSetup`,
   `DatabaseSetupTests`); the guarantee on SQLite history, whose area document is now `server-data` (retention with #35).
@@ -256,8 +267,8 @@ references, so no cycle. Windows-only code: none.
 ## Security considerations
 
 - [x] Limits: the store takes only messages the contract reader accepted, so its bounds are the contract's (measured on
-  the raw input, before decoding); the store adds none. The icon references of `FindMissingIconsAsync` go into one
-  parameter, not into SQL text.
+  the raw input, before decoding); the store adds none. The icon references of `FindMissingIconsAsync` go into
+  parameters (one per reference, or one JSON parameter), never into SQL text.
 - [x] Exceptions that reach a user-visible text: none. The exception of `NotWritable`, `NotADatabase` and
   `UpdateFailed` is attached to the `Critical` line for the operator; at start the file holds no name that a message of
   SQLite could quote. Values never enter SQL text: every write and read is parameterized.
@@ -274,3 +285,36 @@ references, so no cycle. Windows-only code: none.
 ## Out of scope / follow-ups
 
 The spec's *Out of scope*; registering the store in the service container, which #30 does where it uses it.
+
+## Challenge
+
+- 1 (major, EF's lock and history outside the transaction): accepted; fact 10 now states the source-read behavior, 10a
+  its check on EF Core 11. Step 3 treats a file holding only `__EFMigrationsLock` and an empty `__EFMigrationsHistory`
+  as fresh (`Updated`, or `Created` for a file the start created); step 5 deletes every lock row before `MigrateAsync`
+  unconditionally; the tests `ServerDatabaseOpenEarlierSchemaWithLockRowUpdatesWithinBound` and
+  `ServerDatabaseOpenBookkeepingTablesOnlyFileUpdatesWithinBound` seed a lock row and finish within 30 seconds. Spec E5
+  and AC5 now say the two bookkeeping tables may remain after a failed first update (changed in step 2, so in place);
+  the area document says so; record 0065's consequences name the lock row.
+- 2 (minor, the test record 0065 names): accepted; `ServerDatabaseMigrationsRunInsideTransaction` generates the
+  commands of every migration of the real assembly and asserts none is `TransactionSuppressed`; `docs/CONTRIBUTING.md`
+  names it, and record 0065 names both the test and the refusal at start.
+- 3 (minor, the write probe): accepted; the probe creates a table inside the transaction and rolls back (step 4, fact
+  11); the non-root test `ServerDatabaseOpenFileInReadOnlyFolderReportsNotWritable` covers an empty file in a `0500`
+  folder, which stays unchanged.
+
+## Security review
+
+Verdict APPROVED; each note decided:
+
+- N1: accepted; the sentence was wrong. References go into parameters, one per reference and chunked below 32,766, or
+  one JSON parameter through `json_each`, never SQL text; the Dev picks, the area document states it (*Approach*,
+  *Security considerations*).
+- N2: accepted; `server-data.md` and *Data and logs* of `README.md` and `docs/USER_GUIDE.md` (English and German) say
+  after the backup sentence that a restored copy must be owner-only (`chmod 600 censio.db`), side files taking its mode.
+- N3: accepted; step 2 names `SqliteConnectionStringBuilder` with `DataSource` and `Mode` `ReadWrite`.
+- N4: accepted; `ServerStoreLogsNoNameOrValue` also runs `StoreProfileAsync`, every read and a failing write (the E8
+  trigger), so EF Core's error lines are covered.
+- N5: accepted; `I29-AC6` also checks `-wal` and `-shm` when present.
+- N6: taken; the publish line gets `-p:UseAppHost=false`, as the image starts `dotnet Censio.Server.dll` and needs no
+  apphost.
+

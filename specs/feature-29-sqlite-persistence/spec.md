@@ -63,7 +63,8 @@ failures*); the database file is neither deleted nor replaced.
   The file is left unchanged.
 - E5: Bringing the database to the current schema fails, in any of the steps from its schema to the current one:
   `The database '<file>' cannot be updated to the current schema; the server stops.` The database keeps the schema
-  and data it had before the start, also when earlier steps of the same update had succeeded.
+  and data it had before the start, also when earlier steps of the same update had succeeded; a failed first update of
+  a new or empty file may leave two empty bookkeeping tables.
 - E6: A tick whose identity is already stored (a resend, record
   [0059](../../docs/decisions/0059-contract-messages-carry-a-companion-assigned-identity-and-their-profile.md)) is
   reported as already stored and changes nothing; the same holds for an icon whose reference is stored.
@@ -107,7 +108,8 @@ failures*); the database file is neither deleted nor replaced.
   file, and stores and reads as with a file until it stops, N3 included but for a stop during a write (S5, N3).
 - AC5: Each failure of E2 to E5 stops the start with its line, exit code 1 and before listening, E3 also for a foreign
   SQLite file, E4 for a recorded schema version unknown to the build, E5 for a two-step update whose second step fails;
-  after E3 to E5 the file's schema and data are those of before the start (E2, E3, E4, E5).
+  after E3 to E5 the file's schema and data are those of before the start, but for E5's bookkeeping tables (E2, E3,
+  E4, E5).
 - AC6: On Linux the database file, its side files and a folder the server creates are owner-only, and no log line of
   this feature holds a profile or island name or a stored value (N2).
 - AC7: A stored profile is listed with identity and name; storing a known identity with another name keeps one profile
@@ -172,11 +174,10 @@ failures*); the database file is neither deleted nor replaced.
 - 2 (major, AC2 passes a create-only build): accepted. AC2 starts on an earlier schema version holding data and checks
   the recorded versions; AC5 builds E4 from an unknown recorded version and E5 from a failing second step. How the
   test-only history is made is the plan's.
-- 3 (minor, negative zero): accepted. AC8 reads back through a new connection; the column type is the plan's.
-- 4 (minor, foreign SQLite file): accepted. E3 covers it, file unchanged; AC5 tests it.
+- 3 (minor, negative zero): accepted; AC8 reads back through a new connection.
+- 4 (minor, foreign SQLite file): accepted; E3 and AC5 cover it.
 - 5 (minor, tie rule): accepted. S8 and AC9: on equal receive times the tick stored last; a clock set back does not
   make a tick the latest.
-- 6 (minor, in-memory vs N3): accepted. AC4 keeps N3 except the stop during a write; the area document says how N3
-  holds in memory; the connection's lifetime is the plan's.
+- 6 (minor, in-memory vs N3): accepted. AC4 keeps N3 except the stop during a write; the area document says how.
 - 7 (minor, atomic update): accepted. E5 covers earlier successful steps, AC5 tests it; transaction or updated copy is
   the plan's, verified for the EF Core version added; *Out of scope* excludes only a backup kept for the operator.
