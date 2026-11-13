@@ -2,7 +2,7 @@
 
 - **Status:** Proposed
 - **Date:** 2026-11-13
-- **Area:** server
+- **Area:** web-ui
 - **Source:** Issue #31
 - **Supersedes:** —
 

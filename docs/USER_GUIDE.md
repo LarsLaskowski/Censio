@@ -369,7 +369,7 @@ The web pages of the server of the state of `main` (not the image `0.2.0`) sit i
 - Both choices are kept in your browser in two cookies, `censio-theme` and `censio-language`, for a year; they hold no personal data, and a stored language overrides the browser's list. Without cookies (blocked, a private window, cleared) the defaults apply on every visit; a switch still changes the open page.
 - The profile switch is disabled until a later version and shows only its label.
 - The pages load everything from the server itself, no fonts or scripts from other sites. Desktop browsers only; the layout for phones comes later.
-- Not yet tried: the keyboard focus rings and the contrast in a real browser, and the choice after a browser restart; the Product Manager checks them on a local run.
+- Not yet tried: the keyboard focus rings and the contrast in a real browser, and the choice after a browser restart.
 
 ## Data and logs
 
@@ -758,7 +758,7 @@ Die Webseiten des Servers des Stands von `main` (nicht des Images `0.2.0`) stehe
 - Beide Auswahlen werden ein Jahr lang in Ihrem Browser in zwei Cookies, `censio-theme` und `censio-language`, gespeichert; sie enthalten keine personenbezogenen Daten, und eine gespeicherte Sprache hat Vorrang vor der Liste des Browsers. Ohne Cookies (blockiert, privates Fenster, gelöscht) gelten bei jedem Besuch die Voreinstellungen; ein Wechsel ändert trotzdem die offene Seite.
 - Der Profilschalter ist bis zu einer späteren Version deaktiviert und zeigt nur seine Beschriftung.
 - Die Seiten laden alles vom Server selbst, keine Schriften oder Skripte anderer Seiten. Nur Desktop-Browser; das Layout für Smartphones folgt später.
-- Noch nicht ausprobiert: die Tastaturfokus-Rahmen und der Kontrast in einem echten Browser sowie die Auswahl nach einem Browser-Neustart; der Product Manager prüft sie auf einem lokalen Lauf.
+- Noch nicht ausprobiert: die Tastaturfokus-Rahmen und der Kontrast in einem echten Browser sowie die Auswahl nach einem Browser-Neustart.
 
 ## Daten und Logs
 
