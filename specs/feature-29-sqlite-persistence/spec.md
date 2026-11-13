@@ -63,8 +63,8 @@ failures*); the database file is neither deleted nor replaced.
   The file is left unchanged.
 - E5: Bringing the database to the current schema fails, in any of the steps from its schema to the current one:
   `The database '<file>' cannot be updated to the current schema; the server stops.` The database keeps the schema
-  and data it had before the start, also when earlier steps of the same update had succeeded; a failed first update of
-  a new or empty file may leave two empty bookkeeping tables.
+  and data it had before the start, also when earlier steps of the same update had succeeded, a new or empty file
+  included.
 - E6: A tick whose identity is already stored (a resend, record
   [0059](../../docs/decisions/0059-contract-messages-carry-a-companion-assigned-identity-and-their-profile.md)) is
   reported as already stored and changes nothing; the same holds for an icon whose reference is stored.
@@ -108,7 +108,7 @@ failures*); the database file is neither deleted nor replaced.
   file, and stores and reads as with a file until it stops, N3 included but for a stop during a write (S5, N3).
 - AC5: Each failure of E2 to E5 stops the start with its line, exit code 1 and before listening, E3 also for a foreign
   SQLite file, E4 for a recorded schema version unknown to the build, E5 for a two-step update whose second step fails;
-  after E3 to E5 the file's schema and data are those of before the start, but for E5's bookkeeping tables (E2, E3,
+  after E3 to E5 the file's schema and data are those of before the start, a new or empty file's included (E2, E3,
   E4, E5).
 - AC6: On Linux the database file, its side files and a folder the server creates are owner-only, and no log line of
   this feature holds a profile or island name or a stored value (N2).
@@ -148,15 +148,12 @@ failures*); the database file is neither deleted nor replaced.
   database (operator settings come from configuration, the theme is kept per browser, #31). Answered: left out of #29
   (Product Manager); the first feature that stores a setting in the database adds it with its own migration (*Out of
   scope*).
-- Q2: Where is the database without a data directory? Answered: in memory with a warning (Lead decision) (S5), as the ingest
-  token warns and degrades without one ([`ingest.md`](../../docs/areas/ingest.md), *Token*); the image always sets
-  `/config`, and local mode (#39) sets a path.
-- Q3: Is the catalog kept per profile (#30 says "catalog per profile")? Answered: no, per server: a catalog upload
-  carries no profile and the hello reply names one catalog identity ([`contract.md`](../../docs/areas/contract.md)).
-- Q4: Does the database path need its own setting? Answered: yes; the issue says "configurable", and a NAS share is no
-  safe place for SQLite (N6).
-- Q5: How do failures at start behave? Answered: they stop the start (Lead decision), as an unwritable key ring does
-  (record 0011).
+- Q2: Where is the database without a data directory? Answered: in memory with a warning (Lead decision, S5), as the
+  ingest token degrades ([`ingest.md`](../../docs/areas/ingest.md), *Token*).
+- Q3: Is the catalog kept per profile? Answered: no, per server: an upload carries no profile
+  ([`contract.md`](../../docs/areas/contract.md)).
+- Q4: Does the database path need its own setting? Answered: yes (the issue; N6).
+- Q5: How do failures at start behave? Answered: they stop the start (Lead decision, record 0011).
 
 ## Area documents
 
@@ -181,3 +178,9 @@ failures*); the database file is neither deleted nor replaced.
 - 6 (minor, in-memory vs N3): accepted. AC4 keeps N3 except the stop during a write; the area document says how.
 - 7 (minor, atomic update): accepted. E5 covers earlier successful steps, AC5 tests it; transaction or updated copy is
   the plan's, verified for the EF Core version added; *Out of scope* excludes only a backup kept for the operator.
+
+## Amendments
+
+| Criterion | Change | Reason | Step | Decided by |
+| --------- | ------ | ------ | ---- | ---------- |
+| AC5 | E5's bookkeeping-table exception dropped (E5 likewise) | The update runs in one own transaction, which leaves no table (plan facts 9, 22) | 6 Decide (G1) | Lead |
