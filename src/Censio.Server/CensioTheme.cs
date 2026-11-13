@@ -52,7 +52,9 @@ public static class CensioTheme
                                       TextPrimary = "#2B2420",
                                       TextSecondary = "#5A4F45",
                                       ActionDefault = "#5A4F45",
-                                      LinesInputs = "#8A7D70"
+                                      LinesInputs = "#8A7D70",
+                                      Error = "#A4161A",
+                                      Success = "#1B6B2F"
                                   },
                    PaletteDark = new PaletteDark
                                  {
@@ -70,7 +72,9 @@ public static class CensioTheme
                                      TextPrimary = "#EDE4D8",
                                      TextSecondary = "#C2B5A6",
                                      ActionDefault = "#C2B5A6",
-                                     LinesInputs = "#8F8274"
+                                     LinesInputs = "#8F8274",
+                                     Error = "#FF8A80",
+                                     Success = "#7FD08E"
                                  },
                    Typography = new Typography
                                 {
