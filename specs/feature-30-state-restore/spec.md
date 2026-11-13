@@ -1,7 +1,7 @@
 # Spec: Current state per profile and restore after restart
 
 Source: Issue #30
-Status: Draft
+Status: Approved by Lead
 
 ## Problem
 
@@ -56,7 +56,8 @@ state without a database read per update.
   becomes the current state; the islands it lacks keep their listing and name but have no values in it, never zeros.
 - E9: A session start, session end or `status` message is answered as today and changes no stored data and no
   current state.
-- E10: A follower of the state that throws, or blocks, delays neither the acknowledgement nor the other followers.
+- E10: A follower of the state that throws, or blocks, delays neither the acknowledgement nor the other followers; a
+  throw is logged as the warning `A follower of the current state failed.` with the exception.
 - E11: The catalog is stored but some of its icons are not (the connection or the server ended between the upload and
   the icons): `helloAccepted` answers `catalogIdentity` `null`, so the Companion uploads the catalog again and its
   acknowledgement names the missing icons (E1).
@@ -113,7 +114,7 @@ state without a database read per update.
   reply, closes the same way, logs neither `Companion connected.` nor a disconnect line and frees the place (E3, N4).
 - AC8: After each stored change the followers are told which profile changed, or that the catalog or its icons changed;
   a reader never sees a partial state; a follower that throws or blocks delays neither the acknowledgement nor another
-  follower (S1, S5, E10, N1).
+  follower, and a throw logs the warning of E10 (S1, S5, E10, N1).
 - AC9: The state is restored before the server listens; a failure reading it stops the start with exit code 1 and the
   `Critical` line of E4 (S3, E4).
 - AC10: With more stored profiles than the number of N2, the held profiles are those of N2's order, at restore and
