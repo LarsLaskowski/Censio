@@ -1,1 +1,44 @@
 @page "/profiles/{Profile}/sessions/{Session}"
+@inherits DataPageBase
+
+<PageTitle>@($"Censio – {Heading}")</PageTitle>
+
+<h1 class="mud-typography mud-typography-h4">@Heading</h1>
+
+@if (Mode == PageMode.Ready && View is { } view)
+{
+    <p>@ProfileLabel(view)</p>
+    <p><MudLink Href="@PageAddress.RegionsLink(view.ProfileId)">@Texts.AllRegions</MudLink></p>
+}
+@if (Mode != PageMode.NotFound)
+{
+    <DataStatus AsOf="View?.AsOf" />
+}
+@if (StatusText is { } status)
+{
+    <p>@status</p>
+}
+else if (View is { } shown && FindRegion(shown) is { } region)
+{
+    <MudSimpleTable Dense="true" Hover="true">
+        <thead>
+            <tr>
+                <th>@Texts.ColumnIsland</th>
+                <th class="censio-number">@Texts.ColumnBuildings</th>
+                <th class="censio-number">@Texts.ColumnProducedGoods</th>
+                <th class="censio-number">@Texts.ColumnGoodsInDeficit</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var island in OrderedIslands(region))
+            {
+                <tr>
+                    <td><MudLink Href="@PageAddress.IslandLink(shown.ProfileId, island.Key)">@PageNames.Island(island.Name, Language)</MudLink></td>
+                    <td class="censio-number">@PageFormat.Count(island.Figures?.Buildings)</td>
+                    <td class="censio-number">@PageFormat.Count(island.Figures?.ProducedGoods)</td>
+                    <td class="censio-number">@PageFormat.Count(island.Figures?.GoodsInDeficit)</td>
+                </tr>
+            }
+        </tbody>
+    </MudSimpleTable>
+}

@@ -1,0 +1,9 @@
+@using System.Globalization
+@if (Banner is { } banner)
+{
+    <MudAlert Severity="Severity.Warning" Class="mb-3">@banner</MudAlert>
+}
+@if (AsOf is { } asOf)
+{
+    <p>@string.Format(CultureInfo.InvariantCulture, Texts.AsOfFormat, PageFormat.Time(asOf, _offsetMinutes))</p>
+}

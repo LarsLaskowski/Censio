@@ -3,7 +3,7 @@ using System.Globalization;
 namespace Censio.Server;
 
 /// <summary>
-/// Parses the segments of a data page address.
+/// Parses the segments of a data page address and builds the links to the data pages.
 /// </summary>
 public static class PageAddress
 {
@@ -64,6 +64,38 @@ public static class PageAddress
         return text is { Length: > 0 and <= MaxDigits }
                && IsDigits(text)
                && byte.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out value);
+    }
+
+    /// <summary>
+    /// Gives the address of a profile's region overview.
+    /// </summary>
+    /// <param name="profileId">The profile identity</param>
+    /// <returns>The address</returns>
+    public static string RegionsLink(Guid profileId)
+    {
+        return string.Create(CultureInfo.InvariantCulture, $"/profiles/{profileId}/regions");
+    }
+
+    /// <summary>
+    /// Gives the address of the island list of the region that holds a session.
+    /// </summary>
+    /// <param name="profileId">The profile identity</param>
+    /// <param name="sessionGuid">The session GUID</param>
+    /// <returns>The address</returns>
+    public static string RegionLink(Guid profileId, int sessionGuid)
+    {
+        return string.Create(CultureInfo.InvariantCulture, $"/profiles/{profileId}/sessions/{sessionGuid}");
+    }
+
+    /// <summary>
+    /// Gives the address of an island's detail.
+    /// </summary>
+    /// <param name="profileId">The profile identity</param>
+    /// <param name="island">The island</param>
+    /// <returns>The address</returns>
+    public static string IslandLink(Guid profileId, IslandKey island)
+    {
+        return string.Create(CultureInfo.InvariantCulture, $"/profiles/{profileId}/islands/{island.SessionGuid}/{island.IslandId}/{island.AreaIndex}");
     }
 
     /// <summary>

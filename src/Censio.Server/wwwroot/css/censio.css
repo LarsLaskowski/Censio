@@ -6,3 +6,17 @@
 .censio-frame .mud-appbar :focus-visible {
     outline-color: var(--mud-palette-appbar-text);
 }
+
+.censio-frame .censio-number {
+    text-align: right;
+}
+
+.censio-frame .censio-icon {
+    width: 24px;
+}
+
+.censio-frame .censio-icon img {
+    display: block;
+    width: 24px;
+    height: 24px;
+}

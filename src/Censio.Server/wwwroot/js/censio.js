@@ -4,5 +4,8 @@ window.censio = {
     },
     setDocumentLanguage: function (tag) {
         document.documentElement.lang = tag;
+    },
+    utcOffsetMinutes: function (isoInstant) {
+        return -new Date(isoInstant).getTimezoneOffset();
     }
 };

@@ -15,18 +15,50 @@ public partial class Regions
     [Parameter]
     public string? Profile { get; set; }
 
+    /// <summary>
+    /// Gets the heading of the page.
+    /// </summary>
+    private string Heading => Texts.RegionsEntry;
+
     #endregion // Properties
 
-    #region ComponentBase
+    #region DataPageBase
 
-#pragma warning disable RH2003
-    // Skeleton: removed with the implementation
     /// <inheritdoc />
-    protected override Task OnParametersSetAsync()
-    {
-        throw new NotImplementedException();
-    }
-#pragma warning restore RH2003
+    protected override object AddressKey => ValueTuple.Create(Profile);
 
-    #endregion // ComponentBase
+    /// <inheritdoc />
+    protected override bool FollowsNewestProfile => Profile is null;
+
+    /// <inheritdoc />
+    protected override PageMode ResolveTarget(out Guid profileId, out IslandKey? island)
+    {
+        island = null;
+
+        if (Profile is not null)
+        {
+            return PageAddress.TryParseProfile(Profile, out profileId)
+                       ? PageMode.Loading
+                       : PageMode.NotFound;
+        }
+
+        if (State.NewestProfile is { } newest)
+        {
+            profileId = newest;
+
+            return PageMode.Loading;
+        }
+
+        profileId = Guid.Empty;
+
+        return PageMode.NoData;
+    }
+
+    /// <inheritdoc />
+    protected override bool IsKnown(ProfileView view)
+    {
+        return true;
+    }
+
+    #endregion // DataPageBase
 }
