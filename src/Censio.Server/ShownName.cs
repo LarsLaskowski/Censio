@@ -26,12 +26,12 @@ public sealed class ShownName
     /// </summary>
     /// <param name="language">The language</param>
     /// <returns>The name</returns>
-#pragma warning disable S1172, S2325, RH2003 // Skeleton: removed with the implementation
     public string For(UiLanguage language)
     {
-        throw new NotImplementedException();
+        return language == UiLanguage.German
+                   ? German
+                   : English;
     }
-#pragma warning restore S1172, S2325, RH2003
 
     #endregion // Methods
 }

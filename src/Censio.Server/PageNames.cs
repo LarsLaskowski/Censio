@@ -1,3 +1,5 @@
+using System.Globalization;
+
 using Censio.Server.Data;
 
 namespace Censio.Server;
@@ -7,6 +9,15 @@ namespace Censio.Server;
 /// </summary>
 public static class PageNames
 {
+    #region Constants
+
+    /// <summary>
+    /// The number of characters of a profile identity that tell equal names apart.
+    /// </summary>
+    private const int IdentityCharacters = 8;
+
+    #endregion // Constants
+
     #region Methods
 
     /// <summary>
@@ -15,12 +26,12 @@ public static class PageNames
     /// <param name="productGuid">The product GUID</param>
     /// <param name="catalog">The catalog lookup, or <see langword="null"/></param>
     /// <returns>The name</returns>
-#pragma warning disable S1172, RH2003 // Skeleton: removed with the implementation
     public static ShownName Good(int productGuid, PageCatalog? catalog)
     {
-        throw new NotImplementedException();
+        var entry = catalog?.Find(productGuid);
+
+        return Pick(entry, string.Create(CultureInfo.InvariantCulture, $"Good {productGuid}"), string.Create(CultureInfo.InvariantCulture, $"Ware {productGuid}"));
     }
-#pragma warning restore S1172, RH2003
 
     /// <summary>
     /// Gets the name of a region.
@@ -30,12 +41,12 @@ public static class PageNames
     /// <param name="smallestSession">The smallest session GUID of the region</param>
     /// <param name="catalog">The catalog lookup, or <see langword="null"/></param>
     /// <returns>The name</returns>
-#pragma warning disable S1172, RH2003 // Skeleton: removed with the implementation
     public static ShownName Region(int regionGuid, bool isSession, int smallestSession, PageCatalog? catalog)
     {
-        throw new NotImplementedException();
+        var fallback = string.Create(CultureInfo.InvariantCulture, $"Region {(isSession ? smallestSession : regionGuid)}");
+
+        return Pick(isSession ? null : catalog?.Find(smallestSession), fallback, fallback);
     }
-#pragma warning restore S1172, RH2003
 
     /// <summary>
     /// Gets the shown form of an island name.
@@ -43,12 +54,17 @@ public static class PageNames
     /// <param name="name">The stored name</param>
     /// <param name="language">The language</param>
     /// <returns>The shown name</returns>
-#pragma warning disable S1172, RH2003 // Skeleton: removed with the implementation
     public static string Island(string name, UiLanguage language)
     {
-        throw new NotImplementedException();
+        if (string.IsNullOrEmpty(name) == false)
+        {
+            return name;
+        }
+
+        return language == UiLanguage.German
+                   ? "Unbenannte Insel"
+                   : "Unnamed island";
     }
-#pragma warning restore S1172, RH2003
 
     /// <summary>
     /// Gets the profiles to list, with their shown names.
@@ -57,12 +73,26 @@ public static class PageNames
     /// <param name="language">The language</param>
     /// <param name="limit">The maximum number of entries</param>
     /// <returns>The identities with their shown names</returns>
-#pragma warning disable S1172, RH2003 // Skeleton: removed with the implementation
     public static IReadOnlyList<KeyValuePair<Guid, string>> Profiles(IReadOnlyList<StoredProfile> profiles, UiLanguage language, int limit)
     {
-        throw new NotImplementedException();
+        var unnamed = language == UiLanguage.German
+                          ? "Unbenanntes Profil"
+                          : "Unnamed profile";
+        var named = profiles.Select(profile => (profile.Id, Name: string.IsNullOrEmpty(profile.Name) ? unnamed : profile.Name)).ToList();
+        var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var name in named.Select(profile => profile.Name))
+        {
+            counts[name] = counts.GetValueOrDefault(name) + 1;
+        }
+
+        return [
+                   .. named.OrderBy(profile => profile.Name, StringComparer.OrdinalIgnoreCase)
+                           .ThenBy(profile => profile.Id.ToString(), StringComparer.Ordinal)
+                           .Take(limit)
+                           .Select(profile => new KeyValuePair<Guid, string>(profile.Id, counts[profile.Name] > 1 ? $"{profile.Name} ({profile.Id.ToString()[..IdentityCharacters]})" : profile.Name))
+               ];
     }
-#pragma warning restore S1172, RH2003
 
     /// <summary>
     /// Orders the regions for a language.
@@ -70,12 +100,10 @@ public static class PageNames
     /// <param name="regions">The regions</param>
     /// <param name="language">The language</param>
     /// <returns>The ordered regions</returns>
-#pragma warning disable S1172, RH2003 // Skeleton: removed with the implementation
     public static IReadOnlyList<RegionView> OrderRegions(IReadOnlyList<RegionView> regions, UiLanguage language)
     {
-        throw new NotImplementedException();
+        return [.. regions.OrderBy(region => region.Name.For(language), StringComparer.OrdinalIgnoreCase).ThenBy(region => region.RegionGuid)];
     }
-#pragma warning restore S1172, RH2003
 
     /// <summary>
     /// Gets the text of a region in a list of regions.
@@ -84,12 +112,43 @@ public static class PageNames
     /// <param name="regions">All regions</param>
     /// <param name="language">The language</param>
     /// <returns>The text</returns>
-#pragma warning disable S1172, RH2003 // Skeleton: removed with the implementation
     public static string RegionText(RegionView region, IReadOnlyList<RegionView> regions, UiLanguage language)
     {
-        throw new NotImplementedException();
+        var name = region.Name.For(language);
+        var equal = regions.Count(other => string.Equals(other.Name.For(language), name, StringComparison.OrdinalIgnoreCase));
+
+        return equal > 1
+                   ? string.Create(CultureInfo.InvariantCulture, $"{name} ({region.RegionGuid})")
+                   : name;
     }
-#pragma warning restore S1172, RH2003
+
+    /// <summary>
+    /// Takes the names of a catalog entry, the other language's for a language the entry lacks, or the fallbacks.
+    /// </summary>
+    /// <param name="entry">The entry, or <see langword="null"/></param>
+    /// <param name="englishFallback">The English name when the entry names nothing</param>
+    /// <param name="germanFallback">The German name when the entry names nothing</param>
+    /// <returns>The name</returns>
+    private static ShownName Pick(PageCatalogEntry? entry, string englishFallback, string germanFallback)
+    {
+        var english = string.IsNullOrEmpty(entry?.English) ? null : entry.English;
+        var german = string.IsNullOrEmpty(entry?.German) ? null : entry.German;
+
+        if (english is null && german is null)
+        {
+            return new ShownName
+                   {
+                       English = englishFallback,
+                       German = germanFallback
+                   };
+        }
+
+        return new ShownName
+               {
+                   English = english ?? german!,
+                   German = german ?? english!
+               };
+    }
 
     #endregion // Methods
 }

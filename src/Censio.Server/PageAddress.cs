@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace Censio.Server;
 
 /// <summary>
@@ -5,6 +7,20 @@ namespace Censio.Server;
 /// </summary>
 public static class PageAddress
 {
+    #region Constants
+
+    /// <summary>
+    /// The length of an identity in its 36-character form.
+    /// </summary>
+    private const int GuidLength = 36;
+
+    /// <summary>
+    /// The longest digit run a number of an address may have.
+    /// </summary>
+    private const int MaxDigits = 10;
+
+    #endregion // Constants
+
     #region Methods
 
     /// <summary>
@@ -13,12 +29,12 @@ public static class PageAddress
     /// <param name="text">The text</param>
     /// <param name="profileId">The identity</param>
     /// <returns><see langword="true"/> when the text is an identity</returns>
-#pragma warning disable S1172, RH2003 // Skeleton: removed with the implementation
     public static bool TryParseProfile(string? text, out Guid profileId)
     {
-        throw new NotImplementedException();
+        profileId = Guid.Empty;
+
+        return text is { Length: GuidLength } && Guid.TryParseExact(text, "D", out profileId);
     }
-#pragma warning restore S1172, RH2003
 
     /// <summary>
     /// Tries to parse a session GUID.
@@ -26,12 +42,14 @@ public static class PageAddress
     /// <param name="text">The text</param>
     /// <param name="sessionGuid">The session GUID</param>
     /// <returns><see langword="true"/> when the text is a session GUID</returns>
-#pragma warning disable S1172, RH2003 // Skeleton: removed with the implementation
     public static bool TryParseSession(string? text, out int sessionGuid)
     {
-        throw new NotImplementedException();
+        sessionGuid = 0;
+
+        return text is { Length: > 0 and <= MaxDigits + 1 }
+               && IsDigits(text.StartsWith('-') ? text[1..] : text)
+               && int.TryParse(text, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out sessionGuid);
     }
-#pragma warning restore S1172, RH2003
 
     /// <summary>
     /// Tries to parse a byte.
@@ -39,12 +57,24 @@ public static class PageAddress
     /// <param name="text">The text</param>
     /// <param name="value">The value</param>
     /// <returns><see langword="true"/> when the text is a byte</returns>
-#pragma warning disable S1172, RH2003 // Skeleton: removed with the implementation
     public static bool TryParseByte(string? text, out byte value)
     {
-        throw new NotImplementedException();
+        value = 0;
+
+        return text is { Length: > 0 and <= MaxDigits }
+               && IsDigits(text)
+               && byte.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out value);
     }
-#pragma warning restore S1172, RH2003
+
+    /// <summary>
+    /// Tells whether a text is one or more ASCII digits.
+    /// </summary>
+    /// <param name="text">The text</param>
+    /// <returns><see langword="true"/> when the text is not empty and holds only the digits 0 to 9</returns>
+    private static bool IsDigits(string text)
+    {
+        return text.Length > 0 && text.All(character => character is >= '0' and <= '9');
+    }
 
     #endregion // Methods
 }
