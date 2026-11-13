@@ -1,3 +1,5 @@
+using Microsoft.Data.Sqlite;
+
 namespace Censio.Server;
 
 /// <summary>
@@ -7,7 +9,6 @@ public static partial class ServerStateSetup
 {
     #region Methods
 
-#pragma warning disable RH2003 // Skeleton: removed with the implementation
     /// <summary>
     /// Restores the state from the database and reports the result.
     /// </summary>
@@ -16,11 +17,40 @@ public static partial class ServerStateSetup
     /// <param name="logger">The logger</param>
     /// <param name="cancellationToken">The cancellation token</param>
     /// <returns><see langword="true"/> when the state is restored, <see langword="false"/> when the server cannot start</returns>
-    public static Task<bool> TryRestoreAsync(ServerState state, string? databaseFile, ILogger logger, CancellationToken cancellationToken)
+    public static async Task<bool> TryRestoreAsync(ServerState state, string? databaseFile, ILogger logger, CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        try
+        {
+            var count = await state.RestoreAsync(cancellationToken).ConfigureAwait(false);
+
+            LogRestored(logger, count);
+
+            return true;
+        }
+        catch (SqliteException exception)
+        {
+            LogRestoreFailed(logger, exception, databaseFile);
+
+            return false;
+        }
     }
-#pragma warning restore RH2003
+
+    /// <summary>
+    /// Logs the restored profiles.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    /// <param name="count">The number of profiles</param>
+    [LoggerMessage(Level = LogLevel.Information, Message = "Profiles restored from the database: {Count}.")]
+    private static partial void LogRestored(ILogger logger, int count);
+
+    /// <summary>
+    /// Logs a state that cannot be read.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    /// <param name="exception">The exception behind the failure</param>
+    /// <param name="databaseFile">The database file</param>
+    [LoggerMessage(Level = LogLevel.Critical, Message = "The current state cannot be read from the database '{DatabaseFile}'; the server stops.")]
+    private static partial void LogRestoreFailed(ILogger logger, Exception exception, string? databaseFile);
 
     #endregion // Methods
 }
