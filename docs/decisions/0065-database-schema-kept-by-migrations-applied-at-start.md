@@ -1,6 +1,6 @@
 # 0065: The database schema is kept by EF Core migrations applied at start in one transaction; a foreign, newer or failed database stops the start
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-13
 - **Area:** server-data
 - **Source:** Issue #29

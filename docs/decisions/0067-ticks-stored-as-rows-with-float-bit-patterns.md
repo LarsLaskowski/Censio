@@ -1,6 +1,6 @@
 # 0067: A tick is stored as rows per island, entry and map pair in one transaction; floats keep their 32-bit pattern
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-13
 - **Area:** server-data
 - **Source:** Issue #29

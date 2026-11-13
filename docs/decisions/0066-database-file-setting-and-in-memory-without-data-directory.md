@@ -1,6 +1,6 @@
 # 0066: The database lies in the data directory unless `Censio:Database:File` names a file; without either it is kept in memory with a warning
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-13
 - **Area:** server-data
 - **Source:** Issue #29
