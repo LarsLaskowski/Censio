@@ -6,4 +6,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Censio.Contracts\Censio.Contracts.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Censio.Server.Data.Tests" />
+  </ItemGroup>
 </Project>
