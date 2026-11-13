@@ -29,6 +29,7 @@ See [spec.md](spec.md): the ingest stores nothing and nothing restores a state a
 | 15 | A database whose `Ticks` table a second connection renamed passes the start classification and fails the restore with `SqliteException` | to verify: Tester, step 5 (AC9); classification reads only the history (`server-data.md`, *Start*) | unverified |
 | 16 | A cancelled stopping token ends a store call that waits on a write lock held by a second connection | to verify: Tester, step 5 (AC7, place freed); if Microsoft.Data.Sqlite's busy wait ignores the token, the Tester uses a closed socket instead and says so | unverified |
 | 17 | Server tests reach `Microsoft.Data.Sqlite`, and `Program.cs` runs in them | `ProgramTests.cs` (`SqliteConnection.ClearAllPools`, entry point at `:384-414`) | confirmed |
+| 18 | `ReleaseCompanion` frees the place without checking who holds it, so a second release frees a later session's place | `IngestConnections.cs:75-78` (`Volatile.Write(ref _companionTaken, 0)`) | confirmed |
 
 ## Tests per criterion
 
@@ -43,7 +44,7 @@ See [spec.md](spec.md): the ingest stores nothing and nothing restores a state a
 | AC7 | IngestSessionRunAsyncTickStoreFailureCloses1011WithoutAcknowledgement; IngestSessionRunAsyncHelloProfileStoreFailureCloses1011AndFreesPlace; IngestSessionRunAsyncHelloStoreCancelledFreesPlace | tests/Censio.Server.Tests/IngestSessionTests.cs |
 | AC8 | ServerStateStoreTickAsyncTellsFollowersProfileChanged; ServerStateStoreIconAsyncTellsFollowersCatalogChanged; ServerStateChangedThrowingFollowerLogsWarningAndOthersAreTold; ServerStateChangedBlockingFollowerDelaysNoOther; ServerStateReadProfileStateAsyncEarlierStateUnchangedByLaterTick; IngestSessionRunAsyncBlockingFollowerDelaysNoAcknowledgement | tests/Censio.Server.Tests/ServerStateTests.cs; tests/Censio.Server.Tests/IngestSessionTests.cs |
 | AC9 | ServerStateSetupTryRestoreAsyncUnreadableStateLogsCriticalAndReturnsFalse; ProgramStartWithUnreadableStateExitsWithCodeOne | tests/Censio.Server.Tests/ServerStateSetupTests.cs; tests/Censio.Server.Tests/ProgramTests.cs |
-| AC10 | ServerStateRestoreAsyncHoldsProfilesWithNewestTicks; ServerStateStoreTickAsyncNewerTickOfUnheldProfileTakesOldestPlace; ServerStateReadProfileStateAsyncOfUnheldProfileEqualsStore; ServerStateReadProfileStateAsyncFailureLogsErrorAndReturnsFailure; ServerStoreListLatestProfilesAsyncOrdersByLatestTick; ServerStoreReadProfileStateAsyncReadsNameTickAndIslands | tests/Censio.Server.Tests/ServerStateTests.cs; tests/Censio.Server.Data.Tests/ServerStoreTests.cs |
+| AC10 | ServerStateRestoreAsyncHoldsProfilesWithNewestTicks; ServerStateStoreTickAsyncNewerTickOfUnheldProfileTakesOldestPlace; ServerStateStoreTickAsyncAfterIslandReadFailureHoldsStoredLatest; ServerStateReadProfileStateAsyncOfUnheldProfileEqualsStore; ServerStateReadProfileStateAsyncFailureLogsErrorAndReturnsFailure; ServerStoreListLatestProfilesAsyncOrdersByLatestTick; ServerStoreReadProfileStateAsyncReadsNameTickAndIslands | tests/Censio.Server.Tests/ServerStateTests.cs; tests/Censio.Server.Data.Tests/ServerStoreTests.cs |
 
 Cases within these tests (Tester):
 
@@ -66,8 +67,9 @@ Cases within these tests (Tester):
   connection after the interruption gets `null`, and its re-upload lists the missing reference. Unusable: rename `Icons`
   through a second connection, upload a new catalog: `Failed`, `CompleteCatalogIdentity` `null`, `Catalog` notified.
 - AC7: no acknowledgement or reply, close 1011, one `Error` entry `A message could not be stored; the connection is
-  closed.` with an exception; hello case: no `Companion connected.`, no disconnect line, next hello accepted at once;
-  tick case: disconnect line with one refused. Triggers on `Profiles` (hello) and `Ticks` (tick). Cancelled hello store
+  closed.` with an exception; hello case: no `Companion connected.`, no disconnect line; a second Companion's hello is
+  accepted during the failed session's close wait, and after the failed session ends a third hello is still refused
+  `companionConnected`; tick case: disconnect line with one refused. Triggers on `Profiles` (hello) and `Ticks` (tick). Cancelled hello store
   (fact 16): the next hello is accepted.
 - AC8: the blocking follower waits on a `TaskCompletionSource` released at the end; another follower and the
   acknowledgement arrive meanwhile; the throwing follower's warning text is compared.
@@ -75,7 +77,9 @@ Cases within these tests (Tester):
   database.` with the exception, returns `Failure` set and `State` null; a read after undoing the rename succeeds.
 - AC10: latest receive times t1 < t2 < t3: after restore `HeldProfiles` is {2, 3}; a tick of 1 at t4 gives {1, 3}; the
   same with t2 = t3 at restore and a tick of 1 at that time (the older-sequenced one leaves); a renaming hello of 2
-  changes nothing.
+  changes nothing. Marked profile (`ServerStateStoreTickAsyncAfterIslandReadFailureHoldsStoredLatest`): held {A}, P's
+  t3 stored while its islands read fails, then P's t1 stored: P's held state is t3 with its islands. The Tester finds a
+  real failure of only the islands read; if none exists it says so, and the branch is reported as uncovered.
 
 ## Approach
 
@@ -103,7 +107,10 @@ whole under one `Lock`: `Profiles` (ordered by `Id` as `ListProfilesAsync`), the
     the tick is P's latest);
   - otherwise nothing is held.
   Every `Stored` tick notifies `Profile` for P. A failed islands read logs the E13 line and leaves the held set; the
-  result stays `Stored`. No whole tick is read back on this path.
+  result stays `Stored`. A failure in the not-held branch also marks P, since P's stored latest may then be newer than
+  every later tick of P: a stored tick of a marked P takes neither branch above but reads P's whole state
+  (`ServerStore.ReadProfileStateAsync`) and decides by that latest tick's key; it enters, by the not-held rule, and the
+  mark clears; a failed read logs E13 and keeps the mark. Otherwise no whole tick is read back on this path.
 - `StoreCatalogAsync(upload, document)`: an identity equal to a usable held one writes nothing (`AlreadyStored`);
   otherwise store, and on `Stored` replace identity and missing set and notify `Catalog`. The acknowledgement's list
   comes from `FindMissingIconsAsync` over the document's distinct references, ordinally sorted. If that read throws
@@ -118,9 +125,11 @@ whole under one `Lock`: `Profiles` (ordered by `Id` as `ListProfilesAsync`), the
 **Ingest.**
 - The session takes the `ServerState` and passes the stopping token of `RunAsync` to every store call; a cancellation
   rolls back and the existing catch ends the session without an acknowledgement.
-- Hello: right after `TryTakeCompanion` a flag records the taken place, which `EndAsync` releases whatever ended the
-  session; the disconnect line follows a separate "hello accepted" flag. Then `StoreProfileAsync`; `Failed`: release
-  the place, log the E3 line, close 1011 (`WebSocketCloseStatus.InternalServerError`), no `Companion connected.`.
+- Hello: right after `TryTakeCompanion` an `int` place flag is set to 1. One private release method frees the place at
+  most once per session, `if (Interlocked.Exchange(ref _placeTaken, 0) == 1) { _connections.ReleaseCompanion(); }`
+  (fact 18), called by `EndAsync` whatever ended the session and by the `Failed` path; the disconnect line follows a
+  separate "hello accepted" flag. Then `StoreProfileAsync`; `Failed`: that release method, the E3 line, close 1011
+  (`WebSocketCloseStatus.InternalServerError`), no `Companion connected.`.
   Otherwise as today with `CatalogIdentity = CompleteCatalogIdentity`.
 - Tick, icon image, catalog upload: stored through the state; `Stored`/`AlreadyStored` acknowledged with `refusal`
   `null` (a catalog with its missing list), counted accepted; `Failed` logs `Error` `A message could not be stored; the
@@ -227,7 +236,8 @@ All by the Dev, against the code as built:
 
 - `docs/areas/server-state.md` (new) and its row in `docs/areas/README.md`: spec N1, N2, E2, E7, E8, E10, E13; restore
   and its lines; notices; catalog completeness (record 0070); profiles chosen by the Companion, no figure name (record
-  0041); links to records 0041, 0068, 0069, 0070. *Memory*: the held state is two latest ticks plus each held profile's
+  0041); links to records 0041, 0068, 0069, 0070; after a failed islands read a not-held profile enters at its next
+  stored tick, with its stored latest state. *Memory*: the held state is two latest ticks plus each held profile's
   full island list plus the profile list plus the missing-icon set; island lists and the profile list are unbounded in
   count; fact 14's figure; reads on demand are not limited in number, and a caller reachable without login (#32) must
   serialize or bound them.
