@@ -43,11 +43,8 @@ public sealed class PipeRetryDelayTests
     [DataRow(int.MinValue)]
     public void PipeRetryDelayForBelowOneThrows(int failures)
     {
-        // Arrange
-        Action call = () => PipeRetryDelay.For(failures);
-
         // Act
-        var exception = Assert.Throws<ArgumentOutOfRangeException>(call, "A count below one should be rejected");
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(() => PipeRetryDelay.For(failures), "A count below one should be rejected");
 
         // Assert
         Assert.AreEqual("consecutiveFailures", exception.ParamName, "The exception should name the parameter");

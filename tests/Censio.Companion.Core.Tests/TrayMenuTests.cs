@@ -661,10 +661,9 @@ public sealed class TrayMenuTests
     {
         // Arrange
         var state = (PipeConnectionState)99;
-        var call = () => TrayMenu.FormatToolTip(state);
 
         // Act
-        var exception = Assert.Throws<ArgumentOutOfRangeException>(call, "An undefined state should be rejected");
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(() => TrayMenu.FormatToolTip(state), "An undefined state should be rejected");
 
         // Assert
         Assert.AreEqual("state", exception.ParamName, "The exception should name the parameter");
@@ -815,11 +814,8 @@ public sealed class TrayMenuTests
     [TestMethod]
     public void TrayMenuFormatToolTipUndefinedRecordingStateThrows()
     {
-        // Arrange
-        var call = () => TrayMenu.FormatToolTip(PipeConnectionState.Connected, (PipeRecordingState)99);
-
         // Act
-        var exception = Assert.Throws<ArgumentOutOfRangeException>(call, "An undefined recording state should be rejected");
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(() => TrayMenu.FormatToolTip(PipeConnectionState.Connected, (PipeRecordingState)99), "An undefined recording state should be rejected");
 
         // Assert
         Assert.AreEqual("recording", exception.ParamName, "The exception should name the parameter");
@@ -840,10 +836,9 @@ public sealed class TrayMenuTests
                                        Kind = (PipeReplayProblemKind)99
                                    }
                      };
-        var call = () => TrayMenu.FormatReplayToolTip(status);
 
         // Act
-        var exception = Assert.Throws<ArgumentOutOfRangeException>(call, "An undefined problem kind should be rejected");
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(() => TrayMenu.FormatReplayToolTip(status), "An undefined problem kind should be rejected");
 
         // Assert
         Assert.AreEqual("status", exception.ParamName, "The exception should name the parameter");
@@ -864,10 +859,9 @@ public sealed class TrayMenuTests
                      {
                          State = state
                      };
-        var call = () => TrayMenu.FormatReplayToolTip(status);
 
         // Act
-        var exception = Assert.Throws<ArgumentOutOfRangeException>(call, "A state a replay cannot reach should be rejected");
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(() => TrayMenu.FormatReplayToolTip(status), "A state a replay cannot reach should be rejected");
 
         // Assert
         Assert.AreEqual("status", exception.ParamName, "The exception should name the parameter");
