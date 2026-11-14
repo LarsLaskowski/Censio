@@ -1,7 +1,7 @@
 # Spec: Send recordings to a server for testing
 
 Source: Issue #34
-Status: Draft
+Status: Approved by Lead
 
 ## Problem
 
@@ -16,7 +16,7 @@ pages end to end through the real contract.
   starts `Censio.Companion.exe --replay long-session.jsonl --server ws://<host>:8080/ingest --token-file token.txt
   --speed max`, then the tooltip reads `Censio Companion: Replay: Connecting to server`, then the replay states of today
   (`Replay: Connected`, `Replay: Receiving`), and at the end `Censio Companion: Replay finished: <n> ticks sent, 0
-  refused`. The server's pages show the profile `Replay <yyyy-MM-dd HH:mm:ss>` (the Companion's local start time)
+  refused` (`1 tick sent` for one). The server's pages show the profile `Replay <yyyy-MM-dd HH:mm:ss>` (the Companion's local start time)
   with the regions, islands and goods of the recording.
 - S2: Given a data page open in a browser, when the tester replays at a speed such as `10`, then the page updates with
   each tick the Companion sends (a replayed tick closes when the next frame is read, record 0036), the Companion banner shows the Companion connected with the replayed game state
