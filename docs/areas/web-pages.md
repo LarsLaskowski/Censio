@@ -183,8 +183,9 @@ logged.
   and the read is read inside the gate.
 - A page owns a cancellation token that it passes to every read, so a cancelled page leaves the gate. The token is
   cancelled when the request of the prerender is aborted and when the page is disposed (a navigation, the end of the
-  circuit). A closed interactive tab does not dispose the page at once: its circuit is kept until the retention of
-  disconnected circuits ends (default 3 minutes), so the read of a closed tab is cancelled that much later. A cancelled read ends quietly: nothing is
+  circuit). A closed tab disposes the page at once, because the browser tells the server when it hides the page; a tab whose
+  connection is lost without that signal keeps its circuit until the retention of disconnected circuits ends (default
+  3 minutes), so its read is cancelled that much later. A cancelled read ends quietly: nothing is
   shown, logged or retried.
 - A page keeps only a view: the shown names, the figures per region and island, and the rows of the shown island (at
   most 500 of them). It holds no reference to a profile state once the view is built, held states included. The memory of
