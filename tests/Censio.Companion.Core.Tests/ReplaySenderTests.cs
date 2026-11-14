@@ -63,6 +63,11 @@ public sealed class ReplaySenderTests
     private static readonly string[] _connectedAndEndLines = ["Replay connected to the server", "Replay sent 1 ticks, 1 refused"];
 
     /// <summary>
+    /// The lines of a connection that is lost.
+    /// </summary>
+    private static readonly string[] _connectedAndLostLines = ["Replay connected to the server", "Replay sending failed: server connection lost"];
+
+    /// <summary>
     /// The levels of the lines of a connection and its end.
     /// </summary>
     private static readonly LogLevel[] _connectedAndEndLevels = [LogLevel.Information, LogLevel.Information];
@@ -665,6 +670,338 @@ public sealed class ReplaySenderTests
     }
 
     /// <summary>
+    /// A token file that cannot be read or holds no valid token gives its problem and logs its reason.
+    /// </summary>
+    /// <param name="content">The content of the file; <c>null</c> for a file that does not exist</param>
+    /// <param name="expected">The expected problem</param>
+    /// <param name="expectedLine">The expected log line</param>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC5")]
+    [DataRow(null, ReplaySendProblemKind.TokenFileCannotBeRead, "Replay sending failed: token file cannot be read")]
+    [DataRow("too-short-token", ReplaySendProblemKind.TokenFileHoldsNoValidToken, "Replay sending failed: token file holds no valid token")]
+    public async Task ReplaySenderTokenFileProblemGivesItsKind(string? content, ReplaySendProblemKind expected, string expectedLine)
+    {
+        // Arrange
+        var logger = new RecordingLogger();
+        var connector = new DuplexReplayConnector(null);
+        await using var sender = CreateSender(connector, CreateTimeProvider(), logger, CreateTokenFilePath(content));
+
+        // Act
+        var problem = sender.Prepare();
+
+        // Assert
+        Assert.AreEqual(expected, problem, "The token file should give its problem");
+        Assert.AreSequenceEqual([expectedLine], logger.Entries.Select(entry => entry.Message), "The problem should be logged with its reason");
+        Assert.IsEmpty(connector.Addresses, "No connection should be opened");
+    }
+
+    /// <summary>
+    /// A tick without islands is neither sent nor counted, and the next tick is sent.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC1")]
+    public async Task ReplaySenderTickWithoutIslandsIsNotSent()
+    {
+        // Arrange
+        await using var server = ScriptedIngestServer.Create();
+        await using var sender = CreateSender(new DuplexReplayConnector(server.ClientSocket), CreateTimeProvider(), new RecordingLogger(), null);
+
+        await ConnectAcceptedAsync(sender, server);
+
+        // Act
+        var empty = await sender.SendTickAsync(CreateTick(0), TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+        var next = await SendAcknowledgedAsync(sender.SendTickAsync(CreateTick(2), TestContext.CancellationToken), server, null);
+
+        // Assert
+        Assert.IsNull(empty, "A tick without islands should give no problem");
+        Assert.IsNull(next, "The next tick should be acknowledged");
+        Assert.AreEqual(new ReplaySendCounts
+                        {
+                            Ticks = 1,
+                            Refused = 0
+                        },
+                        sender.Counts,
+                        "Only the tick with islands should be counted");
+    }
+
+    /// <summary>
+    /// A hello whose reply is a close frame is connection lost; one whose reply is not a readable hello reply is an invalid
+    /// reply.
+    /// </summary>
+    /// <param name="reply">The reply of the server</param>
+    /// <param name="expected">The expected problem</param>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC7")]
+    [DataRow("close", ReplaySendProblemKind.ConnectionLost)]
+    [DataRow("notJson", ReplaySendProblemKind.InvalidReply)]
+    [DataRow("binary", ReplaySendProblemKind.InvalidReply)]
+    [DataRow("acknowledgement", ReplaySendProblemKind.InvalidReply)]
+    public async Task ReplaySenderHelloReplyProblemGivesItsKind(string reply, ReplaySendProblemKind expected)
+    {
+        // Arrange
+        await using var server = ScriptedIngestServer.Create();
+        await using var sender = CreateSender(new DuplexReplayConnector(server.ClientSocket), CreateTimeProvider(), new RecordingLogger(), null);
+
+        // Act
+        var connecting = sender.ConnectServerAsync(TestContext.CancellationToken);
+
+        await server.ReceiveAsync(TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+        await ReplyToHelloAsync(server, reply);
+
+        var problem = await connecting.WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(expected, problem, $"The hello reply {reply} should give its problem");
+        Assert.AreEqual(WebSocketState.Aborted, server.ClientSocket.State, $"After the hello reply {reply} the connection should be closed");
+    }
+
+    /// <summary>
+    /// A hello the contract writer refuses is not sent and ends the connection as lost.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public async Task ReplaySenderHelloWriterRefusalGivesConnectionLost()
+    {
+        // Arrange
+        await using var server = ScriptedIngestServer.Create();
+        await using var sender = new ReplaySender(_address, null, new string('9', ContractReader.MaxStringBytes + 1), new DuplexReplayConnector(server.ClientSocket), CreateTimeProvider(), new RecordingLogger());
+
+        // Act
+        var problem = await sender.ConnectServerAsync(TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+        var received = await server.ReceiveAsync(TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(ReplaySendProblemKind.ConnectionLost, problem, "A hello the writer refuses should be connection lost");
+        Assert.IsNull(received, "The server should receive no hello, only the end of the connection");
+    }
+
+    /// <summary>
+    /// A reply of exactly 65,536 bytes is read as an acknowledgement.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC9")]
+    public async Task ReplaySenderReplyOfBoundIsRead()
+    {
+        // Arrange
+        await using var server = ScriptedIngestServer.Create();
+        await using var sender = CreateSender(new DuplexReplayConnector(server.ClientSocket), CreateTimeProvider(), new RecordingLogger(), null);
+
+        await ConnectAcceptedAsync(sender, server);
+
+        // Act
+        var problem = await SendTickWithAcknowledgementOfSizeAsync(sender, server, ReplaySender.MaxReplyBytes);
+
+        // Assert
+        Assert.IsNull(problem, "A reply of 65,536 bytes should be read");
+        Assert.AreEqual(new ReplaySendCounts
+                        {
+                            Ticks = 1,
+                            Refused = 0
+                        },
+                        sender.Counts,
+                        "The acknowledged tick should be counted");
+    }
+
+    /// <summary>
+    /// A reply of one byte more than 65,536 bytes is an invalid reply, also as a single frame.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC9")]
+    public async Task ReplaySenderReplyOneOverBoundIsInvalid()
+    {
+        // Arrange
+        await using var server = ScriptedIngestServer.Create();
+        await using var sender = CreateSender(new DuplexReplayConnector(server.ClientSocket), CreateTimeProvider(), new RecordingLogger(), null);
+
+        await ConnectAcceptedAsync(sender, server);
+
+        // Act
+        var problem = await SendTickWithAcknowledgementOfSizeAsync(sender, server, ReplaySender.MaxReplyBytes + 1);
+
+        // Assert
+        Assert.AreEqual(ReplaySendProblemKind.InvalidReply, problem, "A reply of 65,537 bytes should be an invalid reply");
+        Assert.AreEqual(0, sender.Counts.Ticks, "The tick should not be counted as sent");
+    }
+
+    /// <summary>
+    /// The caller's cancellation while connecting, sending or closing is rethrown and ends the connection.
+    /// </summary>
+    /// <param name="step">The step that is cancelled</param>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC10")]
+    [DataRow("connect")]
+    [DataRow("send")]
+    [DataRow("close")]
+    public async Task ReplaySenderCallerCancellationIsRethrown(string step)
+    {
+        // Arrange
+        await using var server = ScriptedIngestServer.Create();
+        await using var sender = CreateSender(new DuplexReplayConnector(server.ClientSocket), CreateTimeProvider(), new RecordingLogger(), null);
+        using var cancellation = new CancellationTokenSource();
+
+        // Act
+        var running = await StartCancelledStepAsync(sender, server, step, cancellation);
+
+        // Assert
+        await Assert.ThrowsAsync<OperationCanceledException>(() => running.WaitAsync(_guard, TestContext.CancellationToken), $"The cancelled {step} should rethrow the cancellation");
+        Assert.AreEqual(WebSocketState.Aborted, server.ClientSocket.State, $"The cancelled {step} should end the connection");
+    }
+
+    /// <summary>
+    /// A close the server does not answer is aborted after two seconds of the time provider, not before, and ends without
+    /// a problem.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC10")]
+    public async Task ReplaySenderCloseWithoutServerCloseAbortsAfterTwoSeconds()
+    {
+        // Arrange
+        await using var server = ScriptedIngestServer.Create();
+        var timeProvider = CreateTimeProvider();
+        var logger = new RecordingLogger();
+        await using var sender = CreateSender(new DuplexReplayConnector(server.ClientSocket), timeProvider, logger, null);
+
+        await ConnectAcceptedAsync(sender, server);
+
+        // Act
+        var closing = sender.CloseAsync(TestContext.CancellationToken);
+
+        await timeProvider.WaitForDelayAsync(TimeSpan.FromSeconds(2), TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+        timeProvider.Advance(TimeSpan.FromSeconds(2) - TimeSpan.FromTicks(1));
+
+        var isCompletedBefore = closing.IsCompleted;
+
+        timeProvider.Advance(TimeSpan.FromTicks(1));
+
+        var problem = await closing.WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        Assert.IsFalse(isCompletedBefore, "The close should wait for the server's close up to two seconds");
+        Assert.IsNull(problem, "A close the server does not answer should give no problem");
+        Assert.AreEqual(WebSocketState.Aborted, server.ClientSocket.State, "The connection should be aborted after two seconds");
+        Assert.Contains("Replay sent 0 ticks, 0 refused", logger.Entries.Select(entry => entry.Message), "The end should be logged");
+    }
+
+    /// <summary>
+    /// A close after a failure gives that failure and logs no end.
+    /// </summary>
+    /// <param name="failure">The failure</param>
+    /// <param name="expected">The expected problem</param>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC7")]
+    [DataRow("unreachable", ReplaySendProblemKind.ServerUnreachable)]
+    [DataRow("tokenRefused", ReplaySendProblemKind.TokenRefused)]
+    [DataRow("invalidReply", ReplaySendProblemKind.InvalidReply)]
+    public async Task ReplaySenderCloseAfterFailureGivesTheFailure(string failure, ReplaySendProblemKind expected)
+    {
+        // Arrange
+        await using var server = ScriptedIngestServer.Create();
+        var logger = new RecordingLogger();
+        var timeProvider = CreateTimeProvider();
+        await using var sender = CreateSender(new DuplexReplayConnector(failure == "unreachable" ? null : server.ClientSocket), timeProvider, logger, null);
+
+        await RunFailureAsync(sender, server, timeProvider, failure);
+
+        // Act
+        var problem = await sender.CloseAsync(TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(expected, problem, $"The close after {failure} should give that failure");
+        Assert.DoesNotContain(entry => entry.Message.StartsWith("Replay sent", StringComparison.Ordinal), logger.Entries, "A failed run should log no end");
+    }
+
+    /// <summary>
+    /// A status whose send fails ends the run as connection lost at the next awaited step.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC9")]
+    public async Task ReplaySenderStatusSendFailureGivesConnectionLost()
+    {
+        // Arrange
+        await using var server = ScriptedIngestServer.Create();
+        var socket = new SendFailingWebSocket(server.ClientSocket);
+        var logger = new RecordingLogger();
+        await using var sender = CreateSender(new DuplexReplayConnector(socket), CreateTimeProvider(), logger, null);
+
+        await ConnectAcceptedAsync(sender, server);
+        socket.FailSends();
+
+        // Act
+        sender.NotifyState(PipeConnectionState.Connected);
+
+        await socket.FailedSend.WaitAsync(_guard, TestContext.CancellationToken);
+
+        var problem = await sender.SendTickAsync(CreateTick(1), TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(ReplaySendProblemKind.ConnectionLost, problem, "A failed status send should end the run as connection lost");
+        Assert.ContainsSingle(entry => entry.Message == "Replay sending failed: server connection lost", logger.Entries, "The failure should be logged once");
+    }
+
+    /// <summary>
+    /// A tick or a close frame whose write fails ends the run as connection lost.
+    /// </summary>
+    /// <param name="step">The step whose write fails: tick or close</param>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC7")]
+    [DataRow("tick")]
+    [DataRow("close")]
+    public async Task ReplaySenderWriteFailureGivesConnectionLost(string step)
+    {
+        // Arrange
+        await using var server = ScriptedIngestServer.Create();
+        var socket = new SendFailingWebSocket(server.ClientSocket);
+        var logger = new RecordingLogger();
+        await using var sender = CreateSender(new DuplexReplayConnector(socket), CreateTimeProvider(), logger, null);
+
+        await ConnectAcceptedAsync(sender, server);
+        socket.FailSends();
+
+        // Act
+        var problem = await RunStepAsync(sender, step).WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(ReplaySendProblemKind.ConnectionLost, problem, $"A failed write of the {step} should be connection lost");
+        Assert.AreSequenceEqual(_connectedAndLostLines, logger.Entries.Select(entry => entry.Message), "The failure should be logged, and no end");
+    }
+
+    /// <summary>
+    /// The caller's cancellation before the connection is opened is rethrown.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC10")]
+    public async Task ReplaySenderCancelledBeforeConnectionIsRethrown()
+    {
+        // Arrange
+        await using var server = ScriptedIngestServer.Create();
+        var connector = new DuplexReplayConnector(server.ClientSocket);
+        await using var sender = CreateSender(connector, CreateTimeProvider(), new RecordingLogger(), null);
+        using var cancellation = new CancellationTokenSource();
+
+        await cancellation.CancelAsync();
+
+        // Act
+        var connecting = sender.ConnectServerAsync(cancellation.Token);
+
+        // Assert
+        await Assert.ThrowsAsync<OperationCanceledException>(() => connecting.WaitAsync(_guard, TestContext.CancellationToken), "The cancellation should be rethrown");
+        Assert.HasCount(1, connector.Addresses, "The connector should have been asked");
+        Assert.AreEqual(WebSocketState.Open, server.ClientSocket.State, "A socket the connector did not give should be left alone");
+    }
+
+    /// <summary>
     /// Creates a time provider that records its timers, at the start time in the local zone of the tests.
     /// </summary>
     /// <returns>The time provider</returns>
@@ -780,6 +1117,125 @@ public sealed class ReplaySenderTests
     }
 
     /// <summary>
+    /// Returns the path of a token file in a new temporary directory, written with a content or not written at all.
+    /// </summary>
+    /// <param name="content">The content; <c>null</c> for a file that does not exist</param>
+    /// <returns>The path of the file</returns>
+    private string CreateTokenFilePath(string? content)
+    {
+        if (content is not null)
+        {
+            return WriteTokenFile(content);
+        }
+
+        var directory = Path.Combine(Path.GetTempPath(), "censio-replay-sender-" + Guid.NewGuid().ToString("N"));
+
+        return Path.Combine(directory, "missing-token.txt");
+    }
+
+    /// <summary>
+    /// Answers the hello with a reply that is not a hello reply, or with a close frame.
+    /// </summary>
+    /// <param name="server">The server</param>
+    /// <param name="reply">The reply: close, notJson, binary or acknowledgement</param>
+    /// <returns>A task that completes when the reply is sent</returns>
+    private async Task ReplyToHelloAsync(ScriptedIngestServer server, string reply)
+    {
+        var acknowledgement = ScriptedIngestServer.Write(ScriptedIngestServer.CreateAcknowledgement(Guid.NewGuid(), null));
+
+        switch (reply)
+        {
+            case "close":
+                await server.CloseOutputAsync(TestContext.CancellationToken);
+                break;
+
+            case "notJson":
+                await server.SendRawAsync(Encoding.UTF8.GetBytes("not a contract message"), WebSocketMessageType.Text, TestContext.CancellationToken);
+                break;
+
+            case "binary":
+                await server.SendRawAsync(acknowledgement, WebSocketMessageType.Binary, TestContext.CancellationToken);
+                break;
+
+            default:
+                await server.SendRawAsync(acknowledgement, WebSocketMessageType.Text, TestContext.CancellationToken);
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Sends a tick and answers it with its acknowledgement padded with leading white space to a total size.
+    /// </summary>
+    /// <param name="sender">The sender</param>
+    /// <param name="server">The server</param>
+    /// <param name="size">The size of the reply in bytes</param>
+    /// <returns>The problem of the send</returns>
+    private async Task<ReplaySendProblemKind?> SendTickWithAcknowledgementOfSizeAsync(ReplaySender sender, ScriptedIngestServer server, int size)
+    {
+        var sending = sender.SendTickAsync(CreateTick(1), TestContext.CancellationToken);
+        var tick = await server.ReceiveAsync(TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+        var acknowledgementSize = ScriptedIngestServer.Write(ScriptedIngestServer.CreateAcknowledgement(ScriptedIngestServer.IdOf(tick), null)).Length;
+        var replying = SendIgnoringFailureAsync(server, CreatePaddedAcknowledgement(tick, size - acknowledgementSize));
+        var problem = await sending.WaitAsync(_guard, TestContext.CancellationToken);
+
+        await replying.WaitAsync(_guard, TestContext.CancellationToken);
+
+        return problem;
+    }
+
+    /// <summary>
+    /// Starts a step of the sender with a token that is cancelled while the step waits for the server.
+    /// </summary>
+    /// <param name="sender">The sender</param>
+    /// <param name="server">The server</param>
+    /// <param name="step">The step: connect, send or close</param>
+    /// <param name="cancellation">The source of the token</param>
+    /// <returns>The task of the cancelled step</returns>
+    private async Task<Task> StartCancelledStepAsync(ReplaySender sender, ScriptedIngestServer server, string step, CancellationTokenSource cancellation)
+    {
+        if (step == "connect")
+        {
+            var connecting = sender.ConnectServerAsync(cancellation.Token);
+
+            await server.ReceiveAsync(TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+            await cancellation.CancelAsync();
+
+            return connecting;
+        }
+
+        await ConnectAcceptedAsync(sender, server);
+
+        if (step == "send")
+        {
+            var sending = sender.SendTickAsync(CreateTick(1), cancellation.Token);
+
+            await server.ReceiveAsync(TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+            await cancellation.CancelAsync();
+
+            return sending;
+        }
+
+        var closing = sender.CloseAsync(cancellation.Token);
+
+        await cancellation.CancelAsync();
+
+        return closing;
+    }
+
+    /// <summary>
+    /// Runs a step of a connected sender: a tick send or the close.
+    /// </summary>
+    /// <param name="sender">The sender</param>
+    /// <param name="step">The step: tick or close</param>
+    /// <returns>The problem of the step</returns>
+    private Task<ReplaySendProblemKind?> RunStepAsync(ReplaySender sender, string step)
+    {
+        return step == "tick"
+                   ? sender.SendTickAsync(CreateTick(1), TestContext.CancellationToken)
+                   : sender.CloseAsync(TestContext.CancellationToken);
+    }
+
+    /// <summary>
     /// Connects a sender to the scripted server, which accepts the hello.
     /// </summary>
     /// <param name="sender">The sender</param>
@@ -891,6 +1347,9 @@ public sealed class ReplaySenderTests
         if (reply == "unawaited")
         {
             await server.SendAsync(ScriptedIngestServer.CreateAcknowledgement(Guid.NewGuid(), null), TestContext.CancellationToken);
+
+            // The sender reads the acknowledgement at once and closes, before the tick is sent.
+            await server.ReceiveAsync(TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
 
             return await sender.SendTickAsync(CreateTick(1), TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
         }

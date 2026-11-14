@@ -141,10 +141,15 @@ public sealed class ScriptedIngestServer : IAsyncDisposable
     /// Receives the next message of the client. A close frame is answered with a close frame.
     /// </summary>
     /// <param name="cancellationToken">The cancellation token</param>
-    /// <returns>The message, or <c>null</c> when the client closed or the connection ended</returns>
+    /// <returns>The message, or <c>null</c> when the client closed or the connection ended, also before this call</returns>
     public async Task<ContractMessage?> ReceiveAsync(CancellationToken cancellationToken)
     {
         var buffer = new ArrayBufferWriter<byte>();
+
+        if (_server.State is not (WebSocketState.Open or WebSocketState.CloseSent))
+        {
+            return null;
+        }
 
         try
         {

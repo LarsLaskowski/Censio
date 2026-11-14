@@ -4,7 +4,7 @@ namespace Censio.Companion.Core.Tests;
 
 /// <summary>
 /// An <see cref="IReplayServerConnector" /> that returns a given socket, or <c>null</c> for a server that cannot be reached,
-/// and records the addresses it was asked for.
+/// records the addresses it was asked for and throws for a cancelled token, as a connector does.
 /// </summary>
 public sealed class DuplexReplayConnector : IReplayServerConnector
 {
@@ -67,6 +67,8 @@ public sealed class DuplexReplayConnector : IReplayServerConnector
         {
             _addresses.Add(address);
         }
+
+        cancellationToken.ThrowIfCancellationRequested();
 
         return Task.FromResult(_socket);
     }

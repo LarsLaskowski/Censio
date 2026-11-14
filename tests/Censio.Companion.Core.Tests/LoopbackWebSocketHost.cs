@@ -17,7 +17,7 @@ using Microsoft.Extensions.Logging;
 namespace Censio.Companion.Core.Tests;
 
 /// <summary>
-/// A Kestrel host on 127.0.0.1 with ports chosen by the system: a WebSocket endpoint, an HTTP answer, a redirect and a
+/// A Kestrel host on 127.0.0.1 with ports chosen by the system: a WebSocket endpoint that echoes, an HTTP answer, a redirect and a
 /// held upgrade over plain HTTP, the WebSocket endpoint over TLS with a self-signed certificate created in memory (its key
 /// never persisted, no certificate store written), and a recording proxy that counts the connections it receives.
 /// </summary>
@@ -265,7 +265,7 @@ public sealed class LoopbackWebSocketHost : IAsyncDisposable
     }
 
     /// <summary>
-    /// Records a request to the WebSocket endpoint and accepts its upgrade, then reads until the client closes.
+    /// Records a request to the WebSocket endpoint and accepts its upgrade, then echoes every frame until the client closes.
     /// </summary>
     /// <param name="context">The request's context</param>
     /// <returns>A task that completes when the connection ends</returns>
@@ -289,6 +289,8 @@ public sealed class LoopbackWebSocketHost : IAsyncDisposable
 
             while (result.MessageType != WebSocketMessageType.Close)
             {
+                await socket.SendAsync(buffer.AsMemory(0, result.Count), result.MessageType, result.EndOfMessage, _stopping.Token).ConfigureAwait(false);
+
                 result = await socket.ReceiveAsync(buffer, _stopping.Token).ConfigureAwait(false);
             }
 

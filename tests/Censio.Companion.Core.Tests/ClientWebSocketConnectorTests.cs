@@ -20,6 +20,11 @@ public sealed class ClientWebSocketConnectorTests
     /// </summary>
     private static readonly TimeSpan _guard = TimeSpan.FromSeconds(10);
 
+    /// <summary>
+    /// The message the echo test sends.
+    /// </summary>
+    private static readonly byte[] _message = "replay message"u8.ToArray();
+
     #endregion // Fields
 
     #region Constructors
@@ -197,6 +202,58 @@ public sealed class ClientWebSocketConnectorTests
         Assert.IsFalse(isCompletedBefore, "The connection should still wait before the timeout");
         Assert.IsNull(socket, "An upgrade without an answer should give no socket");
         Assert.AreEqual(TimeSpan.FromSeconds(30), ClientWebSocketConnector.ConnectTimeout, "The connect timeout should be 30 seconds");
+    }
+
+    /// <summary>
+    /// The socket of a connection stays usable after the connect returned: a message goes to the server and its echo comes
+    /// back, and the connection closes normally.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public async Task ClientWebSocketConnectorConnectedSocketCarriesMessages()
+    {
+        // Arrange
+        await using var host = await LoopbackWebSocketHost.StartAsync(TestContext.CancellationToken);
+        var connector = new ClientWebSocketConnector(new FakeTimeProvider());
+        using var socket = await connector.ConnectAsync(host.WebSocketAddress(LoopbackWebSocketHost.IngestPath, false), TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+        var buffer = new byte[64];
+
+        Assert.IsNotNull(socket, "The WebSocket endpoint should give a socket");
+
+        // Act
+        await socket.SendAsync(_message.AsMemory(), WebSocketMessageType.Text, true, TestContext.CancellationToken);
+
+        var echo = await socket.ReceiveAsync(buffer.AsMemory(), TestContext.CancellationToken);
+
+        await socket.CloseAsync(WebSocketCloseStatus.NormalClosure, null, TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreSequenceEqual(_message, buffer.Take(echo.Count), "The echo of the message should come back over the connection");
+        Assert.AreEqual(WebSocketState.Closed, socket.State, "The connection should close normally");
+    }
+
+    /// <summary>
+    /// The caller's cancellation of a connection that waits for its upgrade is rethrown.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC10")]
+    public async Task ClientWebSocketConnectorCallerCancellationIsRethrown()
+    {
+        // Arrange
+        await using var host = await LoopbackWebSocketHost.StartAsync(TestContext.CancellationToken);
+        var connector = new ClientWebSocketConnector(new FakeTimeProvider());
+        using var cancellation = new CancellationTokenSource();
+
+        // Act
+        var connecting = connector.ConnectAsync(host.WebSocketAddress(LoopbackWebSocketHost.HeldPath, false), cancellation.Token);
+
+        await host.HeldRequestReceived.WaitAsync(_guard, TestContext.CancellationToken);
+        await cancellation.CancelAsync();
+
+        // Assert
+        await Assert.ThrowsAsync<OperationCanceledException>(() => connecting.WaitAsync(_guard, TestContext.CancellationToken), "The caller's cancellation should be rethrown");
     }
 
     #endregion // Methods
