@@ -13,3 +13,4 @@ are quoted in full.
 | 2026-11-14 18:42 | 6 Implement | Dev | Base href and _isOffsetSettled implemented, docs updated, suite green, coverage gate passes; AC5 test still deferred (sonnet/medium · 91,343 tokens · 12 tool uses · 198 s · 24 in · 6,073 out · 962,185 cache read · 39,668 cache write · 176,192 weighted) |
 | 2026-11-14 18:44 | 6 Coverage | Tester | AC5 test DataStatusNewAsOfShowsAtLastOffsetWhileAsking added, passes. Deferred: none (sonnet/medium · 86,625 tokens · 14 tool uses · 135 s · 20 in · 3,779 out · 774,381 cache read · 32,601 cache write · 137,104 weighted) |
 | 2026-11-14 18:45 | 6 Documentation | Orchestrator | written in 6 Implement |
+| 2026-11-14 18:47 | 7 Gate stamp | Orchestrator | PASS on 1fadba3996cc8c0d516d28c38928dfa3f6835f80 (tier standard): Format check pass; Analyzer gate pass; Test with coverage pass; Coverage gate pass; decision-check.py pass; scope-check.py pass · figure-check.py 0 hit(s) |
