@@ -19,14 +19,18 @@ recreation — a new token would silently lock out the Companion.
 
 ## Scenarios
 
-- S1: Given no volume `censio-config`, when the tester runs the documented `docker run`, then `/health` answers
-  `Healthy` and the log shows `An ingest token was generated and stored in '/config/ingest-token'.` and
+- S1: Given no volume `censio-config`, when the tester runs the documented `docker run` with an image newer than
+  `0.2.0` or built from a checkout (`--pull never … censio`), then `/health` answers `Healthy` and the log shows `An ingest token was generated and stored in '/config/ingest-token'.` and
   `The database '/config/censio.db' was created.`
 - S2: Given that server, when the tester recreates it with the documented steps (stop, remove, the same
   `docker run`), then the log shows `The ingest token is read from '/config/ingest-token'.` and
   `The database '/config/censio.db' was opened.`, and the token, the key ring and the stored profiles are the same.
 - S3: Given that server, when the tester updates it with the documented steps (pull the newer tag, remove, the same
   `docker run` with that tag), then S2 holds, with `... was updated to the current schema.` when the schema changed.
+  With `latest` the steps pull `networlddev/censio:latest` first, because `docker run` reuses a local `latest`.
+- S5: Given a server of the image `0.2.0`, which has no ingest token and no database, when the tester updates it to a
+  newer image, then the volume keeps the key ring only: the log shows the first-start lines of S1, and the documents
+  say to read the new token and enter it in the Companion.
 - S4: Given a server started with `CENSIO__INGEST__TOKENFILE`, when the tester recreates it, then the documents say
   to pass the same `-e` and `--mount` again.
 
@@ -59,11 +63,16 @@ recreation — a new token would silently lock out the Companion.
 - AC1: The CI image check, on a new empty named volume, finds `/config/ingest-token` with mode `600` owned by `1654`
   and the line `An ingest token was generated and stored in '/config/ingest-token'.` (S1, N4).
 - AC2: The CI image check, in a second container on the same volume after the first was removed, finds the same token
-  without printing it and the line `The ingest token is read from '/config/ingest-token'.`, besides its existing key
+  by comparing a hash of the file taken in each container (the token itself never reaches a variable that a
+  comparison, a failure message or an echo prints) and the line `The ingest token is read from '/config/ingest-token'.`, besides its existing key
   file and `was opened.` checks (S2, N4).
 - AC3: `README.md` and `docs/USER_GUIDE.md`, in English and German, give the steps to recreate and to update the
   container on the same volume, say what the volume keeps (key ring, ingest token, database) and what is lost
-  without it or when it is deleted, and that a token file is passed again (S2, S3, S4, E1, E2, E3, E4, N1, N2, N5).
+  without it or when it is deleted, that a token file is passed again, that `latest` is pulled before the update, and
+  that an update from `0.2.0` keeps only the key ring and needs the new token in the Companion; the sentence "Not yet
+  tried: the commands of this section in a container" of *Ingest endpoint and token* (both languages) states what
+  AC1 and AC2 now show and keeps *Not yet tried* for the rest (NAS hardware, an update from a published tag)
+  (S2, S3, S4, S5, E1, E2, E3, E4, N1, N2, N5).
 
 ## Out of scope
 
@@ -85,3 +94,16 @@ recreation — a new token would silently lock out the Companion.
 - [server](../../docs/areas/server.md), *Docker image*: "The key ring survives a recreation of a container that
   keeps `/config`" names the ingest token and the database as well.
 - [ingest](../../docs/areas/ingest.md), [server-data](../../docs/areas/server-data.md): unchanged.
+
+## Challenge
+
+- 1 (major, updates from `0.2.0`): accepted. Checked: the tag `v0.2.0` has `DataProtectionSetup.cs` but no
+  `IngestTokenSetup.cs` or `DatabaseSetup.cs`. S1 now names the images its log lines hold for, S5 covers the update
+  from `0.2.0` (key ring kept, first start for token and database, new token into the Companion), and AC3 requires
+  the documents to say so.
+- 2 (minor, `latest`): accepted. S3 and AC3 require the pull of `latest` before the update and the reason.
+- 3 (minor, token printed by the check): accepted. AC2 compares a hash of the file per container and forbids the
+  token in any printed variable (N4).
+- 4 (minor, stale *Not yet tried*): accepted. AC3 requires that sentence of *Ingest endpoint and token*, in both
+  languages, to state what AC1 and AC2 show and keep *Not yet tried* for NAS hardware and an update from a
+  published tag.
