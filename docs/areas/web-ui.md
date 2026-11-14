@@ -138,7 +138,7 @@ its English and German text there and to this table; the texts of the data pages
 
 ### Resources
 
-- A page loads its style sheets, scripts and images only from the server itself, by relative paths: MudBlazor's style
+- A page loads its style sheets, scripts and images only from the server itself, by paths relative to the document base `/` (`<base href="/">` in `App.razor`, so a page at any URL depth loads them): MudBlazor's style
   sheet and script, `css/censio.css`, `js/censio.js` and the Blazor script. No web font, no CDN, no external request.
 - `js/censio.js` offers three functions: `storePreference` writes a preference cookie, `setDocumentLanguage` sets the
   document language, and `utcOffsetMinutes(isoInstant)` gives the browser's UTC offset in minutes at that instant
@@ -162,6 +162,7 @@ its English and German text there and to this table; the texts of the data pages
 - [`decisions/0025-mudblazor-and-blazor-apexcharts-light-theme.md`](../decisions/0025-mudblazor-and-blazor-apexcharts-light-theme.md) — MudBlazor is the component library, with a light and a dark theme.
 - [`decisions/0071-web-ui-choices-kept-in-browser-cookies-written-by-a-script.md`](../decisions/0071-web-ui-choices-kept-in-browser-cookies-written-by-a-script.md) — the choices live in two cookies written by a script and read at render time.
 - [`decisions/0072-web-ui-texts-from-an-own-table-without-culture-data.md`](../decisions/0072-web-ui-texts-from-an-own-table-without-culture-data.md) — the texts come from an own table, without culture data.
+- [`decisions/0081-pages-resolve-resources-against-a-fixed-document-base.md`](../decisions/0081-pages-resolve-resources-against-a-fixed-document-base.md) — pages resolve their resources against the fixed document base `/`.
 
 ## Not here
 

@@ -95,9 +95,17 @@ logged. Users of the web application rely on it.
 ### As-of line and banner
 
 - Every data page shows `As of <time>` / `Stand: <time>` for the receive time of the shown profile's latest tick, as
-  `yyyy-MM-dd HH:mm` in both languages, at the UTC offset the browser gives for that instant. Until the browser has
-  answered, or when it cannot, the time is in UTC and carries the suffix ` UTC` ([record 0078](../decisions/0078-times-shown-at-the-browsers-utc-offset.md)).
+  `yyyy-MM-dd HH:mm` in both languages, at the UTC offset the browser gives for that instant, without a suffix.
+  Until the browser's first answer the line is an empty paragraph (one no-break space, so the table below does not
+  move): no time, no `As of` / `Stand:`, no ` UTC`. When the browser's answer is unusable (a failed call, an answer
+  that is no number, an offset out of range) the time is shown in UTC with the suffix ` UTC`. A new as-of time after
+  the first answer is shown at once at the last offset the browser gave, and follows the browser's answer for the new
+  instant ([record 0078](../decisions/0078-times-shown-at-the-browsers-utc-offset.md)).
   The server resolves no time zone; the browser is asked once for each new as-of time.
+- A browser that never answers leaves the line empty until the circuit's interactive-call timeout
+  (`CircuitOptions.JSInteropDefaultCallTimeout`, 1 minute by default; the server sets no option) ends the call, then the
+  time shows in UTC. While no interactive connection is ever made (for example WebSockets are blocked) the line stays
+  empty. A lost connection is counted as no usable answer, but the user sees Blazor's reconnect display, not the time.
 - A banner (a warning) above the as-of line shows the Companion's state ([`server-state.md`](server-state.md)):
 
   | State | English | German |

@@ -40,6 +40,11 @@ public sealed partial class DataStatus : IDisposable
     private DateTimeOffset? _askedInstant;
 
     /// <summary>
+    /// A value that indicates whether the browser's first answer about its offset, or its failure, has arrived.
+    /// </summary>
+    private bool _isOffsetSettled;
+
+    /// <summary>
     /// A value that indicates whether the component is disposed.
     /// </summary>
     private volatile bool _isDisposed;
@@ -134,6 +139,8 @@ public sealed partial class DataStatus : IDisposable
         {
             _offsetMinutes = null;
         }
+
+        _isOffsetSettled = true;
     }
 
     #endregion // Methods
