@@ -12,9 +12,7 @@ public sealed class ClientWebSocketConnector : IReplayServerConnector
     /// <summary>
     /// The time provider.
     /// </summary>
-#pragma warning disable S4487 // Skeleton: removed with the implementation
     private readonly TimeProvider _timeProvider;
-#pragma warning restore S4487 // Skeleton: removed with the implementation
 
     #endregion // Fields
 
@@ -43,12 +41,38 @@ public sealed class ClientWebSocketConnector : IReplayServerConnector
     #region IReplayServerConnector
 
     /// <inheritdoc />
-#pragma warning disable RH2003 // Skeleton: removed with the implementation
-    public Task<WebSocket?> ConnectAsync(Uri address, CancellationToken cancellationToken)
+    public async Task<WebSocket?> ConnectAsync(Uri address, CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        var socket = new ClientWebSocket();
+
+        try
+        {
+            using var handler = new SocketsHttpHandler
+                                {
+                                    UseProxy = false,
+                                    AllowAutoRedirect = false
+                                };
+            using var invoker = new HttpMessageInvoker(handler);
+            using var timeout = new CancellationTokenSource(ConnectTimeout, _timeProvider);
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeout.Token);
+
+            await socket.ConnectAsync(address, invoker, linked.Token).ConfigureAwait(false);
+
+            return socket;
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException || cancellationToken.IsCancellationRequested == false)
+        {
+            socket.Dispose();
+
+            return null;
+        }
+        catch (OperationCanceledException)
+        {
+            socket.Dispose();
+
+            throw;
+        }
     }
-#pragma warning restore RH2003 // Skeleton: removed with the implementation
 
     #endregion // IReplayServerConnector
 }
