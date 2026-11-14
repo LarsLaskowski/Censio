@@ -24,6 +24,16 @@ public sealed class CompanionCommandLine
     /// </summary>
     public PipeReplaySpeed Speed { get; init; }
 
+    /// <summary>
+    /// Gets the address of the server to send the replay to, if any.
+    /// </summary>
+    public Uri? ServerAddress { get; init; }
+
+    /// <summary>
+    /// Gets the path of the file that holds the token, if any.
+    /// </summary>
+    public string? TokenFilePath { get; init; }
+
     #endregion // Properties
 
     #region Methods
