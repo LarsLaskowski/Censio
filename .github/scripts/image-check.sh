@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
 # Builds the server image and checks it the way the acceptance criteria of feature 4 describe.
 # It also checks the cases of issue 64 (named "I64-AC7a" to "I64-AC7d"): the data-protection key ring in /config,
-# and the cases of issue 29 ("I29-AC1", "I29-AC2", "I29-AC6"): the SQLite database in /config.
+# and the cases of issue 29 ("I29-AC1", "I29-AC2", "I29-AC6"): the SQLite database in /config,
+# and the cases of feature 33 ("F33-AC1", "F33-AC2"): the ingest token file in /config and that a recreated
+# container on the same volume reads the same token (compared by a hash, never by the token itself).
 # Run from the repository root; needs docker, curl, git, dotnet and sudo (for the NAS case).
 # Pushes nothing and logs in nowhere. Every failure prints "image-check: <case>: <expected> / <actual>".
 set -euo pipefail
 
 dockerfile="src/Censio.Server/Dockerfile"
 missing="missing"
+readonly line_missing="line missing"
 work="${RUNNER_TEMP:-$(mktemp -d)}"
 containers=()
 declare -A started
@@ -152,7 +155,7 @@ expect_build_failure()
     fi
     if ! grep -Fxq -- "$line" < <(sed -E 's/^#[0-9]+ [0-9.]+ //' <<< "$output"); then
         echo "$output" >&2
-        fail "$case_name" "build output line '${line}'" "line missing"
+        fail "$case_name" "build output line '${line}'" "$line_missing"
     fi
 }
 
@@ -232,7 +235,7 @@ database_file="/config/censio.db"
 docker exec "$main" test -f "$database_file" || fail "I29-AC1" "${database_file} exists after the first start" "$missing"
 created_text="The database '${database_file}' was created."
 if ! docker logs "$main" 2>&1 | grep -Fq -- "$created_text"; then
-    fail "I29-AC1 log" "log line '${created_text}'" "line missing"
+    fail "I29-AC1 log" "log line '${created_text}'" "$line_missing"
 fi
 
 step "I29-AC6: the database file and its side files are owner-only"
@@ -242,6 +245,19 @@ for side_file in "${database_file}-wal" "${database_file}-shm"; do
         expect_equal "I29-AC6 ${side_file##*/} mode" "600" "$(docker exec "$main" stat -c %a "$side_file")"
     fi
 done
+
+step "F33-AC1: the first start stores the ingest token owner-only"
+token_file="/config/ingest-token"
+docker exec "$main" test -f "$token_file" || fail "F33-AC1" "${token_file} exists after the first start" "$missing"
+expect_equal "F33-AC1 mode and owner" "600:1654" "$(docker exec "$main" stat -c %a:%u "$token_file")"
+generated_text="An ingest token was generated and stored in '${token_file}'."
+if ! docker logs "$main" 2>&1 | grep -Fq -- "$generated_text"; then
+    fail "F33-AC1 log" "log line '${generated_text}'" "$line_missing"
+fi
+token_hash="$(docker exec "$main" sha256sum "$token_file" 2> /dev/null | cut -d ' ' -f 1 || true)"
+if [[ ! "$token_hash" =~ ^[0-9a-f]{64}$ ]]; then
+    fail "F33-AC1 hash" "a sha256 of ${token_file}" "none"
+fi
 
 step "AC5: container turns healthy"
 wait_healthy "AC5" "$main"
@@ -265,7 +281,18 @@ expect_equal "I64-AC7b key files" "$key_files" "$reused_files"
 opened_text="The database '${database_file}' was opened."
 step "I29-AC2: a new container on the same volume opens the database"
 if ! docker logs "$reuse_container" 2>&1 | grep -Fq -- "$opened_text"; then
-    fail "I29-AC2 log" "log line '${opened_text}'" "line missing"
+    fail "I29-AC2 log" "log line '${opened_text}'" "$line_missing"
+fi
+step "F33-AC2: a new container on the same volume reads the same ingest token"
+reused_hash="$(docker exec "$reuse_container" sha256sum "$token_file" 2> /dev/null | cut -d ' ' -f 1 || true)"
+expect_equal "F33-AC2 token hash" "$token_hash" "$reused_hash"
+read_text="The ingest token is read from '${token_file}'."
+reuse_log="$(docker logs "$reuse_container" 2>&1)"
+if ! grep -Fq -- "$read_text" <<< "$reuse_log"; then
+    fail "F33-AC2 log" "log line '${read_text}'" "$line_missing"
+fi
+if grep -Fq -- "$generated_text" <<< "$reuse_log"; then
+    fail "F33-AC2 log" "no line '${generated_text}'" "line present"
 fi
 docker rm -f "$reuse_container" > /dev/null
 
@@ -287,7 +314,7 @@ denied_log="$(docker logs "$denied_container" 2>&1 || true)"
 denied_text="The data-protection key ring cannot be stored in '${key_directory}'; the server stops. Make the data directory writable for the user the server runs as."
 if ! grep -Fq -- "$denied_text" <<< "$denied_log"; then
     echo "$denied_log" >&2
-    fail "I64-AC7d log" "log line '${denied_text}'" "line missing"
+    fail "I64-AC7d log" "log line '${denied_text}'" "$line_missing"
 fi
 docker rm -f "$denied_container" > /dev/null
 

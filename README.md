@@ -83,6 +83,8 @@ The server of the state of `main` and of later releases (not the image `0.2.0`) 
 docker exec censio cat /config/ingest-token
 ```
 
+To change a setting or to move to a newer image, recreate the container on the same volume: `docker stop censio`, `docker rm censio`, then the same `docker run` command with the new tag. The volume `censio-config` keeps the key ring, the ingest token and the database, so the Companion's token keeps working; pull `latest` first (`docker pull networlddev/censio:latest`), because `docker run` reuses a local `latest`. Without `-v` the data is lost with the container, and an update from `0.2.0` keeps only the key ring, so read the new token and enter it in the Companion. The [user guide](docs/USER_GUIDE.md) lists the steps.
+
 The [user guide](docs/USER_GUIDE.md) describes the data directory, the token, NAS hosts, TLS and the limits.
 
 ### Build the server from source
@@ -260,6 +262,8 @@ Der Server des Stands von `main` und späterer Releases (nicht das Image `0.2.0`
 ```text
 docker exec censio cat /config/ingest-token
 ```
+
+Um eine Einstellung zu ändern oder auf ein neueres Image zu wechseln, den Container auf demselben Volume neu erstellen: `docker stop censio`, `docker rm censio`, dann derselbe `docker run`-Befehl mit dem neuen Tag. Das Volume `censio-config` behält den Schlüsselring, das Ingest-Token und die Datenbank, deshalb gilt das Token des Companions weiter; `latest` zuerst laden (`docker pull networlddev/censio:latest`), weil `docker run` ein lokales `latest` wiederverwendet. Ohne `-v` gehen die Daten mit dem Container verloren, und ein Update von `0.2.0` behält nur den Schlüsselring, das neue Token also lesen und im Companion eintragen. Das [Benutzerhandbuch](docs/USER_GUIDE.md#censio-benutzerhandbuch) nennt die Schritte.
 
 Das [Benutzerhandbuch](docs/USER_GUIDE.md#censio-benutzerhandbuch) beschreibt das Datenverzeichnis, das Token, NAS-Hosts, TLS und die Einschränkungen.
 
