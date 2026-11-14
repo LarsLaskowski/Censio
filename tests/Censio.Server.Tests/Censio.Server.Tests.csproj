@@ -13,7 +13,11 @@
     <Compile Include="..\Censio.Server.Data.Tests\RecordingLoggerProvider.cs" Link="RecordingLoggerProvider.cs" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="..\Censio.Pipe.Tests\Fixtures\long-session.jsonl" Link="Fixtures\Pipe\long-session.jsonl" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\..\src\Censio.Server\Censio.Server.csproj" />
     <ProjectReference Include="..\..\src\Censio.Contracts\Censio.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\Censio.Companion.Core\Censio.Companion.Core.csproj" />
   </ItemGroup>
 </Project>

@@ -12,7 +12,8 @@ using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
 
 using MudBlazor;
-using MudBlazor.Services;
+
+using TestContext = Microsoft.VisualStudio.TestTools.UnitTesting.TestContext;
 
 namespace Censio.Server.Tests;
 
@@ -71,6 +72,52 @@ public sealed class MainLayoutTests
 
     #endregion // Constants
 
+    #region Fields
+
+    /// <summary>
+    /// The first profile of the tests, first among equal names.
+    /// </summary>
+    private static readonly Guid _firstProfile = new("11111111-1111-4111-8111-111111111111");
+
+    /// <summary>
+    /// The second profile of the tests.
+    /// </summary>
+    private static readonly Guid _secondProfile = new("22222222-2222-4222-8222-222222222222");
+
+    /// <summary>
+    /// The third profile of the tests.
+    /// </summary>
+    private static readonly Guid _thirdProfile = new("33333333-3333-4333-8333-333333333333");
+
+    /// <summary>
+    /// The fourth profile of the tests.
+    /// </summary>
+    private static readonly Guid _fourthProfile = new("44444444-4444-4444-8444-444444444444");
+
+    #endregion // Fields
+
+    #region Constructors
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="MainLayoutTests" /> class.
+    /// </summary>
+    /// <param name="testContext">The test context</param>
+    public MainLayoutTests(TestContext testContext)
+    {
+        TestContext = testContext;
+    }
+
+    #endregion // Constructors
+
+    #region Properties
+
+    /// <summary>
+    /// Gets the test context.
+    /// </summary>
+    public TestContext TestContext { get; }
+
+    #endregion // Properties
+
     #region Methods
 
     /// <summary>
@@ -91,7 +138,9 @@ public sealed class MainLayoutTests
     public async Task MainLayoutThemeSwitchTogglesDarkModeWithoutReload(UiTheme startTheme, UiLanguage language, string switchLabel, UiTheme expectedTheme, string expectedLabel)
     {
         // Arrange
-        await using var context = CreateContext();
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken);
+
+        var context = host.Context;
         var layout = RenderLayout(context, startTheme, language);
 
         // Act
@@ -118,7 +167,9 @@ public sealed class MainLayoutTests
     public async Task MainLayoutThemeSwitchStoresChoice(UiTheme startTheme, string switchLabel, string expectedValue)
     {
         // Arrange
-        await using var context = CreateContext();
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken);
+
+        var context = host.Context;
         var layout = RenderLayout(context, startTheme, UiLanguage.English);
 
         // Act
@@ -140,7 +191,9 @@ public sealed class MainLayoutTests
     public async Task MainLayoutThemeSwitchWhenStoreFailsKeepsThemeAndLogsKindOnly()
     {
         // Arrange
-        await using var context = CreateContext();
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken);
+
+        var context = host.Context;
         var loggerProvider = new Censio.Server.Data.Tests.RecordingLoggerProvider();
         using var loggerFactory = LoggerFactory.Create(builder => builder.AddProvider(loggerProvider).SetMinimumLevel(LogLevel.Trace));
 
@@ -180,7 +233,9 @@ public sealed class MainLayoutTests
     public async Task MainLayoutLanguageSwitchChangesTextsAndDocumentLanguage(UiLanguage startLanguage, string menuLabel, string option, UiLanguage expectedLanguage, string expectedTag)
     {
         // Arrange
-        await using var context = CreateContext();
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken);
+
+        var context = host.Context;
         var layout = RenderLayout(context, UiTheme.Light, startLanguage);
         var expected = SpecTexts(expectedLanguage);
 
@@ -192,7 +247,7 @@ public sealed class MainLayoutTests
 
         Assert.HasCount(1, layout.FindAll(ByLabel(expected.NavigationButton)), $"The navigation button should be named '{expected.NavigationButton}'");
         Assert.AreEqual(expected.HomeEntry, layout.Find(".mud-nav-link").TextContent.Trim(), "The start page's entry should be in the chosen language");
-        Assert.AreEqual(expected.ProfileSwitch, layout.Find("button[disabled]").TextContent.Trim(), "The profile switch should be in the chosen language");
+        Assert.HasCount(1, ProfileSwitches(layout, expected.ProfileSwitch), "The profile switch should be in the chosen language");
         Assert.HasCount(1, layout.FindAll(ByLabel(expected.SwitchToDarkTheme)), $"The theme switch should be named '{expected.SwitchToDarkTheme}'");
         Assert.HasCount(1, layout.FindAll(ByLabel(expected.LanguageSwitch)), $"The language switch should be named '{expected.LanguageSwitch}'");
         Assert.HasCount(1, documentLanguage, "The document language should be set once");
@@ -215,7 +270,9 @@ public sealed class MainLayoutTests
     public async Task MainLayoutLanguageSwitchStoresChoice(UiLanguage startLanguage, string menuLabel, string option, string expectedValue)
     {
         // Arrange
-        await using var context = CreateContext();
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken);
+
+        var context = host.Context;
         var layout = RenderLayout(context, UiTheme.Light, startLanguage);
 
         // Act
@@ -237,7 +294,9 @@ public sealed class MainLayoutTests
     public async Task MainLayoutLanguageSwitchCascadesCurrentLanguageToPage()
     {
         // Arrange
-        await using var context = CreateContext();
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken);
+
+        var context = host.Context;
         var layout = RenderLayout(context, UiTheme.Light, UiLanguage.English, RenderProbe);
 
         // Act
@@ -249,7 +308,7 @@ public sealed class MainLayoutTests
     }
 
     /// <summary>
-    /// The profile switch is disabled and shows only its label, without any profile service registered.
+    /// Without a profile the profile switch is disabled and shows only its label.
     /// </summary>
     /// <param name="language">The language shown</param>
     /// <param name="expectedLabel">The label of the spec's table</param>
@@ -258,10 +317,12 @@ public sealed class MainLayoutTests
     [TestCategory("AC7")]
     [DataRow(UiLanguage.English, "Profile")]
     [DataRow(UiLanguage.German, "Profil")]
-    public async Task MainLayoutProfileSwitchIsDisabledWithLabelOnly(UiLanguage language, string expectedLabel)
+    public async Task MainLayoutProfileSwitchDisabledWithoutProfiles(UiLanguage language, string expectedLabel)
     {
         // Arrange
-        await using var context = CreateContext();
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken);
+
+        var context = host.Context;
 
         // Act
         var layout = RenderLayout(context, UiTheme.Light, language);
@@ -271,6 +332,191 @@ public sealed class MainLayoutTests
 
         Assert.HasCount(1, disabledButtons, "The profile switch should be the one disabled button");
         Assert.AreEqual(expectedLabel, disabledButtons[0].TextContent.Trim(), "The profile switch should show only its label");
+    }
+
+    /// <summary>
+    /// Once profiles exist, the profile switch is enabled and lists them by shown name, the unnamed one under the unnamed
+    /// text and equal names told apart by the first eight characters of their identity, each a link to its overview.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public async Task MainLayoutProfileSwitchListsByNameWithIdentityForEqualNames()
+    {
+        // Arrange
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken);
+
+        await host.StoreProfileAsync(_secondProfile, "Beta");
+        await host.StoreProfileAsync(_fourthProfile, string.Empty);
+        await host.StoreProfileAsync(_thirdProfile, "alpha");
+        await host.StoreProfileAsync(_firstProfile, "Beta");
+
+        var layout = RenderLayout(host.Context, UiTheme.Light, UiLanguage.English);
+
+        // Act
+        await OpenProfileSwitchAsync(layout);
+
+        // Assert
+        Assert.IsFalse(ProfileSwitches(layout, "Profile").Single().HasAttribute("disabled"), "The profile switch should be enabled once a profile exists");
+        Assert.AreSequenceEqual(PageTestHost.Expect("alpha", "Beta (11111111)", "Beta (22222222)", "Unnamed profile"), ProfileItems(layout), "The profiles should be listed by shown name");
+        Assert.AreSequenceEqual(PageTestHost.Expect(ProfileLink(_thirdProfile), ProfileLink(_firstProfile), ProfileLink(_secondProfile), ProfileLink(_fourthProfile)), ProfileItemLinks(layout), "Each profile should link to its region overview");
+    }
+
+    /// <summary>
+    /// The profile switch lists at most 100 profiles, then the line with the number of the others, which links nowhere.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public async Task MainLayoutProfileSwitchListsAtMost100()
+    {
+        // Arrange
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken);
+
+        await StoreNumberedProfilesAsync(host, 101);
+
+        var layout = RenderLayout(host.Context, UiTheme.Light, UiLanguage.English);
+
+        // Act
+        await OpenProfileSwitchAsync(layout);
+
+        // Assert
+        var expected = Enumerable.Range(1, 100).Select(number => string.Create(CultureInfo.InvariantCulture, $"Profile {number:000}")).Append("1 more profiles").ToList();
+        var links = ProfileItemLinks(layout);
+
+        Assert.AreSequenceEqual(expected, ProfileItems(layout), "The switch should list the first 100 profiles and then the number of the others");
+        Assert.IsNull(links[^1], "The line with the number of the others should link nowhere");
+    }
+
+    /// <summary>
+    /// A tick of a new profile stored while the frame is open adds the profile to the profile switch without a reload.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC6")]
+    public async Task MainLayoutProfileSwitchListsNewProfileLive()
+    {
+        // Arrange
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken);
+
+        await host.StoreProfileAsync(_firstProfile, "First");
+
+        var layout = RenderLayout(host.Context, UiTheme.Light, UiLanguage.English);
+
+        await OpenProfileSwitchAsync(layout);
+
+        // Act
+        await host.StoreTicksAsync(PageTestHost.Tick(_secondProfile, 0, PageTestHost.Island(3245, 1, "Isle A", PageTestHost.Entry(1, 1f, 1f, 0f, 1, 100f))));
+
+        // Assert
+        await layout.WaitForAssertionAsync(() => Assert.AreSequenceEqual(PageTestHost.Expect("First", "Unnamed profile"), ProfileItems(layout), "The new profile should be listed without a reload"), PageTestHost.WaitBound);
+        Assert.IsEmpty(host.Context.Services.GetRequiredService<BunitNavigationManager>().History, "The update should not navigate or reload");
+    }
+
+    /// <summary>
+    /// On a page whose address carries a profile, the Regions entry of the navigation links to that profile's overview;
+    /// after a navigation to an address without a profile it links to <c>/regions</c> again.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public async Task MainLayoutRegionsEntryCarriesShownProfile()
+    {
+        // Arrange
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken);
+
+        var navigation = host.Context.Services.GetRequiredService<BunitNavigationManager>();
+
+        navigation.NavigateTo($"/profiles/{_firstProfile}/islands/3245/1/0");
+
+        var layout = RenderLayout(host.Context, UiTheme.Light, UiLanguage.English);
+
+        Assert.AreEqual(ProfileLink(_firstProfile), RegionsEntryLink(layout), "The Regions entry should carry the profile of the address");
+
+        // Act
+        navigation.NavigateTo("/");
+
+        // Assert
+        await layout.WaitForAssertionAsync(() => Assert.AreEqual("/regions", RegionsEntryLink(layout), "The Regions entry should lead to /regions on an address without a profile"), PageTestHost.WaitBound);
+    }
+
+    /// <summary>
+    /// A hello that renames a listed profile changes its line in the profile switch without a reload.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC6")]
+    public async Task MainLayoutProfileSwitchShowsHelloRenameLive()
+    {
+        // Arrange
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken);
+
+        await host.StoreProfileAsync(_firstProfile, "Old name");
+
+        var layout = RenderLayout(host.Context, UiTheme.Light, UiLanguage.English);
+
+        await OpenProfileSwitchAsync(layout);
+
+        // Act
+        await host.StoreProfileAsync(_firstProfile, "New name");
+
+        // Assert
+        await layout.WaitForAssertionAsync(() => Assert.AreSequenceEqual(PageTestHost.Expect("New name"), ProfileItems(layout), "The renamed profile should be listed under its new name without a reload"), PageTestHost.WaitBound);
+        Assert.IsEmpty(host.Context.Services.GetRequiredService<BunitNavigationManager>().History, "The update should not navigate or reload");
+    }
+
+    /// <summary>
+    /// A tick of a listed profile keeps the profile switch's lines and links as they were.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC6")]
+    public async Task MainLayoutProfileSwitchKeepsLinesOnTickOfListedProfile()
+    {
+        // Arrange
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken);
+
+        await host.StoreProfileAsync(_firstProfile, "First");
+
+        var layout = RenderLayout(host.Context, UiTheme.Light, UiLanguage.English);
+
+        await OpenProfileSwitchAsync(layout);
+
+        var rendersBefore = layout.RenderCount;
+
+        // Act
+        await host.StoreTicksAsync(PageTestHost.Tick(_firstProfile, 0, PageTestHost.Island(3245, 1, "Isle A", PageTestHost.Entry(1, 1f, 1f, 0f, 1, 100f))));
+
+        // Assert
+        await layout.WaitForStateAsync(() => layout.RenderCount > rendersBefore, PageTestHost.WaitBound);
+
+        Assert.AreSequenceEqual(PageTestHost.Expect("First"), ProfileItems(layout), "The listed profile should keep its line");
+        Assert.AreSequenceEqual(PageTestHost.Expect(ProfileLink(_firstProfile)), ProfileItemLinks(layout), "The listed profile should keep its link");
+    }
+
+    /// <summary>
+    /// A profile name with markup shows its characters in the profile switch, not markup.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC10")]
+    public async Task MainLayoutProfileNameWithMarkupShowsCharacters()
+    {
+        // Arrange
+        const string name = "<b>Bold</b> & <img src=x>";
+
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken);
+
+        await host.StoreProfileAsync(_firstProfile, name);
+
+        var layout = RenderLayout(host.Context, UiTheme.Light, UiLanguage.English);
+
+        // Act
+        await OpenProfileSwitchAsync(layout);
+
+        // Assert
+        Assert.AreSequenceEqual(PageTestHost.Expect(name), ProfileItems(layout), "The profile name should show its characters");
+        Assert.IsEmpty(layout.FindAll(".mud-menu-item b, .mud-menu-item img"), "The profile name should not be rendered as markup");
     }
 
     /// <summary>
@@ -286,7 +532,9 @@ public sealed class MainLayoutTests
     public async Task MainLayoutNavigationButtonClosesAndOpensDrawer(int clicks, string expectedState)
     {
         // Arrange
-        await using var context = CreateContext();
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken);
+
+        var context = host.Context;
         var layout = RenderLayout(context, UiTheme.Light, UiLanguage.English);
 
         // Act
@@ -308,27 +556,15 @@ public sealed class MainLayoutTests
     public async Task MainLayoutRenderDoesNotWatchSystemDarkMode(UiTheme theme)
     {
         // Arrange
-        await using var context = CreateContext();
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken);
+
+        var context = host.Context;
 
         // Act
         RenderLayout(context, theme, UiLanguage.English);
 
         // Assert
         Assert.IsEmpty(context.JSInterop.Invocations.Where(invocation => invocation.Identifier == WatchDarkMode).Select(invocation => invocation.Identifier), "The layout should not watch the system's colour scheme");
-    }
-
-    /// <summary>
-    /// Creates a bUnit context with MudBlazor's services and loose JavaScript interop.
-    /// </summary>
-    /// <returns>The context</returns>
-    private static BunitContext CreateContext()
-    {
-        var context = new BunitContext();
-
-        context.JSInterop.Mode = JSRuntimeMode.Loose;
-        context.Services.AddMudServices();
-
-        return context;
     }
 
     /// <summary>
@@ -403,6 +639,81 @@ public sealed class MainLayoutTests
         var color = theme == UiTheme.Dark ? mudTheme.PaletteDark.Background : mudTheme.PaletteLight.Background;
 
         return string.Create(CultureInfo.InvariantCulture, $"--mud-palette-background: rgba({color.R},{color.G},{color.B},1)");
+    }
+
+    /// <summary>
+    /// Stores profiles named <c>Profile 001</c> and onwards, each with a new identity.
+    /// </summary>
+    /// <param name="host">The host</param>
+    /// <param name="count">The number of profiles</param>
+    /// <returns>A task that completes when the profiles are stored</returns>
+    private static async Task StoreNumberedProfilesAsync(PageTestHost host, int count)
+    {
+        foreach (var number in Enumerable.Range(1, count))
+        {
+            await host.StoreProfileAsync(Guid.NewGuid(), string.Create(CultureInfo.InvariantCulture, $"Profile {number:000}"));
+        }
+    }
+
+    /// <summary>
+    /// Gives the buttons of the app bar whose text is the profile switch's label.
+    /// </summary>
+    /// <param name="layout">The rendered layout</param>
+    /// <param name="label">The label of the profile switch</param>
+    /// <returns>The buttons</returns>
+    private static List<AngleSharp.Dom.IElement> ProfileSwitches(IRenderedComponent<MainLayout> layout, string label)
+    {
+        return [.. layout.FindAll(".mud-appbar button").Where(button => button.TextContent.Trim() == label)];
+    }
+
+    /// <summary>
+    /// Opens the English profile switch.
+    /// </summary>
+    /// <param name="layout">The rendered layout</param>
+    /// <returns>A task that completes when the switch is open</returns>
+    private static async Task OpenProfileSwitchAsync(IRenderedComponent<MainLayout> layout)
+    {
+        await ProfileSwitches(layout, "Profile").Single().ClickAsync(new MouseEventArgs());
+    }
+
+    /// <summary>
+    /// Gives the texts of the open profile switch's lines.
+    /// </summary>
+    /// <param name="layout">The rendered layout</param>
+    /// <returns>The texts</returns>
+    private static List<string> ProfileItems(IRenderedComponent<MainLayout> layout)
+    {
+        return [.. layout.FindAll(".mud-menu-item").Select(item => item.TextContent.Trim())];
+    }
+
+    /// <summary>
+    /// Gives the addresses the open profile switch's lines link to, <see langword="null" /> for a line without a link.
+    /// </summary>
+    /// <param name="layout">The rendered layout</param>
+    /// <returns>The addresses</returns>
+    private static List<string?> ProfileItemLinks(IRenderedComponent<MainLayout> layout)
+    {
+        return [.. layout.FindAll(".mud-menu-item").Select(item => item.GetAttribute("href") ?? item.QuerySelector("a")?.GetAttribute("href") ?? item.Closest("a")?.GetAttribute("href"))];
+    }
+
+    /// <summary>
+    /// Gives the address the Regions entry of the navigation links to.
+    /// </summary>
+    /// <param name="layout">The rendered layout</param>
+    /// <returns>The address, or <see langword="null" /> when the entry has none</returns>
+    private static string? RegionsEntryLink(IRenderedComponent<MainLayout> layout)
+    {
+        return layout.FindAll(".mud-nav-link").Single(link => link.TextContent.Trim() == "Regions").GetAttribute("href");
+    }
+
+    /// <summary>
+    /// Gives the address of a profile's region overview.
+    /// </summary>
+    /// <param name="profileId">The profile identity</param>
+    /// <returns>The address</returns>
+    private static string ProfileLink(Guid profileId)
+    {
+        return $"/profiles/{profileId}/regions";
     }
 
     /// <summary>

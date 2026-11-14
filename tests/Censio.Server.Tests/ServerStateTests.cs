@@ -107,6 +107,46 @@ public sealed class ServerStateTests
     /// </summary>
     private const string BreakCatalogDocumentSql = "UPDATE \"Catalog\" SET \"Document\" = x'6E6F74206A736F6E';";
 
+    /// <summary>
+    /// The text of a value that is not there, in the descriptions.
+    /// </summary>
+    private const string NoValue = "<none>";
+
+    /// <summary>
+    /// The session GUID of the region entry of <see cref="CreateNamedCatalog" />.
+    /// </summary>
+    private const int RegionSessionGuid = 3245;
+
+    /// <summary>
+    /// The region GUID of the region entry of <see cref="CreateNamedCatalog" />.
+    /// </summary>
+    private const int SharedRegionGuid = 7;
+
+    /// <summary>
+    /// The GUID of the good of <see cref="CreateNamedCatalog" />, negative as the catalog allows.
+    /// </summary>
+    private const int GoodGuid = -2002;
+
+    /// <summary>
+    /// A GUID <see cref="CreateNamedCatalog" /> has no entry for.
+    /// </summary>
+    private const int MissingGuid = 5;
+
+    /// <summary>
+    /// The English name of the region entry of <see cref="CreateNamedCatalog" />.
+    /// </summary>
+    private const string RegionEnglish = "Region name 4c1e";
+
+    /// <summary>
+    /// The German name of the region entry of <see cref="CreateNamedCatalog" />.
+    /// </summary>
+    private const string RegionGerman = "Regionsname 4c1e";
+
+    /// <summary>
+    /// The English name of the good of <see cref="CreateNamedCatalog" />, which has no German name.
+    /// </summary>
+    private const string GoodEnglish = "Good name 1c5a";
+
     #endregion // Constants
 
     #region Fields
@@ -130,6 +170,11 @@ public sealed class ServerStateTests
     /// The islands <see cref="ServerStateStoreTickAsyncOlderTickIslandNamesEqualStore" /> expects the store to list.
     /// </summary>
     private static readonly string[] _expectedOlderTickIslands = ["1/1/0 Name of the latest tick", "2/2/0 Island only of an older tick"];
+
+    /// <summary>
+    /// What the lookup of <see cref="CreateNamedCatalog" /> finds, as <see cref="DescribeLookup" /> describes it.
+    /// </summary>
+    private static readonly string[] _expectedLookup = [$"{RegionSessionGuid} Region en {RegionEnglish} de {RegionGerman} region {SharedRegionGuid} icon {IconReference(1)}", $"{GoodGuid} Good en {GoodEnglish} de {NoValue} region {NoValue} icon {NoValue}", $"{MissingGuid} <no entry>"];
 
     /// <summary>
     /// The temporary directories of the running test, deleted afterwards.
@@ -1224,6 +1269,407 @@ public sealed class ServerStateTests
     }
 
     /// <summary>
+    /// Before any Companion connected, the Companion state is not connected and has no pipe state.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC8")]
+    public async Task ServerStateCompanionStateWithoutCompanionIsDisconnected()
+    {
+        // Arrange
+        var (_, state) = await OpenRestoredAsync(null);
+
+        // Act
+        var companion = state.CompanionState;
+
+        // Assert
+        Assert.AreEqual(DescribeCompanion(false, null), DescribeCompanion(companion), "Without a Companion the state should be not connected without a pipe state");
+    }
+
+    /// <summary>
+    /// Each change of the Companion's connection or pipe state tells the followers a Companion notice without a profile; a
+    /// pipe state equal to the last one and a second disconnect tell nothing, and the disconnect forgets the pipe state.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC8")]
+    public async Task ServerStateCompanionChangesNotifyFollowers()
+    {
+        // Arrange
+        var (_, state) = await OpenRestoredAsync(null);
+
+        var laterProfile = Guid.NewGuid();
+        var (notices, told) = Follow(state, 5);
+
+        // Act
+        state.SetCompanionConnected();
+        state.SetCompanionPipeState(ContractPipeState.WaitingForGame);
+        state.SetCompanionPipeState(ContractPipeState.WaitingForGame);
+        state.SetCompanionPipeState(ContractPipeState.PipeBusy);
+        state.SetCompanionDisconnected();
+        state.SetCompanionDisconnected();
+
+        // Assert
+        await StoreTicksAsync(state, CreateTick(laterProfile, 100, CreateIsland(1, IslandName, CreateEntry(1))));
+        await told.WaitAsync(_waitBound, TestContext.CancellationToken);
+
+        var companionNotice = DescribeNotice(ServerStateChangeKind.Companion, null);
+        var expected = new[] { companionNotice, companionNotice, companionNotice, companionNotice, DescribeNotice(ServerStateChangeKind.Profile, laterProfile) };
+
+        Assert.AreSequenceEqual(expected.Order(StringComparer.Ordinal).ToList(), notices.Order(StringComparer.Ordinal).ToList(), "The followers should be told of the connect, the two new pipe states and the disconnect, and of nothing that did not change");
+        Assert.AreEqual(DescribeCompanion(false, null), DescribeCompanion(state.CompanionState), "After the disconnect the state should be not connected without a pipe state");
+    }
+
+    /// <summary>
+    /// A pipe state of the connected Companion is kept with the connection.
+    /// </summary>
+    /// <param name="pipeState">The pipe state</param>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC8")]
+    [DataRow(ContractPipeState.WaitingForGame)]
+    [DataRow(ContractPipeState.Connected)]
+    [DataRow(ContractPipeState.Receiving)]
+    [DataRow(ContractPipeState.PipeBusy)]
+    [DataRow(ContractPipeState.ProtocolMismatch)]
+    [DataRow(ContractPipeState.Error)]
+    public async Task ServerStateSetCompanionPipeStateKeepsConnectionAndPipeState(ContractPipeState pipeState)
+    {
+        // Arrange
+        var (_, state) = await OpenRestoredAsync(null);
+
+        state.SetCompanionConnected();
+
+        // Act
+        state.SetCompanionPipeState(pipeState);
+
+        // Assert
+        Assert.AreEqual(DescribeCompanion(true, pipeState), DescribeCompanion(state.CompanionState), "The connected Companion should carry the pipe state it reported");
+    }
+
+    /// <summary>
+    /// A Companion that connects after another reported a pipe state starts without a pipe state: no status since its hello.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC8")]
+    public async Task ServerStateSetCompanionConnectedStartsWithoutPipeState()
+    {
+        // Arrange
+        var (_, state) = await OpenRestoredAsync(null);
+
+        state.SetCompanionConnected();
+        state.SetCompanionPipeState(ContractPipeState.Error);
+        state.SetCompanionDisconnected();
+
+        // Act
+        state.SetCompanionConnected();
+
+        // Assert
+        Assert.AreEqual(DescribeCompanion(true, null), DescribeCompanion(state.CompanionState), "The newly connected Companion should have no pipe state");
+    }
+
+    /// <summary>
+    /// A profile known only from a hello, without a stored tick, is no newest profile.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public async Task ServerStateNewestProfileWithoutTickIsNull()
+    {
+        // Arrange
+        var (_, state) = await OpenRestoredAsync(null);
+
+        await state.StoreProfileAsync(Guid.NewGuid(), ProfileName, TestContext.CancellationToken);
+
+        // Act
+        var newest = state.NewestProfile;
+
+        // Assert
+        Assert.IsNull(newest, "A profile without a tick should not be the newest profile");
+    }
+
+    /// <summary>
+    /// The newest profile is the held profile with the newest latest tick, of equal receive times the one stored later; an
+    /// older tick stored last does not make its profile the newest.
+    /// </summary>
+    /// <param name="actSeconds">The receive time of the first profile's tick stored last</param>
+    /// <param name="expectedIndex">The index of the expected newest profile</param>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC7")]
+    [DataRow(10, 1)]
+    [DataRow(30, 0)]
+    [DataRow(40, 0)]
+    public async Task ServerStateNewestProfileFollowsReceiveTimeThenStoringOrder(int actSeconds, int expectedIndex)
+    {
+        // Arrange
+        var (_, state) = await OpenRestoredAsync(null);
+
+        Guid[] profiles = [Guid.NewGuid(), Guid.NewGuid()];
+
+        await StoreTicksAsync(state,
+                              CreateTick(profiles[0], 20, CreateIsland(1, IslandName, CreateEntry(1))),
+                              CreateTick(profiles[1], 30, CreateIsland(1, IslandName, CreateEntry(2))));
+
+        // Act
+        await StoreTicksAsync(state, CreateTick(profiles[0], actSeconds, CreateIsland(1, IslandName, CreateEntry(3))));
+
+        // Assert
+        Assert.AreEqual(profiles[expectedIndex], state.NewestProfile, "The profile whose latest tick is the newest should be the newest profile");
+    }
+
+    /// <summary>
+    /// After a restore, the newest profile is the one with the newest stored tick.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public async Task ServerStateNewestProfileAfterRestoreIsProfileWithNewestTick()
+    {
+        // Arrange
+        var databaseFile = CreateDatabaseFile();
+        var profiles = await StoreThreeProfilesAsync(databaseFile, 20);
+
+        CloseDatabases();
+
+        var (_, state) = await OpenAsync(databaseFile);
+
+        // Act
+        await state.RestoreAsync(TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(profiles[2], state.NewestProfile, "The third profile, whose latest tick is the newest, should be the newest profile");
+    }
+
+    /// <summary>
+    /// A held profile gives its held state.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC10")]
+    public async Task ServerStateTryGetHeldHeldProfileGivesHeldState()
+    {
+        // Arrange
+        var (_, state) = await OpenRestoredAsync(null);
+
+        var profileId = Guid.NewGuid();
+
+        await StoreTicksAsync(state, CreateTick(profileId, 1, CreateIsland(1, IslandName, CreateEntry(1))));
+
+        // Act
+        var isHeld = state.TryGetHeld(profileId, out var held);
+
+        // Assert
+        Assert.IsTrue(isHeld, "The profile with a stored tick should be held");
+        Assert.AreSequenceEqual(DescribeState(await ReadStateAsync(state, profileId)), DescribeState(held), "The held state should be the profile's state");
+    }
+
+    /// <summary>
+    /// A stored profile that is not held gives no state, without reading the database.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC10")]
+    public async Task ServerStateTryGetHeldUnheldProfileGivesNoState()
+    {
+        // Arrange
+        var databaseFile = CreateDatabaseFile();
+        var profiles = await StoreThreeProfilesAsync(databaseFile, 20);
+
+        CloseDatabases();
+
+        var (_, state) = await OpenRestoredAsync(databaseFile);
+
+        // Act
+        var isHeld = state.TryGetHeld(profiles[0], out var held);
+
+        // Assert
+        Assert.IsFalse(isHeld, "The profile with the oldest tick should not be held");
+        Assert.IsNull(held, "A profile not held should give no state");
+    }
+
+    /// <summary>
+    /// An unknown profile gives no state.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC10")]
+    public async Task ServerStateTryGetHeldUnknownProfileGivesNoState()
+    {
+        // Arrange
+        var (_, state) = await OpenRestoredAsync(null);
+
+        // Act
+        var isHeld = state.TryGetHeld(Guid.NewGuid(), out var held);
+
+        // Assert
+        Assert.IsFalse(isHeld, "An unknown profile should not be held");
+        Assert.IsNull(held, "An unknown profile should give no state");
+    }
+
+    /// <summary>
+    /// Without a stored catalog the state has no catalog lookup.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC5")]
+    public async Task ServerStateCatalogWithoutStoredCatalogHasNoLookup()
+    {
+        // Arrange
+        var (_, state) = await OpenRestoredAsync(null);
+
+        // Act
+        var catalog = state.Catalog;
+
+        // Assert
+        Assert.IsNull(catalog.Identity, "Without a stored catalog there should be no identity");
+        Assert.IsNull(catalog.Lookup, "Without a stored catalog there should be no lookup");
+    }
+
+    /// <summary>
+    /// A stored catalog gives a lookup of its entries: kind, both names, the region GUID and the icon reference; a GUID the
+    /// catalog lacks finds nothing.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC2")]
+    [TestCategory("AC5")]
+    public async Task ServerStateStoreCatalogAsyncGivesCatalogLookup()
+    {
+        // Arrange
+        var (_, state) = await OpenRestoredAsync(null);
+        var (upload, document) = CreateNamedCatalog();
+
+        // Act
+        await state.StoreCatalogAsync(upload, document, TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(upload.ComputeIdentity(), state.Catalog.Identity, "The held catalog should be the stored one");
+        Assert.AreSequenceEqual(_expectedLookup, DescribeLookup(state.Catalog), "The lookup should find each entry of the catalog and nothing else");
+    }
+
+    /// <summary>
+    /// A stored icon keeps the catalog lookup.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC5")]
+    public async Task ServerStateStoreIconAsyncKeepsCatalogLookup()
+    {
+        // Arrange
+        var (_, state) = await OpenRestoredAsync(null);
+        var (upload, document) = CreateNamedCatalog();
+
+        await state.StoreCatalogAsync(upload, document, TestContext.CancellationToken);
+
+        // Act
+        await state.StoreIconAsync(CreateIcon(IconReference(1)), TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(upload.ComputeIdentity(), state.CompleteCatalogIdentity, "The catalog should be complete once its icon is stored");
+        Assert.AreSequenceEqual(_expectedLookup, DescribeLookup(state.Catalog), "The lookup should stay after the icon is stored");
+    }
+
+    /// <summary>
+    /// A restore gives the lookup of the stored catalog, also while one of its icons is not stored.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC2")]
+    [TestCategory("AC5")]
+    public async Task ServerStateRestoreAsyncGivesCatalogLookup()
+    {
+        // Arrange
+        var databaseFile = CreateDatabaseFile();
+        var (_, before) = await OpenRestoredAsync(databaseFile);
+        var (upload, document) = CreateNamedCatalog();
+
+        await before.StoreCatalogAsync(upload, document, TestContext.CancellationToken);
+        CloseDatabases();
+
+        var (_, after) = await OpenAsync(databaseFile);
+
+        // Act
+        await after.RestoreAsync(TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(upload.ComputeIdentity(), after.Catalog.Identity, "The restored catalog should be the stored one");
+        Assert.AreSequenceEqual(_expectedLookup, DescribeLookup(after.Catalog), "The restored lookup should find each entry of the catalog and nothing else");
+    }
+
+    /// <summary>
+    /// A stored icon reads as its bytes.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC5")]
+    public async Task ServerStateReadIconAsyncStoredIconGivesBytes()
+    {
+        // Arrange
+        var (_, state) = await OpenRestoredAsync(null);
+
+        var icon = CreateIcon(IconReference(1));
+
+        await state.StoreIconAsync(icon, TestContext.CancellationToken);
+        await state.StoreIconAsync(CreateIcon(IconReference(2)), TestContext.CancellationToken);
+
+        // Act
+        var bytes = await state.ReadIconAsync(IconReference(1), TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreSequenceEqual(icon.Png.ToArray(), bytes ?? [], "The stored icon should read as its bytes");
+    }
+
+    /// <summary>
+    /// An icon not stored reads as nothing.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC5")]
+    public async Task ServerStateReadIconAsyncUnknownIconGivesNull()
+    {
+        // Arrange
+        var (_, state) = await OpenRestoredAsync(null);
+
+        await state.StoreIconAsync(CreateIcon(IconReference(1)), TestContext.CancellationToken);
+
+        // Act
+        var bytes = await state.ReadIconAsync(IconReference(2), TestContext.CancellationToken);
+
+        // Assert
+        Assert.IsNull(bytes, "An icon not stored should read as nothing");
+    }
+
+    /// <summary>
+    /// A cancelled read of an icon ends with the cancellation, and a later read still reads.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC5")]
+    public async Task ServerStateReadIconAsyncCancelledReadThrowsAndLeavesGate()
+    {
+        // Arrange
+        var (_, state) = await OpenRestoredAsync(null);
+
+        var icon = CreateIcon(IconReference(1));
+
+        await state.StoreIconAsync(icon, TestContext.CancellationToken);
+
+        using var cancellation = new CancellationTokenSource();
+
+        await cancellation.CancelAsync();
+
+        // Act
+        await Assert.ThrowsAsync<OperationCanceledException>(() => state.ReadIconAsync(IconReference(1), cancellation.Token), "A cancelled read should end with the cancellation");
+
+        // Assert
+        var later = await state.ReadIconAsync(IconReference(1), TestContext.CancellationToken).WaitAsync(_waitBound, TestContext.CancellationToken);
+
+        Assert.AreSequenceEqual(icon.Png.ToArray(), later ?? [], "A read after the cancelled one should read the icon");
+    }
+
+    /// <summary>
     /// Gives the receive time some seconds after the base receive time.
     /// </summary>
     /// <param name="seconds">The seconds</param>
@@ -1380,6 +1826,81 @@ public sealed class ServerStateTests
     private static string CatalogEntryJson(int guid, string icon)
     {
         return $"{{\"guid\":{guid.ToString(CultureInfo.InvariantCulture)},\"kind\":\"good\",\"names\":{{}},\"regionGuid\":null,\"regionTypes\":null,\"icon\":{icon}}}";
+    }
+
+    /// <summary>
+    /// Creates a catalog upload and its read document with a region entry, which has both names, a region GUID and an
+    /// icon, and a good with an English name only and no icon.
+    /// </summary>
+    /// <returns>The upload and its document</returns>
+    private static (ContractCatalogUpload Upload, CatalogDocument Document) CreateNamedCatalog()
+    {
+        var region = $"{{\"guid\":{RegionSessionGuid},\"kind\":\"region\",\"names\":{{\"de\":\"{RegionGerman}\",\"en\":\"{RegionEnglish}\"}},\"regionGuid\":{SharedRegionGuid},\"regionTypes\":[\"Sample\"],\"icon\":\"{IconReference(1)}\"}}";
+        var good = $"{{\"guid\":{GoodGuid},\"kind\":\"good\",\"names\":{{\"en\":\"{GoodEnglish}\"}},\"regionGuid\":null,\"regionTypes\":null,\"icon\":null}}";
+        var bytes = Encoding.UTF8.GetBytes($"{{\"schemaVersion\":1,\"gameVersion\":null,\"entries\":[{region},{good}]}}");
+        var document = CatalogDocumentReader.Read(bytes).Document ?? throw new InvalidOperationException("The test catalog should be read");
+
+        return (new ContractCatalogUpload
+                {
+                    Id = Guid.NewGuid(),
+                    Document = bytes
+                },
+                document);
+    }
+
+    /// <summary>
+    /// Describes what the catalog lookup of a hold finds for the GUIDs of <see cref="CreateNamedCatalog" /> and for a GUID
+    /// the catalog lacks.
+    /// </summary>
+    /// <param name="catalog">The catalog hold</param>
+    /// <returns>The lines</returns>
+    private static List<string> DescribeLookup(CatalogHold catalog)
+    {
+        if (catalog.Lookup is not { } lookup)
+        {
+            return ["<no lookup>"];
+        }
+
+        return [.. new[] { RegionSessionGuid, GoodGuid, MissingGuid }.Select(guid => DescribeLookupEntry(guid, lookup.Find(guid)))];
+    }
+
+    /// <summary>
+    /// Describes an entry of the catalog lookup as text.
+    /// </summary>
+    /// <param name="guid">The GUID looked up</param>
+    /// <param name="entry">The entry found, or <see langword="null" /></param>
+    /// <returns>The text</returns>
+    private static string DescribeLookupEntry(int guid, PageCatalogEntry? entry)
+    {
+        if (entry is null)
+        {
+            return $"{guid} <no entry>";
+        }
+
+        var regionGuid = entry.RegionGuid?.ToString(CultureInfo.InvariantCulture) ?? NoValue;
+
+        return $"{guid} {entry.Kind} en {entry.English ?? NoValue} de {entry.German ?? NoValue} region {regionGuid} icon {entry.IconReference ?? NoValue}";
+    }
+
+    /// <summary>
+    /// Describes a Companion state as text.
+    /// </summary>
+    /// <param name="isConnected">Whether a Companion is connected</param>
+    /// <param name="pipeState">The pipe state, or <see langword="null" /></param>
+    /// <returns>The text</returns>
+    private static string DescribeCompanion(bool isConnected, ContractPipeState? pipeState)
+    {
+        return $"connected {isConnected} pipe {pipeState?.ToString() ?? NoValue}";
+    }
+
+    /// <summary>
+    /// Describes a Companion state as text.
+    /// </summary>
+    /// <param name="companion">The Companion state</param>
+    /// <returns>The text</returns>
+    private static string DescribeCompanion(CompanionConnection companion)
+    {
+        return DescribeCompanion(companion.IsConnected, companion.PipeState);
     }
 
     /// <summary>

@@ -7,8 +7,8 @@ the ingest token (file, a file named by configuration, generation, rotation, the
 how a silent connection is found, what the server answers to each message, the closes, the bounds and times, the log
 lines and what never reaches a log. The operator who starts the server and the Companion that connects (#40) rely on it.
 The messages themselves, their reader and the refusal texts are in [`contract.md`](contract.md). A message is stored
-before it is acknowledged (record 0068), the state kept from it is in [`server-state.md`](server-state.md), and nothing
-is shown yet (#32).
+before it is acknowledged (record 0068), the state kept from it is in [`server-state.md`](server-state.md), and the data
+pages that show it are in [`web-pages.md`](web-pages.md).
 
 ## Behavior
 
@@ -89,6 +89,9 @@ arrives in parts, and at most 32,768 bytes. The server decides in this order:
 
 ### One Companion and silent connections
 
+- A Companion whose hello is accepted counts as connected from the moment the server logs `Companion connected.`; when
+  its connection ends the server marks the Companion as disconnected before it frees the place, so a Companion that
+  connects next is never overwritten ([`server-state.md`](server-state.md)). A refused hello changes nothing.
 - Exactly one Companion is connected at a time; a second valid hello is refused (step 5), not allowed to replace the
   first (record 0062). After the first connection closes, or is closed as silent, a new hello is accepted. The place is
   freed when the session ends, so while a message of a connection that is already closed is still being stored (up to
@@ -115,7 +118,9 @@ first:
 
 - A hello, `helloAccepted`, `helloRefused` or `acknowledgement` (a second hello, or a server-to-Companion type), is
   closed with status 1008 and never acknowledged, even when it carries a valid `id`.
-- A `status` message is accepted and gets no reply.
+- A `status` message is accepted and gets no reply; its pipe state is kept as the Companion's game state until the
+  Companion disconnects ([`server-state.md`](server-state.md), *Companion connection*), and the pages that follow the
+  state are told when it changes (record 0075).
 - A tick, icon image or catalog upload the reader accepts is stored, and only then answered, in order, with an
   `acknowledgement` naming its `id`, `refusal` `null`, `refusedVersion` `null`: an acknowledgement says that the message
   is stored (record 0068). A message already stored (a resend after a lost acknowledgement) is acknowledged the same way
@@ -123,8 +128,8 @@ first:
   catalog upload when the SHA-256 of its document equals the stored catalog's. For a catalog upload `missingIcons`
   lists exactly the distinct icon references of its document, sorted, that have no stored icon, a resend included; for
   the other types the list is empty. A later catalog upload replaces the earlier one, whatever its age.
-- A session start or session end the reader accepts is answered the same way and stores nothing; a `status` message and
-  these change no state.
+- A session start or session end the reader accepts is answered the same way and stores nothing; it changes no state, and
+  a `status` message changes only the Companion's game state.
 - A message whose storing fails (disk full, file removed) is not acknowledged: the connection is closed with 1011 and an
   empty reason, the error line of *Log lines* is logged and the message counts as refused. The Companion reconnects and
   resends it.
@@ -344,7 +349,7 @@ the peak, so the figures of both documents stand for their own input.
 - The messages, their reader and writer, bounds of the message fields and the refusal texts: [`contract.md`](contract.md).
 - The catalog document inside an upload: [`game-catalog-format.md`](game-catalog-format.md).
 - The state kept from what arrives: [`server-state.md`](server-state.md); the database: [`server-data.md`](server-data.md).
-- Showing and replaying what arrives (#32), the Companion's sender, buffer and resend (#40, #41, #34), the catalog and
+- Showing what arrives: [`web-pages.md`](web-pages.md). Replaying it, the Companion's sender, buffer and resend (#40, #41, #34), the catalog and
   icons it uploads (#42).
 - The server's HTTP surface, the data directory and the Docker image: [`server.md`](server.md).
 - The code: `IngestTokenSetup`, `IngestAccess`, `IngestConnections`, `IngestSession` and `IngestEndpoint` in

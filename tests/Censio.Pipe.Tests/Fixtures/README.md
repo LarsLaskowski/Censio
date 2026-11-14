@@ -37,7 +37,16 @@ its facts below and a `DataRow` in both tests.
   the stream (the last, without data); 2 ticks without data.
 - 24 island keys, 1 of them renamed (it carries two names); the figure is `Player 1` in both session starts.
 
-The regions and the pause are shown by the file but not asserted.
+`long-session.jsonl` is also linked into `Censio.Server.Tests` (as `Fixtures/Pipe/long-session.jsonl`). The
+`PageReaderFixture…` tests (in `PageReaderTests`) replay it through `PipeReplayStream`, `PipeTickAssembler` and
+`ContractMessageConverter.ToTick` into a real `ServerState` and assert, without a catalog and up to the last tick with
+data: three regions, the session GUIDs 3245, 6627 and 149679 with 13, 9 and 2 islands, each island under the name of
+the latest tick that carries it (the renamed island (6627, 10, 1) included), and each island's goods as in its latest
+tick; after the final empty tick the 24 islands stay listed without values; with a catalog whose region entries give
+two session GUIDs one region GUID, the two form one region. A change to the fixture is checked against these facts
+too.
+
+The pause is shown by the file but not asserted.
 
 ## Deny-list check
 

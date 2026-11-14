@@ -11,7 +11,7 @@ namespace Censio.Server;
 /// The state of the server: the profiles, the held profile states and the catalog, over the store.
 /// </summary>
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1001", Justification = "The semaphore is never waited on through its handle, so it holds nothing to dispose")]
-public sealed partial class ServerState
+public sealed partial class ServerState : IProfileStateSource
 {
     #region Constants
 
@@ -50,6 +50,11 @@ public sealed partial class ServerState
     private readonly HashSet<Guid> _markedProfiles = [];
 
     /// <summary>
+    /// The reader that lets one icon read at a time reach the store.
+    /// </summary>
+    private readonly IconReader _iconReader;
+
+    /// <summary>
     /// The current snapshot, replaced whole under the lock.
     /// </summary>
     private ServerStateSnapshot _snapshot = new()
@@ -58,6 +63,11 @@ public sealed partial class ServerState
                                                 Held = new Dictionary<Guid, HeldProfileState>(),
                                                 Catalog = CatalogHold.None
                                             };
+
+    /// <summary>
+    /// The state of the Companion's connection, replaced whole under the lock.
+    /// </summary>
+    private CompanionConnection _companion = CompanionConnection.Disconnected;
 
     /// <summary>
     /// The last storing sequence. Guarded by the gate.
@@ -77,6 +87,7 @@ public sealed partial class ServerState
     {
         _store = store;
         _logger = logger;
+        _iconReader = new IconReader(store.ReadIconAsync);
     }
 
     #endregion // Constructors
@@ -116,6 +127,35 @@ public sealed partial class ServerState
             return catalog.IsUsable && catalog.MissingIcons!.IsEmpty
                        ? catalog.Identity
                        : null;
+        }
+    }
+
+    /// <summary>
+    /// Gets the state of the Companion's connection.
+    /// </summary>
+    public CompanionConnection CompanionState
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _companion;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets the identity of the profile whose latest tick is the newest, or <see langword="null"/> when none is held.
+    /// </summary>
+    public Guid? NewestProfile
+    {
+        get
+        {
+            var held = GetSnapshot().Held;
+
+            return held.Count == 0
+                       ? null
+                       : held.MaxBy(pair => (pair.Value.ReceiveTicks, pair.Value.Sequence)).Key;
         }
     }
 
@@ -170,54 +210,6 @@ public sealed partial class ServerState
         finally
         {
             _writeGate.Release();
-        }
-    }
-
-    /// <summary>
-    /// Reads the state of a profile.
-    /// </summary>
-    /// <param name="profileId">The profile identity</param>
-    /// <param name="cancellationToken">The cancellation token</param>
-    /// <returns>The read result</returns>
-    public async Task<ProfileStateRead> ReadProfileStateAsync(Guid profileId, CancellationToken cancellationToken)
-    {
-        var snapshot = GetSnapshot();
-
-        if (snapshot.Held.TryGetValue(profileId, out var held))
-        {
-            return new ProfileStateRead
-                   {
-                       State = held.State,
-                       Failure = null
-                   };
-        }
-
-        if (FindProfile(snapshot.Profiles, profileId) < 0)
-        {
-            return new ProfileStateRead
-                   {
-                       State = null,
-                       Failure = null
-                   };
-        }
-
-        try
-        {
-            return new ProfileStateRead
-                   {
-                       State = await _store.ReadProfileStateAsync(profileId, cancellationToken).ConfigureAwait(false),
-                       Failure = null
-                   };
-        }
-        catch (SqliteException exception)
-        {
-            LogStateReadFailed(_logger, exception);
-
-            return new ProfileStateRead
-                   {
-                       State = null,
-                       Failure = exception
-                   };
         }
     }
 
@@ -375,7 +367,8 @@ public sealed partial class ServerState
                             new CatalogHold
                             {
                                 Identity = identity,
-                                MissingIcons = [.. missing]
+                                MissingIcons = [.. missing],
+                                Lookup = PageCatalog.From(document)
                             });
 
                 return new CatalogStoreResult
@@ -399,6 +392,50 @@ public sealed partial class ServerState
         {
             _writeGate.Release();
         }
+    }
+
+    /// <summary>
+    /// Sets the Companion as connected.
+    /// </summary>
+    public void SetCompanionConnected()
+    {
+        SwapCompanion(new CompanionConnection
+                      {
+                          IsConnected = true,
+                          PipeState = null
+                      });
+    }
+
+    /// <summary>
+    /// Sets the state of the Companion's pipe.
+    /// </summary>
+    /// <param name="pipeState">The pipe state</param>
+    public void SetCompanionPipeState(ContractPipeState pipeState)
+    {
+        SwapCompanion(new CompanionConnection
+                      {
+                          IsConnected = true,
+                          PipeState = pipeState
+                      });
+    }
+
+    /// <summary>
+    /// Sets the Companion as disconnected.
+    /// </summary>
+    public void SetCompanionDisconnected()
+    {
+        SwapCompanion(CompanionConnection.Disconnected);
+    }
+
+    /// <summary>
+    /// Reads the bytes of a stored icon.
+    /// </summary>
+    /// <param name="reference">The icon reference</param>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>The icon bytes, or <see langword="null"/> when the icon is not stored</returns>
+    public Task<byte[]?> ReadIconAsync(string reference, CancellationToken cancellationToken)
+    {
+        return _iconReader.ReadAsync(reference, cancellationToken);
     }
 
     /// <summary>
@@ -428,7 +465,8 @@ public sealed partial class ServerState
                             ? new CatalogHold
                               {
                                   Identity = catalog.Identity,
-                                  MissingIcons = catalog.MissingIcons!.Remove(icon.Reference)
+                                  MissingIcons = catalog.MissingIcons!.Remove(icon.Reference),
+                                  Lookup = catalog.Lookup
                               }
                             : catalog);
 
@@ -639,6 +677,25 @@ public sealed partial class ServerState
     }
 
     /// <summary>
+    /// Replaces the state of the Companion's connection and tells the followers, when it changed.
+    /// </summary>
+    /// <param name="companion">The new state</param>
+    private void SwapCompanion(CompanionConnection companion)
+    {
+        lock (_lock)
+        {
+            if (_companion.IsConnected == companion.IsConnected && _companion.PipeState == companion.PipeState)
+            {
+                return;
+            }
+
+            _companion = companion;
+        }
+
+        Notify(ServerStateChangeKind.Companion, null);
+    }
+
+    /// <summary>
     /// Tells each follower of a change on a thread-pool work item of its own.
     /// </summary>
     /// <param name="kind">The kind of the change</param>
@@ -701,7 +758,8 @@ public sealed partial class ServerState
         return new CatalogHold
                {
                    Identity = catalog.Identity,
-                   MissingIcons = [.. missing]
+                   MissingIcons = [.. missing],
+                   Lookup = PageCatalog.From(document)
                };
     }
 
@@ -847,4 +905,69 @@ public sealed partial class ServerState
     }
 
     #endregion // Methods
+
+    #region IProfileStateSource
+
+    /// <inheritdoc/>
+    public CatalogHold Catalog => GetSnapshot().Catalog;
+
+    /// <inheritdoc/>
+    public bool TryGetHeld(Guid profileId, out StoredProfileState? state)
+    {
+        if (GetSnapshot().Held.TryGetValue(profileId, out var held))
+        {
+            state = held.State;
+
+            return true;
+        }
+
+        state = null;
+
+        return false;
+    }
+
+    /// <inheritdoc/>
+    public async Task<ProfileStateRead> ReadProfileStateAsync(Guid profileId, CancellationToken cancellationToken)
+    {
+        var snapshot = GetSnapshot();
+
+        if (snapshot.Held.TryGetValue(profileId, out var held))
+        {
+            return new ProfileStateRead
+                   {
+                       State = held.State,
+                       Failure = null
+                   };
+        }
+
+        if (FindProfile(snapshot.Profiles, profileId) < 0)
+        {
+            return new ProfileStateRead
+                   {
+                       State = null,
+                       Failure = null
+                   };
+        }
+
+        try
+        {
+            return new ProfileStateRead
+                   {
+                       State = await _store.ReadProfileStateAsync(profileId, cancellationToken).ConfigureAwait(false),
+                       Failure = null
+                   };
+        }
+        catch (SqliteException exception)
+        {
+            LogStateReadFailed(_logger, exception);
+
+            return new ProfileStateRead
+                   {
+                       State = null,
+                       Failure = exception
+                   };
+        }
+    }
+
+    #endregion // IProfileStateSource
 }

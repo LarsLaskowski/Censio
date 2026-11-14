@@ -220,7 +220,9 @@ input.
 - It bounds a WebSocket message at the message bound and reads past 32 KiB only on the one accepted Companion's
   connection, so at most one read of the size above runs at a time, with the token off as well; the memory of an
   accepted catalog upload is measured in [`ingest.md`](ingest.md), *Memory of a catalog upload*.
-- PNG data is carried, hashed and bounded, not validated as PNG: whoever serves it to a browser (#42) checks it.
+- PNG data is carried, hashed and bounded, not validated as PNG: whoever serves it to a browser checks it. The server's
+  icon route does (#32): it serves bytes only when they start with the PNG signature followed by an `IHDR` chunk
+  ([`web-pages.md`](web-pages.md), *Icon route*).
 
 ## Related decisions
 

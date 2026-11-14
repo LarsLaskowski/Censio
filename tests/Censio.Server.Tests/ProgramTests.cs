@@ -249,6 +249,77 @@ public sealed class ProgramTests
     }
 
     /// <summary>
+    /// The region overview of the real host without any profile shows the no-data text inside the frame.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC9")]
+    public async Task ProgramGetRegionsShowsNoDataInFrame()
+    {
+        // Arrange
+        using var factory = new CensioServerFactory("Production");
+        using var client = factory.CreateClient();
+
+        // Act
+        using var response = await client.GetAsync("/regions", TestContext.CancellationToken);
+        var body = await response.Content.ReadAsStringAsync(TestContext.CancellationToken);
+
+        // Assert
+        var document = ParseHtml(body);
+
+        Assert.AreEqual(HttpStatusCode.OK, response.StatusCode, "The region overview should answer 200");
+        Assert.AreEqual(1, CountLabel(document, "Open or close the navigation"), "The overview should be shown inside the frame");
+        Assert.Contains("No data yet. The pages fill once the Companion sends data.", document.QuerySelector(".mud-main-content")?.TextContent ?? string.Empty, "The overview should show the no-data text inside the frame");
+    }
+
+    /// <summary>
+    /// A malformed profile in the address of the real host shows the not-found text inside the frame, without echoing the
+    /// address.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC9")]
+    public async Task ProgramGetMalformedProfileShowsNotFoundInFrame()
+    {
+        // Arrange
+        using var factory = new CensioServerFactory("Production");
+        using var client = factory.CreateClient();
+
+        // Act
+        using var response = await client.GetAsync("/profiles/q7malformedq7/regions", TestContext.CancellationToken);
+        var body = await response.Content.ReadAsStringAsync(TestContext.CancellationToken);
+
+        // Assert
+        var document = ParseHtml(body);
+
+        Assert.AreEqual(1, CountLabel(document, "Open or close the navigation"), "The page should be shown inside the frame");
+        Assert.Contains("Not found.", document.QuerySelector(".mud-main-content")?.TextContent ?? string.Empty, "A malformed profile should show the not-found text inside the frame");
+        Assert.DoesNotContain("q7malformedq7", body, "The page should not echo the address");
+    }
+
+    /// <summary>
+    /// The icon route of the real host answers a well-formed reference of an icon that is not stored with 404 and an empty
+    /// body.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC9")]
+    public async Task ProgramGetUnknownIconIsEmptyNotFound()
+    {
+        // Arrange
+        using var factory = new CensioServerFactory("Production");
+        using var client = factory.CreateClient();
+
+        // Act
+        using var response = await client.GetAsync("/icons/" + new string('a', 64), TestContext.CancellationToken);
+        var body = await response.Content.ReadAsByteArrayAsync(TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(HttpStatusCode.NotFound, response.StatusCode, "An icon that is not stored should answer 404");
+        Assert.IsEmpty(body, "The 404 answer of the icon route should have an empty body");
+    }
+
+    /// <summary>
     /// A first visit shows the frame in the light theme with the English texts, the navigation open and the start page's
     /// entry marked.
     /// </summary>

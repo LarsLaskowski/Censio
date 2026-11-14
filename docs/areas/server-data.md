@@ -4,7 +4,7 @@
 
 The server's database: its file, the setting that names it and the in-memory case, what happens at start and the start
 failures, what is stored and the rules of storing and reading it, file modes, privacy, one server per file and the
-measurements. Operators who run the server and the later features that show and prune data (#32, #35, #42) rely on it.
+measurements. Operators who run the server, the data pages ([`web-pages.md`](web-pages.md)) and the later features that prune data and send catalogs (#35, #42) rely on it.
 The ingest writes into the store ([`ingest.md`](ingest.md)): it stores a tick, a catalog or an icon before it
 acknowledges it, and the server reads its state back from the store at start ([`server-state.md`](server-state.md)).
 
@@ -166,4 +166,4 @@ minutes is about 55 MB a day, and 22.1 MiB at the bounds.
 - The data directory and the Docker image: [`server.md`](server.md).
 - What the ingest accepts and answers and when it stores: [`ingest.md`](ingest.md); the state kept from the store: [`server-state.md`](server-state.md).
 - The contract's messages and bounds: [`contract.md`](contract.md); the catalog document: [`game-catalog-format.md`](game-catalog-format.md).
-- Retention, hourly averages and deleting a profile's history (#35); pages (#32).
+- Retention, hourly averages and deleting a profile's history (#35); the pages that show the data: [`web-pages.md`](web-pages.md).

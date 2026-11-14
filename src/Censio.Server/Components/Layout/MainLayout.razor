@@ -1,4 +1,6 @@
 @inherits LayoutComponentBase
+@implements IDisposable
+@using System.Globalization
 
 <div class="censio-frame">
     <MudThemeProvider Theme="_mudTheme" IsDarkMode="_theme == UiTheme.Dark" ObserveSystemDarkModeChange="false" />
@@ -8,7 +10,16 @@
             <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" aria-label="@_texts.NavigationButton" OnClick="ToggleDrawer" />
             <MudText Typo="Typo.h6">Censio</MudText>
             <MudSpacer />
-            <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.Person" Disabled="true" Style="color: var(--mud-palette-appbar-text) !important">@_texts.ProfileSwitch</MudButton>
+            <MudMenu Label="@_texts.ProfileSwitch" StartIcon="@Icons.Material.Filled.Person" Color="Color.Inherit" Variant="Variant.Text" Disabled="@(_profileItems.Count == 0)" MaxHeight="400" AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight">
+                @foreach (var item in _profileItems)
+                {
+                    <MudMenuItem Href="@PageAddress.RegionsLink(item.Key)">@item.Value</MudMenuItem>
+                }
+                @if (_moreProfiles > 0)
+                {
+                    <MudMenuItem Disabled="true">@string.Format(CultureInfo.InvariantCulture, _texts.MoreProfilesFormat, _moreProfiles)</MudMenuItem>
+                }
+            </MudMenu>
             <MudMenu Icon="@Icons.Material.Filled.Translate" Color="Color.Inherit" AriaLabel="@_texts.LanguageSwitch" AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight">
                 <MudMenuItem OnClick="() => ChooseLanguageAsync(UiLanguage.English)">@UiTexts.LanguageName(UiLanguage.English)</MudMenuItem>
                 <MudMenuItem OnClick="() => ChooseLanguageAsync(UiLanguage.German)">@UiTexts.LanguageName(UiLanguage.German)</MudMenuItem>
@@ -18,6 +29,7 @@
         <MudDrawer @bind-Open="_drawerOpen" Variant="DrawerVariant.Persistent" ClipMode="DrawerClipMode.Always">
             <MudNavMenu>
                 <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home">@_texts.HomeEntry</MudNavLink>
+                <MudNavLink Href="@_regionsLink" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Map">@_texts.RegionsEntry</MudNavLink>
             </MudNavMenu>
         </MudDrawer>
         <MudMainContent>

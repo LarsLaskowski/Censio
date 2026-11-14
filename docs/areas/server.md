@@ -39,7 +39,9 @@ the Docker health probe rely on it.
   TLS is the job of a reverse proxy in front of it (`SECURITY.md`).
 - A request for an unknown path answers `404` with an empty body. In `Production` an unhandled error answers
   `500` with an empty body; the server has no exception page, status-code page or error handler of its own.
-- `/`, `/health` and the Blazor hub need no login. Antiforgery protection is on.
+- `/`, `/health`, the data pages (`/regions` and the routes under `/profiles/`), `/icons/{reference}` and the Blazor hub
+  need no login: anyone who reaches the port reads every stored profile ([`web-pages.md`](web-pages.md),
+  `SECURITY.md`). Antiforgery protection is on.
 - `/ingest` is a WebSocket route for the Companion that needs no web login either: it authenticates a connection by the
   token of the first message, unless the setting `Censio:Ingest:RequireToken` is `false` ([`ingest.md`](ingest.md)).
   It speaks plain HTTP and WebSocket like the rest.
@@ -124,6 +126,11 @@ the Docker health probe rely on it.
 
 - The server reads no request body and takes no input on `/health`; on `/` it reads the two preference cookies and the
   `Accept-Language` header and handles unknown values as [`web-ui.md`](web-ui.md) says; what `/ingest` reads is in [`ingest.md`](ingest.md).
+- The data pages read the segments of their address, and `/icons/{reference}` its reference, parsed whole and
+  checked before any read as [`web-pages.md`](web-pages.md) says (a profile in its 36-character form, numbers of at most
+  ten digits, a reference of 64 lowercase hex characters); a segment that does not match shows `Not found.` on a page
+  route and answers `404` on the icon route, and neither is logged. The browser's UTC offset that a page asks for is
+  bounded there (-840 to 840 minutes, else UTC).
 - If the port is taken, the server ends with the ASP.NET Core startup error in the console; it has no handling of
   its own.
 - A data directory that is not an absolute path, or a key directory the server cannot create or write, stops the
@@ -147,5 +154,6 @@ the Docker health probe rely on it.
 ## Not here
 
 - The Companion's WebSocket ingest, its token and the `Censio:Ingest:RequireToken` switch: [`ingest.md`](ingest.md).
+- The data pages and the icon route: [`web-pages.md`](web-pages.md).
 - The database: its file, schema, start failures and storing rules: [`server-data.md`](server-data.md).
 - The web UI's frame, themes and languages: [`web-ui.md`](web-ui.md).

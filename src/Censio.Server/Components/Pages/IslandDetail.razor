@@ -1,0 +1,63 @@
+@page "/profiles/{Profile}/islands/{Session}/{Island}/{Area}"
+@inherits DataPageBase
+@using System.Globalization
+
+<PageTitle>@($"Censio – {Heading}")</PageTitle>
+
+<h1 class="mud-typography mud-typography-h4">@Heading</h1>
+
+@if (Mode == PageMode.Ready && View is { } view && FindRegion(view) is { } region)
+{
+    <p><MudLink Href="@PageAddress.RegionLink(view.ProfileId, region.SessionGuids[0])">@PageNames.RegionText(region, view.Regions, Language)</MudLink> · @ProfileLabel(view)</p>
+}
+@if (Mode != PageMode.NotFound)
+{
+    <DataStatus AsOf="View?.AsOf" />
+}
+@if (StatusText is { } status)
+{
+    <p>@status</p>
+}
+else if (View is { } shown && shown.RowCount == 0)
+{
+    <p>@Texts.NoIslandValues</p>
+}
+else if (View is { } detail)
+{
+    <MudSimpleTable Dense="true" Hover="true">
+        <thead>
+            <tr>
+                <th class="censio-icon"></th>
+                <th>@Texts.ColumnGood</th>
+                <th class="censio-number">@Texts.ColumnProduction</th>
+                <th class="censio-number">@Texts.ColumnConsumption</th>
+                <th class="censio-number">@Texts.ColumnDelta</th>
+                <th class="censio-number">@Texts.ColumnBuildings</th>
+                <th class="censio-number">@Texts.ColumnProductivity</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var row in OrderedRows(detail))
+            {
+                <tr>
+                    <td class="censio-icon">
+                        @if (row.IconReference is { } reference)
+                        {
+                            <img src="@IconAddress(reference)" alt="" width="24" height="24" />
+                        }
+                    </td>
+                    <td>@row.Name.For(Language)</td>
+                    <td class="censio-number">@PageFormat.Rate(row.Production, Language)</td>
+                    <td class="censio-number">@PageFormat.Rate(row.Consumption, Language)</td>
+                    <td class="censio-number"><span class="@DeltaClass(row.Delta)">@PageFormat.Delta(row.Delta, Language)</span></td>
+                    <td class="censio-number">@PageFormat.Count(row.Buildings)</td>
+                    <td class="censio-number">@PageFormat.Percent(row.Productivity, Language)</td>
+                </tr>
+            }
+        </tbody>
+    </MudSimpleTable>
+    if (detail.RowCount > detail.Rows.Count)
+    {
+        <p>@string.Format(CultureInfo.InvariantCulture, Texts.ShowingGoodsFormat, detail.Rows.Count, detail.RowCount)</p>
+    }
+}

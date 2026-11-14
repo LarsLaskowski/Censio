@@ -4,10 +4,10 @@
 
 The server's current state per profile: what a profile's state holds, the latest-tick rule, the two profiles held in
 memory and their order, the read on demand and its failure, the restore at start and its log lines, the notices to the
-followers of the state, the catalog's completeness, profiles as the Companion chooses them, memory and privacy. The pages
-of #32 rely on it to show a profile without a database read per update, and the operator relies on it to find the last
-state again after a restart. The database itself is in [`server-data.md`](server-data.md), what the ingest answers in
-[`ingest.md`](ingest.md). No page shows the state yet (#32).
+followers of the state, the Companion's connection and game state, the catalog's completeness, profiles as the Companion
+chooses them, memory and privacy. The data pages ([`web-pages.md`](web-pages.md)) rely on it to show a profile without a
+database read per update, and the operator relies on it to find the last state again after a restart. The database
+itself is in [`server-data.md`](server-data.md), what the ingest answers in [`ingest.md`](ingest.md).
 
 ## Behavior
 
@@ -49,6 +49,8 @@ state again after a restart. The database itself is in [`server-data.md`](server
   stored tick, with its stored latest state: the server then reads the profile's whole stored state, decides by that
   latest tick's receive time and stores it as the state; a failed read again keeps the mark until the next tick.
 - Another profile's state is read from the database when it is asked for (*Reading on demand*).
+- The profile whose latest tick is the newest among the held profiles (receive time, then storing order) is the newest
+  profile (`NewestProfile`); none is when no profile is held. The data pages show it where no profile is picked.
 
 ### Reading on demand
 
@@ -57,7 +59,11 @@ state again after a restart. The database itself is in [`server-data.md`](server
   gives neither a state nor a failure.
 - A read that fails gives the failure, never an empty or partial state, and logs the error line of *Logging*; the next
   request reads again. A read on demand is not limited in number (record 0069): a caller that anyone can reach without a
-  login (#32) must serialize or bound its reads.
+  login must serialize or bound its reads. The data pages are such callers: they ask whether a profile is held
+  (`TryGetHeld`, one snapshot, so the answer and the held state agree) and read a profile that is not held only through
+  one reader of the whole server, one read at a time, which their closed pages leave by cancelling
+  ([`web-pages.md`](web-pages.md), record 0074). Anything that is shown from a state is derived from it and the state
+  is dropped.
 
 ### Restore at start
 
@@ -73,6 +79,12 @@ state again after a restart. The database itself is in [`server-data.md`](server
 ### Catalog
 
 - The server keeps one catalog, the one last uploaded, for every profile; an older upload replaces a newer one.
+- Besides the catalog's identity and the references of its missing icons the state holds a lookup built from the
+  document when it is stored or restored: for each asset GUID its kind, its English and German names, the region GUID
+  of a region entry and the icon reference. The document itself is not kept, and the lookup is bounded by the catalog
+  document's bounds ([`game-catalog-format.md`](game-catalog-format.md)). The data pages name regions and goods with it.
+- The bytes of a stored icon are read from the database when a request asks for them, one read at a time (an `IconReader`
+  over the store); they are not held.
 - The catalog counts as complete only while it is usable and every icon reference of its document has a stored icon.
   `helloAccepted` names the catalog's identity only then, otherwise `null`, so a Companion uploads again after an
   interruption (record 0070). A stored catalog the server cannot read again at restore, or whose missing icons it cannot
@@ -80,14 +92,27 @@ state again after a restart. The database itself is in [`server-data.md`](server
 - An upload whose identity (the SHA-256 of its document) equals the usable catalog's writes nothing; an acknowledgement,
   the resent one included, lists the references without a stored icon, sorted ordinally.
 
+### Companion connection
+
+- The state holds whether a Companion is connected and the pipe state it last reported (`status`), in memory only
+  (record 0075). A Companion whose hello is accepted is connected with no pipe state; each accepted `status` message
+  sets its pipe state; when the connection ends the state is not connected and the pipe state is forgotten. The server
+  starts with no Companion connected.
+- The ingest clears the state when a connection whose hello was accepted ends, before it frees the Companion's place, so
+  the next Companion's connect cannot be overwritten ([`ingest.md`](ingest.md)).
+- A change that leaves the state as it is (a `status` with the pipe state already held, a second disconnect) tells no one.
+  The state is no database content and survives no restart.
+
 ### Followers and notices
 
 - After each stored change the followers of the state are told which profile changed (a stored tick or hello) or that the
   catalog or its icons changed (a stored catalog or icon). A resend that writes nothing tells no one; a hello that only
-  renames tells the profile changed.
+  renames tells the profile changed. A change of the Companion's connection or pipe state is told as a third kind of
+  notice, without a profile.
 - Each follower is called on its own thread-pool work item, so a follower that blocks or throws delays neither the
   acknowledgement nor another follower. A follower that throws is logged. There is no order across changes. A follower
-  that blocks for good keeps one thread-pool thread per change; the pages of #32 must not block.
+  that blocks for good keeps one thread-pool thread per change; the data pages hand a notice to their own work item
+  and never block it ([`web-pages.md`](web-pages.md)).
 
 ### Logging
 
@@ -118,12 +143,14 @@ The restore lines are in *Restore at start*; the line of a message that could no
   | The same, for a profile whose islands read failed earlier: the call also reads its whole stored state back (one more tick) | 125.4 MiB | 259.5 to 260.0 MiB |
 
   Retained, a worst tick built in code is about 41.8 MiB; read by the contract reader it retains 43.3 MiB ([`contract.md`](contract.md), *Memory of a read*). The peak includes what the write path allocates and the garbage collector has not collected yet, and a single run went higher (250.9 and 325.0 MiB in one of seven later runs); it is an order of magnitude, not a guarantee.
-- Reads on demand are not limited in number; each holds the state it reads until its caller drops it.
+- Reads on demand are not limited in number; each holds the state it reads until its caller drops it. The data pages
+  keep only what they show ([`web-pages.md`](web-pages.md)); an icon read holds its bytes until the response is written.
 
 ### Privacy
 
 The state holds names of profiles and islands, which are private; the server writes none to its log
-([`server-data.md`](server-data.md), *Start*) and sends none anywhere.
+([`server-data.md`](server-data.md), *Start*) and sends none anywhere except to the data pages, which show them to
+anyone who reaches the server ([`web-pages.md`](web-pages.md)).
 
 ## Limits and errors
 
@@ -137,9 +164,12 @@ The state holds names of profiles and islands, which are private; the server wri
 - [`decisions/0068`](../decisions/0068-ingest-acknowledges-a-message-only-after-it-is-stored.md) — a message is acknowledged only after it is stored.
 - [`decisions/0069`](../decisions/0069-current-state-of-the-newest-profiles-held-in-memory-and-restored-at-start.md) — the two newest profiles are held in memory, restored at start and announced off the ingest's path.
 - [`decisions/0070`](../decisions/0070-hello-names-the-stored-catalog-only-when-all-its-icons-are-stored.md) — the hello names the catalog only when all its icons are stored.
+- [`decisions/0074`](../decisions/0074-pages-keep-derived-views-and-read-unheld-profiles-one-at-a-time.md) — the pages read profiles that are not held one at a time and keep only derived views.
+- [`decisions/0075`](../decisions/0075-companion-connection-and-game-state-held-in-the-server-state.md) — the Companion's connection and game state are held in the server state and announced.
 
 ## Not here
 
 - Storing, the schema and the database file: [`server-data.md`](server-data.md).
 - What the ingest answers and when it closes: [`ingest.md`](ingest.md).
-- Pages, the profile switch and the banner (#32), retention and deleting a profile with its held state (#35).
+- The pages, the profile switch and the banner that show it: [`web-pages.md`](web-pages.md), [`web-ui.md`](web-ui.md).
+- Retention and deleting a profile with its held state (#35).

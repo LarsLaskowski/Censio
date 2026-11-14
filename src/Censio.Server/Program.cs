@@ -3,6 +3,8 @@ using Censio.Server.Data;
 
 using MudBlazor.Services;
 
+ServerState? state = null;
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.WebHost.UseStaticWebAssets();
@@ -13,6 +15,9 @@ builder.Services.AddMudServices();
 builder.Services.AddHealthChecks();
 builder.Services.AddCensioDataProtection();
 builder.Services.AddCensioIngest();
+builder.Services.AddSingleton(_ => state ?? throw new InvalidOperationException("The server state is not restored yet."));
+builder.Services.AddSingleton<IProfileStateSource>(_ => state ?? throw new InvalidOperationException("The server state is not restored yet."));
+builder.Services.AddSingleton<PageReader>();
 
 var app = builder.Build();
 
@@ -37,7 +42,7 @@ if (database is null)
     return 1;
 }
 
-var state = new ServerState(new ServerStore(database), app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Censio.Server.State"));
+state = new ServerState(new ServerStore(database), app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Censio.Server.State"));
 
 if (await ServerStateSetup.TryRestoreAsync(state, database.DatabaseFile, app.Logger, app.Lifetime.ApplicationStopping).ConfigureAwait(false) == false)
 {
@@ -49,6 +54,7 @@ app.UseAntiforgery();
 app.MapStaticAssets();
 app.MapHealthChecks("/health");
 app.MapCensioIngest(ingestAccess, state);
+app.MapCensioIcons(state);
 app.MapRazorComponents<Censio.Server.Components.App>()
    .AddInteractiveServerRenderMode();
 

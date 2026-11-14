@@ -2,11 +2,11 @@
 
 ## Scope
 
-The frame of the server's web pages: the app bar, the navigation, the profile switch placeholder, the light and the
+The frame of the server's web pages: the app bar, the navigation, the profile switch, the light and the
 dark theme with their palette, typography and contrast levels, the language choice and its default, the two cookies
 that keep the choices, the treatment of unknown stored values, the frame's texts in English and German, and that every
 resource comes from the server itself. Desktop browsers only. Users of the web application rely on it; the pages'
-data is not part of it.
+data is in [`web-pages.md`](web-pages.md).
 
 ## Behavior
 
@@ -16,10 +16,17 @@ data is not part of it.
   remaining width.
 - The app bar shows, from left to right, the navigation button, the name `Censio`, the profile switch, the language
   switch and the theme switch.
-- The navigation is open when a page opens and lists the start page (`Home` / `Startseite`, link `/`). The navigation
-  button closes and opens it; while it is closed the content takes the freed width.
-- The profile switch is a placeholder: it shows only its text (`Profile` / `Profil`), is disabled and cannot be
-  focused or opened, and shows no profile name and no other stored data. It stays so until a later version.
+- The navigation is open when a page opens and lists the start page (`Home` / `Startseite`, link `/`) and the region
+  overview (`Regions` / `Regionen`). The Regions entry leads to the region overview of the profile whose page is shown
+  (`/profiles/{profile}/regions`, followed as the address changes) and to `/regions` on every other address; it is marked
+  on every address that starts with its link. The navigation button
+  closes and opens it; while it is closed the content takes the freed width.
+- The profile switch is a menu in the app bar with the text `Profile` / `Profil`. It is disabled while no profile
+  exists. Otherwise it lists at most 100 profiles by shown name, each a link to that profile's region overview, then the
+  disabled line `<n> more profiles` / `<n> weitere Profile` when there are more; a profile without a name is `Unnamed
+  profile` / `Unbenanntes Profil`, and equal shown names are told apart as [`web-pages.md`](web-pages.md) says. The list
+  follows the server's profiles without a reload. The switch only chooses what the data pages show; every name is shown
+  as text.
 - A page receives the language and the texts that are shown at the moment as cascaded values, so a page follows a
   language switch without a reload.
 
@@ -81,6 +88,8 @@ Colours are fixed by the theme; values not listed keep MudBlazor's defaults.
 | Text secondary | `#5A4F45` | `#C2B5A6` |
 | Action default | `#5A4F45` | `#C2B5A6` |
 | Lines and inputs | `#8A7D70` | `#8F8274` |
+| Error (a negative delta) | `#A4161A` | `#FF8A80` |
+| Success (a positive delta) | `#1B6B2F` | `#7FD08E` |
 
 ### Contrast
 
@@ -91,8 +100,8 @@ Both palettes meet WCAG 2.1 level AA, checked by a unit test for every pair:
   primary contrast text on primary; secondary contrast text on secondary; secondary on background and surface.
 - Lines, icons and focus, 3:1: drawer icon on drawer background; action default and lines and inputs on background and
   surface; focus ring: app bar text on app bar background, primary on drawer background, background and surface.
-- The disabled profile switch takes the app bar text colour explicitly instead of MudBlazor's disabled colour, so its
-  label meets the text level.
+- Error and success on surface, 4.5:1 (the colours of the delta in the goods table).
+- The profile switch takes the app bar text colour while it is disabled too (`wwwroot/css/censio.css`), instead of MudBlazor's disabled colour, so its label meets the text level.
 
 ### Focus ring
 
@@ -111,7 +120,12 @@ Both palettes meet WCAG 2.1 level AA, checked by a unit test for every pair:
 | ------- | ------- | ------ |
 | Navigation button (accessible name) | `Open or close the navigation` | `Navigation öffnen oder schließen` |
 | Navigation entry of `/` | `Home` | `Startseite` |
+| Navigation entry of the region overview | `Regions` | `Regionen` |
+| Island without a name | `Unnamed island` | `Unbenannte Insel` |
+| Profile without a name | `Unnamed profile` | `Unbenanntes Profil` |
+| Good the catalog does not name | `Good <GUID>` | `Ware <GUID>` |
 | Profile switch | `Profile` | `Profil` |
+| Profile switch, line for the profiles it does not list | `<n> more profiles` | `<n> weitere Profile` |
 | Theme switch in the light theme (accessible name) | `Switch to the dark theme` | `Zum dunklen Design wechseln` |
 | Theme switch in the dark theme (accessible name) | `Switch to the light theme` | `Zum hellen Design wechseln` |
 | Language switch (accessible name) | `Language` | `Sprache` |
@@ -120,14 +134,17 @@ Both palettes meet WCAG 2.1 level AA, checked by a unit test for every pair:
 The texts come from a table of the application itself (`UiTexts`); the web UI creates no culture and uses no resource
 files or request localization, so both languages render in the Docker image, which runs without culture data
 ([record 0072](../decisions/0072-web-ui-texts-from-an-own-table-without-culture-data.md)). A new page or UI text adds
-its English and German text there and to this table.
+its English and German text there and to this table; the texts of the data pages are in [`web-pages.md`](web-pages.md).
 
 ### Resources
 
 - A page loads its style sheets, scripts and images only from the server itself, by relative paths: MudBlazor's style
   sheet and script, `css/censio.css`, `js/censio.js` and the Blazor script. No web font, no CDN, no external request.
-- `js/censio.js` offers two functions, one that writes a preference cookie and one that sets the document language; it
-  reads nothing and catches nothing.
+- `js/censio.js` offers three functions: `storePreference` writes a preference cookie, `setDocumentLanguage` sets the
+  document language, and `utcOffsetMinutes(isoInstant)` gives the browser's UTC offset in minutes at that instant
+  (`-new Date(isoInstant).getTimezoneOffset()`, daylight saving included), which the as-of line of the data pages asks for
+  ([`web-pages.md`](web-pages.md)). The first two read nothing; the third reads the browser's clock settings and catches
+  nothing.
 
 ## Limits and errors
 
@@ -149,4 +166,5 @@ its English and German text there and to this table.
 ## Not here
 
 - The HTTP surface, the start page's title, heading and version line: [`server.md`](server.md).
-- The data the pages show, the phone layout and the profile switch's function: later features (#32, #53).
+- The data pages, their texts, formats, live updates and the as-of line and banner: [`web-pages.md`](web-pages.md).
+- The phone layout: a later feature (#53).
