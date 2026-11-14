@@ -110,7 +110,7 @@ mismatch`: the version gate skips every frame of a file without it.
 ### Privacy
 
 A recording holds the name of the player figure, island names and the economic data as the game sent them. It stays on the
-machine, is never sent anywhere and is never deleted automatically. Only anonymised fixtures (record 0029,
+machine, is never deleted automatically and is sent only when the user replays it with `--server`, as contract messages (ticks, session events and states, without the figure name) to the server named there ([`replay-sending.md`](replay-sending.md)); nothing else sends it. Only anonymised fixtures (record 0029,
 *Anonymising* below) may be shared publicly.
 
 ## Limits and errors

@@ -241,7 +241,13 @@ public sealed partial class App : Application, IDisposable
     private void StartReplay(CompanionCommandLine commandLine)
     {
         var path = commandLine.ReplayPath!;
-        var runner = new PipeReplayRunner(() => System.IO.File.OpenRead(path), commandLine.Speed, TimeProvider.System, _logger);
+        var runner = commandLine.ServerAddress is { } address
+                         ? new PipeReplayRunner(() => System.IO.File.OpenRead(path),
+                                                commandLine.Speed,
+                                                TimeProvider.System,
+                                                _logger,
+                                                new ReplaySender(address, commandLine.TokenFilePath, ProductVersion.Read(typeof(App).Assembly), new ClientWebSocketConnector(TimeProvider.System), TimeProvider.System, _logger))
+                         : new PipeReplayRunner(() => System.IO.File.OpenRead(path), commandLine.Speed, TimeProvider.System, _logger);
         var fileName = System.IO.Path.GetFileName(path);
 
         CompanionLog.ReplayStarted(_logger, fileName);

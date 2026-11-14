@@ -38,6 +38,16 @@ public sealed class PipeReplayRunner
     private readonly ILogger _logger;
 
     /// <summary>
+    /// The sender that sends the replay to a server, if any.
+    /// </summary>
+    private readonly ReplaySender? _sender;
+
+    /// <summary>
+    /// The read stamp of the last read; it is the stamp of a session item when the assembler returns the item.
+    /// </summary>
+    private DateTimeOffset _lastReadStamp;
+
+    /// <summary>
     /// The current status.
     /// </summary>
     private PipeReplayStatus _status = new()
@@ -73,6 +83,23 @@ public sealed class PipeReplayRunner
         _speed = speed;
         _waitProvider = waitProvider;
         _logger = logger;
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="PipeReplayRunner" /> class that sends the replay to a server.
+    /// </summary>
+    /// <param name="openRecording">Opens the recording</param>
+    /// <param name="speed">The replay speed</param>
+    /// <param name="waitProvider">The clock of the waits between the lines</param>
+    /// <param name="logger">The logger</param>
+    /// <param name="sender">The sender that sends the replay to a server</param>
+    public PipeReplayRunner(Func<Stream> openRecording, PipeReplaySpeed speed, TimeProvider waitProvider, ILogger logger, ReplaySender sender)
+    {
+        _openRecording = openRecording;
+        _speed = speed;
+        _waitProvider = waitProvider;
+        _logger = logger;
+        _sender = sender;
     }
 
     #endregion // Constructor
@@ -150,6 +177,13 @@ public sealed class PipeReplayRunner
     /// <returns>A task that completes when the replay has stopped</returns>
     public async Task RunAsync(CancellationToken cancellationToken)
     {
+        if (_sender is not null)
+        {
+            await RunSendingAsync(_sender, cancellationToken).ConfigureAwait(false);
+
+            return;
+        }
+
         Stream recording;
 
         try
@@ -172,7 +206,7 @@ public sealed class PipeReplayRunner
         await using (recording.ConfigureAwait(false))
         {
             using var replay = new PipeReplayStream(recording, _speed, clock, _waitProvider);
-            using var assembler = new PipeTickAssembler(new PipeMessageReader(replay), clock, (read, _) => Observe(read, cancellationToken));
+            using var assembler = new PipeTickAssembler(new PipeMessageReader(replay), clock, (read, stamp) => Observe(read, stamp, cancellationToken));
 
             try
             {
@@ -196,6 +230,210 @@ public sealed class PipeReplayRunner
 
             Finish(replay.Problem, cancellationToken);
         }
+    }
+
+    /// <summary>
+    /// Replays the recording to a server: reads the token file, checks the header, connects, sends and closes.
+    /// </summary>
+    /// <param name="sender">The sender</param>
+    /// <param name="cancellationToken">The token that stops the replay</param>
+    /// <returns>A task that completes when the replay has stopped</returns>
+    private async Task RunSendingAsync(ReplaySender sender, CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (sender.Prepare() is { } tokenProblem)
+            {
+                Finish(null, tokenProblem, null, cancellationToken);
+
+                return;
+            }
+
+            if (await CheckHeaderAsync(cancellationToken).ConfigureAwait(false) is { } headerProblem)
+            {
+                Finish(headerProblem, cancellationToken);
+
+                return;
+            }
+
+            Publish(new PipeReplayStatus
+                    {
+                        State = PipeConnectionState.Connected,
+                        IsConnecting = true
+                    },
+                    cancellationToken);
+
+            if (await sender.ConnectServerAsync(cancellationToken).ConfigureAwait(false) is { } connectProblem)
+            {
+                Finish(null, connectProblem, null, cancellationToken);
+
+                return;
+            }
+
+            Publish(new PipeReplayStatus
+                    {
+                        State = PipeConnectionState.Connected
+                    },
+                    cancellationToken);
+            sender.NotifyState(PipeConnectionState.Connected);
+
+            await ReplayAndSendAsync(sender, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // The replay is stopped: no further status.
+        }
+        finally
+        {
+            await sender.DisposeAsync().ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Opens the recording and reads its first line to find a problem of its header.
+    /// </summary>
+    /// <param name="cancellationToken">The token that stops the replay</param>
+    /// <returns>The problem, or <c>null</c> if the header is fine</returns>
+    private async Task<PipeReplayProblem?> CheckHeaderAsync(CancellationToken cancellationToken)
+    {
+        Stream recording;
+
+        try
+        {
+            recording = _openRecording();
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        {
+            return new PipeReplayProblem
+                   {
+                       Kind = PipeReplayProblemKind.FileNotFound
+                   };
+        }
+
+        await using (recording.ConfigureAwait(false))
+        {
+            var line = await new PipeRecordingReader(recording).ReadAsync(cancellationToken).ConfigureAwait(false);
+
+            return line is { Kind: PipeRecordingLineKind.Problem, Problem.Kind: not PipeReplayProblemKind.InvalidLine }
+                       ? line.Problem
+                       : null;
+        }
+    }
+
+    /// <summary>
+    /// Replays the recording and sends every item to the server, then closes the connection and finishes.
+    /// </summary>
+    /// <param name="sender">The sender</param>
+    /// <param name="cancellationToken">The token that stops the replay</param>
+    /// <returns>A task that completes when the replay has stopped</returns>
+    private async Task ReplayAndSendAsync(ReplaySender sender, CancellationToken cancellationToken)
+    {
+        Stream recording;
+
+        try
+        {
+            recording = _openRecording();
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        {
+            var closeProblem = await sender.CloseAsync(cancellationToken).ConfigureAwait(false);
+
+            Finish(new PipeReplayProblem
+                   {
+                       Kind = PipeReplayProblemKind.FileNotFound
+                   },
+                   closeProblem,
+                   null,
+                   cancellationToken);
+
+            return;
+        }
+
+        var clock = new PipeReplayClock(DateTimeOffset.UnixEpoch);
+
+        await using (recording.ConfigureAwait(false))
+        {
+            using var replay = new PipeReplayStream(recording, _speed, clock, _waitProvider);
+            using var assembler = new PipeTickAssembler(new PipeMessageReader(replay), clock, (read, stamp) => Observe(read, stamp, cancellationToken));
+
+            var sendProblem = await SendItemsAsync(sender, assembler, cancellationToken).ConfigureAwait(false);
+
+            if (sendProblem is not null)
+            {
+                Finish(null, sendProblem, null, cancellationToken);
+
+                return;
+            }
+
+            var problem = await sender.CloseAsync(cancellationToken).ConfigureAwait(false);
+
+            if (replay.Problem is not null || problem is not null)
+            {
+                Finish(replay.Problem, problem, null, cancellationToken);
+            }
+            else
+            {
+                Finish(null, null, sender.Counts, cancellationToken);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Reads the items of the replay and sends them until the end or a problem of sending.
+    /// </summary>
+    /// <param name="sender">The sender</param>
+    /// <param name="assembler">The assembler</param>
+    /// <param name="cancellationToken">The token that stops the replay</param>
+    /// <returns>The problem of sending, or <c>null</c> if the replay reached its end</returns>
+    private async Task<ReplaySendProblemKind?> SendItemsAsync(ReplaySender sender, PipeTickAssembler assembler, CancellationToken cancellationToken)
+    {
+        PipeTickResult item;
+
+        do
+        {
+            item = await assembler.ReadAsync(cancellationToken).ConfigureAwait(false);
+
+            var problem = await SendItemAsync(sender, item, cancellationToken).ConfigureAwait(false);
+
+            if (problem is not null)
+            {
+                return problem;
+            }
+        }
+        while (item.Kind != PipeTickResultKind.EndOfStream);
+
+        return null;
+    }
+
+    /// <summary>
+    /// Publishes and sends one item of the replay.
+    /// </summary>
+    /// <param name="sender">The sender</param>
+    /// <param name="item">The item</param>
+    /// <param name="cancellationToken">The token that stops the replay</param>
+    /// <returns>The problem of sending, or <c>null</c> if there is none</returns>
+    private async Task<ReplaySendProblemKind?> SendItemAsync(ReplaySender sender, PipeTickResult item, CancellationToken cancellationToken)
+    {
+        if (item.Tick is { } tick)
+        {
+            PublishTick(tick);
+
+            return await sender.SendTickAsync(tick, cancellationToken).ConfigureAwait(false);
+        }
+
+        DateTimeOffset stamp;
+
+        lock (_statusLock)
+        {
+            stamp = _lastReadStamp;
+        }
+
+        return item.Kind switch
+               {
+                   PipeTickResultKind.SessionStart => await sender.SendSessionStartAsync(stamp, cancellationToken).ConfigureAwait(false),
+                   PipeTickResultKind.SessionEnd => await sender.SendSessionEndAsync(stamp, cancellationToken).ConfigureAwait(false),
+                   _ => null
+               };
     }
 
     /// <summary>
@@ -234,13 +472,21 @@ public sealed class PipeReplayRunner
     /// Applies the status rule to a read result.
     /// </summary>
     /// <param name="read">The read result</param>
+    /// <param name="stamp">The time the read completed</param>
     /// <param name="cancellationToken">The token that stops the replay</param>
-    private void Observe(PipeReadResult read, CancellationToken cancellationToken)
+    private void Observe(PipeReadResult read, DateTimeOffset stamp, CancellationToken cancellationToken)
     {
+        lock (_statusLock)
+        {
+            _lastReadStamp = stamp;
+        }
+
         if (PipeStatusRule.ForRead(read) is not { State: PipeConnectionState.Receiving or PipeConnectionState.ProtocolMismatch } status)
         {
             return;
         }
+
+        _sender?.NotifyState(status.State);
 
         Publish(new PipeReplayStatus
                 {
@@ -256,6 +502,18 @@ public sealed class PipeReplayRunner
     /// <param name="cancellationToken">The token that stops the replay</param>
     private void Finish(PipeReplayProblem? problem, CancellationToken cancellationToken)
     {
+        Finish(problem, null, null, cancellationToken);
+    }
+
+    /// <summary>
+    /// Ends the replay that was sent to a server, keeping the state it reached.
+    /// </summary>
+    /// <param name="problem">The problem of the recording that ended the replay, if any</param>
+    /// <param name="sendProblem">The problem of sending that ended the replay, if any</param>
+    /// <param name="sent">The counts of what was sent, if the replay was sent completely</param>
+    /// <param name="cancellationToken">The token that stops the replay</param>
+    private void Finish(PipeReplayProblem? problem, ReplaySendProblemKind? sendProblem, ReplaySendCounts? sent, CancellationToken cancellationToken)
+    {
         PipeConnectionState state;
 
         lock (_statusLock)
@@ -265,11 +523,11 @@ public sealed class PipeReplayRunner
 
         if (cancellationToken.IsCancellationRequested == false)
         {
-            if (problem is null)
+            if (problem is null && sendProblem is null)
             {
                 CompanionLog.ReplayFinished(_logger);
             }
-            else
+            else if (problem is not null)
             {
                 CompanionLog.ReplayProblem(_logger, TrayMenu.FormatReplayReason(problem) ?? problem.Kind.ToString());
             }
@@ -279,7 +537,9 @@ public sealed class PipeReplayRunner
                 {
                     State = state,
                     IsFinished = true,
-                    Problem = problem
+                    Problem = problem,
+                    SendProblem = sendProblem,
+                    Sent = sent
                 },
                 cancellationToken);
     }

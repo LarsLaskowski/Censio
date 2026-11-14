@@ -5,7 +5,7 @@
 The JSON contract version 1 between the Companion and the server: the ten messages, their wire form, the version rule
 and the frozen hello, identities, the reader's checks in order, the bounds, the refusal texts and what never crosses.
 The server and the Companion rely on it. The server's endpoint reads and answers these messages ([`ingest.md`](ingest.md));
-the Companion does not send them yet (#40).
+a Companion that replays a recording with `--server` sends them ([`replay-sending.md`](replay-sending.md)); live sending is #40.
 
 ## Behavior
 
@@ -237,7 +237,7 @@ input.
 ## Not here
 
 - The server's endpoint, its token and what it answers to each message: [`ingest.md`](ingest.md).
-- The Companion's sending, the buffer and the resend (#40, #41); uploading the catalog and the icons (#42).
+- The Companion's sending of a replay: [`replay-sending.md`](replay-sending.md); live sending, the buffer and the resend (#40, #41); uploading the catalog and the icons (#42).
 - The catalog document itself: [`game-catalog-format.md`](game-catalog-format.md).
 - The pipe's frames and ticks: [`pipe.md`](pipe.md).
 - The code: `ContractReader`, `ContractWriter` and the message types in `src/Censio.Contracts`, the conversion of pipe

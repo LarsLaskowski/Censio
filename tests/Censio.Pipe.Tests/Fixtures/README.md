@@ -46,6 +46,13 @@ tick; after the final empty tick the 24 islands stay listed without values; with
 two session GUIDs one region GUID, the two form one region. A change to the fixture is checked against these facts
 too.
 
+The `IngestEndpointReplaySent…` tests and `IngestEndpointSecondReplayCreatesSecondProfile` (in `IngestEndpointTests`)
+replay the same linked file through `PipeReplayRunner` and `ReplaySender` into the server's real ingest endpoint (over
+`TestServerReplayConnector`) and assert the facts above for the replay's profile: the three regions with their islands,
+the 24 islands without values after the final tick, the replay ending with `<n> ticks sent, 0 refused` where `<n>` is
+the number of the fixture's ticks with at least one island, computed by the test from its own replay of the file, a
+notice to the server state's followers for the profile and each sent tick, and a second profile for a second replay.
+
 The pause is shown by the file but not asserted.
 
 ## Deny-list check

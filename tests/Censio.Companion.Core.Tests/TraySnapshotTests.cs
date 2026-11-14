@@ -113,6 +113,46 @@ public sealed class TraySnapshotTests
     }
 
     /// <summary>
+    /// The snapshot of a replay sent to a server shows the problem look for a send problem and the waiting look while it
+    /// connects and when it finished with its counts.
+    /// </summary>
+    /// <param name="isConnecting">Whether the replay connects</param>
+    /// <param name="sendProblem">The send problem, if any</param>
+    /// <param name="isSent">Whether the replay finished with counts</param>
+    /// <param name="expectedLook">The expected look</param>
+    /// <param name="expectedStatusText">The expected status text</param>
+    [TestMethod]
+    [TestCategory("AC7")]
+    [DataRow(false, ReplaySendProblemKind.ServerUnreachable, false, TrayIconLook.Problem, "Replay error: server unreachable")]
+    [DataRow(true, null, false, TrayIconLook.Waiting, "Replay: Connecting to server")]
+    [DataRow(false, null, true, TrayIconLook.Waiting, "Replay finished: 31 ticks sent, 1 refused")]
+    public void TraySnapshotForReplaySendMapsLook(bool isConnecting, ReplaySendProblemKind? sendProblem, bool isSent, TrayIconLook expectedLook, string expectedStatusText)
+    {
+        // Arrange
+        var status = new PipeReplayStatus
+                     {
+                         State = PipeConnectionState.Connected,
+                         IsConnecting = isConnecting,
+                         IsFinished = sendProblem is not null || isSent,
+                         SendProblem = sendProblem,
+                         Sent = isSent
+                                    ? new ReplaySendCounts
+                                      {
+                                          Ticks = 31,
+                                          Refused = 1
+                                      }
+                                    : null
+                     };
+
+        // Act
+        var snapshot = TraySnapshot.ForReplay(status, _lastTick);
+
+        // Assert
+        Assert.AreEqual(expectedLook, snapshot.Look, "The look should follow the sending");
+        Assert.AreEqual(expectedStatusText, snapshot.StatusText, "The status text should be the one of the tooltip");
+    }
+
+    /// <summary>
     /// The snapshot of an invalid command line shows the problem look, no last tick and a toggle that cannot be used.
     /// </summary>
     [TestMethod]

@@ -236,6 +236,140 @@ public sealed class CompanionCommandLineTests
     }
 
     /// <summary>
+    /// A replay with --server gives the address and, with --token-file, the path of the token file, whatever the
+    /// order and the case of the switches.
+    /// </summary>
+    /// <param name="text">The arguments, separated by '|'</param>
+    /// <param name="address">The expected server address</param>
+    /// <param name="tokenFilePath">The expected path of the token file</param>
+    [TestMethod]
+    [TestCategory("AC4")]
+    [DataRow("--replay|f|--server|ws://localhost:8080/ingest|--token-file|token.txt", "ws://localhost:8080/ingest", "token.txt")]
+    [DataRow("--replay|f|--server|wss://censio.example/ingest", "wss://censio.example/ingest", null)]
+    [DataRow("--TOKEN-FILE|C:\\My Files\\token.txt|--Server|ws://192.168.1.20:8080/ingest|--REPLAY|f|--speed|max", "ws://192.168.1.20:8080/ingest", "C:\\My Files\\token.txt")]
+    [DataRow("--server|WSS://Censio.Example:443/ingest|--replay|f", "wss://censio.example/ingest", null)]
+    [DataRow("--replay|f|--server|ws://[::1]:5000/ingest?client=replay|--token-file|t", "ws://[::1]:5000/ingest?client=replay", "t")]
+    public void CompanionCommandLineReplayWithServerGivesAddressAndTokenFile(string text, string address, string? tokenFilePath)
+    {
+        // Arrange
+        var args = ArgsOf(text);
+
+        // Act
+        var commandLine = CompanionCommandLine.Parse(args);
+
+        // Assert
+        Assert.AreEqual(CompanionMode.Replay, commandLine.Mode, $"The command line '{text}' should select replay");
+        Assert.AreEqual("f", commandLine.ReplayPath, "The path should be the argument after --replay");
+        Assert.AreEqual(new Uri(address), commandLine.ServerAddress, "The address should be the argument after --server");
+        Assert.AreEqual(tokenFilePath, commandLine.TokenFilePath, "The token file should be the argument after --token-file");
+    }
+
+    /// <summary>
+    /// Each command line of E1 that uses --server or --token-file is invalid.
+    /// </summary>
+    /// <param name="text">The arguments, separated by '|'</param>
+    [TestMethod]
+    [TestCategory("AC4")]
+    [DataRow("--server|ws://localhost:8080/ingest")]
+    [DataRow("--server|ws://localhost:8080/ingest|--token-file|t")]
+    [DataRow("--token-file|t")]
+    [DataRow("--replay|f|--token-file|t")]
+    [DataRow("--replay|f|--server|ws://a/ingest|--server|ws://b/ingest")]
+    [DataRow("--replay|f|--server|ws://a/ingest|--token-file|t|--token-file|u")]
+    [DataRow("--replay|f|--server")]
+    [DataRow("--replay|f|--server|ws://a/ingest|--token-file")]
+    [DataRow("--replay|f|--server|")]
+    [DataRow("--replay|f|--server|ws://a/ingest|--token-file|")]
+    [DataRow("--replay|f|--server|--token-file|t")]
+    [DataRow("--replay|f|--server|ws://a/ingest|--token-file|--speed|max")]
+    [DataRow("--record|--server|ws://a/ingest")]
+    [DataRow("--record|--replay|f|--server|ws://a/ingest")]
+    [DataRow("--replay|f|--server|ws://a/ingest|--record")]
+    [DataRow("--replay|f|--server|http://a/ingest")]
+    [DataRow("--replay|f|--server|https://a/ingest")]
+    [DataRow("--replay|f|--server|ftp://a/ingest")]
+    [DataRow("--replay|f|--server|ingest")]
+    [DataRow("--replay|f|--server|/ingest")]
+    [DataRow("--replay|f|--server|localhost:8080/ingest")]
+    [DataRow("--replay|f|--server|ws:///ingest")]
+    [DataRow("--replay|f|--server|ws://user@a/ingest")]
+    [DataRow("--replay|f|--server|ws://user:secret@a/ingest")]
+    [DataRow("--replay|f|--server|ws://a/ingest#part")]
+    [DataRow("--replay|f|--server|ws://a/ingest#")]
+    [DataRow("--replay|f|--server|ws://a/my ingest")]
+    public void CompanionCommandLineServerSwitchesGiveInvalid(string text)
+    {
+        // Arrange
+        var args = ArgsOf(text);
+
+        // Act
+        var commandLine = CompanionCommandLine.Parse(args);
+
+        // Assert
+        Assert.AreEqual(CompanionMode.Invalid, commandLine.Mode, $"The command line '{text}' should be invalid");
+        Assert.IsNull(commandLine.ServerAddress, $"The command line '{text}' should give no address");
+        Assert.IsNull(commandLine.TokenFilePath, $"The command line '{text}' should give no token file");
+    }
+
+    /// <summary>
+    /// An address that holds a control or white space character other than a space is invalid.
+    /// </summary>
+    /// <param name="address">The address</param>
+    [TestMethod]
+    [TestCategory("AC4")]
+    [DataRow("ws://a/in\tgest")]
+    [DataRow("ws://a/ingest\u0001")]
+    [DataRow("ws://a/ingest\u007F")]
+    [DataRow("ws://a/ingest\u00A0")]
+    [DataRow("ws://a/ingest\n")]
+    public void CompanionCommandLineServerAddressWithControlCharacterGivesInvalid(string address)
+    {
+        // Arrange
+        var args = new[] { "--replay", "f", "--server", address };
+
+        // Act
+        var commandLine = CompanionCommandLine.Parse(args);
+
+        // Assert
+        Assert.Contains(character => char.IsControl(character) || char.IsWhiteSpace(character), address, "The address of the case should still hold its control or white space character");
+        Assert.AreEqual(CompanionMode.Invalid, commandLine.Mode, "An address with a control or white space character should be invalid");
+    }
+
+    /// <summary>
+    /// A replay without --server gives neither an address nor a token file.
+    /// </summary>
+    /// <param name="text">The arguments, separated by '|'</param>
+    [TestMethod]
+    [TestCategory("AC4")]
+    [DataRow("--replay|f")]
+    [DataRow("--replay|f|--speed|max")]
+    [DataRow("--speed|10|--replay|f")]
+    public void CompanionCommandLineReplayWithoutServerHasNoAddress(string text)
+    {
+        // Arrange
+        var args = ArgsOf(text);
+
+        // Act
+        var commandLine = CompanionCommandLine.Parse(args);
+
+        // Assert
+        Assert.AreEqual(CompanionMode.Replay, commandLine.Mode, $"The command line '{text}' should select replay");
+        Assert.AreEqual("f", commandLine.ReplayPath, "The path should be the argument after --replay");
+        Assert.IsNull(commandLine.ServerAddress, "Without --server no address should be set");
+        Assert.IsNull(commandLine.TokenFilePath, "Without --server no token file should be set");
+    }
+
+    /// <summary>
+    /// Splits a command line text at '|' into its arguments, keeping empty ones and spaces.
+    /// </summary>
+    /// <param name="text">The text</param>
+    /// <returns>The arguments</returns>
+    private static string[] ArgsOf(string text)
+    {
+        return text.Split('|');
+    }
+
+    /// <summary>
     /// Splits a command line text into its arguments.
     /// </summary>
     /// <param name="text">The text</param>

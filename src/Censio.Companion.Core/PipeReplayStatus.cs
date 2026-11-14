@@ -24,5 +24,20 @@ public readonly record struct PipeReplayStatus
     /// </summary>
     public PipeReplayProblem? Problem { get; init; }
 
+    /// <summary>
+    /// Gets a value indicating whether the replay is connecting to the server.
+    /// </summary>
+    public bool IsConnecting { get; init; }
+
+    /// <summary>
+    /// Gets the problem of sending the replay to the server that ended the replay, if any.
+    /// </summary>
+    public ReplaySendProblemKind? SendProblem { get; init; }
+
+    /// <summary>
+    /// Gets the counts of what the replay sent to the server, if it was sent.
+    /// </summary>
+    public ReplaySendCounts? Sent { get; init; }
+
     #endregion // Properties
 }

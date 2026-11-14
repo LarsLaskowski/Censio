@@ -67,11 +67,11 @@ public sealed record TraySnapshot
     {
         TrayIconLook look;
 
-        if (status.Problem is not null)
+        if (status.Problem is not null || status.SendProblem is not null)
         {
             look = TrayIconLook.Problem;
         }
-        else if (status.IsFinished)
+        else if (status.IsFinished || status.IsConnecting)
         {
             look = TrayIconLook.Waiting;
         }
