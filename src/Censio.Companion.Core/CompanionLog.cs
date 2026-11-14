@@ -92,6 +92,38 @@ public static partial class CompanionLog
     public static partial void ReplayProblem(ILogger logger, string reason);
 
     /// <summary>
+    /// Logs that a replay is connected to the server.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    [LoggerMessage(Level = LogLevel.Information, Message = "Replay connected to the server")]
+    public static partial void ReplaySendConnected(ILogger logger);
+
+    /// <summary>
+    /// Logs that the server refused a replay.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    /// <param name="reason">The reason</param>
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Replay refused by the server: {Reason}")]
+    public static partial void ReplaySendRefused(ILogger logger, string reason);
+
+    /// <summary>
+    /// Logs that sending a replay failed.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    /// <param name="reason">The reason</param>
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Replay sending failed: {Reason}")]
+    public static partial void ReplaySendFailed(ILogger logger, string reason);
+
+    /// <summary>
+    /// Logs the end of sending a replay.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    /// <param name="ticks">The number of ticks sent</param>
+    /// <param name="refused">The number of messages refused</param>
+    [LoggerMessage(Level = LogLevel.Information, Message = "Replay sent {Ticks} ticks, {Refused} refused")]
+    public static partial void ReplaySendFinished(ILogger logger, int ticks, int refused);
+
+    /// <summary>
     /// Logs that a folder could not be opened.
     /// </summary>
     /// <param name="logger">The logger</param>
