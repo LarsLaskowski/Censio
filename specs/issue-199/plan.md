@@ -166,3 +166,24 @@ review.
 ## Out of scope / follow-ups
 
 - Running the server under a path base (record 0081, *Consequences*).
+
+## Challenge notes
+
+I found no major problems with the plan, so it can go ahead. I have two minor notes for the Dev and Tester.
+
+**What I checked against the code (all confirmed):**
+- **#199 cause:** `src/Censio.Server/Components/App.razor` lines 4-15 have no `<base>`, and the asset links use `@Assets[...]` relative paths.
+- **AC1 test fails today:** I traced each case. From `/profiles/p/islands/s/i/a`, `css/censio.css` resolves to a 7-segment path, but the island route has 6. From `/profiles/p/sessions/s` it resolves to 5 segments against a 4-segment route. No route or static asset matches, so the deep rows get 404 (`/does-not-exist` returns 404 at `ProgramTests.cs:243`). The `/` and `/regions` rows get 200.
+- **No path base exists:** `Program.cs` has no `UsePathBase` and no forwarded headers. Every in-app link is root-relative (`MainLayout.razor:31-32` and the `PageAddress` links in the pages). Record 0081 option 1 is therefore enough. The issue asks for it to work "also behind a path base if one is configured", and none can be configured.
+- **#200 cause:** `DataStatus.razor.cs` lines 149-191. The offset is asked for only in `OnAfterRenderAsync`, so the prerender and the first interactive render show UTC.
+- **No sibling code path:** `DataStatus` is the only user of `PageFormat.Time` and `utcOffsetMinutes`. It is used by `Regions.razor:15`, `RegionIslands.razor:15` and `IslandDetail.razor:15`.
+- **Existing page tests still hold:** `IslandDetailTests.cs:355` and `RegionIslandsTests.cs:218` only assert that "As of" is absent on a not-found page.
+- **AC5 test cannot fail today:** after a new instant, `_offsetMinutes` is never reset, so the plan is right to defer it to step 6.
+- **AC3 assertion works:** .NET `string.Trim()` removes U+00A0, the no-break space the empty line will hold.
+- **Doc targets are right:** `docs/areas/web-pages.md:98-99`, `docs/USER_GUIDE.md:440` and `:902`.
+
+**Minor objections:**
+
+1. **minor: fact 11 can be settled now.** `Program.cs:13` calls `AddInteractiveServerComponents()` without options, so the default `CircuitOptions.JSInteropDefaultCallTimeout` applies. That default is 1 minute. A browser that never answers will show an empty line for up to a minute before it settles in UTC (before this change it showed UTC at once). Why it matters: the documentation should say so. Instruction to the Dev: confirm the default in step 6 as planned. Then say in `docs/areas/web-pages.md`, *As-of line and banner*, that the line stays empty until the browser answers or the call times out after the circuit's interop timeout (1 minute by default). Also say that the line stays empty while no interactive connection is ever made, for example when WebSockets are blocked.
+
+2. **minor: the "lost connection" case in AC4 cannot be seen in a browser.** On a `JSDisconnectedException`, the server sets UTC and re-renders, but the connection is gone, so the new line never reaches the browser. That AC4 case can only be checked as server-side component state. Why it matters: a manual check or the user guide could promise something the user never sees. Instruction to the Dev and Tester: cover "lost connection" in AC4 only through the existing catch in a unit test. Do not promise in `docs/USER_GUIDE.md` that a lost connection shows UTC; a dropped connection shows Blazor's reconnect UI instead. `docs/areas/web-pages.md:201` may keep listing it as "counts as none".
