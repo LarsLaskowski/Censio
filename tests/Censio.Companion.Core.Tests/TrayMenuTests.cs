@@ -793,6 +793,128 @@ public sealed class TrayMenuTests
     }
 
     /// <summary>
+    /// A replay that ended with a problem of sending names its reason, and the reason is the text of its kind.
+    /// </summary>
+    /// <param name="kind">The kind of the send problem</param>
+    /// <param name="reason">The expected reason</param>
+    [TestMethod]
+    [TestCategory("AC5")]
+    [TestCategory("AC7")]
+    [DataRow(ReplaySendProblemKind.TokenFileCannotBeRead, "token file cannot be read")]
+    [DataRow(ReplaySendProblemKind.TokenFileHoldsNoValidToken, "token file holds no valid token")]
+    [DataRow(ReplaySendProblemKind.ServerUnreachable, "server unreachable")]
+    [DataRow(ReplaySendProblemKind.TokenRefused, "token refused")]
+    [DataRow(ReplaySendProblemKind.CompanionConnected, "another Companion is connected")]
+    [DataRow(ReplaySendProblemKind.VersionNotSupported, "server does not support contract version 1")]
+    [DataRow(ReplaySendProblemKind.NoAnswer, "server does not answer")]
+    [DataRow(ReplaySendProblemKind.ConnectionLost, "server connection lost")]
+    [DataRow(ReplaySendProblemKind.InvalidReply, "invalid server reply")]
+    public void TrayMenuReplaySendProblemGivesReasonText(ReplaySendProblemKind kind, string reason)
+    {
+        // Arrange
+        var status = new PipeReplayStatus
+                     {
+                         State = PipeConnectionState.Receiving,
+                         IsFinished = true,
+                         SendProblem = kind
+                     };
+
+        // Act
+        var toolTip = TrayMenu.FormatReplayToolTip(status);
+
+        // Assert
+        Assert.AreEqual("Censio Companion: Replay error: " + reason, toolTip, $"The tooltip should name the reason of {kind}");
+        Assert.AreEqual(reason, TrayMenu.FormatReplaySendReason(kind), $"The reason of {kind} should be its text");
+    }
+
+    /// <summary>
+    /// A send problem wins over a problem of the recording, the end of the replay and the counts.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public void TrayMenuReplaySendProblemWinsOverProblem()
+    {
+        // Arrange
+        var status = new PipeReplayStatus
+                     {
+                         State = PipeConnectionState.Receiving,
+                         IsFinished = true,
+                         Problem = new PipeReplayProblem
+                                   {
+                                       Kind = PipeReplayProblemKind.InvalidLine,
+                                       LineNumber = 7
+                                   },
+                         SendProblem = ReplaySendProblemKind.ConnectionLost,
+                         Sent = new ReplaySendCounts
+                                {
+                                    Ticks = 3,
+                                    Refused = 0
+                                }
+                     };
+
+        // Act
+        var toolTip = TrayMenu.FormatReplayToolTip(status);
+
+        // Assert
+        Assert.AreEqual("Censio Companion: Replay error: server connection lost", toolTip, "The send problem should be shown first");
+    }
+
+    /// <summary>
+    /// A replay that connects to the server says so.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC1")]
+    public void TrayMenuReplayConnectingGivesConnectingText()
+    {
+        // Arrange
+        var status = new PipeReplayStatus
+                     {
+                         State = PipeConnectionState.Connected,
+                         IsConnecting = true
+                     };
+
+        // Act
+        var toolTip = TrayMenu.FormatReplayToolTip(status);
+
+        // Assert
+        Assert.AreEqual("Censio Companion: Replay: Connecting to server", toolTip, "The tooltip should say that the replay connects to the server");
+    }
+
+    /// <summary>
+    /// A replay sent to the server ends with the counts of sent ticks and refused messages, one tick in the singular.
+    /// </summary>
+    /// <param name="ticks">The number of sent ticks</param>
+    /// <param name="refused">The number of refused messages</param>
+    /// <param name="expected">The expected tooltip</param>
+    [TestMethod]
+    [TestCategory("AC1")]
+    [TestCategory("AC8")]
+    [DataRow(0, 0, "Censio Companion: Replay finished: 0 ticks sent, 0 refused")]
+    [DataRow(1, 0, "Censio Companion: Replay finished: 1 tick sent, 0 refused")]
+    [DataRow(31, 1, "Censio Companion: Replay finished: 31 ticks sent, 1 refused")]
+    [DataRow(2, 3, "Censio Companion: Replay finished: 2 ticks sent, 3 refused")]
+    public void TrayMenuReplaySendFinishedGivesCounts(int ticks, int refused, string expected)
+    {
+        // Arrange
+        var status = new PipeReplayStatus
+                     {
+                         State = PipeConnectionState.Receiving,
+                         IsFinished = true,
+                         Sent = new ReplaySendCounts
+                                {
+                                    Ticks = ticks,
+                                    Refused = refused
+                                }
+                     };
+
+        // Act
+        var toolTip = TrayMenu.FormatReplayToolTip(status);
+
+        // Assert
+        Assert.AreEqual(expected, toolTip, "The tooltip should name the sent ticks and the refused messages");
+    }
+
+    /// <summary>
     /// The tooltip of an invalid command line has the exact text.
     /// </summary>
     [TestMethod]

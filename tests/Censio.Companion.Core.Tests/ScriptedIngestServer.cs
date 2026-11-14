@@ -38,6 +38,11 @@ public sealed class ScriptedIngestServer : IAsyncDisposable
     /// </summary>
     private readonly WebSocket _server;
 
+    /// <summary>
+    /// Whether the client sent a close frame.
+    /// </summary>
+    private volatile bool _isClosedByClient;
+
     #endregion // Fields
 
     #region Constructors
@@ -78,6 +83,11 @@ public sealed class ScriptedIngestServer : IAsyncDisposable
     /// Gets the number of bytes the client has read from the connection.
     /// </summary>
     public long ClientBytesRead => _clientStream.BytesRead;
+
+    /// <summary>
+    /// Gets a value indicating whether the client sent a close frame, rather than ending the connection without one.
+    /// </summary>
+    public bool IsClosedByClient => _isClosedByClient;
 
     #endregion // Properties
 
@@ -159,6 +169,11 @@ public sealed class ScriptedIngestServer : IAsyncDisposable
             {
                 var result = await _server.ReceiveAsync(buffer.GetMemory(4096), cancellationToken).ConfigureAwait(false);
 
+                if (result.MessageType == WebSocketMessageType.Close)
+                {
+                    _isClosedByClient = true;
+                }
+
                 if (result.MessageType == WebSocketMessageType.Close && _server.State == WebSocketState.CloseReceived)
                 {
                     await _server.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, null, cancellationToken).ConfigureAwait(false);
@@ -200,6 +215,51 @@ public sealed class ScriptedIngestServer : IAsyncDisposable
                         cancellationToken).ConfigureAwait(false);
 
         return hello;
+    }
+
+    /// <summary>
+    /// Accepts the hello and acknowledges every message after it, a status excepted, until the connection ends.
+    /// </summary>
+    /// <param name="isAbortingAtFirstTick">
+    /// Whether the connection is ended without a close frame instead of acknowledging
+    /// the first tick
+    /// </param>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>The messages received, the hello first, in order</returns>
+    public async Task<List<ContractMessage>> AcknowledgeAllAsync(bool isAbortingAtFirstTick, CancellationToken cancellationToken)
+    {
+        var messages = new List<ContractMessage>();
+        var hello = await AcceptHelloAsync(cancellationToken).ConfigureAwait(false);
+
+        if (hello is null)
+        {
+            return messages;
+        }
+
+        messages.Add(hello);
+
+        var message = await ReceiveAsync(cancellationToken).ConfigureAwait(false);
+
+        while (message is not null)
+        {
+            messages.Add(message);
+
+            if (isAbortingAtFirstTick && message is ContractTick)
+            {
+                Abort();
+
+                return messages;
+            }
+
+            if (message is not ContractStatus && await TryAcknowledgeAsync(message, cancellationToken).ConfigureAwait(false) == false)
+            {
+                return messages;
+            }
+
+            message = await ReceiveAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        return messages;
     }
 
     /// <summary>
@@ -254,6 +314,26 @@ public sealed class ScriptedIngestServer : IAsyncDisposable
     {
         _server.Abort();
         _serverStream.Dispose();
+    }
+
+    /// <summary>
+    /// Acknowledges a message as accepted, unless the connection ended.
+    /// </summary>
+    /// <param name="message">The message</param>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns><c>true</c> if the acknowledgement was sent</returns>
+    private async Task<bool> TryAcknowledgeAsync(ContractMessage message, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await AcknowledgeAsync(message, null, cancellationToken).ConfigureAwait(false);
+
+            return true;
+        }
+        catch (Exception exception) when (exception is WebSocketException or IOException)
+        {
+            return false;
+        }
     }
 
     #endregion // Methods

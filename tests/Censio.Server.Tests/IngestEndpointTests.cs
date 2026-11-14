@@ -1,7 +1,10 @@
 using System.Net;
 using System.Net.WebSockets;
+using System.Runtime.CompilerServices;
 
+using Censio.Companion.Core;
 using Censio.Contracts;
+using Censio.Pipe;
 using Censio.Server.Data;
 
 using Microsoft.AspNetCore.Builder;
@@ -21,6 +24,16 @@ namespace Censio.Server.Tests;
 public sealed class IngestEndpointTests
 {
     #region Fields
+
+    /// <summary>
+    /// The real-time limit of a replay of the fixture into the test server.
+    /// </summary>
+    private static readonly TimeSpan _replayBound = TimeSpan.FromSeconds(10);
+
+    /// <summary>
+    /// The regions of the fixture, ordered by GUID, with their numbers of islands.
+    /// </summary>
+    private static readonly string[] _fixtureRegions = ["3245 islands 13", "6627 islands 9", "149679 islands 2"];
 
     /// <summary>
     /// The temporary directories of the running test, deleted afterwards.
@@ -278,6 +291,147 @@ public sealed class IngestEndpointTests
     }
 
     /// <summary>
+    /// A replay of the fixture sent with the stored token fills the pages of its profile: three regions with the session
+    /// GUIDs 3245, 6627 and 149679 and 13, 9 and 2 islands, and after the final tick without data the 24 islands without
+    /// values.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC1")]
+    public async Task IngestEndpointReplaySentFixtureFillsPages()
+    {
+        // Arrange
+        var dataDirectory = CreateTemporaryDirectory();
+        using var factory = new CensioServerFactory("Production", CreateDataDirectorySettings(dataDirectory));
+        var state = factory.Services.GetRequiredService<ServerState>();
+        await using var sender = CreateReplaySender(factory, dataDirectory);
+
+        // Act
+        await CreateFixtureRunner(sender).RunAsync(TestContext.CancellationToken).WaitAsync(_replayBound, TestContext.CancellationToken);
+
+        var read = await new PageReader(state).ReadAsync(sender.ProfileId, null, TestContext.CancellationToken);
+
+        // Assert
+        var view = read.View ?? throw new AssertFailedException("The replayed profile should have a view");
+        var islands = view.Regions.SelectMany(region => region.Islands).ToList();
+
+        Assert.AreSequenceEqual(_fixtureRegions, view.Regions.OrderBy(region => region.RegionGuid).Select(region => $"{region.RegionGuid} islands {region.Islands.Count}"), "The pages should show the fixture's three regions with their islands");
+        Assert.HasCount(24, islands, "The 24 islands should be listed");
+        Assert.IsEmpty(islands.Where(island => island.Figures is not null).ToList(), "After the final tick without data no island should have values");
+        Assert.AreEqual(sender.ProfileName, state.Profiles.Single(profile => profile.Id == sender.ProfileId).Name, "The profile should carry the replay's name");
+        Assert.StartsWith("Replay ", sender.ProfileName, "The profile name should be the replay's");
+    }
+
+    /// <summary>
+    /// A replay of the fixture ends with the number of its ticks with at least one island sent and none refused.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC1")]
+    public async Task IngestEndpointReplaySentFixtureCountsTicksWithIslands()
+    {
+        // Arrange
+        var dataDirectory = CreateTemporaryDirectory();
+        using var factory = new CensioServerFactory("Production", CreateDataDirectorySettings(dataDirectory));
+        var expected = await CountFixtureTicksWithIslandsAsync();
+        await using var sender = CreateReplaySender(factory, dataDirectory);
+        var runner = CreateFixtureRunner(sender);
+
+        // Act
+        await runner.RunAsync(TestContext.CancellationToken).WaitAsync(_replayBound, TestContext.CancellationToken);
+
+        // Assert
+        Assert.IsGreaterThan(0, expected, "The fixture should have ticks with islands, or the test would prove less");
+        Assert.AreEqual(new ReplaySendCounts
+                        {
+                            Ticks = expected,
+                            Refused = 0
+                        },
+                        runner.Status.Sent,
+                        "Every tick with islands should be sent and none refused");
+        Assert.AreEqual($"Censio Companion: Replay finished: {expected} ticks sent, 0 refused", TrayMenu.FormatReplayToolTip(runner.Status), "The Companion should end with the counts");
+    }
+
+    /// <summary>
+    /// The followers of the server state are told of the replay's profile and of each sent tick.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC2")]
+    public async Task IngestEndpointReplaySentFixtureNotifiesFollowersPerTick()
+    {
+        // Arrange
+        var dataDirectory = CreateTemporaryDirectory();
+        using var factory = new CensioServerFactory("Production", CreateDataDirectorySettings(dataDirectory));
+        var state = factory.Services.GetRequiredService<ServerState>();
+        var ticks = await CountFixtureTicksWithIslandsAsync();
+        await using var sender = CreateReplaySender(factory, dataDirectory);
+        var (notices, told) = FollowProfile(state, sender.ProfileId, ticks + 1);
+
+        // Act
+        await CreateFixtureRunner(sender).RunAsync(TestContext.CancellationToken).WaitAsync(_replayBound, TestContext.CancellationToken);
+        await told.WaitAsync(_replayBound, TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(ticks + 1, Volatile.Read(ref notices.Value), "The followers should be told of the profile and of each sent tick");
+    }
+
+    /// <summary>
+    /// The Companion shows as connected with the replayed state while the ticks are sent, and as not connected after the end.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC2")]
+    public async Task IngestEndpointReplaySentShowsCompanionConnectedThenNot()
+    {
+        // Arrange
+        var dataDirectory = CreateTemporaryDirectory();
+        using var factory = new CensioServerFactory("Production", CreateDataDirectorySettings(dataDirectory));
+        var state = factory.Services.GetRequiredService<ServerState>();
+        await using var sender = CreateReplaySender(factory, dataDirectory);
+        var runner = CreateFixtureRunner(sender);
+        var seen = new List<CompanionConnection>();
+
+        runner.TickReceived += (_, _) => seen.Add(state.CompanionState);
+
+        // Act
+        await runner.RunAsync(TestContext.CancellationToken).WaitAsync(_replayBound, TestContext.CancellationToken);
+        await WaitForCompanionDisconnectedAsync(state);
+
+        // Assert
+        Assert.IsNotEmpty(seen, "The replay should raise its ticks");
+        Assert.DoesNotContain(connection => connection.IsConnected == false, seen, "The Companion should show as connected while the ticks are sent");
+        Assert.AreEqual(ContractPipeState.Receiving, seen[^1].PipeState, "The Companion should show the replayed state");
+        Assert.IsFalse(state.CompanionState.IsConnected, "After the end the Companion should show as not connected");
+    }
+
+    /// <summary>
+    /// A second replay creates a second profile.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC3")]
+    public async Task IngestEndpointSecondReplayCreatesSecondProfile()
+    {
+        // Arrange
+        var dataDirectory = CreateTemporaryDirectory();
+        using var factory = new CensioServerFactory("Production", CreateDataDirectorySettings(dataDirectory));
+        var state = factory.Services.GetRequiredService<ServerState>();
+        await using var first = CreateReplaySender(factory, dataDirectory);
+        await using var second = CreateReplaySender(factory, dataDirectory);
+
+        await CreateFixtureRunner(first).RunAsync(TestContext.CancellationToken).WaitAsync(_replayBound, TestContext.CancellationToken);
+        await WaitForCompanionDisconnectedAsync(state);
+
+        // Act
+        await CreateFixtureRunner(second).RunAsync(TestContext.CancellationToken).WaitAsync(_replayBound, TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreNotEqual(first.ProfileId, second.ProfileId, "Each replay should have its own profile identity");
+        Assert.AreSequenceEqual(new[] { first.ProfileId, second.ProfileId }.Order(), state.Profiles.Select(profile => profile.Id).Order(), "The server should hold the two replays as two profiles");
+    }
+
+    /// <summary>
     /// Returns the WebSocket address of the endpoint on the test server.
     /// </summary>
     /// <param name="factory">The server factory</param>
@@ -302,6 +456,59 @@ public sealed class IngestEndpointTests
                {
                    [DataProtectionSetup.DataDirectoryKey] = dataDirectory
                };
+    }
+
+    /// <summary>
+    /// Creates a runner that replays the fixture at maximum speed into a sender.
+    /// </summary>
+    /// <param name="sender">The sender</param>
+    /// <returns>The runner</returns>
+    private static PipeReplayRunner CreateFixtureRunner(ReplaySender sender)
+    {
+        return new PipeReplayRunner(() => File.OpenRead(FixturePath()), PipeReplaySpeed.Maximum, TimeProvider.System, NullLogger.Instance, sender);
+    }
+
+    /// <summary>
+    /// Creates a sender that connects to the test server's ingest endpoint with the stored token.
+    /// </summary>
+    /// <param name="factory">The server factory</param>
+    /// <param name="dataDirectory">The data directory of the server</param>
+    /// <returns>The sender</returns>
+    private static ReplaySender CreateReplaySender(WebApplicationFactory<Program> factory, string dataDirectory)
+    {
+        return new ReplaySender(IngestUri(factory), Path.Combine(dataDirectory, IngestTokenSetup.TokenFileName), "1.0.0", new TestServerReplayConnector(factory.Server), TimeProvider.System, NullLogger.Instance);
+    }
+
+    /// <summary>
+    /// Returns the path of the pipe fixture.
+    /// </summary>
+    /// <returns>The path</returns>
+    private static string FixturePath()
+    {
+        return Path.Combine(AppContext.BaseDirectory, "Fixtures", "Pipe", "long-session.jsonl");
+    }
+
+    /// <summary>
+    /// Follows the server state and counts the changes of a profile.
+    /// </summary>
+    /// <param name="state">The server state</param>
+    /// <param name="profileId">The profile identity</param>
+    /// <param name="expected">The number of changes after which the returned task completes</param>
+    /// <returns>The count and the task that completes once the expected number was told</returns>
+    private static (StrongBox<int> Notices, Task Told) FollowProfile(ServerState state, Guid profileId, int expected)
+    {
+        var notices = new StrongBox<int>();
+        var told = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        state.Changed += (_, change) =>
+                         {
+                             if (change.Kind == ServerStateChangeKind.Profile && change.ProfileId == profileId && Interlocked.Increment(ref notices.Value) >= expected)
+                             {
+                                 told.TrySetResult();
+                             }
+                         };
+
+        return (notices, told.Task);
     }
 
     /// <summary>
@@ -368,6 +575,54 @@ public sealed class IngestEndpointTests
         _sockets.Add(socket);
 
         return socket;
+    }
+
+    /// <summary>
+    /// Replays the fixture through the message reader and the tick assembler and counts its ticks with at least one island.
+    /// </summary>
+    /// <returns>The number of ticks with islands</returns>
+    private async Task<int> CountFixtureTicksWithIslandsAsync()
+    {
+        var clock = new PipeReplayClock(DateTimeOffset.UnixEpoch);
+
+        using var replay = new PipeReplayStream(File.OpenRead(FixturePath()), PipeReplaySpeed.Maximum, clock, TimeProvider.System);
+        using var assembler = new PipeTickAssembler(new PipeMessageReader(replay), clock);
+
+        var count = 0;
+        var result = await assembler.ReadAsync(TestContext.CancellationToken);
+
+        while (result.Kind != PipeTickResultKind.EndOfStream)
+        {
+            count += result.Tick is { Islands.Count: > 0 } ? 1 : 0;
+            result = await assembler.ReadAsync(TestContext.CancellationToken);
+        }
+
+        return count;
+    }
+
+    /// <summary>
+    /// Waits until the server shows the Companion as not connected.
+    /// </summary>
+    /// <param name="state">The server state</param>
+    /// <returns>A task that completes when the Companion is not connected</returns>
+    private async Task WaitForCompanionDisconnectedAsync(ServerState state)
+    {
+        var disconnected = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        state.Changed += (_, _) =>
+                         {
+                             if (state.CompanionState.IsConnected == false)
+                             {
+                                 disconnected.TrySetResult();
+                             }
+                         };
+
+        if (state.CompanionState.IsConnected == false)
+        {
+            disconnected.TrySetResult();
+        }
+
+        await disconnected.Task.WaitAsync(_replayBound, TestContext.CancellationToken);
     }
 
     /// <summary>
