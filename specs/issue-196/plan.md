@@ -67,7 +67,7 @@ check* alone (Markdown only).
 ## Approach
 
 The exact text is `specs/issue-196/project-target.md` (CRLF, as the original): the whole file as it should read,
-built from `.squad/project.md` at 456c772 (its last change on `main`). The Dev (all sections but *Test doubles*)
+built from `.squad/project.md` at 877bc0c (its last change on `main`). The Dev (all sections but *Test doubles*)
 and the Tester (*Test doubles*) each report in step 6 that the target stands for their section, or the exact
 change they need; the orchestrator then copies it over `.squad/project.md` — if `main` changed the file
 meanwhile, it reapplies the hunks of `git diff --no-index` between the two instead — runs *Format* and
@@ -143,3 +143,29 @@ worded.
 
 - The *Security areas* introduction and the remaining entries; a later shortening, when the file grows again, is
   its own issue.
+
+## Security notes
+
+## Security plan review: specs/issue-196 (mode `plan`)
+
+The rewording keeps every security area. No entry under *Security areas* is removed or narrowed.
+
+**How I checked**
+- I diffed the current `/home/user/Censio/.squad/project.md` against `/home/user/Censio/specs/issue-196/project-target.md`. In *Security areas*, only lines 22, 26, 27 and 29 change, which are the four entries the plan names.
+- For each entry I compared the backticked names, link targets and `*Section*` pointers before and after, using a Python script against both files.
+  - The section's introduction is byte-identical.
+  - No entry is added or removed.
+  - The only name that leaves a code span is `docs/areas/contract.md` in Parsing of external input. It is now the `[contract](../docs/areas/contract.md)` link in the same entry, so it is still covered.
+
+**Entry by entry**
+- **Network exposure:** `IconEndpoint` moves from the `/icons/{reference}` parenthesis into the file list, and the route stays listed. Dropping "read on `/`" leaves the cookies and `Accept-Language` without a route limit, which is wider, not narrower.
+- **Parsing of external input:** the dropped glosses all describe code that is still covered by name.
+  - The catalog cache file parser `GameCatalogCacheFile` is in `src/Censio.GameData/GameCatalogCacheFile.cs`. The recordings and their anonymiser are in `src/Censio.Pipe/` (`PipeFrameAnonymiser.cs`). Both stay covered by "all of `src/Censio.Pipe` and `src/Censio.GameData`".
+  - `CompanionSettings`, `RegistryUbisoftInstallRecords`, `GameInstallationSearch`, `ContractReader`, `CatalogDocumentReader`, `PageAddress`, `PngHeader` and `DataStatus` are all still named.
+- **File paths the Companion writes, prunes or opens:** every type stays. The replay file and the anonymiser's output and temporary file stay. The read-only scope of the installation and its archives is unchanged. `PipeRecordingFiles` and `GameCatalogCacheStore` (both in `src/Censio.Companion.Core/`) are still named.
+- **Logging and showing external data:** "its diagnostics window" replaces "the diagnostics window's game names and icons", and "the server's request logging and pages" replaces the version limited to names and icons. Both are wider. `PngWriter` and `GameCatalogCacheFile` remain as PNG sources of the window.
+
+**Tier:** `standard` matches a rewording of *Security areas* that changes no control and narrows no area. None of the other sections changes a security area. The added `IngestTokenSetupTests` and `DatabaseSetupTests` and the renaming of the `Censio.GameData` reader only make the text more accurate. The plan runs no measurements and needs none.
+
+**Findings**
+- [NON-BLOCKING] The plan states the wrong base commit for `.squad/project.md`. In *Approach* it says the target was "built from `.squad/project.md` at 877bc0c (its last change on `main`)". `git log -- .squad/project.md` shows the last change is 877bc0c (#192), and ececc7b and d757d0b also come after 456c772. My diff against the current file shows only the plan's intended edits, and the #189–#192 additions (`PageAddress`, `DataStatus`, `PageNames`, `ProfileViewBuilder`, web-pages) are in the target. So the target is built from the current text and nothing is reverted. The wrong ref still matters, because the orchestrator's "if `main` changed the file meanwhile" check would compare against it. Smallest fix, verbatim: replace "at 456c772 (its last change on `main`)" with "at 877bc0c (its last change on `main`)". Recommendation: fix now.
