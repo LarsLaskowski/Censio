@@ -12,3 +12,5 @@ are quoted in full.
 | 2026-11-14 08:26 | 2a Spec approval | Product Manager | spec approved |
 | 2026-11-14 08:29 | 2b Plan | Lead | RESULT: DONE, tier standard, one group G1, no production/test code (CI script image-check.sh + docs), early draft PR; security areas: CI config, ingest token (opus/medium · 33,077 tokens · 17 tool uses · 133 s · 32 in · 12,124 out · 1,827,516 cache read · 32,621 cache write · 385,608 weighted · continued) |
 | 2026-11-14 08:29 | 2b Challenge skipped | Orchestrator | challenge skipped — no production code (*Verification without tests*) |
+| 2026-11-14 08:30 | 3 Plan security | Security | VERDICT: APPROVED. Non-blocking: (1) drop docker cp fallback, fact 8 confirmed (BusyBox sha256sum present); (2) capture hash with \|\| true so F33-AC1 failure line prints under set -e; (3) run F33-AC2 after I29-AC2 but before the reuse container is removed. (opus/medium · 49,258 tokens · 11 tool uses · 89 s · 22 in · 7,181 out · 347,753 cache read · 40,041 cache write · 206,732 weighted) |
+| 2026-11-14 08:30 | 4-5 Skipped | Orchestrator | no production or test code: see *Verification without tests* |

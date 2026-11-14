@@ -152,3 +152,54 @@ unprinted (record 0061).
 ## Out of scope / follow-ups
 
 As [spec.md](spec.md), *Out of scope*.
+
+## Security notes
+
+## Security plan review: specs/feature-33-docker-config (mode `plan`, round 1)
+
+I found no blocking findings. The tier and the list of security areas are correct, and the plan keeps the ingest token out of variables, logs, echoes and failure messages.
+
+**Files read:** `/home/user/Censio/specs/feature-33-docker-config/spec.md`, `/home/user/Censio/specs/feature-33-docker-config/plan.md`, `/home/user/Censio/.github/scripts/image-check.sh`, `/home/user/Censio/src/Censio.Server/IngestTokenSetup.cs`, `/home/user/Censio/src/Censio.Server/Dockerfile`, `/home/user/Censio/docs/USER_GUIDE.md` (sections on the token and on data), the `.squad/routing.md` table of tiers and `.squad/stack.md` (*Known pitfalls*).
+
+### Tier and security areas
+- **`standard` is the right tier.** The change adds two read-only CI checks and operator documentation. It creates, changes or removes no security control, and it changes no CI permissions, secrets or triggers.
+- **The list of security areas touched is complete:** CI configuration (`image-check.sh`, CI job `image`) and the ingest token. I found no other area.
+
+### Keeping the token out of output
+- The plan never runs `cat` on the token, never stores it in a variable and never echoes it. The only value captured is `token_hash`, and a bad value fails with fixed text (`"none"`), never the value itself. That covers N4.
+- `expect_equal` (`image-check.sh:55-64`) prints only the two hashes on a mismatch. The token is 32 random bytes (`IngestTokenSetup.cs:51`, `:123`), and it exists only in CI. Its SHA-256 reveals nothing.
+- Existing output that could carry server logs:
+  - `docker logs "$nas_container"` (line 313) prints a whole log.
+  - The `denied_log` echo (line 289) does the same.
+  - The server logs only fixed messages and paths, never the token (the `[LoggerMessage]` definitions in `IngestTokenSetup.cs`), so neither can leak it.
+- **Fact 8 — measured, now confirmed.** I started `dockerd` as `.squad/stack.md` describes, pulled the pinned runtime base image and ran:
+  ```
+  docker run --rm --user 1654:1654 --entrypoint sh mcr.microsoft.com/dotnet/aspnet:11.0.0-alpine3.24-amd64@sha256:c25d3320… -c 'umask 077; printf abc > /tmp/t; chmod 600 /tmp/t; sha256sum /tmp/t; stat -c %a:%u /tmp/t; readlink -f "$(command -v sha256sum)"'
+  ```
+  Output:
+  ```
+  ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad  /tmp/t
+  600:1654
+  /bin/busybox
+  ```
+  So BusyBox `sha256sum` is in the runtime image, user 1654 can hash its own `0600` file, and the output is `<hash>  <path>`, with the hash as the first field. Fact 5 (mode and owner of the real token file) stays for CI step F33-AC1 to show, as the plan says.
+
+### Documented recreate and update steps
+None of them weaken anything:
+- **Same `docker run` again:** this keeps every setting as it was. If an operator leaves out the `-e CENSIO__INGEST__TOKENFILE` / `--mount`, the server generates a new token in `/config`. The Companion is then refused (fails closed), not let in.
+- **Volume lost, or update from `0.2.0`:** a new token is created and the Companion must be given it. Again this fails closed.
+- **Falling back to the old tag:** an older image refuses a newer database (E4), so this also fails closed.
+- **Reading the token:** the steps reuse the existing `docker exec censio cat /config/ingest-token` (`USER_GUIDE.md:105`/`:497`). That is the operator's intended way to read it, and nothing new prints the token.
+- **Pulling the mutable `latest` tag:** this is existing behaviour, made explicit.
+
+### Non-blocking findings
+1. **The `docker cp` fallback of fact 8 would write the token to the runner's disk.** That file would sit in `$work`, which is not in `dirs` for cleanup. Fact 8 is now confirmed, so the fallback is not needed.
+   - Smallest fix: mark fact 8 confirmed with the run above and delete the fallback sentence in the facts table and in *Options considered*.
+   - If a fallback must stay, hash a stream instead of a copied file: `docker exec "$main" cat /config/ingest-token | sha256sum`. The token then goes through a pipe and never into a variable or file. This needs the plan's "never read by `cat`" sentence loosened to "never captured in a variable or file".
+   - Recommendation: fix now (plan edit only).
+2. **Under `set -euo pipefail`, a plain `token_hash="$(docker exec … sha256sum … | awk …)"` exits on failure without the `image-check: F33-AC1: …` line.** No secret is involved: BusyBox's error names only the path.
+   - Smallest fix: capture with `|| true` (or `if ! …; then fail …`) so the 64-hex check prints the fixed failure message.
+   - Recommendation: fix now, as a Dev instruction in *Approach*.
+3. **Order of the second check:** F33-AC2 has to run before `docker rm -f "$reuse_container"` (`image-check.sh:270`). "After `I29-AC2`" implies it but does not say so.
+   - Smallest fix: in *Approach*, say "after I29-AC2, before the reuse container is removed".
+   - Recommendation: fix now.
