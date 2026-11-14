@@ -949,6 +949,67 @@ public sealed class ReplaySenderTests
     }
 
     /// <summary>
+    /// A status queued behind a status whose send fails is not written to the failed connection.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC9")]
+    public async Task ReplaySenderStatusQueuedBehindFailedSendIsNotWritten()
+    {
+        // Arrange
+        await using var server = ScriptedIngestServer.Create();
+        var socket = new SendFailingWebSocket(server.ClientSocket);
+        var logger = new RecordingLogger();
+        await using var sender = CreateSender(new DuplexReplayConnector(socket), CreateTimeProvider(), logger, null);
+
+        await ConnectAcceptedAsync(sender, server);
+        socket.HoldSends();
+        sender.NotifyState(PipeConnectionState.Connected);
+
+        await socket.HeldSend.WaitAsync(_guard, TestContext.CancellationToken);
+
+        sender.NotifyState(PipeConnectionState.Receiving);
+
+        // Act
+        socket.ReleaseSends();
+
+        var problem = await sender.CloseAsync(TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(ReplaySendProblemKind.ConnectionLost, problem, "The failed status send should end the run as connection lost");
+        Assert.AreEqual(1, socket.FailedSendCount, "The status queued behind the failed one should not be written");
+        Assert.ContainsSingle(entry => entry.Message == "Replay sending failed: server connection lost", logger.Entries, "The failure should be logged once");
+    }
+
+    /// <summary>
+    /// A status send that is still writing when the sender is disposed ends without a failure.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC10")]
+    public async Task ReplaySenderDisposedDuringStatusSendLogsNoFailure()
+    {
+        // Arrange
+        await using var server = ScriptedIngestServer.Create();
+        var socket = new SendFailingWebSocket(server.ClientSocket);
+        var logger = new RecordingLogger();
+        await using var sender = CreateSender(new DuplexReplayConnector(socket), CreateTimeProvider(), logger, null);
+
+        await ConnectAcceptedAsync(sender, server);
+        socket.HoldSends();
+        sender.NotifyState(PipeConnectionState.Connected);
+
+        await socket.HeldSend.WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Act
+        await sender.DisposeAsync().AsTask().WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        Assert.IsEmpty(logger.Entries.Where(entry => entry.Message.StartsWith("Replay sending failed", StringComparison.Ordinal)).ToList(), "Disposing the sender should not be logged as a failure");
+        Assert.AreEqual(1, socket.FailedSendCount, "Only the held status should have been written");
+    }
+
+    /// <summary>
     /// A tick or a close frame whose write fails ends the run as connection lost.
     /// </summary>
     /// <param name="step">The step whose write fails: tick or close</param>

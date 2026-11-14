@@ -662,6 +662,67 @@ public sealed class PipeReplayRunnerTests
     }
 
     /// <summary>
+    /// A recording that cannot be opened or whose header is invalid ends the replay with today's problem before any
+    /// connection, and without a send problem.
+    /// </summary>
+    /// <param name="text">The content of the recording; <c>null</c> for a file that does not exist</param>
+    /// <param name="expected">The expected problem</param>
+    /// <returns>The task</returns>
+    [TestMethod]
+    [TestCategory("AC6")]
+    [DataRow(null, PipeReplayProblemKind.FileNotFound)]
+    [DataRow("hello\n", PipeReplayProblemKind.NotARecording)]
+    [DataRow("{\"format\":\"censio-pipe-recording\",\"version\":2}\n", PipeReplayProblemKind.UnsupportedVersion)]
+    public async Task PipeReplayRunnerHeaderProblemWithSenderConnectsNever(string? text, PipeReplayProblemKind expected)
+    {
+        // Arrange
+        var connector = new DuplexReplayConnector(null);
+        await using var sender = CreateSender(connector, null);
+        var runner = CreateSendingRunner(() => OpenText(text), sender);
+
+        // Act
+        await runner.RunAsync(TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(expected, runner.Status.Problem?.Kind, "The recording should end the replay with today's problem");
+        Assert.IsTrue(runner.Status.IsFinished, "The problem of the recording should end the replay");
+        Assert.IsNull(runner.Status.SendProblem, "A problem of the recording is no send problem");
+        Assert.IsNull(runner.Status.Sent, "A replay that was not sent should carry no counts");
+        Assert.IsEmpty(connector.Addresses, "No connection should be opened");
+        Assert.IsEmpty(_events.Where(status => status.IsConnecting).ToList(), "The replay should never show that it connects");
+    }
+
+    /// <summary>
+    /// An invalid first frame line is no problem of the header: the replay connects and reports the line in the replay,
+    /// then closes the connection.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    [TestCategory("AC6")]
+    [TestCategory("AC10")]
+    public async Task PipeReplayRunnerInvalidFirstFrameLineIsReportedAfterConnecting()
+    {
+        // Arrange
+        var header = PipeTestFrames.Recording(_start);
+        byte[] withInvalidLine = [.. header, .. Encoding.UTF8.GetBytes("not json\n")];
+        await using var server = ScriptedIngestServer.Create();
+        await using var sender = CreateSender(new DuplexReplayConnector(server.ClientSocket), null);
+        var runner = CreateSendingRunner(() => new MemoryStream(withInvalidLine), sender);
+        var serving = server.AcknowledgeAllAsync(false, TestContext.CancellationToken);
+
+        // Act
+        await runner.RunAsync(TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+
+        var messages = await serving.WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(PipeReplayProblemKind.InvalidLine, runner.Status.Problem?.Kind, "The invalid first frame line should be reported in the replay");
+        Assert.AreEqual(2L, runner.Status.Problem?.LineNumber, "The problem should name the first frame line");
+        Assert.IsInstanceOfType<ContractHello>(messages.FirstOrDefault(), "The replay should have connected");
+        Assert.IsTrue(server.IsClosedByClient, "The connection should be closed with a close frame");
+    }
+
+    /// <summary>
     /// A failure of the server ends the replay with its send problem: a refused hello before the replay, a connection lost
     /// at the first tick.
     /// </summary>
@@ -878,6 +939,17 @@ public sealed class PipeReplayRunnerTests
         opens.Enqueue(opens.Count + 1);
 
         return new MemoryStream(recording);
+    }
+
+    /// <summary>
+    /// Opens a recording of a text, or fails as a file that does not exist.
+    /// </summary>
+    /// <param name="text">The content of the recording; <c>null</c> for a file that does not exist</param>
+    /// <returns>The stream</returns>
+    /// <exception cref="FileNotFoundException">The text is <c>null</c></exception>
+    private static MemoryStream OpenText(string? text)
+    {
+        return text is null ? throw new FileNotFoundException("The recording does not exist.") : new MemoryStream(Encoding.UTF8.GetBytes(text));
     }
 
     /// <summary>

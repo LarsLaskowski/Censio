@@ -21,9 +21,29 @@ public sealed class SendFailingWebSocket : WebSocket
     private readonly TaskCompletionSource _failedSend = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     /// <summary>
+    /// Completed when a send is held.
+    /// </summary>
+    private readonly TaskCompletionSource _heldSend = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    /// <summary>
+    /// Completed when the held sends are released.
+    /// </summary>
+    private readonly TaskCompletionSource _releasedSends = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    /// <summary>
     /// Whether sends fail.
     /// </summary>
     private volatile bool _isFailingSends;
+
+    /// <summary>
+    /// Whether a failing send is held until it is released or cancelled.
+    /// </summary>
+    private volatile bool _isHoldingSends;
+
+    /// <summary>
+    /// The number of sends that failed or were held.
+    /// </summary>
+    private int _failedSendCount;
 
     #endregion // Fields
 
@@ -47,6 +67,16 @@ public sealed class SendFailingWebSocket : WebSocket
     /// </summary>
     public Task FailedSend => _failedSend.Task;
 
+    /// <summary>
+    /// Gets a task that completes when the first send was held.
+    /// </summary>
+    public Task HeldSend => _heldSend.Task;
+
+    /// <summary>
+    /// Gets the number of message sends that failed or were held.
+    /// </summary>
+    public int FailedSendCount => Volatile.Read(ref _failedSendCount);
+
     #endregion // Properties
 
     #region Methods
@@ -57,6 +87,39 @@ public sealed class SendFailingWebSocket : WebSocket
     public void FailSends()
     {
         _isFailingSends = true;
+    }
+
+    /// <summary>
+    /// Makes every following message send wait until <see cref="ReleaseSends" /> and then fail with an
+    /// <see cref="IOException" />, or end with the cancellation of its token, as a write that hangs and then breaks.
+    /// </summary>
+    public void HoldSends()
+    {
+        _isHoldingSends = true;
+        _isFailingSends = true;
+    }
+
+    /// <summary>
+    /// Lets the held sends fail.
+    /// </summary>
+    public void ReleaseSends()
+    {
+        _releasedSends.TrySetResult();
+    }
+
+    /// <summary>
+    /// Holds a send until it is released or its token is cancelled, then fails it.
+    /// </summary>
+    /// <param name="cancellationToken">The token of the send</param>
+    /// <returns>A task that fails when the send is released or cancelled</returns>
+    /// <exception cref="IOException">The send was released</exception>
+    private async ValueTask HoldAsync(CancellationToken cancellationToken)
+    {
+        _heldSend.TrySetResult();
+
+        await _releasedSends.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+
+        throw new IOException("The connection's writes failed.");
     }
 
     #endregion // Methods
@@ -127,6 +190,16 @@ public sealed class SendFailingWebSocket : WebSocket
     /// <inheritdoc />
     public override ValueTask SendAsync(ReadOnlyMemory<byte> buffer, WebSocketMessageType messageType, bool endOfMessage, CancellationToken cancellationToken)
     {
+        if (_isFailingSends)
+        {
+            Interlocked.Increment(ref _failedSendCount);
+        }
+
+        if (_isHoldingSends)
+        {
+            return HoldAsync(cancellationToken);
+        }
+
         if (_isFailingSends)
         {
             _failedSend.TrySetResult();

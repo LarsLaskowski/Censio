@@ -967,6 +967,29 @@ public sealed class TrayMenuTests
     }
 
     /// <summary>
+    /// An undefined send problem kind has no reason text and is rejected by the tooltip.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public void TrayMenuFormatReplayToolTipUndefinedSendProblemKindThrows()
+    {
+        // Arrange
+        var status = new PipeReplayStatus
+                     {
+                         State = PipeConnectionState.Connected,
+                         IsFinished = true,
+                         SendProblem = (ReplaySendProblemKind)99
+                     };
+
+        // Act
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(() => TrayMenu.FormatReplayToolTip(status), "An undefined send problem kind should be rejected");
+
+        // Assert
+        Assert.AreEqual("status", exception.ParamName, "The exception should name the parameter");
+        Assert.IsNull(TrayMenu.FormatReplaySendReason((ReplaySendProblemKind)99), "An undefined send problem kind should have no reason text");
+    }
+
+    /// <summary>
     /// A state a replay cannot be in is rejected.
     /// </summary>
     /// <param name="state">The state</param>
