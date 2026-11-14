@@ -270,7 +270,7 @@ public sealed class ReplaySender : IAsyncDisposable
 
             _lastState = state;
             previous = _statusSend;
-            _statusSend = Task.Run(() => SendStatusAsync(previous, state));
+            _statusSend = Task.Run(() => SendStatusAsync(previous, state), CancellationToken.None);
         }
     }
 
@@ -370,6 +370,100 @@ public sealed class ReplaySender : IAsyncDisposable
     }
 
     /// <summary>
+    /// Reads one message of the server, at most <see cref="MaxReplyBytes" /> bytes long; it never throws.
+    /// </summary>
+    /// <param name="socket">The socket</param>
+    /// <param name="buffer">The buffer of <see cref="MaxReplyBytes" /> plus one byte</param>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>The message or the problem</returns>
+    private static async Task<(ContractMessage? Message, ReplaySendProblemKind? Problem)> ReadMessageAsync(WebSocket socket, byte[] buffer, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var length = 0;
+            WebSocketReceiveResult result;
+
+            do
+            {
+                result = await socket.ReceiveAsync(new ArraySegment<byte>(buffer, length, buffer.Length - length), cancellationToken).ConfigureAwait(false);
+
+                if (result.MessageType == WebSocketMessageType.Close)
+                {
+                    return (null, ReplaySendProblemKind.ConnectionLost);
+                }
+
+                if (result.MessageType != WebSocketMessageType.Text || (result.EndOfMessage == false && length + result.Count >= MaxReplyBytes))
+                {
+                    return (null, ReplaySendProblemKind.InvalidReply);
+                }
+
+                length += result.Count;
+            }
+            while (result.EndOfMessage == false);
+
+            if (length > MaxReplyBytes)
+            {
+                return (null, ReplaySendProblemKind.InvalidReply);
+            }
+
+            var read = ContractReader.Read(buffer.AsSpan(0, length));
+
+            return read.Message is null
+                       ? (null, ReplaySendProblemKind.InvalidReply)
+                       : (read.Message, null);
+        }
+        catch (Exception)
+        {
+            return (null, ReplaySendProblemKind.ConnectionLost);
+        }
+    }
+
+    /// <summary>
+    /// Waits for the receive of an unfinished read to end, so that its exception is observed; the socket is aborted when
+    /// the read does not end.
+    /// </summary>
+    /// <param name="receiving">The read</param>
+    /// <param name="socket">The socket</param>
+    /// <returns>A task that completes when the read ended</returns>
+    private static async Task ObserveAsync(Task receiving, WebSocket socket)
+    {
+        if (receiving.IsCompleted == false)
+        {
+            socket.Abort();
+        }
+
+        try
+        {
+            await receiving.ConfigureAwait(false);
+        }
+        catch (Exception)
+        {
+            // The read ended with the abort of the socket; the problem is the one of the caller.
+        }
+    }
+
+    /// <summary>
+    /// Gives the reason of a problem as the tray shows it.
+    /// </summary>
+    /// <param name="problem">The problem</param>
+    /// <returns>The reason</returns>
+    private static string FormatReason(ReplaySendProblemKind problem)
+    {
+        return problem switch
+               {
+                   ReplaySendProblemKind.TokenFileCannotBeRead => "token file cannot be read",
+                   ReplaySendProblemKind.TokenFileHoldsNoValidToken => "token file holds no valid token",
+                   ReplaySendProblemKind.ServerUnreachable => "server unreachable",
+                   ReplaySendProblemKind.TokenRefused => "token refused",
+                   ReplaySendProblemKind.CompanionConnected => "another Companion is connected",
+                   ReplaySendProblemKind.VersionNotSupported => "server does not support contract version 1",
+                   ReplaySendProblemKind.NoAnswer => "server does not answer",
+                   ReplaySendProblemKind.ConnectionLost => "server connection lost",
+                   _ => "invalid server reply"
+               };
+    }
+
+    /// <summary>
     /// Connects, sends the hello and waits for its answer.
     /// </summary>
     /// <param name="cancellationToken">The cancellation token</param>
@@ -405,7 +499,7 @@ public sealed class ReplaySender : IAsyncDisposable
         await socket.SendAsync(written.Utf8Json, WebSocketMessageType.Text, true, cancellationToken).ConfigureAwait(false);
 
         var receiving = ReadMessageAsync(socket, new byte[MaxReplyBytes + 1], _lifetime.Token);
-        ReadOutcome outcome;
+        (ContractMessage? Message, ReplaySendProblemKind? Problem) outcome;
 
         try
         {
@@ -429,7 +523,7 @@ public sealed class ReplaySender : IAsyncDisposable
     /// <param name="socket">The socket</param>
     /// <param name="outcome">The outcome of reading the message</param>
     /// <returns>The problem, or <c>null</c> if the hello is accepted</returns>
-    private ReplaySendProblemKind? HandleHelloReply(WebSocket socket, ReadOutcome outcome)
+    private ReplaySendProblemKind? HandleHelloReply(WebSocket socket, (ContractMessage? Message, ReplaySendProblemKind? Problem) outcome)
     {
         if (outcome.Problem is not null)
         {
@@ -441,7 +535,7 @@ public sealed class ReplaySender : IAsyncDisposable
             case ContractHelloAccepted:
                 {
                     CompanionLog.ReplaySendConnected(_logger);
-                    _receiveLoop = Task.Run(() => ReceiveLoopAsync(socket, _lifetime.Token));
+                    _receiveLoop = Task.Run(() => ReceiveLoopAsync(socket, _lifetime.Token), CancellationToken.None);
 
                     return null;
                 }
@@ -460,30 +554,6 @@ public sealed class ReplaySender : IAsyncDisposable
                 {
                     return Fail(ReplaySendProblemKind.InvalidReply);
                 }
-        }
-    }
-
-    /// <summary>
-    /// Waits for the receive of an unfinished read to end, so that its exception is observed; the socket is aborted when
-    /// the read does not end.
-    /// </summary>
-    /// <param name="receiving">The read</param>
-    /// <param name="socket">The socket</param>
-    /// <returns>A task that completes when the read ended</returns>
-    private async Task ObserveAsync(Task receiving, WebSocket socket)
-    {
-        if (receiving.IsCompleted == false)
-        {
-            socket.Abort();
-        }
-
-        try
-        {
-            await receiving.ConfigureAwait(false);
-        }
-        catch (Exception)
-        {
-            // The read ended with the abort of the socket; the problem is the one of the caller.
         }
     }
 
@@ -584,10 +654,18 @@ public sealed class ReplaySender : IAsyncDisposable
             _awaited = awaited;
         }
 
+        // A frame of the server that arrived before this send is read by the receive loop first.
+        await Task.Yield();
+
         await _sendLock.WaitAsync(cancellationToken).ConfigureAwait(false);
 
         try
         {
+            if (GetFailure() is not null)
+            {
+                return null;
+            }
+
             await socket.SendAsync(data, WebSocketMessageType.Text, true, cancellationToken).ConfigureAwait(false);
         }
         finally
@@ -726,55 +804,6 @@ public sealed class ReplaySender : IAsyncDisposable
     }
 
     /// <summary>
-    /// Reads one message of the server, at most <see cref="MaxReplyBytes" /> bytes long; it never throws.
-    /// </summary>
-    /// <param name="socket">The socket</param>
-    /// <param name="buffer">The buffer of <see cref="MaxReplyBytes" /> plus one byte</param>
-    /// <param name="cancellationToken">The cancellation token</param>
-    /// <returns>The message or the problem</returns>
-    private static async Task<ReadOutcome> ReadMessageAsync(WebSocket socket, byte[] buffer, CancellationToken cancellationToken)
-    {
-        try
-        {
-            var length = 0;
-            WebSocketReceiveResult result;
-
-            do
-            {
-                result = await socket.ReceiveAsync(new ArraySegment<byte>(buffer, length, buffer.Length - length), cancellationToken).ConfigureAwait(false);
-
-                if (result.MessageType == WebSocketMessageType.Close)
-                {
-                    return new ReadOutcome(null, ReplaySendProblemKind.ConnectionLost);
-                }
-
-                if (result.MessageType != WebSocketMessageType.Text || (result.EndOfMessage == false && length + result.Count >= MaxReplyBytes))
-                {
-                    return new ReadOutcome(null, ReplaySendProblemKind.InvalidReply);
-                }
-
-                length += result.Count;
-            }
-            while (result.EndOfMessage == false);
-
-            if (length > MaxReplyBytes)
-            {
-                return new ReadOutcome(null, ReplaySendProblemKind.InvalidReply);
-            }
-
-            var read = ContractReader.Read(buffer.AsSpan(0, length));
-
-            return read.Message is null
-                       ? new ReadOutcome(null, ReplaySendProblemKind.InvalidReply)
-                       : new ReadOutcome(read.Message, null);
-        }
-        catch (Exception)
-        {
-            return new ReadOutcome(null, ReplaySendProblemKind.ConnectionLost);
-        }
-    }
-
-    /// <summary>
     /// Ends the run with a problem: the first problem is logged and the connection is aborted.
     /// </summary>
     /// <param name="problem">The problem</param>
@@ -860,27 +889,6 @@ public sealed class ReplaySender : IAsyncDisposable
         socket?.Abort();
     }
 
-    /// <summary>
-    /// Gives the reason of a problem as the tray shows it.
-    /// </summary>
-    /// <param name="problem">The problem</param>
-    /// <returns>The reason</returns>
-    private static string FormatReason(ReplaySendProblemKind problem)
-    {
-        return problem switch
-               {
-                   ReplaySendProblemKind.TokenFileCannotBeRead => "token file cannot be read",
-                   ReplaySendProblemKind.TokenFileHoldsNoValidToken => "token file holds no valid token",
-                   ReplaySendProblemKind.ServerUnreachable => "server unreachable",
-                   ReplaySendProblemKind.TokenRefused => "token refused",
-                   ReplaySendProblemKind.CompanionConnected => "another Companion is connected",
-                   ReplaySendProblemKind.VersionNotSupported => "server does not support contract version 1",
-                   ReplaySendProblemKind.NoAnswer => "server does not answer",
-                   ReplaySendProblemKind.ConnectionLost => "server connection lost",
-                   _ => "invalid server reply"
-               };
-    }
-
     #endregion // Methods
 
     #region IAsyncDisposable
@@ -916,15 +924,4 @@ public sealed class ReplaySender : IAsyncDisposable
     }
 
     #endregion // IAsyncDisposable
-
-    #region Nested types
-
-    /// <summary>
-    /// The outcome of reading one message of the server.
-    /// </summary>
-    /// <param name="Message">The message, if it was read</param>
-    /// <param name="Problem">The problem, if the message was not read</param>
-    private readonly record struct ReadOutcome(ContractMessage? Message, ReplaySendProblemKind? Problem);
-
-    #endregion // Nested types
 }
