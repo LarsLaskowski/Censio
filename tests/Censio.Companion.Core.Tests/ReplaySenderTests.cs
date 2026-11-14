@@ -78,6 +78,11 @@ public sealed class ReplaySenderTests
     private static readonly TimeSpan _guard = TimeSpan.FromSeconds(10);
 
     /// <summary>
+    /// The real-time limit of a wait for a timer that a broken implementation never starts, short so the test fails fast.
+    /// </summary>
+    private static readonly TimeSpan _timerGuard = TimeSpan.FromSeconds(2);
+
+    /// <summary>
     /// The temporary directories of the test.
     /// </summary>
     private readonly List<string> _temporaryDirectories = [];
@@ -294,6 +299,56 @@ public sealed class ReplaySenderTests
         Assert.IsFalse(isCompletedBefore, "The sender should still wait before the reply timeout");
         Assert.AreEqual(ReplaySendProblemKind.NoAnswer, problem, "No acknowledgement within the timeout should be no answer");
         Assert.IsNull(afterwards, "The connection should be closed");
+    }
+
+    /// <summary>
+    /// A tick whose write never completes is no answer once the reply timeout has passed, not before: the write itself
+    /// hangs, or a status write still in progress keeps the tick from being written.
+    /// </summary>
+    /// <param name="isStatusWriteHanging">Whether a status write hangs before the tick; otherwise the tick's write hangs</param>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC7")]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task ReplaySenderSendNeverCompletesGivesNoAnswer(bool isStatusWriteHanging)
+    {
+        // Arrange
+        await using var server = ScriptedIngestServer.Create();
+        var socket = new SendFailingWebSocket(server.ClientSocket);
+        var timeProvider = CreateTimeProvider();
+        await using var sender = CreateSender(new DuplexReplayConnector(socket), timeProvider, new RecordingLogger(), null);
+
+        await ConnectAcceptedAsync(sender, server);
+        socket.HoldSends();
+
+        if (isStatusWriteHanging)
+        {
+            sender.NotifyState(PipeConnectionState.Connected);
+
+            await socket.HeldSend.WaitAsync(_guard, TestContext.CancellationToken);
+        }
+
+        var replyTimers = CountReplyTimers(timeProvider);
+
+        // Act
+        var sending = sender.SendTickAsync(CreateTick(1), TestContext.CancellationToken);
+        var hasTimer = await WaitForReplyTimersAsync(timeProvider, replyTimers + 1);
+
+        Assert.IsTrue(hasTimer, "The write of the tick should be limited by the reply timeout");
+
+        timeProvider.Advance(ReplaySender.ReplyTimeout - TimeSpan.FromTicks(1));
+
+        var isCompletedBefore = sending.IsCompleted;
+
+        timeProvider.Advance(TimeSpan.FromTicks(1));
+
+        var problem = await sending.WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        Assert.IsFalse(isCompletedBefore, "The sender should still wait before the reply timeout");
+        Assert.AreEqual(ReplaySendProblemKind.NoAnswer, problem, "A write that does not complete within the reply timeout should be no answer");
+        Assert.AreEqual(1, socket.FailedSendCount, "Only the first held write should have reached the socket");
     }
 
     /// <summary>
@@ -1335,6 +1390,33 @@ public sealed class ReplaySenderTests
         timeProvider.Advance(TimeSpan.FromTicks(1));
 
         return isCompleted;
+    }
+
+    /// <summary>
+    /// Waits a short real time until the given number of reply timers exists.
+    /// </summary>
+    /// <param name="timeProvider">The time provider</param>
+    /// <param name="replyTimers">The number of reply timers to wait for</param>
+    /// <returns><see langword="true" /> if the timers exist, <see langword="false" /> if they were not started in time</returns>
+    private async Task<bool> WaitForReplyTimersAsync(RecordingTimeProvider timeProvider, int replyTimers)
+    {
+        using var limit = CancellationTokenSource.CreateLinkedTokenSource(TestContext.CancellationToken);
+
+        limit.CancelAfter(_timerGuard);
+
+        try
+        {
+            while (CountReplyTimers(timeProvider) < replyTimers)
+            {
+                await timeProvider.WaitForTimersAsync(timeProvider.Delays.Count + 1, limit.Token);
+            }
+
+            return true;
+        }
+        catch (OperationCanceledException) when (TestContext.CancellationToken.IsCancellationRequested == false)
+        {
+            return false;
+        }
     }
 
     /// <summary>
