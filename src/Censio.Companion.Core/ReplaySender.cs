@@ -646,21 +646,33 @@ public sealed class ReplaySender : IAsyncDisposable
         // A frame of the server that arrived before this send is read by the receive loop first.
         await Task.Yield();
 
-        await _sendLock.WaitAsync(cancellationToken).ConfigureAwait(false);
-
-        try
-        {
-            if (GetFailure() is not null)
+        // Taking the send lock and writing the message are bounded by the reply timeout, like the acknowledgement.
+        using (var writeTimeout = new CancellationTokenSource(ReplyTimeout, _timeProvider))
+            using (var writeLinked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, writeTimeout.Token))
             {
-                return null;
-            }
+                try
+                {
+                    await _sendLock.WaitAsync(writeLinked.Token).ConfigureAwait(false);
 
-            await socket.SendAsync(data, WebSocketMessageType.Text, true, cancellationToken).ConfigureAwait(false);
-        }
-        finally
-        {
-            _sendLock.Release();
-        }
+                    try
+                    {
+                        if (GetFailure() is not null)
+                        {
+                            return null;
+                        }
+
+                        await socket.SendAsync(data, WebSocketMessageType.Text, true, writeLinked.Token).ConfigureAwait(false);
+                    }
+                    finally
+                    {
+                        _sendLock.Release();
+                    }
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested == false && writeTimeout.IsCancellationRequested)
+                {
+                    throw new TimeoutException("The server did not take the message in time.");
+                }
+            }
 
         return await awaited.Task.WaitAsync(ReplyTimeout, _timeProvider, cancellationToken).ConfigureAwait(false);
     }

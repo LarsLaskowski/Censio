@@ -91,7 +91,8 @@ what the server does with them in [`ingest.md`](ingest.md).
   one reply are held and a slow server slows the replay; the receive times stay the recorded ones.
 - An acknowledgement without a refusal counts a sent tick (a session event is not counted); an acknowledgement with a
   refusal, or a message the writer refused, counts as refused and the replay goes on.
-- The Companion waits at most 30 seconds for each acknowledgement.
+- The Companion waits at most 30 seconds for each acknowledgement, and writing a message is bounded by the same 30
+  seconds.
 
 ### Keep-alive
 
@@ -103,11 +104,12 @@ what the server does with them in [`ingest.md`](ingest.md).
 ### Ending a run
 
 - At the end of the recording the connection is closed and the status text reads `Replay finished: <n> ticks sent, <r>
-  refused` (`1 tick sent` for one), `<n>` the ticks sent and `<r>` the messages refused. After an invalid or unreadable
-  line the ticks before it are sent and the connection is closed, then the run ends with today's `Replay error: invalid
-  line <n>`.
-- A server failure ends the run at once with its reason; what the server acknowledged before stays stored and nothing is
-  resent or retried.
+  refused` (`1 tick sent` for one), `<n>` the ticks sent and `<r>` the messages refused. After an invalid line or a
+  failed read the ticks before it are sent and the connection is closed, then the run ends with today's `Replay error:
+  invalid line <n>` or `Replay error: read failed`.
+- A server failure ends the run with its reason when the replay next sends a message, or at the end of the recording
+  when none follows, so a pause of the recording delays it; the connection itself is aborted at once, what the server
+  acknowledged before stays stored and nothing is resent or retried.
 - `Exit` during a run aborts the connection at once and raises no further status; an unacknowledged message may or may
   not be stored.
 
@@ -138,7 +140,7 @@ below are done by the Companion at once.
 | token refused | The server answered `helloRefused` `tokenRefused` |
 | another Companion is connected | `helloRefused` `companionConnected` |
 | server does not support contract version 1 | `helloRefused` `unsupportedVersion` |
-| server does not answer | No `helloAccepted` or `helloRefused` within 30 seconds of the hello, or no acknowledgement within 30 seconds of a message |
+| server does not answer | No `helloAccepted` or `helloRefused` within 30 seconds of the hello, a message the server does not take within 30 seconds, or no acknowledgement within 30 seconds of a message |
 | server connection lost | The connection ends after the hello (a close frame, a failed send or receive, a server that stops) |
 | invalid server reply | A frame that is not a readable contract message, is binary, is larger than 65,536 bytes, is of a type the server does not send at that point, or acknowledges another message than the awaited one, also one that arrives while nothing is awaited |
 

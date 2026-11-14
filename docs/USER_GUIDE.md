@@ -361,11 +361,11 @@ To try the server without the game, the Companion sends a recording to it, throu
    | `token refused` | The server's token differs or the file holds none while the server needs one |
    | `another Companion is connected` | The server has one Companion connected; close it and run again |
    | `server does not support contract version 1` | The server is of another contract version |
-   | `server does not answer` | No reply within 30 seconds |
+   | `server does not answer` | No reply, or a message the server does not take, within 30 seconds |
    | `server connection lost` | The server stopped, the network failed or the server closed the connection |
    | `invalid server reply` | The server sent something a server must not send |
 
-   A recording that cannot be opened or has an invalid header ends with its reason (*Recording and replay*) before the server is contacted, so no profile is created; an invalid line later ends the replay after the ticks before it were sent.
+   A recording that cannot be opened or has an invalid header ends with its reason (*Recording and replay*) before the server is contacted, so no profile is created; an invalid or unreadable line later ends the replay after the ticks before it were sent.
 7. **Warnings.** Over `ws://` the token and the data cross the network unencrypted: use `wss://` (a reverse proxy with TLS in front of the server, *Network and TLS*) wherever the path is not your own network; the Companion checks the certificate with Windows and has no way to skip it, and it never uses a configured proxy. Replay a raw recording only into your own server. Each run creates a profile that stays until retention (#35). Delete the token file when the testing ends and rotate the server's token if it was exposed (`SECURITY.md`).
 
 ### Build from source
@@ -823,11 +823,11 @@ Um den Server ohne das Spiel auszuprobieren, sendet der Companion ihm eine Aufze
    | `token refused` | Das Token des Servers weicht ab, oder die Datei enthält keines, obwohl der Server eines braucht |
    | `another Companion is connected` | Beim Server ist ein Companion verbunden; ihn schließen und erneut abspielen |
    | `server does not support contract version 1` | Der Server hat eine andere Vertragsversion |
-   | `server does not answer` | Keine Antwort innerhalb von 30 Sekunden |
+   | `server does not answer` | Keine Antwort und keine Annahme einer Nachricht durch den Server innerhalb von 30 Sekunden |
    | `server connection lost` | Der Server wurde gestoppt, das Netz fiel aus, oder der Server hat die Verbindung geschlossen |
    | `invalid server reply` | Der Server hat etwas gesendet, das ein Server nicht senden darf |
 
-   Eine Aufzeichnung, die sich nicht öffnen lässt oder einen ungültigen Kopf hat, endet mit ihrem Grund (*Aufzeichnen und Abspielen*), bevor der Server kontaktiert wird, es entsteht also kein Profil; eine ungültige Zeile später beendet das Abspielen, nachdem die Ticks davor gesendet wurden.
+   Eine Aufzeichnung, die sich nicht öffnen lässt oder einen ungültigen Kopf hat, endet mit ihrem Grund (*Aufzeichnen und Abspielen*), bevor der Server kontaktiert wird, es entsteht also kein Profil; eine ungültige oder nicht lesbare Zeile später beendet das Abspielen, nachdem die Ticks davor gesendet wurden.
 7. **Warnungen.** Über `ws://` laufen Token und Daten unverschlüsselt durchs Netz: überall, wo der Weg nicht Ihr eigenes Netz ist, `wss://` verwenden (ein Reverse-Proxy mit TLS vor dem Server, *Netzwerk und TLS*); der Companion prüft das Zertifikat mit Windows und kann es nicht überspringen, und er nutzt nie einen eingerichteten Proxy. Eine rohe Aufzeichnung nur in den eigenen Server abspielen. Jeder Lauf erzeugt ein Profil, das bis zur Aufbewahrung (#35) bleibt. Die Token-Datei löschen, wenn das Testen endet, und das Token des Servers erneuern, wenn es offengelegt wurde (`SECURITY.md`).
 
 ### Aus dem Quellcode bauen
