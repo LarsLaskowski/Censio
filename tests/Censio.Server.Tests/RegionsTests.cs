@@ -8,6 +8,7 @@ using Censio.Contracts;
 using Censio.Server.Components.Pages;
 using Censio.Server.Data;
 
+using Microsoft.AspNetCore.Http;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -37,6 +38,11 @@ public sealed class RegionsTests
     /// The second session GUID of the tests.
     /// </summary>
     private const int SecondSession = 6627;
+
+    /// <summary>
+    /// The text of a failed read.
+    /// </summary>
+    private const string ReloadText = "The data cannot be read right now. Reload the page to try again.";
 
     #endregion // Constants
 
@@ -596,6 +602,115 @@ public sealed class RegionsTests
         // Assert
         await page.WaitForAssertionAsync(() => Assert.AreEqual("New name", ProfileLine(page), "The page should show the new profile name without a reload"), PageTestHost.WaitBound);
         Assert.IsEmpty(host.Context.Services.GetRequiredService<BunitNavigationManager>().History, "The update should not navigate or reload");
+    }
+
+    /// <summary>
+    /// After a failed read, neither a catalog notice nor a tick of the profile reads again: the reload text stays until the
+    /// page is reloaded.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC9")]
+    public async Task RegionsReadFailureIsNotRetriedOnNotice()
+    {
+        // Arrange
+        using var source = new FakeProfileStateSource(false);
+
+        source.Store(_firstProfile,
+                     new ProfileStateRead
+                     {
+                         State = null,
+                         Failure = new SqliteException("test read failure", 1)
+                     });
+        source.Store(_secondProfile, StoredRead(CreateState(_secondProfile)));
+
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken, source);
+
+        var page = RenderPicked(host, _firstProfile);
+        var witness = RenderPicked(host, _secondProfile);
+
+        await page.WaitForAssertionAsync(() => Assert.Contains(ReloadText, PageTestHost.Text(page), "The failed read should show the reload text"), PageTestHost.WaitBound);
+        await witness.WaitForStateAsync(() => witness.FindAll("tbody tr").Count == 1, PageTestHost.WaitBound);
+
+        // Act
+        await host.StoreTicksAsync(FirstSessionTick(_firstProfile, 10, 5));
+        await host.StoreCatalogAsync(PageTestHost.RegionEntry(FirstSession, 900001, "Latium", "Latium"));
+
+        // Assert
+        await witness.WaitForAssertionAsync(() => Assert.HasCount(2, source.Reads.Where(read => read == _secondProfile).ToList(), "The witness page should read again on the catalog notice"), PageTestHost.WaitBound);
+
+        Assert.HasCount(1, source.Reads.Where(read => read == _firstProfile).ToList(), "The failed page should not read again on a notice");
+        Assert.Contains(ReloadText, PageTestHost.Text(page), "The reload text should stay");
+    }
+
+    /// <summary>
+    /// An aborted request of a prerendered page cancels the page's read in flight, so the next read through the gate starts
+    /// without waiting for it.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC10")]
+    public async Task RegionsAbortedPrerenderCancelsItsRead()
+    {
+        // Arrange
+        using var source = new FakeProfileStateSource(true);
+        using var abort = new CancellationTokenSource();
+
+        source.Store(_firstProfile, StoredRead(CreateState(_firstProfile)));
+        source.Store(_secondProfile, StoredRead(CreateState(_secondProfile)));
+
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken, source);
+
+        var request = new DefaultHttpContext
+                      {
+                          RequestAborted = abort.Token
+                      };
+
+        host.Context.Render<Regions>(parameters => parameters.AddCascadingValue(UiLanguage.English)
+                                                             .AddCascadingValue(UiTexts.For(UiLanguage.English))
+                                                             .AddCascadingValue<HttpContext>(request)
+                                                             .Add(regions => regions.Profile, _firstProfile.ToString()));
+
+        await source.WaitForReadAsync(PageTestHost.WaitBound, TestContext.CancellationToken);
+
+        // Act
+        await abort.CancelAsync();
+
+        // Assert
+        var laterRead = host.Context.Services.GetRequiredService<PageReader>().ReadAsync(_secondProfile, null, TestContext.CancellationToken);
+
+        await source.WaitForReadAsync(PageTestHost.WaitBound, TestContext.CancellationToken);
+
+        Assert.AreSequenceEqual(new[] { _firstProfile, _secondProfile }, source.Reads.ToList(), "The next read should start once the aborted page's read was cancelled");
+
+        source.ReleaseReads();
+
+        var read = await laterRead.WaitAsync(PageTestHost.WaitBound, TestContext.CancellationToken);
+
+        Assert.AreEqual(_secondProfile, read.View?.ProfileId, "The next read should give its profile's view");
+    }
+
+    /// <summary>
+    /// Building counts whose sum passes <see cref="int.MaxValue" /> show their whole sum on the overview.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC2")]
+    public async Task RegionsBuildingCountsPastInt32MaxShowWholeSum()
+    {
+        // Arrange
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken);
+
+        await host.StoreTicksAsync(PageTestHost.Tick(_firstProfile,
+                                                     0,
+                                                     PageTestHost.Island(FirstSession, 1, "Isle A", PageTestHost.Entry(1, 1f, 1f, 0.5f, int.MaxValue, 100f)),
+                                                     PageTestHost.Island(FirstSession, 2, "Isle B", PageTestHost.Entry(1, 1f, 1f, 0.5f, int.MaxValue, 100f))));
+
+        // Act
+        var page = RenderPicked(host, _firstProfile);
+
+        // Assert
+        await page.WaitForAssertionAsync(() => Assert.AreSequenceEqual(PageTestHost.Expect("Region 3245|2|4294967294|2|0"), PageTestHost.Describe(page), "The region should show the whole sum of its buildings"), PageTestHost.WaitBound);
     }
 
     /// <summary>

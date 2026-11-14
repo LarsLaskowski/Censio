@@ -414,6 +414,33 @@ public sealed class MainLayoutTests
     }
 
     /// <summary>
+    /// On a page whose address carries a profile, the Regions entry of the navigation links to that profile's overview;
+    /// after a navigation to an address without a profile it links to <c>/regions</c> again.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public async Task MainLayoutRegionsEntryCarriesShownProfile()
+    {
+        // Arrange
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken);
+
+        var navigation = host.Context.Services.GetRequiredService<BunitNavigationManager>();
+
+        navigation.NavigateTo($"/profiles/{_firstProfile}/islands/3245/1/0");
+
+        var layout = RenderLayout(host.Context, UiTheme.Light, UiLanguage.English);
+
+        Assert.AreEqual(ProfileLink(_firstProfile), RegionsEntryLink(layout), "The Regions entry should carry the profile of the address");
+
+        // Act
+        navigation.NavigateTo("/");
+
+        // Assert
+        await layout.WaitForAssertionAsync(() => Assert.AreEqual("/regions", RegionsEntryLink(layout), "The Regions entry should lead to /regions on an address without a profile"), PageTestHost.WaitBound);
+    }
+
+    /// <summary>
     /// A hello that renames a listed profile changes its line in the profile switch without a reload.
     /// </summary>
     /// <returns>A task that completes when the test is done</returns>
@@ -667,6 +694,16 @@ public sealed class MainLayoutTests
     private static List<string?> ProfileItemLinks(IRenderedComponent<MainLayout> layout)
     {
         return [.. layout.FindAll(".mud-menu-item").Select(item => item.GetAttribute("href") ?? item.QuerySelector("a")?.GetAttribute("href") ?? item.Closest("a")?.GetAttribute("href"))];
+    }
+
+    /// <summary>
+    /// Gives the address the Regions entry of the navigation links to.
+    /// </summary>
+    /// <param name="layout">The rendered layout</param>
+    /// <returns>The address, or <see langword="null" /> when the entry has none</returns>
+    private static string? RegionsEntryLink(IRenderedComponent<MainLayout> layout)
+    {
+        return layout.FindAll(".mud-nav-link").Single(link => link.TextContent.Trim() == "Regions").GetAttribute("href");
     }
 
     /// <summary>

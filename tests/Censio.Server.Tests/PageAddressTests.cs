@@ -174,5 +174,45 @@ public sealed class PageAddressTests
         Assert.IsFalse(parsed, $"The byte text {text} should be refused");
     }
 
+    /// <summary>
+    /// On an address that carries a profile, the Regions entry links to that profile's overview, query and fragment
+    /// ignored.
+    /// </summary>
+    /// <param name="relativePath">The base-relative address after the profile identity</param>
+    [TestMethod]
+    [TestCategory("AC7")]
+    [DataRow("/regions")]
+    [DataRow("/sessions/3245")]
+    [DataRow("/islands/3245/1/0")]
+    [DataRow("/regions?x=1#top")]
+    public void PageAddressRegionsEntryLinkCarriesProfileOfAddress(string relativePath)
+    {
+        // Act
+        var link = PageAddress.RegionsEntryLink($"profiles/{ProfileText}{relativePath}");
+
+        // Assert
+        Assert.AreEqual($"/profiles/{ProfileText}/regions", link, $"The Regions entry on profiles/<profile>{relativePath} should carry the profile");
+    }
+
+    /// <summary>
+    /// On an address that carries no well-formed profile, the Regions entry links to the overview of the newest profile.
+    /// </summary>
+    /// <param name="relativePath">The base-relative address</param>
+    [TestMethod]
+    [TestCategory("AC7")]
+    [DataRow("")]
+    [DataRow("regions")]
+    [DataRow("profiles/x/regions")]
+    [DataRow("profiles/")]
+    [DataRow(null)]
+    public void PageAddressRegionsEntryLinkWithoutProfileIsRegions(string? relativePath)
+    {
+        // Act
+        var link = PageAddress.RegionsEntryLink(relativePath);
+
+        // Assert
+        Assert.AreEqual("/regions", link, $"The Regions entry on '{relativePath}' should lead to /regions");
+    }
+
     #endregion // Methods
 }

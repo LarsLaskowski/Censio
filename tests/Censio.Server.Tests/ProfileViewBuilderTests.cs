@@ -135,6 +135,28 @@ public sealed class ProfileViewBuilderTests
     }
 
     /// <summary>
+    /// Building counts whose island sum and region sum pass <see cref="int.MaxValue" /> are summed without an overflow.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC2")]
+    public void ProfileViewBuilderBuildingCountsNearInt32MaxDoNotThrow()
+    {
+        // Arrange
+        var tick = CreateTick(TickIsland(10, 1, "Island 1", Entry(1, int.MaxValue, 1f), Entry(2, int.MaxValue, 1f)),
+                              TickIsland(10, 2, "Island 2", Entry(1, int.MaxValue, 1f)));
+        var state = CreateState(tick);
+
+        // Act
+        var view = ProfileViewBuilder.Build(state, null, null, null);
+
+        // Assert
+        string[] expected = ["10/1/0 Island 1 buildings 4294967294 produced 2 deficit 0", "10/2/0 Island 2 buildings 2147483647 produced 1 deficit 0"];
+
+        Assert.AreSequenceEqual(expected, DescribeIslands(view.Regions.Single()), "The island sum should pass int.MaxValue without an overflow");
+        Assert.AreEqual("buildings 6442450941 produced 3 deficit 0", DescribeFigures(view.Regions.Single().Figures), "The region sum should pass int.MaxValue without an overflow");
+    }
+
+    /// <summary>
     /// A delta that rounds to zero is no deficit: the count follows the value rounded to two decimals.
     /// </summary>
     [TestMethod]

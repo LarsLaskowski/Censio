@@ -208,6 +208,27 @@ public sealed class PageNamesTests
     }
 
     /// <summary>
+    /// The fallback names of an unnamed island, an unnamed profile and a good the catalog cannot name are the texts of
+    /// <see cref="UiTexts" /> of the shown language.
+    /// </summary>
+    /// <param name="language">The language</param>
+    [TestMethod]
+    [TestCategory("AC10")]
+    [DataRow(UiLanguage.English)]
+    [DataRow(UiLanguage.German)]
+    public void PageNamesFallbacksComeFromUiTexts(UiLanguage language)
+    {
+        // Arrange
+        var texts = UiTexts.For(language);
+
+        // Act
+        var names = $"{PageNames.Island(string.Empty, language)}|{PageNames.Profiles([CreateProfile("11111111-0000-4000-8000-000000000001", null)], language, 1)[0].Value}|{PageNames.Good(1001, null).For(language)}";
+
+        // Assert
+        Assert.AreEqual($"{texts.UnnamedIsland}|{texts.UnnamedProfile}|{string.Format(CultureInfo.InvariantCulture, texts.GoodFallbackFormat, 1001)}", names, $"The fallback names in {language} should be the texts of UiTexts");
+    }
+
+    /// <summary>
     /// Reads a catalog document of entries into the lookup of the pages.
     /// </summary>
     /// <param name="entries">The entries as JSON</param>
