@@ -10,7 +10,7 @@ public sealed class KeyFigures
     /// <summary>
     /// Gets the number of buildings.
     /// </summary>
-    public required int Buildings { get; init; }
+    public required long Buildings { get; init; }
 
     /// <summary>
     /// Gets the number of produced goods.

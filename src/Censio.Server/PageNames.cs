@@ -30,7 +30,9 @@ public static class PageNames
     {
         var entry = catalog?.Find(productGuid);
 
-        return Pick(entry, string.Create(CultureInfo.InvariantCulture, $"Good {productGuid}"), string.Create(CultureInfo.InvariantCulture, $"Ware {productGuid}"));
+        return Pick(entry,
+                    string.Format(CultureInfo.InvariantCulture, UiTexts.For(UiLanguage.English).GoodFallbackFormat, productGuid),
+                    string.Format(CultureInfo.InvariantCulture, UiTexts.For(UiLanguage.German).GoodFallbackFormat, productGuid));
     }
 
     /// <summary>
@@ -61,9 +63,7 @@ public static class PageNames
             return name;
         }
 
-        return language == UiLanguage.German
-                   ? "Unbenannte Insel"
-                   : "Unnamed island";
+        return UiTexts.For(language).UnnamedIsland;
     }
 
     /// <summary>
@@ -75,9 +75,7 @@ public static class PageNames
     /// <returns>The identities with their shown names</returns>
     public static IReadOnlyList<KeyValuePair<Guid, string>> Profiles(IReadOnlyList<StoredProfile> profiles, UiLanguage language, int limit)
     {
-        var unnamed = language == UiLanguage.German
-                          ? "Unbenanntes Profil"
-                          : "Unnamed profile";
+        var unnamed = UiTexts.For(language).UnnamedProfile;
         var named = profiles.Select(profile => (profile.Id, Name: string.IsNullOrEmpty(profile.Name) ? unnamed : profile.Name)).ToList();
         var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 

@@ -60,7 +60,7 @@ logged. Users of the web application rely on it.
 - The table has the columns `Island`, `Buildings`, `Produced goods`, `Goods in deficit` (German `Insel`, `Gebäude`,
   `Produzierte Waren`, `Waren im Defizit`). The islands are ordered by shown name (ordinal, letter case ignored), ties by
   session GUID, island ID and area index. The name is a link to the island's detail.
-- An island with an empty name is shown as `Unnamed island` / `Unbenannte Insel`.
+- An island with an empty name is shown as `Unnamed island` / `Unbenannte Insel` (`UiTexts`).
 
 ### Island detail
 
@@ -72,7 +72,7 @@ logged. Users of the web application rely on it.
   name (ordinal, letter case ignored), ties by product GUID. For an island with more entries the line
   `Showing 500 of <n> goods.` / `500 von <n> Waren angezeigt.` follows the table.
 - A good is named by the catalog entry in the shown language, else in the other language, else `Good <GUID>` /
-  `Ware <GUID>`.
+  `Ware <GUID>` (`UiTexts`, in both languages).
 - A good shows its icon (`<img src="/icons/<reference>" alt="">`) only when the catalog entry names an icon whose PNG the
   server has stored; otherwise the icon cell stays empty.
 - An island the latest tick has no values for (it lacks the island, or the tick is empty) keeps its heading and shows
@@ -89,7 +89,7 @@ logged. Users of the web application rely on it.
   the text colour. The sign carries the meaning without the colour.
 - Productivity is stored as a percent (up to 435): it is rounded to a whole number, not multiplied, and shown `87%` in
   English and `87 %` in German.
-- Counts are whole numbers. A value that is no value (`null`) shows `–`.
+- Counts are whole numbers; the buildings of an island and of a region are summed in 64 bits, so no sum overflows. A value that is no value (`null`) shows `–`.
 - No number or time is formatted with a culture ([record 0072](../decisions/0072-web-ui-texts-from-an-own-table-without-culture-data.md)).
 
 ### As-of line and banner
@@ -119,7 +119,7 @@ logged. Users of the web application rely on it.
 | a failed read | `The data cannot be read right now. Reload the page to try again.` | `Die Daten können gerade nicht gelesen werden. Laden Sie die Seite neu, um es erneut zu versuchen.` |
 
 A page that updates keeps the figures it shows until the new ones replace them. A failed read replaces them with the last
-text and is not retried until the page is loaded again.
+text and is not retried until the page is loaded again: a notice of the server state does not read it again.
 
 ### Live updates
 
@@ -181,8 +181,10 @@ logged.
   `Loading…` when they show nothing yet ([record 0074](../decisions/0074-pages-keep-derived-views-and-read-unheld-profiles-one-at-a-time.md)).
   The state is read through the same gate, never beside it: a profile that leaves the held profiles between the check
   and the read is read inside the gate.
-- A page owns a cancellation token that it cancels when it is closed (a closed tab, a navigation, the end of a
-  prerender), and passes it to every read, so a closed page leaves the gate. A cancelled read ends quietly: nothing is
+- A page owns a cancellation token that it passes to every read, so a cancelled page leaves the gate. The token is
+  cancelled when the request of the prerender is aborted and when the page is disposed (a navigation, the end of the
+  circuit). A closed interactive tab does not dispose the page at once: its circuit is kept until the retention of
+  disconnected circuits ends (default 3 minutes), so the read of a closed tab is cancelled that much later. A cancelled read ends quietly: nothing is
   shown, logged or retried.
 - A page keeps only a view: the shown names, the figures per region and island, and the rows of the shown island (at
   most 500 of them). It holds no reference to a profile state once the view is built, held states included. The memory of

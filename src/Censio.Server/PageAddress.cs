@@ -19,6 +19,11 @@ public static class PageAddress
     /// </summary>
     private const int MaxDigits = 10;
 
+    /// <summary>
+    /// The start of the address of a profile's pages.
+    /// </summary>
+    private const string ProfilesPrefix = "profiles/";
+
     #endregion // Constants
 
     #region Methods
@@ -74,6 +79,36 @@ public static class PageAddress
     public static string RegionsLink(Guid profileId)
     {
         return string.Create(CultureInfo.InvariantCulture, $"/profiles/{profileId}/regions");
+    }
+
+    /// <summary>
+    /// Gives the address the Regions navigation entry leads to: the region overview of the profile the address shows, or the one of the newest profile.
+    /// </summary>
+    /// <param name="relativePath">The base-relative address, query and fragment included</param>
+    /// <returns>The address</returns>
+    public static string RegionsEntryLink(string? relativePath)
+    {
+        var path = relativePath ?? string.Empty;
+        var end = path.IndexOfAny(['?', '#']);
+
+        if (end >= 0)
+        {
+            path = path[..end];
+        }
+
+        if (path.StartsWith(ProfilesPrefix, StringComparison.Ordinal))
+        {
+            var rest = path[ProfilesPrefix.Length..];
+            var slash = rest.IndexOf('/', StringComparison.Ordinal);
+            var identity = slash < 0 ? rest : rest[..slash];
+
+            if (TryParseProfile(identity, out var profileId))
+            {
+                return RegionsLink(profileId);
+            }
+        }
+
+        return "/regions";
     }
 
     /// <summary>

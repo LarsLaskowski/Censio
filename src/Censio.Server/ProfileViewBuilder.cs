@@ -124,7 +124,7 @@ public static class ProfileViewBuilder
 
         return new KeyFigures
                {
-                   Buildings = island.Entries.Sum(entry => entry.BuildingCount),
+                   Buildings = island.Entries.Sum(entry => (long)entry.BuildingCount),
                    ProducedGoods = island.Entries.Count(entry => entry.BuildingCount > 0),
                    GoodsInDeficit = island.Entries.Count(entry => entry.Delta is { } delta && PageFormat.Round(delta) < 0)
                };

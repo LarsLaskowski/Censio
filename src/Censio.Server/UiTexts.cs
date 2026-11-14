@@ -20,6 +20,9 @@ public sealed class UiTexts
                                                    SwitchToLightTheme = "Switch to the light theme",
                                                    LanguageSwitch = "Language",
                                                    MoreProfilesFormat = "{0} more profiles",
+                                                   UnnamedIsland = "Unnamed island",
+                                                   UnnamedProfile = "Unnamed profile",
+                                                   GoodFallbackFormat = "Good {0}",
                                                    ColumnRegion = "Region",
                                                    ColumnIslands = "Islands",
                                                    ColumnBuildings = "Buildings",
@@ -57,6 +60,9 @@ public sealed class UiTexts
                                                   SwitchToLightTheme = "Zum hellen Design wechseln",
                                                   LanguageSwitch = "Sprache",
                                                   MoreProfilesFormat = "{0} weitere Profile",
+                                                  UnnamedIsland = "Unbenannte Insel",
+                                                  UnnamedProfile = "Unbenanntes Profil",
+                                                  GoodFallbackFormat = "Ware {0}",
                                                   ColumnRegion = "Region",
                                                   ColumnIslands = "Inseln",
                                                   ColumnBuildings = "Gebäude",
@@ -84,6 +90,21 @@ public sealed class UiTexts
     #endregion // Fields
 
     #region Properties
+
+    /// <summary>
+    /// Gets the name shown for an island without a name.
+    /// </summary>
+    public required string UnnamedIsland { get; init; }
+
+    /// <summary>
+    /// Gets the name shown for a profile without a name.
+    /// </summary>
+    public required string UnnamedProfile { get; init; }
+
+    /// <summary>
+    /// Gets the format of the name of a good the catalog does not name, with the product GUID as its argument.
+    /// </summary>
+    public required string GoodFallbackFormat { get; init; }
 
     /// <summary>
     /// Gets the label of the button that closes and opens the navigation.

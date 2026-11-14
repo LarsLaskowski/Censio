@@ -29,7 +29,7 @@
         <MudDrawer @bind-Open="_drawerOpen" Variant="DrawerVariant.Persistent" ClipMode="DrawerClipMode.Always">
             <MudNavMenu>
                 <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home">@_texts.HomeEntry</MudNavLink>
-                <MudNavLink Href="/regions" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Map">@_texts.RegionsEntry</MudNavLink>
+                <MudNavLink Href="@_regionsLink" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Map">@_texts.RegionsEntry</MudNavLink>
             </MudNavMenu>
         </MudDrawer>
         <MudMainContent>

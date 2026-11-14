@@ -84,7 +84,7 @@ public static class PageFormat
     /// </summary>
     /// <param name="value">The value</param>
     /// <returns>The text</returns>
-    public static string Count(int? value)
+    public static string Count(long? value)
     {
         return value?.ToString(CultureInfo.InvariantCulture) ?? NoValue;
     }

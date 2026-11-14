@@ -1,6 +1,7 @@
 using Censio.Server.Data;
 
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Routing;
 using Microsoft.JSInterop;
 
 using MudBlazor;
@@ -64,6 +65,11 @@ public sealed partial class MainLayout : IDisposable
     private int _moreProfiles;
 
     /// <summary>
+    /// The address the Regions navigation entry leads to.
+    /// </summary>
+    private string _regionsLink = "/regions";
+
+    /// <summary>
     /// A value that indicates whether the layout is disposed.
     /// </summary>
     private volatile bool _isDisposed;
@@ -89,6 +95,12 @@ public sealed partial class MainLayout : IDisposable
     /// </summary>
     [Inject]
     private IJSRuntime JsRuntime { get; set; } = null!;
+
+    /// <summary>
+    /// Gets or sets the navigation manager.
+    /// </summary>
+    [Inject]
+    private NavigationManager Navigation { get; set; } = null!;
 
     /// <summary>
     /// Gets or sets the server state.
@@ -144,6 +156,38 @@ public sealed partial class MainLayout : IDisposable
                             }
 
                             RefreshProfiles(false);
+                            StateHasChanged();
+                        });
+    }
+
+    /// <summary>
+    /// Points the Regions navigation entry at the address now shown.
+    /// </summary>
+    private void RefreshRegionsLink()
+    {
+        _regionsLink = PageAddress.RegionsEntryLink(Navigation.ToBaseRelativePath(Navigation.Uri));
+    }
+
+    /// <summary>
+    /// Follows the address: it only hands the work to the layout's context.
+    /// </summary>
+    /// <param name="sender">The navigation manager</param>
+    /// <param name="arguments">The change</param>
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs arguments)
+    {
+        if (_isDisposed)
+        {
+            return;
+        }
+
+        _ = InvokeAsync(() =>
+                        {
+                            if (_isDisposed)
+                            {
+                                return;
+                            }
+
+                            RefreshRegionsLink();
                             StateHasChanged();
                         });
     }
@@ -214,7 +258,9 @@ public sealed partial class MainLayout : IDisposable
         _texts = UiTexts.For(_language);
 
         RefreshProfiles(true);
+        RefreshRegionsLink();
         State.Changed += OnStateChanged;
+        Navigation.LocationChanged += OnLocationChanged;
     }
 
     #endregion // ComponentBase
@@ -226,6 +272,7 @@ public sealed partial class MainLayout : IDisposable
     {
         _isDisposed = true;
         State.Changed -= OnStateChanged;
+        Navigation.LocationChanged -= OnLocationChanged;
     }
 
     #endregion // IDisposable

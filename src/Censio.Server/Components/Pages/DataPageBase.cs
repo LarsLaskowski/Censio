@@ -64,6 +64,12 @@ public abstract class DataPageBase : ComponentBase, IDisposable
     public UiTexts Texts { get; set; } = UiTexts.For(UiLanguage.English);
 
     /// <summary>
+    /// Gets or sets the request the page is rendered for; its abort cancels the page's reads during prerendering.
+    /// </summary>
+    [CascadingParameter]
+    public HttpContext? HttpContext { get; set; }
+
+    /// <summary>
     /// Gets the shown view, or <see langword="null" /> when the page shows none.
     /// </summary>
     protected ProfileView? View { get; private set; }
@@ -277,7 +283,7 @@ public abstract class DataPageBase : ComponentBase, IDisposable
     /// <returns>A task that completes when the page shows the newest state</returns>
     private async Task ReadAfterNoticeAsync(ServerStateChangedEventArgs arguments)
     {
-        if (_isDisposed)
+        if (_isDisposed || Mode == PageMode.Failed)
         {
             return;
         }
@@ -300,7 +306,7 @@ public abstract class DataPageBase : ComponentBase, IDisposable
     /// <inheritdoc />
     protected override void OnInitialized()
     {
-        _cancellation = new CancellationTokenSource();
+        _cancellation = CancellationTokenSource.CreateLinkedTokenSource(HttpContext?.RequestAborted ?? CancellationToken.None);
         _cancellationToken = _cancellation.Token;
         State.Changed += OnStateChanged;
     }
