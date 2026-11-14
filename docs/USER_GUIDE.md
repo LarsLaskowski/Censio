@@ -84,6 +84,38 @@ docker pull networlddev/censio:0.2.0
 
 Building the image from source and starting it with the commands of this guide was tried on Docker Desktop for Windows in PowerShell 7. An automated check on Linux Docker Engine runs the `--user 99:100` command with a bind mount owned by `99:100`; Windows PowerShell 5.1, the other commands of this section (the `chown` remedy, the pull on the NAS), the stop at start for an unwritable directory on NAS hardware, and Unraid or Synology hardware have not been tried yet.
 
+#### Recreate and update
+
+Recreate the container to change a setting or to move to a newer image: the data lives in the volume, not in the container. Update to a newer version by pulling its tag first (`0.2.1` here stands for the version you want); `docker run` reuses an image of the same tag that is already on the host, so with `latest` the pull is what fetches the newer image:
+
+```text
+docker pull networlddev/censio:0.2.1
+```
+
+```text
+docker stop censio
+```
+
+```text
+docker rm censio
+```
+
+Then start the container with the same command as under *Run*, with the new tag (and with every `-e`, `-p`, `--user` and `--mount` you used before):
+
+```text
+docker run -d --name censio -p 8080:8080 -v censio-config:/config networlddev/censio:0.2.1
+```
+
+- **What the volume keeps.** The key ring, the ingest token and the database in `/config`. The new container logs `The ingest token is read from '/config/ingest-token'.` and `The database '/config/censio.db' was opened.` (or `The database '/config/censio.db' was updated to the current schema.` when the new version changed the schema), and the token of the Companion keeps working.
+- **A token file of your own.** If you started with `CENSIO__INGEST__TOKENFILE`, pass the same `-e` and the same `--mount` again (*Ingest endpoint and token*); without them the server generates a new token in `/config`, and the Companion is refused.
+- **Without `-v`.** The server then writes into the container, and removing the container deletes the key ring, the token and the database.
+- **A deleted volume.** The next start is a first start: the server generates a new token, which you read and enter in the Companion again.
+- **Updating from `0.2.0`.** That image has no ingest token and no database, so the volume keeps only the key ring: the new container logs the first-start lines (`An ingest token was generated and stored in '/config/ingest-token'.` and `The database '/config/censio.db' was created.`). Read the new token and enter it in the Companion.
+- **Going back.** An older image refuses a database that a newer one wrote, so going back to an older image on the same volume is not supported.
+- **A volume the user cannot write.** A `--user` that cannot write `/config` stops the start with exit code 1; see *Data directory and NAS hosts*.
+
+Run the commands one at a time. If `docker pull` fails, stop there: nothing was removed. If `docker run` with the new tag fails after `docker rm`, run it with the old tag: the volume is untouched and the old server starts again. Tried with Linux Docker Engine and an image built from a checkout: stop, remove and run on one volume, with the same token and the opened database afterwards. Not yet tried: the pull of a newer published tag, an update from a published tag, and NAS hardware.
+
 #### Network and TLS
 
 Inside the image the server listens on all interfaces of the container, on plain HTTP, with no login on the start page and `/health`. The `-p` mapping decides who can reach it: `-p 8080:8080` publishes it on every interface of the host. To reach it from the host alone, bind the mapping to the loopback address:
@@ -96,7 +128,7 @@ On Linux a published port bypasses host firewalls such as ufw and firewalld, so 
 
 #### Ingest endpoint and token
 
-The server of the state of `main` and of later releases (not the image `0.2.0`) takes a Companion's data on the WebSocket endpoint `ws://<host>:8080/ingest`, where `<host>` is the machine that runs Docker and `8080` the published port; there is no TLS on it (*Network and TLS*). No Companion sends data yet. The server stores what it receives before it acknowledges it and restores the last state of each profile at start (*Data and logs*), but the pages show no data until a Companion sends it (*Web interface*). Tried with the server started outside Docker on Linux: the creation of the token file with mode `0600`, its reading at the next start, and the refusals below. Not yet tried: the commands of this section in a container and on NAS hardware, and reading the file through a NAS share.
+The server of the state of `main` and of later releases (not the image `0.2.0`) takes a Companion's data on the WebSocket endpoint `ws://<host>:8080/ingest`, where `<host>` is the machine that runs Docker and `8080` the published port; there is no TLS on it (*Network and TLS*). No Companion sends data yet. The server stores what it receives before it acknowledges it and restores the last state of each profile at start (*Data and logs*), but the pages show no data until a Companion sends it (*Web interface*). Tried with the server started outside Docker on Linux: the creation of the token file with mode `0600`, its reading at the next start, and the refusals below. Tried in a container (Linux Docker Engine, an image built from a checkout, an automated check): on a new volume the token file with mode `0600` owned by the container user, and the same token after a recreation of the container on that volume. Not yet tried: the other commands of this section in a container, NAS hardware, reading the file through a NAS share, and an update from a published tag.
 
 - **The token.** It is required by default. At its first start the server generates a token of 43 characters and stores it in `/config/ingest-token`; the log shows `An ingest token was generated and stored in '/config/ingest-token'.` At every later start it reads the same file (`The ingest token is read from '/config/ingest-token'.`). The log never holds the token.
 - **Reading it.** The file has mode `0600` and belongs to the container user (`1654`, or the `--user` of the NAS section above), so a NAS share or a file browser, which runs as another user, cannot read it. Read it in the container, or as root on the host in the folder you mounted as `/config`:
@@ -476,6 +508,38 @@ docker pull networlddev/censio:0.2.0
 
 Das Bauen des Images aus dem Quellcode und sein Start mit den Befehlen dieser Anleitung wurde unter Docker Desktop für Windows in PowerShell 7 ausprobiert. Eine automatische Prüfung unter Docker Engine für Linux führt den Befehl mit `--user 99:100` und einem Bind-Mount aus, der `99:100` gehört; Windows PowerShell 5.1, die übrigen Befehle dieses Abschnitts (die `chown`-Abhilfe, das Laden auf dem NAS), der Stopp beim Start für ein nicht beschreibbares Verzeichnis auf NAS-Hardware sowie Unraid- oder Synology-Hardware wurden noch nicht ausprobiert.
 
+#### Neu erstellen und aktualisieren
+
+Den Container neu erstellen, um eine Einstellung zu ändern oder auf ein neueres Image zu wechseln: Die Daten liegen im Volume, nicht im Container. Auf eine neuere Version wird aktualisiert, indem zuerst ihr Tag geladen wird (`0.2.1` steht hier für die gewünschte Version); `docker run` verwendet ein Image desselben Tags, das schon auf dem Host liegt, deshalb lädt bei `latest` erst der Pull das neuere Image:
+
+```text
+docker pull networlddev/censio:0.2.1
+```
+
+```text
+docker stop censio
+```
+
+```text
+docker rm censio
+```
+
+Danach den Container mit demselben Befehl wie unter *Starten* starten, mit dem neuen Tag (und mit jedem `-e`, `-p`, `--user` und `--mount`, das vorher verwendet wurde):
+
+```text
+docker run -d --name censio -p 8080:8080 -v censio-config:/config networlddev/censio:0.2.1
+```
+
+- **Was das Volume behält.** Den Schlüsselring, das Ingest-Token und die Datenbank in `/config`. Der neue Container schreibt `The ingest token is read from '/config/ingest-token'.` und `The database '/config/censio.db' was opened.` ins Log (oder `The database '/config/censio.db' was updated to the current schema.`, wenn die neue Version das Schema geändert hat), und das Token des Companions gilt weiter.
+- **Eine eigene Token-Datei.** Wurde mit `CENSIO__INGEST__TOKENFILE` gestartet, dasselbe `-e` und dasselbe `--mount` erneut angeben (*Ingest-Endpunkt und Token*); ohne sie erzeugt der Server ein neues Token in `/config`, und der Companion wird abgelehnt.
+- **Ohne `-v`.** Der Server schreibt dann in den Container, und das Entfernen des Containers löscht Schlüsselring, Token und Datenbank.
+- **Ein gelöschtes Volume.** Der nächste Start ist ein erster Start: Der Server erzeugt ein neues Token, das Sie lesen und erneut im Companion eintragen.
+- **Aktualisieren von `0.2.0`.** Dieses Image hat kein Ingest-Token und keine Datenbank, deshalb behält das Volume nur den Schlüsselring: Der neue Container schreibt die Zeilen des ersten Starts ins Log (`An ingest token was generated and stored in '/config/ingest-token'.` und `The database '/config/censio.db' was created.`). Das neue Token lesen und im Companion eintragen.
+- **Zurückgehen.** Ein älteres Image verweigert eine Datenbank, die ein neueres geschrieben hat; das Zurückgehen auf ein älteres Image mit demselben Volume wird deshalb nicht unterstützt.
+- **Ein Volume, das der Benutzer nicht beschreiben kann.** Ein `--user`, der `/config` nicht beschreiben kann, beendet den Start mit Exit-Code 1; siehe *Datenverzeichnis und NAS-Hosts*.
+
+Die Befehle werden einzeln ausgeführt. Schlägt `docker pull` fehl, hier aufhören: Es wurde nichts entfernt. Schlägt `docker run` mit dem neuen Tag nach `docker rm` fehl, ihn mit dem alten Tag ausführen: Das Volume ist unberührt, und der alte Server startet wieder. Ausprobiert mit Docker Engine unter Linux und einem aus einem Checkout gebauten Image: Stoppen, Entfernen und Starten auf einem Volume, danach mit demselben Token und der geöffneten Datenbank. Noch nicht ausprobiert: das Laden eines neueren veröffentlichten Tags, ein Update von einem veröffentlichten Tag und NAS-Hardware.
+
 #### Netzwerk und TLS
 
 Im Image lauscht der Server auf allen Schnittstellen des Containers, über reines HTTP und ohne Login für Startseite und `/health`. Die `-p`-Abbildung entscheidet, wer ihn erreicht: `-p 8080:8080` veröffentlicht ihn auf jeder Schnittstelle des Hosts. Um ihn nur vom Host aus erreichbar zu machen, die Abbildung an die Loopback-Adresse binden:
@@ -488,7 +552,7 @@ Unter Linux umgeht ein veröffentlichter Port Host-Firewalls wie ufw und firewal
 
 #### Ingest-Endpunkt und Token
 
-Der Server des Stands von `main` und späterer Releases (nicht das Image `0.2.0`) nimmt die Daten eines Companions auf dem WebSocket-Endpunkt `ws://<Host>:8080/ingest` entgegen; `<Host>` ist der Rechner, auf dem Docker läuft, und `8080` der veröffentlichte Port; TLS gibt es dort nicht (*Netzwerk und TLS*). Noch kein Companion sendet Daten. Der Server speichert, was er empfängt, bevor er es bestätigt, und stellt beim Start den letzten Stand jedes Profils wieder her (*Daten und Logs*), aber die Seiten zeigen erst Daten, wenn ein Companion sie sendet (*Weboberfläche*). Ausprobiert mit dem Server, der außerhalb von Docker unter Linux gestartet wurde: das Anlegen der Token-Datei mit Modus `0600`, ihr Lesen beim nächsten Start und die Ablehnungen unten. Noch nicht ausprobiert: die Befehle dieses Abschnitts in einem Container und auf NAS-Hardware sowie das Lesen der Datei über eine NAS-Freigabe.
+Der Server des Stands von `main` und späterer Releases (nicht das Image `0.2.0`) nimmt die Daten eines Companions auf dem WebSocket-Endpunkt `ws://<Host>:8080/ingest` entgegen; `<Host>` ist der Rechner, auf dem Docker läuft, und `8080` der veröffentlichte Port; TLS gibt es dort nicht (*Netzwerk und TLS*). Noch kein Companion sendet Daten. Der Server speichert, was er empfängt, bevor er es bestätigt, und stellt beim Start den letzten Stand jedes Profils wieder her (*Daten und Logs*), aber die Seiten zeigen erst Daten, wenn ein Companion sie sendet (*Weboberfläche*). Ausprobiert mit dem Server, der außerhalb von Docker unter Linux gestartet wurde: das Anlegen der Token-Datei mit Modus `0600`, ihr Lesen beim nächsten Start und die Ablehnungen unten. Im Container ausprobiert (Docker Engine unter Linux, ein aus einem Checkout gebautes Image, eine automatische Prüfung): auf einem neuen Volume die Token-Datei mit Modus `0600` und dem Container-Benutzer als Eigentümer sowie dasselbe Token nach dem Neuerstellen des Containers auf diesem Volume. Noch nicht ausprobiert: die anderen Befehle dieses Abschnitts in einem Container, NAS-Hardware, das Lesen der Datei über eine NAS-Freigabe und ein Update von einem veröffentlichten Tag.
 
 - **Das Token.** Es wird standardmäßig verlangt. Beim ersten Start erzeugt der Server ein Token aus 43 Zeichen und speichert es in `/config/ingest-token`; das Log zeigt `An ingest token was generated and stored in '/config/ingest-token'.` Bei jedem späteren Start liest er dieselbe Datei (`The ingest token is read from '/config/ingest-token'.`). Das Log enthält das Token nie.
 - **Lesen.** Die Datei hat den Modus `0600` und gehört dem Container-Benutzer (`1654` oder dem `--user` des NAS-Abschnitts oben); eine NAS-Freigabe oder ein Dateibrowser, die als ein anderer Benutzer laufen, können sie deshalb nicht lesen. Im Container lesen oder als root auf dem Host in dem Ordner, den Sie als `/config` eingebunden haben:
