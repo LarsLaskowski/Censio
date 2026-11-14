@@ -225,7 +225,7 @@ public sealed class ReplaySender : IAsyncDisposable
                           ? ReplaySendProblemKind.TokenFileCannotBeRead
                           : ReplaySendProblemKind.TokenFileHoldsNoValidToken;
 
-        CompanionLog.ReplaySendFailed(_logger, FormatReason(problem));
+        CompanionLog.ReplaySendFailed(_logger, Reason(problem));
 
         return problem;
     }
@@ -447,20 +447,9 @@ public sealed class ReplaySender : IAsyncDisposable
     /// </summary>
     /// <param name="problem">The problem</param>
     /// <returns>The reason</returns>
-    private static string FormatReason(ReplaySendProblemKind problem)
+    private static string Reason(ReplaySendProblemKind problem)
     {
-        return problem switch
-               {
-                   ReplaySendProblemKind.TokenFileCannotBeRead => "token file cannot be read",
-                   ReplaySendProblemKind.TokenFileHoldsNoValidToken => "token file holds no valid token",
-                   ReplaySendProblemKind.ServerUnreachable => "server unreachable",
-                   ReplaySendProblemKind.TokenRefused => "token refused",
-                   ReplaySendProblemKind.CompanionConnected => "another Companion is connected",
-                   ReplaySendProblemKind.VersionNotSupported => "server does not support contract version 1",
-                   ReplaySendProblemKind.NoAnswer => "server does not answer",
-                   ReplaySendProblemKind.ConnectionLost => "server connection lost",
-                   _ => "invalid server reply"
-               };
+        return TrayMenu.FormatReplaySendReason(problem) ?? problem.ToString();
     }
 
     /// <summary>
@@ -842,11 +831,11 @@ public sealed class ReplaySender : IAsyncDisposable
     {
         if (problem is ReplaySendProblemKind.TokenRefused or ReplaySendProblemKind.CompanionConnected or ReplaySendProblemKind.VersionNotSupported)
         {
-            CompanionLog.ReplaySendRefused(_logger, FormatReason(problem));
+            CompanionLog.ReplaySendRefused(_logger, Reason(problem));
         }
         else
         {
-            CompanionLog.ReplaySendFailed(_logger, FormatReason(problem));
+            CompanionLog.ReplaySendFailed(_logger, Reason(problem));
         }
     }
 

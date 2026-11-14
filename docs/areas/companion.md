@@ -3,7 +3,7 @@
 ## Scope
 
 The Companion process on Windows: its tray icon, tooltip and menu, how it exits, how many instances run, the
-version it shows, its command line (recording the pipe and replaying a recording), starting and stopping a recording
+version it shows, its command line (recording the pipe, replaying a recording and sending it to a server), starting and stopping a recording
 from the menu, the optional start with Windows, the menu entry for the diagnostics window, the game installation line, the folders it opens, its settings file, and the release ZIP it ships in. The window itself is in [`companion-diagnostics.md`](companion-diagnostics.md) and the log file in [`companion-log.md`](companion-log.md). The user who starts the Companion relies on it.
 
 ## Behavior
@@ -58,18 +58,23 @@ from the menu, the optional start with Windows, the menu entry for the diagnosti
 
 ### Command line
 
-The Companion knows three switches; the case of a switch does not matter. A start without a switch behaves as
+The Companion knows five switches; the case of a switch does not matter. A start without a switch behaves as
 described in the other sections.
 
 | Switch | Meaning |
 | ------ | ------- |
 | `--record` | Start with the recording on: record every connection to the pipe to a file until it is stopped from the menu or `Exit` (*Recording*) |
 | `--replay <file>` | Do not open the pipe; feed the recording `<file>` through the pipe's reader and tick assembler (*Replay*) |
+| `--server <address>` | With `--replay` only: send the replay to the server at the `ws://` or `wss://` address ([`replay-sending.md`](replay-sending.md)) |
+| `--token-file <file>` | With `--server` only: the file that holds the ingest token the replay presents ([`replay-sending.md`](replay-sending.md), *Token file*) |
 | `--speed <value>` | With `--replay` only: `max` (no pauses) or a factor from `0.1` to `1000`, written with a decimal point (`.`) also on a German Windows; default `1` (real speed) |
 
 - Any other command line is invalid: an unknown argument, a switch given twice, `--speed` without `--replay`, a speed
   that is not `max` or a factor in that range, `--replay` without a file or with an empty one or with a switch in
-  the place of the file, or `--record` together with `--replay`. The tooltip reads `Censio Companion: Invalid command
+  the place of the file, `--record` together with `--replay`, `--server` without `--replay` or together with `--record`,
+  `--token-file` without `--server`, `--server` or `--token-file` without a value, with an empty one or with a switch in
+  its place, and an address that is not an absolute `ws://` or `wss://` address with a host, or that holds a user name,
+  a password or a fragment ([`replay-sending.md`](replay-sending.md), *Switches*). The tooltip reads `Censio Companion: Invalid command
   line`, the Companion neither records, replays nor opens the pipe, the icon shows the *problem* look, and the menu shows
   `Last tick: none` with `Start recording` greyed out; the folder entries, the log and `Exit` work as usual.
 - The menu has the entries of *Tray icon and menu* with every switch.
@@ -149,6 +154,10 @@ described in the other sections.
   until `Exit`. A replay never shows `Error`. The tooltip is `Censio Companion: ` and the status text.
 - A problem with the file ends the replay with the status text `Replay error: <reason>` after the frames before it
   were replayed, with a reason of [`pipe-recording.md`](pipe-recording.md) (*Limits and errors*).
+- With `--server` the status text reads `Replay: Connecting to server` first (*waiting* look), and after the last frame
+  `Replay finished: <n> ticks sent, <r> refused` (`1 tick sent` for one); a problem of sending ends it with `Replay
+  error: <reason>` and the *problem* look, the reason one of [`replay-sending.md`](replay-sending.md) (*Limits and
+  errors*), which wins over a problem of the file. Without `--server` a replay opens no network connection.
 - The tooltip, the last tick and the icon show the progress, and the diagnostics window shows the replayed ticks and follows the replay tick by tick; after `Replay finished` it keeps the last tick of the file. The last tick is the recorded receive time of the latest replayed tick.
 
 ### Single instance
@@ -202,4 +211,4 @@ described in the other sections.
 - The diagnostics window: [`companion-diagnostics.md`](companion-diagnostics.md).
 - The log file, its lines and its writer: [`companion-log.md`](companion-log.md).
 - Building the catalog: [`game-catalog.md`](game-catalog.md); the icons: [`game-catalog-icons.md`](game-catalog-icons.md); the cache: [`game-catalog-cache.md`](game-catalog-cache.md).
-- Reading the game files: [`game-files.md`](game-files.md); the connection to the server, a settings window (later issues).
+- Reading the game files: [`game-files.md`](game-files.md); the connection to the server for a replay: [`replay-sending.md`](replay-sending.md); the connection to the server in a live run and a settings window (later issues).

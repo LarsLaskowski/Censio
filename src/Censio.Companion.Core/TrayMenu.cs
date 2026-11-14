@@ -130,11 +130,28 @@ public static class TrayMenu
     /// <exception cref="ArgumentOutOfRangeException">The state or the problem kind is not a defined value</exception>
     public static string FormatReplayToolTip(PipeReplayStatus status)
     {
+        if (status.SendProblem is { } sendProblem)
+        {
+            var sendReason = FormatReplaySendReason(sendProblem) ?? throw new ArgumentOutOfRangeException(nameof(status), sendProblem, "The send problem kind is not defined");
+
+            return $"{ToolTip}: Replay error: {sendReason}";
+        }
+
         if (status.Problem is { } problem)
         {
             var reason = FormatReplayReason(problem) ?? throw new ArgumentOutOfRangeException(nameof(status), problem.Kind, "The problem kind is not defined");
 
             return $"{ToolTip}: Replay error: {reason}";
+        }
+
+        if (status.IsConnecting)
+        {
+            return $"{ToolTip}: Replay: Connecting to server";
+        }
+
+        if (status is { IsFinished: true, Sent: { } sent })
+        {
+            return string.Create(CultureInfo.InvariantCulture, $"{ToolTip}: Replay finished: {sent.Ticks} {(sent.Ticks == 1 ? "tick" : "ticks")} sent, {sent.Refused} refused");
         }
 
         if (status.IsFinished)
@@ -344,12 +361,22 @@ public static class TrayMenu
     /// </summary>
     /// <param name="kind">The problem kind</param>
     /// <returns>The reason, or <see langword="null" /> if the problem kind is not a defined value</returns>
-#pragma warning disable RH2003 // Skeleton: removed with the implementation
     public static string? FormatReplaySendReason(ReplaySendProblemKind kind)
     {
-        throw new NotImplementedException();
+        return kind switch
+               {
+                   ReplaySendProblemKind.TokenFileCannotBeRead => "token file cannot be read",
+                   ReplaySendProblemKind.TokenFileHoldsNoValidToken => "token file holds no valid token",
+                   ReplaySendProblemKind.ServerUnreachable => "server unreachable",
+                   ReplaySendProblemKind.TokenRefused => "token refused",
+                   ReplaySendProblemKind.CompanionConnected => "another Companion is connected",
+                   ReplaySendProblemKind.VersionNotSupported => "server does not support contract version 1",
+                   ReplaySendProblemKind.NoAnswer => "server does not answer",
+                   ReplaySendProblemKind.ConnectionLost => "server connection lost",
+                   ReplaySendProblemKind.InvalidReply => "invalid server reply",
+                   _ => null
+               };
     }
-#pragma warning restore RH2003 // Skeleton: removed with the implementation
 
     /// <summary>
     /// Removes the application name and the colon from the start of a tooltip text.

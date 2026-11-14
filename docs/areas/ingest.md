@@ -5,7 +5,7 @@
 The server's WebSocket endpoint for the Companion: the route and its HTTP refusals, the hello and its checks in order,
 the ingest token (file, a file named by configuration, generation, rotation, the switch that turns it off, comparison), one Companion at a time and
 how a silent connection is found, what the server answers to each message, the closes, the bounds and times, the log
-lines and what never reaches a log. The operator who starts the server and the Companion that connects (#40) rely on it.
+lines and what never reaches a log. The operator who starts the server and the Companion that connects (a replay with `--server`, live sending #40) rely on it.
 The messages themselves, their reader and the refusal texts are in [`contract.md`](contract.md). A message is stored
 before it is acknowledged (record 0068), the state kept from it is in [`server-state.md`](server-state.md), and the data
 pages that show it are in [`web-pages.md`](web-pages.md).
@@ -349,7 +349,7 @@ the peak, so the figures of both documents stand for their own input.
 - The messages, their reader and writer, bounds of the message fields and the refusal texts: [`contract.md`](contract.md).
 - The catalog document inside an upload: [`game-catalog-format.md`](game-catalog-format.md).
 - The state kept from what arrives: [`server-state.md`](server-state.md); the database: [`server-data.md`](server-data.md).
-- Showing what arrives: [`web-pages.md`](web-pages.md). Replaying it, the Companion's sender, buffer and resend (#40, #41, #34), the catalog and
+- Showing what arrives: [`web-pages.md`](web-pages.md). The Companion's replay sending: [`replay-sending.md`](replay-sending.md); live sending, buffer and resend (#40, #41), the catalog and
   icons it uploads (#42).
 - The server's HTTP surface, the data directory and the Docker image: [`server.md`](server.md).
 - The code: `IngestTokenSetup`, `IngestAccess`, `IngestConnections`, `IngestSession` and `IngestEndpoint` in
