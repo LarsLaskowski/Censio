@@ -1,6 +1,6 @@
 # 0076: Icons are served by their content hash after a PNG header check
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-13
 - **Area:** web-pages
 - **Source:** Issue #32

@@ -1,6 +1,6 @@
 # 0077: The page address carries the shown profile
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-13
 - **Area:** web-pages
 - **Source:** Issue #32
@@ -26,4 +26,5 @@ it ([`areas/web-pages.md`](../areas/web-pages.md)).
 
 ## Consequences
 
-The address is untrusted input, parsed whole by own code; anything unknown shows `Not found.`
+The address is untrusted input, parsed whole by own code; anything unknown shows `Not found.` The navigation's Regions entry keeps
+the profile of the shown address, so a picked profile is left only by the profile switch.

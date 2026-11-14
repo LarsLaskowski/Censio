@@ -1,6 +1,6 @@
 # 0074: The pages keep only derived views and read profiles that are not held one at a time
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-13
 - **Area:** web-pages
 - **Source:** Issue #32
@@ -25,7 +25,8 @@ Blazor Server keeps its component state for as long as it is open.
 ## Decision
 
 Option 3: reads of profiles that are not held pass one gate of one place, and a page keeps a view of figures, names
-and at most 500 rows, holding no reference to a profile state once the view is built; a page that closes cancels its waiting or running read
+and at most 500 rows, holding no reference to a profile state once the view is built; a page that closes, or whose
+prerender request is aborted, cancels its waiting or running read
 ([`areas/web-pages.md`](../areas/web-pages.md)).
 
 ## Consequences

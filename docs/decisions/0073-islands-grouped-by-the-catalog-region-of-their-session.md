@@ -1,6 +1,6 @@
 # 0073: Islands are grouped by the catalog region of their session, a session without one forms its own region
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-13
 - **Area:** web-pages
 - **Source:** Issue #32

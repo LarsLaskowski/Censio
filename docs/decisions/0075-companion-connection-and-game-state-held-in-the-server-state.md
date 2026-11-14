@@ -1,6 +1,6 @@
 # 0075: The Companion's connection and game state are held in memory in the server state and announced to its followers
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-13
 - **Area:** server-state
 - **Source:** Issue #32

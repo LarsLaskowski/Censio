@@ -1,6 +1,6 @@
 # 0078: Times are shown at the browser's UTC offset for the instant
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-13
 - **Area:** web-pages
 - **Source:** Issue #32
