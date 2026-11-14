@@ -357,11 +357,9 @@ public sealed class PipeReplayRunnerTests
         var runner = CreateRunner(() => stream);
 
         // Act
-        var action = () => runner.RunAsync(TestContext.CancellationToken);
+        await Assert.ThrowsExactlyAsync<NotSupportedException>(() => runner.RunAsync(TestContext.CancellationToken), "A read failure of the stream should not be turned into file not found");
 
         // Assert
-        await Assert.ThrowsExactlyAsync<NotSupportedException>(action, "A read failure of the stream should not be turned into file not found");
-
         Assert.IsFalse(runner.Status.IsFinished, "The replay should not report a problem of the file");
         Assert.IsNull(runner.Status.Problem, "No problem should be set");
     }

@@ -76,10 +76,9 @@ public sealed class PipeRecordingFilesTests
         var files = new PipeRecordingFiles(PipeRecordingFiles.DefaultFolder(string.Empty));
 
         // Act
-        var action = () => files.Create(_started);
+        Assert.ThrowsExactly<InvalidOperationException>(() => files.Create(_started), "A folder that is not a full path should be refused");
 
         // Assert
-        Assert.ThrowsExactly<InvalidOperationException>(action, "A folder that is not a full path should be refused");
         Assert.IsFalse(Directory.Exists(Path.Combine(Environment.CurrentDirectory, "Censio")), "Nothing should be created below the working directory");
     }
 
@@ -164,11 +163,9 @@ public sealed class PipeRecordingFilesTests
         var files = new PipeRecordingFiles(folder);
 
         // Act
-        var action = () => files.Create(_started);
+        var exception = Assert.ThrowsExactly<IOException>(() => files.Create(_started), "A second with no free name should be refused with an I/O error");
 
         // Assert
-        var exception = Assert.ThrowsExactly<IOException>(action, "A second with no free name should be refused with an I/O error");
-
         Assert.AreEqual("No free recording file name is left for this second.", exception.Message, "The error should name the reason");
         Assert.HasCount(1000, Directory.GetFiles(folder), "No file beyond the 1,000th name should be created");
     }
@@ -213,11 +210,9 @@ public sealed class PipeRecordingFilesTests
         var files = new PipeRecordingFiles(folder);
 
         // Act
-        var action = () => files.Create(_started);
+        var exception = Assert.Throws<SystemException>(() => files.Create(_started), "A directory with the name of the file should make the creation fail");
 
         // Assert
-        var exception = Assert.Throws<SystemException>(action, "A directory with the name of the file should make the creation fail");
-
         Assert.IsNotInstanceOfType<NotImplementedException>(exception, "The failure should come from the file system");
         Assert.IsTrue(exception is IOException or UnauthorizedAccessException, "The file system should refuse the name with an I/O or access error");
         Assert.HasCount(1, Directory.GetFileSystemEntries(folder), "No other suffix should have been tried");
@@ -237,10 +232,9 @@ public sealed class PipeRecordingFilesTests
         var files = new PipeRecordingFiles(folder);
 
         // Act
-        var action = () => files.Create(_started);
+        Assert.ThrowsExactly<InvalidOperationException>(() => files.Create(_started), "A folder that is not a full path should be refused");
 
         // Assert
-        Assert.ThrowsExactly<InvalidOperationException>(action, "A folder that is not a full path should be refused");
         Assert.IsFalse(Directory.Exists(Path.Combine(Environment.CurrentDirectory, "Recordings")), "Nothing should be created below the working directory");
     }
 

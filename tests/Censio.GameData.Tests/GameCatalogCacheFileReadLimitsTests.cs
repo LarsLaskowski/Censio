@@ -250,11 +250,8 @@ public sealed class GameCatalogCacheFileReadLimitsTests
     [TestCategory("AC6")]
     public void GameCatalogCacheResultFromKindLoadedThrows()
     {
-        // Arrange
-        var action = () => GameCatalogCacheResult.FromKind(GameCatalogCacheResultKind.Loaded);
-
         // Act and Assert
-        Assert.ThrowsExactly<ArgumentException>(action, "A loaded result without catalog and icons should be refused");
+        Assert.ThrowsExactly<ArgumentException>(() => GameCatalogCacheResult.FromKind(GameCatalogCacheResultKind.Loaded), "A loaded result without catalog and icons should be refused");
     }
 
     #endregion // AC6
