@@ -108,6 +108,9 @@ its file and what it stands in for; its behavior is read in its code.
 - `FakeUbisoftInstallRecords` (`tests/Censio.Companion.Core.Tests/FakeUbisoftInstallRecords.cs`) — an `IUbisoftInstallRecords`.
 - `FakeFileVersionReader` (`tests/Censio.Companion.Core.Tests/FakeFileVersionReader.cs`) — an `IFileVersionReader`.
 - `RegExportUbisoftInstallRecords` (`tests/Censio.Companion.Core.Tests/RegExportUbisoftInstallRecords.cs`) — an `IUbisoftInstallRecords` over a `reg export` file, for the sample in `Fixtures/GameInstallation/`.
+- `ScriptedIngestServer`, `DuplexReplayConnector`, `ThrowingWebSocket`, `SendFailingWebSocket` (`tests/Censio.Companion.Core.Tests/`) — the server side, connector and failing sockets of the replay sender's tests.
+- `LoopbackWebSocketHost`, `LoopbackWebProxy` (`tests/Censio.Companion.Core.Tests/`) — a loopback Kestrel host (no certificate store written) and a proxy that never bypasses, for `ClientWebSocketConnector`.
+- `TestServerReplayConnector` (`tests/Censio.Server.Tests/TestServerReplayConnector.cs`) — an `IReplayServerConnector` into the real ingest endpoint.
 - `NonSeekableStream` (`tests/Censio.GameData.Tests/NonSeekableStream.cs`) — a forward-only stream; `TrackingStream` (`tests/Censio.GameData.Tests/TrackingStream.cs`) — a memory stream that logs its disposal.
 - `DdsFileBuilder` (`tests/Censio.GameData.Tests/DdsFileBuilder.cs`) — synthetic BC7 DDS files and their expected pixels.
 - `ForeignContractMessage` (`tests/Censio.Contracts.Tests/ForeignContractMessage.cs`) — a `ContractMessage` of no contract type.

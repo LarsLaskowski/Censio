@@ -16,5 +16,5 @@ Plan: [plan.md](plan.md)
 | 10 | G3 | Keep-alive measurement on the published server, written into the area document | `docs/areas/replay-sending.md`, *Measurements* | AC13 | 9 | Dev | [x] |
 | 11 | G3 | Area documents, index, architecture, SECURITY, README and user guide (English and German), report the `.squad/project.md` text | the files of plan *Documentation updates* | AC12 | 10 | Dev | [x] |
 | 12 | G3 | Fixture README and the *Test doubles* lines for `.squad/project.md` | `tests/Censio.Pipe.Tests/Fixtures/README.md` | AC1 | 8 | Tester | [x] |
-| 13 | G3 | Write the reported `.squad/project.md` text | `.squad/project.md` | AC12 | 11, 12 | Orchestrator | [ ] |
+| 13 | G3 | Write the reported `.squad/project.md` text | `.squad/project.md` | AC12 | 11, 12 | Orchestrator | [x] |
 | 14 | PM | Manual run of the documented steps on Windows at `--speed 10`, Docker and from source; confirm plan facts 12 and 13 | — | AC12 | 11 | Product Manager | [ ] |
