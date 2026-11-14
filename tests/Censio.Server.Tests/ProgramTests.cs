@@ -41,6 +41,11 @@ public sealed class ProgramTests
     private static readonly Regex _censioStyleSheet = new("(^|/)css/censio(\\.[A-Za-z0-9]+)?\\.css$", RegexOptions.None, TimeSpan.FromSeconds(5));
 
     /// <summary>
+    /// The pattern of the fingerprint of a static web asset in its file name.
+    /// </summary>
+    private static readonly Regex _fingerprint = new("\\.[A-Za-z0-9]{6,}(?=\\.(css|js)$)", RegexOptions.None, TimeSpan.FromSeconds(5));
+
+    /// <summary>
     /// The pattern of the Blazor script element on the start page.
     /// </summary>
     private static readonly Regex _blazorScript = new("<script[^>]*\\ssrc=\"([^\"]*_framework/blazor\\.web(\\.[A-Za-z0-9]+)?\\.js)\"", RegexOptions.None, TimeSpan.FromSeconds(5));
@@ -125,6 +130,44 @@ public sealed class ProgramTests
         // Assert
         Assert.IsTrue(match.Success, "The start page should reference _framework/blazor.web.js, fingerprinted or not");
         Assert.AreEqual(System.Net.HttpStatusCode.OK, script.StatusCode, "The referenced Blazor script should answer 200");
+    }
+
+    /// <summary>
+    /// A page at any depth carries the document base <c>/</c>, and its style sheets and scripts, resolved against that base, are served.
+    /// </summary>
+    /// <param name="path">The address of the page</param>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC1")]
+    [DataRow("/")]
+    [DataRow("/regions")]
+    [DataRow("/profiles/q7malformedq7/regions")]
+    [DataRow("/profiles/q7malformedq7/sessions/q7malformedq7")]
+    [DataRow("/profiles/q7malformedq7/islands/q7malformedq7/q7malformedq7/q7malformedq7")]
+    public async Task ProgramGetPageResolvesResourcesAgainstRootBase(string path)
+    {
+        // Arrange
+        using var factory = new CensioServerFactory("Production");
+        using var client = factory.CreateClient();
+        var pageAddress = new Uri(client.BaseAddress!, path);
+        string[] expected = [
+                                "/_content/MudBlazor/MudBlazor.min.css → 200",
+                                "/css/censio.css → 200",
+                                "/_content/MudBlazor/MudBlazor.min.js → 200",
+                                "/js/censio.js → 200",
+                                "/_framework/blazor.web.js → 200"
+                            ];
+
+        // Act
+        using var response = await client.GetAsync(pageAddress, TestContext.CancellationToken);
+        var document = await new HtmlParser().ParseDocumentAsync(await response.Content.ReadAsStringAsync(TestContext.CancellationToken), TestContext.CancellationToken);
+        var baseElement = document.QuerySelector("base[href]");
+        var documentBase = baseElement is null ? pageAddress : new Uri(pageAddress, baseElement.GetAttribute("href"));
+        var actual = await FetchResourcesAsync(client, document, documentBase, TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual("/", baseElement?.GetAttribute("href"), "The head should carry a base element with the href /");
+        Assert.AreSequenceEqual(expected, actual, "Every style sheet and script should be served when resolved against the document base");
     }
 
     /// <summary>
@@ -784,6 +827,31 @@ public sealed class ProgramTests
     private static IDocument ParseHtml(string body)
     {
         return new HtmlParser().ParseDocument(body);
+    }
+
+    /// <summary>
+    /// Requests every style sheet and script of a page, resolved against the document base, as a browser does.
+    /// </summary>
+    /// <param name="client">The client</param>
+    /// <param name="document">The page</param>
+    /// <param name="documentBase">The document base</param>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>One entry per resource, in document order: its path without a fingerprint, an arrow and the status code</returns>
+    private static async Task<List<string>> FetchResourcesAsync(HttpClient client, IDocument document, Uri documentBase, CancellationToken cancellationToken)
+    {
+        var result = new List<string>();
+
+        foreach (var element in document.QuerySelectorAll("link[rel=stylesheet], script[src]"))
+        {
+            var reference = element.GetAttribute("href") ?? element.GetAttribute("src");
+            var address = new Uri(documentBase, reference);
+
+            using var response = await client.GetAsync(address, cancellationToken);
+
+            result.Add($"{_fingerprint.Replace(address.AbsolutePath, string.Empty)} → {(int)response.StatusCode}");
+        }
+
+        return result;
     }
 
     /// <summary>
