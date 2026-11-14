@@ -83,9 +83,11 @@ No section of every C# file sets a rule or a code-style option outside the block
 `squad_settings.py` with the issue that brings the code up to it: it is written as `suggestion`, which the *Analyzer
 gate* still reports in a changed file, and the entry goes once the issue is done; that holds for a rule the baseline
 does not set too (one on only through `AnalysisLevel`, CA1848). The blocks do not reach the code the Razor compiler
-generates from a `.razor` file's markup; the rules the baseline switches off (S1125) are off there too through the
-template-managed global analyzer config `.squad/dotnet-rules.globalconfig`, which `Directory.Build.props` names in
-`GlobalAnalyzerConfigFiles`.
+generates from a `.razor` file's markup, nor a diagnostic without a location (MSTEST0001): the template-managed global
+analyzer config `.squad/dotnet-rules.globalconfig` switches the baseline's off rules (S1125) off there too and sets
+the severity of the rules reported without a location. A pending entry for one of those is written by `dotnet-rules.py`
+into `.squad/dotnet-rules-pending.globalconfig`, whose higher `global_level` wins over the managed file;
+`Directory.Build.props` names both in `GlobalAnalyzerConfigFiles`.
 
 SonarAnalyzer.CSharp runs only the rules of *Sonar way core* by default. The rules the project's SonarQube Cloud C#
 profile adds (*Sonar way comprehensive*: S3776, S1192, S107, …), and the core rules it switches off, are set in the
@@ -136,8 +138,8 @@ image, because no `.razor` file existed at restore time). A Blazor project there
 scripts without any `.razor` file present (`Censio.Server`, record 0007); the script below stays unchanged. Where Docker runs, build the image. Where it does not
 (the sandbox), reproduce the Dockerfile's order in a scratch directory; every change to a `.csproj`,
 `Directory.*.props`, a `.razor` or other content item, a static web asset or the Dockerfile runs it before the
-review. The image build needs `.squad/dotnet-rules.globalconfig`, which `Directory.Build.props` names: a Dockerfile
-that copies files by name copies it into the build stage, and a `.dockerignore` that leaves out `.squad/` lets it in
+review. The image build needs both global configs of `.squad/` that `Directory.Build.props` names: a Dockerfile
+that copies files by name copies them into the build stage, and a `.dockerignore` that leaves out `.squad/` lets them in
 (`dotnet_config.py` checks both):
 
 ```bash
@@ -146,13 +148,13 @@ git ls-files -z -- 'global.json' 'Directory.Build.props' 'Directory.Packages.pro
   'src/Censio.Server/Censio.Server.csproj' 'src/Censio.Contracts/Censio.Contracts.csproj' \
   'src/Censio.Server.Data/Censio.Server.Data.csproj' | xargs -0 -I{} cp --parents {} "$scratch"
 (cd "$scratch" && dotnet restore src/Censio.Server/Censio.Server.csproj -r linux-musl-x64)
-git ls-files -z -- '.editorconfig' '.squad/dotnet-rules.globalconfig' 'src' | xargs -0 -I{} cp --parents {} "$scratch"
+git ls-files -z -- '.editorconfig' '.squad/dotnet-rules.globalconfig' '.squad/dotnet-rules-pending.globalconfig' 'src' | xargs -0 -I{} cp --parents {} "$scratch"
 (cd "$scratch" && dotnet publish src/Censio.Server/Censio.Server.csproj -c Release --no-restore -r linux-musl-x64 --self-contained false -p:UseAppHost=false -o ./publish)
 ls "$scratch"/publish/wwwroot/_framework/blazor.web*.js \
   || { echo "publish output lacks wwwroot/_framework/blazor.web*.js (see docs/decisions/0007)" >&2; false; }
 ```
 
-Keep the first copy equal to the `COPY` lines before `RUN dotnet restore` in the Dockerfile and the second to the `COPY .editorconfig`, `COPY .squad/dotnet-rules.globalconfig` and `COPY src/` lines after it. A `--no-restore`
+Keep the first copy equal to the `COPY` lines before `RUN dotnet restore` in the Dockerfile and the second to the `COPY .editorconfig`, `COPY .squad/dotnet-rules.globalconfig .squad/dotnet-rules-pending.globalconfig .squad/` and `COPY src/` lines after it. A `--no-restore`
 publish that fails, or an output that is missing, is the defect the CI release build would report after the
 PR is open.
 

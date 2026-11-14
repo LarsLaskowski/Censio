@@ -10,7 +10,7 @@ COPY src/Censio.Server.Data/Censio.Server.Data.csproj src/Censio.Server.Data/
 RUN dotnet restore src/Censio.Server/Censio.Server.csproj -r linux-musl-x64
 
 COPY .editorconfig ./
-COPY .squad/dotnet-rules.globalconfig .squad/
+COPY .squad/dotnet-rules.globalconfig .squad/dotnet-rules-pending.globalconfig .squad/
 COPY src/ src/
 
 ARG VERSION=0.0.0
