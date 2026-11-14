@@ -1,7 +1,7 @@
 # Spec: Docker configuration: /config volume and environment variables
 
 Source: Issue #33
-Status: Draft
+Status: Approved by Product Manager
 
 ## Problem
 
