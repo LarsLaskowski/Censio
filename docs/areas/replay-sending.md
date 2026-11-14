@@ -191,9 +191,13 @@ and `KeyPath` of a certificate for `localhost` signed by a scratch CA created fo
 
 Not run: the check in a disposable container of the .NET SDK image (the container runtime had no running daemon in the
 environment of the measurement), so the trust of a CA by the container's own store and by the Windows certificate store
-was not tried; and the manual run on Windows, in Docker and from source with the documented steps, and the claims that
-Windows PowerShell 5.1's `>` writes UTF-16 with a byte order mark and that `docker cp` copies the token file
-byte for byte (Product Manager).
+was not tried.
+
+The Product Manager ran the documented steps on Windows at `--speed 10` with `long-session.jsonl`: a Docker server
+(image built from this state of the repository) and a server from source (`ws://localhost:5000/ingest`) both filled
+the pages (regions and islands), and a token file written by Windows PowerShell 5.1 with `>` was accepted, so that
+shell's encoding is confirmed. Not tried: `docker cp` for the token file, a token file saved by Notepad as UTF-16 BE,
+`wss://` on Windows, the Windows certificate store, a configured system proxy and a remote Docker host.
 
 ## Related decisions
 
