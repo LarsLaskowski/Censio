@@ -1,6 +1,6 @@
 # 0080: The replay's ingest token is read from a file named on the command line, with byte order marks accepted
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-14
 - **Area:** replay-sending
 - **Source:** Issue #34

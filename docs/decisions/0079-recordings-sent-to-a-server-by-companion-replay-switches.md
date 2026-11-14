@@ -1,6 +1,6 @@
 # 0079: Recordings are sent to a server by switches of the Companion's replay, one message at a time, without reconnect
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-14
 - **Area:** replay-sending
 - **Source:** Issue #34

@@ -140,6 +140,6 @@ once in the [area document](../areas/README.md) of the record's area, and the re
 | [0076](0076-icons-served-by-content-hash-after-a-png-header-check.md) | Icons are served by their content hash after a PNG header check | Accepted | 2026-11-13 |
 | [0077](0077-page-address-carries-the-shown-profile.md) | The page address carries the shown profile | Accepted | 2026-11-13 |
 | [0078](0078-times-shown-at-the-browsers-utc-offset.md) | Times are shown at the browser's UTC offset for the instant | Accepted | 2026-11-13 |
-| [0079](0079-recordings-sent-to-a-server-by-companion-replay-switches.md) | Recordings are sent to a server by switches of the Companion's replay, one message at a time, without reconnect | Proposed | 2026-11-14 |
-| [0080](0080-replay-token-read-from-a-file-named-on-the-command-line.md) | The replay's ingest token is read from a file named on the command line, with byte order marks accepted | Proposed | 2026-11-14 |
+| [0079](0079-recordings-sent-to-a-server-by-companion-replay-switches.md) | Recordings are sent to a server by switches of the Companion's replay, one message at a time, without reconnect | Accepted | 2026-11-14 |
+| [0080](0080-replay-token-read-from-a-file-named-on-the-command-line.md) | The replay's ingest token is read from a file named on the command line, with byte order marks accepted | Accepted | 2026-11-14 |
 <!-- project:end index -->
