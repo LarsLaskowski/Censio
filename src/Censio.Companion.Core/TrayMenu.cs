@@ -340,6 +340,18 @@ public static class TrayMenu
     }
 
     /// <summary>
+    /// Formats the reason of a problem of sending a replay to a server.
+    /// </summary>
+    /// <param name="kind">The problem kind</param>
+    /// <returns>The reason, or <see langword="null" /> if the problem kind is not a defined value</returns>
+#pragma warning disable RH2003 // Skeleton: removed with the implementation
+    public static string? FormatReplaySendReason(ReplaySendProblemKind kind)
+    {
+        throw new NotImplementedException();
+    }
+#pragma warning restore RH2003 // Skeleton: removed with the implementation
+
+    /// <summary>
     /// Removes the application name and the colon from the start of a tooltip text.
     /// </summary>
     /// <param name="toolTip">The tooltip text</param>

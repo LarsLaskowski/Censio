@@ -38,6 +38,13 @@ public sealed class PipeReplayRunner
     private readonly ILogger _logger;
 
     /// <summary>
+    /// The sender that sends the replay to a server, if any.
+    /// </summary>
+#pragma warning disable S4487 // Skeleton: removed with the implementation
+    private readonly ReplaySender? _sender;
+#pragma warning restore S4487 // Skeleton: removed with the implementation
+
+    /// <summary>
     /// The current status.
     /// </summary>
     private PipeReplayStatus _status = new()
@@ -73,6 +80,23 @@ public sealed class PipeReplayRunner
         _speed = speed;
         _waitProvider = waitProvider;
         _logger = logger;
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="PipeReplayRunner" /> class that sends the replay to a server.
+    /// </summary>
+    /// <param name="openRecording">Opens the recording</param>
+    /// <param name="speed">The replay speed</param>
+    /// <param name="waitProvider">The clock of the waits between the lines</param>
+    /// <param name="logger">The logger</param>
+    /// <param name="sender">The sender that sends the replay to a server</param>
+    public PipeReplayRunner(Func<Stream> openRecording, PipeReplaySpeed speed, TimeProvider waitProvider, ILogger logger, ReplaySender sender)
+    {
+        _openRecording = openRecording;
+        _speed = speed;
+        _waitProvider = waitProvider;
+        _logger = logger;
+        _sender = sender;
     }
 
     #endregion // Constructor
