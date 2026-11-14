@@ -21,6 +21,6 @@
     height: 24px;
 }
 
-.censio-frame .mud-appbar .mud-button-root:disabled {
-    color: var(--mud-palette-appbar-text) !important;
+.censio-frame .mud-appbar .mud-button-root:disabled .mud-button-label {
+    color: var(--mud-palette-appbar-text);
 }
