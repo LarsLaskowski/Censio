@@ -236,6 +236,45 @@ public sealed class CompanionCommandLineTests
     }
 
     /// <summary>
+    /// A replay with --server gives the address and, with --token-file, the path of the token file, whatever the
+    /// order and the case of the switches.
+    /// </summary>
+    /// <param name="text">The arguments, separated by '|'</param>
+    /// <param name="address">The expected server address</param>
+    /// <param name="tokenFilePath">The expected path of the token file</param>
+    [TestMethod]
+    [TestCategory("AC4")]
+    [DataRow("--replay|f|--server|ws://localhost:8080/ingest|--token-file|token.txt", "ws://localhost:8080/ingest", "token.txt")]
+    [DataRow("--replay|f|--server|wss://censio.example/ingest", "wss://censio.example/ingest", null)]
+    [DataRow("--TOKEN-FILE|C:\\My Files\\token.txt|--Server|ws://192.168.1.20:8080/ingest|--REPLAY|f|--speed|max", "ws://192.168.1.20:8080/ingest", "C:\\My Files\\token.txt")]
+    [DataRow("--server|WSS://Censio.Example:443/ingest|--replay|f", "wss://censio.example/ingest", null)]
+    [DataRow("--replay|f|--server|ws://[::1]:5000/ingest?client=replay|--token-file|t", "ws://[::1]:5000/ingest?client=replay", "t")]
+    public void CompanionCommandLineReplayWithServerGivesAddressAndTokenFile(string text, string address, string? tokenFilePath)
+    {
+        // Arrange
+        var args = ArgsOf(text);
+
+        // Act
+        var commandLine = CompanionCommandLine.Parse(args);
+
+        // Assert
+        Assert.AreEqual(CompanionMode.Replay, commandLine.Mode, $"The command line '{text}' should select replay");
+        Assert.AreEqual("f", commandLine.ReplayPath, "The path should be the argument after --replay");
+        Assert.AreEqual(new Uri(address), commandLine.ServerAddress, "The address should be the argument after --server");
+        Assert.AreEqual(tokenFilePath, commandLine.TokenFilePath, "The token file should be the argument after --token-file");
+    }
+
+    /// <summary>
+    /// Splits a command line text at '|' into its arguments, keeping empty ones and spaces.
+    /// </summary>
+    /// <param name="text">The text</param>
+    /// <returns>The arguments</returns>
+    private static string[] ArgsOf(string text)
+    {
+        return text.Split('|');
+    }
+
+    /// <summary>
     /// Splits a command line text into its arguments.
     /// </summary>
     /// <param name="text">The text</param>
