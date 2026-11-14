@@ -98,7 +98,7 @@ the Docker health probe rely on it.
   cannot write (a bind mount owned by another UID, a named volume combined with another `--user`) stops the
   container at start with exit code 1; it is made writable by starting with `--user <uid>:<gid>` of the
   directory's owner or by `chown -R 1654:1654 <dir>` on the host.
-- The key ring, the ingest token file and the database survive a recreation of a container that keeps `/config`; an image without a token or database (`0.2.0`) creates them at its first start on such a volume.
+- The key ring, the ingest token file and the database survive a recreation of a container that keeps `/config`; on a volume the image `0.2.0` used, which holds only the key ring, a newer image creates the token file and the database at its first start.
 - Health check: the image probes `http://127.0.0.1:<port>/health` with BusyBox `wget`, where `<port>` is the first
   entry of `ASPNETCORE_HTTP_PORTS` (`8080;8081` probes 8080). Interval 10 s, timeout 3 s, start period 30 s,
   3 retries; the container reads `healthy` within 60 s of the start.
