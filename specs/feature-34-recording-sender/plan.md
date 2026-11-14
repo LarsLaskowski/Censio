@@ -24,7 +24,8 @@ See [spec.md](spec.md), *Problem*: no Companion sends contract messages; the rep
 | 10 | The TestServer WebSocket allows a send while a receive is pending on the same socket | to verify: Tester, step 5, the first `IngestEndpointTests` replay test | unverified |
 | 11 | A `ClientWebSocket` connected through an `HttpMessageInvoker` over `SocketsHttpHandler { UseProxy = false, AllowAutoRedirect = false }` uses no proxy, follows no redirect and sends no `Origin` | to verify: Tester, step 5, `ClientWebSocketConnectorTests` (each test must fail on a connector that uses `ClientWebSocket.ConnectAsync(uri, ct)` with default options, checked once in a scratch worktree) | unverified |
 | 12 | Windows PowerShell 5.1 `>` writes UTF-16 LE with a byte order mark; `docker cp` copies the `0600` token file out of the container byte for byte | to verify: Product Manager, AC12 dry run | unverified |
-| 13 | A server from source takes `--Censio:DataDirectory=<folder>` on its command line and listens on `http://localhost:5000` | `src/Censio.Server/Program.cs:8` (`CreateBuilder(args)`); README, *Configuration*; the run is shown by AC12 | confirmed |
+| 13 | `dotnet run --project src/Censio.Server` uses the launch profile (`http://localhost:51849`, Development, a browser); with `--no-launch-profile` the server takes `--Censio:DataDirectory=<folder>` from its arguments and listens on `http://localhost:5000` | `src/Censio.Server/Properties/launchSettings.json`; `src/Censio.Server/Program.cs:8` (`CreateBuilder(args)`); README, *Configuration*; the run is shown by AC12 | confirmed |
+| 16 | The Windows shell logs a faulted background task with its full exception | `src/Censio.Companion/App.xaml.cs:411`; `docs/areas/companion-log.md` | confirmed |
 | 14 | The fixture's 33 ticks: `<n>` of AC1 is the count with at least one island | `tests/Censio.Pipe.Tests/Fixtures/README.md`; the Tester computes `<n>` from the replay in the test, never a typed number | confirmed |
 | 15 | The released tags are `v0.1.0` and `v0.2.0`; records 0079 and 0080 are new | `git ls-remote --tags origin` | confirmed |
 
@@ -38,11 +39,11 @@ See [spec.md](spec.md), *Problem*: no Companion sends contract messages; the rep
 | AC4 | `CompanionCommandLineServerSwitchesGiveInvalid` (one DataRow per E1 case), `CompanionCommandLineReplayWithServerGivesAddressAndTokenFile`, `CompanionCommandLineReplayWithoutServerHasNoAddress` | `tests/Censio.Companion.Core.Tests/CompanionCommandLineTests.cs` |
 | AC5 | `ReplayTokenFileUnreadableGivesCannotBeRead` (missing, folder), `ReplayTokenFileInvalidContentGivesNoValidToken` (empty, 31 and 1,025 characters, a space inside, a character above `~`, 65,537 bytes, invalid UTF-8, UTF-16 without mark), `ReplayTokenFileSurroundingWhiteSpaceIsTrimmed`, `ReplayTokenFileByteOrderMarksGiveSameToken` (UTF-8, UTF-16 LE, UTF-16 BE); `PipeReplayRunnerTokenFileProblemConnectsNever` | `tests/Censio.Companion.Core.Tests/ReplayTokenFileTests.cs`; `tests/Censio.Companion.Core.Tests/PipeReplayRunnerTests.cs` |
 | AC6 | `PipeReplayRunnerHeaderProblemWithSenderConnectsNever` (missing file, not a recording, unsupported version) | `tests/Censio.Companion.Core.Tests/PipeReplayRunnerTests.cs` |
-| AC7 | `ReplaySenderUnreachableServerGivesServerUnreachable`, `ReplaySenderHelloRefusedGivesReason` (three reasons), `ReplaySenderNoHelloReplyGivesNoAnswer`, `ReplaySenderNoAcknowledgementGivesNoAnswer`, `ReplaySenderCloseAfterHelloGivesConnectionLost`, `ReplaySenderInvalidReplyGivesInvalidServerReply` (not JSON, binary, `helloAccepted` after the hello, acknowledgement of another id, acknowledgement while nothing is awaited); `ClientWebSocketConnectorHttpAnswerGivesNoSocket`, `ClientWebSocketConnectorRedirectGivesNoSocket`, `ClientWebSocketConnectorUntrustedCertificateGivesNoSocket`, `ClientWebSocketConnectorTrustedCertificateConnects`, `ClientWebSocketConnectorSendsNoOrigin`, `ClientWebSocketConnectorBypassesSystemProxy`, `ClientWebSocketConnectorNoUpgradeWithinTimeoutGivesNoSocket`; `TrayMenuReplaySendProblemGivesReasonText` (one DataRow per kind) | `tests/Censio.Companion.Core.Tests/ReplaySenderTests.cs`; `tests/Censio.Companion.Core.Tests/ClientWebSocketConnectorTests.cs`; `tests/Censio.Companion.Core.Tests/TrayMenuTests.cs` |
+| AC7 | `ReplaySenderUnreachableServerGivesServerUnreachable`, `ReplaySenderHelloRefusedGivesReason` (three reasons), `ReplaySenderNoHelloReplyGivesNoAnswer`, `ReplaySenderNoAcknowledgementGivesNoAnswer`, `ReplaySenderCloseAfterHelloGivesConnectionLost`, `ReplaySenderInvalidReplyGivesInvalidServerReply` (not JSON, binary, `helloAccepted` after the hello, acknowledgement of another id, acknowledgement while nothing is awaited); `ClientWebSocketConnectorHttpAnswerGivesNoSocket`, `ClientWebSocketConnectorRedirectGivesNoSocket`, `ClientWebSocketConnectorUntrustedCertificateGivesNoSocket`, `ClientWebSocketConnectorSendsNoOrigin`, `ClientWebSocketConnectorBypassesSystemProxy`, `ClientWebSocketConnectorNoUpgradeWithinTimeoutGivesNoSocket`; `TrayMenuReplaySendProblemGivesReasonText` (one DataRow per kind) | `tests/Censio.Companion.Core.Tests/ReplaySenderTests.cs`; `tests/Censio.Companion.Core.Tests/ClientWebSocketConnectorTests.cs`; `tests/Censio.Companion.Core.Tests/TrayMenuTests.cs`; manual: Dev, the successful `wss://` connection (S4) in a disposable container of the .NET SDK image whose own store trusts a scratch CA, a scratch program with `ClientWebSocketConnector` against a Kestrel `wss://` endpoint, result in `docs/areas/replay-sending.md`, *Measurements* |
 | AC8 | `ReplaySenderRefusedAcknowledgementCountsRefused`, `ReplaySenderWriterRefusalCountsRefusedAndGoesOn` | `tests/Censio.Companion.Core.Tests/ReplaySenderTests.cs` |
 | AC9 | `ReplaySenderSendsNextMessageOnlyAfterAcknowledgement`, `ReplaySenderStateChangeSendsStatusWithoutWaiting`, `ReplaySenderReplyOverBoundReadsNoFurther`; `PipeReplayRunnerRepeatedSessionEndIsNotSent`, `PipeReplayRunnerSessionEventCarriesRecordedStamp`, `PipeReplayRunnerTickWithoutIslandsIsNotSent` | `tests/Censio.Companion.Core.Tests/ReplaySenderTests.cs`; `tests/Censio.Companion.Core.Tests/PipeReplayRunnerTests.cs` |
-| AC10 | `PipeReplayRunnerInvalidLineAfterTicksClosesConnection`, `PipeReplayRunnerCancelledAbortsConnection` | `tests/Censio.Companion.Core.Tests/PipeReplayRunnerTests.cs` |
-| AC11 | `ReplaySenderLogsConnectionAndEnd`, `ReplaySenderLogsNeitherTokenNorAddressNorNames` (every failure path) | `tests/Censio.Companion.Core.Tests/ReplaySenderTests.cs` |
+| AC10 | `PipeReplayRunnerInvalidLineAfterTicksClosesConnection`, `PipeReplayRunnerCancelledAbortsConnection`, `PipeReplayRunnerSecondOpenFailureClosesConnection` (an `openRecording` that succeeds once, then throws) | `tests/Censio.Companion.Core.Tests/PipeReplayRunnerTests.cs` |
+| AC11 | `ReplaySenderLogsConnectionAndEnd`, `ReplaySenderLogsNeitherTokenNorAddressNorNames` (every failure path), `ReplaySenderUnlistedExceptionGivesConnectionLostWithoutAddress` (a test `WebSocket` whose send and receive throw an exception type of no catch list, its message holding the address) | `tests/Censio.Companion.Core.Tests/ReplaySenderTests.cs` |
 | AC12 | manual: Product Manager on Windows, on the branch head: the Companion built from source as the README says, the server image built from the checkout (*Build from source*) and the server started from source; runs the documented steps of both languages at `--speed 10`; confirms facts 12 and 13 | — |
 | AC13 | `ReplaySenderFrameBetweenMessagesIsReadAtOnce` (a receive is pending between messages); manual: Dev, a scratch measurement on the published server (`dotnet publish src/Censio.Server -c Release`), a replay whose next tick follows 70 s after an acknowledgement, recorded in `docs/areas/replay-sending.md`, *Measurements* | `tests/Censio.Companion.Core.Tests/ReplaySenderTests.cs` |
 
@@ -66,8 +67,10 @@ creates a `ClientWebSocket` without subprotocol, `Origin`, client certificate or
 through an `HttpMessageInvoker` over `SocketsHttpHandler { UseProxy = false, AllowAutoRedirect = false }` (default
 TLS validation of the operating system), under a cancellation of `ConnectTimeout` (30 s) on the injected
 `TimeProvider`, linked to the caller's token. `WebSocketException`, `HttpRequestException`, `AuthenticationException`,
-`IOException`, `InvalidOperationException` and the timeout's `OperationCanceledException` give `null` (the socket
-disposed); the caller's cancellation is rethrown.
+`IOException`, `InvalidOperationException`, the timeout's `OperationCanceledException` and every other exception
+give `null` (the socket disposed); only the caller's cancellation is rethrown. The production constructor sets no
+certificate chain policy and no validation callback; there is no test-only trust seam, and no test writes to a
+certificate store.
 
 **Sender.** `ReplaySender` holds the connection of one run:
 
@@ -82,19 +85,23 @@ disposed); the caller's cancellation is rethrown.
 - Receive loop (from `helloAccepted` to the close, always one receive pending, answering pings): reads each message
   into one buffer of `MaxReplyBytes + 1` bytes; a message longer than `MaxReplyBytes` (65,536), a binary frame, a
   message `ContractReader` refuses, any type but `acknowledgement`, or an acknowledgement whose id is not the one
-  awaited (or none awaited) ends the run as `InvalidReply`; a close frame or a receive exception as `ConnectionLost`.
+  awaited (or none awaited) ends the run as `InvalidReply`; a close frame or any receive exception as `ConnectionLost`.
   The awaited acknowledgement completes the one pending send.
 - `SendTickAsync`: a tick without islands returns at once (not counted). Otherwise `ContractMessageConverter.ToTick`,
   then `ContractWriter.Write`; a writer refusal counts as refused and returns no problem. It sends, then waits for the
   acknowledgement within `ReplyTimeout` (`NoAnswer`): `refusal` `null` counts a sent tick, any refusal a refused
   message. `SendSessionStartAsync` and `SendSessionEndAsync` do the same with the converter's session messages (an
   accepted session event is not counted, a refused one is).
-- `NotifyState` is synchronous: it records the state and, when it differs from the last state sent, starts a send of
-  `ContractMessageConverter.ToStatus` without waiting for any reply. All sends go through one send lock
-  (`SemaphoreSlim`), so a status never interleaves with a message; a failed status send ends the run as
-  `ConnectionLost` at the next awaited step.
-- `CloseAsync` waits for a running status send, closes with `NormalClosure` and waits at most 2 s for the server's
-  close, then aborts; logs `ReplaySendFinished`. `DisposeAsync` aborts the socket and cancels the loop (Exit).
+- `NotifyState` is synchronous and safe to call from any thread, also while a send runs (the observer runs inside the
+  assembler's read, which on the quiet-close path keeps running while the runner awaits a send): under a lock it
+  records the state and, when it differs from the last state sent, starts a send of `ContractMessageConverter.ToStatus`
+  without waiting for any reply. All sends go through one send lock (`SemaphoreSlim`), so a status never interleaves
+  with a message; the status send task is kept and always observed (also after `DisposeAsync`), and its failure ends
+  the run as `ConnectionLost` at the next awaited step.
+- `CloseAsync` waits for a running status send, closes with `NormalClosure` and waits at most 2 s on the injected
+  `TimeProvider` (never a real delay) for the server's close, then aborts; logs `ReplaySendFinished`. `DisposeAsync`
+  aborts the socket and cancels the loop (Exit).
+- Every exception of a send or receive but the caller's cancellation gives `ConnectionLost`; none leaves the sender.
 - Every failure logs `ReplaySendFailed` with the reason text of the tray; no exception object, address, token or
   name is passed to a log call (exception texts can carry the address).
 
@@ -105,11 +112,13 @@ disposed); the caller's cancellation is rethrown.
    `FileNotFound`, a problem line of kind other than `InvalidLine` with that problem; then the stream is closed.
 3. Publish `IsConnecting`; `ConnectServerAsync`; a problem finishes with `SendProblem`.
 4. Publish `Connected`, `NotifyState(Connected)`; replay as today. The observer also stores the stamp of every read
-   and calls `NotifyState` for `Receiving` and `ProtocolMismatch`. After each item: a tick goes to `SendTickAsync`
+   (behind a lock, since it runs on the read's thread) and calls `NotifyState` for `Receiving` and `ProtocolMismatch`. After each item: a tick goes to `SendTickAsync`
    (after `PublishTick`), a session start or end to its send with the stored stamp, a repeated session end nowhere.
    A send problem stops the replay and finishes with `SendProblem` after `DisposeAsync`.
 5. At the end: `CloseAsync`; then a recording problem finishes with that problem (today's text), a close problem with
-   `SendProblem`, otherwise with `Sent` = the counts.
+   `SendProblem`, otherwise with `Sent` = the counts. The recording is opened a second time for the replay; a failure
+   of that open, after the connection is open, goes through `CloseAsync` before it finishes with `FileNotFound`, like
+   every other end of the run.
 6. Cancellation: `DisposeAsync`, no further status.
 
 Without a sender nothing changes.
@@ -253,24 +262,34 @@ All by the Dev after the code is green, unless named otherwise:
   user replays it with `--server`, to the server named.
 - `docs/areas/contract.md` (*Scope*, *Not here*) and `docs/areas/ingest.md` (*Scope*, *Not here*, the "#34" pointer):
   a replay with `--server` sends the messages.
+- `docs/areas/replay-sending.md`, *Accepted risks*: a UNC path given for `--replay` or `--token-file` is read over SMB
+  with the user's credentials (the user's own path, accepted); a FIFO or device as token file blocks the start.
 - `docs/areas/companion-log.md`: the four lines and that they hold no token, address or name.
 - `docs/ARCHITECTURE.md`: *Data flow* (contract messages are sent by a replay with `--server`, live sending #40;
   links record 0079), *Security model* (the outbound connection, token file, TLS, no proxy; record 0080).
 - `SECURITY.md`: the security-relevant list gets the replay's outbound connection and the token file.
 - `README.md` (English and German): *Status* bullet; a short *Sending a recording to a server* under *Companion*
-  with the command and a link to the guide.
+  with the command and a link to the guide; correct "Nothing is sent from the Companion to the server.", "The
+  Companion has no settings, such as a server address or a token." and "No Companion sends anything yet" (and their
+  German lines) for the replay, and "enter it in the Companion" (README *Server* section, both languages) to say that
+  for a replay the token goes into the `--token-file` file.
 - `docs/USER_GUIDE.md` (English and German): the procedure of the spec's N11 (three server placements, the server
-  from source with `--Censio:DataDirectory`, the token file by `docker cp` or Notepad, the fixture's raw download
+  from source with exactly `dotnet run --project src/Censio.Server -c Release --no-launch-profile --
+  --Censio:DataDirectory=<full path>` at `ws://localhost:5000/ingest`, the token file outside the source checkout
+  (for example `%USERPROFILE%\censio-token.txt`), kept private and deleted when testing ends (`SECURITY.md`), the token file by `docker cp` or Notepad, the fixture's raw download
   `https://raw.githubusercontent.com/LarsLaskowski/Censio/main/tests/Censio.Pipe.Tests/Fixtures/long-session.jsonl`,
   full paths, `--speed 10`), the status texts and errors, the warnings (`ws://` unencrypted, raw recordings only into
-  one's own server, a profile per run, E13); *Ingest endpoint and token*: "No Companion sends data yet" corrected.
+  one's own server, a profile per run, E13); *Ingest endpoint and token*: "No Companion sends data yet" corrected, and
+  every "enter it in the Companion" (the token sections, both languages) says that for a replay the token goes into
+  the `--token-file` file.
   Statements AC12 has not shown are marked "Not yet tried" until it ran.
 - `tests/Censio.Pipe.Tests/Fixtures/README.md` (Tester): the fixture is also linked into `Censio.Companion.Core.Tests`
   and used by the replay sender tests.
 - `.squad/project.md` (orchestrator writes; Dev reports this text for *Security areas*): replace the *Outbound calls*
   line with "- Outbound calls: only the replay's WebSocket to the server named by `--server` (`ReplaySender`,
   `ClientWebSocketConnector`, `IReplayServerConnector`), with the token from `ReplayTokenFile`, no proxy, no redirect;
-  any other call to a server is a new security area. A UNC installation folder from the settings file is probed and
+  any other call to a server is a new security area. A UNC path given for `--replay` or `--token-file` is read over SMB
+  as the user's own choice. A UNC installation folder from the settings file is probed and
   read over SMB (`GameInstallation`, `GameArchiveStateReader`, `GameCatalogReader.Load`, `GameIconReader.Load`) —
   [replay-sending](../docs/areas/replay-sending.md), [game-installation](../docs/areas/game-installation.md),
   *Folders from outside*, [game-catalog](../docs/areas/game-catalog.md), *Limits and errors*."; and add `ReplayTokenFile`
@@ -297,14 +316,47 @@ All by the Dev after the code is green, unless named otherwise:
 - The token is held as a string by the sender for the run's hello only; it is not in `ToString` of any type, not in a
   status, menu, diagnostics or log line (AC11).
 - `wss://` uses the operating system's certificate validation; there is no switch to skip it.
-- A FIFO or device named as token file blocks the replay start; the user's own path, accepted like the server's
-  configured file (`ingest.md`, *Accepted risks*), stated in replay-sending.
+- A FIFO or device named as token file blocks the replay start, and a UNC path for `--replay` or `--token-file` is
+  read over SMB with the user's credentials; both are the user's own path, accepted like the server's configured file
+  (`ingest.md`, *Accepted risks*) and stated in replay-sending.
+- Every exception but the caller's cancellation is caught inside the connector (`null`) and the sender
+  (`ConnectionLost`), so no exception reaches the shell's background-task log line (fact 16), which logs it whole.
+- No test writes to a certificate store; the test certificate is created in memory and its key never persisted.
 - A hostile server can only end the run (every unexpected frame is `InvalidReply`) or hold it until the 30 s timeouts.
 
 ## Decision records
 
 - `docs/decisions/0079-recordings-sent-to-a-server-by-companion-replay-switches.md` (Proposed)
 - `docs/decisions/0080-replay-token-read-from-a-file-named-on-the-command-line.md` (Proposed)
+
+## Challenge
+
+Plan challenge (2 major, 5 minor), all accepted:
+
+- M1 (launch profile): accepted. Fact 13 corrected; the guide gives `dotnet run ... --no-launch-profile` with the data
+  directory, and spec N11 names that command.
+- M2 (trusted certificate on Linux CI): accepted, together with Security's blocking finding: no test-only trust seam;
+  `ClientWebSocketConnectorTrustedCertificateConnects` dropped; S4's success is a manual check by the Dev in a
+  disposable container (AC7 row); the untrusted-certificate test stays.
+- m1 (README and guide lines): accepted, *Documentation updates*.
+- m2 (close wait): accepted; it runs on the injected `TimeProvider`, tested on `FakeTimeProvider`.
+- m3 (observer thread): accepted; stamp behind a lock, `NotifyState` thread-safe, the status task always observed.
+- m4 (proxy test): accepted; the Tester sets `HttpClient.DefaultProxy` to a `WebProxy` at the recording proxy with
+  `BypassProxyOnLocal = false`, restores it in `finally`, and confirms in a scratch worktree that the test fails on a
+  default `ClientWebSocket` (plan fact 11).
+- m5 (second open): accepted; routed through `CloseAsync`, test `PipeReplayRunnerSecondOpenFailureClosesConnection`.
+
+## Security review
+
+- Blocking (certificate trust in tests): option (b) taken: the trusted-certificate test is dropped (M2); the
+  production constructor sets no chain policy or callback; "no test writes to a certificate store" is in *Security
+  considerations*. Option (a) lost: a trust seam in production code would be a second way to configure validation.
+- Non-blocking 1 (unlisted exceptions): fixed; every exception but the caller's cancellation stays inside the
+  connector and the sender; AC11 test `ReplaySenderUnlistedExceptionGivesConnectionLostWithoutAddress`.
+- Non-blocking 2 (UNC paths): fixed; *Security considerations*, replay-sending *Accepted risks*, and the
+  `.squad/project.md` text.
+- Non-blocking 3 (token file location): fixed; the guide names a place outside the checkout, kept private and deleted
+  after testing, in both languages.
 
 ## Out of scope / follow-ups
 

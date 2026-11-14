@@ -106,7 +106,9 @@ Each `Replay error: <reason>` is the tooltip's status text with the *problem* lo
   The fixture is a direct download of `tests/Censio.Pipe.Tests/Fixtures/long-session.jsonl`; the token a byte-exact
   copy (`docker cp censio:/config/ingest-token <file>`, the host file, or `<data directory>\ingest-token`) or pasted
   into Notepad (N4). The guide gives full paths (Explorer and shortcuts set the working folder). A server from source
-  needs `Censio:DataDirectory` set (else every Companion is refused) and is at `ws://localhost:5000/ingest`.
+  is started with `dotnet run --project src/Censio.Server -c Release --no-launch-profile --
+  --Censio:DataDirectory=<full path>` (without the data directory every Companion is refused) and is at
+  `ws://localhost:5000/ingest`.
 - N10: Needs a server with the contract version 1 ingest (not the image `0.2.0`); no server change.
 
 ## Acceptance criteria
