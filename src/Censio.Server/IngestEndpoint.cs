@@ -62,6 +62,7 @@ public static class IngestEndpoint
     public static IServiceCollection AddCensioIngest(this IServiceCollection services)
     {
         services.TryAddSingleton<IngestConnections>();
+        services.TryAddSingleton(static provider => new IngestHosts(provider.GetRequiredService<TimeProvider>(), provider.GetRequiredService<ILoggerFactory>().CreateLogger(LogCategory)));
         services.TryAddSingleton(TimeProvider.System);
 
         return services;
@@ -120,7 +121,7 @@ public static class IngestEndpoint
         try
         {
             using var webSocket = await context.WebSockets.AcceptWebSocketAsync(CreateAcceptContext()).ConfigureAwait(false);
-            using var session = new IngestSession(webSocket, access, connections, state, services.GetRequiredService<TimeProvider>(), services.GetRequiredService<ILoggerFactory>().CreateLogger(LogCategory), serverVersion);
+            using var session = new IngestSession(webSocket, access, new IngestAdmission(connections, services.GetRequiredService<IngestHosts>(), new IngestHost(null), context.Connection.RemoteIpAddress), state, services.GetRequiredService<TimeProvider>(), services.GetRequiredService<ILoggerFactory>().CreateLogger(LogCategory), serverVersion);
 
             // From its first line the session owns the pending place.
             sessionStarted = true;

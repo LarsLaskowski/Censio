@@ -217,6 +217,11 @@ public sealed class IngestSessionTests : IDisposable
     private readonly IngestConnections _connections = new();
 
     /// <summary>
+    /// The hosts the sessions share.
+    /// </summary>
+    private readonly IngestHosts _hosts;
+
+    /// <summary>
     /// The token that signals the stop of the server.
     /// </summary>
     private readonly CancellationTokenSource _stopping = new();
@@ -257,6 +262,7 @@ public sealed class IngestSessionTests : IDisposable
     public IngestSessionTests(TestContext testContext)
     {
         TestContext = testContext;
+        _hosts = new IngestHosts(_timeProvider, _logger);
     }
 
     #endregion // Constructors
@@ -1841,7 +1847,7 @@ public sealed class IngestSessionTests : IDisposable
         _disposables.AddRange([client, server, clientStream, serverStream]);
         _connections.TryEnterPendingHello();
 
-        var session = new IngestSession(server, access, _connections, _state, _timeProvider, _logger, serverVersion);
+        var session = new IngestSession(server, access, new IngestAdmission(_connections, _hosts, _hosts.TryEnterPendingHello(null)!, null), _state, _timeProvider, _logger, serverVersion);
 
         return (session.RunAsync(_stopping.Token), client, serverStream);
     }
@@ -2096,6 +2102,7 @@ public sealed class IngestSessionTests : IDisposable
         }
 
         _stopping.Dispose();
+        _hosts.Dispose();
     }
 
     #endregion // IDisposable

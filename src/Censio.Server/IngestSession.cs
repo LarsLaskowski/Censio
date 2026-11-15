@@ -57,9 +57,9 @@ public sealed partial class IngestSession : IDisposable
     private readonly IngestAccess _access;
 
     /// <summary>
-    /// The connection counters.
+    /// The places and the outcome report of the connection.
     /// </summary>
-    private readonly IngestConnections _connections;
+    private readonly IngestAdmission _admission;
 
     /// <summary>
     /// The server state the messages are stored through.
@@ -155,16 +155,16 @@ public sealed partial class IngestSession : IDisposable
     /// </summary>
     /// <param name="webSocket">The WebSocket of the connection</param>
     /// <param name="access">The access that checks the token</param>
-    /// <param name="connections">The connection counters</param>
+    /// <param name="admission">The places and the outcome report of the connection</param>
     /// <param name="state">The server state the messages are stored through</param>
     /// <param name="timeProvider">The time provider</param>
     /// <param name="logger">The logger</param>
     /// <param name="serverVersion">The version of the server</param>
-    public IngestSession(WebSocket webSocket, IngestAccess access, IngestConnections connections, ServerState state, TimeProvider timeProvider, ILogger logger, string serverVersion)
+    public IngestSession(WebSocket webSocket, IngestAccess access, IngestAdmission admission, ServerState state, TimeProvider timeProvider, ILogger logger, string serverVersion)
     {
         _webSocket = webSocket;
         _access = access;
-        _connections = connections;
+        _admission = admission;
         _state = state;
         _timeProvider = timeProvider;
         _logger = logger;
@@ -184,6 +184,11 @@ public sealed partial class IngestSession : IDisposable
     /// Gets the time a close waits for the reply of the peer (2 seconds).
     /// </summary>
     public static TimeSpan CloseWait => TimeSpan.FromSeconds(2);
+
+    /// <summary>
+    /// Gets the time a send may take before the connection is aborted.
+    /// </summary>
+    public static TimeSpan SendTimeout => TimeSpan.FromSeconds(30);
 
     #endregion // Properties
 
@@ -389,7 +394,7 @@ public sealed partial class IngestSession : IDisposable
             return false;
         }
 
-        if (_connections.TryTakeCompanion() == false)
+        if (_admission.TryTakeCompanion() == false)
         {
             LogCompanionConnected(_logger);
             await RefuseHelloAsync(ContractHelloRefusal.CompanionConnected, ContractReader.CurrentVersion, buffer).ConfigureAwait(false);
@@ -792,7 +797,7 @@ public sealed partial class IngestSession : IDisposable
     {
         if (Interlocked.Exchange(ref _pendingLeft, 1) == 0)
         {
-            _connections.LeavePendingHello();
+            _admission.LeavePendingHello();
         }
     }
 
@@ -808,7 +813,7 @@ public sealed partial class IngestSession : IDisposable
                 _state.SetCompanionDisconnected();
             }
 
-            _connections.ReleaseCompanion();
+            _admission.ReleaseCompanion();
         }
     }
 
