@@ -1,6 +1,8 @@
+using System.Globalization;
 using System.Text.Json;
 
 using Bunit;
+using Bunit.JSInterop;
 
 using Censio.Contracts;
 using Censio.Server.Components;
@@ -83,6 +85,7 @@ public sealed class DataStatusTests
     /// <returns>A task that represents the asynchronous test</returns>
     [TestMethod]
     [TestCategory("AC8")]
+    [TestCategory("AC3")]
     [DataRow(UiLanguage.English, 60, "As of 2026-11-13 13:00")]
     [DataRow(UiLanguage.German, -300, "Stand: 2026-11-13 07:00")]
     [DataRow(UiLanguage.English, 840, "As of 2026-11-14 02:00")]
@@ -102,16 +105,15 @@ public sealed class DataStatusTests
     }
 
     /// <summary>
-    /// While the browser has not given its offset, the as-of line shows the time in UTC with the suffix.
+    /// While the browser has not answered about its offset, the as-of line is an empty paragraph without time and suffix.
     /// </summary>
     /// <param name="language">The language shown</param>
-    /// <param name="expected">The as-of line</param>
     /// <returns>A task that represents the asynchronous test</returns>
     [TestMethod]
-    [TestCategory("AC8")]
-    [DataRow(UiLanguage.English, "As of 2026-11-13 12:00 UTC")]
-    [DataRow(UiLanguage.German, "Stand: 2026-11-13 12:00 UTC")]
-    public async Task DataStatusShowsUtcWithoutOffset(UiLanguage language, string expected)
+    [TestCategory("AC3")]
+    [DataRow(UiLanguage.English)]
+    [DataRow(UiLanguage.German)]
+    public async Task DataStatusShowsNoTimeWhileBrowserHasNotAnswered(UiLanguage language)
     {
         // Arrange
         await using var host = await CreateConnectedHostAsync();
@@ -122,7 +124,37 @@ public sealed class DataStatusTests
         var status = Render(host, language);
 
         // Assert
-        Assert.AreEqual(expected, PageTestHost.Text(status).Trim(), "The as-of line should show UTC until the browser gives its offset");
+        Assert.HasCount(1, status.FindAll("p"), "The as-of line should be one paragraph");
+        Assert.AreEqual(string.Empty, PageTestHost.Text(status).Trim(), "The as-of line should be empty until the browser answers");
+        Assert.DoesNotContain("UTC", status.Markup, "The markup should not name UTC until the browser answers");
+    }
+
+    /// <summary>
+    /// A new as-of time shows at once at the last offset the browser gave, never as an empty line, while the browser's
+    /// answer for the new instant is outstanding.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC5")]
+    public async Task DataStatusNewAsOfShowsAtLastOffsetWhileAsking()
+    {
+        // Arrange
+        await using var host = await CreateConnectedHostAsync();
+        var nextAsOf = _asOf.AddHours(1);
+
+        host.Context.JSInterop.Setup<int>(UtcOffsetMinutes, arguments => IsInstant(arguments, _asOf)).SetResult(60);
+        host.Context.JSInterop.Setup<int>(UtcOffsetMinutes, arguments => IsInstant(arguments, nextAsOf));
+
+        var status = Render(host, UiLanguage.English);
+
+        await status.WaitForAssertionAsync(() => Assert.AreEqual("As of 2026-11-13 13:00", PageTestHost.Text(status).Trim(), "The first answer should set the offset"), PageTestHost.WaitBound);
+
+        // Act
+        status.Render(parameters => parameters.Add(component => component.AsOf, nextAsOf));
+
+        // Assert
+        await status.WaitForAssertionAsync(() => Assert.HasCount(2, host.Context.JSInterop.Invocations[UtcOffsetMinutes], "The browser should be asked for the new instant"), PageTestHost.WaitBound);
+        Assert.AreEqual("As of 2026-11-13 14:00", PageTestHost.Text(status).Trim(), "The new time should show at the last offset while the second answer is outstanding");
     }
 
     /// <summary>
@@ -132,6 +164,7 @@ public sealed class DataStatusTests
     /// <returns>A task that represents the asynchronous test</returns>
     [TestMethod]
     [TestCategory("AC8")]
+    [TestCategory("AC4")]
     [DataRow(841)]
     [DataRow(-841)]
     [DataRow(int.MaxValue)]
@@ -148,7 +181,7 @@ public sealed class DataStatusTests
 
         // Assert
         await status.WaitForAssertionAsync(() => Assert.HasCount(1, host.Context.JSInterop.Invocations[UtcOffsetMinutes], "The browser should be asked for its offset once"), PageTestHost.WaitBound);
-        Assert.AreEqual("As of 2026-11-13 12:00 UTC", PageTestHost.Text(status).Trim(), "An offset out of range should leave the time in UTC");
+        await status.WaitForAssertionAsync(() => Assert.AreEqual("As of 2026-11-13 12:00 UTC", PageTestHost.Text(status).Trim(), "An offset out of range should leave the time in UTC"), PageTestHost.WaitBound);
     }
 
     /// <summary>
@@ -158,6 +191,7 @@ public sealed class DataStatusTests
     /// <returns>A task that represents the asynchronous test</returns>
     [TestMethod]
     [TestCategory("AC8")]
+    [TestCategory("AC4")]
     [DataRow(nameof(JSException))]
     [DataRow(nameof(JsonException))]
     public async Task DataStatusInteropFailureShowsUtc(string failure)
@@ -172,7 +206,7 @@ public sealed class DataStatusTests
 
         // Assert
         await status.WaitForAssertionAsync(() => Assert.HasCount(1, host.Context.JSInterop.Invocations[UtcOffsetMinutes], "The browser should be asked for its offset once"), PageTestHost.WaitBound);
-        Assert.AreEqual("As of 2026-11-13 12:00 UTC", PageTestHost.Text(status).Trim(), "A failed browser call should leave the time in UTC");
+        await status.WaitForAssertionAsync(() => Assert.AreEqual("As of 2026-11-13 12:00 UTC", PageTestHost.Text(status).Trim(), "A failed browser call should leave the time in UTC"), PageTestHost.WaitBound);
     }
 
     /// <summary>
@@ -297,6 +331,18 @@ public sealed class DataStatusTests
     private static IRenderedComponent<DataStatus> Render(PageTestHost host, UiLanguage language)
     {
         return host.Render<DataStatus>(language, parameters => parameters.Add(status => status.AsOf, _asOf));
+    }
+
+    /// <summary>
+    /// Tells whether the browser call asks for the offset at an instant.
+    /// </summary>
+    /// <param name="arguments">The call's arguments</param>
+    /// <param name="instant">The instant</param>
+    /// <returns><see langword="true" /> when the call's first argument is the instant</returns>
+    private static bool IsInstant(JSRuntimeInvocation arguments, DateTimeOffset instant)
+    {
+        return arguments.Arguments.Count > 0
+               && Equals(arguments.Arguments[0], instant.UtcDateTime.ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'", CultureInfo.InvariantCulture));
     }
 
     /// <summary>

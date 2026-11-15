@@ -5,5 +5,12 @@
 }
 @if (AsOf is { } asOf)
 {
-    <p>@string.Format(CultureInfo.InvariantCulture, Texts.AsOfFormat, PageFormat.Time(asOf, _offsetMinutes))</p>
+    if (_isOffsetSettled)
+    {
+        <p>@string.Format(CultureInfo.InvariantCulture, Texts.AsOfFormat, PageFormat.Time(asOf, _offsetMinutes))</p>
+    }
+    else
+    {
+        <p>&nbsp;</p>
+    }
 }
