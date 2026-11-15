@@ -327,9 +327,9 @@ client side. By subtraction, not measured directly, the server's share at the pe
 164.4 MiB and these 8 MiB, about 196 MiB, 10 MiB above the reader alone with its input (the buffer is 2.9 MiB larger than
 that input).
 
-The figure of [`contract.md`](contract.md) (the reader's peak of 158.8 MiB) belongs to that document's own catalog; on
-the catalog of this measurement the same reader peaks at 185.9 MiB. The shape of a catalog, not only its size, decides
-the peak, so the figures of both documents stand for their own input.
+The figures of [`contract.md`](contract.md), *Memory of a read*, belong to its three catalog shapes, the highest peak
+333.8 MiB; the catalog of this measurement gave 185.9 MiB. The shape of a catalog, not only its size, decides the peak,
+so each figure stands for its own input.
 
 ## Related decisions
 

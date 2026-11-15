@@ -178,38 +178,57 @@ server's refusal reaches the Companion as a catalog kind of the acknowledgement.
 ### Memory of a read
 
 Measured on the real `ContractReader.Read`, .NET 11, Release, workstation non-concurrent garbage collection, one
-process per case, the input read from a file before the measurement. The scratch program was outside the repository.
+process per case, the input read from a file before the measurement, three runs per case. The scratch program was
+outside the repository; the catalogs are described below exactly enough to rebuild them byte for byte.
+
+All three catalog shapes are a `catalogUpload` with `id` `11111111-2222-4333-8444-555555555555`, written by
+`CatalogDocumentWriter` (names sorted) and wrapped by `ContractWriter`. The document: `schemaVersion` 1, `gameVersion`
+`1.2.3.4`, 16,384 entries; entry `i` (0 to 16,383) has `guid` `i + 1`, `kind` `good`, `regionGuid` `null` and `icon`
+`i` in lowercase hexadecimal, left-padded with `0` to 64 digits. Every name value and every region type is `x`
+repeated `L` times, `L` the largest length that keeps the document within the bound of 16,777,216 bytes.
+
+| Shape | Names of each entry | `regionTypes` of each entry | `L` | Document | SHA-256 of the document | Message |
+| ----- | ------------------- | --------------------------- | --- | -------- | ----------------------- | ------- |
+| A | 16, tags `aa` to `ap` | `null` | 46 | 16,602,325 bytes | `68910f3c29a42bc1f8201baecf756f4501e0ba68752f72279dea96b432dd5d21` | 22,136,538 bytes |
+| B | as A | 32 | 13 | 16,291,029 bytes | `7ce273bb1c433039d77a6951c48c66fa948a10d22bb378335e91db5409f3292f` | 21,721,474 bytes |
+| C | as B, each tag its two letters followed by `-a` sixteen times (34 characters, 17 subtags) | 32 | 2 | 16,028,885 bytes | `8d6710b30e08d7ad2d097cada6d9b350d9cabf6a8efb16dec550e83edefea3ea` | 21,371,950 bytes |
 
 ```
 dotnet build -c Release
-dotnet bin/Release/net11.0/measure.dll gen catalog       catalog.json
+dotnet bin/Release/net11.0/measure.dll gen A catalog-a.json     # likewise B and C; writes the document beside it
 dotnet bin/Release/net11.0/measure.dll gen minimal-tick  minimal-tick.json
 dotnet bin/Release/net11.0/measure.dll gen pairs-tick    pairs-tick.json
 dotnet bin/Release/net11.0/measure.dll gen four-pairs-tick four-pairs-tick.json
-dotnet bin/Release/net11.0/measure.dll run catalog.json      # likewise minimal-tick.json, pairs-tick.json and four-pairs-tick.json
+dotnet bin/Release/net11.0/measure.dll run catalog-a.json      # likewise catalog-b.json, catalog-c.json, minimal-tick.json, pairs-tick.json and four-pairs-tick.json
 ```
 
 | Case | Input | Read time | Model retained | Peak managed (input included) | Allocated during read | Peak working set |
 | ---- | ----- | --------- | -------------- | ----------------------------- | --------------------- | ---------------- |
-| Catalog upload: document of 16,635,093 bytes (16,384 entries with 16 names), message of 22,180,226 bytes | 22,180,226 bytes | 432 to 503 ms | 48.0 MiB (69.2 MiB with the input) | 158.8 MiB | 137.6 MiB | 196.5 MiB |
+| Catalog upload, shape A | 22,136,538 bytes | 376 to 384 ms | 98.9 MiB (120.0 MiB with the input) | 159.8 MiB | 138.4 MiB | 206.1 MiB |
+| Catalog upload, shape B | 21,721,474 bytes | 489 to 503 ms | 109.4 MiB (130.2 MiB with the input) | 174.6 MiB | 153.6 MiB | 221.0 MiB |
+| Catalog upload, shape C | 21,371,950 bytes | 1,233 to 1,255 ms | 113.2 MiB (133.6 MiB with the input) | 333.8 MiB | 417.8 MiB | 385.4 MiB |
 | Tick of 91,761 minimal entries (all floats `null`, empty maps) in 256 islands (not the worst tick) | 25,165,389 bytes | 718 to 889 ms | 26.3 MiB (50.4 MiB with the input) | 70.6 MiB | 46.4 MiB | 121.0 MiB |
 | Tick of 92,097 entries with four workforce pairs each (368,388 pairs, floats written as `0`), in 256 islands | 25,165,356 bytes | 875 to 1,331 ms | 43.3 MiB (67.3 MiB with the input) | 114.4 MiB | 90.1 MiB | 169.2 MiB |
 | Tick of 524,288 entries and pairs, read straight into the maps | 4,241,243 bytes | 265 ms | 19.1 MiB (23.2 MiB with the input) | 40.2 MiB | 36.1 MiB | 88.7 MiB |
 
-Output of the runs (the first: catalog; peak managed sampled every millisecond):
+Each figure of a catalog row is the largest of its three runs, the read time its range. Output of the run with the
+highest peak (shape C, the third run; peak managed sampled every millisecond):
 
 ```
-input bytes            : 22,180,226
-managed before (input) : 21.2 MiB
-managed after (model)  : 69.2 MiB  (input + model alive)
-managed retained model : 48.0 MiB
-peak managed (sampled, 1 ms, incl. input): 158.8 MiB
-allocated during Read  : 137.6 MiB
-peak working set       : 196.5 MiB
+input bytes            : 21,371,950
+managed before (input) : 20.4 MiB
+managed after (model)  : 133.6 MiB  (input + model alive)
+managed retained model : 113.2 MiB
+peak managed (sampled, 1 ms, incl. input): 333.8 MiB
+allocated during Read  : 417.4 MiB
+peak working set       : 385.4 MiB
+read time              : 1233 ms  error=none
 ```
 
-The largest read is therefore a catalog upload: about 159 MiB of managed memory at its peak with the input, 197 MiB of
-working set. The worst tick at the bound is one of entries with a few pairs each: about 114 MiB at its peak with the
+The largest read is therefore a catalog upload of shape C: 333.8 MiB of managed memory at its peak with the input,
+385.4 MiB of working set. The peak depends on the catalog's shape, not only its size: the three messages are of nearly
+the same size (21.4 to 22.1 million bytes), yet the peak of C is twice that of A, because the reader allocates per tag
+and per subtag. The worst tick at the bound is one of entries with a few pairs each: about 114 MiB at its peak with the
 input.
 
 ### Security considerations for the endpoint (#28)
