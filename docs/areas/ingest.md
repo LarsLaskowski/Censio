@@ -351,8 +351,9 @@ names of 42 characters each, 16,604,431 bytes, message 22,139,346 bytes. The con
 | Session control, the same size of junk (refused by the reader at once) | 101.3 MiB | 80.0 MiB | 133.6 MiB |
 
 The session minus its control allocates 172.4 MiB, 8.0 MiB more than the reader alone (the list and the written reply of
-1.1 MB); the server's share at the peak is about 196 MiB by subtraction. The figures of [`contract.md`](contract.md)
-belong to that document's own catalog: its shape, not only its size, decides the peak.
+1.1 MB); the server's share at the peak is about 196 MiB by subtraction. The figures of [`contract.md`](contract.md),
+*Memory of a read*, belong to its three catalog shapes, the highest peak 333.8 MiB; the catalog of this measurement
+gave 185.9 MiB. The shape of a catalog, not only its size, decides the peak, so each figure stands for its own input.
 
 ## Related decisions
 
