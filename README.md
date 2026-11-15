@@ -19,7 +19,7 @@ What `v0.3.0` cannot do:
 
 - Names and icons in the Companion only in the diagnostics window (regions and goods): the Companion loads them from its cache or reads them from your installation at every start, and reads them again when the game was updated (it checks when the game connects), and shows a bare number (GUID) where it cannot name one, and no icon where the game's files give none (the log line `Catalog icons: …` counts them); buildings and workforce have no column yet.
 - Nothing is sent from the Companion to the server except a recording you replay with `--server` (*Sending a recording to a server*); live sending is not there yet (#40), so the pages fill only from a replay.
-- There is no history: the pages show the latest tick of a profile only, and there are no trend charts (#35).
+- There is no history: the pages show the latest tick of a profile only, and there are no trend charts (#35 to #38).
 - The Companion has no settings for a server address or a token; a replay takes them as the switches `--server` and `--token-file`.
 
 ## Getting Censio
@@ -200,7 +200,7 @@ Das kann `v0.3.0` nicht:
 
 - Namen und Symbole im Companion nur im Diagnosefenster (Regionen und Waren): Der Companion lädt sie bei jedem Start aus seinem Cache oder liest sie aus Ihrer Installation und liest sie erneut, wenn das Spiel aktualisiert wurde (er prüft das, wenn das Spiel sich verbindet), und zeigt eine blanke Zahl (GUID), wo er keinen Namen findet, und kein Symbol, wo die Spieldateien keines liefern (die Logzeile `Catalog icons: …` zählt sie); Gebäude und Arbeitskräfte haben noch keine Spalte.
 - Der Companion sendet nichts an den Server, außer einer Aufzeichnung, die Sie mit `--server` abspielen (*Eine Aufzeichnung an einen Server senden*); das Senden im laufenden Betrieb gibt es noch nicht (#40), die Seiten füllen sich also nur durch ein Abspielen.
-- Es gibt keinen Verlauf: Die Seiten zeigen nur den letzten Tick eines Profils, und es gibt keine Trenddiagramme (#35).
+- Es gibt keinen Verlauf: Die Seiten zeigen nur den letzten Tick eines Profils, und es gibt keine Trenddiagramme (#35 bis #38).
 - Der Companion hat keine Einstellungen für eine Serveradresse oder ein Token; ein Abspielen nimmt sie als Schalter `--server` und `--token-file`.
 
 ## Censio beziehen
