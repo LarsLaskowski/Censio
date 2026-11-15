@@ -1,6 +1,6 @@
 # 0081: Pages resolve their resources against a fixed document base of `/`
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-14
 - **Area:** web-ui
 - **Source:** Issue #199
