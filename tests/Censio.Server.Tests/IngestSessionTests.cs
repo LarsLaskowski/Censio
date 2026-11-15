@@ -23,6 +23,16 @@ public sealed class IngestSessionTests : IDisposable
     #region Constants
 
     /// <summary>
+    /// The line logged when a host is blocked.
+    /// </summary>
+    private const string BlockStartLine = "A host was refused 10 times within 60 seconds; its connections are refused for 60 seconds.";
+
+    /// <summary>
+    /// The unread bytes at which a pipe of <see cref="InMemoryDuplexStream" /> pauses its writer.
+    /// </summary>
+    private const int PipePauseBytes = 65536;
+
+    /// <summary>
     /// The stored token.
     /// </summary>
     private const string Token = "MARKERTOKEN-secret";
@@ -217,6 +227,11 @@ public sealed class IngestSessionTests : IDisposable
     private readonly IngestConnections _connections = new();
 
     /// <summary>
+    /// The hosts the sessions share.
+    /// </summary>
+    private readonly IngestHosts _hosts;
+
+    /// <summary>
     /// The token that signals the stop of the server.
     /// </summary>
     private readonly CancellationTokenSource _stopping = new();
@@ -257,6 +272,7 @@ public sealed class IngestSessionTests : IDisposable
     public IngestSessionTests(TestContext testContext)
     {
         TestContext = testContext;
+        _hosts = new IngestHosts(_timeProvider, _logger);
     }
 
     #endregion // Constructors
@@ -1614,6 +1630,282 @@ public sealed class IngestSessionTests : IDisposable
     }
 
     /// <summary>
+    /// A hello refused for its token counts as a failed hello: with nine failed hellos before it, it blocks the host.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC4")]
+    public async Task IngestSessionTokenRefusedHelloCountsAsFailedHello()
+    {
+        // Arrange
+        FailNineHellos();
+
+        var (run, client, _) = StartSession(IngestAccess.CreateForToken(Token));
+
+        // Act
+        await IngestClient.SendAsync(client, IngestClient.Hello("MARKERTOKEN-wrong"));
+        await IngestClient.ReceiveUntilCloseAsync(client);
+        await FinishAsync(client, run);
+
+        // Assert
+        AssertHostBlocked("a hello refused for its token");
+    }
+
+    /// <summary>
+    /// A hello refused for its contract version counts as a failed hello.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC4")]
+    public async Task IngestSessionUnsupportedVersionHelloCountsAsFailedHello()
+    {
+        // Arrange
+        FailNineHellos();
+
+        var (run, client, _) = StartSession(IngestAccess.CreateForToken(Token));
+
+        // Act
+        await IngestClient.SendAsync(client, IngestClient.Hello(Token, 2));
+        await IngestClient.ReceiveUntilCloseAsync(client);
+        await FinishAsync(client, run);
+
+        // Assert
+        AssertHostBlocked("a hello refused for its version");
+    }
+
+    /// <summary>
+    /// A first message that is no hello, closed without a reply, counts as a failed hello.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC4")]
+    public async Task IngestSessionFirstMessageNotHelloCountsAsFailedHello()
+    {
+        // Arrange
+        FailNineHellos();
+
+        var (run, client, _) = StartSession(IngestAccess.CreateForToken(Token));
+
+        // Act
+        await IngestClient.SendAsync(client, IngestClient.Tick(Id1));
+        await IngestClient.ReceiveUntilCloseAsync(client);
+        await FinishAsync(client, run);
+
+        // Assert
+        AssertHostBlocked("a first message that is no hello");
+    }
+
+    /// <summary>
+    /// A binary first message, closed without a reply, counts as a failed hello.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC4")]
+    public async Task IngestSessionBinaryFirstMessageCountsAsFailedHello()
+    {
+        // Arrange
+        FailNineHellos();
+
+        var (run, client, _) = StartSession(IngestAccess.CreateForToken(Token));
+
+        // Act
+        await client.SendAsync(new byte[] { 1, 2, 3 }, WebSocketMessageType.Binary, true, TestContext.CancellationToken);
+        await IngestClient.ReceiveUntilCloseAsync(client);
+        await FinishAsync(client, run);
+
+        // Assert
+        AssertHostBlocked("a binary first message");
+    }
+
+    /// <summary>
+    /// A hello not sent within 10 seconds counts as a failed hello.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC4")]
+    public async Task IngestSessionHelloTimeoutCountsAsFailedHello()
+    {
+        // Arrange
+        FailNineHellos();
+
+        var (run, client, _) = StartSession(IngestAccess.CreateForToken(Token));
+
+        await IngestClient.GuardAsync(_timeProvider.WaitForDelayAsync(_helloTimeout, TestContext.CancellationToken));
+
+        // Act
+        _timeProvider.Advance(_helloTimeout);
+        await IngestClient.ReceiveUntilCloseAsync(client);
+        await FinishAsync(client, run);
+
+        // Assert
+        AssertHostBlocked("a hello timeout");
+    }
+
+    /// <summary>
+    /// A connection the peer closes before its hello counts as a failed hello.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC4")]
+    public async Task IngestSessionPeerClosedBeforeHelloCountsAsFailedHello()
+    {
+        // Arrange
+        FailNineHellos();
+
+        var (run, client, _) = StartSession(IngestAccess.CreateForToken(Token));
+
+        // Act
+        await FinishAsync(client, run);
+
+        // Assert
+        AssertHostBlocked("a peer that closed before its hello");
+    }
+
+    /// <summary>
+    /// A hello refused because another Companion is connected is not counted, and leaves the host's place.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC4")]
+    public async Task IngestSessionCompanionConnectedRefusalIsNotCounted()
+    {
+        // Arrange
+        await StartAcceptedSessionAsync();
+        FailNineHellos();
+
+        var (run, client, _) = StartSession(IngestAccess.CreateForToken(Token));
+
+        // Act
+        await IngestClient.SendAsync(client, IngestClient.Hello(Token));
+
+        var (messages, _, _) = await IngestClient.ReceiveUntilCloseAsync(client);
+
+        await FinishAsync(client, run);
+
+        // Assert
+        AssertHelloRefused(messages[0], ContractHelloRefusal.CompanionConnected, 1);
+        AssertHostNotCounted("a companionConnected refusal");
+    }
+
+    /// <summary>
+    /// A hello whose profile cannot be stored is not counted, and leaves the host's place.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC4")]
+    public async Task IngestSessionProfileStoreFailureIsNotCounted()
+    {
+        // Arrange
+        await UseDatabaseFileAsync();
+        ExecuteOnFile(FailProfilesSql);
+        FailNineHellos();
+
+        var (run, client, _) = StartSession(IngestAccess.CreateForToken(Token));
+
+        // Act
+        await IngestClient.SendAsync(client, IngestClient.Hello(Token));
+
+        var (_, closeStatus, _) = await IngestClient.ReceiveUntilCloseAsync(client);
+
+        await FinishAsync(client, run);
+
+        // Assert
+        Assert.AreEqual(WebSocketCloseStatus.InternalServerError, closeStatus, "The hello whose profile cannot be stored should be closed with 1011");
+        AssertHostNotCounted("a profile store failure");
+    }
+
+    /// <summary>
+    /// A hello phase cut short by the server's stop is not counted, and leaves the host's place.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC4")]
+    public async Task IngestSessionServerStopBeforeHelloIsNotCounted()
+    {
+        // Arrange
+        FailNineHellos();
+
+        var (run, client, _) = StartSession(IngestAccess.CreateForToken(Token));
+
+        // Act
+        await _stopping.CancelAsync();
+
+        var (_, closeStatus, _) = await IngestClient.ReceiveUntilCloseAsync(client);
+
+        await FinishAsync(client, run);
+
+        // Assert
+        Assert.AreEqual(WebSocketCloseStatus.EndpointUnavailable, closeStatus, "The stop should close the connection with 1001");
+        AssertHostNotCounted("a stop before the hello");
+    }
+
+    /// <summary>
+    /// An accepted Companion that sends while its replies stay unread is ended once an acknowledgement's send has been
+    /// blocked for 30 seconds: the end is logged, the Companion's place is freed and a new hello is accepted.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC8")]
+    public async Task IngestSessionRepliesNotReadEndsConnectionAfterSendTimeout()
+    {
+        // Arrange
+        var (run, client, serverStream) = await StartAcceptedSessionAsync();
+
+        await serverStream.WriteAsync(new byte[PipePauseBytes - 1], TestContext.CancellationToken);
+
+        var timers = _timeProvider.Delays.Count;
+
+        await IngestClient.SendAsync(client, IngestClient.Tick(Id1));
+        await IngestClient.GuardAsync(_timeProvider.WaitForTimersAsync(timers + 1, TestContext.CancellationToken));
+
+        // Act
+        _timeProvider.Advance(IngestSession.SendTimeout);
+        await IngestClient.GuardAsync(run);
+
+        var (_, nextClient, _) = StartSession(IngestAccess.CreateForToken(Token));
+
+        await IngestClient.SendAsync(nextClient, IngestClient.Hello(Token));
+
+        var (nextReply, _, _) = await IngestClient.ReceiveAsync(nextClient);
+
+        // Assert
+        Assert.AreEqual(30, IngestSession.SendTimeout.TotalSeconds, "The send bound should be 30 seconds");
+        Assert.AreEqual(IngestSession.SendTimeout, _timeProvider.Delays[timers], "The blocked acknowledgement's send should be bounded by the send timeout");
+        Assert.Contains("Companion disconnected; 1 messages accepted, 0 refused.", LogMessages(), "The end of the connection should be logged with its counts");
+        Assert.IsInstanceOfType<ContractHelloAccepted>(nextReply, "A new hello should be accepted once the connection ended");
+    }
+
+    /// <summary>
+    /// An accepted Companion with a receive pending that sends nothing stays connected past 60 seconds, beyond several
+    /// send bounds, and its next tick is acknowledged.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC8")]
+    public async Task IngestSessionIdleWithReceivePendingStaysConnected()
+    {
+        // Arrange
+        var (run, client, _) = await StartAcceptedSessionAsync();
+
+        var receive = IngestClient.ReceiveAsync(client);
+
+        // Act
+        for (var step = 0; step < 4; step++)
+        {
+            _timeProvider.Advance(IngestSession.SendTimeout);
+        }
+
+        await IngestClient.SendAsync(client, IngestClient.Tick(Id1));
+
+        var (reply, _, _) = await receive;
+
+        // Assert
+        AssertAcknowledgement(reply, Id1, null, null, []);
+        Assert.IsFalse(run.IsCompleted, "The session should still run after 120 seconds without a frame");
+        Assert.IsEmpty(LogMessages().Where(message => message.StartsWith("Companion disconnected", StringComparison.Ordinal)).ToList(), "No end of the connection should be logged");
+    }
+
+    /// <summary>
     /// Builds a status message with a pipe state.
     /// </summary>
     /// <param name="wireName">The pipe state as the contract names it</param>
@@ -1841,7 +2133,7 @@ public sealed class IngestSessionTests : IDisposable
         _disposables.AddRange([client, server, clientStream, serverStream]);
         _connections.TryEnterPendingHello();
 
-        var session = new IngestSession(server, access, _connections, _state, _timeProvider, _logger, serverVersion);
+        var session = new IngestSession(server, access, new IngestAdmission(_connections, _hosts, _hosts.TryEnterPendingHello(null)!, null), _state, _timeProvider, _logger, serverVersion);
 
         return (session.RunAsync(_stopping.Token), client, serverStream);
     }
@@ -1923,6 +2215,57 @@ public sealed class IngestSessionTests : IDisposable
     private List<(LogLevel Level, string Message)> LogEntries()
     {
         return [.. _logger.Entries.Select(entry => (entry.Level, entry.Message))];
+    }
+
+    /// <summary>
+    /// Records nine failed hellos of the sessions' host (no address) directly on the hosts.
+    /// </summary>
+    private void FailNineHellos()
+    {
+        for (var index = 0; index < IngestHosts.MaxFailedHellos - 1; index++)
+        {
+            var host = _hosts.TryEnterPendingHello(null);
+
+            Assert.IsNotNull(host, "Each failed hello of the arrangement should get a place");
+            _hosts.RecordFailedHello(host);
+        }
+    }
+
+    /// <summary>
+    /// Counts the free places of the sessions' host by taking them all.
+    /// </summary>
+    /// <returns>The number of free places; 0 when the host is blocked</returns>
+    private int CountFreeHostPlaces()
+    {
+        var count = 0;
+
+        while (count <= IngestHosts.MaxPendingHellosPerHost && _hosts.TryEnterPendingHello(null) is not null)
+        {
+            count++;
+        }
+
+        return count;
+    }
+
+    /// <summary>
+    /// Asserts that the session's hello was counted as the tenth failed hello: the host is blocked and the block logged.
+    /// </summary>
+    /// <param name="caseName">The name of the case</param>
+    private void AssertHostBlocked(string caseName)
+    {
+        Assert.Contains((LogLevel.Warning, BlockStartLine), LogEntries(), $"The tenth failed hello should start a block: {caseName}");
+        Assert.AreEqual(0, CountFreeHostPlaces(), $"The blocked host should get no place: {caseName}");
+    }
+
+    /// <summary>
+    /// Asserts that the session's hello was not counted and left the host's place: the host is not blocked and all its
+    /// places are free.
+    /// </summary>
+    /// <param name="caseName">The name of the case</param>
+    private void AssertHostNotCounted(string caseName)
+    {
+        Assert.DoesNotContain((LogLevel.Warning, BlockStartLine), LogEntries(), $"No block should start: {caseName}");
+        Assert.AreEqual(IngestHosts.MaxPendingHellosPerHost, CountFreeHostPlaces(), $"The host's places should all be free: {caseName}");
     }
 
     /// <summary>
@@ -2096,6 +2439,7 @@ public sealed class IngestSessionTests : IDisposable
         }
 
         _stopping.Dispose();
+        _hosts.Dispose();
     }
 
     #endregion // IDisposable

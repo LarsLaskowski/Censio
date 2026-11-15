@@ -57,9 +57,9 @@ public sealed partial class IngestSession : IDisposable
     private readonly IngestAccess _access;
 
     /// <summary>
-    /// The connection counters.
+    /// The places and the outcome report of the connection.
     /// </summary>
-    private readonly IngestConnections _connections;
+    private readonly IngestAdmission _admission;
 
     /// <summary>
     /// The server state the messages are stored through.
@@ -155,16 +155,16 @@ public sealed partial class IngestSession : IDisposable
     /// </summary>
     /// <param name="webSocket">The WebSocket of the connection</param>
     /// <param name="access">The access that checks the token</param>
-    /// <param name="connections">The connection counters</param>
+    /// <param name="admission">The places and the outcome report of the connection</param>
     /// <param name="state">The server state the messages are stored through</param>
     /// <param name="timeProvider">The time provider</param>
     /// <param name="logger">The logger</param>
     /// <param name="serverVersion">The version of the server</param>
-    public IngestSession(WebSocket webSocket, IngestAccess access, IngestConnections connections, ServerState state, TimeProvider timeProvider, ILogger logger, string serverVersion)
+    public IngestSession(WebSocket webSocket, IngestAccess access, IngestAdmission admission, ServerState state, TimeProvider timeProvider, ILogger logger, string serverVersion)
     {
         _webSocket = webSocket;
         _access = access;
-        _connections = connections;
+        _admission = admission;
         _state = state;
         _timeProvider = timeProvider;
         _logger = logger;
@@ -184,6 +184,11 @@ public sealed partial class IngestSession : IDisposable
     /// Gets the time a close waits for the reply of the peer (2 seconds).
     /// </summary>
     public static TimeSpan CloseWait => TimeSpan.FromSeconds(2);
+
+    /// <summary>
+    /// Gets the time a send may take before the connection is aborted.
+    /// </summary>
+    public static TimeSpan SendTimeout => TimeSpan.FromSeconds(30);
 
     #endregion // Properties
 
@@ -348,6 +353,7 @@ public sealed partial class IngestSession : IDisposable
 
         if (isMessage == false)
         {
+            ReportUndecidedHello();
             await CloseAndDiscardAsync(closeStatus, buffer).ConfigureAwait(false);
 
             return false;
@@ -358,6 +364,7 @@ public sealed partial class IngestSession : IDisposable
         if (read.Error is { Kind: ContractErrorKind.UnsupportedVersion, Version: { } version })
         {
             LogUnsupportedVersion(_logger, version);
+            _admission.RecordFailedHello();
             await RefuseHelloAsync(ContractHelloRefusal.UnsupportedVersion, version, buffer).ConfigureAwait(false);
 
             return false;
@@ -365,6 +372,7 @@ public sealed partial class IngestSession : IDisposable
 
         if (read.Message is not ContractHello hello)
         {
+            _admission.RecordFailedHello();
             await CloseAndDiscardAsync(WebSocketCloseStatus.PolicyViolation, buffer).ConfigureAwait(false);
 
             return false;
@@ -384,14 +392,16 @@ public sealed partial class IngestSession : IDisposable
         if (_access.IsTokenAccepted(hello.Token) == false)
         {
             LogTokenRefused(_logger);
+            _admission.RecordFailedHello();
             await RefuseHelloAsync(ContractHelloRefusal.TokenRefused, ContractReader.CurrentVersion, buffer).ConfigureAwait(false);
 
             return false;
         }
 
-        if (_connections.TryTakeCompanion() == false)
+        if (_admission.TryTakeCompanion() == false)
         {
             LogCompanionConnected(_logger);
+            _admission.RecordUncountedHello();
             await RefuseHelloAsync(ContractHelloRefusal.CompanionConnected, ContractReader.CurrentVersion, buffer).ConfigureAwait(false);
 
             return false;
@@ -403,6 +413,7 @@ public sealed partial class IngestSession : IDisposable
 
         if (stored.Outcome == ServerStoreOutcome.Failed)
         {
+            _admission.RecordUncountedHello();
             ReleasePlace();
             LogStoreFailed(_logger, stored.Failure);
             await CloseAndDiscardAsync(WebSocketCloseStatus.InternalServerError, buffer).ConfigureAwait(false);
@@ -411,6 +422,7 @@ public sealed partial class IngestSession : IDisposable
         }
 
         _helloAccepted = true;
+        _admission.RecordAcceptedHello();
         LogCompanionAccepted(_logger);
         _state.SetCompanionConnected();
 
@@ -711,7 +723,9 @@ public sealed partial class IngestSession : IDisposable
                 return false;
             }
 
-            await _webSocket.SendAsync(written.Utf8Json, WebSocketMessageType.Text, true, CancellationToken.None).ConfigureAwait(false);
+            using var sendTimeout = new CancellationTokenSource(SendTimeout, _timeProvider);
+
+            await _webSocket.SendAsync(written.Utf8Json, WebSocketMessageType.Text, true, sendTimeout.Token).ConfigureAwait(false);
 
             return true;
         }
@@ -766,6 +780,7 @@ public sealed partial class IngestSession : IDisposable
         }
 
         LeavePendingHello();
+        _admission.RecordFailedHello();
         _timeoutClose = CloseAsync(WebSocketCloseStatus.PolicyViolation);
     }
 
@@ -786,13 +801,28 @@ public sealed partial class IngestSession : IDisposable
     }
 
     /// <summary>
+    /// Reports a hello that ended with no decision: a failed hello, unless the server is stopping.
+    /// </summary>
+    private void ReportUndecidedHello()
+    {
+        if (_stoppingToken.IsCancellationRequested)
+        {
+            _admission.RecordUncountedHello();
+        }
+        else
+        {
+            _admission.RecordFailedHello();
+        }
+    }
+
+    /// <summary>
     /// Leaves the pending place, once.
     /// </summary>
     private void LeavePendingHello()
     {
         if (Interlocked.Exchange(ref _pendingLeft, 1) == 0)
         {
-            _connections.LeavePendingHello();
+            _admission.LeavePendingHello();
         }
     }
 
@@ -808,7 +838,7 @@ public sealed partial class IngestSession : IDisposable
                 _state.SetCompanionDisconnected();
             }
 
-            _connections.ReleaseCompanion();
+            _admission.ReleaseCompanion();
         }
     }
 
@@ -820,6 +850,8 @@ public sealed partial class IngestSession : IDisposable
     {
         _helloTimer?.Dispose();
         LeavePendingHello();
+
+        ReportUndecidedHello();
         _webSocket.Abort();
 
         await _timeoutClose.ConfigureAwait(false);

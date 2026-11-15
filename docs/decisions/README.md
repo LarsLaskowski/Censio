@@ -143,4 +143,5 @@ once in the [area document](../areas/README.md) of the record's area, and the re
 | [0079](0079-recordings-sent-to-a-server-by-companion-replay-switches.md) | Recordings are sent to a server by switches of the Companion's replay, one message at a time, without reconnect | Accepted | 2026-11-14 |
 | [0080](0080-replay-token-read-from-a-file-named-on-the-command-line.md) | The replay's ingest token is read from a file named on the command line, with byte order marks accepted | Accepted | 2026-11-14 |
 | [0081](0081-pages-resolve-resources-against-a-fixed-document-base.md) | Pages resolve their resources against a fixed document base of `/` | Accepted | 2026-11-14 |
+| [0082](0082-ingest-limits-connections-per-host-and-blocks-failing-hosts.md) | The ingest endpoint limits connections per host and blocks a host whose hellos keep failing | Accepted | 2026-11-15 |
 <!-- project:end index -->

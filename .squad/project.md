@@ -16,7 +16,7 @@ protected, the concrete types, files or endpoints, and a link to the area docume
 (`- Session tokens: issued in src/Auth/, checked by every /api route — [Sessions](../docs/areas/sessions.md)`); no
 limits, patterns or sequences.
 
-- Ingest token and Companion authentication: the WebSocket endpoint `/ingest` and its token (`IngestEndpoint`, `IngestSession`, `IngestConnections`, `IngestTokenSetup`, `IngestAccess` in `src/Censio.Server`, the file `ingest-token` in the data directory, the setting `Censio:Ingest:TokenFile` and the file it names) — [ingest](../docs/areas/ingest.md), [record 0019](../docs/decisions/0019-websocket-transport-with-shared-token.md).
+- Ingest token and Companion authentication: the WebSocket endpoint `/ingest` and its token (`IngestEndpoint`, `IngestSession`, `IngestConnections`, `IngestHosts`, `IngestHost`, `IngestAdmission`, `IngestTokenSetup`, `IngestAccess` in `src/Censio.Server`, the file `ingest-token` in the data directory, the setting `Censio:Ingest:TokenFile` and the file it names) — [ingest](../docs/areas/ingest.md), [record 0019](../docs/decisions/0019-websocket-transport-with-shared-token.md).
 - Network exposure: the server's listener and its routes reachable without login (`/`, `/health`, `/ingest`, the data pages (`/regions`, `/profiles/…`), `/icons/{reference}`, the Blazor hub, static assets) in `src/Censio.Server/Program.cs`, `IconEndpoint` and `src/Censio.Server/Dockerfile`; the preference cookies and `Accept-Language` (`UiPreferences`, `App.razor`) — [server](../docs/areas/server.md), [web-ui](../docs/areas/web-ui.md), [web-pages](../docs/areas/web-pages.md).
 - Data-protection key ring: `DataProtectionSetup` under the data directory — [server](../docs/areas/server.md), *Data directory and key ring*.
 - Server database: the file, its side files and folders, owner-only (`ServerDatabase`, `DatabaseSetup`), and the in-memory state of the stored data (`ServerState`, `ServerStateSetup`) — [server-data](../docs/areas/server-data.md), [server-state](../docs/areas/server-state.md).
@@ -85,6 +85,7 @@ its file and what it stands in for; its behavior is read in its code.
 - `ConcurrentRecordingLogger` (`tests/Censio.Server.Tests/ConcurrentRecordingLogger.cs`) — an `ILogger` for entries from any thread.
 - `ExtendedMigrationsAssembly` (`tests/Censio.Server.Data.Tests/`) — an `IMigrationsAssembly` of the real migrations plus test ones, for a test-only schema history.
 - `FakeProfileStateSource` (`tests/Censio.Server.Tests/FakeProfileStateSource.cs`) — an `IProfileStateSource` of held and stored states.
+- `HeldTimerTimeProvider` (`tests/Censio.Server.Tests/HeldTimerTimeProvider.cs`) — a `FakeTimeProvider` whose timers never run on their own; a test runs a timer's callback by hand, also after disposal, which models a late thread-pool callback.
 - `ChunkedStream` (`tests/Censio.Pipe.Tests/ChunkedStream.cs`) — a chunked read-only stream with faults, for the frame reader.
 - `ChunkedClockStream` (`tests/Censio.Pipe.Tests/ChunkedClockStream.cs`) — a chunked stream for record-and-replay round trips.
 - `PipeFrameBuilder` (`tests/Censio.Pipe.Tests/PipeFrameBuilder.cs`, linked into the Companion and Anonymiser tests) — synthetic and corrupt pipe frames.

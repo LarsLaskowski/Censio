@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Net.WebSockets;
 using System.Runtime.CompilerServices;
@@ -6,12 +7,16 @@ using Censio.Companion.Core;
 using Censio.Contracts;
 using Censio.Pipe;
 using Censio.Server.Data;
+using Censio.Server.Data.Tests;
 
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 
@@ -23,7 +28,36 @@ namespace Censio.Server.Tests;
 [TestClass]
 public sealed class IngestEndpointTests
 {
+    #region Constants
+
+    /// <summary>
+    /// The logger category of the ingest log lines.
+    /// </summary>
+    private const string IngestLogCategory = "Censio.Server.Ingest";
+
+    /// <summary>
+    /// The line logged when a host is blocked.
+    /// </summary>
+    private const string BlockStartLine = "A host was refused 10 times within 60 seconds; its connections are refused for 60 seconds.";
+
+    /// <summary>
+    /// The setting that enables ASP.NET Core's forwarded headers (ASPNETCORE_FORWARDEDHEADERS_ENABLED).
+    /// </summary>
+    private const string ForwardedHeadersEnabledKey = "FORWARDEDHEADERS_ENABLED";
+
+    /// <summary>
+    /// The X-Forwarded-For header.
+    /// </summary>
+    private const string ForwardedForHeader = "X-Forwarded-For";
+
+    #endregion // Constants
+
     #region Fields
+
+    /// <summary>
+    /// Four client addresses, each a host of its own.
+    /// </summary>
+    private static readonly IPAddress[] _fourHosts = [IPAddress.Parse("198.51.100.1"), IPAddress.Parse("198.51.100.2"), IPAddress.Parse("198.51.100.3"), IPAddress.Parse("198.51.100.4")];
 
     /// <summary>
     /// The real-time limit of a replay of the fixture into the test server.
@@ -159,40 +193,44 @@ public sealed class IngestEndpointTests
     }
 
     /// <summary>
-    /// While 16 connections wait for their hello, a 17th upgrade is answered 503.
+    /// While 16 connections of 4 hosts wait for their hello, a 17th upgrade of a fifth host is answered 503.
     /// </summary>
     /// <returns>A task that completes when the test is done</returns>
     [TestMethod]
     [TestCategory("AC11")]
+    [TestCategory("AC1")]
     public async Task IngestEndpointSeventeenthPendingConnectionReturns503()
     {
         // Arrange
         using var baseFactory = new CensioServerFactory("Production");
-        using var factory = baseFactory.WithWebHostBuilder(builder => builder.ConfigureTestServices(services => services.AddSingleton<TimeProvider>(new FakeTimeProvider())));
-        var client = factory.Server.CreateWebSocketClient();
+        using var factory = WithFakeClock(baseFactory, new FakeTimeProvider());
 
-        await ConnectPendingAsync(client, IngestUri(factory), IngestConnections.MaxPendingHellos);
+        await ConnectPendingFromHostsAsync(factory, _fourHosts, IngestHosts.MaxPendingHellosPerHost);
+
+        var client = CreateClientFrom(factory, IPAddress.Parse("198.51.100.5"));
 
         // Act
         var exception = await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => client.ConnectAsync(IngestUri(factory), TestContext.CancellationToken), "The 17th upgrade should be refused");
 
         // Assert
-        Assert.HasCount(16, _sockets, "Sixteen connections should wait for their hello");
+        Assert.HasCount(16, _sockets, "Sixteen connections of four hosts should wait for their hello");
         Assert.AreEqual("Incomplete handshake, status code: 503", exception.Message, "The 17th pending connection should answer 503");
     }
 
     /// <summary>
-    /// An accept that fails leaves the pending place it took.
+    /// An accept that fails leaves the pending place and the host's place it took, and is not counted as a failed hello.
     /// </summary>
     /// <returns>A task that completes when the test is done</returns>
     [TestMethod]
     [TestCategory("AC11")]
+    [TestCategory("AC4")]
     public async Task IngestEndpointAcceptFailureLeavesPendingPlace()
     {
         // Arrange
         var builder = WebApplication.CreateBuilder();
 
         builder.WebHost.UseTestServer();
+        builder.Services.AddSingleton<TimeProvider>(new FakeTimeProvider());
         builder.Services.AddCensioIngest();
 
         await using var app = builder.Build();
@@ -214,6 +252,9 @@ public sealed class IngestEndpointTests
         await app.StartAsync(TestContext.CancellationToken);
 
         using var client = app.GetTestClient();
+        var hosts = app.Services.GetRequiredService<IngestHosts>();
+
+        FailHellos(hosts, null, IngestHosts.MaxFailedHellos - 1);
 
         // Act
         await SendIgnoringFailureAsync(client, IngestEndpoint.Path, TestContext.CancellationToken);
@@ -223,6 +264,242 @@ public sealed class IngestEndpointTests
 
         Assert.AreEqual(1, feature.AcceptCount, "The endpoint should have tried to accept");
         Assert.AreEqual(IngestConnections.MaxPendingHellos, CountFreePendingPlaces(connections), "The failed accept should leave its pending place");
+        Assert.AreEqual(IngestHosts.MaxPendingHellosPerHost, CountFreeHostPlaces(hosts, null), "The failed accept should leave the host's places free and not block it as a tenth failed hello");
+    }
+
+    /// <summary>
+    /// A host with 4 connections waiting gets 429 with an empty body on a fifth upgrade, while another host's upgrade is
+    /// accepted.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC1")]
+    public async Task IngestEndpointFifthPendingConnectionOfOneHostReturns429()
+    {
+        // Arrange
+        using var baseFactory = new CensioServerFactory("Production");
+        using var factory = WithFakeClock(baseFactory, new FakeTimeProvider());
+        var full = IPAddress.Parse("198.51.100.1");
+
+        await ConnectPendingFromHostsAsync(factory, [full], IngestHosts.MaxPendingHellosPerHost);
+
+        // Act
+        var (status, body) = await SendRequestAsync(factory, Upgrade(full));
+
+        // Assert
+        Assert.AreEqual(StatusCodes.Status429TooManyRequests, status, "The fifth upgrade of the host should answer 429");
+        Assert.AreEqual(string.Empty, body, "The 429 answer should have an empty body");
+        Assert.AreEqual(WebSocketState.Open, (await ConnectFromAsync(factory, IPAddress.Parse("198.51.100.2"))).State, "Another host's upgrade should be accepted");
+    }
+
+    /// <summary>
+    /// While 16 connections wait, a host with 4 of them gets 429, not 503: the host's bound is decided first.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC2")]
+    public async Task IngestEndpointFullHostWhileSixteenPendingReturns429()
+    {
+        // Arrange
+        using var baseFactory = new CensioServerFactory("Production");
+        using var factory = WithFakeClock(baseFactory, new FakeTimeProvider());
+
+        await ConnectPendingFromHostsAsync(factory, _fourHosts, IngestHosts.MaxPendingHellosPerHost);
+
+        // Act
+        var (status, body) = await SendRequestAsync(factory, Upgrade(_fourHosts[0]));
+
+        // Assert
+        Assert.HasCount(16, _sockets, "Sixteen connections should wait for their hello");
+        Assert.AreEqual(StatusCodes.Status429TooManyRequests, status, "The full host should answer 429 before the total of 16 is checked");
+        Assert.AreEqual(string.Empty, body, "The 429 answer should have an empty body");
+    }
+
+    /// <summary>
+    /// The refusals are decided in the order not an upgrade 400, Origin 403, blocked host 429, full host 429, 16 waiting
+    /// 503, each with an empty body, and none writes an ingest log line.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC2")]
+    public async Task IngestEndpointRefusedUpgradesWriteNoLogLine()
+    {
+        // Arrange
+        var loggerProvider = new RecordingLoggerProvider();
+        using var baseFactory = new CensioServerFactory("Production");
+        using var factory = WithFakeClock(baseFactory, new FakeTimeProvider(), builder => builder.ConfigureLogging(logging => logging.AddProvider(loggerProvider).AddFilter<RecordingLoggerProvider>((category, _) => category == IngestLogCategory)));
+        var blocked = IPAddress.Parse("203.0.113.9");
+        var fresh = IPAddress.Parse("203.0.113.10");
+
+        await ConnectPendingFromHostsAsync(factory, _fourHosts, IngestHosts.MaxPendingHellosPerHost);
+        FailHellos(factory.Services.GetRequiredService<IngestHosts>(), blocked, IngestHosts.MaxFailedHellos);
+
+        var linesBefore = loggerProvider.Logger.Entries.Count;
+
+        // Act
+        var answers = new List<(int? Status, string Body)>
+                      {
+                          await SendRequestAsync(factory, Plain(blocked)),
+                          await SendRequestAsync(factory, WithOrigin(Upgrade(blocked))),
+                          await SendRequestAsync(factory, Upgrade(blocked)),
+                          await SendRequestAsync(factory, Upgrade(_fourHosts[0])),
+                          await SendRequestAsync(factory, Upgrade(fresh))
+                      };
+
+        // Assert
+        Assert.AreSequenceEqual(new int?[] { 400, 403, 429, 429, 503 }, answers.Select(answer => answer.Status).ToList(), "The refusals should be plain 400, Origin 403, blocked host 429, full host 429 and 16 waiting 503");
+        Assert.IsEmpty(answers.Where(answer => answer.Body.Length > 0).ToList(), "Every refusal should have an empty body");
+        Assert.HasCount(linesBefore, loggerProvider.Logger.Entries, "No refusal should write an ingest log line");
+    }
+
+    /// <summary>
+    /// A plain request of a blocked host is answered 400, not 429: the request is checked before the host.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC2")]
+    public async Task IngestEndpointBlockedHostPlainRequestReturns400()
+    {
+        // Arrange
+        using var baseFactory = new CensioServerFactory("Production");
+        using var factory = WithFakeClock(baseFactory, new FakeTimeProvider());
+        var blocked = IPAddress.Parse("203.0.113.9");
+
+        FailHellos(factory.Services.GetRequiredService<IngestHosts>(), blocked, IngestHosts.MaxFailedHellos);
+
+        // Act
+        var (status, body) = await SendRequestAsync(factory, Plain(blocked));
+
+        // Assert
+        Assert.AreEqual(StatusCodes.Status400BadRequest, status, "The blocked host's plain request should answer 400");
+        Assert.AreEqual(string.Empty, body, "The 400 answer should have an empty body");
+        Assert.AreEqual(StatusCodes.Status429TooManyRequests, (await SendRequestAsync(factory, Upgrade(blocked))).Status, "The host should be blocked");
+    }
+
+    /// <summary>
+    /// An upgrade with an Origin header of a blocked host is answered 403, not 429: the Origin is checked before the host.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC2")]
+    public async Task IngestEndpointBlockedHostWithOriginReturns403()
+    {
+        // Arrange
+        using var baseFactory = new CensioServerFactory("Production");
+        using var factory = WithFakeClock(baseFactory, new FakeTimeProvider());
+        var blocked = IPAddress.Parse("203.0.113.9");
+
+        FailHellos(factory.Services.GetRequiredService<IngestHosts>(), blocked, IngestHosts.MaxFailedHellos);
+
+        // Act
+        var (status, body) = await SendRequestAsync(factory, WithOrigin(Upgrade(blocked)));
+
+        // Assert
+        Assert.AreEqual(StatusCodes.Status403Forbidden, status, "The blocked host's upgrade with an Origin header should answer 403");
+        Assert.AreEqual(string.Empty, body, "The 403 answer should have an empty body");
+        Assert.AreEqual(StatusCodes.Status429TooManyRequests, (await SendRequestAsync(factory, Upgrade(blocked))).Status, "The host should be blocked");
+    }
+
+    /// <summary>
+    /// The 10th hello of a host refused for its token blocks the host: its next upgrade gets 429 with an empty body, and
+    /// the start of the block is logged.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC3")]
+    public async Task IngestEndpointTenthTokenRefusedHelloBlocksHost()
+    {
+        // Arrange
+        var loggerProvider = new RecordingLoggerProvider();
+        using var baseFactory = new CensioServerFactory("Production", CreateDataDirectorySettings(CreateTemporaryDirectory()));
+        using var factory = WithFakeClock(baseFactory, new FakeTimeProvider(), builder => builder.ConfigureLogging(logging => logging.AddProvider(loggerProvider).AddFilter<RecordingLoggerProvider>((category, _) => category == IngestLogCategory)));
+        var host = IPAddress.Parse("198.51.100.1");
+
+        await RefuseTokenHellosAsync(factory, host, IngestHosts.MaxFailedHellos, true);
+
+        // Act
+        var (status, body) = await SendRequestAsync(factory, Upgrade(host));
+
+        // Assert
+        Assert.AreEqual(StatusCodes.Status429TooManyRequests, status, "The blocked host's upgrade should answer 429");
+        Assert.AreEqual(string.Empty, body, "The 429 answer should have an empty body");
+        Assert.ContainsSingle(entry => entry.Message == BlockStartLine, loggerProvider.Logger.Entries.ToList(), "The start of the block should be logged once");
+    }
+
+    /// <summary>
+    /// Hellos refused for their token count when they are decided, while their connections still wait for the peer's
+    /// close: the 10th blocks the host.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC3")]
+    public async Task IngestEndpointRefusedHellosInCloseWaitBlockHost()
+    {
+        // Arrange
+        using var baseFactory = new CensioServerFactory("Production", CreateDataDirectorySettings(CreateTemporaryDirectory()));
+        using var factory = WithFakeClock(baseFactory, new FakeTimeProvider());
+        var host = IPAddress.Parse("198.51.100.1");
+
+        await RefuseTokenHellosAsync(factory, host, IngestHosts.MaxFailedHellos, false);
+
+        // Act
+        var (status, _) = await SendRequestAsync(factory, Upgrade(host));
+
+        // Assert
+        Assert.HasCount(IngestHosts.MaxFailedHellos, _sockets, "Ten refused connections should wait in their close wait");
+        Assert.AreEqual(StatusCodes.Status429TooManyRequests, status, "The host should be blocked by hellos refused while their connections wait for the close");
+    }
+
+    /// <summary>
+    /// With forwarded headers enabled, upgrades carrying X-Forwarded-For count for their TCP peer: a fifth from one peer
+    /// gets 429 whatever address the header names, and a peer whose header names the full host is accepted.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC9")]
+    public async Task IngestEndpointForwardedForWithForwardedHeadersEnabledCountsForPeer()
+    {
+        // Arrange
+        using var baseFactory = new CensioServerFactory("Production");
+        using var factory = WithFakeClock(baseFactory, new FakeTimeProvider(), builder => builder.UseSetting(ForwardedHeadersEnabledKey, "true"));
+        var peer = IPAddress.Parse("192.0.2.1");
+
+        await ConnectPendingWithHeaderAsync(factory, peer, ForwardedForHeader, "203.0.113.{0}", IngestHosts.MaxPendingHellosPerHost);
+
+        // Act
+        var (status, _) = await SendRequestAsync(factory, WithHeader(Upgrade(peer), ForwardedForHeader, "203.0.113.5"));
+
+        // Assert
+        Assert.AreEqual(StatusCodes.Status429TooManyRequests, status, "The peer's fifth upgrade should answer 429 whatever X-Forwarded-For names");
+        Assert.AreEqual(WebSocketState.Open, (await ConnectFromAsync(factory, IPAddress.Parse("192.0.2.2"), ForwardedForHeader, peer.ToString())).State, "Another peer naming the full host in X-Forwarded-For should be accepted");
+    }
+
+    /// <summary>
+    /// Upgrades carrying X-Forwarded-For or Forwarded count for their TCP peer, with forwarded headers unset or enabled.
+    /// </summary>
+    /// <param name="header">The forwarded header</param>
+    /// <param name="format">The format of the header's value, with the index of the connection</param>
+    /// <param name="enabled">The value of the forwarded-headers setting, or <c>null</c> when unset</param>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC9")]
+    [DataRow(ForwardedForHeader, "203.0.113.{0}", null)]
+    [DataRow("Forwarded", "for=203.0.113.{0}", null)]
+    [DataRow("Forwarded", "for=203.0.113.{0}", "true")]
+    public async Task IngestEndpointForwardedHeadersCountForPeer(string header, string format, string? enabled)
+    {
+        // Arrange
+        using var baseFactory = new CensioServerFactory("Production");
+        using var factory = WithFakeClock(baseFactory, new FakeTimeProvider(), builder => builder.UseSetting(ForwardedHeadersEnabledKey, enabled));
+        var peer = IPAddress.Parse("192.0.2.1");
+
+        await ConnectPendingWithHeaderAsync(factory, peer, header, format, IngestHosts.MaxPendingHellosPerHost);
+
+        // Act
+        var (status, _) = await SendRequestAsync(factory, WithHeader(Upgrade(peer), header, string.Format(CultureInfo.InvariantCulture, format, 5)));
+
+        // Assert
+        Assert.AreEqual(StatusCodes.Status429TooManyRequests, status, $"The peer's fifth upgrade should answer 429 whatever {header} names, setting {enabled ?? "unset"}");
     }
 
     /// <summary>
@@ -548,6 +825,138 @@ public sealed class IngestEndpointTests
     }
 
     /// <summary>
+    /// Counts the free places of a host by taking them all.
+    /// </summary>
+    /// <param name="hosts">The hosts</param>
+    /// <param name="address">The address of the host</param>
+    /// <returns>The number of free places; 0 when the host is blocked</returns>
+    private static int CountFreeHostPlaces(IngestHosts hosts, IPAddress? address)
+    {
+        var count = 0;
+
+        while (count <= IngestHosts.MaxPendingHellosPerHost && hosts.TryEnterPendingHello(address) is not null)
+        {
+            count++;
+        }
+
+        return count;
+    }
+
+    /// <summary>
+    /// Records failed hellos of a host directly on the hosts, each on a place it got.
+    /// </summary>
+    /// <param name="hosts">The hosts</param>
+    /// <param name="address">The address of the host</param>
+    /// <param name="count">The number of failed hellos</param>
+    private static void FailHellos(IngestHosts hosts, IPAddress? address, int count)
+    {
+        for (var index = 0; index < count; index++)
+        {
+            var host = hosts.TryEnterPendingHello(address);
+
+            Assert.IsNotNull(host, "Each failed hello of the arrangement should get a place");
+            hosts.RecordFailedHello(host);
+        }
+    }
+
+    /// <summary>
+    /// Builds the server with a fake clock and further configuration.
+    /// </summary>
+    /// <param name="baseFactory">The server factory</param>
+    /// <param name="clock">The clock of the server</param>
+    /// <param name="configure">The further configuration, or <c>null</c> for none</param>
+    /// <returns>The configured factory</returns>
+    private static WebApplicationFactory<Program> WithFakeClock(CensioServerFactory baseFactory, FakeTimeProvider clock, Action<IWebHostBuilder>? configure = null)
+    {
+        return baseFactory.WithWebHostBuilder(builder =>
+                                              {
+                                                  builder.ConfigureTestServices(services => services.AddSingleton<TimeProvider>(clock));
+                                                  configure?.Invoke(builder);
+                                              });
+    }
+
+    /// <summary>
+    /// Builds a plain request to the endpoint from a client address.
+    /// </summary>
+    /// <param name="address">The client address</param>
+    /// <returns>The configuration of the request</returns>
+    private static Action<HttpContext> Plain(IPAddress address)
+    {
+        return context =>
+               {
+                   context.Request.Path = IngestEndpoint.Path;
+                   context.Connection.RemoteIpAddress = address;
+               };
+    }
+
+    /// <summary>
+    /// Builds a WebSocket upgrade to the endpoint from a client address, whose accept fails if it is reached.
+    /// </summary>
+    /// <param name="address">The client address</param>
+    /// <returns>The configuration of the request</returns>
+    private static Action<HttpContext> Upgrade(IPAddress address)
+    {
+        var plain = Plain(address);
+
+        return context =>
+               {
+                   plain(context);
+                   context.Features.Set<IHttpWebSocketFeature>(new FailingWebSocketFeature());
+               };
+    }
+
+    /// <summary>
+    /// Adds an Origin header to a request.
+    /// </summary>
+    /// <param name="request">The configuration of the request</param>
+    /// <returns>The configuration with the header</returns>
+    private static Action<HttpContext> WithOrigin(Action<HttpContext> request)
+    {
+        return WithHeader(request, "Origin", "http://browser.example");
+    }
+
+    /// <summary>
+    /// Adds a header to a request.
+    /// </summary>
+    /// <param name="request">The configuration of the request</param>
+    /// <param name="name">The name of the header</param>
+    /// <param name="value">The value of the header</param>
+    /// <returns>The configuration with the header</returns>
+    private static Action<HttpContext> WithHeader(Action<HttpContext> request, string name, string value)
+    {
+        return context =>
+               {
+                   request(context);
+                   context.Request.Headers[name] = value;
+               };
+    }
+
+    /// <summary>
+    /// Creates a WebSocket client whose connections come from a client address, with an optional header.
+    /// </summary>
+    /// <param name="factory">The server factory</param>
+    /// <param name="address">The client address</param>
+    /// <param name="header">The name of a header to send, or <c>null</c> for none</param>
+    /// <param name="value">The value of the header</param>
+    /// <returns>The client</returns>
+    private static WebSocketClient CreateClientFrom(WebApplicationFactory<Program> factory, IPAddress address, string? header = null, string? value = null)
+    {
+        var client = factory.Server.CreateWebSocketClient();
+
+        client.ConfigureRequest = request =>
+                                  {
+                                      request.HttpContext.Connection.RemoteIpAddress = address;
+
+                                      if (header is not null)
+                                      {
+                                          request.Headers[header] = value;
+                                      }
+                                  };
+
+        return client;
+    }
+
+    /// <summary>
     /// Opens connections that send no hello.
     /// </summary>
     /// <param name="client">The WebSocket client of the test server</param>
@@ -575,6 +984,101 @@ public sealed class IngestEndpointTests
         _sockets.Add(socket);
 
         return socket;
+    }
+
+    /// <summary>
+    /// Opens a connection from a client address, with an optional header, that is aborted after the test.
+    /// </summary>
+    /// <param name="factory">The server factory</param>
+    /// <param name="address">The client address</param>
+    /// <param name="header">The name of a header to send, or <c>null</c> for none</param>
+    /// <param name="value">The value of the header</param>
+    /// <returns>The socket</returns>
+    private Task<WebSocket> ConnectFromAsync(WebApplicationFactory<Program> factory, IPAddress address, string? header = null, string? value = null)
+    {
+        return ConnectAsync(CreateClientFrom(factory, address, header, value), IngestUri(factory));
+    }
+
+    /// <summary>
+    /// Opens connections that send no hello from each of a number of hosts.
+    /// </summary>
+    /// <param name="factory">The server factory</param>
+    /// <param name="hosts">The client addresses</param>
+    /// <param name="perHost">The number of connections of each host</param>
+    /// <returns>The task</returns>
+    private async Task ConnectPendingFromHostsAsync(WebApplicationFactory<Program> factory, IPAddress[] hosts, int perHost)
+    {
+        foreach (var host in hosts)
+        {
+            await ConnectPendingAsync(CreateClientFrom(factory, host), IngestUri(factory), perHost).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Opens connections that send no hello from one peer, each with a header naming another address.
+    /// </summary>
+    /// <param name="factory">The server factory</param>
+    /// <param name="peer">The TCP peer's address</param>
+    /// <param name="header">The name of the header</param>
+    /// <param name="format">The format of the header's value, with the index of the connection</param>
+    /// <param name="count">The number of connections</param>
+    /// <returns>The task</returns>
+    private async Task ConnectPendingWithHeaderAsync(WebApplicationFactory<Program> factory, IPAddress peer, string header, string format, int count)
+    {
+        for (var index = 1; index <= count; index++)
+        {
+            await ConnectFromAsync(factory, peer, header, string.Format(CultureInfo.InvariantCulture, format, index)).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Opens connections from a host that each send a hello with a wrong token and read its refusal and the server's close.
+    /// </summary>
+    /// <param name="factory">The server factory</param>
+    /// <param name="host">The client address</param>
+    /// <param name="count">The number of connections</param>
+    /// <param name="answerClose">Whether each connection answers the server's close, or leaves it in its close wait</param>
+    /// <returns>The task</returns>
+    private async Task RefuseTokenHellosAsync(WebApplicationFactory<Program> factory, IPAddress host, int count, bool answerClose)
+    {
+        for (var index = 0; index < count; index++)
+        {
+            var socket = await ConnectFromAsync(factory, host).ConfigureAwait(false);
+
+            await IngestClient.SendAsync(socket, IngestClient.Hello("MARKERTOKEN-wrong")).ConfigureAwait(false);
+
+            var (messages, _, _) = await IngestClient.ReceiveUntilCloseAsync(socket).ConfigureAwait(false);
+
+            Assert.IsInstanceOfType<ContractHelloRefused>(messages.Single(), "Each hello of the arrangement should be refused");
+
+            if (answerClose)
+            {
+                await IngestClient.CloseAsync(socket).ConfigureAwait(false);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Sends a request through the test server and reads its status and body.
+    /// </summary>
+    /// <param name="factory">The server factory</param>
+    /// <param name="request">The configuration of the request</param>
+    /// <returns>The status and body, or a <c>null</c> status when the request reached the accept</returns>
+    private async Task<(int? Status, string Body)> SendRequestAsync(WebApplicationFactory<Program> factory, Action<HttpContext> request)
+    {
+        try
+        {
+            var context = await factory.Server.SendAsync(request, TestContext.CancellationToken).ConfigureAwait(false);
+
+            using var reader = new StreamReader(context.Response.Body);
+
+            return (context.Response.StatusCode, await reader.ReadToEndAsync(TestContext.CancellationToken).ConfigureAwait(false));
+        }
+        catch (WebSocketException)
+        {
+            // The test host rethrows the failed accept of a request that was let through.
+            return (null, string.Empty);
+        }
     }
 
     /// <summary>
