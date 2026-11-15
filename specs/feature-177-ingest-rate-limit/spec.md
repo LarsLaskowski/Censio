@@ -37,7 +37,8 @@ a related defect the block per host bounds (E3). Only a refused hello with a rep
 - E1: A failed hello is a connection that got a place and whose hello was not accepted: refused `unsupportedVersion` or
   `tokenRefused`, closed without a reply (*The hello*, step 1 and 3, the 10-second timeout), or ended by the peer first.
   Not counted: `companionConnected` (it needs the token, and the real Companion meets it while its earlier connection is
-  still stored), a profile that could not be stored (a server fault) and a hello cut short by the server's stop.
+  still stored), a profile that could not be stored (a server fault), a hello cut short by the server's stop and a WebSocket
+  accept that fails.
 - E2: An accepted hello sets the host's count to zero; a running block is not shortened.
 - E3: The window slides: a host is blocked when a failed hello makes 10 of its failed hellos lie within the last 60
   seconds. Refused upgrades are no failed hellos and do not extend a block; those of a blocked host are counted for the
@@ -69,8 +70,9 @@ a related defect the block per host bounds (E3). Only a refused hello with a rep
   `Information` (end), category `Censio.Server.Ingest`.
 - N5: A Companion with the right token, one connection at a time, sees no change; the replay reports `429` as
   `server unreachable` (`replay-sending.md`).
-- N6: Per host at most 12 lines in any 60 seconds; a host below the threshold writes up to 9 for as long as it goes on.
-  Many hosts can still grow the log: an accepted risk, Docker log rotation (`--log-opt max-size`) the remedy.
+- N6: Per host at most 16 lines in any 60 seconds (10 refusals, the block's start line, up to 4 connections waiting when
+  it starts (E5), and the end line of an earlier block); a host below the threshold writes up to 9 for as long as it goes
+  on. Many hosts can still grow the log: an accepted risk, Docker log rotation (`--log-opt max-size`) the remedy.
 
 ## Acceptance criteria
 

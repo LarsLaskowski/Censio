@@ -31,6 +31,8 @@ the hello, not at the upgrade.
    the ground on which 0064 rejected an origin list.
 7. **Naming the blocked address in the log** — lets the operator block it; breaks the rule that no line names an
    address.
+8. **Falling back to the total when only one address is seen** — would undo a collapse of all clients to one address
+   (a proxy, some Docker setups); a single genuine Companion shows one address too, so nothing marks the collapse.
 
 ## Decision
 
