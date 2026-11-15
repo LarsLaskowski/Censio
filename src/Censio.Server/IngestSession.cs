@@ -353,6 +353,7 @@ public sealed partial class IngestSession : IDisposable
 
         if (isMessage == false)
         {
+            ReportUndecidedHello();
             await CloseAndDiscardAsync(closeStatus, buffer).ConfigureAwait(false);
 
             return false;
@@ -363,6 +364,7 @@ public sealed partial class IngestSession : IDisposable
         if (read.Error is { Kind: ContractErrorKind.UnsupportedVersion, Version: { } version })
         {
             LogUnsupportedVersion(_logger, version);
+            _admission.RecordFailedHello();
             await RefuseHelloAsync(ContractHelloRefusal.UnsupportedVersion, version, buffer).ConfigureAwait(false);
 
             return false;
@@ -370,6 +372,7 @@ public sealed partial class IngestSession : IDisposable
 
         if (read.Message is not ContractHello hello)
         {
+            _admission.RecordFailedHello();
             await CloseAndDiscardAsync(WebSocketCloseStatus.PolicyViolation, buffer).ConfigureAwait(false);
 
             return false;
@@ -389,6 +392,7 @@ public sealed partial class IngestSession : IDisposable
         if (_access.IsTokenAccepted(hello.Token) == false)
         {
             LogTokenRefused(_logger);
+            _admission.RecordFailedHello();
             await RefuseHelloAsync(ContractHelloRefusal.TokenRefused, ContractReader.CurrentVersion, buffer).ConfigureAwait(false);
 
             return false;
@@ -397,6 +401,7 @@ public sealed partial class IngestSession : IDisposable
         if (_admission.TryTakeCompanion() == false)
         {
             LogCompanionConnected(_logger);
+            _admission.RecordUncountedHello();
             await RefuseHelloAsync(ContractHelloRefusal.CompanionConnected, ContractReader.CurrentVersion, buffer).ConfigureAwait(false);
 
             return false;
@@ -408,6 +413,7 @@ public sealed partial class IngestSession : IDisposable
 
         if (stored.Outcome == ServerStoreOutcome.Failed)
         {
+            _admission.RecordUncountedHello();
             ReleasePlace();
             LogStoreFailed(_logger, stored.Failure);
             await CloseAndDiscardAsync(WebSocketCloseStatus.InternalServerError, buffer).ConfigureAwait(false);
@@ -416,6 +422,7 @@ public sealed partial class IngestSession : IDisposable
         }
 
         _helloAccepted = true;
+        _admission.RecordAcceptedHello();
         LogCompanionAccepted(_logger);
         _state.SetCompanionConnected();
 
@@ -716,7 +723,9 @@ public sealed partial class IngestSession : IDisposable
                 return false;
             }
 
-            await _webSocket.SendAsync(written.Utf8Json, WebSocketMessageType.Text, true, CancellationToken.None).ConfigureAwait(false);
+            using var sendTimeout = new CancellationTokenSource(SendTimeout, _timeProvider);
+
+            await _webSocket.SendAsync(written.Utf8Json, WebSocketMessageType.Text, true, sendTimeout.Token).ConfigureAwait(false);
 
             return true;
         }
@@ -771,6 +780,7 @@ public sealed partial class IngestSession : IDisposable
         }
 
         LeavePendingHello();
+        _admission.RecordFailedHello();
         _timeoutClose = CloseAsync(WebSocketCloseStatus.PolicyViolation);
     }
 
@@ -788,6 +798,21 @@ public sealed partial class IngestSession : IDisposable
     private void OnCloseWaitElapsed()
     {
         _webSocket.Abort();
+    }
+
+    /// <summary>
+    /// Reports a hello that ended with no decision: a failed hello, unless the server is stopping.
+    /// </summary>
+    private void ReportUndecidedHello()
+    {
+        if (_stoppingToken.IsCancellationRequested)
+        {
+            _admission.RecordUncountedHello();
+        }
+        else
+        {
+            _admission.RecordFailedHello();
+        }
     }
 
     /// <summary>
@@ -825,6 +850,8 @@ public sealed partial class IngestSession : IDisposable
     {
         _helloTimer?.Dispose();
         LeavePendingHello();
+
+        ReportUndecidedHello();
         _webSocket.Abort();
 
         await _timeoutClose.ConfigureAwait(false);

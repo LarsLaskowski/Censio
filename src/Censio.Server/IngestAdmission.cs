@@ -14,8 +14,6 @@ public sealed class IngestAdmission
     /// </summary>
     private readonly IngestConnections _connections;
 
-#pragma warning disable S4487 // Skeleton: removed with the implementation
-
     /// <summary>
     /// The hosts of the endpoint.
     /// </summary>
@@ -31,7 +29,10 @@ public sealed class IngestAdmission
     /// </summary>
     private readonly IPAddress? _address;
 
-#pragma warning restore S4487
+    /// <summary>
+    /// A value indicating whether the outcome of the hello was reported (0 not yet, 1 reported).
+    /// </summary>
+    private int _reported;
 
     #endregion // Fields
 
@@ -81,33 +82,47 @@ public sealed class IngestAdmission
         _connections.ReleaseCompanion();
     }
 
-#pragma warning disable S2325, RH2003 // Skeleton: removed with the implementation
-
     /// <summary>
-    /// Reports that the hello of the connection failed.
+    /// Reports that the hello of the connection failed; the host's waiting place is left with it.
     /// </summary>
     public void RecordFailedHello()
     {
-        throw new NotImplementedException();
+        if (TryReport())
+        {
+            _hosts.RecordFailedHello(_host);
+        }
     }
 
     /// <summary>
-    /// Reports that the hello of the connection was accepted.
+    /// Reports that the hello of the connection was accepted; the host's waiting place is left with it.
     /// </summary>
     public void RecordAcceptedHello()
     {
-        throw new NotImplementedException();
+        if (TryReport())
+        {
+            _hosts.RecordAcceptedHello(_host, _address);
+        }
     }
 
     /// <summary>
-    /// Reports that the hello of the connection ended without counting as failed or accepted.
+    /// Reports that the hello of the connection ended without counting as failed or accepted; the host's waiting place is left.
     /// </summary>
     public void RecordUncountedHello()
     {
-        throw new NotImplementedException();
+        if (TryReport())
+        {
+            _hosts.LeavePendingHello(_host);
+        }
     }
 
-#pragma warning restore S2325, RH2003
+    /// <summary>
+    /// Takes the right to report the outcome, which only the first report has.
+    /// </summary>
+    /// <returns><c>true</c> when no outcome was reported before</returns>
+    private bool TryReport()
+    {
+        return Interlocked.Exchange(ref _reported, 1) == 0;
+    }
 
     #endregion // Methods
 }

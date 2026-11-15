@@ -1,6 +1,8 @@
 using Censio.Contracts;
 
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Net.Http.Headers;
 
@@ -65,6 +67,9 @@ public static class IngestEndpoint
         services.TryAddSingleton(static provider => new IngestHosts(provider.GetRequiredService<TimeProvider>(), provider.GetRequiredService<ILoggerFactory>().CreateLogger(LogCategory)));
         services.TryAddSingleton(TimeProvider.System);
 
+        // X-Forwarded-For never replaces the remote address: the limits count the TCP peer.
+        services.PostConfigure<ForwardedHeadersOptions>(static options => options.ForwardedHeaders &= ~ForwardedHeaders.XForwardedFor);
+
         return services;
     }
 
@@ -108,20 +113,33 @@ public static class IngestEndpoint
 
         var services = context.RequestServices;
         var connections = services.GetRequiredService<IngestConnections>();
+        var hosts = services.GetRequiredService<IngestHosts>();
+        var address = context.Connection.RemoteIpAddress;
+        var host = hosts.TryEnterPendingHello(address);
+
+        if (host is null)
+        {
+            context.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+
+            return;
+        }
 
         if (connections.TryEnterPendingHello() == false)
         {
+            hosts.LeavePendingHello(host);
             context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
 
             return;
         }
+
+        var admission = new IngestAdmission(connections, hosts, host, address);
 
         var sessionStarted = false;
 
         try
         {
             using var webSocket = await context.WebSockets.AcceptWebSocketAsync(CreateAcceptContext()).ConfigureAwait(false);
-            using var session = new IngestSession(webSocket, access, new IngestAdmission(connections, services.GetRequiredService<IngestHosts>(), new IngestHost(null), context.Connection.RemoteIpAddress), state, services.GetRequiredService<TimeProvider>(), services.GetRequiredService<ILoggerFactory>().CreateLogger(LogCategory), serverVersion);
+            using var session = new IngestSession(webSocket, access, admission, state, services.GetRequiredService<TimeProvider>(), services.GetRequiredService<ILoggerFactory>().CreateLogger(LogCategory), serverVersion);
 
             // From its first line the session owns the pending place.
             sessionStarted = true;
@@ -132,7 +150,10 @@ public static class IngestEndpoint
         {
             if (sessionStarted == false)
             {
-                connections.LeavePendingHello();
+                admission.LeavePendingHello();
+
+                // A failed accept is not a failed hello: the handshake can fail on the server's side.
+                admission.RecordUncountedHello();
             }
         }
     }
