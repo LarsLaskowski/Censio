@@ -104,9 +104,7 @@ arrives in parts, and at most 32,768 bytes. The server decides in this order:
   and one whose message arrives in parts over more than 60 seconds, stay connected (idle at 110 seconds and a message
   over 75 seconds measured). The session has no idle timer of its own; liveness is the keep-alive alone.
 - Every send of the server (a reply or an acknowledgement) is bound to 30 seconds: one not finished by then aborts the
-  connection without a close frame, and the session ends as after any lost connection, the place freed. A connection
-  whose peer stops reading is thus gone about 33 seconds after the last frame the server read (the store, about 3
-  seconds, plus 30). A Companion that reads under about 37 KB/s cannot take the largest acknowledgement (a catalog
+  connection without a close frame, and the session ends as after any lost connection, the place freed. A connection whose peer stops reading while the server's replies back up is thus gone about 33 seconds after the last frame the server read (the store, about 3 seconds, plus 30); one whose replies still fit and that then sends nothing is ended by the keep-alive (56.18 seconds measured). A Companion that reads under about 37 KB/s cannot take the largest acknowledgement (a catalog
   upload with 16,384 `missingIcons`, about 1.1 MB) in time: every such upload is aborted and the Companion reconnects
   and resends in a loop.
 - Limit: .NET answers a ping only inside a receive. A Companion that keeps a receive pending, as #40 does, answers at
@@ -261,9 +259,7 @@ unset, none of the file checks runs.
   0082).
 - **Log volume.** Many hosts or IPv6 addresses can still grow the log by up to 16 lines per host and minute; Docker's
   default `json-file` driver does not rotate (remedy: `--log-opt max-size`).
-- **A token holder that never reads.** A Companion with the token that keeps sending frames without reading keeps the
-  one place as long as it likes: .NET answers pings inside the receive, out of the session's reach, so the send bound
-  has nothing to time out. Measured: a client sending a ping every 10 ms and never reading was open at 200 seconds.
+- **A token holder that never reads.** A Companion with the token that keeps sending frames the server does not answer (pings, `status` messages) without reading keeps the one place as long as it likes: .NET answers pings inside the receive, out of the session's reach, so the send bound has nothing to time out; one whose acknowledged messages back up is ended by the send bound. Measured: a client sending a ping every 10 ms and never reading was open at 200 seconds.
   It was so before the limits and no bound is added (record 0082); rotating the token ends it.
 - **Token off.** With `RequireToken` `false` anyone who reaches the server can send data, and the first to connect keeps
   the one Companion place. Use the switch only on a network where every host is trusted.
@@ -286,12 +282,7 @@ times and one timer, plus at most 14 refused connections per entry in their clos
 
 ## Measurements
 
-The limits per host, the send bound and the keep-alive under it were measured on the published Release server of the
-branch head (Linux), with scratch clients outside the repository: a raw TCP WebSocket that never answers a ping, which
-sends session-start messages (each acknowledged) after reading its `helloAccepted` once.
-
-Timing of the keep-alive, the send bound and the limits was measured on the real server (the keep-alive uses .NET's own
-timer, not a fake clock); the programs were scratch code outside the repository.
+Timing of the keep-alive and the send bound, and the client address under Docker, were measured on the published Release server (Linux; the keep-alive uses .NET's own timer, not a fake clock); the programs were scratch code outside the repository.
 
 ### Keep-alive on Kestrel
 
@@ -320,8 +311,7 @@ frame (56.24 measured), under 60.
 
 ### Send bound, limits per host and client address
 
-The raw client sends session-start messages (each acknowledged) after reading its `helloAccepted` once, on the published
-Release server of the branch head.
+A raw TCP WebSocket client that never answers a ping sends session-start messages (each acknowledged) after reading its `helloAccepted` once.
 
 | Case | Result |
 | ---- | ------ |
@@ -361,10 +351,10 @@ catalog, not only its size, decides the peak.
 - [`decisions/0020`](../decisions/0020-one-companion-per-server-with-savegame-profiles.md) — one Companion per server.
 - [`decisions/0058`](../decisions/0058-contract-read-strictly-by-exact-version-with-a-frozen-hello.md) — the version is checked before the token and the second Companion.
 - [`decisions/0061`](../decisions/0061-ingest-token-generated-into-a-file-of-the-data-directory.md) — the token is generated into a file of the data directory or read from a configured file, and compared by its hash.
-- [`decisions/0062`](../decisions/0062-one-companion-second-refused-silence-found-by-websocket-pings.md) — a second Companion is refused, a silent connection is found by pings, every close has a 2-second wait.
+- [`decisions/0062`](../decisions/0062-one-companion-second-refused-silence-found-by-websocket-pings.md) — a second Companion is refused, a silent connection is found by pings, every send is bound in time, every close has a 2-second wait.
 - [`decisions/0063`](../decisions/0063-refused-contract-messages-acknowledged-by-id-or-the-connection-closed.md) — a refused message is acknowledged by its id when the reader yields one, else the connection closes.
 - [`decisions/0064`](../decisions/0064-ingest-refuses-browser-upgrades-and-bounds-pending-hellos.md) — browser upgrades are refused, pending hellos are bounded.
-- [`decisions/0082`](../decisions/0082-ingest-limits-connections-per-host-and-blocks-failing-hosts.md) — limits per host, the block of a host whose hellos keep failing, the send bound.
+- [`decisions/0082`](../decisions/0082-ingest-limits-connections-per-host-and-blocks-failing-hosts.md) — limits per host and the block of a host whose hellos keep failing.
 - [`decisions/0006`](../decisions/0006-server-plain-http-and-open-health.md) — plain HTTP, no web login.
 - [`decisions/0068`](../decisions/0068-ingest-acknowledges-a-message-only-after-it-is-stored.md) — a message is acknowledged only after it is stored; a failed store closes the connection with 1011.
 - [`decisions/0070`](../decisions/0070-hello-names-the-stored-catalog-only-when-all-its-icons-are-stored.md) — the hello names the catalog only when all its icons are stored.
