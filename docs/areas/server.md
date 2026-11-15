@@ -44,6 +44,8 @@ the Docker health probe rely on it.
   `SECURITY.md`). Antiforgery protection is on.
 - `/ingest` is a WebSocket route for the Companion that needs no web login either: it authenticates a connection by the
   token of the first message, unless the setting `Censio:Ingest:RequireToken` is `false` ([`ingest.md`](ingest.md)).
+  Its limits count the TCP peer's address: `ASPNETCORE_FORWARDEDHEADERS_ENABLED` `true` takes the scheme from
+  `X-Forwarded-Proto` only, and `X-Forwarded-For` never replaces the client address (record 0082).
   It speaks plain HTTP and WebSocket like the rest.
 - Host filtering is off (`AllowedHosts` is `*`), a deliberate choice (record 0006).
 

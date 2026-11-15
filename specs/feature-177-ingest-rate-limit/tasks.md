@@ -12,5 +12,5 @@ Plan: [plan.md](plan.md)
 | 6 | G2 | Implement the endpoint's `429`, the admission, the registration and the forwarded-headers post-configuration; the session's outcome reports and send bound | src/Censio.Server/IngestEndpoint.cs, src/Censio.Server/IngestAdmission.cs, src/Censio.Server/IngestSession.cs | AC1, AC2, AC3, AC4, AC8, AC9 | 5 | Dev | [x] |
 | 7 | G2 | Mutation check: AC9's tests fail with the `PostConfigure` removed, then restored | — | AC9 | 6 | Tester | [x] |
 | 8 | G2 | Measurements *noread-send*, *noread-then-idle*, *idle* (optionally *ping-flood*) and *client-address* | — (results into docs/areas/ingest.md, row 9) | AC1, AC8 | 6 | Dev | [x] |
-| 9 | G2 | Documentation updates of the plan; report the `.squad/project.md` text | docs/areas/ingest.md, docs/areas/server.md, docs/ARCHITECTURE.md, SECURITY.md, docs/USER_GUIDE.md | AC1, AC2, AC3, AC5, AC6, AC7, AC8, AC9 | 7, 8 | Dev | [ ] |
-| 10 | G2 | Write in the `.squad/project.md` type list the Dev reports | .squad/project.md | AC1 | 9 | Orchestrator | [ ] |
+| 9 | G2 | Documentation updates of the plan; report the `.squad/project.md` text | docs/areas/ingest.md, docs/areas/server.md, docs/ARCHITECTURE.md, SECURITY.md, docs/USER_GUIDE.md | AC1, AC2, AC3, AC5, AC6, AC7, AC8, AC9 | 7, 8 | Dev | [x] |
+| 10 | G2 | Write in the `.squad/project.md` type list the Dev reports | .squad/project.md | AC1 | 9 | Orchestrator | [x] |

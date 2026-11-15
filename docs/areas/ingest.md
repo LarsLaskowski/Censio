@@ -2,10 +2,10 @@
 
 ## Scope
 
-The server's WebSocket endpoint for the Companion: the route and its HTTP refusals, the hello and its checks in order,
-the ingest token (file, a file named by configuration, generation, rotation, the switch that turns it off, comparison), one Companion at a time and
-how a silent connection is found, what the server answers to each message, the closes, the bounds and times, the log
-lines and what never reaches a log. The operator who starts the server and the Companion that connects (a replay with `--server`, live sending #40) rely on it.
+The server's WebSocket endpoint for the Companion: the route and its HTTP refusals, the hello and its checks, the ingest
+token, one Companion at a time and how a silent connection is found, the limits per host, the answers to each message,
+the closes, the bounds and times, the log lines and what never reaches a log. The operator who starts the server and the
+Companion that connects rely on it.
 The messages themselves, their reader and the refusal texts are in [`contract.md`](contract.md). A message is stored
 before it is acknowledged (record 0068), the state kept from it is in [`server-state.md`](server-state.md), and the data
 pages that show it are in [`web-pages.md`](web-pages.md).
@@ -17,8 +17,9 @@ pages that show it are in [`web-pages.md`](web-pages.md).
 - The Companion connects with a WebSocket to `/ingest` (`ws://<host>:<port>/ingest`, plain HTTP, no subprotocol;
   record 0006). The route answers every HTTP method.
 - A request that is no WebSocket upgrade is answered `400`; an upgrade that carries an `Origin` header (a browser
-  always sends one, the Companion none) `403`; a further upgrade while 16 connections wait for their hello `503`. All
-  three have an empty body, and they are decided in this order.
+  always sends one, the Companion none) `403`; an upgrade of a blocked host, or of a host that already has 4 connections
+  waiting for their hello, `429`; a further upgrade while 16 connections wait for their hello `503`. All four have an
+  empty body, write no log line and are decided in this order (*Limits per host*).
 - The pages and `/health` are unchanged by the endpoint ([`server.md`](server.md)).
 
 ### The hello
@@ -65,16 +66,14 @@ arrives in parts, and at most 32,768 bytes. The server decides in this order:
 - Both files are read up to 65,536 bytes; surrounding space, tab, carriage return and line feed are trimmed, and what is
   left must be 32 to 1,024 characters of visible ASCII (`!` to `~`). A generated token (43 characters) and
   `openssl rand -base64 32` (44) satisfy it.
-- The file is written to `ingest-token.tmp`, flushed and moved to `ingest-token` without overwriting an existing file;
-  on a failure the temporary file is deleted, so a partial token is never read at a later start.
-- On Linux the file is created with mode `0600`, readable by its owner only; in the Docker image the owner is the
-  container user (`1654`, or the `--user` of the container). On Windows (local mode) the file takes the access rules of
-  its folder; no owner-only mode is set there.
+- The file is written to `ingest-token.tmp`, flushed and moved to `ingest-token` without overwriting; a failure deletes
+  the temporary file, so a partial token is never read.
+- On Linux the file is created with mode `0600`; in the Docker image the owner is the container user (`1654`, or the
+  `--user` of the container). On Windows the file takes the access rules of its folder.
 - Rotation of the generated token: stop the server, delete `ingest-token`, start the server; it generates a new token,
-  and a hello with the old one is refused as in *The hello*. The Companion is given the new token. Rotation of a
-  configured token: change the configured file and restart the server; a hello with the old token is refused. The
-  token is not set in a setting of its own, because an environment value shows in `docker inspect` and the process
-  environment (record 0061).
+  and a hello with the old one is refused as in *The hello*; the Companion is given the new token. A configured token
+  is rotated by changing its file and restarting. The token has no setting of its own, because an environment value
+  shows in `docker inspect` (record 0061).
 - A presented token is compared by its SHA-256 against the SHA-256 of the stored token with a fixed-time comparison, so
   neither the position of a difference nor the length shows in the time. The server keeps only that hash for the
   comparison.
@@ -101,15 +100,46 @@ arrives in parts, and at most 32,768 bytes. The server decides in this order:
   35 seconds. A ping is sent only after 15 seconds in which no data arrived, so a connection that receives bytes does
   not get one. The measured worst case from the last received frame to the abort of a connection that vanished is
   56.24 seconds, under 60 (*Measurements*); the next hello is then accepted.
-- Silence is counted in WebSocket frames, not in contract messages: a Companion that answers pings but sends no message
-  for any time, and one whose message arrives in parts over more than 60 seconds, stay connected (idle at 110 seconds
-  and a message over 75 seconds measured).
-- After the hello the session has no idle timer of its own; liveness is the keep-alive alone.
+- Silence is counted in WebSocket frames, not in contract messages: a Companion that answers pings but sends no message,
+  and one whose message arrives in parts over more than 60 seconds, stay connected (idle at 110 seconds and a message
+  over 75 seconds measured). The session has no idle timer of its own; liveness is the keep-alive alone.
+- Every send of the server (a reply or an acknowledgement) is bound to 30 seconds: one not finished by then aborts the
+  connection without a close frame, and the session ends as after any lost connection, the place freed. A connection
+  whose peer stops reading is thus gone about 33 seconds after the last frame the server read (the store, about 3
+  seconds, plus 30). A Companion that reads under about 37 KB/s cannot take the largest acknowledgement (a catalog
+  upload with 16,384 `missingIcons`, about 1.1 MB) in time: every such upload is aborted and the Companion reconnects
+  and resends in a loop.
 - Limit: .NET answers a ping only inside a receive. A Companion that keeps a receive pending, as #40 does, answers at
-  once. A Companion without a receive pending, whose ping is still unanswered when a message begins, can answer it only
-  after that message, so the message must end within 35 seconds of the ping; otherwise the connection is aborted
-  and the Companion reconnects and resends its unacknowledged messages (measured: a message of 20 seconds survives, one
-  of 40 seconds is aborted).
+  once; one without, whose ping is unanswered when a message begins, answers only after that message, which must end
+  within 35 seconds of the ping, else the connection is aborted and the Companion reconnects and resends its
+  unacknowledged messages (measured: 20 seconds survives, 40 is aborted).
+
+### Limits per host
+
+- A host is the TCP peer's IP address. An IPv4-mapped IPv6 address is its IPv4 address, a scope id is dropped, every
+  other IPv6 address is a host of its own (no `/64` grouping), connections without an address are one host.
+  `X-Forwarded-For` never changes the address: the server clears that part of ASP.NET Core's forwarded-headers
+  options, so `ASPNETCORE_FORWARDEDHEADERS_ENABLED` `true` affects the scheme only; .NET does not process the
+  `Forwarded` header (record 0082).
+- A host has at most 4 connections waiting for their hello, each holding its place until the hello is decided; a fifth
+  upgrade is answered `429`.
+- A *failed hello* is a connection that got a place and whose hello was not accepted: `unsupportedVersion`,
+  `tokenRefused`, a first message that is no hello, binary, unreadable or not complete in 10 seconds, or a connection
+  its peer ended first. It counts when the hello is decided, before the reply, so a refused connection in its close
+  wait counts. Not counted: a `companionConnected` refusal, a profile that could not be stored, a stopping server and a
+  failed WebSocket accept. An accepted hello sets the host's count to zero; a block stays.
+- The 10th failed hello within 60 seconds (each counts for 60) blocks the host for 60 seconds: its upgrades get `429`
+  and do not extend the block, and a connection already waiting is decided as usual, its failed hello not counted.
+  After the block the count starts at zero; a restart forgets every count and block.
+- Block lines, none naming an address: at the start, `Warning`, `A host was refused 10 times within 60 seconds; its
+  connections are refused for 60 seconds.`; at the end, `Information`, from a timer (so also for a host that went
+  quiet), `A host's block ended; <n> connections were refused while it lasted.`, `<n>` the `429` of the block. A host
+  writes at most 16 lines in any 60 seconds: 10 refusals, the start line, up to 4 connections already waiting and the
+  end line of an earlier block.
+- At most 1,024 hosts have an entry; one is forgotten when nothing of it waits and 60 seconds have passed since its last
+  failed hello and its block's end. Hosts beyond the table share one entry and its limits. The host of the last accepted
+  hello keeps an entry of its own outside the table; an accepted hello on the shared entry gives its address such an
+  entry and leaves the shared entry's failures alone.
 
 ### Messages after the hello
 
@@ -128,8 +158,7 @@ first:
   catalog upload when the SHA-256 of its document equals the stored catalog's. For a catalog upload `missingIcons`
   lists exactly the distinct icon references of its document, sorted, that have no stored icon, a resend included; for
   the other types the list is empty. A later catalog upload replaces the earlier one, whatever its age.
-- A session start or session end the reader accepts is answered the same way and stores nothing; it changes no state, and
-  a `status` message changes only the Companion's game state.
+- A session start or session end the reader accepts is answered the same way and stores nothing.
 - A message whose storing fails (disk full, file removed) is not acknowledged: the connection is closed with 1011 and an
   empty reason, the error line of *Log lines* is logged and the message counts as refused. The Companion reconnects and
   resends it.
@@ -138,9 +167,8 @@ first:
   `catalogMalformed`, `catalogUnsupportedVersion`, `catalogInvalid`, `catalogTooLarge`), `refusedVersion` the
   catalog's schema version for `catalogUnsupportedVersion` and `null` otherwise, `missingIcons` empty. The connection
   stays open (record 0063).
-- Everything else closes the connection without an acknowledgement: a message whose `id` cannot be read (*malformed*,
-  *unsupported version*, *invalid* with an unusable `id`) with 1008, a binary frame with 1003, a message over the
-  bound, or one the reader refuses as *too large* (its own size and count bounds), with 1009.
+- Everything else closes the connection without an acknowledgement: a message whose `id` cannot be read with 1008, a
+  binary frame with 1003, a message over the bound or one the reader refuses as *too large* with 1009.
 - At the close of a connection whose hello was accepted the server logs
   `Companion disconnected; <a> messages accepted, <r> refused.` with its counts (a `status` and every message
   acknowledged with `refusal` `null` count as accepted; an acknowledged refusal and a message that closes the
@@ -157,12 +185,12 @@ first:
 | Binary frame | 1003 | none |
 | Every other case of the first message and of the message phase that closes | 1008 | none |
 | The server stops | 1001 | none |
+| A send not finished within 30 seconds | none: the connection is aborted | none |
 
 The reason of every close is empty. A close frame is sent without waiting for the peer; the server then discards what
-the peer sends until its close frame arrives or 2 seconds pass (the close wait), and aborts the socket. A refused or
-violating peer therefore holds its connection at most 2 seconds after the close, however it keeps sending frames, and
-it still reads the close status before the connection ends (measured: a client received the close frame with status
-1000 after a refused hello and with 1008 after a second hello, each before its connection ended).
+the peer sends until its close frame arrives or 2 seconds pass (the close wait), then aborts. A refused or
+violating peer therefore holds its connection at most 2 seconds after the close, and still reads the close status
+(measured: 1000 after a refused hello, 1008 after a second hello).
 
 ### Bounds and times
 
@@ -171,7 +199,10 @@ it still reads the close status before the connection ends (measured: a client r
 | Complete first message, from the upgrade | 10 seconds |
 | First message | 32,768 bytes |
 | Later message | 25,165,824 bytes (24 MiB), never read past one byte beyond |
-| Connections that have not completed their hello | 16 |
+| Connections that have not completed their hello | 16 in total, 4 per host |
+| Failed hellos that block a host; the window; the block | 10; 60 seconds; 60 seconds |
+| Hosts with an entry | 1,024 |
+| Send of the server | 30 seconds |
 | Ping interval, pong timeout | 15 seconds, 35 seconds |
 | Close wait | 2 seconds |
 | Token | generated 43 characters; every token 32 to 1,024 characters; file at most 65,536 bytes |
@@ -183,7 +214,7 @@ read at a time.
 ### Log lines
 
 Besides the lines named above: a message or a hello's profile that could not be stored logs, at `Error` and with the
-exception, `A message could not be stored; the connection is closed.`; the category of the session lines is `Censio.Server.Ingest`. No line holds the token,
+exception, `A message could not be stored; the connection is closed.`; the two block lines of *Limits per host* are logged too; the category of the session lines is `Censio.Server.Ingest`. No line holds the token,
 a profile or island name, a Companion version or any other content of a message, no remote address, and no path or value
 of `Censio:Ingest:TokenFile`; the only value
 taken from a message is the found contract version number. A first message that closes the connection without a
@@ -211,108 +242,107 @@ order:
    character outside `!` to `~`, or over 65,536 bytes):
    `The ingest token file named by Censio:Ingest:TokenFile holds no valid token (32 to 1,024 visible ASCII characters); the server stops.`
 
-Without the setting and with the token required:
-
-- the token file cannot be read: `The ingest token file '<file>' cannot be read; the server stops.`
-- the file holds no valid token (empty after trimming, fewer than 32 or more than 1,024 characters, a character outside
-  `!` to `~`, or over 65,536 bytes): `The ingest token file '<file>' holds no valid token (32 to 1,024 visible ASCII characters); the server stops.`
-- the file cannot be created: `The ingest token file '<file>' cannot be created; the server stops. Make the data directory writable for the user the server runs as.`
+Without the setting and with the token required the same two failures, and a file that cannot be created, stop the start
+with the file's path in the line: `The ingest token file '<file>' cannot be read; the server stops.`,
+`The ingest token file '<file>' holds no valid token (32 to 1,024 visible ASCII characters); the server stops.` and
+`The ingest token file '<file>' cannot be created; the server stops. Make the data directory writable for the user the server runs as.`
 
 These checks run after the data-protection key ring ([`server.md`](server.md)). With the switch `false` and the setting
 unset, none of the file checks runs.
 
 ### Accepted risks
 
-- **Lock-out through the 16 places.** Any host that reaches `/ingest` can hold the 16 places of connections that have not
-  completed their hello by reopening connections, and so keep the real Companion out, also with the token required.
-  A connection holds its place until its hello is decided, at most 10 seconds, so the attacker must keep opening
-  connections. There is no rate limit by host or per address (record 0064); a reverse proxy or the `-p` mapping
-  restricts who reaches the port.
-- **Log volume.** Each refused hello writes one warning line; without a rate limit a reconnect loop can grow the log
-  without bound, and Docker's default `json-file` log driver does not rotate.
-- **Token off.** With `RequireToken` `false` anyone who reaches the server can send data, and the first one to connect
-  keeps the one Companion place and so keeps the real Companion out. Use the switch only on a network where every host
-  is trusted.
-- **Plain text.** The token and the data cross the network unencrypted unless a reverse proxy terminates TLS in front of
-  the server (`SECURITY.md`, record 0006).
+- **Hosts that look alike.** Behind a reverse proxy all clients are one host, so one client's failures block the
+  Companion behind the same address. Docker Engine on Linux with `-p 8080:8080` (measured): a client from another host
+  keeps its own address, a client on the Docker host itself (`127.0.0.1`, a container) arrives as the bridge gateway,
+  one shared host. IPv6 on Docker is not measured. Docker Desktop for Windows is not measured: all clients may arrive
+  as one host. A device with many IPv6 addresses escapes the limits per host, and only the total of 16 holds against it.
+  A flood of more hosts than the table holds refuses a Companion that arrives on a new address while it lasts (record
+  0082).
+- **Log volume.** Many hosts or IPv6 addresses can still grow the log by up to 16 lines per host and minute, and
+  Docker's default `json-file` log driver does not rotate: the remedy is `--log-opt max-size` or another driver.
+- **A token holder that never reads.** A Companion with the token that keeps sending frames without reading keeps the
+  one place as long as it likes: .NET answers pings inside the receive, out of the session's reach, so the send bound
+  has nothing to time out. Measured: a client sending a ping every 10 ms and never reading was open at 200 seconds.
+  It was so before the limits and no bound is added (record 0082); rotating the token ends it.
+- **Token off.** With `RequireToken` `false` anyone who reaches the server can send data, and the first to connect keeps
+  the one Companion place. Use the switch only on a network where every host is trusted.
+- **Plain text.** The token and the data cross the network unencrypted unless a reverse proxy terminates TLS
+  (`SECURITY.md`, record 0006). On Windows the token file takes its folder's access rules, so a share that exposes the
+  data directory exposes the token.
 - **The configured file's access rules.** The server neither checks nor changes the mode or owner of the file named by
   `Censio:Ingest:TokenFile`; who can read it is the operator's decision (a swarm secret is `0444`). A FIFO at that path
   blocks the start until it is written.
-- **Growth by a token holder.** Every stored tick, icon and profile stays until retention (#35): a Companion with the token, or anyone with the token switched off, can grow the database file, the profile list and a profile's island list (up to 256 new islands per tick) without a bound, and the server holds the profile list and the island lists of the held profiles in memory.
-- **A leaked token file.** On Windows the file takes its folder's access rules, and a share that exposes the data
-  directory exposes the token.
+- **Growth by a token holder.** Every stored tick, icon and profile stays until retention (#35): a Companion with the token (or anyone, with the token off) can grow the database file, the profile list and a profile's island list (up to 256 new islands per tick) without a bound; the server holds those lists in memory.
 
 ### Memory
 
 The largest message is a catalog upload ([`contract.md`](contract.md), *Memory of a read*). Only the accepted
-Companion's connection reads past 32 KiB, so the server runs at most one such read at a time, also with the token off.
-That connection holds a buffer of 25,165,825 bytes, the reader's model of the catalog (kept until the reply is
+Companion's connection reads past 32 KiB, so at most one such read runs at a time. It holds a buffer of 25,165,825 bytes, the reader's model of the catalog (kept until the reply is
 written), the list of `missingIcons` and the written acknowledgement (*Memory of a catalog upload* below).
+
+The limits per host hold at most 1,024 entries plus the shared and the protected one, each with at most 10 failure
+times and one timer, plus at most 14 refused connections per entry in their close wait, each with a 32,769-byte buffer.
 
 ## Measurements
 
-The keep-alive cannot be tested on a fake clock (.NET's keep-alive uses its own timer), so its timing was measured on
-the real server. The programs were scratch code outside the repository.
+The limits per host, the send bound and the keep-alive under it were measured on the published Release server of the
+branch head (Linux), with scratch clients outside the repository: a raw TCP WebSocket that never answers a ping, which
+sends session-start messages (each acknowledged) after reading its `helloAccepted` once.
+
+Timing of the keep-alive, the send bound and the limits was measured on the real server (the keep-alive uses .NET's own
+timer, not a fake clock); the programs were scratch code outside the repository.
 
 ### Keep-alive on Kestrel
 
 The published server (`dotnet publish src/Censio.Server -c Release`, ASP.NET Core 11.0.0, Linux) accepts its WebSockets
-with a keep-alive interval of 15 seconds and a timeout of 35 seconds (the values of the endpoint). One server per
-run, started with
-
-```
-dotnet Censio.Server.dll --urls http://127.0.0.1:<port> --Censio:DataDirectory=<empty directory>
-```
-
-and a scratch client (`probe`) that opens a raw TCP WebSocket (so that it never answers a ping) or a
-`ClientWebSocket` (which answers a ping only inside a receive), sends a hello with the token from the data directory
-and then behaves as stated:
-
-```
-dotnet probe.dll vanish <port> <token> <delay>   # raw client; delay = seconds between upgrade and hello
-dotnet probe.dll idle <port> <token> 110         # receive pending, nothing sent
-dotnet probe.dll stream <port> <token>           # receive pending, a session-start message of 183 bytes in 16 fragments, 5 s apart
-dotnet probe.dll stream-noreceive <port> <token> # the same, no receive pending
-dotnet probe.dll late-75 <port> <token>          # no receive pending, the message begins 19 s after the hello,
-                                                 # 76 fragments, 1 s apart
-dotnet probe.dll late-short <port> <token>       # as late-75 with 5 fragments, 5 s apart (20 s)
-dotnet probe.dll late-long <port> <token>        # as late-75 with 9 fragments, 5 s apart (40 s)
-dotnet probe.dll refused <port> <token>          # wrong token
-dotnet probe.dll violation <port> <token>        # a second hello after helloAccepted
-```
+with a keep-alive interval of 15 seconds and a timeout of 35 seconds. One server per run (`dotnet Censio.Server.dll
+--urls http://127.0.0.1:<port> --Censio:DataDirectory=<empty directory>`), and a scratch client that opens a raw TCP
+WebSocket (so that it never answers a ping) or a `ClientWebSocket` (which answers a ping only inside a receive), sends a
+hello with the token from the data directory and then behaves as stated. The probe's modes were a vanished peer (hello
+after a delay), idle, messages in 16 or 76 fragments with and without a receive pending, a wrong token and a second
+hello.
 
 | Case | Result |
 | ---- | ------ |
-| Vanished peer (never answers a ping), 16 runs with the hello sent 0.01 to 3.74 seconds after the upgrade, which moves the hello against the server's heartbeat | the server aborted the connection after 52.51 to 56.24 seconds from the hello; the one ping came 15.01 to 18.73 seconds after the hello; the largest value, 56.24, belongs to a hello sent at once after the upgrade |
+| Vanished peer (never answers a ping), 16 runs with the hello 0.01 to 3.74 seconds after the upgrade | aborted 52.51 to 56.24 seconds after the hello; the one ping came 15.01 to 18.73 seconds after it |
 | Idle peer with a receive pending | open at 110.08 seconds, answered every ping |
 | A message of 75 seconds with a receive pending | completed at 75.05 seconds and acknowledged |
 | The same message, no receive pending, fragments 5 seconds apart from the hello | completed at 75.04 seconds, connection open: no ping is sent while data arrives |
 | No receive pending, the ping unanswered, a message beginning at 19 seconds and lasting 75 seconds | aborted: the first send that failed was at 57.06 seconds |
 | The same, a message lasting 40 seconds (5-second fragments) | aborted: first failed send at 59.04 seconds (the earlier fragment at 54.04 went through) |
 | The same, a message lasting 20 seconds, then a receive | completed at 39.15 seconds, acknowledged, connection open |
-| Refused hello (wrong token) | `helloRefused`, then close frame with status 1000 after 0.06 seconds |
-| A second hello after `helloAccepted` | close frame with status 1008 |
+| Refused hello (wrong token); a second hello after `helloAccepted` | close frame with status 1000 after 0.06 seconds; with status 1008 |
 
-The heartbeat of .NET's keep-alive runs every `min(interval, timeout) / 4`, that is 3.75 seconds, from the upgrade. A
-ping is sent at the first heartbeat 15 seconds after the last data and the connection is aborted at the first heartbeat
-more than 35 seconds after the ping, which is 10 heartbeats (37.5 seconds). The worst case is therefore a ping at
-18.75 and an abort at 56.25 seconds after the last frame, which the 56.24 seconds measured confirm; the upper bound of
-57.5 seconds (15 + 35 + two heartbeats) is not reached. The worst case stays under the 60 seconds of the spec.
+The keep-alive heartbeat runs every 3.75 seconds from the upgrade: a ping goes at the first heartbeat 15 seconds after
+the last data, the abort at the first more than 35 seconds after it, so the worst case is 56.25 seconds after the last
+frame (56.24 measured), under 60.
+
+### Send bound, limits per host and client address
+
+The raw client sends session-start messages (each acknowledged) after reading its `helloAccepted` once, on the published
+Release server of the branch head.
+
+| Case | Result |
+| ---- | ------ |
+| Messages sent, never read, until the write fails (3 runs) | aborted 30.74, 30.85 and 30.93 seconds after the first message, the server logging `Companion disconnected; 28573 messages accepted, 0 refused.` in the first; the next hello was accepted |
+| 1, 10, 100 and 1,000 messages, then nothing | aborted 56.15 to 56.18 seconds after the last frame |
+| Receive pending, nothing sent | open at 110.05 seconds |
+| A ping every 10 ms, never reading | open at 200 seconds (19,650 pings) |
+
+The client address was read in a scratch copy of the endpoint (a temporary line, never committed) in a container of
+Docker Engine 29.9.2 on Linux, started with `-p 8080:8080`. A client on the host to `127.0.0.1` or `172.17.0.1`, and a
+client in a container on a Docker bridge to the host's address, arrived as `172.17.0.1`, the bridge gateway; a client on
+the host to the host's own address as that address; a client in a separate network namespace joined to the host by a
+virtual link, which stands for a host of the LAN, as its own address (`10.99.0.2`). Not measured: IPv6 and Docker Desktop
+for Windows.
 
 ### Memory of a catalog upload
 
 One catalog upload at the bound through a real `IngestSession` (a hello accepted, then one message; a
-`WebSocket.CreateFromStream` pair over in-memory pipes), .NET 11, Release, workstation non-concurrent garbage
-collection, one process per case, the message read from a file before the measurement and peak managed memory
+`WebSocket.CreateFromStream` pair over in-memory pipes), .NET 11, Release, one process per case, peak managed memory
 sampled every millisecond, as in [`contract.md`](contract.md), *Memory of a read*. The document: 16,384 entries with 16
-names of 42 characters each and a distinct icon reference, 16,604,431 bytes, message 22,139,346 bytes.
-
-```
-dotnet bin/Release/net11.0/mem.dll gen catalog.json
-dotnet bin/Release/net11.0/mem.dll read      catalog.json   # the reader alone, for comparison
-dotnet bin/Release/net11.0/mem.dll transport catalog.json   # the session with a message of 22,139,346 bytes of junk: the cost of buffer and harness
-dotnet bin/Release/net11.0/mem.dll session   catalog.json   # the session, three runs
-```
+names of 42 characters each, 16,604,431 bytes, message 22,139,346 bytes. The control sends the same size of junk.
 
 | Case | Peak managed (message of the client included) | Allocated | Peak working set |
 | ---- | --------------------------------------------- | --------- | ---------------- |
@@ -320,16 +350,9 @@ dotnet bin/Release/net11.0/mem.dll session   catalog.json   # the session, three
 | Session, catalog upload (acknowledgement of 1,097,872 bytes, 16,384 `missingIcons`) | 252.7 MiB | 252.4 MiB | 284.6 MiB |
 | Session control, the same size of junk (refused by the reader at once) | 101.3 MiB | 80.0 MiB | 133.6 MiB |
 
-The session minus its control allocates 172.4 MiB, 8.0 MiB more than the reader alone: the retained catalog document
-is what the reader builds anyway (no second read), and the list and the written reply of 1.1 MB account for the
-rest. The 80 MiB of the control are the server's buffer of 24 MiB and the harness's own copies and buffers on the
-client side. By subtraction, not measured directly, the server's share at the peak is its buffer of 24 MiB, the reader's
-164.4 MiB and these 8 MiB, about 196 MiB, 10 MiB above the reader alone with its input (the buffer is 2.9 MiB larger than
-that input).
-
-The figure of [`contract.md`](contract.md) (the reader's peak of 158.8 MiB) belongs to that document's own catalog; on
-the catalog of this measurement the same reader peaks at 185.9 MiB. The shape of a catalog, not only its size, decides
-the peak, so the figures of both documents stand for their own input.
+The session minus its control allocates 172.4 MiB, 8.0 MiB more than the reader alone (the list and the written reply of
+1.1 MB); the server's share at the peak is about 196 MiB by subtraction. The figures of [`contract.md`](contract.md)
+belong to that document's own catalog: its shape, not only its size, decides the peak.
 
 ## Related decisions
 
@@ -340,6 +363,7 @@ the peak, so the figures of both documents stand for their own input.
 - [`decisions/0062`](../decisions/0062-one-companion-second-refused-silence-found-by-websocket-pings.md) — a second Companion is refused, a silent connection is found by pings, every close has a 2-second wait.
 - [`decisions/0063`](../decisions/0063-refused-contract-messages-acknowledged-by-id-or-the-connection-closed.md) — a refused message is acknowledged by its id when the reader yields one, else the connection closes.
 - [`decisions/0064`](../decisions/0064-ingest-refuses-browser-upgrades-and-bounds-pending-hellos.md) — browser upgrades are refused, pending hellos are bounded.
+- [`decisions/0082`](../decisions/0082-ingest-limits-connections-per-host-and-blocks-failing-hosts.md) — limits per host, the block of a host whose hellos keep failing, the send bound.
 - [`decisions/0006`](../decisions/0006-server-plain-http-and-open-health.md) — plain HTTP, no web login.
 - [`decisions/0068`](../decisions/0068-ingest-acknowledges-a-message-only-after-it-is-stored.md) — a message is acknowledged only after it is stored; a failed store closes the connection with 1011.
 - [`decisions/0070`](../decisions/0070-hello-names-the-stored-catalog-only-when-all-its-icons-are-stored.md) — the hello names the catalog only when all its icons are stored.
@@ -352,5 +376,5 @@ the peak, so the figures of both documents stand for their own input.
 - Showing what arrives: [`web-pages.md`](web-pages.md). The Companion's replay sending: [`replay-sending.md`](replay-sending.md); live sending, buffer and resend (#40, #41), the catalog and
   icons it uploads (#42).
 - The server's HTTP surface, the data directory and the Docker image: [`server.md`](server.md).
-- The code: `IngestTokenSetup`, `IngestAccess`, `IngestConnections`, `IngestSession` and `IngestEndpoint` in
+- The code: `IngestTokenSetup`, `IngestAccess`, `IngestConnections`, `IngestHosts`, `IngestHost`, `IngestAdmission`, `IngestSession` and `IngestEndpoint` in
   `src/Censio.Server`.
