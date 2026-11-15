@@ -10,3 +10,4 @@ are quoted in full.
 | 2026-11-15 17:32 | 2 Challenge skipped | Orchestrator | challenge skipped — tier trivial is never challenged |
 | 2026-11-15 17:32 | 4-5 Skipped | Orchestrator | no production or test code: see *Verification without tests* |
 | 2026-11-15 17:34 | 6 Implement | Dev | Measured shapes A/B/C three times each (peak managed 159.8 / 174.6 / 333.8 MiB), rewrote contract.md Memory of a read and the ingest.md comparison; docs only (sonnet/medium · 98,502 tokens · 12 tool uses · 124 s · 22 in · 11,157 out · 885,942 cache read · 43,021 cache write · 198,177 weighted) |
+| 2026-11-15 17:35 | 6 Tester share | Tester | AC1 verified: shapes A, B, C rebuilt from contract.md text alone match document byte counts and SHA-256 exactly (sonnet/medium · 85,341 tokens · 8 tool uses · 41 s · 14 in · 3,356 out · 506,802 cache read · 30,993 cache write · 106,215 weighted) |
