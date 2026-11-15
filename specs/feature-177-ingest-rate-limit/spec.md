@@ -1,7 +1,7 @@
 # Spec: Limit ingest connections per host
 
 Source: Issue #177
-Status: Draft
+Status: Approved by Lead
 
 ## Problem
 
@@ -37,11 +37,11 @@ a related defect the block per host bounds (E3). Only a refused hello with a rep
 - E1: A failed hello is a connection that got a place and whose hello was not accepted: refused `unsupportedVersion` or
   `tokenRefused`, closed without a reply (*The hello*, step 1 and 3, the 10-second timeout), or ended by the peer first.
   Not counted: `companionConnected` (it needs the token, and the real Companion meets it while its earlier connection is
-  still stored) and a profile that could not be stored (a server fault).
+  still stored), a profile that could not be stored (a server fault) and a hello cut short by the server's stop.
 - E2: An accepted hello sets the host's count to zero; a running block is not shortened.
 - E3: The window slides: a host is blocked when a failed hello makes 10 of its failed hellos lie within the last 60
   seconds. Refused upgrades are no failed hellos and do not extend a block; those of a blocked host are counted for the
-  end line. After a block the count starts at zero.
+  end line. A hello that fails during a block (E5) is not counted; after a block the count starts at zero.
 - E4: Order of the HTTP refusals: not an upgrade `400`; an `Origin` header `403`; a blocked host `429`; a host with 4
   connections waiting `429`; 16 waiting `503`. Empty bodies; none is logged.
 - E5: A connection already waiting when its host is blocked is decided as today.

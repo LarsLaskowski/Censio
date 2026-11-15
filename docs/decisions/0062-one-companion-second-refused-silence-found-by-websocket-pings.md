@@ -25,11 +25,13 @@ and an idle Companion (no game running) sends no message for hours.
 5. **The WebSocket ping keep-alive of .NET: a ping after 15 s without received data, closed when no pong arrives within
    35 s** (chosen) — no contract change, idle Companions answer pings, a dead one is closed within 60 s (57.5 s worst
    case; 40 s was measured at 60.0 s, too close); runs on the real clock.
+6. **A time bound on each of the server's sends** (chosen, #177) — a peer that stops reading blocks a send, and whether
+   .NET's keep-alive aborts a connection behind a blocked send is not measured; testable on an injected clock.
 
 ## Decision
 
-Options 2 and 5. A hello that passes the version and token checks while a Companion is connected is refused with
-`companionConnected`; the endpoint accepts its WebSockets with the keep-alive interval 15 s and timeout 35 s. Values are in
+Options 2, 5 and 6. A hello that passes the version and token checks while a Companion is connected is refused with
+`companionConnected`; the endpoint accepts its WebSockets with the keep-alive interval 15 s and timeout 35 s, and aborts a connection whose send does not complete in time. Values are in
 [`ingest.md`](../areas/ingest.md).
 
 ## Consequences

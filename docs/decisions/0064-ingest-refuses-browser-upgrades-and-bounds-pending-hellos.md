@@ -18,9 +18,10 @@ considerations for the endpoint*).
 1. **Allow-list of origins** — supports a browser client; Censio has none, and a list is configuration to get wrong.
 2. **Refuse every upgrade with an `Origin` header** (chosen) — a Companion sends none; a browser always does.
 3. **No bound on pending connections** — simplest; memory and sockets grow with an attacker's connections.
-4. **A fixed bound of 16 pending connections, refused with `503` beyond** (chosen) — bounded; a host that keeps 16 open
-   locks the Companion out, an accepted risk while there is no rate limit.
-5. **A bound per remote address** — fairer; behind a reverse proxy every client has the proxy's address.
+4. **A fixed bound of 16 pending connections, refused with `503` beyond** (chosen) — bounded; alone, a host that keeps
+   16 open locks the Companion out.
+5. **A bound per remote address instead of the total** — fairer; behind a reverse proxy every client has the proxy's
+   address, and many addresses together are unbounded.
 
 ## Decision
 
@@ -29,4 +30,4 @@ Options 2 and 4. Values and statuses are in [`ingest.md`](../areas/ingest.md).
 ## Consequences
 
 - A browser-based Companion would need this record revisited.
-- Rate limiting per host stays open; the lock-out is named in `ingest.md` and `SECURITY.md`.
+- The total bound stays beside the limits per host of [0082](0082-ingest-limits-connections-per-host-and-blocks-failing-hosts.md).
