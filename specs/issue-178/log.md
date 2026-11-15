@@ -9,3 +9,4 @@ are quoted in full.
 | 2026-11-15 17:32 | 2 Plan | Lead | RESULT: DONE, tier trivial: remeasure catalog read peak over three shapes, rewrite Memory of a read in contract.md and the ingest.md comparison (opus/medium · 86,958 tokens · 29 tool uses · 269 s · 56 in · 24,480 out · 1,479,982 cache read · 85,482 cache write · 606,615 weighted) |
 | 2026-11-15 17:32 | 2 Challenge skipped | Orchestrator | challenge skipped — tier trivial is never challenged |
 | 2026-11-15 17:32 | 4-5 Skipped | Orchestrator | no production or test code: see *Verification without tests* |
+| 2026-11-15 17:34 | 6 Implement | Dev | Measured shapes A/B/C three times each (peak managed 159.8 / 174.6 / 333.8 MiB), rewrote contract.md Memory of a read and the ingest.md comparison; docs only (sonnet/medium · 98,502 tokens · 12 tool uses · 124 s · 22 in · 11,157 out · 885,942 cache read · 43,021 cache write · 198,177 weighted) |
