@@ -1876,6 +1876,36 @@ public sealed class IngestSessionTests : IDisposable
     }
 
     /// <summary>
+    /// An accepted Companion with a receive pending that sends nothing stays connected past 60 seconds, beyond several
+    /// send bounds, and its next tick is acknowledged.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC8")]
+    public async Task IngestSessionIdleWithReceivePendingStaysConnected()
+    {
+        // Arrange
+        var (run, client, _) = await StartAcceptedSessionAsync();
+
+        var receive = IngestClient.ReceiveAsync(client);
+
+        // Act
+        for (var step = 0; step < 4; step++)
+        {
+            _timeProvider.Advance(IngestSession.SendTimeout);
+        }
+
+        await IngestClient.SendAsync(client, IngestClient.Tick(Id1));
+
+        var (reply, _, _) = await receive;
+
+        // Assert
+        AssertAcknowledgement(reply, Id1, null, null, []);
+        Assert.IsFalse(run.IsCompleted, "The session should still run after 120 seconds without a frame");
+        Assert.IsEmpty(LogMessages().Where(message => message.StartsWith("Companion disconnected", StringComparison.Ordinal)).ToList(), "No end of the connection should be logged");
+    }
+
+    /// <summary>
     /// Builds a status message with a pipe state.
     /// </summary>
     /// <param name="wireName">The pipe state as the contract names it</param>

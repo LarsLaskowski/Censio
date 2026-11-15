@@ -561,6 +561,239 @@ public sealed class IngestHostsTests
     }
 
     /// <summary>
+    /// A failed hello after the block's end, before the block's timer ran, ends the block and logs its end with the refused
+    /// upgrades.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC5")]
+    public void IngestHostsRecordFailedHelloAfterBlockElapsedBeforeTimerLogsBlockEnd()
+    {
+        // Arrange
+        var clock = new HeldTimerTimeProvider(_timeProvider.GetUtcNow());
+        using var hosts = new IngestHosts(clock, _logger);
+        var address = IPAddress.Parse("198.51.100.1");
+
+        Block(hosts, address);
+
+        var refused = RefuseUpgrades(hosts, address, 2);
+
+        clock.Advance(IngestHosts.BlockDuration);
+
+        // Act
+        var failed = FailHellos(hosts, address, 1);
+
+        // Assert
+        Assert.AreEqual(2, refused, "Two upgrades should be refused during the block");
+        Assert.AreEqual(1, failed, "The failed hello after the block should get a place");
+        Assert.AreSequenceEqual(new[] { BlockStartLine, "Information: A host's block ended; 2 connections were refused while it lasted." }, Lines(), "The end of the block should be logged by the failed hello, with the refused upgrades");
+    }
+
+    /// <summary>
+    /// The timer of a block a failed hello already ended logs nothing when it runs late.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC5")]
+    public void IngestHostsBlockTimerAfterFailedHelloEndedBlockLogsNothing()
+    {
+        // Arrange
+        var clock = new HeldTimerTimeProvider(_timeProvider.GetUtcNow());
+        using var hosts = new IngestHosts(clock, _logger);
+        var address = IPAddress.Parse("198.51.100.1");
+
+        Block(hosts, address);
+        clock.Advance(IngestHosts.BlockDuration);
+
+        var failed = FailHellos(hosts, address, 1);
+
+        // Act
+        clock.RunTimer(0);
+
+        // Assert
+        Assert.AreEqual(1, clock.TimerCount, "One block timer should be created");
+        Assert.AreEqual(1, failed, "The failed hello after the block should get a place");
+        Assert.AreSequenceEqual(new[] { BlockStartLine, "Information: A host's block ended; 0 connections were refused while it lasted." }, Lines(), "The end of the block should be logged once");
+    }
+
+    /// <summary>
+    /// The timer of an earlier block that runs late during a later block of the same host neither logs nor ends the
+    /// later block, whose own timer logs its end.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC5")]
+    public void IngestHostsBlockTimerOfEarlierBlockDoesNotEndLaterBlock()
+    {
+        // Arrange
+        var clock = new HeldTimerTimeProvider(_timeProvider.GetUtcNow());
+        using var hosts = new IngestHosts(clock, _logger);
+        var address = IPAddress.Parse("198.51.100.1");
+
+        Block(hosts, address);
+        clock.Advance(IngestHosts.BlockDuration);
+        Block(hosts, address);
+
+        // Act
+        clock.RunTimer(0);
+
+        var linesAfterEarlierTimer = Lines();
+        var refused = RefuseUpgrades(hosts, address, 1);
+
+        clock.RunTimer(1);
+
+        // Assert
+        Assert.AreEqual(2, clock.TimerCount, "Each block should create its timer");
+        Assert.AreSequenceEqual(new[] { BlockStartLine, "Information: A host's block ended; 0 connections were refused while it lasted.", BlockStartLine }, linesAfterEarlierTimer, "The earlier block's timer should log nothing during the later block");
+        Assert.AreEqual(1, refused, "The later block should still refuse the host");
+        Assert.AreSequenceEqual(new[] { BlockStartLine, "Information: A host's block ended; 0 connections were refused while it lasted.", BlockStartLine, "Information: A host's block ended; 1 connections were refused while it lasted." }, Lines(), "The later block's timer should log its end with its own refused upgrades");
+    }
+
+    /// <summary>
+    /// A host whose block ended keeps its entry for 60 seconds after the block's end, and is forgotten then.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public void IngestHostsTryEnterPendingHelloEndedBlockKeepsEntryForWindow()
+    {
+        // Arrange
+        using var hosts = CreateHosts();
+
+        Block(hosts, IPAddress.Parse("192.0.2.10"));
+
+        var tracked = FillTrackedHosts(hosts, IngestHosts.MaxTrackedHosts - 1);
+
+        _timeProvider.Advance(IngestHosts.BlockDuration + TimeSpan.FromSeconds(30));
+
+        var withinWindow = hosts.TryEnterPendingHello(IPAddress.Parse("198.51.100.1"));
+        var otherWithinWindow = hosts.TryEnterPendingHello(IPAddress.Parse("198.51.100.2"));
+
+        _timeProvider.Advance(TimeSpan.FromSeconds(30));
+
+        // Act
+        var afterWindow = hosts.TryEnterPendingHello(IPAddress.Parse("198.51.100.3"));
+
+        // Assert
+        Assert.HasCount(1023, tracked, "Every other tracked host should get a place");
+        Assert.IsNotNull(withinWindow, "A new host within the window should get a place on the shared entry");
+        Assert.AreSame(withinWindow, otherWithinWindow, "Within 60 seconds of its block's end the host should keep its entry, so new hosts share one");
+        Assert.IsNotNull(afterWindow, "A new host after the window should get a place");
+        Assert.AreNotSame(withinWindow, afterWindow, "60 seconds after its block's end the host should be forgotten, freeing its entry");
+    }
+
+    /// <summary>
+    /// A host with nothing waiting and neither a failed hello nor a block is forgotten at once when the table is full.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public void IngestHostsTryEnterPendingHelloHostWithoutFailuresIsForgottenAtOnce()
+    {
+        // Arrange
+        using var hosts = CreateHosts();
+        var tracked = FillTrackedHosts(hosts, IngestHosts.MaxTrackedHosts);
+
+        tracked.ForEach(hosts.LeavePendingHello);
+
+        // Act
+        var first = hosts.TryEnterPendingHello(IPAddress.Parse("198.51.100.1"));
+        var second = hosts.TryEnterPendingHello(IPAddress.Parse("198.51.100.2"));
+
+        // Assert
+        Assert.HasCount(1024, tracked, "Every tracked host should get a place");
+        Assert.IsNotNull(first, "The first new host should get a place");
+        Assert.AreNotSame(first, second, "The quiet hosts should be forgotten at once, so each new host gets an entry of its own");
+    }
+
+    /// <summary>
+    /// When another host's hello is accepted, the earlier accepted host's entry moves into the table with its waiting
+    /// connections.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public void IngestHostsRecordAcceptedHelloOtherHostMovesPreviousIntoTable()
+    {
+        // Arrange
+        using var hosts = CreateHosts();
+        var first = IPAddress.Parse("192.0.2.10");
+        var second = IPAddress.Parse("192.0.2.20");
+
+        hosts.RecordAcceptedHello(EnterPendingHello(hosts, first), first);
+
+        var waiting = EnterPendingHellos(hosts, first, 3);
+
+        // Act
+        hosts.RecordAcceptedHello(EnterPendingHello(hosts, second), second);
+
+        // Assert
+        Assert.HasCount(3, waiting, "Three connections of the earlier accepted host should wait");
+        Assert.HasCount(1, EnterPendingHellos(hosts, first, IngestHosts.MaxPendingHellosPerHost), "The earlier accepted host should keep its entry with its three waiting connections");
+    }
+
+    /// <summary>
+    /// When another host's hello is accepted while the table is full, the earlier accepted host's entry is dropped and the
+    /// host shares the entry of the untracked hosts.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public void IngestHostsRecordAcceptedHelloOtherHostWithTableFullDropsPrevious()
+    {
+        // Arrange
+        using var hosts = CreateHosts();
+        var first = IPAddress.Parse("192.0.2.10");
+        var waiting = AcceptOtherHostWithTableFull(hosts, first, IPAddress.Parse("192.0.2.20"));
+
+        // Act
+        var dropped = hosts.TryEnterPendingHello(first);
+
+        // Assert
+        Assert.IsNotNull(dropped, "The earlier accepted host should get a place");
+        Assert.AreNotSame(waiting, dropped, "The earlier accepted host's entry should be dropped");
+        Assert.AreSame(hosts.TryEnterPendingHello(IPAddress.Parse("198.51.100.1")), dropped, "The earlier accepted host should share the entry of the untracked hosts");
+    }
+
+    /// <summary>
+    /// An accepted hello of a connection whose entry was dropped gives its address a fresh entry of its own.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public void IngestHostsRecordAcceptedHelloOnDroppedEntryGivesAddressFreshEntry()
+    {
+        // Arrange
+        using var hosts = CreateHosts();
+        var first = IPAddress.Parse("192.0.2.10");
+        var waiting = AcceptOtherHostWithTableFull(hosts, first, IPAddress.Parse("192.0.2.20"));
+        var shared = EnterPendingHello(hosts, IPAddress.Parse("198.51.100.1"));
+
+        // Act
+        hosts.RecordAcceptedHello(waiting, first);
+
+        // Assert
+        var own = EnterPendingHellos(hosts, first, IngestHosts.MaxPendingHellosPerHost + 1);
+
+        Assert.HasCount(IngestHosts.MaxPendingHellosPerHost, own, "The address should have a fresh entry with all its places free");
+        Assert.AreNotSame(waiting, own[0], "The address should not get the dropped entry back");
+        Assert.AreNotSame(shared, own[0], "The address should not use the shared entry");
+    }
+
+    /// <summary>
+    /// Accepts a first host's hello, leaves one of its connections waiting, fills the table and accepts a second host's
+    /// hello, which drops the first host's entry.
+    /// </summary>
+    /// <param name="hosts">The hosts</param>
+    /// <param name="first">The address of the first host</param>
+    /// <param name="second">The address of the second host</param>
+    /// <returns>The dropped entry the first host's waiting connection was counted on</returns>
+    private static IngestHost AcceptOtherHostWithTableFull(IngestHosts hosts, IPAddress first, IPAddress second)
+    {
+        hosts.RecordAcceptedHello(EnterPendingHello(hosts, first), first);
+
+        var waiting = EnterPendingHello(hosts, first);
+        var tracked = FillTrackedHosts(hosts, IngestHosts.MaxTrackedHosts);
+
+        Assert.HasCount(IngestHosts.MaxTrackedHosts, tracked, "Every tracked host of the arrangement should get a place");
+        hosts.RecordAcceptedHello(EnterPendingHello(hosts, second), second);
+
+        return waiting;
+    }
+
+    /// <summary>
     /// Enters one pending hello that must get a place.
     /// </summary>
     /// <param name="hosts">The hosts</param>

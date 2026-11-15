@@ -353,6 +353,54 @@ public sealed class IngestEndpointTests
     }
 
     /// <summary>
+    /// A plain request of a blocked host is answered 400, not 429: the request is checked before the host.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC2")]
+    public async Task IngestEndpointBlockedHostPlainRequestReturns400()
+    {
+        // Arrange
+        using var baseFactory = new CensioServerFactory("Production");
+        using var factory = WithFakeClock(baseFactory, new FakeTimeProvider());
+        var blocked = IPAddress.Parse("203.0.113.9");
+
+        FailHellos(factory.Services.GetRequiredService<IngestHosts>(), blocked, IngestHosts.MaxFailedHellos);
+
+        // Act
+        var (status, body) = await SendRequestAsync(factory, Plain(blocked));
+
+        // Assert
+        Assert.AreEqual(StatusCodes.Status400BadRequest, status, "The blocked host's plain request should answer 400");
+        Assert.AreEqual(string.Empty, body, "The 400 answer should have an empty body");
+        Assert.AreEqual(StatusCodes.Status429TooManyRequests, (await SendRequestAsync(factory, Upgrade(blocked))).Status, "The host should be blocked");
+    }
+
+    /// <summary>
+    /// An upgrade with an Origin header of a blocked host is answered 403, not 429: the Origin is checked before the host.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC2")]
+    public async Task IngestEndpointBlockedHostWithOriginReturns403()
+    {
+        // Arrange
+        using var baseFactory = new CensioServerFactory("Production");
+        using var factory = WithFakeClock(baseFactory, new FakeTimeProvider());
+        var blocked = IPAddress.Parse("203.0.113.9");
+
+        FailHellos(factory.Services.GetRequiredService<IngestHosts>(), blocked, IngestHosts.MaxFailedHellos);
+
+        // Act
+        var (status, body) = await SendRequestAsync(factory, WithOrigin(Upgrade(blocked)));
+
+        // Assert
+        Assert.AreEqual(StatusCodes.Status403Forbidden, status, "The blocked host's upgrade with an Origin header should answer 403");
+        Assert.AreEqual(string.Empty, body, "The 403 answer should have an empty body");
+        Assert.AreEqual(StatusCodes.Status429TooManyRequests, (await SendRequestAsync(factory, Upgrade(blocked))).Status, "The host should be blocked");
+    }
+
+    /// <summary>
     /// The 10th hello of a host refused for its token blocks the host: its next upgrade gets 429 with an empty body, and
     /// the start of the block is logged.
     /// </summary>
