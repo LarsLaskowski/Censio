@@ -48,3 +48,10 @@ changes the remote address. Values, the cases that count and the log lines are i
 - A flood of more hosts than the table holds refuses a Companion that arrives on a new address while it lasts.
 - `ASPNETCORE_FORWARDEDHEADERS_ENABLED` keeps its effect on the scheme only, for the whole server.
 - Many hosts can still grow the log; Docker log rotation stays the operator's remedy.
+- On Docker Engine with `-p`, clients on the Docker host itself (`127.0.0.1`, containers) share one address, the bridge
+  gateway; a client from another host keeps its own. Docker Desktop for Windows and IPv6 are not measured.
+- A token holder that keeps sending frames (pings) without reading keeps the one Companion place as long as it likes, as
+  before this change, and no bound is added: .NET answers its pings inside the receive, out of the session's reach, so
+  the send bound has no reply to time out; an idle timer on contract messages would end the idle Companion that record
+  [0062](0062-one-companion-second-refused-silence-found-by-websocket-pings.md) keeps connected; and a token holder that
+  reads its replies holds the place just as long. Rotating the token is the remedy.

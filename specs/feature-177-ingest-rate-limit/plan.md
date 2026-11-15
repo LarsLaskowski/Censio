@@ -20,12 +20,13 @@ Feature: see [spec.md](spec.md), *Problem*.
 | 6 | A `PostConfigure<ForwardedHeadersOptions>` that clears `XForwardedFor` wins over that setup, so the remote address stays the TCP peer's; .NET does not process the RFC 7239 `Forwarded` header | Security measured it on Kestrel in its plan review; AC9's endpoint tests pin it, and once with the `PostConfigure` removed they must fail (mutation check, Tester, step 6) | confirmed |
 | 7 | A test sets a connection's address through `WebSocketClient.ConfigureRequest`, an `Action<HttpRequest>` on the server's request | `IngestEndpointTests.cs:152` sets `request.Headers.Origin` there; `request.HttpContext.Connection.RemoteIpAddress` is settable on the same object | confirmed |
 | 8 | Cancelling `WebSocket.SendAsync` aborts the socket and ends a send blocked on a full transport, on the in-memory pipe and on Kestrel | Security measured it on Kestrel in its plan review; AC8's session test pins it on the pipe | confirmed |
-| 9 | Whether .NET's keep-alive aborts while its ping send is blocked behind a full transport | to verify: measurement *noread-then-idle* (Dev, step 6) | unverified |
+| 9 | .NET's keep-alive aborts while its ping send is blocked behind a full transport | measurement *noread-then-idle* (Dev, step 6): 56.2 s for 1, 10, 100 and 1,000 unread ticks | confirmed |
 | 10 | `InMemoryDuplexStream` pipes pause a writer at 65,536 unread bytes (default `Pipe`) | `tests/Censio.Server.Tests/InMemoryDuplexStream.cs:85` `new Pipe()` | confirmed |
 | 11 | Records 0062 and 0064 are unreleased | `git ls-tree v0.2.0 docs/decisions/` holds neither; `git ls-remote --tags origin`: `v0.1.0`, `v0.2.0` | confirmed |
 | 12 | `IngestSession`'s constructor has 7 parameters, the S107 limit | `IngestSession.cs` constructor | confirmed |
 | 13 | A refused connection holds its socket up to 2 s after its waiting place is freed | `IngestSession.cs:340` (place left before the decision), `CloseAsync` (:736, close-wait timer), `DiscardUntilClosedAsync` | confirmed |
-| 14 | Docker Engine on Linux with `-p` passes a LAN client's address to the container; a client on the Docker host itself, or over IPv6 through `docker-proxy`, may arrive as the bridge gateway | to verify: measurement *client-address* (Dev, step 6, *Approach*) | unverified |
+| 14 | Docker Engine on Linux with `-p` passes a LAN client's address to the container; a client on the Docker host itself (`127.0.0.1`, a container) arrives as the bridge gateway `172.17.0.1` | measurement *client-address* (Dev, step 6): LAN client stood in by a network namespace over veth and DNAT, not a second physical host | confirmed |
+| 16 | A client over IPv6 through `docker-proxy` may arrive as the bridge gateway | to verify: measurement *client-address* over IPv6 on a Docker host that has it, by a user after merge (none in the session); the documents state it as not measured | unverified |
 | 15 | Docker Desktop for Windows (WSL 2, `USER_GUIDE.md` lines 11, 85, 338) passes the client's address | to verify: no member can measure it in the session (no Windows host); the documents state it as not measured (*Approach*, *Client address under Docker*); a measurement by a user on Docker Desktop, after merge, would settle it | unverified |
 
 ## Tests per criterion
@@ -112,7 +113,8 @@ Release server of the branch head): *noread-send* — the client sends ticks wit
 last frame the server read to the abort, `Companion disconnected; …`, then a hello accepted; *noread-then-idle* — the
 client sends 1, 10, 100 and 1,000 ticks without receiving, then nothing: the abort within 60 s of its last frame in every
 run (fact 9); *idle* — a client with a receive pending stays open at 110 s, as before; optionally *ping-flood* — a
-client that sends pings and never reads is aborted by the keep-alive (Security measured about 56 s). A run over 60 s
+client with the token that sends pings and never reads (measured: one ping every 10 ms stayed connected 200 s; an
+accepted risk, record 0082, *Consequences*). A run over 60 s
 goes to the Lead (mode `decide`).
 
 **Client address under Docker** (Dev, step 6, measurement *client-address*, fact 14): with Docker Engine in the session,
@@ -244,6 +246,11 @@ All by the Dev, once the code is green, against the code as built:
   - *Accepted risks*: rewrite *Lock-out through the 16 places* and *Log volume* (many hosts or IPv6 addresses, a proxy
     as one host, a flood refusing a Companion on a new address, rotation with `--log-opt max-size`, and the client
     address per Docker setup as *client-address* measured it, Docker Desktop for Windows as not measured).
+  - *Accepted risks*, new entry *A token holder that never reads*: a client with the token that keeps sending frames
+    (pings, every 10 ms measured) and reads nothing stays connected past 200 seconds and keeps the one Companion place;
+    the keep-alive sends no ping while frames arrive, the send bound has no reply to time out, and its pongs fill the
+    transport only slowly; a token holder that reads its replies holds the place as long; rotating the token is the
+    remedy (record 0082). *One Companion and silent connections* points to it.
   - *Memory*: at most 1,024 table entries plus the shared and the protected one, plus at most 14 refused connections per
     entry in their close wait of 2 seconds, each holding the 32,769-byte hello buffer.
   - *Measurements*: the measurements of *Approach*.
@@ -253,10 +260,13 @@ All by the Dev, once the code is green, against the code as built:
 - `docs/ARCHITECTURE.md` line 91: "the 16 places can lock the Companion out, and there is no rate limit" becomes the
   limits per host and the remaining risks; records "0061 to 0064, 0082".
 - `SECURITY.md` line 36: the sentence beginning "Without a rate limit" becomes the limits per host, what remains
-  (many hosts, a proxy as one host, the client address per Docker setup as measured) and Docker log rotation.
+  (many hosts, a proxy as one host, the client address per Docker setup as measured, a token holder that never reads
+  keeping the Companion place until the token is rotated) and Docker log rotation.
 - `docs/USER_GUIDE.md` line 162 (*Limits*, English) and line 625 (*Einschränkungen*, German): the same, in user terms,
   with `--log-opt max-size` as the rotation example, the client address per Docker setup (Docker Desktop for Windows
-  not measured), and that a connection slower than about 37 KB/s cannot complete a large catalog upload.
+  not measured), and that a connection slower than about 37 KB/s cannot complete a large catalog upload; in the *One
+  Companion* bullet (English and German), that a client with the token that keeps sending is not found silent and keeps
+  the place, so a refusal `another Companion is connected` while none of yours runs calls for rotating the token.
 - `.squad/project.md` line 19 (*Ingest token and Companion authentication*): the Dev reports, and the orchestrator writes
   in, the type list `IngestEndpoint`, `IngestSession`, `IngestConnections`, `IngestHosts`, `IngestHost`,
   `IngestAdmission`, `IngestTokenSetup`, `IngestAccess` in place of the current one, the rest of the line unchanged.
