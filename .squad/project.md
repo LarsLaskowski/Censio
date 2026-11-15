@@ -1,7 +1,7 @@
 # Project
 
-What the squad needs to know about this project that is not stack-specific, read by the Lead, the Devil's
-Advocate, Security, the Tester and the Reviewer. `adopt-template` creates it once and never overwrites it; a
+What the squad needs to know about this project that is not stack-specific, read by five squad members on
+every launch. `adopt-template` creates it once and never overwrites it; a
 product PR updates it when the change makes an entry untrue (`.squad/routing.md`, *Scope of a product PR*).
 
 Every entry points: it names files, types or endpoints and links the document that says more. Behavior, values,
@@ -73,27 +73,24 @@ change with it.
 
 **A new page or UI text** touches: `UiTexts` (English and German) and its tests, the navigation in `MainLayout.razor`, `docs/areas/web-ui.md` (*Texts*), the user guide.
 
-**A new log message** touches:
-- `CompanionLog` (a `LoggerMessage` method) and the list of what is logged in `docs/areas/companion-log.md`
+**A new log message** touches: `CompanionLog` (a `LoggerMessage` method) and the list of what is logged in `docs/areas/companion-log.md`.
 
 ## Test doubles
 
-Hand-written fakes and stubs the tests reuse, no mocking library (`docs/UNIT_TESTS.md`). One line each: the double,
-its file and what it stands in for; its behavior is read in its code.
+Hand-written fakes and stubs the tests reuse, no mocking library (`docs/UNIT_TESTS.md`). Each entry: the doubles,
+their file or folder and what they stand in for; their behavior is read in their code.
 
-- `RecordingLogger` (`tests/Censio.Server.Tests/RecordingLogger.cs`, linked into the Companion and Server.Data tests) — an `ILogger` that keeps every entry.
-- `ConcurrentRecordingLogger` (`tests/Censio.Server.Tests/ConcurrentRecordingLogger.cs`) — an `ILogger` for entries from any thread.
+- `RecordingLogger` (`tests/Censio.Server.Tests/RecordingLogger.cs`, linked into the Companion and Server.Data tests) and `ConcurrentRecordingLogger` (`tests/Censio.Server.Tests/ConcurrentRecordingLogger.cs`) — `ILogger`s that keep every entry, the second from any thread.
 - `ExtendedMigrationsAssembly` (`tests/Censio.Server.Data.Tests/`) — an `IMigrationsAssembly` of the real migrations plus test ones, for a test-only schema history.
 - `FakeProfileStateSource` (`tests/Censio.Server.Tests/FakeProfileStateSource.cs`) — an `IProfileStateSource` of held and stored states.
-- `HeldTimerTimeProvider` (`tests/Censio.Server.Tests/HeldTimerTimeProvider.cs`) — a `FakeTimeProvider` whose timers never run on their own; a test runs a timer's callback by hand, also after disposal, which models a late thread-pool callback.
-- `ChunkedStream` (`tests/Censio.Pipe.Tests/ChunkedStream.cs`) — a chunked read-only stream with faults, for the frame reader.
-- `ChunkedClockStream` (`tests/Censio.Pipe.Tests/ChunkedClockStream.cs`) — a chunked stream for record-and-replay round trips.
+- `HeldTimerTimeProvider` (`tests/Censio.Server.Tests/HeldTimerTimeProvider.cs`) — a `FakeTimeProvider` whose timer callbacks run only by hand, also after disposal (a late thread-pool callback).
+- `ChunkedStream` and `ChunkedClockStream` (`tests/Censio.Pipe.Tests/`) — chunked streams: read-only with faults for the frame reader, and for record-and-replay round trips.
 - `PipeFrameBuilder` (`tests/Censio.Pipe.Tests/PipeFrameBuilder.cs`, linked into the Companion and Anonymiser tests) — synthetic and corrupt pipe frames.
 - `ScriptedPipeMessageSource` with `HeldPipeRead` (`tests/Censio.Pipe.Tests/`) — an `IPipeMessageSource`, for the tick assembler.
 - `ScriptedPipeConnector` (`tests/Censio.Companion.Core.Tests/ScriptedPipeConnector.cs`) — an `IPipeConnector`, for the pipe connection.
 - `ControlledPipeStream` (`tests/Censio.Companion.Core.Tests/ControlledPipeStream.cs`) — models an asynchronous pipe read's end and cancellation (checked against `dotnet/runtime` `release/11.0` `PipeStream.ValueTaskSource.cs`).
 - `ControlledWriteStream` (`tests/Censio.Pipe.Tests/ControlledWriteStream.cs`, linked into the Companion tests) — models a file stream's write and flush failures (checked against `dotnet/runtime` `release/11.0` `Win32Marshal`).
-- `SparseStream` (`tests/Censio.GameData.Tests/SparseStream.cs`) — a sparse seekable stream; `RdaArchiveBuilder` (`tests/Censio.GameData.Tests/RdaArchiveBuilder.cs`) builds RDA archives.
+- `SparseStream`, `NonSeekableStream`, `TrackingStream`, `RdaArchiveBuilder`, `DdsFileBuilder` (`tests/Censio.GameData.Tests/`) — a sparse seekable stream, a forward-only stream, a memory stream that logs its disposal, and builders of RDA archives and of synthetic BC7 DDS files with their expected pixels.
 - `ScriptedPipeAnonymiserRandom` (`tests/Censio.Pipe.Tests/ScriptedPipeAnonymiserRandom.cs`, linked into the Anonymiser tests) — an `IPipeAnonymiserRandom` of queued draws.
 - `TwoPassRecordingStream` (`tests/Censio.Pipe.Tests/TwoPassRecordingStream.cs`) — a seekable stream that differs per pass, for the anonymiser's two reads.
 - `FailingTextWriter` (`tests/Censio.Anonymiser.Tests/FailingTextWriter.cs`) — a `TextWriter` whose writes fail.
@@ -104,12 +101,8 @@ its file and what it stands in for; its behavior is read in its code.
 - `CascadedLanguageProbe` (`tests/Censio.Server.Tests/CascadedLanguageProbe.cs`) — a page stand-in, for what pages receive from `MainLayout`.
 - `InMemoryDuplexStream` (`tests/Censio.Server.Tests/InMemoryDuplexStream.cs`) — an in-memory connection end, for real `WebSocket` pairs.
 - `FailingWebSocketFeature` (`tests/Censio.Server.Tests/FailingWebSocketFeature.cs`) — an `IHttpWebSocketFeature` whose every accept fails.
-- `FakeDiagnosticsWindow` (`tests/Censio.Companion.Core.Tests/FakeDiagnosticsWindow.cs`) — an `IDiagnosticsWindow`.
 - `FakeStartupEntryStore` (`tests/Censio.Companion.Core.Tests/FakeStartupEntryStore.cs`) — models the store contract of `RegistryStartupEntryStore` (checked against the .NET 11 `RegistryKey` source).
-- `FakeUbisoftInstallRecords` (`tests/Censio.Companion.Core.Tests/FakeUbisoftInstallRecords.cs`) — an `IUbisoftInstallRecords`.
-- `FakeFileVersionReader` (`tests/Censio.Companion.Core.Tests/FakeFileVersionReader.cs`) — an `IFileVersionReader`.
+- `FakeDiagnosticsWindow`, `FakeUbisoftInstallRecords`, `FakeFileVersionReader` (`tests/Censio.Companion.Core.Tests/`) — an `IDiagnosticsWindow`, `IUbisoftInstallRecords` and `IFileVersionReader`.
 - `RegExportUbisoftInstallRecords` (`tests/Censio.Companion.Core.Tests/RegExportUbisoftInstallRecords.cs`) — an `IUbisoftInstallRecords` over a `reg export` file, for the sample in `Fixtures/GameInstallation/`.
-- `ScriptedIngestServer`, `DuplexReplayConnector`, `ThrowingWebSocket`, `SendFailingWebSocket`, `LoopbackWebSocketHost`, `LoopbackWebProxy` (`tests/Censio.Companion.Core.Tests/`), `TestServerReplayConnector` (`tests/Censio.Server.Tests/`) — the ingest server, connectors, failing sockets and loopback host of the replay sender's tests.
-- `NonSeekableStream` (`tests/Censio.GameData.Tests/NonSeekableStream.cs`) — a forward-only stream; `TrackingStream` (`tests/Censio.GameData.Tests/TrackingStream.cs`) — a memory stream that logs its disposal.
-- `DdsFileBuilder` (`tests/Censio.GameData.Tests/DdsFileBuilder.cs`) — synthetic BC7 DDS files and their expected pixels.
+- `ScriptedIngestServer`, `DuplexReplayConnector`, `ThrowingWebSocket`, `SendFailingWebSocket`, `LoopbackWebSocketHost`, `LoopbackWebProxy` (`tests/Censio.Companion.Core.Tests/`), `TestServerReplayConnector` (`tests/Censio.Server.Tests/`) — doubles of the replay sender's tests.
 - `ForeignContractMessage` (`tests/Censio.Contracts.Tests/ForeignContractMessage.cs`) — a `ContractMessage` of no contract type.
