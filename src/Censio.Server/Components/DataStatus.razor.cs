@@ -121,7 +121,8 @@ public sealed partial class DataStatus : IDisposable
 
     /// <summary>
     /// Asks the browser for its UTC offset at the shown instant. The answer is untrusted: an offset out of range, a failed
-    /// call and an answer of the wrong type leave the time in UTC.
+    /// or cancelled call, a lost connection and an answer of the wrong type show the time in UTC. Either way the first
+    /// answer ends the empty as-of line.
     /// </summary>
     /// <param name="instant">The shown instant</param>
     /// <returns>A task that completes when the browser answered</returns>

@@ -206,7 +206,7 @@ logged.
 ### The browser's offset
 
 - The browser's answer is untrusted. An offset outside -840 to 840 minutes (the 14 hours a time zone may differ from
-  UTC) counts as none, as does a failed call, an answer that is no number and a lost connection; the time then stays in
+  UTC) counts as none, as does a failed call, an answer that is no number and a lost connection; the time is then shown in
   UTC. None of these is logged or shown.
 
 ### Failures
