@@ -4,7 +4,7 @@ Plan: [plan.md](plan.md)
 
 | # | Group | Task | Files | Criteria | Depends on | Owner | Done |
 | - | ----- | ---- | ----- | -------- | ---------- | ----- | ---- |
-| 1 | G1 | Skeleton: IngestHosts (MaxPendingHellosPerHost, MaxFailedHellos, MaxTrackedHosts, FailureWindow, BlockDuration, constructor, TryEnterPendingHello, LeavePendingHello, RecordFailedHello, RecordAcceptedHello, Dispose) and IngestHost as in *Signatures* | src/Censio.Server/IngestHosts.cs, src/Censio.Server/IngestHost.cs | AC1, AC3, AC5, AC6, AC7 | — | Dev | [ ] |
+| 1 | G1 | Skeleton: IngestHosts (MaxPendingHellosPerHost, MaxFailedHellos, MaxTrackedHosts, FailureWindow, BlockDuration, constructor, TryEnterPendingHello, LeavePendingHello, RecordFailedHello, RecordAcceptedHello, Dispose) and IngestHost as in *Signatures* | src/Censio.Server/IngestHosts.cs, src/Censio.Server/IngestHost.cs | AC1, AC3, AC5, AC6, AC7 | — | Dev | [x] |
 | 2 | G1 | Tests first: the `IngestHostsTests` of *Tests per criterion* | tests/Censio.Server.Tests/IngestHostsTests.cs | AC1, AC3, AC4, AC5, AC6, AC7 | 1 | Tester | [ ] |
 | 3 | G1 | Implement the hosts, the sliding window, the block with its timer and lines, the table with shared and protected entry | src/Censio.Server/IngestHosts.cs, src/Censio.Server/IngestHost.cs | AC1, AC3, AC4, AC5, AC6, AC7 | 2 | Dev | [ ] |
 | 4 | G2 | Skeleton: IngestAdmission (constructor, LeavePendingHello, TryTakeCompanion, ReleaseCompanion, RecordFailedHello, RecordAcceptedHello, RecordUncountedHello); the changed IngestSession constructor and SendTimeout; adapt `IngestSessionTests.StartSession` mechanically | src/Censio.Server/IngestAdmission.cs, src/Censio.Server/IngestSession.cs, tests/Censio.Server.Tests/IngestSessionTests.cs | AC1, AC4, AC8 | 3 | Dev | [ ] |
