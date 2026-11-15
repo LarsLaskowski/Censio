@@ -26,11 +26,6 @@ public sealed class IngestHost
     internal string? Key { get; }
 
     /// <summary>
-    /// Gets a value indicating whether this is the entry shared by the hosts beyond the tracked ones.
-    /// </summary>
-    internal bool IsShared => Key is null;
-
-    /// <summary>
     /// Gets or sets the number of connections that wait for their hello.
     /// </summary>
     internal int Waiting { get; set; }
