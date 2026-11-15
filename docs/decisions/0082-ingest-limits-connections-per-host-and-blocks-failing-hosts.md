@@ -1,6 +1,6 @@
 # 0082: The ingest endpoint limits connections per host and blocks a host whose hellos keep failing
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-15
 - **Area:** ingest
 - **Source:** Issue #177
