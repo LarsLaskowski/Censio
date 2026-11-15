@@ -98,8 +98,8 @@ arrives in parts, and at most 32,768 bytes. The server decides in this order:
   reconnects as after any refusal.
 - The server sends a WebSocket ping every 15 seconds and aborts a connection whose ping is not answered by a pong within
   35 seconds. A ping is sent only after 15 seconds in which no data arrived, so a connection that receives bytes does
-  not get one. The measured worst case from the last received frame to the abort of a connection that vanished is
-  56.24 seconds, under 60 (*Measurements*); the next hello is then accepted.
+  not get one. The measured worst case from the last received frame to the abort of a vanished connection is
+  56.24 seconds (*Measurements*); the next hello is then accepted.
 - Silence is counted in WebSocket frames, not in contract messages: a Companion that answers pings but sends no message,
   and one whose message arrives in parts over more than 60 seconds, stay connected (idle at 110 seconds and a message
   over 75 seconds measured). The session has no idle timer of its own; liveness is the keep-alive alone.
@@ -259,8 +259,8 @@ unset, none of the file checks runs.
   as one host. A device with many IPv6 addresses escapes the limits per host, and only the total of 16 holds against it.
   A flood of more hosts than the table holds refuses a Companion that arrives on a new address while it lasts (record
   0082).
-- **Log volume.** Many hosts or IPv6 addresses can still grow the log by up to 16 lines per host and minute, and
-  Docker's default `json-file` log driver does not rotate: the remedy is `--log-opt max-size` or another driver.
+- **Log volume.** Many hosts or IPv6 addresses can still grow the log by up to 16 lines per host and minute; Docker's
+  default `json-file` driver does not rotate (remedy: `--log-opt max-size`).
 - **A token holder that never reads.** A Companion with the token that keeps sending frames without reading keeps the
   one place as long as it likes: .NET answers pings inside the receive, out of the session's reach, so the send bound
   has nothing to time out. Measured: a client sending a ping every 10 ms and never reading was open at 200 seconds.
@@ -297,9 +297,9 @@ timer, not a fake clock); the programs were scratch code outside the repository.
 
 The published server (`dotnet publish src/Censio.Server -c Release`, ASP.NET Core 11.0.0, Linux) accepts its WebSockets
 with a keep-alive interval of 15 seconds and a timeout of 35 seconds. One server per run (`dotnet Censio.Server.dll
---urls http://127.0.0.1:<port> --Censio:DataDirectory=<empty directory>`), and a scratch client that opens a raw TCP
-WebSocket (so that it never answers a ping) or a `ClientWebSocket` (which answers a ping only inside a receive), sends a
-hello with the token from the data directory and then behaves as stated. The probe's modes were a vanished peer (hello
+--urls http://127.0.0.1:<port> --Censio:DataDirectory=<empty directory>`); a scratch client, a raw TCP WebSocket (never
+answers a ping) or a `ClientWebSocket` (answers only inside a receive), sends a hello with the token and then behaves as
+stated. The probe's modes were a vanished peer (hello
 after a delay), idle, messages in 16 or 76 fragments with and without a receive pending, a wrong token and a second
 hello.
 
@@ -339,10 +339,10 @@ for Windows.
 
 ### Memory of a catalog upload
 
-One catalog upload at the bound through a real `IngestSession` (a hello accepted, then one message; a
-`WebSocket.CreateFromStream` pair over in-memory pipes), .NET 11, Release, one process per case, peak managed memory
-sampled every millisecond, as in [`contract.md`](contract.md), *Memory of a read*. The document: 16,384 entries with 16
-names of 42 characters each, 16,604,431 bytes, message 22,139,346 bytes. The control sends the same size of junk.
+One catalog upload at the bound through a real `IngestSession` (a hello accepted, then one message; in-memory pipes),
+.NET 11, Release, one process per case, peak managed memory sampled every millisecond, as in
+[`contract.md`](contract.md), *Memory of a read*. The document: 16,384 entries with 16 names of 42 characters each,
+16,604,431 bytes, message 22,139,346 bytes. The control sends the same size of junk.
 
 | Case | Peak managed (message of the client included) | Allocated | Peak working set |
 | ---- | --------------------------------------------- | --------- | ---------------- |
@@ -350,10 +350,10 @@ names of 42 characters each, 16,604,431 bytes, message 22,139,346 bytes. The con
 | Session, catalog upload (acknowledgement of 1,097,872 bytes, 16,384 `missingIcons`) | 252.7 MiB | 252.4 MiB | 284.6 MiB |
 | Session control, the same size of junk (refused by the reader at once) | 101.3 MiB | 80.0 MiB | 133.6 MiB |
 
-The session minus its control allocates 172.4 MiB, 8.0 MiB more than the reader alone (the list and the written reply of
-1.1 MB); the server's share at the peak is about 196 MiB by subtraction. The figures of [`contract.md`](contract.md),
-*Memory of a read*, belong to its three catalog shapes, the highest peak 333.8 MiB; the catalog of this measurement
-gave 185.9 MiB. The shape of a catalog, not only its size, decides the peak, so each figure stands for its own input.
+The session minus its control allocates 172.4 MiB, 8.0 MiB more than the reader alone (the list and the written reply);
+the server's share at the peak is about 196 MiB by subtraction. The figures of [`contract.md`](contract.md), *Memory of
+a read*, belong to its three catalog shapes, the highest peak 333.8 MiB; this catalog gave 185.9 MiB. The shape of a
+catalog, not only its size, decides the peak.
 
 ## Related decisions
 
