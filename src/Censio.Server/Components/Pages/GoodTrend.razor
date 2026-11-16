@@ -1,4 +1,25 @@
 @page "/profiles/{Profile}/islands/{Session}/{Island}/{Area}/goods/{Good}"
 @inherits DataPageBase
-@* Skeleton: removed with the implementation *@
-<h1 class="mud-typography mud-typography-h4"></h1>
+
+<PageTitle>@($"Censio – {Heading}")</PageTitle>
+
+<h1 class="mud-typography mud-typography-h4">@Heading</h1>
+
+@if (Mode == PageMode.Ready && View is { } view && IslandDetail.FindIsland(view) is { } island && IslandDetail.FindRegion(view) is { } region)
+{
+    <p><MudLink Href="@PageAddress.IslandLink(view.ProfileId, island.Key)">@PageNames.Island(island.Name, Language)</MudLink> · <MudLink Href="@PageAddress.RegionLink(view.ProfileId, region.SessionGuids[0])">@PageNames.RegionText(region, view.Regions, Language)</MudLink> · @ProfileLabel(view)</p>
+}
+@if (Mode != PageMode.NotFound)
+{
+    <DataStatus AsOf="View?.AsOf" />
+}
+@if (StatusText is { } status)
+{
+    <p>@status</p>
+}
+else if (View is { } shown)
+{
+    <p>@Texts.ChartRange</p>
+    <TrendChart Heading="@Texts.ChartThisIsland" Kind="TrendKind.Good" Read="@(_isFailed ? _failedRead : _islandRead)" AsOf="shown.AsOf" ReadNumber="_islandNumber" />
+    <TrendChart Heading="@Texts.ChartRegionTotal" Kind="TrendKind.Good" Read="@(_isFailed ? _failedRead : _regionRead)" AsOf="shown.AsOf" ReadNumber="_regionNumber" />
+}

@@ -138,22 +138,17 @@ public abstract class DataPageBase : ComponentBase, IDisposable
     /// <param name="view">The view</param>
     /// <param name="cancellationToken">The cancellation token</param>
     /// <returns>A task that completes when the details are read</returns>
-#pragma warning disable RH2003 // Skeleton: removed with the implementation
     protected virtual Task ReadDetailsAsync(ProfileView view, CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        return Task.CompletedTask;
     }
-#pragma warning restore RH2003
 
     /// <summary>
     /// Clears what <see cref="ReadDetailsAsync" /> read.
     /// </summary>
-#pragma warning disable RH2003 // Skeleton: removed with the implementation
     protected virtual void ClearDetails()
     {
-        throw new NotImplementedException();
     }
-#pragma warning restore RH2003
 
     /// <summary>
     /// Gives the shown name of the profile.
@@ -249,6 +244,19 @@ public abstract class DataPageBase : ComponentBase, IDisposable
             return;
         }
 
+        if (ShowRead(read) is { } ready && RendererInfo.IsInteractive)
+        {
+            await ReadDetailsAsync(ready, _cancellationToken).ConfigureAwait(true);
+        }
+    }
+
+    /// <summary>
+    /// Shows the result of the read of the profile.
+    /// </summary>
+    /// <param name="read">The read</param>
+    /// <returns>The view when the page shows it, otherwise <see langword="null" /></returns>
+    private ProfileView? ShowRead(PageRead read)
+    {
         if (read.IsFailed)
         {
             Show(PageMode.Failed, null);
@@ -264,11 +272,15 @@ public abstract class DataPageBase : ComponentBase, IDisposable
         else if (IsKnown(view))
         {
             Show(PageMode.Ready, view);
+
+            return view;
         }
         else
         {
             Show(PageMode.NotFound, null);
         }
+
+        return null;
     }
 
     /// <summary>
@@ -345,6 +357,8 @@ public abstract class DataPageBase : ComponentBase, IDisposable
         }
 
         _addressKey = key;
+
+        ClearDetails();
 
         return LoadAsync();
     }

@@ -35,12 +35,17 @@ public sealed class TrendRange
     /// </summary>
     /// <param name="latestTick">The receive time of the latest tick</param>
     /// <returns>The range</returns>
-#pragma warning disable RH2003 // Skeleton: removed with the implementation
     public static TrendRange Before(DateTimeOffset latestTick)
     {
-        throw new NotImplementedException();
+        var back = latestTick.UtcTicks - TimeSpan.TicksPerDay;
+        var start = back - (back % TimeSpan.TicksPerHour);
+
+        return new TrendRange
+               {
+                   Start = new DateTimeOffset(start, TimeSpan.Zero),
+                   End = new DateTimeOffset(latestTick.UtcTicks + 1, TimeSpan.Zero)
+               };
     }
-#pragma warning restore RH2003
 
     #endregion // Methods
 }

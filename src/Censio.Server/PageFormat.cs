@@ -47,12 +47,12 @@ public static class PageFormat
     /// <param name="value">The value</param>
     /// <param name="language">The language</param>
     /// <returns>The text</returns>
-#pragma warning disable RH2003 // Skeleton: removed with the implementation
     public static string Rate(double? value, UiLanguage language)
     {
-        throw new NotImplementedException();
+        return value is { } rate
+                   ? Localize(Group(Round(rate)), language)
+                   : NoValue;
     }
-#pragma warning restore RH2003
 
     /// <summary>
     /// Formats a delta, with its sign.
@@ -78,12 +78,17 @@ public static class PageFormat
     /// <param name="value">The value</param>
     /// <param name="language">The language</param>
     /// <returns>The text</returns>
-#pragma warning disable RH2003 // Skeleton: removed with the implementation
     public static string Delta(double? value, UiLanguage language)
     {
-        throw new NotImplementedException();
+        if (value is not { } delta)
+        {
+            return NoValue;
+        }
+
+        var rounded = Round(delta);
+
+        return Localize(rounded > 0 ? "+" + Group(rounded) : Group(rounded), language);
     }
-#pragma warning restore RH2003
 
     /// <summary>
     /// Formats a percentage.
@@ -116,6 +121,17 @@ public static class PageFormat
     }
 
     /// <summary>
+    /// Formats a whole number with thousands separators.
+    /// </summary>
+    /// <param name="value">The value</param>
+    /// <param name="language">The language</param>
+    /// <returns>The text</returns>
+    public static string Number(long value, UiLanguage language)
+    {
+        return Localize(value.ToString("N0", CultureInfo.InvariantCulture), language);
+    }
+
+    /// <summary>
     /// Formats an instant at the browser's UTC offset; an offset outside -840 to 840 minutes, or none, shows UTC.
     /// </summary>
     /// <param name="value">The instant</param>
@@ -138,7 +154,17 @@ public static class PageFormat
     /// <returns>The rounded value</returns>
     internal static double Round(float value)
     {
-        var rounded = Math.Round((double)value, 2, MidpointRounding.AwayFromZero);
+        return Round((double)value);
+    }
+
+    /// <summary>
+    /// Rounds a value to two decimals, midpoints away from zero; a rounded negative zero is zero.
+    /// </summary>
+    /// <param name="value">The value</param>
+    /// <returns>The rounded value</returns>
+    internal static double Round(double value)
+    {
+        var rounded = Math.Round(value, 2, MidpointRounding.AwayFromZero);
 
         return rounded == 0
                    ? 0

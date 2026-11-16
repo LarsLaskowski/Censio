@@ -1,3 +1,6 @@
+using System.Globalization;
+using System.Text.Json;
+
 using Microsoft.JSInterop;
 
 namespace Censio.Server;
@@ -7,6 +10,15 @@ namespace Censio.Server;
 /// </summary>
 public static class BrowserOffset
 {
+    #region Constants
+
+    /// <summary>
+    /// The greatest UTC offset in minutes the browser may give, in either direction.
+    /// </summary>
+    private const int MaxOffsetMinutes = 840;
+
+    #endregion // Constants
+
     #region Methods
 
     /// <summary>
@@ -16,12 +28,21 @@ public static class BrowserOffset
     /// <param name="instant">The instant</param>
     /// <param name="cancellationToken">The cancellation token</param>
     /// <returns>The offset in minutes, or <see langword="null"/> when there is no usable answer</returns>
-#pragma warning disable RH2003 // Skeleton: removed with the implementation
-    public static Task<int?> AskAsync(IJSRuntime jsRuntime, DateTimeOffset instant, CancellationToken cancellationToken)
+    public static async Task<int?> AskAsync(IJSRuntime jsRuntime, DateTimeOffset instant, CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        try
+        {
+            var offset = await jsRuntime.InvokeAsync<int>("censio.utcOffsetMinutes", cancellationToken, instant.UtcDateTime.ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'", CultureInfo.InvariantCulture)).ConfigureAwait(false);
+
+            return offset is >= -MaxOffsetMinutes and <= MaxOffsetMinutes
+                       ? offset
+                       : null;
+        }
+        catch (Exception exception) when (exception is JSException or JsonException or JSDisconnectedException or OperationCanceledException)
+        {
+            return null;
+        }
     }
-#pragma warning restore RH2003
 
     #endregion // Methods
 }

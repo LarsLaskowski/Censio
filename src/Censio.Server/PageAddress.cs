@@ -139,12 +139,10 @@ public static class PageAddress
     /// <param name="text">The text</param>
     /// <param name="productGuid">The product GUID</param>
     /// <returns><see langword="true"/> when the text is a product GUID</returns>
-#pragma warning disable RH2003 // Skeleton: removed with the implementation
     public static bool TryParseGood(string? text, out int productGuid)
     {
-        throw new NotImplementedException();
+        return TryParseSession(text, out productGuid);
     }
-#pragma warning restore RH2003
 
     /// <summary>
     /// Gives the address of a good's page on an island.
@@ -153,12 +151,10 @@ public static class PageAddress
     /// <param name="island">The island</param>
     /// <param name="productGuid">The product GUID of the good</param>
     /// <returns>The address</returns>
-#pragma warning disable RH2003 // Skeleton: removed with the implementation
     public static string GoodLink(Guid profileId, IslandKey island, int productGuid)
     {
-        throw new NotImplementedException();
+        return string.Create(CultureInfo.InvariantCulture, $"{IslandLink(profileId, island)}/goods/{productGuid}");
     }
-#pragma warning restore RH2003
 
     /// <summary>
     /// Tells whether a text is one or more ASCII digits.

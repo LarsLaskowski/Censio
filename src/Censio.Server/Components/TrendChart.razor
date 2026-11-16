@@ -1,2 +1,38 @@
-@* Skeleton: removed with the implementation *@
-<div></div>
+@using System.Globalization
+@using MudBlazor.Charts
+<h2 class="mud-typography mud-typography-h6">@Heading</h2>
+@ChildContent
+@if (Read is null)
+{
+    <p>@Texts.Loading</p>
+}
+else if (Read.IsFailed)
+{
+    <p>@Texts.ReadFailed</p>
+}
+else if (_hasNoValues)
+{
+    <p>@Texts.ChartNoValues</p>
+}
+else if (_drawn is not { } drawn)
+{
+    <p>@Texts.Loading</p>
+}
+else
+{
+    <div class="censio-chart" @key="drawn.ReadNumber">
+        <MudChart @ref="_chart"
+                  T="double"
+                  ChartType="ChartType.Timeseries"
+                  ChartSeries="@drawn.Series"
+                  ChartOptions="@_options"
+                  TooltipTemplate="@RenderTooltip"
+                  Width="100%"
+                  Height="300px"
+                  MatchBoundsToSize="true" />
+    </div>
+    @if (drawn.Read.View is { } view && view.TotalCount > view.Points.Count)
+    {
+        <p>@string.Format(CultureInfo.InvariantCulture, Texts.ChartCapFormat, PageFormat.Number(view.TotalCount, Language))</p>
+    }
+}

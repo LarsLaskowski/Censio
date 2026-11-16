@@ -37,7 +37,9 @@
             <MudContainer>
                 <CascadingValue Value="_language">
                     <CascadingValue Value="_texts">
-                        @Body
+                        <CascadingValue Value="_theme">
+                            @Body
+                        </CascadingValue>
                     </CascadingValue>
                 </CascadingValue>
             </MudContainer>
