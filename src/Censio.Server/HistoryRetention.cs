@@ -344,6 +344,16 @@ public sealed partial class HistoryRetention : IDisposable
         }
 
         cancellationToken.ThrowIfCancellationRequested();
+
+        if (result.Outcome == HistoryOutcome.NothingToDo)
+        {
+            // A deletion left rows that no sweep has removed yet: keep the request, log nothing and ask for a run that sweeps
+            Volatile.Write(ref _cleanUpRequested, 1);
+            Volatile.Read(ref _asked).TrySetResult();
+
+            return false;
+        }
+
         Volatile.Write(ref _cleanUpRequested, 1);
         LogClearIncomplete(_logger, result.Failure);
 

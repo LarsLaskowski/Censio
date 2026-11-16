@@ -109,7 +109,10 @@ measurements. Operators who run the server rely on the retention and the deletio
 - **Clean-up.** The server's connection runs with secure delete, so SQLite overwrites everything this version deletes
   (retention included), and after the steps the write-ahead log is checkpointed and truncated, under the write gate. A
   reader that holds an older snapshot blocks the truncation: the clean-up then logs the warning below and the next run
-  tries again until it succeeds. The in-memory database has no file and counts as cleared. Once the clean-up line is
+  tries again until it succeeds. The in-memory database has no file and counts as cleared. The decision that nothing is
+  left to sweep is made under the same write gate: while a tombstone exists (a deletion arrived after the last sweep step)
+  the clean-up does nothing, logs nothing and keeps its request, and the run the deletion asked for sweeps the rows
+  first. Once the clean-up line is
   logged, none of the names that only the deleted profile held occurs in the database file or in its `-wal` and `-shm`
   files; a test with the real schema checks that.
 - **Residue of older versions.** A version before this one deleted nothing and left copies of changed names in the free

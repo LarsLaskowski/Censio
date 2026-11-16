@@ -185,21 +185,32 @@ public sealed class HistoryStore
     }
 
     /// <summary>
-    /// Checkpoints and truncates the write-ahead log so no deleted data stays in it.
+    /// Checkpoints and truncates the write-ahead log so no deleted data stays in it, when no deleted profile is left to sweep.
     /// </summary>
     /// <param name="cancellationToken">The cancellation token</param>
-    /// <returns>The result of the step</returns>
+    /// <returns>
+    /// <see cref="HistoryOutcome.NothingToDo"/> when a tombstone is left, so the sweep is not finished and nothing was cleared;
+    /// otherwise <see cref="HistoryOutcome.Done"/> (also for the in-memory database, which has no file),
+    /// <see cref="HistoryOutcome.Blocked"/> when a read blocks the truncation, or <see cref="HistoryOutcome.Failed"/>
+    /// </returns>
     public async Task<HistoryResult> ClearDeletedAsync(CancellationToken cancellationToken)
     {
-        if (_database.DatabaseFile is null)
-        {
-            return new HistoryResult(HistoryOutcome.Done, null, null);
-        }
-
         await _database.Gate.WaitAsync(cancellationToken).ConfigureAwait(false);
 
         try
         {
+            using var tombstoneCommand = StoreAccess.CreateCommand(_database.Connection, TombstoneSql);
+
+            if (await tombstoneCommand.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is not null)
+            {
+                return new HistoryResult(HistoryOutcome.NothingToDo, null, null);
+            }
+
+            if (_database.DatabaseFile is null)
+            {
+                return new HistoryResult(HistoryOutcome.Done, null, null);
+            }
+
             using var command = StoreAccess.CreateCommand(_database.Connection, "PRAGMA wal_checkpoint(TRUNCATE);");
             using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
 

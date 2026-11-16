@@ -491,6 +491,7 @@ public sealed partial class ServerState : IProfileStateSource
                 profiles = read.Profiles;
                 held = read.Held;
                 _sequence = read.Sequence;
+                _markedProfiles.Clear();
             }
             catch (SqliteException exception)
             {
@@ -498,9 +499,9 @@ public sealed partial class ServerState : IProfileStateSource
 
                 profiles = [.. profiles.Where(profile => profile.Id != profileId)];
                 held = held.Where(pair => pair.Key != profileId).ToDictionary();
+                _markedProfiles.Remove(profileId);
             }
 
-            _markedProfiles.Clear();
             Swap(new ServerStateSnapshot
                  {
                      Profiles = profiles,
