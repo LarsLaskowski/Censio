@@ -78,10 +78,10 @@ has no caller outside the tests, and no chart package is referenced.
   takes the write gate, a chart read holds that gate no longer than a fold step at the bounds does (about 4 seconds),
   so the ingest still acknowledges within the Companion's 30 seconds (record 0068).
 - N4: Safety: no name reaches the chart as markup (E7); line names, headings and notes are fixed texts of `UiTexts`.
-- N5: Resources and licence: the chart's script and styles are served by the server itself; no CDN or other external
-  request ([`web-ui.md`](../../docs/areas/web-ui.md), *Resources*). Every chart component and script the server or the
-  image ships is under a licence that allows its redistribution in this MIT project without a fee or a revenue limit
-  (record 0028); which library is pending Q7.
+- N5: Library and resources: the charts are MudBlazor's own (Q7), so no chart package, script or style beyond MudBlazor's
+  is added and nothing is loaded from another site ([`web-ui.md`](../../docs/areas/web-ui.md), *Resources*). The gap of
+  S7 and the animation of S5 stay required; the plan verifies that MudBlazor's chart draws both and, if it does not,
+  returns the question to the Product Manager before building (record 0025's chart part superseded, record 0028).
 - N6: Languages: every chart text in English and German from `UiTexts`; no number or time formatted with .NET culture
   data (record 0072); times in the browser's time zone (record 0078).
 - N7: Look: the chart's text, grid and lines take the theme's palette; each line colour reaches 3:1 against the surface
@@ -118,8 +118,8 @@ AC1 to AC3 check the history as stored by the replay, before any retention run.
 - AC10: The chart options carry the theme's palette, with every line colour at 3:1 or more against the surface in both
   themes (checked by a unit test), and animation switched on (S5, N7).
 - AC11: A name holding markup appears on the page and in the chart as text only, checked with a name of E7 (E7, N4).
-- AC12: The page loads the chart's script and styles from the server's own paths only, and the image serves them; a
-  test names the version of every chart script the server ships and checks its licence header against N5 (N5).
+- AC12: The server adds no chart package, script or style beyond MudBlazor's, and a chart page loads resources from
+  the server's own paths only (N5).
 - AC13: Each read of N2 reads at most 2,880 points; the reads run one at a time on their own gate and end when the page
   is disposed; their time at the contract's bounds and the write gate's hold on the in-memory database are measured
   against N3 (N2, N3).
@@ -145,15 +145,14 @@ AC1 to AC3 check the history as stored by the replay, before any retention run.
 - Q4: Do the charts update live? Answered: yes (S4), like every data page of #32.
 - Q5: Where are region totals reached? Answered: on the good's page (S2), no goods list before #47.
 - Q6: Which values? Answered: production, consumption, delta, as the issue names them.
-- Q7: Which chart library, now that ApexCharts is no longer MIT (Challenge M1)? Options: (a) MudBlazor's own charts,
-  superseding record 0025's chart part; (b) Blazor-ApexCharts 6.0.2 pinned; (c) ApexCharts 8.8.1 under its own licence.
-  Escalated to the Product Manager; recommendation (a).
+- Q7: Which chart library, now that ApexCharts is no longer MIT (Challenge M1)? Answered: MudBlazor's own charts, by
+  the Product Manager, instead of the issue's Blazor-ApexCharts; a new record supersedes record 0025's chart part (N5).
 
 ## Area documents
 
 - `web-pages.md` (or a new `web-charts.md` that #37 and #38 extend, the plan decides): the good page, its links and
   states, the overview chart, the range, the gap rule, hourly means, the region total, the cap, the reads and bounds.
-- `web-ui.md`: the chart texts, colours and contrast, and the chart's resources.
+- `web-ui.md`: the chart texts, colours and contrast; *Resources* unchanged but for the charts' mention.
 - `history.md`: *Scope* and *Not here* point to the charts; the new reads join *The series read*.
 
 ## Challenge
@@ -161,7 +160,7 @@ AC1 to AC3 check the history as stored by the replay, before any retention run.
 - M1 (ApexCharts no longer MIT) — accepted, escalated as Q7. Verified in the packages: wrapper 8.0.0 ships ApexCharts
   8.8.1 under the "ApexCharts License" (free only under $2M revenue, OEM licence for embedding in a product used by
   others) and calls `ApexCharts.setLicense`; wrapper 6.0.2 ships the MIT 4.7.0 for net8.0 and net9.0 only. N5 and AC12
-  now require and check a redistributable licence.
+  now use MudBlazor's charts (Q7).
 - M2 (retention folds the fixture) — accepted. Verified: receive times 22:54:38 to 00:21:36 UTC, pause inside hour 23.
   AC1 to AC3 check the history before any fold; S8 and AC4 add the folded replay; AC14 and AC15 follow.
 - M3 (reads unbounded) — accepted; verified `HistorySeriesQuery` names one good and `StoreAccess.ReadAsync` takes the
