@@ -48,8 +48,13 @@ clean-up takes before the write gate and holds through the truncation. The rules
 
 - The in-memory database's write gate is held for one part at a time, so the ingest waits at most for a part.
 - The clean-up waits at most for one part, and no chart read holds the deleted rows in the write-ahead log.
-- A fold that runs between two parts of one read can show a tick twice or miss it in that drawing, only for a profile
-  whose range reaches back 7 days (idle); the next read draws it right.
+- A fold that runs between two parts of one read can miss a tick in that drawing (a gap point), never show it twice,
+  only for a profile whose range reaches back 7 days (idle); the next read draws it right.
+- The 10 seconds of a read hold where the file's pages are in the page cache. Uncached, the region read at the bounds
+  (256 islands) takes about 70 seconds, the fixture's region of 24 islands about 1 second. Accepted: that chart shows
+  `Loading…` meanwhile, the pages' reads are not held, and the ingest and the clean-up wait at most for one part. Bounding
+  the region read further (a lower cap for the region, or option 4) costs more than a first read of a region far
+  beyond any played game.
 - Every stored tick entry writes the index as well, and the migration builds it over the stored ticks at the first
   start; both costs are measured in [`history.md`](../areas/history.md) (*Measurements*).
 - The series read stays as it is, for later charts of other values (#49 to #51).

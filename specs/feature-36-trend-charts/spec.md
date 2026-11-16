@@ -27,8 +27,9 @@ has no caller outside the tests, and no chart package is referenced.
   mean building count above 0, goods in deficit the goods whose mean delta, rounded as *Number formats* says, is below 0.
 - S4: Given an open chart page, when a tick of its profile is stored, then every chart shows the new point without a
   reload, and the range moves with it.
-- S5: The charts animate when first drawn and when their points change, and take the colours of the shown theme; a theme
-  or language switch recolours or retranslates them at once, without a reload.
+- S5: The charts animate when first drawn and when their points change, unless the browser asks for reduced
+  motion, and take the colours of the shown theme; a theme or language switch recolours or retranslates them at once,
+  without a reload.
 - S6: Hovering a point shows a tooltip: the time as `yyyy-MM-dd HH:mm` at the browser's UTC offset for the latest
   tick (the as-of line's offset; without a usable answer in UTC with ` UTC`), `Hourly average` /
   `Stundenmittel` for an hourly point, and each line's value formatted as *Number formats* of `web-pages.md` (delta
@@ -76,7 +77,9 @@ has no caller outside the tests, and no chart package is referenced.
   page's reads are cancelled with the page. A prerendered page reads no chart: its charts show `Loading…` until the page
   is interactive.
 - N3: Time: at the contract's bounds (256 islands of 512 entries per tick) each read of N2 over 2,880 points finishes
-  within 10 seconds, measured as `history.md` (*Measurements*) measures on ticks at the bounds and scaled to 2,880. On the in-memory database, where every read
+  within 10 seconds, measured as `history.md` (*Measurements*) measures on ticks at the bounds and scaled to 2,880, with the
+  file's pages in the page cache. A read whose pages are not cached may take longer (record 0087); its chart shows
+  `Loading…` meanwhile, and the other pages are not held. On the in-memory database, where every read
   takes the write gate, a chart read holds that gate no longer than a fold step at the bounds does (about 4 seconds),
   so the ingest still acknowledges within the Companion's 30 seconds (record 0068).
 - N4: Safety: no name reaches the chart as markup (E7); line names, headings and notes are fixed texts of `UiTexts`.
@@ -125,11 +128,11 @@ AC1 to AC3 check the history as stored by the replay, before any retention run.
 - AC12: The server adds no chart package, script or style beyond MudBlazor's, and a chart page loads resources from
   the server's own paths only (N5).
 - AC13: Each read of N2 reads at most 2,880 points; the reads run one at a time on their own gate, end when the page
-  is disposed, and a prerendered page makes none; their time at the contract's bounds and the write gate's hold on the in-memory database are measured
+  is disposed, and a prerendered page makes none; their time at the contract's bounds (pages cached, the uncached time stated beside it) and the write gate's hold on the in-memory database are measured
   against N3 (N2, N3).
 - AC14: manual (Product Manager, on a build of the branch, the fixture replayed after the server's first retention run
   and checked before the next, the log line `History reduced …` absent since the replay): in the light and the dark
-  theme the charts look finished, animate, show the pause as a gap and the tooltip; a page logs nothing (S5, S6, S7, N8).
+  theme the charts look finished, animate (the browser's reduced-motion setting off), show the pause as a gap and the tooltip; a page logs nothing (S5, S6, S7, N8).
 - AC15: README and user guide, English first, then German, describe the good page, the overview chart, the range, the
   gaps, the hourly means and that an old recording shows as hourly means after the next retention run, and the README's
   "no trend charts" line is gone.
@@ -141,7 +144,7 @@ AC1 to AC3 check the history as stored by the replay, before any retention run.
 - Range picker and the game-time axis: #37 (record 0022). Sparklines and trend arrows: #38.
 - Other values (perfect generation, productivity, income, maintenance, workforce): #49 to #51; a region's goods list
   and deficits: #47; the phone layout: #53.
-- The chart toolbar (zoom, download), several goods in one chart, and honouring the browser's reduced-motion setting.
+- The chart toolbar (zoom, download), several goods in one chart.
 
 ## Open questions
 
@@ -177,3 +180,10 @@ AC1 to AC3 check the history as stored by the replay, before any retention run.
 - Minor 1 — accepted: S3 defines the hourly figures, AC3 covers one. Minor 2 — accepted: own gate (N2). Minor 3 —
   accepted: axis labels (S6, N6). Minor 4 — accepted: threshold 15 minutes, clear of 9.4 and 18.3; AC1 asserts the
   join. Minor 5 — accepted: AC6 builds its data. Minor 6 — accepted: N1 starts at the hour 24 hours back.
+
+## Amendments
+
+| Criterion | Change | Reason | Step | Decided by |
+| --------- | ------ | ------ | ---- | ---------- |
+| AC13 | The time of the reads is measured with the file's pages in the page cache, the uncached time stated beside it; N3 names the uncached case as an accepted risk | Cold page cache at the bounds: region read 68 to 74 s; measured warm as `history.md` measures, 3.5 to 4.4 s; the fixture's region 1.0 s cold (record 0087) | 6 | Lead |
+| AC14 | "animate" holds with the browser's reduced-motion setting off; S5 honours that setting, no longer out of scope | The reveal is switched off under `prefers-reduced-motion: reduce`, an accessibility default kept at no cost | 6 | Lead |

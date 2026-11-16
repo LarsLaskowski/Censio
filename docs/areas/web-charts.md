@@ -142,9 +142,8 @@ English and German. Users of the web application rely on it; the pages around th
   A new read re-creates the chart element, so the reveal runs again whenever the points change, which for an open page is
   at every stored tick; a theme or a language switch keeps the element and so does not run it.
 - **Reduced motion.** Inside `@media (prefers-reduced-motion: reduce)` the same selector sets `animation: none`, so a
-  browser that asks for reduced motion draws the lines at once, fully opaque and without the reveal. The browser's
-  reduced-motion setting is honoured only by this one block; the spec of the feature listed it as out of scope, and the block
-  was added with the animation.
+  browser that asks for reduced motion draws the lines at once, fully opaque and without the reveal. This block is the
+  only place that honours the browser's reduced-motion setting.
 
 ### The reads
 
