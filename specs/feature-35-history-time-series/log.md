@@ -38,3 +38,4 @@ are quoted in full.
 | 2026-11-16 14:58 | 6 Decide (G4) | Lead | RESULT: DECIDED — record 0083 corrected in place to ~108 bytes a folded tick; 1.2 GB/year worst case accepted as documented, no scope change (opus/medium · 4,247 tokens · 5 tool uses · 29 s · 12 in · 2,406 out · 321,084 cache read · 82,076 cache write · 261,382 weighted · continued from 6 Decide (G2)) |
 | 2026-11-16 14:58 | 6 Coverage skipped (G4) | Orchestrator | skipped — G4 changed documentation only, no code or test |
 | 2026-11-16 14:58 | 6 Documentation | Orchestrator | written in 6 Implement (G4) |
+| 2026-11-16 15:00 | 6 Coverage (test documentation) | Tester | UNIT_TESTS.md PageTestHost bullet extended; checks pass. Deferred: none (opus/medium · 9,931 tokens · 6 tool uses · 144 s · 14 in · 3,012 out · 1,477,678 cache read · 236,181 cache write · 768,368 weighted · continued from 6 Coverage (G1)) |
