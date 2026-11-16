@@ -76,6 +76,12 @@ public sealed class ServerStoreTests : IDisposable
     private const string CreateFailingTriggerSql = "CREATE TRIGGER \"FailMapPairs\" BEFORE INSERT ON \"TickMapPairs\" BEGIN SELECT RAISE(ABORT, '" + FailingWriteMessage + "'); END;";
 
     /// <summary>
+    /// The statement that makes every insert of a tombstone fail, after the deletion removed the profile row and its
+    /// islands in the same transaction.
+    /// </summary>
+    private const string CreateFailingTombstoneTriggerSql = "CREATE TRIGGER \"FailTombstones\" BEFORE INSERT ON \"DeletedProfiles\" BEGIN SELECT RAISE(ABORT, '" + FailingWriteMessage + "'); END;";
+
+    /// <summary>
     /// The number of islands of a tick at the contract's bounds.
     /// </summary>
     private const int BoundIslands = 256;
@@ -1064,6 +1070,38 @@ public sealed class ServerStoreTests : IDisposable
         Assert.AreSequenceEqual(new[] { DescribeProfile(profileId, ProfileName) }, DescribeProfiles(await store.ListProfilesAsync(cancellationToken)), "The stored profile should stay listed");
         Assert.AreSequenceEqual(DescribeTick(tick), DescribeTick(await store.ReadTickAsync(tick.Id, cancellationToken)), "The stored tick should read back unchanged");
         Assert.AreEqual("1 1 1 2", CountTickRows(databaseFile), "No row of the stored tick should be touched");
+        Assert.AreEqual("0", CountDeletedProfiles(databaseFile), "No tombstone should be written");
+    }
+
+    /// <summary>
+    /// A deletion that fails before its rows are gone stores no change: the profile, its islands and its tick stay
+    /// whole, no tombstone is written, and the failure is reported with its exception.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC6")]
+    public async Task ServerStoreDeleteProfileFailureKeepsProfileWhole()
+    {
+        // Arrange
+        var databaseFile = CreateDatabaseFile();
+        var store = await OpenStoreAsync(databaseFile);
+        var profileId = Guid.NewGuid();
+        var cancellationToken = TestContext.CancellationToken;
+        var tick = CreateTick(profileId, 1, CreateIsland(1, IslandName, CreateEntry(1)));
+
+        await store.StoreProfileAsync(profileId, ProfileName, cancellationToken);
+        await store.StoreTickAsync(tick, cancellationToken);
+        Execute(databaseFile, command => command.CommandText = CreateFailingTombstoneTriggerSql);
+
+        // Act
+        var result = await store.DeleteProfileAsync(profileId, cancellationToken);
+
+        // Assert
+        Assert.AreEqual(HistoryOutcome.Failed, result.Outcome, "A failing deletion should be reported as failed");
+        Assert.IsInstanceOfType<SqliteException>(result.Failure, "The SQLite exception behind the failure should be attached");
+        Assert.AreSequenceEqual(new[] { DescribeProfile(profileId, ProfileName) }, DescribeProfiles(await store.ListProfilesAsync(cancellationToken)), "The profile should stay listed with its name");
+        Assert.AreSequenceEqual(new[] { "1/1/0 " + IslandName }, DescribeIslands(await store.ListIslandsAsync(profileId, cancellationToken)), "The profile's island should stay");
+        Assert.AreSequenceEqual(DescribeTick(tick), DescribeTick(await store.ReadTickAsync(tick.Id, cancellationToken)), "The profile's tick should read back unchanged");
         Assert.AreEqual("0", CountDeletedProfiles(databaseFile), "No tombstone should be written");
     }
 

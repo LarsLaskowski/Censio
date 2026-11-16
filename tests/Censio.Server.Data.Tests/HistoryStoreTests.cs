@@ -73,6 +73,12 @@ public sealed class HistoryStoreTests
     private const string CreateFailingFoldTriggerSql = "CREATE TRIGGER \"FailFoldedTicks\" BEFORE INSERT ON \"FoldedTicks\" BEGIN SELECT RAISE(ABORT, '" + FailingFoldMessage + "'); END;";
 
     /// <summary>
+    /// The statement that makes every delete of a tick fail, after the tick's islands, entries and pairs were removed
+    /// in the same sweep step.
+    /// </summary>
+    private const string CreateFailingSweepTriggerSql = "CREATE TRIGGER \"FailTickDelete\" BEFORE DELETE ON \"Ticks\" BEGIN SELECT RAISE(ABORT, '" + FailingFoldMessage + "'); END;";
+
+    /// <summary>
     /// The statement that counts the rows of every table a profile's ticks, hourly points and identity live in, in the
     /// order Ticks, TickIslands, TickEntries, TickMapPairs, HourlyPoints, HourlyIslands, HourlyEntries, HourlyMapPairs,
     /// FoldedTicks, DeletedProfiles, Profiles, Islands.
@@ -697,6 +703,100 @@ public sealed class HistoryStoreTests
     }
 
     /// <summary>
+    /// A tick that arrives for an hour before an already folded hour is returned before that hourly point, so the
+    /// series stays in time order.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC4")]
+    public async Task HistoryStoreReadSeriesLateTickOfEarlierHourComesBeforeHourlyPoint()
+    {
+        // Arrange
+        var (store, history, _) = await OpenAsync();
+
+        var profileId = Guid.NewGuid();
+        var latest = LatestTick(profileId);
+        var late = PlainTick(profileId, -Hour + (10 * Minute), 5);
+
+        await StoreAsync(store, PlainTick(profileId, 10 * Minute, 10), PlainTick(profileId, 20 * Minute, 20), latest);
+        await FoldAllAsync(history, profileId);
+        await store.StoreTickAsync(late, TestContext.CancellationToken);
+
+        // Act
+        var series = await ReadSeriesAsync(history, profileId, _hour.AddHours(-1), _hour.AddHours(3));
+
+        // Assert
+        var expected = new[]
+                       {
+                           TickLine(late, IslandName, late.Islands[0].Entries[0]),
+                           HourlyHead(_hour, 2, 10, 20, IslandName) + EntryBody(PlainEntry(ProductGuid)),
+                           TickLine(latest, IslandName, latest.Islands[0].Entries[0])
+                       };
+
+        Assert.AreSequenceEqual(expected, series, "The late tick of the earlier hour should come before the hourly point");
+    }
+
+    /// <summary>
+    /// An hourly point of an hour whose ticks lacked the island, or held the island without the good, is a point
+    /// without values (and without a name for the missing island), never zeros.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC4")]
+    public async Task HistoryStoreReadSeriesHourlyPointWithoutIslandOrGoodHasNoValues()
+    {
+        // Arrange
+        var (store, history, _) = await OpenAsync();
+
+        var profileId = Guid.NewGuid();
+
+        await StoreAsync(store,
+                         Tick(profileId, -Hour + (10 * Minute), 10, Island(OtherIslandKey, "Other island", PlainEntry(ProductGuid))),
+                         Tick(profileId, -Hour + (20 * Minute), 20, Island(OtherIslandKey, "Other island", PlainEntry(ProductGuid))),
+                         Tick(profileId, 10 * Minute, 30, Island(IslandKey, IslandName, PlainEntry(OtherProductGuid))),
+                         Tick(profileId, 20 * Minute, 40, Island(IslandKey, IslandName, PlainEntry(OtherProductGuid))),
+                         LatestTick(profileId));
+        await FoldAllAsync(history, profileId);
+
+        // Act
+        var series = await ReadSeriesAsync(history, profileId, _hour.AddHours(-1), _hour.AddHours(1));
+
+        // Assert
+        var expected = new[]
+                       {
+                           Head(true, _hour.AddHours(-1), 2, 10, 20, null) + EntryBody(null),
+                           HourlyHead(_hour, 2, 30, 40, IslandName) + EntryBody(null)
+                       };
+
+        Assert.AreSequenceEqual(expected, series, "An hourly point without the island or the good should have no values, never zeros");
+    }
+
+    /// <summary>
+    /// A fold step for a profile without ticks reports nothing to do and leaves another profile's foldable ticks alone.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC1")]
+    public async Task HistoryStoreFoldNextTickProfileWithoutTicksReportsNothingToDo()
+    {
+        // Arrange
+        var (store, history, databaseFile) = await OpenAsync();
+
+        var otherId = Guid.NewGuid();
+
+        await StoreAsync(store, PlainTick(otherId, 10 * Minute, 10), LatestTick(otherId));
+
+        // Act
+        var result = await history.FoldNextTickAsync(Guid.NewGuid(), _clock.GetUtcNow(), TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(HistoryOutcome.NothingToDo, result.Outcome, "A profile without ticks should have nothing to fold");
+        Assert.IsNull(result.Failure, "Nothing to do should carry no exception");
+        Assert.IsNull(result.Hour, "Nothing to do should name no folded hour");
+        Assert.AreEqual("2 2 2 4 0 0 0 0 0 0 1 1", CountRows(databaseFile), "The other profile's ticks should stay unfolded");
+    }
+
+    /// <summary>
     /// A fold step that fails changes nothing: the tick stays whole and no hourly row is written.
     /// </summary>
     /// <returns>A task that represents the asynchronous test</returns>
@@ -777,6 +877,100 @@ public sealed class HistoryStoreTests
         Assert.AreEqual("1 1 1 2 0 0 0 0 0 0 1 1", CountRows(databaseFile), "Only the new tick, its island and the recreated profile should remain");
         Assert.AreEqual(recreating.Id, (await store.ReadLatestTickAsync(profileId, TestContext.CancellationToken))?.Id, "The new tick should be the profile's latest");
         Assert.AreSequenceEqual(new[] { TickLine(recreating, IslandName, recreating.Islands[0].Entries[0]) }, await ReadSeriesAsync(history, profileId, _hour.AddDays(-1), _hour.AddDays(1)), "The series should hold only the new tick");
+    }
+
+    /// <summary>
+    /// A sweep step that fails removes nothing: the deleted profile's tick rows, already removed children included,
+    /// stay as they were, and the failure is reported with its exception.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC6")]
+    public async Task HistoryStoreSweepNextFailureRemovesNothing()
+    {
+        // Arrange
+        var (store, history, databaseFile) = await OpenAsync();
+
+        var profileId = Guid.NewGuid();
+
+        await StoreAsync(store, PlainTick(profileId, 10 * Minute, 10), LatestTick(profileId));
+        await store.DeleteProfileAsync(profileId, TestContext.CancellationToken);
+        CreateFailingSweepTrigger(databaseFile);
+
+        // Act
+        var result = await history.SweepNextAsync(TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(HistoryOutcome.Failed, result.Outcome, "A failing sweep step should be reported as failed");
+        Assert.IsInstanceOfType<SqliteException>(result.Failure, "The SQLite exception behind the failure should be attached");
+        Assert.AreEqual("2 2 2 4 0 0 0 0 0 1 0 0", CountRows(databaseFile), "Every tick row of the deleted profile and its tombstone should remain");
+    }
+
+    /// <summary>
+    /// The clean-up of an in-memory database, which has no file and no write-ahead log, reports done.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC8")]
+    public async Task HistoryStoreClearDeletedInMemoryDatabaseReportsDone()
+    {
+        // Arrange
+        var result = await ServerDatabase.OpenAsync(null, NullLoggerFactory.Instance, TestContext.CancellationToken);
+        var database = result.Database ?? throw new InvalidOperationException($"The database could not be opened: {result.Kind}", result.Failure);
+
+        _databases.Add(database);
+
+        var history = new HistoryStore(database);
+
+        // Act
+        var cleared = await history.ClearDeletedAsync(TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(HistoryOutcome.Done, cleared.Outcome, "The clean-up of an in-memory database should be done");
+        Assert.IsNull(cleared.Failure, "The clean-up of an in-memory database should carry no exception");
+    }
+
+    /// <summary>
+    /// A checkpoint SQLite refuses with an error, here because the kept connection is inside a read transaction,
+    /// reports failed with the exception and releases the write gate. The kept connection's timeout is lowered to one
+    /// second, so SQLite's retries of the locked checkpoint end quickly.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC8")]
+    public async Task HistoryStoreClearDeletedCheckpointErrorReportsFailedAndReleasesGate()
+    {
+        // Arrange
+        var (_, history, _) = await OpenAsync();
+
+        var database = _databases[^1];
+
+        database.Connection.DefaultTimeout = 1;
+
+        using var hold = database.Connection.CreateCommand();
+
+        hold.CommandText = HoldReadSql;
+        await hold.ExecuteScalarAsync(TestContext.CancellationToken);
+
+        // Act
+        HistoryResult result;
+
+        try
+        {
+            result = await history.ClearDeletedAsync(TestContext.CancellationToken);
+        }
+        finally
+        {
+            using var rollback = database.Connection.CreateCommand();
+
+            rollback.CommandText = "ROLLBACK;";
+            await rollback.ExecuteNonQueryAsync(TestContext.CancellationToken);
+        }
+
+        // Assert
+        Assert.AreEqual(HistoryOutcome.Failed, result.Outcome, "A checkpoint SQLite refuses should be reported as failed");
+        Assert.IsInstanceOfType<SqliteException>(result.Failure, "The SQLite exception behind the failure should be attached");
+        Assert.AreEqual(1, database.Gate.CurrentCount, "The write gate should be released after the failure");
     }
 
     /// <summary>
@@ -1347,6 +1541,19 @@ public sealed class HistoryStoreTests
         using var command = connection.CreateCommand();
 
         command.CommandText = CreateFailingFoldTriggerSql;
+        command.ExecuteNonQuery();
+    }
+
+    /// <summary>
+    /// Creates the trigger of <see cref="CreateFailingSweepTriggerSql" /> over a connection of its own.
+    /// </summary>
+    /// <param name="databaseFile">The file</param>
+    private static void CreateFailingSweepTrigger(string databaseFile)
+    {
+        using var connection = OpenRawConnection(databaseFile);
+        using var command = connection.CreateCommand();
+
+        command.CommandText = CreateFailingSweepTriggerSql;
         command.ExecuteNonQuery();
     }
 
