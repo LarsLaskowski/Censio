@@ -618,6 +618,54 @@ public sealed class HistoryRetentionTests
     }
 
     /// <summary>
+    /// A deletion of the only profile while a run is under way leaves no profile to fold, so the run reaches its
+    /// clean-up before any sweep removed the deleted rows: it logs no cleared line while those rows remain, and the next
+    /// run sweeps them, clears and logs the cleared line, with no row and no name of the profile left.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC6")]
+    [TestCategory("AC8")]
+    public async Task HistoryRetentionDeleteProfileDuringRunClearsOnlyAfterSweep()
+    {
+        // Arrange
+        var (state, history, databaseFile) = await OpenAsync();
+
+        var deletedId = Guid.NewGuid();
+
+        using var clock = new BlockingClockTimeProvider(_foldTime);
+
+        await state.StoreProfileAsync(deletedId, DeletedProfileName, TestContext.CancellationToken);
+        await StoreTicksAsync(state,
+                              Tick(deletedId, _hour.AddMinutes(10), DeletedIslandName),
+                              Tick(deletedId, _hour.AddHours(6).AddMinutes(30), DeletedIslandName));
+
+        using var retention = new HistoryRetention(state, history, clock, _logger);
+
+        var run = Task.Run(() => retention.RunAsync(TestContext.CancellationToken), TestContext.CancellationToken);
+
+        await Task.WhenAny(clock.Reached, run).WaitAsync(_waitBound, TestContext.CancellationToken);
+        await retention.DeleteProfileAsync(deletedId, TestContext.CancellationToken).WaitAsync(_waitBound, TestContext.CancellationToken);
+        clock.Release();
+        await run.WaitAsync(_waitBound, TestContext.CancellationToken);
+
+        var afterFirstRun = DescribeEntries();
+        var rowsAfterFirstRun = CountRows(databaseFile);
+
+        // Act
+        await retention.RunAsync(TestContext.CancellationToken).WaitAsync(_waitBound, TestContext.CancellationToken);
+
+        // Assert
+        var deleted = Describe(LogLevel.Information, DeletedLine, null);
+
+        Assert.AreSequenceEqual(new[] { deleted }, afterFirstRun, "The run should log no cleared line while the deleted rows remain");
+        Assert.AreEqual("2 0 0 1", rowsAfterFirstRun, "The deleted profile's ticks and tombstone should still be there after the first run");
+        Assert.AreSequenceEqual(new[] { deleted, Describe(LogLevel.Information, ClearedLine, null) }, DescribeEntries(), "The next run should sweep and then log the cleared line");
+        Assert.AreEqual("0 0 0 0", CountRows(databaseFile), "No row of the deleted profile should be left");
+        Assert.IsEmpty(FindNamesInFiles(databaseFile, DeletedProfileName, DeletedIslandName), "No name only the deleted profile held should be left in the database files");
+    }
+
+    /// <summary>
     /// A clean-up that a held read blocks logs the warning of spec E10 without an exception; once the read has ended the
     /// next run clears the deleted history, logs the cleared line, and no name only the deleted profile held is left in
     /// the database files.

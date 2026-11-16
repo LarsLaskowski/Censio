@@ -931,6 +931,35 @@ public sealed class HistoryStoreTests
     }
 
     /// <summary>
+    /// A clean-up while a deleted profile's rows are not all swept yet reports nothing to do, without an exception and
+    /// without a checkpoint, in a file and in an in-memory database alike.
+    /// </summary>
+    /// <param name="inMemory">Whether the database is in memory</param>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC8")]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task HistoryStoreClearDeletedUnsweptRowsReportsNothingToDo(bool inMemory)
+    {
+        // Arrange
+        var (store, history) = await OpenStoresAsync(inMemory);
+
+        var profileId = Guid.NewGuid();
+
+        await StoreAsync(store, PlainTick(profileId, 10 * Minute, 10), LatestTick(profileId));
+        await store.DeleteProfileAsync(profileId, TestContext.CancellationToken);
+
+        // Act
+        var result = await history.ClearDeletedAsync(TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(HistoryOutcome.NothingToDo, result.Outcome, "A clean-up before the sweep removed every row of the deleted profile should report nothing to do");
+        Assert.IsNull(result.Failure, "Nothing to do should carry no exception");
+        Assert.AreEqual(1, _databases[^1].Gate.CurrentCount, "The write gate should be released");
+    }
+
+    /// <summary>
     /// A checkpoint SQLite refuses with an error, here because the kept connection is inside a read transaction,
     /// reports failed with the exception and releases the write gate. The kept connection's timeout is lowered to one
     /// second, so SQLite's retries of the locked checkpoint end quickly.
@@ -1623,6 +1652,28 @@ public sealed class HistoryStoreTests
         _databases.Add(database);
 
         return (new ServerStore(database), new HistoryStore(database), databaseFile);
+    }
+
+    /// <summary>
+    /// Opens a store and a history store on a new database file or an in-memory database.
+    /// </summary>
+    /// <param name="inMemory">Whether the database is in memory</param>
+    /// <returns>The store and the history store</returns>
+    private async Task<(ServerStore Store, HistoryStore History)> OpenStoresAsync(bool inMemory)
+    {
+        if (inMemory == false)
+        {
+            var (fileStore, fileHistory, _) = await OpenAsync();
+
+            return (fileStore, fileHistory);
+        }
+
+        var result = await ServerDatabase.OpenAsync(null, NullLoggerFactory.Instance, TestContext.CancellationToken);
+        var database = result.Database ?? throw new InvalidOperationException($"The database could not be opened: {result.Kind}", result.Failure);
+
+        _databases.Add(database);
+
+        return (new ServerStore(database), new HistoryStore(database));
     }
 
     /// <summary>

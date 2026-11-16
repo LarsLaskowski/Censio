@@ -1766,6 +1766,43 @@ public sealed class ServerStateTests
     }
 
     /// <summary>
+    /// A deletion whose re-read fails keeps the mark of another profile whose state could not be read: once reads work
+    /// again, that profile's next tick, an older one, holds its stored latest state, not the older tick.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public async Task ServerStateDeleteProfileFailedRebuildKeepsOtherProfileMarked()
+    {
+        // Arrange
+        var databaseFile = CreateDatabaseFile();
+        var (store, state) = await OpenRestoredAsync(databaseFile);
+
+        var heldId = Guid.NewGuid();
+        var deletedId = Guid.NewGuid();
+        var markedId = Guid.NewGuid();
+
+        await StoreTicksAsync(state,
+                              CreateTick(deletedId, 10, CreateIsland(1, IslandName, CreateEntry(1))),
+                              CreateTick(heldId, 20, CreateIsland(1, IslandName, CreateEntry(1))));
+        ExecutePooled(databaseFile, BreakIslandReadsSql);
+        await StoreTicksAsync(state, CreateTick(markedId, 30, CreateIsland(1, "Island of the newest tick", CreateEntry(1))));
+
+        // Act
+        var result = await state.DeleteProfileAsync(deletedId, TestContext.CancellationToken);
+
+        // Assert
+        ExecutePooled(databaseFile, RepairIslandReadsSql);
+        await StoreTicksAsync(state, CreateTick(markedId, 5, CreateIsland(3, "Island of the oldest tick", CreateEntry(3))));
+
+        var stored = await store.ReadProfileStateAsync(markedId, TestContext.CancellationToken);
+
+        Assert.AreEqual(HistoryOutcome.Done, result.Outcome, "The deletion should be done although its re-read failed");
+        Assert.AreSequenceEqual(new[] { heldId, markedId }.Order().ToList(), state.HeldProfiles.Order().ToList(), "The marked profile should be held after its next tick");
+        Assert.AreSequenceEqual(DescribeState(stored), DescribeState(await ReadStateAsync(state, markedId)), "The held state should be the stored latest state, so the mark survived the deletion");
+    }
+
+    /// <summary>
     /// Deleting the newest of three profiles, of which two are held, holds the two remaining ones, as a restore would, and
     /// makes the next newest the newest profile.
     /// </summary>
