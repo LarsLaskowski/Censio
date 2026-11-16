@@ -21,5 +21,11 @@ public partial class Routes
     [Parameter]
     public UiLanguage Language { get; set; }
 
+    /// <summary>
+    /// Gets or sets a value indicating whether the page may delete a profile's history.
+    /// </summary>
+    [Parameter]
+    public bool DeletionAllowed { get; set; }
+
     #endregion // Properties
 }

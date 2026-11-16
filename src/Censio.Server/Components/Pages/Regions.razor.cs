@@ -16,6 +16,18 @@ public partial class Regions
     public string? Profile { get; set; }
 
     /// <summary>
+    /// Gets or sets a value indicating whether the page may delete a profile's history.
+    /// </summary>
+    [CascadingParameter(Name = "DeletionAllowed")]
+    public bool DeletionAllowed { get; set; }
+
+    // Skeleton: removed with the implementation, which adds [Inject]: an [Inject] here would fail every existing page test, none of which registers the service
+    /// <summary>
+    /// Gets or sets the history retention.
+    /// </summary>
+    public HistoryRetention Retention { get; set; } = null!;
+
+    /// <summary>
     /// Gets the heading of the page.
     /// </summary>
     private string Heading => Texts.RegionsEntry;

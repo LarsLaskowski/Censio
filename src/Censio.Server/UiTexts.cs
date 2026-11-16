@@ -44,7 +44,14 @@ public sealed class UiTexts
                                                    AsOfFormat = "As of {0}",
                                                    CompanionNotConnected = "The Companion is not connected.",
                                                    GameNotRunning = "The game is not running.",
-                                                   StatisticsUnreadable = "The Companion cannot read the game's statistics."
+                                                   StatisticsUnreadable = "The Companion cannot read the game's statistics.",
+                                                   DeleteHistory = "Delete history",
+                                                   DeleteHistoryTitle = "Delete history?",
+                                                   DeleteHistoryTextFormat = "All data of the profile {0} is removed from the server: its regions, islands, goods and history. This cannot be undone.",
+                                                   DeleteHistoryConfirm = "Delete",
+                                                   DeleteHistoryCancel = "Cancel",
+                                                   DeleteHistoryFailed = "The history could not be deleted.",
+                                                   DeleteHistoryHostRefused = "Deleting needs this page opened by IP address or as localhost, or by a host name the setting AllowedHosts lists."
                                                };
 
     /// <summary>
@@ -84,7 +91,14 @@ public sealed class UiTexts
                                                   AsOfFormat = "Stand: {0}",
                                                   CompanionNotConnected = "Der Companion ist nicht verbunden.",
                                                   GameNotRunning = "Das Spiel läuft nicht.",
-                                                  StatisticsUnreadable = "Der Companion kann die Statistik des Spiels nicht lesen."
+                                                  StatisticsUnreadable = "Der Companion kann die Statistik des Spiels nicht lesen.",
+                                                  DeleteHistory = "Verlauf löschen",
+                                                  DeleteHistoryTitle = "Verlauf löschen?",
+                                                  DeleteHistoryTextFormat = "Alle Daten des Profils {0} werden vom Server entfernt: seine Regionen, Inseln, Waren und sein Verlauf. Das lässt sich nicht rückgängig machen.",
+                                                  DeleteHistoryConfirm = "Löschen",
+                                                  DeleteHistoryCancel = "Abbrechen",
+                                                  DeleteHistoryFailed = "Der Verlauf konnte nicht gelöscht werden.",
+                                                  DeleteHistoryHostRefused = "Löschen setzt voraus, dass diese Seite über die IP-Adresse oder localhost geöffnet wurde, oder über einen Hostnamen, den die Einstellung AllowedHosts nennt."
                                               };
 
     #endregion // Fields
@@ -255,6 +269,41 @@ public sealed class UiTexts
     /// Gets the banner while the Companion cannot read the statistics.
     /// </summary>
     public required string StatisticsUnreadable { get; init; }
+
+    /// <summary>
+    /// Gets the label of the button that deletes a profile's history.
+    /// </summary>
+    public required string DeleteHistory { get; init; }
+
+    /// <summary>
+    /// Gets the title of the deletion dialog.
+    /// </summary>
+    public required string DeleteHistoryTitle { get; init; }
+
+    /// <summary>
+    /// Gets the text of the deletion dialog; the profile name is argument 0.
+    /// </summary>
+    public required string DeleteHistoryTextFormat { get; init; }
+
+    /// <summary>
+    /// Gets the label of the button that confirms the deletion.
+    /// </summary>
+    public required string DeleteHistoryConfirm { get; init; }
+
+    /// <summary>
+    /// Gets the label of the button that cancels the deletion.
+    /// </summary>
+    public required string DeleteHistoryCancel { get; init; }
+
+    /// <summary>
+    /// Gets the text shown when the deletion failed.
+    /// </summary>
+    public required string DeleteHistoryFailed { get; init; }
+
+    /// <summary>
+    /// Gets the text shown when the page was opened by a host that may not delete.
+    /// </summary>
+    public required string DeleteHistoryHostRefused { get; init; }
 
     #endregion // Properties
 

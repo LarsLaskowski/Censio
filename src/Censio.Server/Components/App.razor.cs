@@ -29,6 +29,12 @@ public partial class App
     [CascadingParameter]
     public HttpContext? HttpContext { get; set; }
 
+    // Skeleton: removed with the implementation, which adds [Inject]: an [Inject] here would fail the existing App test, which registers no configuration
+    /// <summary>
+    /// Gets or sets the configuration.
+    /// </summary>
+    public IConfiguration Configuration { get; set; } = null!;
+
     #endregion // Properties
 
     #region ComponentBase
