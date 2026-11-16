@@ -83,6 +83,21 @@ public sealed class HistoryRetentionTests
     private const string DropFailingFoldTriggerSql = "DROP TRIGGER \"FailFoldedTicks\";";
 
     /// <summary>
+    /// The statement that makes every fold step after the first fail, as a full disk would.
+    /// </summary>
+    private const string CreateSecondFoldFailingTriggerSql = "CREATE TRIGGER \"FailFoldedTicks\" BEFORE INSERT ON \"FoldedTicks\" WHEN (SELECT count(*) FROM \"FoldedTicks\") >= 1 BEGIN SELECT RAISE(ABORT, 'test fold failure'); END;";
+
+    /// <summary>
+    /// The statement that makes every sweep step removing a tick of a deleted profile fail, and nothing else.
+    /// </summary>
+    private const string CreateFailingSweepTriggerSql = "CREATE TRIGGER \"FailSweep\" BEFORE DELETE ON \"Ticks\" WHEN OLD.\"ProfileId\" IN (SELECT \"TombstoneId\" FROM \"DeletedProfiles\") BEGIN SELECT RAISE(ABORT, 'test sweep failure'); END;";
+
+    /// <summary>
+    /// The statement that removes the trigger of <see cref="CreateFailingSweepTriggerSql" />.
+    /// </summary>
+    private const string DropFailingSweepTriggerSql = "DROP TRIGGER \"FailSweep\";";
+
+    /// <summary>
     /// The statement that makes every deletion of a profile fail before its rows are gone.
     /// </summary>
     private const string CreateFailingDeleteTriggerSql = "CREATE TRIGGER \"FailProfileDelete\" BEFORE DELETE ON \"Profiles\" BEGIN SELECT RAISE(ABORT, 'test delete failure'); END;";
@@ -278,6 +293,151 @@ public sealed class HistoryRetentionTests
         Assert.AreEqual("5 0 0 0", rowsAfterFailure, "The failed run should leave every tick whole");
         Assert.AreSequenceEqual(expected, DescribeEntries(), "The failed run should log one warning with its exception and end, and the next run should fold and log the reduced line");
         Assert.AreEqual("2 3 3 0", CountRows(databaseFile), "The next run should fold every old tick of both profiles");
+    }
+
+    /// <summary>
+    /// A fold step that fails after an earlier step of the run folded logs the warning of spec E6 and the reduced line
+    /// of the folded tick, and ends the run before the clean-up a deletion asked for; the next run folds the rest and
+    /// does the clean-up.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC5")]
+    public async Task HistoryRetentionRunFoldFailureAfterFoldLogsReducedLineAndDefersClear()
+    {
+        // Arrange
+        var (state, history, databaseFile) = await OpenAsync();
+
+        var keptId = Guid.NewGuid();
+        var deletedId = Guid.NewGuid();
+
+        await StoreTicksAsync(state,
+                              Tick(keptId, _hour.AddMinutes(10), IslandName),
+                              Tick(keptId, _hour.AddMinutes(70), IslandName),
+                              LatestTick(keptId),
+                              Tick(deletedId, _hour.AddMinutes(20), DeletedIslandName));
+
+        using var retention = new HistoryRetention(state, history, new FakeTimeProvider(_foldTime), _logger);
+
+        await retention.DeleteProfileAsync(deletedId, TestContext.CancellationToken);
+        Execute(databaseFile, CreateSecondFoldFailingTriggerSql);
+        await retention.RunAsync(TestContext.CancellationToken).WaitAsync(_waitBound, TestContext.CancellationToken);
+
+        var afterFailedRun = DescribeEntries();
+        var rowsAfterFailedRun = CountRows(databaseFile);
+
+        Execute(databaseFile, DropFailingFoldTriggerSql);
+
+        // Act
+        await retention.RunAsync(TestContext.CancellationToken).WaitAsync(_waitBound, TestContext.CancellationToken);
+
+        // Assert
+        var failedRun = new[]
+                        {
+                            Describe(LogLevel.Information, DeletedLine, null),
+                            Describe(LogLevel.Warning, ReduceFailedLine, typeof(SqliteException)),
+                            Describe(LogLevel.Information, ReducedLine(1, 1), null)
+                        };
+
+        Assert.AreSequenceEqual(failedRun, afterFailedRun, "The failed run should log the warning and the reduced line of its one fold, and no clean-up line");
+        Assert.AreEqual("2 1 1 0", rowsAfterFailedRun, "The failed run should have folded one tick and swept the deleted profile");
+        Assert.AreSequenceEqual(failedRun.Concat([Describe(LogLevel.Information, ReducedLine(1, 1), null), Describe(LogLevel.Information, ClearedLine, null)]).ToList(), DescribeEntries(), "The next run should fold the rest and do the deferred clean-up");
+        Assert.AreEqual("1 2 2 0", CountRows(databaseFile), "The next run should fold the remaining old tick");
+    }
+
+    /// <summary>
+    /// A sweep step that fails at the start of a run logs the clean-up warning of spec E10 with its exception and ends
+    /// the run before any fold; the next run, with the failure gone, sweeps, folds and clears.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC6")]
+    [TestCategory("AC8")]
+    public async Task HistoryRetentionRunSweepFailureLogsWarningAndEndsRun()
+    {
+        // Arrange
+        var (state, history, databaseFile) = await OpenAsync();
+
+        var keptId = Guid.NewGuid();
+        var deletedId = Guid.NewGuid();
+
+        await StoreTicksAsync(state,
+                              Tick(keptId, _hour.AddMinutes(10), IslandName),
+                              LatestTick(keptId),
+                              Tick(deletedId, _hour.AddMinutes(20), DeletedIslandName));
+
+        using var retention = new HistoryRetention(state, history, new FakeTimeProvider(_foldTime), _logger);
+
+        await retention.DeleteProfileAsync(deletedId, TestContext.CancellationToken);
+        Execute(databaseFile, CreateFailingSweepTriggerSql);
+        await retention.RunAsync(TestContext.CancellationToken).WaitAsync(_waitBound, TestContext.CancellationToken);
+
+        var afterFailedRun = DescribeEntries();
+        var rowsAfterFailedRun = CountRows(databaseFile);
+
+        Execute(databaseFile, DropFailingSweepTriggerSql);
+
+        // Act
+        await retention.RunAsync(TestContext.CancellationToken).WaitAsync(_waitBound, TestContext.CancellationToken);
+
+        // Assert
+        var failedRun = new[]
+                        {
+                            Describe(LogLevel.Information, DeletedLine, null),
+                            Describe(LogLevel.Warning, ClearBlockedLine, typeof(SqliteException))
+                        };
+
+        Assert.AreSequenceEqual(failedRun, afterFailedRun, "The failed sweep should log the clean-up warning with its exception and end the run");
+        Assert.AreEqual("3 0 0 1", rowsAfterFailedRun, "The failed run should fold nothing and leave the deleted profile unswept");
+        Assert.AreSequenceEqual(failedRun.Concat([Describe(LogLevel.Information, ReducedLine(1, 1), null), Describe(LogLevel.Information, ClearedLine, null)]).ToList(), DescribeEntries(), "The next run should sweep, fold and clear");
+        Assert.AreEqual("1 1 1 0", CountRows(databaseFile), "The next run should remove the deleted profile's rows and fold the kept old tick");
+    }
+
+    /// <summary>
+    /// A deletion asked while a run is under way whose sweep step then fails, before the run's next fold step, logs the
+    /// clean-up warning of spec E10 with its exception and ends the run without folding.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC6")]
+    [TestCategory("AC8")]
+    public async Task HistoryRetentionDeleteProfileDuringFoldsSweepFailureEndsRun()
+    {
+        // Arrange
+        var (state, history, databaseFile) = await OpenAsync();
+
+        var keptId = Guid.NewGuid();
+        var deletedId = Guid.NewGuid();
+
+        using var clock = new BlockingClockTimeProvider(_foldTime);
+
+        await StoreTicksAsync(state,
+                              Tick(keptId, _hour.AddMinutes(10), IslandName),
+                              LatestTick(keptId),
+                              Tick(deletedId, _hour.AddMinutes(20), DeletedIslandName));
+        Execute(databaseFile, CreateFailingSweepTriggerSql);
+
+        using var retention = new HistoryRetention(state, history, clock, _logger);
+
+        var run = Task.Run(() => retention.RunAsync(TestContext.CancellationToken), TestContext.CancellationToken);
+
+        await Task.WhenAny(clock.Reached, run).WaitAsync(_waitBound, TestContext.CancellationToken);
+        await retention.DeleteProfileAsync(deletedId, TestContext.CancellationToken).WaitAsync(_waitBound, TestContext.CancellationToken);
+
+        // Act
+        clock.Release();
+
+        await run.WaitAsync(_waitBound, TestContext.CancellationToken);
+
+        // Assert
+        var expected = new[]
+                       {
+                           Describe(LogLevel.Information, DeletedLine, null),
+                           Describe(LogLevel.Warning, ClearBlockedLine, typeof(SqliteException))
+                       };
+
+        Assert.AreSequenceEqual(expected, DescribeEntries(), "The failed sweep during the folds should log the clean-up warning with its exception and no reduced line");
+        Assert.AreEqual("3 0 0 1", CountRows(databaseFile), "The run should end before folding and leave the deleted profile unswept");
     }
 
     /// <summary>
