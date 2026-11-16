@@ -1,6 +1,8 @@
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 
+using AngleSharp.Dom;
+
 using Bunit;
 using Bunit.TestDoubles;
 
@@ -11,6 +13,8 @@ using Censio.Server.Data;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
+
+using MudBlazor;
 
 using TestContext = Microsoft.VisualStudio.TestTools.UnitTesting.TestContext;
 
@@ -44,6 +48,31 @@ public sealed class RegionsTests
     /// </summary>
     private const string ReloadText = "The data cannot be read right now. Reload the page to try again.";
 
+    /// <summary>
+    /// The name of the first profile in the deletion tests.
+    /// </summary>
+    private const string FirstProfileName = "Profile one";
+
+    /// <summary>
+    /// The name of the second profile in the deletion tests.
+    /// </summary>
+    private const string SecondProfileName = "Profile two";
+
+    /// <summary>
+    /// The English dialog text of a deletion of <see cref="FirstProfileName" />.
+    /// </summary>
+    private const string FirstProfileDialogText = "All data of the profile Profile one is removed from the server: its regions, islands, goods and history. This cannot be undone.";
+
+    /// <summary>
+    /// The English text of a failed deletion (spec E9).
+    /// </summary>
+    private const string DeleteFailedText = "The history could not be deleted.";
+
+    /// <summary>
+    /// The statement that makes every deletion of a profile fail before its rows are gone.
+    /// </summary>
+    private const string CreateFailingDeleteTriggerSql = "CREATE TRIGGER \"FailProfileDelete\" BEFORE DELETE ON \"Profiles\" BEGIN SELECT RAISE(ABORT, 'test delete failure'); END;";
+
     #endregion // Constants
 
     #region Fields
@@ -57,6 +86,11 @@ public sealed class RegionsTests
     /// The second profile of the tests.
     /// </summary>
     private static readonly Guid _secondProfile = new("22222222-2222-4222-8222-222222222222");
+
+    /// <summary>
+    /// The temporary directories of the running test, deleted afterwards.
+    /// </summary>
+    private readonly List<string> _temporaryDirectories = [];
 
     #endregion // Fields
 
@@ -83,6 +117,234 @@ public sealed class RegionsTests
     #endregion // Properties
 
     #region Methods
+
+    /// <summary>
+    /// Deletes the temporary directories of the test.
+    /// </summary>
+    [TestCleanup]
+    public void Cleanup()
+    {
+        foreach (var directory in _temporaryDirectories.Where(Directory.Exists))
+        {
+            Directory.Delete(directory, true);
+        }
+    }
+
+    /// <summary>
+    /// The overview of a profile's address offers one enabled <c>Delete history</c> button in the language shown, without
+    /// the text of a refused host.
+    /// </summary>
+    /// <param name="language">The language shown</param>
+    /// <param name="label">The label of the spec</param>
+    /// <param name="refusal">The text of a refused host in that language, which the page should not show</param>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC9")]
+    [DataRow(UiLanguage.English, "Delete history", "Deleting needs this page opened by IP address or as localhost, or by a host name the setting AllowedHosts lists.")]
+    [DataRow(UiLanguage.German, "Verlauf löschen", "Löschen setzt voraus, dass diese Seite über die IP-Adresse oder localhost geöffnet wurde, oder über einen Hostnamen, den die Einstellung AllowedHosts nennt.")]
+    public async Task RegionsProfileAddressOffersDeleteHistory(UiLanguage language, string label, string refusal)
+    {
+        // Arrange
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken);
+
+        await host.StoreTicksAsync(FirstSessionTick(_firstProfile, 0, 3));
+
+        // Act
+        var page = host.Render<Regions>(language, parameters => parameters.Add(regions => regions.Profile, _firstProfile.ToString()));
+
+        // Assert
+        await page.WaitForStateAsync(() => page.FindAll("tbody tr").Count == 1, PageTestHost.WaitBound);
+
+        var buttons = Buttons(page, label);
+
+        Assert.HasCount(1, buttons, "The overview of a profile's address should offer one Delete history button");
+        Assert.IsFalse(buttons[0].HasAttribute("disabled"), "The button should be enabled on a page of a trusted host");
+        Assert.DoesNotContain(refusal, PageTestHost.Text(page), "A page of a trusted host should not show the refusal text");
+    }
+
+    /// <summary>
+    /// The button opens the dialog with the spec's title, the text naming the profile as the profile switch names it
+    /// (the unnamed text without a name), and the buttons <c>Cancel</c> and <c>Delete</c> in that order; opening it
+    /// deletes nothing.
+    /// </summary>
+    /// <param name="language">The language shown</param>
+    /// <param name="name">The profile name, or <see langword="null" /> for an unnamed profile</param>
+    /// <param name="title">The title of the spec</param>
+    /// <param name="text">The text of the spec with the shown name</param>
+    /// <param name="cancel">The label of the cancelling button</param>
+    /// <param name="confirm">The label of the confirming button</param>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC9")]
+    [DataRow(UiLanguage.English, FirstProfileName, "Delete history?", FirstProfileDialogText, "Cancel", "Delete")]
+    [DataRow(UiLanguage.German, FirstProfileName, "Verlauf löschen?", "Alle Daten des Profils Profile one werden vom Server entfernt: seine Regionen, Inseln, Waren und sein Verlauf. Das lässt sich nicht rückgängig machen.", "Abbrechen", "Löschen")]
+    [DataRow(UiLanguage.English, null, "Delete history?", "All data of the profile Unnamed profile is removed from the server: its regions, islands, goods and history. This cannot be undone.", "Cancel", "Delete")]
+    [DataRow(UiLanguage.German, null, "Verlauf löschen?", "Alle Daten des Profils Unbenanntes Profil werden vom Server entfernt: seine Regionen, Inseln, Waren und sein Verlauf. Das lässt sich nicht rückgängig machen.", "Abbrechen", "Löschen")]
+    public async Task RegionsDeleteDialogShowsSpecTexts(UiLanguage language, string? name, string title, string text, string cancel, string confirm)
+    {
+        // Arrange
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken);
+
+        await StoreNamedProfileAsync(host, _firstProfile, name, 0);
+
+        var dialogs = host.Context.Render<MudDialogProvider>();
+        var page = await RenderReadyAsync(host, _firstProfile, language);
+
+        // Act
+        ClickDeleteHistory(page, language);
+
+        // Assert
+        await dialogs.WaitForStateAsync(() => dialogs.FindAll(".mud-dialog").Count == 1, PageTestHost.WaitBound);
+
+        Assert.AreEqual(title, dialogs.Find(".mud-dialog-title").TextContent.Trim(), "The dialog should carry the spec's title");
+        Assert.AreEqual(text, dialogs.Find(".mud-dialog-content").TextContent.Trim(), "The dialog should name the profile as the profile switch names it");
+        Assert.AreSequenceEqual(PageTestHost.Expect(cancel, confirm), ButtonLabels(dialogs.FindAll(".mud-dialog-actions button")), "The dialog should offer Cancel, then Delete");
+        Assert.Contains(_firstProfile, ProfileIds(host), "Opening the dialog should delete nothing");
+    }
+
+    /// <summary>
+    /// Confirming deletes the profile the dialog named when it opened, also after the page moved on to another profile,
+    /// closes the dialog and goes to <c>/regions</c>; the other profile stays.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC7")]
+    [TestCategory("AC9")]
+    public async Task RegionsDeleteConfirmedDeletesProfileOfDialog()
+    {
+        // Arrange
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken);
+
+        await StoreNamedProfileAsync(host, _firstProfile, FirstProfileName, 0);
+        await StoreNamedProfileAsync(host, _secondProfile, SecondProfileName, 10);
+
+        var dialogs = host.Context.Render<MudDialogProvider>();
+        var page = await RenderReadyAsync(host, _firstProfile, UiLanguage.English);
+
+        ClickDeleteHistory(page, UiLanguage.English);
+
+        await dialogs.WaitForStateAsync(() => dialogs.FindAll(".mud-dialog").Count == 1, PageTestHost.WaitBound);
+
+        var dialogText = dialogs.Find(".mud-dialog-content").TextContent.Trim();
+
+        page.Render(parameters => parameters.Add(regions => regions.Profile, _secondProfile.ToString()));
+
+        await page.WaitForAssertionAsync(() => Assert.AreEqual(SecondProfileName, ProfileLine(page), "The page should have moved on to the second profile"), PageTestHost.WaitBound);
+
+        // Act
+        ClickDialogButton(dialogs, "Delete");
+
+        // Assert
+        var navigation = host.Context.Services.GetRequiredService<BunitNavigationManager>();
+
+        await page.WaitForAssertionAsync(() => Assert.AreEqual("regions", navigation.ToBaseRelativePath(navigation.Uri), "The page should go to /regions after the deletion"), PageTestHost.WaitBound);
+
+        Assert.AreEqual(FirstProfileDialogText, dialogText, "The dialog should have named the first profile");
+        Assert.AreSequenceEqual(new[] { _secondProfile }, ProfileIds(host), "Only the profile the dialog named should be deleted");
+        Assert.IsEmpty(dialogs.FindAll(".mud-dialog"), "The dialog should be closed after the deletion");
+    }
+
+    /// <summary>
+    /// Cancelling closes the dialog without deleting or navigating.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC9")]
+    public async Task RegionsDeleteCancelledDeletesNothing()
+    {
+        // Arrange
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken);
+
+        await StoreNamedProfileAsync(host, _firstProfile, FirstProfileName, 0);
+
+        var dialogs = host.Context.Render<MudDialogProvider>();
+        var page = await RenderReadyAsync(host, _firstProfile, UiLanguage.English);
+
+        ClickDeleteHistory(page, UiLanguage.English);
+
+        await dialogs.WaitForStateAsync(() => dialogs.FindAll(".mud-dialog").Count == 1, PageTestHost.WaitBound);
+
+        // Act
+        ClickDialogButton(dialogs, "Cancel");
+
+        // Assert
+        await dialogs.WaitForStateAsync(() => dialogs.FindAll(".mud-dialog").Count == 0, PageTestHost.WaitBound);
+
+        Assert.AreSequenceEqual(new[] { _firstProfile }, ProfileIds(host), "Cancelling should delete nothing");
+        Assert.IsEmpty(host.Context.Services.GetRequiredService<BunitNavigationManager>().History, "Cancelling should not navigate");
+        Assert.HasCount(1, page.FindAll("tbody tr"), "The page should still show the profile's regions");
+    }
+
+    /// <summary>
+    /// A deletion that fails keeps the dialog open with its text and the failure text of spec E9 in a second paragraph,
+    /// keeps the profile and does not navigate.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC9")]
+    public async Task RegionsDeleteFailedShowsFailureText()
+    {
+        // Arrange
+        var databaseFile = CreateDatabaseFile();
+
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken, null, databaseFile);
+
+        await StoreNamedProfileAsync(host, _firstProfile, FirstProfileName, 0);
+        ExecuteOn(databaseFile, CreateFailingDeleteTriggerSql);
+
+        var dialogs = host.Context.Render<MudDialogProvider>();
+        var page = await RenderReadyAsync(host, _firstProfile, UiLanguage.English);
+
+        ClickDeleteHistory(page, UiLanguage.English);
+
+        await dialogs.WaitForStateAsync(() => dialogs.FindAll(".mud-dialog").Count == 1, PageTestHost.WaitBound);
+
+        // Act
+        ClickDialogButton(dialogs, "Delete");
+
+        // Assert
+        await dialogs.WaitForAssertionAsync(() => Assert.AreSequenceEqual(PageTestHost.Expect(FirstProfileDialogText, DeleteFailedText), ParagraphTexts(dialogs), "The dialog should show its text and then the failure text"), PageTestHost.WaitBound);
+
+        Assert.HasCount(1, dialogs.FindAll(".mud-dialog"), "The dialog should stay open after a failure");
+        Assert.AreSequenceEqual(new[] { _firstProfile }, ProfileIds(host), "A failed deletion should keep the profile");
+        Assert.IsEmpty(host.Context.Services.GetRequiredService<BunitNavigationManager>().History, "A failed deletion should not navigate");
+    }
+
+    /// <summary>
+    /// On a page of a host the host rule does not trust, the button is disabled and followed by the refusal text in the
+    /// language shown, and clicking it opens no dialog and deletes nothing.
+    /// </summary>
+    /// <param name="language">The language shown</param>
+    /// <param name="refusal">The refusal text of the spec</param>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC9")]
+    [DataRow(UiLanguage.English, "Deleting needs this page opened by IP address or as localhost, or by a host name the setting AllowedHosts lists.")]
+    [DataRow(UiLanguage.German, "Löschen setzt voraus, dass diese Seite über die IP-Adresse oder localhost geöffnet wurde, oder über einen Hostnamen, den die Einstellung AllowedHosts nennt.")]
+    public async Task RegionsUntrustedHostDisablesButtonAndIgnoresEvent(UiLanguage language, string refusal)
+    {
+        // Arrange
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken);
+
+        host.DeletionAllowed = false;
+
+        await StoreNamedProfileAsync(host, _firstProfile, FirstProfileName, 0);
+
+        var dialogs = host.Context.Render<MudDialogProvider>();
+        var page = await RenderReadyAsync(host, _firstProfile, language);
+        var buttons = Buttons(page, UiTexts.For(language).DeleteHistory);
+
+        Assert.HasCount(1, buttons, "The page should show the Delete history button, disabled");
+
+        // Act
+        TryClick(buttons[0]);
+
+        // Assert
+        Assert.IsTrue(buttons[0].HasAttribute("disabled"), "The button should be disabled on a page of an untrusted host");
+        Assert.Contains(refusal, PageTestHost.Text(page), "The page should show the refusal text");
+        Assert.IsEmpty(dialogs.FindAll(".mud-dialog"), "Clicking the disabled button should open no dialog");
+        Assert.AreSequenceEqual(new[] { _firstProfile }, ProfileIds(host), "Nothing should be deleted");
+    }
 
     /// <summary>
     /// The overview lists the profile's regions ordered by name with their island count and key figures, each region a
@@ -877,6 +1139,154 @@ public sealed class RegionsTests
     }
 
     /// <summary>
+    /// Gives the buttons whose trimmed text is a label.
+    /// </summary>
+    /// <typeparam name="TComponent">The type of the rendered component</typeparam>
+    /// <param name="rendered">The rendered component</param>
+    /// <param name="label">The label</param>
+    /// <returns>The buttons</returns>
+    private static List<IElement> Buttons<TComponent>(IRenderedComponent<TComponent> rendered, string label)
+        where TComponent : Microsoft.AspNetCore.Components.IComponent
+    {
+        return [.. rendered.FindAll("button").Where(button => button.TextContent.Trim() == label)];
+    }
+
+    /// <summary>
+    /// Gives the trimmed texts of buttons.
+    /// </summary>
+    /// <param name="buttons">The buttons</param>
+    /// <returns>The texts</returns>
+    private static List<string> ButtonLabels(IEnumerable<IElement> buttons)
+    {
+        return [.. buttons.Select(button => button.TextContent.Trim())];
+    }
+
+    /// <summary>
+    /// Gives the trimmed texts of the paragraphs of the open dialog's content.
+    /// </summary>
+    /// <param name="dialogs">The rendered dialog provider</param>
+    /// <returns>The texts</returns>
+    private static List<string> ParagraphTexts(IRenderedComponent<MudDialogProvider> dialogs)
+    {
+        return [.. dialogs.FindAll(".mud-dialog-content p").Select(paragraph => paragraph.TextContent.Trim())];
+    }
+
+    /// <summary>
+    /// Clicks the page's one <c>Delete history</c> button in a language, failing when the page offers none.
+    /// </summary>
+    /// <param name="page">The rendered page</param>
+    /// <param name="language">The language shown</param>
+    private static void ClickDeleteHistory(IRenderedComponent<Regions> page, UiLanguage language)
+    {
+        var buttons = Buttons(page, UiTexts.For(language).DeleteHistory);
+
+        Assert.HasCount(1, buttons, "The page should offer one Delete history button");
+
+        buttons[0].Click();
+    }
+
+    /// <summary>
+    /// Clicks the one button of the open dialog with a label, failing when there is none.
+    /// </summary>
+    /// <param name="dialogs">The rendered dialog provider</param>
+    /// <param name="label">The label</param>
+    private static void ClickDialogButton(IRenderedComponent<MudDialogProvider> dialogs, string label)
+    {
+        var buttons = Buttons(dialogs, label);
+
+        Assert.HasCount(1, buttons, $"The dialog should offer one {label} button");
+
+        buttons[0].Click();
+    }
+
+    /// <summary>
+    /// Clicks an element and ignores that it has no click handler, as a disabled button may render none.
+    /// </summary>
+    /// <param name="element">The element</param>
+    private static void TryClick(IElement element)
+    {
+        try
+        {
+            element.Click();
+        }
+        catch (MissingEventHandlerException)
+        {
+            // A disabled button may carry no click handler: the click does nothing, which is what the test expects
+        }
+    }
+
+    /// <summary>
+    /// Gives the identities of the profiles the state lists, in its order.
+    /// </summary>
+    /// <param name="host">The host</param>
+    /// <returns>The identities</returns>
+    private static List<Guid> ProfileIds(PageTestHost host)
+    {
+        return [.. host.State.Profiles.Select(profile => profile.Id)];
+    }
+
+    /// <summary>
+    /// Runs a constant statement of this class over a connection of its own, without the pool, to a SQLite file.
+    /// </summary>
+    /// <param name="databaseFile">The file</param>
+    /// <param name="sql">The statement</param>
+    private static void ExecuteOn(string databaseFile, string sql)
+    {
+        var builder = new SqliteConnectionStringBuilder
+                      {
+                          DataSource = databaseFile,
+                          Mode = SqliteOpenMode.ReadWrite,
+                          Pooling = false
+                      };
+
+        using var connection = new SqliteConnection(builder.ToString());
+
+        connection.Open();
+
+        using var command = connection.CreateCommand();
+
+#pragma warning disable CA2100 // Constant statements of this class only
+        command.CommandText = sql;
+#pragma warning restore CA2100
+
+        command.ExecuteNonQuery();
+    }
+
+    /// <summary>
+    /// Stores a profile with a name, when one is given, and a tick of it in the first session.
+    /// </summary>
+    /// <param name="host">The host</param>
+    /// <param name="profileId">The profile identity</param>
+    /// <param name="name">The name, or <see langword="null" /> for none</param>
+    /// <param name="receiveSeconds">The receive time of the tick in seconds</param>
+    /// <returns>A task that completes when the profile and its tick are stored</returns>
+    private static async Task StoreNamedProfileAsync(PageTestHost host, Guid profileId, string? name, long receiveSeconds)
+    {
+        if (name is not null)
+        {
+            await host.StoreProfileAsync(profileId, name);
+        }
+
+        await host.StoreTicksAsync(FirstSessionTick(profileId, receiveSeconds, 3));
+    }
+
+    /// <summary>
+    /// Renders the overview of a profile and waits until it shows its regions.
+    /// </summary>
+    /// <param name="host">The host</param>
+    /// <param name="profileId">The profile</param>
+    /// <param name="language">The language shown</param>
+    /// <returns>The rendered page</returns>
+    private static async Task<IRenderedComponent<Regions>> RenderReadyAsync(PageTestHost host, Guid profileId, UiLanguage language)
+    {
+        var page = host.Render<Regions>(language, parameters => parameters.Add(regions => regions.Profile, profileId.ToString()));
+
+        await page.WaitForStateAsync(() => page.FindAll("tbody tr").Count == 1, PageTestHost.WaitBound);
+
+        return page;
+    }
+
+    /// <summary>
     /// Gives the address of a region's island list.
     /// </summary>
     /// <param name="profileId">The profile identity</param>
@@ -885,6 +1295,20 @@ public sealed class RegionsTests
     private static string RegionLink(Guid profileId, int sessionGuid)
     {
         return $"/profiles/{profileId}/sessions/{sessionGuid}";
+    }
+
+    /// <summary>
+    /// Creates the path of a database file in a new temporary directory.
+    /// </summary>
+    /// <returns>The full path of the database file, not yet created</returns>
+    private string CreateDatabaseFile()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "censio-regions-tests-" + Guid.NewGuid().ToString("N"));
+
+        Directory.CreateDirectory(directory);
+        _temporaryDirectories.Add(directory);
+
+        return Path.Combine(directory, "censio.db");
     }
 
     #endregion // Methods
