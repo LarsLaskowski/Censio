@@ -125,6 +125,29 @@ internal sealed class TickWriter : IDisposable
     #region Methods
 
     /// <summary>
+    /// Creates a prepared command.
+    /// </summary>
+    /// <param name="connection">The connection</param>
+    /// <param name="sql">The statement</param>
+    /// <param name="parameters">The parameters, in the order they are set</param>
+    /// <returns>The prepared command</returns>
+    public static SqliteCommand Create(SqliteConnection connection, string sql, params (string Name, SqliteType Type)[] parameters)
+    {
+        var command = connection.CreateCommand();
+
+#pragma warning disable CA2100 // Constant statements of the stores only, values travel as parameters
+        command.CommandText = sql;
+#pragma warning restore CA2100
+
+        foreach (var (name, type) in parameters)
+        {
+            command.Parameters.Add(name, type);
+        }
+
+        return command;
+    }
+
+    /// <summary>
     /// Writes the tick, its islands, entries and pairs, and the latest island names.
     /// </summary>
     /// <param name="tick">The tick</param>
@@ -177,29 +200,6 @@ internal sealed class TickWriter : IDisposable
         return value is null
                    ? DBNull.Value
                    : BitConverter.SingleToInt32Bits(value.Value);
-    }
-
-    /// <summary>
-    /// Creates a prepared command.
-    /// </summary>
-    /// <param name="connection">The connection</param>
-    /// <param name="sql">The statement</param>
-    /// <param name="parameters">The parameters, in the order they are set</param>
-    /// <returns>The prepared command</returns>
-    private static SqliteCommand Create(SqliteConnection connection, string sql, params (string Name, SqliteType Type)[] parameters)
-    {
-        var command = connection.CreateCommand();
-
-#pragma warning disable CA2100 // Constant statements of this class only, values travel as parameters
-        command.CommandText = sql;
-#pragma warning restore CA2100
-
-        foreach (var (name, type) in parameters)
-        {
-            command.Parameters.Add(name, type);
-        }
-
-        return command;
     }
 
     /// <summary>

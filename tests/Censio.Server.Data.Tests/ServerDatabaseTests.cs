@@ -61,7 +61,7 @@ public sealed class ServerDatabaseTests : IDisposable
     /// <summary>
     /// The tables of the current schema, sorted ordinally.
     /// </summary>
-    private static readonly string[] _currentTables = ["Catalog", "Icons", "Islands", "Profiles", "TickEntries", "TickIslands", "TickMapPairs", "Ticks"];
+    private static readonly string[] _currentTables = ["Catalog", "DeletedProfiles", "FoldedTicks", "HourlyEntries", "HourlyIslands", "HourlyMapPairs", "HourlyPoints", "Icons", "Islands", "Profiles", "TickEntries", "TickIslands", "TickMapPairs", "Ticks"];
 
     /// <summary>
     /// The temporary directories of the running test, deleted afterwards.

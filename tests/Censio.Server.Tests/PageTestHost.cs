@@ -10,8 +10,10 @@ using Censio.Server.Data;
 
 using Microsoft.AspNetCore.Components;
 using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Time.Testing;
 
 using MudBlazor.Services;
 
@@ -19,7 +21,9 @@ namespace Censio.Server.Tests;
 
 /// <summary>
 /// A bUnit context for the data pages: MudBlazor's services, loose JavaScript interop, a restored <see cref="ServerState" />
-/// over an in-memory database and a <see cref="PageReader" /> over that state or over a fake source.
+/// over an in-memory database (or a given file), a <see cref="PageReader" /> over that state or over a fake source, a
+/// <see cref="HistoryRetention" /> over that state registered by a late-bound factory as the server registers it, and a
+/// configuration; pages get the language, its texts and whether they may delete cascaded, as the frame cascades them.
 /// </summary>
 public sealed class PageTestHost : IAsyncDisposable
 {
@@ -29,6 +33,11 @@ public sealed class PageTestHost : IAsyncDisposable
     /// The receive time of a tick at second 0.
     /// </summary>
     public const string BaseReceiveTimeText = "2026-11-13 12:00";
+
+    /// <summary>
+    /// The name under which the frame cascades whether a page may delete a profile's history.
+    /// </summary>
+    public const string DeletionAllowedName = "DeletionAllowed";
 
     #endregion // Constants
 
@@ -64,13 +73,15 @@ public sealed class PageTestHost : IAsyncDisposable
     /// <param name="database">The database of the state</param>
     /// <param name="state">The restored state</param>
     /// <param name="context">The bUnit context</param>
+    /// <param name="configuration">The configuration the pages read</param>
     /// <param name="cancellationToken">The cancellation token of the test</param>
-    private PageTestHost(ServerDatabase database, ServerState state, BunitContext context, CancellationToken cancellationToken)
+    private PageTestHost(ServerDatabase database, ServerState state, BunitContext context, ConfigurationManager configuration, CancellationToken cancellationToken)
     {
         _database = database;
         _cancellationToken = cancellationToken;
         State = state;
         Context = context;
+        Configuration = configuration;
     }
 
     #endregion // Constructors
@@ -87,6 +98,17 @@ public sealed class PageTestHost : IAsyncDisposable
     /// </summary>
     public ServerState State { get; }
 
+    /// <summary>
+    /// Gets the configuration the pages read, registered as <see cref="IConfiguration" />; without a setting of its own.
+    /// </summary>
+    public ConfigurationManager Configuration { get; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether a page rendered by <see cref="Render{TPage}" /> may delete a profile's
+    /// history, as the frame cascades it for a page opened by a trusted host; <see langword="true" /> unless a test sets it.
+    /// </summary>
+    public bool DeletionAllowed { get; set; } = true;
+
     #endregion // Properties
 
     #region Methods
@@ -96,24 +118,28 @@ public sealed class PageTestHost : IAsyncDisposable
     /// </summary>
     /// <param name="cancellationToken">The cancellation token of the test</param>
     /// <param name="source">The fake source the page reader reads, or <see langword="null" /> for the state</param>
+    /// <param name="databaseFile">The database file, or <see langword="null" /> for an in-memory database</param>
     /// <returns>The host</returns>
-    public static async Task<PageTestHost> CreateAsync(CancellationToken cancellationToken, FakeProfileStateSource? source = null)
+    public static async Task<PageTestHost> CreateAsync(CancellationToken cancellationToken, FakeProfileStateSource? source = null, string? databaseFile = null)
     {
-        var opened = await ServerDatabase.OpenAsync(null, NullLoggerFactory.Instance, cancellationToken).ConfigureAwait(false);
+        var opened = await ServerDatabase.OpenAsync(databaseFile, NullLoggerFactory.Instance, cancellationToken).ConfigureAwait(false);
         var database = opened.Database ?? throw new InvalidOperationException($"The database could not be opened: {opened.Kind}", opened.Failure);
         var state = new ServerState(new ServerStore(database), NullLogger.Instance);
 
         await state.RestoreAsync(cancellationToken).ConfigureAwait(false);
 
         var context = new BunitContext();
+        var configuration = new ConfigurationManager();
 
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddMudServices();
         context.Services.AddSingleton(state);
         context.Services.AddSingleton<IProfileStateSource>(state);
         context.Services.AddSingleton(new PageReader(source ?? (IProfileStateSource)state));
+        context.Services.AddSingleton<IConfiguration>(configuration);
+        context.Services.AddSingleton(_ => new HistoryRetention(state, new HistoryStore(database), new FakeTimeProvider(_baseReceiveTime), NullLogger.Instance));
 
-        return new PageTestHost(database, state, context, cancellationToken);
+        return new PageTestHost(database, state, context, configuration, cancellationToken);
     }
 
     /// <summary>
@@ -305,7 +331,7 @@ public sealed class PageTestHost : IAsyncDisposable
     }
 
     /// <summary>
-    /// Renders a page with the language and its texts cascaded, as the frame cascades them.
+    /// Renders a page with the language, its texts and <see cref="DeletionAllowed" /> cascaded, as the frame cascades them.
     /// </summary>
     /// <typeparam name="TPage">The type of the page</typeparam>
     /// <param name="language">The language shown</param>
@@ -317,7 +343,8 @@ public sealed class PageTestHost : IAsyncDisposable
         return Context.Render<TPage>(builder =>
                                      {
                                          builder.AddCascadingValue(language)
-                                                .AddCascadingValue(UiTexts.For(language));
+                                                .AddCascadingValue(UiTexts.For(language))
+                                                .AddCascadingValue(DeletionAllowedName, DeletionAllowed);
                                          parameters(builder);
                                      });
     }
@@ -453,6 +480,7 @@ public sealed class PageTestHost : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         await Context.DisposeAsync().ConfigureAwait(false);
+        Configuration.Dispose();
         _database.Dispose();
         SqliteConnection.ClearAllPools();
     }

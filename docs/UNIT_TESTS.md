@@ -30,9 +30,13 @@ neighboring test file before inventing a new pattern.
   `ContractMessageConverter.ToTick`, as the Companion converts it, into a real `ServerState`; the facts they assert are
   listed in the fixture's `README.md`.
 - Data pages are rendered with `PageTestHost` (`tests/Censio.Server.Tests/PageTestHost.cs`): a bUnit context with
-  MudBlazor's services, loose JavaScript interop and a restored `ServerState` over an in-memory database, whose
-  `PageReader` reads that state or a `FakeProfileStateSource`; notices still come from the state, so a test that
-  counts reads stores its ticks and catalogs in the state and its read results in the fake.
+  MudBlazor's services, loose JavaScript interop and a restored `ServerState` over an in-memory database (or a database
+  file the test passes), whose `PageReader` reads that state or a `FakeProfileStateSource`; notices still come from the
+  state, so a test that counts reads stores its ticks and catalogs in the state and its read results in the fake. The
+  host also registers a `HistoryRetention` over that state by a late-bound factory, as the server registers it, and an
+  `IConfiguration` without settings of its own, and cascades `DeletionAllowed` to the page it renders: `true` unless
+  the test sets `PageTestHost.DeletionAllowed`, which stands for a page opened by a host the deletion rule does not
+  trust.
 - `CENSIO_FIXTURE_DENY_LIST`: the path of the local deny list the fixtures are checked against
   (`FixtureDenyListTests`, `tests/Censio.Pipe.Tests/Fixtures/README.md`); unset, that test is reported inconclusive.
 - `CENSIO_ANNO_INSTALL`: the Anno 117 installation folder, set on Windows for the survey test

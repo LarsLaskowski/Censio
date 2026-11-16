@@ -12,9 +12,14 @@ internal static class TickReader
     #region Constants
 
     /// <summary>
-    /// The statement that selects a tick by its identity.
+    /// The statement that selects a tick by its identity; the profile row keeps a deleted profile's ticks hidden.
     /// </summary>
-    public const string ByIdSql = "SELECT \"Number\", \"Id\", \"ProfileId\", \"ReceiveTicks\", \"GameTime\" FROM \"Ticks\" WHERE \"Id\" = $value;";
+    public const string ByIdSql = "SELECT t.\"Number\", t.\"Id\", t.\"ProfileId\", t.\"ReceiveTicks\", t.\"GameTime\" FROM \"Ticks\" t JOIN \"Profiles\" p ON p.\"Id\" = t.\"ProfileId\" WHERE t.\"Id\" = $value;";
+
+    /// <summary>
+    /// The statement that selects a tick by its row number.
+    /// </summary>
+    public const string ByNumberSql = "SELECT \"Number\", \"Id\", \"ProfileId\", \"ReceiveTicks\", \"GameTime\" FROM \"Ticks\" WHERE \"Number\" = $value;";
 
     /// <summary>
     /// The statement that selects the latest tick of a profile: latest receive time, then the one stored last.
@@ -45,11 +50,11 @@ internal static class TickReader
     /// Reads one tick, in one read transaction so that a write in between is not seen half.
     /// </summary>
     /// <param name="connection">The opened connection</param>
-    /// <param name="sql">The statement, <see cref="ByIdSql"/> or <see cref="LatestSql"/></param>
-    /// <param name="value">The value of its parameter</param>
+    /// <param name="sql">The statement, <see cref="ByIdSql"/>, <see cref="LatestSql"/> or <see cref="ByNumberSql"/></param>
+    /// <param name="value">The value of its parameter, a <see cref="Guid"/> or a row number</param>
     /// <param name="cancellationToken">The cancellation token</param>
     /// <returns>The tick, or <see langword="null"/> when none matches</returns>
-    public static async Task<ContractTick?> ReadAsync(SqliteConnection connection, string sql, Guid value, CancellationToken cancellationToken)
+    public static async Task<ContractTick?> ReadAsync(SqliteConnection connection, string sql, object value, CancellationToken cancellationToken)
     {
 #pragma warning disable S6966 // The async overload has no deferred form and begins an immediate (write) transaction
         using var transaction = connection.BeginTransaction(true);
@@ -62,11 +67,11 @@ internal static class TickReader
     /// Reads one tick inside the read transaction the caller has begun on the connection.
     /// </summary>
     /// <param name="connection">The opened connection with the caller's transaction</param>
-    /// <param name="sql">The statement, <see cref="ByIdSql"/> or <see cref="LatestSql"/></param>
-    /// <param name="value">The value of its parameter</param>
+    /// <param name="sql">The statement, <see cref="ByIdSql"/>, <see cref="LatestSql"/> or <see cref="ByNumberSql"/></param>
+    /// <param name="value">The value of its parameter, a <see cref="Guid"/> or a row number</param>
     /// <param name="cancellationToken">The cancellation token</param>
     /// <returns>The tick, or <see langword="null"/> when none matches</returns>
-    public static async Task<ContractTick?> ReadInTransactionAsync(SqliteConnection connection, string sql, Guid value, CancellationToken cancellationToken)
+    public static async Task<ContractTick?> ReadInTransactionAsync(SqliteConnection connection, string sql, object value, CancellationToken cancellationToken)
     {
         long number;
         Guid id;

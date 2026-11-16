@@ -76,6 +76,12 @@ public sealed class ServerStoreTests : IDisposable
     private const string CreateFailingTriggerSql = "CREATE TRIGGER \"FailMapPairs\" BEFORE INSERT ON \"TickMapPairs\" BEGIN SELECT RAISE(ABORT, '" + FailingWriteMessage + "'); END;";
 
     /// <summary>
+    /// The statement that makes every insert of a tombstone fail, after the deletion removed the profile row and its
+    /// islands in the same transaction.
+    /// </summary>
+    private const string CreateFailingTombstoneTriggerSql = "CREATE TRIGGER \"FailTombstones\" BEFORE INSERT ON \"DeletedProfiles\" BEGIN SELECT RAISE(ABORT, '" + FailingWriteMessage + "'); END;";
+
+    /// <summary>
     /// The number of islands of a tick at the contract's bounds.
     /// </summary>
     private const int BoundIslands = 256;
@@ -138,6 +144,17 @@ public sealed class ServerStoreTests : IDisposable
     /// The island name only the older tick of the one-transaction test carries.
     /// </summary>
     private const string OlderIslandName = "Island of the older tick";
+
+    /// <summary>
+    /// The island name of the profile a deletion keeps.
+    /// </summary>
+    private const string OtherIslandName = "Island of the kept profile";
+
+    /// <summary>
+    /// How many seconds before the base receive time a tick is received that a fold step at the base receive time folds:
+    /// 10 days, beyond the 7 days of full resolution.
+    /// </summary>
+    private const long FoldedTickSeconds = 10 * 24 * 3600;
 
     #endregion // Constants
 
@@ -951,6 +968,144 @@ public sealed class ServerStoreTests : IDisposable
     }
 
     /// <summary>
+    /// Deleting a profile removes its profile row and islands at once, and from then on no read returns its ticks or
+    /// hourly points: not by profile, not by tick identity and not as a series.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC6")]
+    public async Task ServerStoreDeleteProfileRemovesProfileAndIslandsAndHidesTicks()
+    {
+        // Arrange
+        var store = await OpenStoreAsync(CreateDatabaseFile());
+        var history = new HistoryStore(_databases[^1]);
+        var profileId = Guid.NewGuid();
+        var cancellationToken = TestContext.CancellationToken;
+        var latest = CreateTick(profileId, 1, CreateIsland(1, IslandName, CreateEntry(1)));
+
+        await store.StoreProfileAsync(profileId, ProfileName, cancellationToken);
+        await StoreTicksAsync(store, CreateTick(profileId, -FoldedTickSeconds, CreateIsland(1, IslandName, CreateEntry(1))), latest);
+
+        var fold = await history.FoldNextTickAsync(profileId, _baseReceiveTime, cancellationToken);
+
+        // Act
+        var result = await store.DeleteProfileAsync(profileId, cancellationToken);
+
+        // Assert
+        var series = await history.ReadSeriesAsync(CreateSeriesQuery(profileId), cancellationToken);
+
+        Assert.AreEqual(HistoryOutcome.Done, fold.Outcome, "The old tick should have been folded, or the series check below would prove nothing");
+        Assert.AreEqual(HistoryOutcome.Done, result.Outcome, "A stored profile should be deleted");
+        Assert.IsEmpty(await store.ListProfilesAsync(cancellationToken), "The profile should no longer be listed");
+        Assert.IsEmpty(await store.ListIslandsAsync(profileId, cancellationToken), "The profile's islands should be gone");
+        Assert.IsNull(await store.ReadProfileStateAsync(profileId, cancellationToken), "The profile should have no state");
+        Assert.IsNull(await store.ReadLatestTickAsync(profileId, cancellationToken), "No latest tick of the profile should be read");
+        Assert.IsNull(await store.ReadTickAsync(latest.Id, cancellationToken), "The deleted profile's tick should not be read by its identity");
+        Assert.IsEmpty(await store.ListLatestProfilesAsync(10, cancellationToken), "The profile should not be listed by its latest tick");
+        Assert.IsEmpty(series, "No tick or hourly point of the profile should be read as a series");
+    }
+
+    /// <summary>
+    /// Deleting a profile leaves the other profiles, the catalog and the icons as they were.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC6")]
+    public async Task ServerStoreDeleteProfileKeepsOtherProfilesCatalogAndIcons()
+    {
+        // Arrange
+        var store = await OpenStoreAsync(CreateDatabaseFile());
+        var deletedId = Guid.NewGuid();
+        var keptId = Guid.NewGuid();
+        var cancellationToken = TestContext.CancellationToken;
+        var kept = CreateTick(keptId, 2, CreateIsland(2, OtherIslandName, CreateEntry(3)));
+        var upload = CreateCatalogUpload("kept");
+        var icon = CreateIcon(IconReference(1), "kept");
+
+        await store.StoreProfileAsync(deletedId, ProfileName, cancellationToken);
+        await store.StoreProfileAsync(keptId, OtherProfileName, cancellationToken);
+        await StoreTicksAsync(store, CreateTick(deletedId, 1, CreateIsland(1, IslandName, CreateEntry(1))), kept);
+        await store.StoreCatalogAsync(upload, cancellationToken);
+        await store.StoreIconAsync(icon, cancellationToken);
+
+        // Act
+        await store.DeleteProfileAsync(deletedId, cancellationToken);
+
+        // Assert
+        var state = await store.ReadProfileStateAsync(keptId, cancellationToken);
+        var catalog = await store.ReadCatalogAsync(cancellationToken);
+
+        Assert.AreSequenceEqual(new[] { DescribeProfile(keptId, OtherProfileName) }, DescribeProfiles(await store.ListProfilesAsync(cancellationToken)), "Only the other profile should be listed, with its name");
+        Assert.IsNotNull(state, "The other profile's state should be read");
+        Assert.AreSequenceEqual(DescribeTick(kept), DescribeTick(state.LatestTick), "The other profile's latest tick should read back unchanged");
+        Assert.AreSequenceEqual(new[] { "2/2/0 " + OtherIslandName }, DescribeIslands(state.Islands), "The other profile's islands should read back unchanged");
+        Assert.AreEqual(upload.ComputeIdentity(), catalog?.Identity, "The catalog should read back unchanged");
+        Assert.AreSequenceEqual(upload.Document.ToArray(), catalog?.Document.ToArray() ?? [], "The catalog document should read back byte for byte");
+        Assert.AreSequenceEqual(icon.Png.ToArray(), await store.ReadIconAsync(icon.Reference, cancellationToken) ?? [], "The icon should read back unchanged");
+    }
+
+    /// <summary>
+    /// Deleting a profile the store does not hold reports nothing to do and changes nothing.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC6")]
+    public async Task ServerStoreDeleteProfileUnknownProfileChangesNothing()
+    {
+        // Arrange
+        var databaseFile = CreateDatabaseFile();
+        var store = await OpenStoreAsync(databaseFile);
+        var profileId = Guid.NewGuid();
+        var cancellationToken = TestContext.CancellationToken;
+        var tick = CreateTick(profileId, 1, CreateIsland(1, IslandName, CreateEntry(1)));
+
+        await store.StoreProfileAsync(profileId, ProfileName, cancellationToken);
+        await store.StoreTickAsync(tick, cancellationToken);
+
+        // Act
+        var result = await store.DeleteProfileAsync(Guid.NewGuid(), cancellationToken);
+
+        // Assert
+        Assert.AreEqual(HistoryOutcome.NothingToDo, result.Outcome, "Deleting an unknown profile should report nothing to do");
+        Assert.AreSequenceEqual(new[] { DescribeProfile(profileId, ProfileName) }, DescribeProfiles(await store.ListProfilesAsync(cancellationToken)), "The stored profile should stay listed");
+        Assert.AreSequenceEqual(DescribeTick(tick), DescribeTick(await store.ReadTickAsync(tick.Id, cancellationToken)), "The stored tick should read back unchanged");
+        Assert.AreEqual("1 1 1 2", CountTickRows(databaseFile), "No row of the stored tick should be touched");
+        Assert.AreEqual("0", CountDeletedProfiles(databaseFile), "No tombstone should be written");
+    }
+
+    /// <summary>
+    /// A deletion that fails before its rows are gone stores no change: the profile, its islands and its tick stay
+    /// whole, no tombstone is written, and the failure is reported with its exception.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC6")]
+    public async Task ServerStoreDeleteProfileFailureKeepsProfileWhole()
+    {
+        // Arrange
+        var databaseFile = CreateDatabaseFile();
+        var store = await OpenStoreAsync(databaseFile);
+        var profileId = Guid.NewGuid();
+        var cancellationToken = TestContext.CancellationToken;
+        var tick = CreateTick(profileId, 1, CreateIsland(1, IslandName, CreateEntry(1)));
+
+        await store.StoreProfileAsync(profileId, ProfileName, cancellationToken);
+        await store.StoreTickAsync(tick, cancellationToken);
+        Execute(databaseFile, command => command.CommandText = CreateFailingTombstoneTriggerSql);
+
+        // Act
+        var result = await store.DeleteProfileAsync(profileId, cancellationToken);
+
+        // Assert
+        Assert.AreEqual(HistoryOutcome.Failed, result.Outcome, "A failing deletion should be reported as failed");
+        Assert.IsInstanceOfType<SqliteException>(result.Failure, "The SQLite exception behind the failure should be attached");
+        Assert.AreSequenceEqual(new[] { DescribeProfile(profileId, ProfileName) }, DescribeProfiles(await store.ListProfilesAsync(cancellationToken)), "The profile should stay listed with its name");
+        Assert.AreSequenceEqual(new[] { "1/1/0 " + IslandName }, DescribeIslands(await store.ListIslandsAsync(profileId, cancellationToken)), "The profile's island should stay");
+        Assert.AreSequenceEqual(DescribeTick(tick), DescribeTick(await store.ReadTickAsync(tick.Id, cancellationToken)), "The profile's tick should read back unchanged");
+        Assert.AreEqual("0", CountDeletedProfiles(databaseFile), "No tombstone should be written");
+    }
+
+    /// <summary>
     /// Gives the receive time some seconds after the base receive time.
     /// </summary>
     /// <param name="seconds">The seconds</param>
@@ -1397,6 +1552,41 @@ public sealed class ServerStoreTests : IDisposable
         command.CommandText = "SELECT (SELECT count(*) FROM \"Ticks\") || ' ' || (SELECT count(*) FROM \"TickIslands\") || ' ' || (SELECT count(*) FROM \"TickEntries\") || ' ' || (SELECT count(*) FROM \"TickMapPairs\");";
 
         return Convert.ToString(command.ExecuteScalar(), CultureInfo.InvariantCulture) ?? string.Empty;
+    }
+
+    /// <summary>
+    /// Counts the tombstones of deleted profiles over a connection of its own.
+    /// </summary>
+    /// <param name="databaseFile">The file</param>
+    /// <returns>The count</returns>
+    private static string CountDeletedProfiles(string databaseFile)
+    {
+        using var connection = OpenRawConnection(databaseFile);
+        using var command = connection.CreateCommand();
+
+        command.CommandText = "SELECT count(*) FROM \"DeletedProfiles\";";
+
+        return Convert.ToString(command.ExecuteScalar(), CultureInfo.InvariantCulture) ?? string.Empty;
+    }
+
+    /// <summary>
+    /// Creates the series query of the first island and good of <see cref="CreateEntry" /> over the receive times of
+    /// the tests, from 11 days before the base receive time to a day after it.
+    /// </summary>
+    /// <param name="profileId">The profile identity</param>
+    /// <returns>The query</returns>
+    private static HistorySeriesQuery CreateSeriesQuery(Guid profileId)
+    {
+        return new HistorySeriesQuery
+               {
+                   ProfileId = profileId,
+                   SessionGuid = 1,
+                   IslandId = 1,
+                   AreaIndex = 0,
+                   ProductGuid = 1,
+                   RangeStart = _baseReceiveTime.AddDays(-11),
+                   RangeEnd = _baseReceiveTime.AddDays(1)
+               };
     }
 
     /// <summary>

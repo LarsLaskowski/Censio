@@ -159,7 +159,9 @@ below are done by the Companion at once.
 - **The token file's access rules** are the user's; the Companion neither checks nor changes them. A token file left in a
   folder others can read leaks the token (`SECURITY.md`).
 - **No buffer.** The replay is no live Companion: it buffers nothing and a lost connection loses the rest of the run.
-- **Growth.** Every run adds a profile `Replay <time>` and its ticks until retention (#35).
+- **Growth.** Every run adds a profile `Replay <time>` and its ticks. A replay keeps the recorded receive times, so the
+  ticks of an old recording are folded into hourly points at the next retention run, except those of the profile's
+  latest hour, which stay as ticks, and the operator removes a profile in the web interface ([`history.md`](history.md)).
 
 ## Measurements
 

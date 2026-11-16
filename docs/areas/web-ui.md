@@ -14,6 +14,8 @@ data is in [`web-pages.md`](web-pages.md).
 
 - Every page is shown inside one frame: an app bar on top, a navigation on the left and the page content in the
   remaining width.
+- The frame provides the places in which the popovers of its menus and the dialogs of the pages open; the one dialog of
+  the pages is the deletion dialog of [`web-pages.md`](web-pages.md).
 - The app bar shows, from left to right, the navigation button, the name `Censio`, the profile switch, the language
   switch and the theme switch.
 - The navigation is open when a page opens and lists the start page (`Home` / `Startseite`, link `/`) and the region
@@ -130,6 +132,12 @@ Both palettes meet WCAG 2.1 level AA, checked by a unit test for every pair:
 | Theme switch in the dark theme (accessible name) | `Switch to the light theme` | `Zum hellen Design wechseln` |
 | Language switch (accessible name) | `Language` | `Sprache` |
 | Language options | `English`, `Deutsch` | `English`, `Deutsch` |
+| Button that opens the deletion dialog | `Delete history` | `Verlauf löschen` |
+| Deletion dialog, title | `Delete history?` | `Verlauf löschen?` |
+| Deletion dialog, text (`<name>` the profile's shown name) | `All data of the profile <name> is removed from the server: its regions, islands, goods and history. This cannot be undone.` | `Alle Daten des Profils <name> werden vom Server entfernt: seine Regionen, Inseln, Waren und sein Verlauf. Das lässt sich nicht rückgängig machen.` |
+| Deletion dialog, buttons | `Cancel`, `Delete` | `Abbrechen`, `Löschen` |
+| Deletion dialog, text after a failure | `The history could not be deleted.` | `Der Verlauf konnte nicht gelöscht werden.` |
+| Text beside the disabled button | `Deleting needs this page opened by IP address or as localhost, or by a host name the setting AllowedHosts lists.` | `Löschen setzt voraus, dass diese Seite über die IP-Adresse oder localhost geöffnet wurde, oder über einen Hostnamen, den die Einstellung AllowedHosts nennt.` |
 
 The texts come from a table of the application itself (`UiTexts`); the web UI creates no culture and uses no resource
 files or request localization, so both languages render in the Docker image, which runs without culture data

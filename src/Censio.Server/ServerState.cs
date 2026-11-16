@@ -174,25 +174,7 @@ public sealed partial class ServerState : IProfileStateSource
 
         try
         {
-            var profiles = await _store.ListProfilesAsync(cancellationToken).ConfigureAwait(false);
-            var latest = await _store.ListLatestProfilesAsync(MaxHeldProfiles, cancellationToken).ConfigureAwait(false);
-            var held = new Dictionary<Guid, HeldProfileState>();
-            var sequence = 0L;
-
-            foreach (var profileId in latest.Reverse())
-            {
-                var state = await _store.ReadProfileStateAsync(profileId, cancellationToken).ConfigureAwait(false);
-
-                if (state?.LatestTick is { } tick)
-                {
-                    held[profileId] = new HeldProfileState
-                                      {
-                                          State = state,
-                                          ReceiveTicks = tick.ReceiveTime.UtcTicks,
-                                          Sequence = ++sequence
-                                      };
-                }
-            }
+            var (profiles, held, sequence) = await ReadProfilesAsync(_store, cancellationToken).ConfigureAwait(false);
 
             var catalog = await RestoreCatalogAsync(cancellationToken).ConfigureAwait(false);
 
@@ -200,7 +182,7 @@ public sealed partial class ServerState : IProfileStateSource
             _markedProfiles.Clear();
             Swap(new ServerStateSnapshot
                  {
-                     Profiles = [.. profiles.OrderBy(profile => profile.Id.ToString(), StringComparer.Ordinal)],
+                     Profiles = profiles,
                      Held = held,
                      Catalog = catalog
                  });
@@ -476,6 +458,95 @@ public sealed partial class ServerState : IProfileStateSource
         {
             _writeGate.Release();
         }
+    }
+
+    /// <summary>
+    /// Deletes a profile with its history and rebuilds the held profiles and the profile list.
+    /// </summary>
+    /// <param name="profileId">The profile identity</param>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>The result of the deletion</returns>
+    public async Task<HistoryResult> DeleteProfileAsync(Guid profileId, CancellationToken cancellationToken)
+    {
+        await _writeGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+
+        try
+        {
+            var result = await _store.DeleteProfileAsync(profileId, cancellationToken).ConfigureAwait(false);
+
+            if (result.Outcome != HistoryOutcome.Done)
+            {
+                return result;
+            }
+
+            var snapshot = GetSnapshot();
+            var profiles = snapshot.Profiles;
+            var held = snapshot.Held;
+
+            try
+            {
+                // The rows are gone, so the deletion counts as done and the re-read is not cancelled
+                var read = await ReadProfilesAsync(_store, CancellationToken.None).ConfigureAwait(false);
+
+                profiles = read.Profiles;
+                held = read.Held;
+                _sequence = read.Sequence;
+                _markedProfiles.Clear();
+            }
+            catch (SqliteException exception)
+            {
+                LogStateReadFailed(_logger, exception);
+
+                profiles = [.. profiles.Where(profile => profile.Id != profileId)];
+                held = held.Where(pair => pair.Key != profileId).ToDictionary();
+                _markedProfiles.Remove(profileId);
+            }
+
+            Swap(new ServerStateSnapshot
+                 {
+                     Profiles = profiles,
+                     Held = held,
+                     Catalog = snapshot.Catalog
+                 });
+            Notify(ServerStateChangeKind.Profile, profileId);
+
+            return result;
+        }
+        finally
+        {
+            _writeGate.Release();
+        }
+    }
+
+    /// <summary>
+    /// Reads the profiles and the states of the newest ones from the store.
+    /// </summary>
+    /// <param name="store">The store</param>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>The profiles ordered by identity, the held states and the last sequence</returns>
+    private static async Task<(List<StoredProfile> Profiles, Dictionary<Guid, HeldProfileState> Held, long Sequence)> ReadProfilesAsync(ServerStore store, CancellationToken cancellationToken)
+    {
+        var profiles = await store.ListProfilesAsync(cancellationToken).ConfigureAwait(false);
+        var latest = await store.ListLatestProfilesAsync(MaxHeldProfiles, cancellationToken).ConfigureAwait(false);
+        var held = new Dictionary<Guid, HeldProfileState>();
+        var sequence = 0L;
+
+        foreach (var profileId in latest.Reverse())
+        {
+            var state = await store.ReadProfileStateAsync(profileId, cancellationToken).ConfigureAwait(false);
+
+            if (state?.LatestTick is { } tick)
+            {
+                held[profileId] = new HeldProfileState
+                                  {
+                                      State = state,
+                                      ReceiveTicks = tick.ReceiveTime.UtcTicks,
+                                      Sequence = ++sequence
+                                  };
+            }
+        }
+
+        return ([.. profiles.OrderBy(profile => profile.Id.ToString(), StringComparer.Ordinal)], held, sequence);
     }
 
     /// <summary>

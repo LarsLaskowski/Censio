@@ -199,6 +199,6 @@ Until more fixtures from real recordings test the reader (one anonymised fixture
 
 - Finding, opening and keeping the connection, its states and the retry: [`pipe-connection.md`](pipe-connection.md).
 - Recording the frames to a file and replaying it: [`pipe-recording.md`](pipe-recording.md).
-- Telling a resent or paused tick from a new one (#35).
+- Telling a resent or paused tick from a new one: the server stores every tick under its own identity and its series read returns each as a point of its own, also with a repeated game time ([`history.md`](history.md)).
 - Assigning ticks to a profile: record 0041.
 - Anonymising recordings: [`pipe-recording.md`](pipe-recording.md), *Anonymising*.

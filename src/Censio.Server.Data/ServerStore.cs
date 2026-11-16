@@ -46,11 +46,11 @@ public sealed class ServerStore
     {
         return WriteAsync(async connection =>
                           {
-                              await ExecuteAsync(connection,
-                                                 "INSERT INTO \"Profiles\" (\"Id\", \"Name\") VALUES ($id, $name) ON CONFLICT (\"Id\") DO UPDATE SET \"Name\" = excluded.\"Name\";",
-                                                 cancellationToken,
-                                                 ("$id", profileId),
-                                                 ("$name", name)).ConfigureAwait(false);
+                              await StoreAccess.ExecuteAsync(connection,
+                                                             "INSERT INTO \"Profiles\" (\"Id\", \"Name\") VALUES ($id, $name) ON CONFLICT (\"Id\") DO UPDATE SET \"Name\" = excluded.\"Name\";",
+                                                             cancellationToken,
+                                                             ("$id", profileId),
+                                                             ("$name", name)).ConfigureAwait(false);
 
                               return ServerStoreOutcome.Stored;
                           },
@@ -68,7 +68,7 @@ public sealed class ServerStore
                                                        {
                                                            var profiles = new List<StoredProfile>();
 
-                                                           using var command = CreateCommand(connection, "SELECT \"Id\", \"Name\" FROM \"Profiles\" ORDER BY \"Id\";");
+                                                           using var command = StoreAccess.CreateCommand(connection, "SELECT \"Id\", \"Name\" FROM \"Profiles\" ORDER BY \"Id\";");
                                                            using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
 
                                                            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
@@ -95,14 +95,14 @@ public sealed class ServerStore
     {
         return WriteAsync(async connection =>
                           {
-                              using var exists = CreateCommand(connection, "SELECT 1 FROM \"Ticks\" WHERE \"Id\" = $id;", ("$id", tick.Id));
+                              using var exists = StoreAccess.CreateCommand(connection, "SELECT 1 WHERE EXISTS (SELECT 1 FROM \"Ticks\" WHERE \"Id\" = $id) OR EXISTS (SELECT 1 FROM \"FoldedTicks\" WHERE \"Id\" = $id);", ("$id", tick.Id));
 
                               if (await exists.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is not null)
                               {
                                   return ServerStoreOutcome.AlreadyStored;
                               }
 
-                              await ExecuteAsync(connection, "INSERT OR IGNORE INTO \"Profiles\" (\"Id\", \"Name\") VALUES ($id, NULL);", cancellationToken, ("$id", tick.ProfileId)).ConfigureAwait(false);
+                              await StoreAccess.ExecuteAsync(connection, "INSERT OR IGNORE INTO \"Profiles\" (\"Id\", \"Name\") VALUES ($id, NULL);", cancellationToken, ("$id", tick.ProfileId)).ConfigureAwait(false);
 
                               using var writer = new TickWriter(connection);
 
@@ -111,6 +111,39 @@ public sealed class ServerStore
                               return ServerStoreOutcome.Stored;
                           },
                           cancellationToken);
+    }
+
+    /// <summary>
+    /// Deletes a profile with its history: its profile row and islands at once, its ticks and hourly points are hidden
+    /// by a tombstone and removed by the sweep steps of the history store.
+    /// </summary>
+    /// <param name="profileId">The profile identity</param>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>The result of the deletion</returns>
+    public Task<HistoryResult> DeleteProfileAsync(Guid profileId, CancellationToken cancellationToken)
+    {
+        return StoreAccess.WriteAsync(_database,
+                                      async connection =>
+                                      {
+                                          using var exists = StoreAccess.CreateCommand(connection, "SELECT 1 FROM \"Profiles\" WHERE \"Id\" = $id;", ("$id", profileId));
+
+                                          if (await exists.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is null)
+                                          {
+                                              return new HistoryResult(HistoryOutcome.NothingToDo, null, null);
+                                          }
+
+                                          var tombstone = Guid.NewGuid();
+
+                                          await StoreAccess.ExecuteAsync(connection, "DELETE FROM \"Profiles\" WHERE \"Id\" = $id;", cancellationToken, ("$id", profileId)).ConfigureAwait(false);
+                                          await StoreAccess.ExecuteAsync(connection, "DELETE FROM \"Islands\" WHERE \"ProfileId\" = $id;", cancellationToken, ("$id", profileId)).ConfigureAwait(false);
+                                          await StoreAccess.ExecuteAsync(connection, "INSERT INTO \"DeletedProfiles\" (\"TombstoneId\") VALUES ($tombstone);", cancellationToken, ("$tombstone", tombstone)).ConfigureAwait(false);
+                                          await StoreAccess.ExecuteAsync(connection, "UPDATE \"Ticks\" SET \"ProfileId\" = $tombstone WHERE \"ProfileId\" = $id;", cancellationToken, ("$tombstone", tombstone), ("$id", profileId)).ConfigureAwait(false);
+                                          await StoreAccess.ExecuteAsync(connection, "UPDATE \"HourlyPoints\" SET \"ProfileId\" = $tombstone WHERE \"ProfileId\" = $id;", cancellationToken, ("$tombstone", tombstone), ("$id", profileId)).ConfigureAwait(false);
+
+                                          return new HistoryResult(HistoryOutcome.Done, null, null);
+                                      },
+                                      exception => new HistoryResult(HistoryOutcome.Failed, exception, null),
+                                      cancellationToken);
     }
 
     /// <summary>
@@ -162,7 +195,7 @@ public sealed class ServerStore
 
                              StoredProfile profile;
 
-                             using (var command = CreateCommand(connection, "SELECT \"Id\", \"Name\" FROM \"Profiles\" WHERE \"Id\" = $id;", ("$id", profileId)))
+                             using (var command = StoreAccess.CreateCommand(connection, "SELECT \"Id\", \"Name\" FROM \"Profiles\" WHERE \"Id\" = $id;", ("$id", profileId)))
                              {
                                  using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
 
@@ -203,9 +236,9 @@ public sealed class ServerStore
                                               {
                                                   var profiles = new List<Guid>();
 
-                                                  using var command = CreateCommand(connection,
-                                                                                    "SELECT p.\"Id\" FROM \"Profiles\" p JOIN \"Ticks\" t ON t.\"Number\" = (SELECT \"Number\" FROM \"Ticks\" WHERE \"ProfileId\" = p.\"Id\" ORDER BY \"ReceiveTicks\" DESC, \"Number\" DESC LIMIT 1) ORDER BY t.\"ReceiveTicks\" DESC, t.\"Number\" DESC LIMIT $count;",
-                                                                                    ("$count", count));
+                                                  using var command = StoreAccess.CreateCommand(connection,
+                                                                                                "SELECT p.\"Id\" FROM \"Profiles\" p JOIN \"Ticks\" t ON t.\"Number\" = (SELECT \"Number\" FROM \"Ticks\" WHERE \"ProfileId\" = p.\"Id\" ORDER BY \"ReceiveTicks\" DESC, \"Number\" DESC LIMIT 1) ORDER BY t.\"ReceiveTicks\" DESC, t.\"Number\" DESC LIMIT $count;",
+                                                                                                ("$count", count));
                                                   using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
 
                                                   while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
@@ -228,11 +261,11 @@ public sealed class ServerStore
     {
         return WriteAsync(async connection =>
                           {
-                              await ExecuteAsync(connection,
-                                                 "INSERT INTO \"Catalog\" (\"Id\", \"Identity\", \"Document\") VALUES (1, $identity, $document) ON CONFLICT (\"Id\") DO UPDATE SET \"Identity\" = excluded.\"Identity\", \"Document\" = excluded.\"Document\";",
-                                                 cancellationToken,
-                                                 ("$identity", upload.ComputeIdentity()),
-                                                 ("$document", upload.Document.ToArray())).ConfigureAwait(false);
+                              await StoreAccess.ExecuteAsync(connection,
+                                                             "INSERT INTO \"Catalog\" (\"Id\", \"Identity\", \"Document\") VALUES (1, $identity, $document) ON CONFLICT (\"Id\") DO UPDATE SET \"Identity\" = excluded.\"Identity\", \"Document\" = excluded.\"Document\";",
+                                                             cancellationToken,
+                                                             ("$identity", upload.ComputeIdentity()),
+                                                             ("$document", upload.Document.ToArray())).ConfigureAwait(false);
 
                               return ServerStoreOutcome.Stored;
                           },
@@ -248,7 +281,7 @@ public sealed class ServerStore
     {
         return ReadAsync(async connection =>
                          {
-                             using var command = CreateCommand(connection, "SELECT \"Identity\", \"Document\" FROM \"Catalog\" WHERE \"Id\" = 1;");
+                             using var command = StoreAccess.CreateCommand(connection, "SELECT \"Identity\", \"Document\" FROM \"Catalog\" WHERE \"Id\" = 1;");
                              using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
 
                              if (await reader.ReadAsync(cancellationToken).ConfigureAwait(false) == false)
@@ -275,11 +308,11 @@ public sealed class ServerStore
     {
         return WriteAsync(async connection =>
                           {
-                              var changed = await ExecuteAsync(connection,
-                                                               "INSERT OR IGNORE INTO \"Icons\" (\"Reference\", \"Png\") VALUES ($reference, $png);",
-                                                               cancellationToken,
-                                                               ("$reference", icon.Reference),
-                                                               ("$png", icon.Png.ToArray())).ConfigureAwait(false);
+                              var changed = await StoreAccess.ExecuteAsync(connection,
+                                                                           "INSERT OR IGNORE INTO \"Icons\" (\"Reference\", \"Png\") VALUES ($reference, $png);",
+                                                                           cancellationToken,
+                                                                           ("$reference", icon.Reference),
+                                                                           ("$png", icon.Png.ToArray())).ConfigureAwait(false);
 
                               return changed == 0
                                          ? ServerStoreOutcome.AlreadyStored
@@ -298,7 +331,7 @@ public sealed class ServerStore
     {
         return ReadAsync(async connection =>
                          {
-                             using var command = CreateCommand(connection, "SELECT \"Png\" FROM \"Icons\" WHERE \"Reference\" = $reference;", ("$reference", reference));
+                             using var command = StoreAccess.CreateCommand(connection, "SELECT \"Png\" FROM \"Icons\" WHERE \"Reference\" = $reference;", ("$reference", reference));
 
                              return await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) as byte[];
                          },
@@ -317,9 +350,9 @@ public sealed class ServerStore
                                                 {
                                                     var missing = new List<string>();
 
-                                                    using var command = CreateCommand(connection,
-                                                                                      "SELECT DISTINCT j.\"value\" FROM json_each($references) j WHERE NOT EXISTS (SELECT 1 FROM \"Icons\" i WHERE i.\"Reference\" = j.\"value\");",
-                                                                                      ("$references", JsonSerializer.Serialize(references)));
+                                                    using var command = StoreAccess.CreateCommand(connection,
+                                                                                                  "SELECT DISTINCT j.\"value\" FROM json_each($references) j WHERE NOT EXISTS (SELECT 1 FROM \"Icons\" i WHERE i.\"Reference\" = j.\"value\");",
+                                                                                                  ("$references", JsonSerializer.Serialize(references)));
                                                     using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
 
                                                     while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
@@ -345,9 +378,9 @@ public sealed class ServerStore
     {
         var islands = new List<StoredIsland>();
 
-        using var command = CreateCommand(connection,
-                                          "SELECT \"SessionGuid\", \"IslandId\", \"AreaIndex\", \"Name\" FROM \"Islands\" WHERE \"ProfileId\" = $profile ORDER BY \"SessionGuid\", \"IslandId\", \"AreaIndex\";",
-                                          ("$profile", profileId));
+        using var command = StoreAccess.CreateCommand(connection,
+                                                      "SELECT \"SessionGuid\", \"IslandId\", \"AreaIndex\", \"Name\" FROM \"Islands\" WHERE \"ProfileId\" = $profile ORDER BY \"SessionGuid\", \"IslandId\", \"AreaIndex\";",
+                                                      ("$profile", profileId));
         using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
 
         while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
@@ -365,107 +398,17 @@ public sealed class ServerStore
     }
 
     /// <summary>
-    /// Rolls back the open transaction, when SQLite has not ended it already.
-    /// </summary>
-    /// <param name="connection">The connection</param>
-    private static void Rollback(SqliteConnection connection)
-    {
-        try
-        {
-            using var command = CreateCommand(connection, "ROLLBACK;");
-
-            command.ExecuteNonQuery();
-        }
-        catch (SqliteException)
-        {
-            // SQLite ended the transaction itself, so nothing is left to roll back
-        }
-    }
-
-    /// <summary>
-    /// Creates a command with parameters.
-    /// </summary>
-    /// <param name="connection">The connection</param>
-    /// <param name="sql">The constant statement</param>
-    /// <param name="parameters">The parameters</param>
-    /// <returns>The command</returns>
-    private static SqliteCommand CreateCommand(SqliteConnection connection, string sql, params (string Name, object Value)[] parameters)
-    {
-        var command = connection.CreateCommand();
-
-#pragma warning disable CA2100 // Constant statements of this class only, values travel as parameters
-        command.CommandText = sql;
-#pragma warning restore CA2100
-
-        foreach (var (name, value) in parameters)
-        {
-            command.Parameters.AddWithValue(name, value);
-        }
-
-        return command;
-    }
-
-    /// <summary>
-    /// Runs one statement.
-    /// </summary>
-    /// <param name="connection">The connection</param>
-    /// <param name="sql">The constant statement</param>
-    /// <param name="cancellationToken">The cancellation token</param>
-    /// <param name="parameters">The parameters</param>
-    /// <returns>The number of changed rows</returns>
-    private static async Task<int> ExecuteAsync(SqliteConnection connection, string sql, CancellationToken cancellationToken, params (string Name, object Value)[] parameters)
-    {
-        using var command = CreateCommand(connection, sql, parameters);
-
-        return await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-    }
-
-    /// <summary>
     /// Runs a write in one immediate transaction, serialized by the gate of the database.
     /// </summary>
     /// <param name="write">The write, which returns its outcome</param>
     /// <param name="cancellationToken">The cancellation token</param>
     /// <returns>The store result; a failure of SQLite rolls everything back</returns>
-    private async Task<ServerStoreResult> WriteAsync(Func<SqliteConnection, Task<ServerStoreOutcome>> write, CancellationToken cancellationToken)
+    private Task<ServerStoreResult> WriteAsync(Func<SqliteConnection, Task<ServerStoreOutcome>> write, CancellationToken cancellationToken)
     {
-        await _database.Gate.WaitAsync(cancellationToken).ConfigureAwait(false);
-
-        try
-        {
-            var connection = _database.Connection;
-            var begun = false;
-            var committed = false;
-
-            try
-            {
-                await ExecuteAsync(connection, "BEGIN IMMEDIATE;", cancellationToken).ConfigureAwait(false);
-
-                begun = true;
-
-                var outcome = await write(connection).ConfigureAwait(false);
-
-                await ExecuteAsync(connection, "COMMIT;", cancellationToken).ConfigureAwait(false);
-
-                committed = true;
-
-                return new ServerStoreResult(outcome, null);
-            }
-            catch (SqliteException exception)
-            {
-                return new ServerStoreResult(ServerStoreOutcome.Failed, exception);
-            }
-            finally
-            {
-                if (begun && committed == false)
-                {
-                    Rollback(connection);
-                }
-            }
-        }
-        finally
-        {
-            _database.Gate.Release();
-        }
+        return StoreAccess.WriteAsync(_database,
+                                      async connection => new ServerStoreResult(await write(connection).ConfigureAwait(false), null),
+                                      exception => new ServerStoreResult(ServerStoreOutcome.Failed, exception),
+                                      cancellationToken);
     }
 
     /// <summary>
@@ -475,27 +418,9 @@ public sealed class ServerStore
     /// <param name="read">The read</param>
     /// <param name="cancellationToken">The cancellation token</param>
     /// <returns>The result of the read</returns>
-    private async Task<T> ReadAsync<T>(Func<SqliteConnection, Task<T>> read, CancellationToken cancellationToken)
+    private Task<T> ReadAsync<T>(Func<SqliteConnection, Task<T>> read, CancellationToken cancellationToken)
     {
-        if (_database.DatabaseFile is null)
-        {
-            await _database.Gate.WaitAsync(cancellationToken).ConfigureAwait(false);
-
-            try
-            {
-                return await read(_database.Connection).ConfigureAwait(false);
-            }
-            finally
-            {
-                _database.Gate.Release();
-            }
-        }
-
-        using var connection = new SqliteConnection(_database.Connection.ConnectionString);
-
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
-
-        return await read(connection).ConfigureAwait(false);
+        return StoreAccess.ReadAsync(_database, read, cancellationToken);
     }
 
     #endregion // Methods

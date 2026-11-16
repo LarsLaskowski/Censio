@@ -147,6 +147,12 @@ public sealed class ServerStateTests
     /// </summary>
     private const string GoodEnglish = "Good name 1c5a";
 
+    /// <summary>
+    /// The name of the island of the tick <see cref="ServerStateStoreTickAfterDeletionCreatesUnnamedProfile" /> stores
+    /// after the deletion.
+    /// </summary>
+    private const string IslandAfterDeletion = "Island after the deletion 6d0a";
+
     #endregion // Constants
 
     #region Fields
@@ -170,6 +176,11 @@ public sealed class ServerStateTests
     /// The islands <see cref="ServerStateStoreTickAsyncOlderTickIslandNamesEqualStore" /> expects the store to list.
     /// </summary>
     private static readonly string[] _expectedOlderTickIslands = ["1/1/0 Name of the latest tick", "2/2/0 Island only of an older tick"];
+
+    /// <summary>
+    /// The islands <see cref="ServerStateStoreTickAfterDeletionCreatesUnnamedProfile" /> expects.
+    /// </summary>
+    private static readonly string[] _expectedIslandsAfterDeletion = [$"2/2/0 {IslandAfterDeletion}"];
 
     /// <summary>
     /// What the lookup of <see cref="CreateNamedCatalog" /> finds, as <see cref="DescribeLookup" /> describes it.
@@ -1667,6 +1678,189 @@ public sealed class ServerStateTests
         var later = await state.ReadIconAsync(IconReference(1), TestContext.CancellationToken).WaitAsync(_waitBound, TestContext.CancellationToken);
 
         Assert.AreSequenceEqual(icon.Png.ToArray(), later ?? [], "A read after the cancelled one should read the icon");
+    }
+
+    /// <summary>
+    /// Deleting a held profile drops its held state, leaves it out of the profile list, reads it as no state (a page shows
+    /// it as not found) and tells the followers that the profile changed; the other profile and the catalog stay.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public async Task ServerStateDeleteProfileDropsHeldStateAndNotifies()
+    {
+        // Arrange
+        var (_, state) = await OpenRestoredAsync(null);
+
+        var deletedId = Guid.NewGuid();
+        var keptId = Guid.NewGuid();
+        var (upload, document) = CreateCatalog(1, IconReference(1));
+
+        await state.StoreProfileAsync(deletedId, ProfileName, TestContext.CancellationToken);
+        await StoreTicksAsync(state,
+                              CreateTick(deletedId, 1, CreateIsland(1, IslandName, CreateEntry(1))),
+                              CreateTick(keptId, 2, CreateIsland(2, "Island of the kept profile", CreateEntry(2))));
+        await state.StoreCatalogAsync(upload, document, TestContext.CancellationToken);
+        await state.StoreIconAsync(CreateIcon(IconReference(1)), TestContext.CancellationToken);
+
+        var expectedKept = DescribeState(await ReadStateAsync(state, keptId));
+        var catalogIdentity = state.CompleteCatalogIdentity;
+        var (notices, told) = Follow(state, 1);
+
+        // Act
+        var result = await state.DeleteProfileAsync(deletedId, TestContext.CancellationToken);
+
+        // Assert
+        await told.WaitAsync(_waitBound, TestContext.CancellationToken);
+
+        Assert.AreEqual(HistoryOutcome.Done, result.Outcome, "The deletion of a stored profile should be done");
+        Assert.AreSequenceEqual(new[] { DescribeProfile(keptId, null) }, DescribeProfiles(state.Profiles), "Only the kept profile should be listed");
+        Assert.DoesNotContain(deletedId, state.HeldProfiles, "The deleted profile should no longer be held");
+        Assert.IsFalse(state.TryGetHeld(deletedId, out _), "The deleted profile should give no held state");
+        Assert.IsNull(await ReadStateAsync(state, deletedId), "The deleted profile should read as no state, so a page shows it as not found");
+        Assert.AreSequenceEqual(expectedKept, DescribeState(await ReadStateAsync(state, keptId)), "The kept profile's state should be unchanged");
+        Assert.IsNotNull(catalogIdentity, "The catalog should be complete before the deletion, or the comparison below would prove less");
+        Assert.AreEqual(catalogIdentity, state.CompleteCatalogIdentity, "The catalog should be kept");
+        Assert.AreSequenceEqual(new[] { DescribeNotice(ServerStateChangeKind.Profile, deletedId) }, notices.ToList(), "The followers should be told that the deleted profile changed");
+    }
+
+    /// <summary>
+    /// A deletion whose rows are gone but whose re-read of the held profiles fails still counts as done: the failed state
+    /// read is logged with its exception, the deleted profile is dropped from the profile list and the held states in
+    /// memory, the other profile stays held, and the followers are told once that the deleted profile changed.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public async Task ServerStateDeleteProfileFailedRebuildDropsProfileAndNotifies()
+    {
+        // Arrange
+        var databaseFile = CreateDatabaseFile();
+        var (_, state) = await OpenRestoredAsync(databaseFile);
+
+        var deletedId = Guid.NewGuid();
+        var keptId = Guid.NewGuid();
+
+        await state.StoreProfileAsync(deletedId, ProfileName, TestContext.CancellationToken);
+        await StoreTicksAsync(state,
+                              CreateTick(deletedId, 1, CreateIsland(1, IslandName, CreateEntry(1))),
+                              CreateTick(keptId, 2, CreateIsland(2, "Island of the kept profile", CreateEntry(2))));
+        ExecutePooled(databaseFile, BreakIslandReadsSql);
+
+        var heldBefore = state.HeldProfiles.Order().ToList();
+        var (notices, told) = Follow(state, 1);
+
+        // Act
+        var result = await state.DeleteProfileAsync(deletedId, TestContext.CancellationToken);
+
+        // Assert
+        await told.WaitAsync(_waitBound, TestContext.CancellationToken);
+
+        Assert.AreSequenceEqual(new[] { deletedId, keptId }.Order().ToList(), heldBefore, "Both profiles should be held before the deletion, or the checks below would prove less");
+        Assert.AreEqual(HistoryOutcome.Done, result.Outcome, "A deletion whose rows are gone should be done although the re-read failed");
+        Assert.AreSequenceEqual(new[] { DescribeProfile(keptId, null) }, DescribeProfiles(state.Profiles), "Only the kept profile should be listed");
+        Assert.AreSequenceEqual(new[] { keptId }, state.HeldProfiles.ToList(), "Only the kept profile should stay held");
+        Assert.IsFalse(state.TryGetHeld(deletedId, out _), "The deleted profile should give no held state");
+        Assert.AreSequenceEqual(new[] { DescribeNotice(ServerStateChangeKind.Profile, deletedId) }, notices.ToList(), "The followers should be told once that the deleted profile changed");
+        Assert.AreSequenceEqual(new[] { (LogLevel.Error, ReadFailureLine, true) }, _logger.Entries.Select(entry => (entry.Level, entry.Message, entry.Exception is SqliteException)).ToList(), "The failed re-read should be logged once as a failed state read with its exception");
+    }
+
+    /// <summary>
+    /// A deletion whose re-read fails keeps the mark of another profile whose state could not be read: once reads work
+    /// again, that profile's next tick, an older one, holds its stored latest state, not the older tick.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public async Task ServerStateDeleteProfileFailedRebuildKeepsOtherProfileMarked()
+    {
+        // Arrange
+        var databaseFile = CreateDatabaseFile();
+        var (store, state) = await OpenRestoredAsync(databaseFile);
+
+        var heldId = Guid.NewGuid();
+        var deletedId = Guid.NewGuid();
+        var markedId = Guid.NewGuid();
+
+        await StoreTicksAsync(state,
+                              CreateTick(deletedId, 10, CreateIsland(1, IslandName, CreateEntry(1))),
+                              CreateTick(heldId, 20, CreateIsland(1, IslandName, CreateEntry(1))));
+        ExecutePooled(databaseFile, BreakIslandReadsSql);
+        await StoreTicksAsync(state, CreateTick(markedId, 30, CreateIsland(1, "Island of the newest tick", CreateEntry(1))));
+
+        // Act
+        var result = await state.DeleteProfileAsync(deletedId, TestContext.CancellationToken);
+
+        // Assert
+        ExecutePooled(databaseFile, RepairIslandReadsSql);
+        await StoreTicksAsync(state, CreateTick(markedId, 5, CreateIsland(3, "Island of the oldest tick", CreateEntry(3))));
+
+        var stored = await store.ReadProfileStateAsync(markedId, TestContext.CancellationToken);
+
+        Assert.AreEqual(HistoryOutcome.Done, result.Outcome, "The deletion should be done although its re-read failed");
+        Assert.AreSequenceEqual(new[] { heldId, markedId }.Order().ToList(), state.HeldProfiles.Order().ToList(), "The marked profile should be held after its next tick");
+        Assert.AreSequenceEqual(DescribeState(stored), DescribeState(await ReadStateAsync(state, markedId)), "The held state should be the stored latest state, so the mark survived the deletion");
+    }
+
+    /// <summary>
+    /// Deleting the newest of three profiles, of which two are held, holds the two remaining ones, as a restore would, and
+    /// makes the next newest the newest profile.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public async Task ServerStateDeleteProfileHoldsNextNewestProfile()
+    {
+        // Arrange
+        var (_, state) = await OpenRestoredAsync(null);
+
+        Guid[] profiles = [Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()];
+
+        await StoreTicksAsync(state,
+                              CreateTick(profiles[0], 10, CreateIsland(1, IslandName, CreateEntry(1))),
+                              CreateTick(profiles[1], 20, CreateIsland(1, IslandName, CreateEntry(2))),
+                              CreateTick(profiles[2], 30, CreateIsland(1, IslandName, CreateEntry(3))));
+
+        var heldBefore = state.HeldProfiles.Order().ToList();
+
+        // Act
+        await state.DeleteProfileAsync(profiles[2], TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreSequenceEqual(new[] { profiles[1], profiles[2] }.Order().ToList(), heldBefore, "The two newest profiles should be held before the deletion, or the comparison below would prove less");
+        Assert.AreEqual(profiles[1], state.NewestProfile, "The profile with the next newest tick should be the newest profile");
+        Assert.AreSequenceEqual(new[] { profiles[0], profiles[1] }.Order().ToList(), state.HeldProfiles.Order().ToList(), "The two remaining profiles should be held");
+    }
+
+    /// <summary>
+    /// A tick of a deleted profile creates it again without a name, holding only that tick and its island.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public async Task ServerStateStoreTickAfterDeletionCreatesUnnamedProfile()
+    {
+        // Arrange
+        var (store, state) = await OpenRestoredAsync(null);
+
+        var profileId = Guid.NewGuid();
+        var later = CreateTick(profileId, 2, CreateIsland(2, IslandAfterDeletion, CreateEntry(2)));
+
+        await state.StoreProfileAsync(profileId, ProfileName, TestContext.CancellationToken);
+        await StoreTicksAsync(state, CreateTick(profileId, 1, CreateIsland(1, IslandName, CreateEntry(1))));
+        await state.DeleteProfileAsync(profileId, TestContext.CancellationToken);
+
+        // Act
+        var result = await state.StoreTickAsync(later, TestContext.CancellationToken);
+
+        // Assert
+        var read = await ReadStateAsync(state, profileId);
+
+        Assert.AreEqual(ServerStoreOutcome.Stored, result.Outcome, "The later tick should be stored");
+        Assert.AreSequenceEqual(new[] { DescribeProfile(profileId, null) }, DescribeProfiles(state.Profiles), "The profile should be listed again, without a name");
+        Assert.AreSequenceEqual(DescribeProfiles(await store.ListProfilesAsync(TestContext.CancellationToken)), DescribeProfiles(state.Profiles), "The profiles should be listed as the store lists them");
+        Assert.AreSequenceEqual(DescribeTick(later), DescribeTick(read?.LatestTick), "The later tick should be the profile's state");
+        Assert.AreSequenceEqual(_expectedIslandsAfterDeletion, DescribeIslands(read?.Islands ?? []), "Only the later tick's island should be listed");
     }
 
     /// <summary>
