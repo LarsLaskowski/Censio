@@ -113,6 +113,20 @@ public sealed class ServerStore
                           cancellationToken);
     }
 
+    // Skeleton: removed with the implementation
+#pragma warning disable S2325, RH2003
+    /// <summary>
+    /// Deletes a profile with its history.
+    /// </summary>
+    /// <param name="profileId">The profile identity</param>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>The result of the deletion</returns>
+    public Task<HistoryResult> DeleteProfileAsync(Guid profileId, CancellationToken cancellationToken)
+    {
+        throw new NotImplementedException();
+    }
+#pragma warning restore S2325, RH2003
+
     /// <summary>
     /// Reads a tick.
     /// </summary>

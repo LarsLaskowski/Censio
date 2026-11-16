@@ -15,7 +15,7 @@ partial class CensioDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261113143019_InitialSchema";
+    public override string LastMigrationId => "20261116122234_AddHistory";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -38,6 +38,209 @@ partial class CensioDbContextModelSnapshot : ModelSnapshot
                 b.HasKey("Id");
 
                 b.ToTable("Catalog");
+            });
+
+        modelBuilder.Entity("Censio.Server.Data.DeletedProfileRow", b =>
+            {
+                b.Property<Guid>("TombstoneId")
+                    .HasColumnType("TEXT");
+
+                b.HasKey("TombstoneId");
+
+                b.ToTable("DeletedProfiles");
+            });
+
+        modelBuilder.Entity("Censio.Server.Data.FoldedTickRow", b =>
+            {
+                b.Property<long>("Number")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("INTEGER");
+
+                b.Property<Guid>("Id")
+                    .HasColumnType("TEXT");
+
+                b.Property<long>("PointNumber")
+                    .HasColumnType("INTEGER");
+
+                b.HasKey("Number");
+
+                b.HasIndex("Id")
+                    .IsUnique();
+
+                b.HasIndex("PointNumber");
+
+                b.ToTable("FoldedTicks");
+            });
+
+        modelBuilder.Entity("Censio.Server.Data.HourlyEntryRow", b =>
+            {
+                b.Property<long>("Id")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("INTEGER");
+
+                b.Property<int>("AverageProductivityCount")
+                    .HasColumnType("INTEGER");
+
+                b.Property<double>("AverageProductivitySum")
+                    .HasColumnType("REAL");
+
+                b.Property<long>("BuildingCountSum")
+                    .HasColumnType("INTEGER");
+
+                b.Property<int>("ConsumptionCount")
+                    .HasColumnType("INTEGER");
+
+                b.Property<double>("ConsumptionSum")
+                    .HasColumnType("REAL");
+
+                b.Property<int>("DeltaCount")
+                    .HasColumnType("INTEGER");
+
+                b.Property<double>("DeltaSum")
+                    .HasColumnType("REAL");
+
+                b.Property<int>("EntryCount")
+                    .HasColumnType("INTEGER");
+
+                b.Property<int>("GenerationCount")
+                    .HasColumnType("INTEGER");
+
+                b.Property<double>("GenerationSum")
+                    .HasColumnType("REAL");
+
+                b.Property<long>("HourlyIslandId")
+                    .HasColumnType("INTEGER");
+
+                b.Property<int>("IncomeCount")
+                    .HasColumnType("INTEGER");
+
+                b.Property<double>("IncomeSum")
+                    .HasColumnType("REAL");
+
+                b.Property<long>("MaintenanceSum")
+                    .HasColumnType("INTEGER");
+
+                b.Property<int>("PerfectConsumptionCount")
+                    .HasColumnType("INTEGER");
+
+                b.Property<double>("PerfectConsumptionSum")
+                    .HasColumnType("REAL");
+
+                b.Property<int>("PerfectGenerationCount")
+                    .HasColumnType("INTEGER");
+
+                b.Property<double>("PerfectGenerationSum")
+                    .HasColumnType("REAL");
+
+                b.Property<int>("ProductGuid")
+                    .HasColumnType("INTEGER");
+
+                b.Property<long>("ProfitSum")
+                    .HasColumnType("INTEGER");
+
+                b.Property<int>("SummedProductivityCount")
+                    .HasColumnType("INTEGER");
+
+                b.Property<double>("SummedProductivitySum")
+                    .HasColumnType("REAL");
+
+                b.HasKey("Id");
+
+                b.HasIndex("HourlyIslandId", "ProductGuid")
+                    .IsUnique();
+
+                b.ToTable("HourlyEntries");
+            });
+
+        modelBuilder.Entity("Censio.Server.Data.HourlyIslandRow", b =>
+            {
+                b.Property<long>("Id")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("INTEGER");
+
+                b.Property<byte>("AreaIndex")
+                    .HasColumnType("INTEGER");
+
+                b.Property<byte>("IslandId")
+                    .HasColumnType("INTEGER");
+
+                b.Property<string>("Name")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.Property<long>("NameReceiveTicks")
+                    .HasColumnType("INTEGER");
+
+                b.Property<long>("NameTickNumber")
+                    .HasColumnType("INTEGER");
+
+                b.Property<long>("PointNumber")
+                    .HasColumnType("INTEGER");
+
+                b.Property<int>("SessionGuid")
+                    .HasColumnType("INTEGER");
+
+                b.HasKey("Id");
+
+                b.HasIndex("PointNumber", "SessionGuid", "IslandId", "AreaIndex")
+                    .IsUnique();
+
+                b.ToTable("HourlyIslands");
+            });
+
+        modelBuilder.Entity("Censio.Server.Data.HourlyMapPairRow", b =>
+            {
+                b.Property<long>("Id")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("INTEGER");
+
+                b.Property<long>("AmountSum")
+                    .HasColumnType("INTEGER");
+
+                b.Property<long>("EntryId")
+                    .HasColumnType("INTEGER");
+
+                b.Property<int>("Guid")
+                    .HasColumnType("INTEGER");
+
+                b.Property<byte>("Kind")
+                    .HasColumnType("INTEGER");
+
+                b.HasKey("Id");
+
+                b.HasIndex("EntryId", "Kind", "Guid")
+                    .IsUnique();
+
+                b.ToTable("HourlyMapPairs");
+            });
+
+        modelBuilder.Entity("Censio.Server.Data.HourlyPointRow", b =>
+            {
+                b.Property<long>("Number")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("INTEGER");
+
+                b.Property<long>("FirstGameTime")
+                    .HasColumnType("INTEGER");
+
+                b.Property<long>("HourTicks")
+                    .HasColumnType("INTEGER");
+
+                b.Property<long>("LastGameTime")
+                    .HasColumnType("INTEGER");
+
+                b.Property<Guid>("ProfileId")
+                    .HasColumnType("TEXT");
+
+                b.Property<int>("TickCount")
+                    .HasColumnType("INTEGER");
+
+                b.HasKey("Number");
+
+                b.HasIndex("ProfileId", "HourTicks")
+                    .IsUnique();
+
+                b.ToTable("HourlyPoints");
             });
 
         modelBuilder.Entity("Censio.Server.Data.IconRow", b =>

@@ -87,6 +87,70 @@ internal sealed class CensioDbContext : DbContext
                                                 entity.HasIndex(row => row.EntryId);
                                             });
 
+        modelBuilder.Entity<HourlyPointRow>(entity =>
+                                            {
+                                                entity.ToTable("HourlyPoints");
+                                                entity.HasKey(row => row.Number);
+                                                entity.Property(row => row.Number).ValueGeneratedOnAdd();
+                                                entity.HasIndex(row => new
+                                                                       {
+                                                                           row.ProfileId,
+                                                                           row.HourTicks
+                                                                       }).IsUnique();
+                                            });
+
+        modelBuilder.Entity<HourlyIslandRow>(entity =>
+                                             {
+                                                 entity.ToTable("HourlyIslands");
+                                                 entity.HasKey(row => row.Id);
+                                                 entity.HasIndex(row => new
+                                                                        {
+                                                                            row.PointNumber,
+                                                                            row.SessionGuid,
+                                                                            row.IslandId,
+                                                                            row.AreaIndex
+                                                                        }).IsUnique();
+                                             });
+
+        modelBuilder.Entity<HourlyEntryRow>(entity =>
+                                            {
+                                                entity.ToTable("HourlyEntries");
+                                                entity.HasKey(row => row.Id);
+                                                entity.HasIndex(row => new
+                                                                       {
+                                                                           row.HourlyIslandId,
+                                                                           row.ProductGuid
+                                                                       }).IsUnique();
+                                            });
+
+        modelBuilder.Entity<HourlyMapPairRow>(entity =>
+                                              {
+                                                  entity.ToTable("HourlyMapPairs");
+                                                  entity.HasKey(row => row.Id);
+                                                  entity.HasIndex(row => new
+                                                                         {
+                                                                             row.EntryId,
+                                                                             row.Kind,
+                                                                             row.Guid
+                                                                         }).IsUnique();
+                                              });
+
+        modelBuilder.Entity<FoldedTickRow>(entity =>
+                                           {
+                                               entity.ToTable("FoldedTicks");
+                                               entity.HasKey(row => row.Number);
+                                               entity.Property(row => row.Number).ValueGeneratedOnAdd();
+                                               entity.HasIndex(row => row.Id).IsUnique();
+                                               entity.HasIndex(row => row.PointNumber);
+                                           });
+
+        modelBuilder.Entity<DeletedProfileRow>(entity =>
+                                               {
+                                                   entity.ToTable("DeletedProfiles");
+                                                   entity.HasKey(row => row.TombstoneId);
+                                                   entity.Property(row => row.TombstoneId).ValueGeneratedNever();
+                                               });
+
         modelBuilder.Entity<CatalogRow>(entity =>
                                         {
                                             entity.ToTable("Catalog");
