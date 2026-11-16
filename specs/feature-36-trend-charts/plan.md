@@ -102,7 +102,7 @@ Feature: [spec.md](spec.md), AC1 to AC15.
   `Primary`, produced `Success`, deficit `Error` — values of `CensioTheme`'s palettes, which already reach 4.5:1 on
   surface.
 - `MainLayout` cascades its `UiTheme`. `censio.css`: `.censio-chart path.mud-chart-line` animates once per element,
-  0.8 s, `clip-path: inset(0 100% 0 0)` to `inset(0)` with opacity 0 to 1 (pending spec Q8).
+  0.8 s, `clip-path: inset(0 100% 0 0)` to `inset(0)` with opacity 0 to 1 (spec Q8).
 
 Layout of the good page, top to bottom: `h1` good name; `<p>` island link · region link · profile; banner and as-of
 line; `<p>` range line; per chart an `h2` (`mud-typography-h6`) heading, the chart (height 300 px, legend below), then
@@ -118,7 +118,7 @@ the cap line when E6 applies. The overview sits on the island detail between the
   read for an hour's error once a season; one offset for the latest tick, as the as-of line uses.
 - Line colours as CSS variables in the SVG `stroke` attribute — lost: presentation attributes do not resolve `var()`
   reliably; the cascaded theme is certain.
-- Animation by a script — lost: a new script for a style effect; a CSS rule needs none (pending Q8).
+- Animation by a script — lost: a new script for a style effect; a CSS rule needs none (spec Q8, the Product Manager's choice).
 
 ## Affected projects and types
 

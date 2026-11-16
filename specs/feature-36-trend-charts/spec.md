@@ -150,7 +150,7 @@ AC1 to AC3 check the history as stored by the replay, before any retention run.
   the Product Manager, instead of the issue's Blazor-ApexCharts; a new record supersedes record 0025's chart part (N5).
 - Q8: MudBlazor's chart has no animation (plan, fact 4). Options: (a) a style rule of our own reveals each line from
   left to right when a chart is drawn and on each new read, no script; (b) no animation, S5 and AC10 lose it; (c) (a)
-  on the first drawing only. Escalated to the Product Manager; recommendation (a).
+  on the first drawing only. Answered: (a), by the Product Manager ("CSS-Reveal bei jedem Zeichnen") — S5, AC10.
 
 ## Area documents
 
