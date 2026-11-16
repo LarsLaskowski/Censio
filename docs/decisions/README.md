@@ -147,4 +147,7 @@ once in the [area document](../areas/README.md) of the record's area, and the re
 | [0083](0083-history-folded-tick-by-tick-into-hourly-sums-and-counts.md) | The history is folded tick by tick into hourly sums and counts; the latest hour and the tick identities are kept | Accepted | 2026-11-16 |
 | [0084](0084-profile-deleted-in-steps-and-cleared-from-the-file.md) | A profile is deleted at once for its readers, its rows are removed in steps, and the file is cleared of them | Accepted | 2026-11-16 |
 | [0085](0085-deletion-only-from-pages-opened-by-a-trusted-host.md) | A profile's history can be deleted only from a page opened by IP address, as localhost or by a listed host name | Accepted | 2026-11-16 |
+| [0086](0086-charts-drawn-with-mudblazors-own-time-series-chart.md) | Charts are drawn with MudBlazor's own time-series chart, not Blazor-ApexCharts | Proposed | 2026-11-16 |
+| [0087](0087-chart-reads-aggregate-per-point-bounded-in-parts-with-a-product-index.md) | Chart reads aggregate per point, read the newest 2,880 points in parts, and use an index of tick entries by good | Proposed | 2026-11-16 |
+| [0088](0088-charts-show-the-day-up-to-the-latest-tick-with-gaps-after-15-minutes.md) | Charts show the day up to a profile's latest tick and break a line after 15 minutes without a point | Proposed | 2026-11-16 |
 <!-- project:end index -->

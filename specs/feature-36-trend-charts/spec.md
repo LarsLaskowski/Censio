@@ -1,7 +1,7 @@
 # Spec: Trend charts per good, island and region
 
 Source: Issue #36
-Status: Draft
+Status: Approved by Lead
 
 ## Problem
 
@@ -29,9 +29,10 @@ has no caller outside the tests, and no chart package is referenced.
   reload, and the range moves with it.
 - S5: The charts animate when first drawn and when their points change, and take the colours of the shown theme; a theme
   or language switch recolours or retranslates them at once, without a reload.
-- S6: Hovering a point shows a tooltip: the time as `yyyy-MM-dd HH:mm` in the browser's time zone, `Hourly average` /
+- S6: Hovering a point shows a tooltip: the time as `yyyy-MM-dd HH:mm` at the browser's UTC offset for the latest
+  tick (the as-of line's offset; without a usable answer in UTC with ` UTC`), `Hourly average` /
   `Stundenmittel` for an hourly point, and each line's value formatted as *Number formats* of `web-pages.md` (delta
-  signed, the overview's counts whole), `–` for no value. The time axis's labels are in the browser's time zone too.
+  signed, the overview's counts whole), `–` for no value. The time axis's labels, `HH:mm`, use the same offset.
 - S7: Where data is missing the line is interrupted, never drawn to zero: at a point without the line's value, and
   between two points when the later starts more than 15 minutes after the earlier ends (a tick ends at its time, an
   hourly point one hour after its start). In the fixture as stored, before any fold, the 18-minute pause is such a gap
@@ -74,7 +75,7 @@ has no caller outside the tests, and no chart package is referenced.
   not the pages' profile reader (record 0074), so a long chart read never leaves the other pages on `Loading…`; a
   page's reads are cancelled with the page.
 - N3: Time: at the contract's bounds (256 islands of 512 entries per tick) each read of N2 over 2,880 points finishes
-  within 10 seconds, measured as `history.md` (*Measurements*) measures. On the in-memory database, where every read
+  within 10 seconds, measured as `history.md` (*Measurements*) measures on ticks at the bounds and scaled to 2,880. On the in-memory database, where every read
   takes the write gate, a chart read holds that gate no longer than a fold step at the bounds does (about 4 seconds),
   so the ingest still acknowledges within the Companion's 30 seconds (record 0068).
 - N4: Safety: no name reaches the chart as markup (E7); line names, headings and notes are fixed texts of `UiTexts`.
@@ -83,7 +84,7 @@ has no caller outside the tests, and no chart package is referenced.
   S7 and the animation of S5 stay required; the plan verifies that MudBlazor's chart draws both and, if it does not,
   returns the question to the Product Manager before building (record 0025's chart part superseded, record 0028).
 - N6: Languages: every chart text in English and German from `UiTexts`; no number or time formatted with .NET culture
-  data (record 0072); times in the browser's time zone (record 0078).
+  data (record 0072); times at the browser's UTC offset for the latest tick (record 0078).
 - N7: Look: the chart's text, grid and lines take the theme's palette; each line colour reaches 3:1 against the surface
   in both themes (the *Lines* level of `web-ui.md`, *Contrast*). Desktop browsers only.
 - N8: Logging: the charts log nothing of their own; a failed read is logged without a name or value, as
@@ -147,6 +148,9 @@ AC1 to AC3 check the history as stored by the replay, before any retention run.
 - Q6: Which values? Answered: production, consumption, delta, as the issue names them.
 - Q7: Which chart library, now that ApexCharts is no longer MIT (Challenge M1)? Answered: MudBlazor's own charts, by
   the Product Manager, instead of the issue's Blazor-ApexCharts; a new record supersedes record 0025's chart part (N5).
+- Q8: MudBlazor's chart has no animation (plan, fact 4). Options: (a) a style rule of our own reveals each line from
+  left to right when a chart is drawn and on each new read, no script; (b) no animation, S5 and AC10 lose it; (c) (a)
+  on the first drawing only. Escalated to the Product Manager; recommendation (a).
 
 ## Area documents
 
