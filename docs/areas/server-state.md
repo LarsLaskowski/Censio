@@ -76,6 +76,19 @@ itself is in [`server-data.md`](server-data.md), what the ingest answers in [`in
   `The current state cannot be read from the database '<file>'; the server stops.` with the exception (the path is left
   out for an in-memory database). A database written before this feature is read as it is; the schema is unchanged.
 
+### Deleting a profile
+
+- Deleting a profile's history ([`history.md`](history.md)) takes the state's write gate like a stored message, has the
+  store delete the profile, and, once the store reports it done, reads the profile list and the two held profiles again
+  from the database as the restore does (the catalog stays, the marks of a failed island read are dropped). The deleted
+  profile is then neither listed nor held, the profile that follows it by its latest tick is held in its place, and the
+  followers are told that the profile changed. A profile that is already gone changes nothing and tells no one.
+- The deletion counts as done once the store reports it: the read afterwards is not cancelled, and when it fails the
+  server logs the error line of *Logging* and drops the profile from the held list, the held states and the marks in
+  memory instead; the followers are told and the caller gets the store's result. The held profiles can then miss the
+  profile that would have followed, until the next tick or restart.
+- A tick of the deleted profile that arrives later creates it again without a name ([`history.md`](history.md)).
+
 ### Catalog
 
 - The server keeps one catalog, the one last uploaded, for every profile; an older upload replaces a newer one.
@@ -166,10 +179,11 @@ anyone who reaches the server ([`web-pages.md`](web-pages.md)).
 - [`decisions/0070`](../decisions/0070-hello-names-the-stored-catalog-only-when-all-its-icons-are-stored.md) — the hello names the catalog only when all its icons are stored.
 - [`decisions/0074`](../decisions/0074-pages-keep-derived-views-and-read-unheld-profiles-one-at-a-time.md) — the pages read profiles that are not held one at a time and keep only derived views.
 - [`decisions/0075`](../decisions/0075-companion-connection-and-game-state-held-in-the-server-state.md) — the Companion's connection and game state are held in the server state and announced.
+- [`decisions/0084`](../decisions/0084-profile-deleted-in-steps-and-cleared-from-the-file.md) — a deleted profile is gone for its readers at once, its rows are removed in steps.
 
 ## Not here
 
 - Storing, the schema and the database file: [`server-data.md`](server-data.md).
 - What the ingest answers and when it closes: [`ingest.md`](ingest.md).
 - The pages, the profile switch and the banner that show it: [`web-pages.md`](web-pages.md), [`web-ui.md`](web-ui.md).
-- Retention and deleting a profile with its held state (#35).
+- Retention, deleting a profile's history in the database and the retention job: [`history.md`](history.md).

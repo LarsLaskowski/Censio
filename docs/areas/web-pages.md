@@ -4,14 +4,14 @@
 
 The server's data pages: the region overview, the island list of a region, the island detail with its goods table, the
 key figures, names and their fallbacks, the number and time formats, the row and profile limits, the live updates, the
-as-of line and the banner, the addresses and their failures, the bounded reads of profiles, the icon route and what is
-logged. Users of the web application rely on it.
+as-of line and the banner, the addresses and their failures, the bounded reads of profiles, the icon route, deleting a
+profile's history with the host rule that guards it, and what is logged. Users of the web application rely on it.
 
 ## Behavior
 
 ### Pages and routes
 
-- Four routes show data, all inside the frame of [`web-ui.md`](web-ui.md), none needs a login ([record 0006](../decisions/0006-server-plain-http-and-open-health.md)):
+- Four routes show data, all inside the frame of [`web-ui.md`](web-ui.md), none needs a login ([record 0006](../decisions/0006-server-plain-http-and-open-health.md); only the deletion of a profile's history has a rule of its own, *Deleting a profile's history*):
 
   | Route | Page |
   | ----- | ---- |
@@ -151,6 +151,41 @@ text and is not retried until the page is loaded again: a notice of the server s
   Profile`. It chooses only what the pages show; the Companion still chooses which profile receives ticks
   (record 0041).
 
+### Deleting a profile's history
+
+- `/profiles/{profile}/regions` shows, after the as-of line and in every state but `Not found.`, the outlined button
+  `Delete history` / `Verlauf löschen` in the error colour. `/regions`, which follows the newest profile, shows none, so
+  a click never meets a profile that moved on.
+- The button opens a dialog `Delete history?` / `Verlauf löschen?` with the text of [`web-ui.md`](web-ui.md) (*Texts*),
+  `<name>` being the profile's shown name as in the profile switch (`Unnamed profile` / `Unbenanntes Profil` without
+  one), and the buttons `Cancel` / `Abbrechen` and `Delete` / `Löschen`. Only `Delete` deletes, and it deletes the
+  profile whose identity and name the dialog took when it opened, never another, also when the page has moved on
+  meanwhile. `Delete` is disabled while the deletion runs.
+- A deletion that is done, or that finds the profile already gone (two browsers), closes the dialog and goes to
+  `/regions`. A failed deletion keeps the dialog open and adds a second paragraph `The history could not be deleted.` /
+  `Der Verlauf konnte nicht gelöscht werden.`; the exception goes to the log of the retention job, never to the page
+  ([`history.md`](history.md)). After a deletion a page that shows the profile shows `Not found.`, and the profile switch
+  no longer lists it ([`server-state.md`](server-state.md), *Deleting a profile*).
+- **Host rule.** The server decides when it renders a page, from the request's host and the setting `AllowedHosts`
+  ([`server.md`](server.md)), whether the page may delete, and hands the answer to the interactive page in the root
+  parameters that ASP.NET Core protects with the data-protection key ring, so the browser cannot change it (record 0085).
+  A host is trusted when it is an IPv4 or IPv6 address, or `localhost` (letter case ignored; `localhost.` and
+  `foo.localhost` are not), or a name `AllowedHosts` lists: an entry equal to the host ignoring letter case, or
+  `*.<domain>` for a host that ends with `.<domain>` (`example.com` is not matched by `*.example.com`). `AllowedHosts`
+  unset, empty or `*` lists no name. A request without a host, or a page rendered without an HTTP request, is not trusted.
+- On a page whose host is not trusted the button is disabled and the text `Deleting needs this page opened by IP address
+  or as localhost, or by a host name the setting AllowedHosts lists.` / `Löschen setzt voraus, dass diese Seite über die
+  IP-Adresse oder localhost geöffnet wurde, oder über einen Hostnamen, den die Einstellung AllowedHosts nennt.` follows it
+  on the same line; the page's handlers check the answer again, so no event of such a page deletes.
+- **Behind a reverse proxy** the rule sees the host the proxy sends. A proxy that replaces `Host` by an address or by a
+  listed name (nginx's default `$proxy_host`) makes every page it serves trusted, the pages of a DNS-rebinding attack
+  included; the proxy must pass the client's host (nginx: `proxy_set_header Host $host;`) and answer only its own names,
+  which `AllowedHosts` lists. `X-Forwarded-Host` is not read; it would be no safer.
+- Interactive pages are answered with `Content-Security-Policy: frame-ancestors 'self'` (ASP.NET Core's own header), so a
+  page of another site cannot show a trusted page in a frame and have its button clicked; a test pins the header.
+- Anyone who reaches the server by its address can delete the history of any profile; restricting who reaches the port
+  stays the remedy (`SECURITY.md`).
+
 ### Icon route
 
 - `GET /icons/{reference}` answers `200` with the stored PNG when `reference` is exactly 64 characters of `0-9a-f`
@@ -165,8 +200,9 @@ text and is not retried until the page is loaded again: a notice of the server s
 
 ### Logging
 
-The pages log nothing of their own. A failed read of a profile is logged by the server state without a name or a value
-([`server-state.md`](server-state.md), *Logging*); an address, a name, a figure and the browser's offset are never
+The pages log nothing of their own, a deletion included: the retention job logs it without a name
+([`history.md`](history.md), *Log lines*). A failed read of a profile is logged by the server state without a name or a
+value ([`server-state.md`](server-state.md), *Logging*); an address, a name, a figure and the browser's offset are never
 logged.
 
 ## Limits and errors
@@ -224,10 +260,12 @@ logged.
 - [`decisions/0076-icons-served-by-content-hash-after-a-png-header-check.md`](../decisions/0076-icons-served-by-content-hash-after-a-png-header-check.md) — icons are served by their content hash after a PNG header check.
 - [`decisions/0077-page-address-carries-the-shown-profile.md`](../decisions/0077-page-address-carries-the-shown-profile.md) — the page address carries the shown profile.
 - [`decisions/0078-times-shown-at-the-browsers-utc-offset.md`](../decisions/0078-times-shown-at-the-browsers-utc-offset.md) — times are shown at the browser's UTC offset for the instant.
+- [`decisions/0085-deletion-only-from-pages-opened-by-a-trusted-host.md`](../decisions/0085-deletion-only-from-pages-opened-by-a-trusted-host.md) — the deletion of a profile's history only from a page opened by a trusted host.
 
 ## Not here
 
 - The frame, the theme, the language and the profile switch's look: [`web-ui.md`](web-ui.md).
 - The state the pages read, its memory and its followers: [`server-state.md`](server-state.md).
 - What the Companion sends and how it is stored: [`ingest.md`](ingest.md), [`contract.md`](contract.md).
-- Deficits and surpluses per region, efficiency, economics, workforce, search, trends and history, the phone layout and sorting by column: later features (#47 to #51, #35 to #38, #53).
+- The stored history, the series read and the deletion's rules: [`history.md`](history.md).
+- Deficits and surpluses per region, efficiency, economics, workforce, search, charts of the history, the phone layout and sorting by column: later features (#47 to #51, #36 to #38, #53).

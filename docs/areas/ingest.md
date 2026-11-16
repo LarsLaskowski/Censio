@@ -269,7 +269,7 @@ unset, none of the file checks runs.
 - **The configured file's access rules.** The server neither checks nor changes the mode or owner of the file named by
   `Censio:Ingest:TokenFile`; who can read it is the operator's decision (a swarm secret is `0444`). A FIFO at that path
   blocks the start until it is written.
-- **Growth by a token holder.** Every stored tick, icon and profile stays until retention (#35): a Companion with the token (or anyone, with the token off) can grow the database file, the profile list and a profile's island list (up to 256 new islands per tick) without a bound; the server holds those lists in memory.
+- **Growth by a token holder.** Every stored icon and profile stays, a tick for 7 days and then as hourly rows ([`history.md`](history.md)): a Companion with the token (or anyone, with the token off) can grow the database file, the profile list and a profile's island list (up to 256 new islands per tick) without a bound; the server holds those lists in memory.
 
 ### Memory
 

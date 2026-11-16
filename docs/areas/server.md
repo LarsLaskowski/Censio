@@ -47,7 +47,15 @@ the Docker health probe rely on it.
   Its limits count the TCP peer's address: `ASPNETCORE_FORWARDEDHEADERS_ENABLED` `true` takes the scheme from
   `X-Forwarded-Proto` only, and `X-Forwarded-For` never replaces the client address (record 0082).
   It speaks plain HTTP and WebSocket like the rest.
-- Host filtering is off (`AllowedHosts` is `*`), a deliberate choice (record 0006).
+- Host filtering is off by default (`AllowedHosts` is `*`), a deliberate choice (record 0006). The setting `AllowedHosts`
+  (environment variable `ALLOWEDHOSTS`) is ASP.NET Core's own: a list of host names separated by `;` (the port of a
+  request is ignored), `*.<domain>` for every host of a domain. Listing names turns host filtering on for every request, the health
+  check and the ingest included: a request whose `Host` is not listed answers `400`, so the list must hold every name and
+  address the server is reached by, `127.0.0.1` for the image's health check among them. The same list decides which
+  host names may delete a profile's history ([`web-pages.md`](web-pages.md), *Deleting a profile's history*). Behind a
+  reverse proxy the server sees the `Host` the proxy sends: the proxy must pass the client's host (nginx:
+  `proxy_set_header Host $host;`, not its default `$proxy_host`) and answer only its own names, which `AllowedHosts`
+  lists (record 0085).
 
 ### Data directory and key ring
 
@@ -144,6 +152,7 @@ the Docker health probe rely on it.
 
 - [`decisions/0005-product-version-from-one-build-property.md`](../decisions/0005-product-version-from-one-build-property.md) — the version comes from the build property `Version`.
 - [`decisions/0006-server-plain-http-and-open-health.md`](../decisions/0006-server-plain-http-and-open-health.md) — plain HTTP, no web login, open `/health`, host filtering off.
+- [`decisions/0085-deletion-only-from-pages-opened-by-a-trusted-host.md`](../decisions/0085-deletion-only-from-pages-opened-by-a-trusted-host.md) — the deletion of a profile's history needs a trusted host; `AllowedHosts` and the reverse proxy rule.
 - [`decisions/0007-server-web-assets-independent-of-restore-inputs.md`](../decisions/0007-server-web-assets-independent-of-restore-inputs.md) — the project requests the Blazor scripts itself, so the image contains them.
 - [`decisions/0009-server-image-runs-as-a-fixed-non-root-user.md`](../decisions/0009-server-image-runs-as-a-fixed-non-root-user.md) — user 1654, other UIDs through `--user`, no `VOLUME`.
 - [`decisions/0010-server-image-base-pinned-by-amd64-manifest-digest.md`](../decisions/0010-server-image-base-pinned-by-amd64-manifest-digest.md) — full-version amd64 base tags pinned by digest, the `base.digest` label checked in CI.
