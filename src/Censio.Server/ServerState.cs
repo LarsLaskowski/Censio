@@ -478,6 +478,20 @@ public sealed partial class ServerState : IProfileStateSource
         }
     }
 
+    // Skeleton: removed with the implementation
+#pragma warning disable S1172, S2325, RH2003
+    /// <summary>
+    /// Deletes a profile with its history and rebuilds the held profiles and the profile list.
+    /// </summary>
+    /// <param name="profileId">The profile identity</param>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>The result of the deletion</returns>
+    public Task<HistoryResult> DeleteProfileAsync(Guid profileId, CancellationToken cancellationToken)
+    {
+        throw new NotImplementedException();
+    }
+#pragma warning restore S1172, S2325, RH2003
+
     /// <summary>
     /// Gets the distinct references of the icons of a catalog document, ordinally sorted.
     /// </summary>
