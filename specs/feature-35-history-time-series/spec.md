@@ -23,10 +23,9 @@ hourly averages kept without limit, deletion per profile) and left its details t
   stay as they are.
 - S3: Given a read whose range spans both, then it returns the hourly points of the reduced hours and the ticks of the
   rest in one time order, never a tick together with the hourly point that already holds it.
-- S4: Given a profile in the profile switch, when the operator deletes its history and confirms, then every stored
-  datum of that profile is gone, the profile leaves the switch and the pages without a reload, and the other profiles,
-  the catalog and the icons are untouched. *How the operator starts the deletion is the open question Q1; S4 and AC9
-  are written for the recommended answer.*
+- S4: Given a profile in the profile switch, when the operator chooses `Delete history` on its region
+  overview and confirms the dialog, then every stored datum of that profile is gone, the profile leaves the switch and
+  the pages without a reload, and the other profiles, the catalog and the icons are untouched.
 
 ## Errors and edge cases
 
@@ -115,10 +114,9 @@ hourly averages kept without limit, deletion per profile) and left its details t
 
 ## Open questions
 
-- Q1: How does the operator start a deletion? Not answered — escalated to the Product Manager. Options: (A) a button
-  with confirmation on the profile's region overview, open to everyone who reaches the server like every page (record
-  0006), with N7 added; (B) the same button, shown only when a new server setting allows it, default off; (C) no web
-  action, a server command run while the server is stopped. Recommendation: A.
+- Q1: How does the operator start a deletion? Answered: (Product Manager) option A, a `Delete history` button with a
+  confirmation dialog on the profile's region overview, without login like every page (record 0006), with record 0006
+  revisited so that a page of another site cannot start it (N7, AC9).
 - Q2: Does deleting the history keep the profile and its name? Answered: (Lead) no, "removes it completely" (issue);
   an empty profile would stay in the switch with nothing to show, and replay profiles are what users want gone.
 - Q3: Does an absent workforce or building GUID mean 0? Answered: (Lead) yes for a carried entry: a map is the set of
