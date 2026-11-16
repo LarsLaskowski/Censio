@@ -5,13 +5,15 @@
 The server's data pages: the region overview, the island list of a region, the island detail with its goods table, the
 key figures, names and their fallbacks, the number and time formats, the row and profile limits, the live updates, the
 as-of line and the banner, the addresses and their failures, the bounded reads of profiles, the icon route, deleting a
-profile's history with the host rule that guards it, and what is logged. Users of the web application rely on it.
+profile's history with the host rule that guards it, and what is logged. The good's page and the charts have their own
+document, [`web-charts.md`](web-charts.md); this one holds their route, address and logging rules. Users of the web
+application rely on it.
 
 ## Behavior
 
 ### Pages and routes
 
-- Four routes show data, all inside the frame of [`web-ui.md`](web-ui.md), none needs a login ([record 0006](../decisions/0006-server-plain-http-and-open-health.md); only the deletion of a profile's history has a rule of its own, *Deleting a profile's history*):
+- Five routes show data, all inside the frame of [`web-ui.md`](web-ui.md), none needs a login ([record 0006](../decisions/0006-server-plain-http-and-open-health.md); only the deletion of a profile's history has a rule of its own, *Deleting a profile's history*):
 
   | Route | Page |
   | ----- | ---- |
@@ -19,14 +21,15 @@ profile's history with the host rule that guards it, and what is logged. Users o
   | `/profiles/{profile}/regions` | the region overview of the named profile |
   | `/profiles/{profile}/sessions/{session}` | the island list of the region that holds the session |
   | `/profiles/{profile}/islands/{session}/{island}/{area}` | the goods of one island |
+  | `/profiles/{profile}/islands/{session}/{island}/{area}/goods/{good}` | the trend charts of one good on one island ([`web-charts.md`](web-charts.md)) |
 
 - The profile in an address is a picked profile: it stays until another is picked, and every link a page offers carries
   the profile the page shows, so a reload and a copied address show the same profile ([record 0077](../decisions/0077-page-address-carries-the-shown-profile.md)).
   A region is addressed by its smallest session GUID; the island list shows the region that holds the session of the
   address, whichever of its sessions that is.
 - The browser's tab title of every page is `Censio – <heading>`. The heading is the page's `h1`: `Regions` / `Regionen`
-  on the overview, the region's name on the island list, the island's name on the detail, and `Regions` / `Regionen`
-  while the page shows no data, a loading text or an error text.
+  on the overview, the region's name on the island list, the island's name on the detail, the good's shown name on the
+  good's page, and `Regions` / `Regionen` while the page shows no data, a loading text or an error text.
 - Every name is shown as text, never as markup.
 
 ### Regions
@@ -65,6 +68,8 @@ profile's history with the host rule that guards it, and what is logged. Users o
 ### Island detail
 
 - The heading is the island's name; under it `<region> · <profile>`, the region a link back to its island list.
+- Above the goods table, under the as-of line, the chart `Overview` / `Übersicht` shows the island's key figures over the
+  last 24 hours up to the latest tick ([`web-charts.md`](web-charts.md)).
 - The table lists one row per entry of the island in the latest tick, with the columns (an unlabelled icon column of
   24 pixels, then) `Good`, `Production`, `Consumption`, `Delta`, `Buildings`, `Productivity` (German `Ware`,
   `Produktion`, `Verbrauch`, `Delta`, `Gebäude`, `Produktivität`).
@@ -72,7 +77,8 @@ profile's history with the host rule that guards it, and what is logged. Users o
   name (ordinal, letter case ignored), ties by product GUID. For an island with more entries the line
   `Showing 500 of <n> goods.` / `500 von <n> Waren angezeigt.` follows the table.
 - A good is named by the catalog entry in the shown language, else in the other language, else `Good <GUID>` /
-  `Ware <GUID>` (`UiTexts`, in both languages).
+  `Ware <GUID>` (`UiTexts`, in both languages). The name is a link to the good's page, which charts the good on this
+  island and over its region ([`web-charts.md`](web-charts.md)).
 - A good shows its icon (`<img src="/icons/<reference>" alt="">`) only when the catalog entry names an icon whose PNG the
   server has stored; otherwise the icon cell stays empty.
 - An island the latest tick has no values for (it lacks the island, or the tick is empty) keeps its heading and shows
@@ -202,8 +208,9 @@ text and is not retried until the page is loaded again: a notice of the server s
 
 The pages log nothing of their own, a deletion included: the retention job logs it without a name
 ([`history.md`](history.md), *Log lines*). A failed read of a profile is logged by the server state without a name or a
-value ([`server-state.md`](server-state.md), *Logging*); an address, a name, a figure and the browser's offset are never
-logged.
+value ([`server-state.md`](server-state.md), *Logging*); a failed read of a chart logs the warning `A chart could not be read
+from the database.` with the exception and nothing else ([`web-charts.md`](web-charts.md), *Logging*); an address, a name, a
+figure and the browser's offset are never logged.
 
 ## Limits and errors
 
@@ -213,8 +220,10 @@ logged.
   36-character form of a GUID (`D`), the session an integer of at most ten digits with an optional leading minus, the
   island and the area a byte of at most ten digits, all digits ASCII, nothing else. Any other segment, of any length
   and with any characters, is not found.
-- `Not found.` is shown for an address that matches one of the four routes but names a profile, region or island that
-  is unknown or malformed. The address is neither echoed nor logged. A path that matches none of the routes keeps the
+- The good of the good's page is a session-style integer: at most ten ASCII digits with an optional leading minus.
+- `Not found.` is shown for an address that matches one of the five routes but names a profile, region, island or good
+  that is malformed, or a profile, region or island that is unknown (a well-formed good the island never carried is not
+  unknown, [`web-charts.md`](web-charts.md)). The address is neither echoed nor logged. A path that matches none of the routes keeps the
   empty `404` of [`server.md`](server.md), because the router has no content for it.
 - The icon route reads its reference as *Icon route* says, before any read.
 
@@ -234,7 +243,8 @@ logged.
 - A page keeps only a view: the shown names, the figures per region and island, and the rows of the shown island (at
   most 500 of them). It holds no reference to a profile state once the view is built, held states included. The memory of
   a page is proportional to the island count of its profile, which is unbounded ([`server-state.md`](server-state.md),
-  *Memory*), and a worst island of 92,097 entries shows 500 rows.
+  *Memory*), and a worst island of 92,097 entries shows 500 rows. The reads of the charts are bounded and gated apart
+  from this reader ([`web-charts.md`](web-charts.md), *The reads*); a page keeps the points of its charts besides the view.
 - The bytes of an icon stay in memory after the icon read is released, until the response is written: up to 17,825,792
   bytes for each request in flight ([`contract.md`](contract.md), *Bounds*). The number of requests in flight is not
   limited, like the uploads of an accepted risk of [`ingest.md`](ingest.md) (*Accepted risks*).
@@ -261,6 +271,7 @@ logged.
 - [`decisions/0077-page-address-carries-the-shown-profile.md`](../decisions/0077-page-address-carries-the-shown-profile.md) — the page address carries the shown profile.
 - [`decisions/0078-times-shown-at-the-browsers-utc-offset.md`](../decisions/0078-times-shown-at-the-browsers-utc-offset.md) — times are shown at the browser's UTC offset for the instant.
 - [`decisions/0085-deletion-only-from-pages-opened-by-a-trusted-host.md`](../decisions/0085-deletion-only-from-pages-opened-by-a-trusted-host.md) — the deletion of a profile's history only from a page opened by a trusted host.
+- [`decisions/0086-charts-drawn-with-mudblazors-own-time-series-chart.md`](../decisions/0086-charts-drawn-with-mudblazors-own-time-series-chart.md) — the charts of the good's page and the island overview are MudBlazor's own time-series chart.
 
 ## Not here
 
@@ -268,4 +279,5 @@ logged.
 - The state the pages read, its memory and its followers: [`server-state.md`](server-state.md).
 - What the Companion sends and how it is stored: [`ingest.md`](ingest.md), [`contract.md`](contract.md).
 - The stored history, the series read and the deletion's rules: [`history.md`](history.md).
-- Deficits and surpluses per region, efficiency, economics, workforce, search, charts of the history, the phone layout and sorting by column: later features (#47 to #51, #36 to #38, #53).
+- The charts, their range, gaps, tooltip, colours and reads: [`web-charts.md`](web-charts.md).
+- Deficits and surpluses per region, efficiency, economics, workforce, search, a range picker, sparklines and trend arrows, the phone layout and sorting by column: later features (#37, #38, #47 to #51, #53).

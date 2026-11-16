@@ -29,8 +29,9 @@ data is in [`web-pages.md`](web-pages.md).
   profile` / `Unbenanntes Profil`, and equal shown names are told apart as [`web-pages.md`](web-pages.md) says. The list
   follows the server's profiles without a reload. The switch only chooses what the data pages show; every name is shown
   as text.
-- A page receives the language and the texts that are shown at the moment as cascaded values, so a page follows a
-  language switch without a reload.
+- A page receives the language, the texts and the theme that are shown at the moment as cascaded values, so a page follows
+  a language or theme switch without a reload; the charts take their colours from the cascaded theme
+  ([`web-charts.md`](web-charts.md)).
 
 ### Theme
 
@@ -90,8 +91,8 @@ Colours are fixed by the theme; values not listed keep MudBlazor's defaults.
 | Text secondary | `#5A4F45` | `#C2B5A6` |
 | Action default | `#5A4F45` | `#C2B5A6` |
 | Lines and inputs | `#8A7D70` | `#8F8274` |
-| Error (a negative delta) | `#A4161A` | `#FF8A80` |
-| Success (a positive delta) | `#1B6B2F` | `#7FD08E` |
+| Error (a negative delta, a chart line) | `#A4161A` | `#FF8A80` |
+| Success (a positive delta, a chart line) | `#1B6B2F` | `#7FD08E` |
 
 ### Contrast
 
@@ -103,6 +104,9 @@ Both palettes meet WCAG 2.1 level AA, checked by a unit test for every pair:
 - Lines, icons and focus, 3:1: drawer icon on drawer background; action default and lines and inputs on background and
   surface; focus ring: app bar text on app bar background, primary on drawer background, background and surface.
 - Error and success on surface, 4.5:1 (the colours of the delta in the goods table).
+- The lines of the charts take error, success and secondary colours ([`web-charts.md`](web-charts.md), *Colours*), so they
+  reuse the pairs above on surface (4.5:1) and meet the 3:1 of the *Lines* level; a unit test checks each line colour at 3:1
+  in both themes.
 - The profile switch takes the app bar text colour while it is disabled too (`wwwroot/css/censio.css`), instead of MudBlazor's disabled colour, so its label meets the text level.
 
 ### Focus ring
@@ -110,6 +114,12 @@ Both palettes meet WCAG 2.1 level AA, checked by a unit test for every pair:
 - A control that takes the keyboard focus shows a 2 px outline with a 2 px offset in the primary colour, in the app
   bar in the app bar text colour. It replaces MudBlazor's own focus tint, which reaches only 1.05:1 on the app bar.
   It is defined in `wwwroot/css/censio.css` for everything inside the frame.
+
+### Motion
+
+- The one animation of our own is the reveal of the chart lines (`wwwroot/css/censio.css`, [`web-charts.md`](web-charts.md),
+  *Animation*). The same file switches it off inside `@media (prefers-reduced-motion: reduce)`, so a browser that asks for
+  reduced motion draws the lines at once. MudBlazor's own transitions are not changed.
 
 ### Typography
 
@@ -142,7 +152,8 @@ Both palettes meet WCAG 2.1 level AA, checked by a unit test for every pair:
 The texts come from a table of the application itself (`UiTexts`); the web UI creates no culture and uses no resource
 files or request localization, so both languages render in the Docker image, which runs without culture data
 ([record 0072](../decisions/0072-web-ui-texts-from-an-own-table-without-culture-data.md)). A new page or UI text adds
-its English and German text there and to this table; the texts of the data pages are in [`web-pages.md`](web-pages.md).
+its English and German text there and to this table; the texts of the data pages are in [`web-pages.md`](web-pages.md) and
+those of the charts in [`web-charts.md`](web-charts.md).
 
 ### Resources
 
@@ -150,9 +161,12 @@ its English and German text there and to this table; the texts of the data pages
   sheet and script, `css/censio.css`, `js/censio.js` and the Blazor script. No web font, no CDN, no external request.
 - `js/censio.js` offers three functions: `storePreference` writes a preference cookie, `setDocumentLanguage` sets the
   document language, and `utcOffsetMinutes(isoInstant)` gives the browser's UTC offset in minutes at that instant
-  (`-new Date(isoInstant).getTimezoneOffset()`, daylight saving included), which the as-of line of the data pages asks for
-  ([`web-pages.md`](web-pages.md)). The first two read nothing; the third reads the browser's clock settings and catches
+  (`-new Date(isoInstant).getTimezoneOffset()`, daylight saving included), which the as-of line of the data pages and their
+  charts ask for ([`web-pages.md`](web-pages.md), [`web-charts.md`](web-charts.md)). The first two read nothing; the third reads the browser's clock settings and catches
   nothing.
+- The charts are MudBlazor's own and add no chart package, script or style beyond MudBlazor's; the rule of our own for them
+  is the reveal in `css/censio.css` ([`web-charts.md`](web-charts.md)). A page that shows a chart loads nothing from another
+  site either.
 
 ## Limits and errors
 
@@ -167,7 +181,8 @@ its English and German text there and to this table; the texts of the data pages
 
 ## Related decisions
 
-- [`decisions/0025-mudblazor-and-blazor-apexcharts-light-theme.md`](../decisions/0025-mudblazor-and-blazor-apexcharts-light-theme.md) — MudBlazor is the component library, with a light and a dark theme.
+- [`decisions/0025-mudblazor-and-blazor-apexcharts-light-theme.md`](../decisions/0025-mudblazor-and-blazor-apexcharts-light-theme.md) — MudBlazor is the component library, with a light and a dark theme (its chart part is amended by record 0086).
+- [`decisions/0086-charts-drawn-with-mudblazors-own-time-series-chart.md`](../decisions/0086-charts-drawn-with-mudblazors-own-time-series-chart.md) — the charts are MudBlazor's own, not Blazor-ApexCharts.
 - [`decisions/0071-web-ui-choices-kept-in-browser-cookies-written-by-a-script.md`](../decisions/0071-web-ui-choices-kept-in-browser-cookies-written-by-a-script.md) — the choices live in two cookies written by a script and read at render time.
 - [`decisions/0072-web-ui-texts-from-an-own-table-without-culture-data.md`](../decisions/0072-web-ui-texts-from-an-own-table-without-culture-data.md) — the texts come from an own table, without culture data.
 - [`decisions/0081-pages-resolve-resources-against-a-fixed-document-base.md`](../decisions/0081-pages-resolve-resources-against-a-fixed-document-base.md) — pages resolve their resources against the fixed document base `/`.
