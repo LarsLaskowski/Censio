@@ -30,8 +30,8 @@ after a tick was stored, so the same tick can arrive again.
 
 For the hour of a profile's latest tick: **reduce it like any other** (the pages, which show the latest tick, would show
 nothing for a profile not played for a week) or **keep it at full resolution** (chosen). For a tick that was folded:
-**forget its identity** (a resent tick would count twice) or **keep it in its own table** (chosen, 16 bytes a tick). For
-two entries of one good on one island: **sum them** (wrong for productivity), **keep both by position** (positions are
+**forget its identity** (a resent tick would count twice) or **keep it in its own table** (chosen, about 108 bytes a tick with
+its unique index, measured in [history.md](../areas/history.md)). For two entries of one good on one island: **sum them** (wrong for productivity), **keep both by position** (positions are
 not stable across ticks) or **use the first in stored position** (chosen).
 
 ## Decision
