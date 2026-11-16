@@ -4,6 +4,7 @@ using Censio.Server.Data;
 using MudBlazor.Services;
 
 ServerState? state = null;
+HistoryRetention? retention = null;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,6 +18,7 @@ builder.Services.AddCensioDataProtection();
 builder.Services.AddCensioIngest();
 builder.Services.AddSingleton(_ => state ?? throw new InvalidOperationException("The server state is not restored yet."));
 builder.Services.AddSingleton<IProfileStateSource>(_ => state ?? throw new InvalidOperationException("The server state is not restored yet."));
+builder.Services.AddSingleton(_ => retention ?? throw new InvalidOperationException("The history retention is not created yet."));
 builder.Services.AddSingleton<PageReader>();
 
 var app = builder.Build();
@@ -48,6 +50,11 @@ if (await ServerStateSetup.TryRestoreAsync(state, database.DatabaseFile, app.Log
 {
     return 1;
 }
+
+using var history = new HistoryRetention(state, new HistoryStore(database), TimeProvider.System, app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Censio.Server.History"));
+
+retention = history;
+app.Lifetime.ApplicationStarted.Register(() => history.Start(app.Lifetime.ApplicationStopping));
 
 app.UseWebSockets();
 app.UseAntiforgery();
