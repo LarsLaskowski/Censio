@@ -479,15 +479,33 @@ public sealed partial class ServerState : IProfileStateSource
                 return result;
             }
 
-            var (profiles, held, sequence) = await ReadProfilesAsync(_store, cancellationToken).ConfigureAwait(false);
+            var snapshot = GetSnapshot();
+            var profiles = snapshot.Profiles;
+            var held = snapshot.Held;
 
-            _sequence = sequence;
+            try
+            {
+                // The rows are gone, so the deletion counts as done and the re-read is not cancelled
+                var read = await ReadProfilesAsync(_store, CancellationToken.None).ConfigureAwait(false);
+
+                profiles = read.Profiles;
+                held = read.Held;
+                _sequence = read.Sequence;
+            }
+            catch (SqliteException exception)
+            {
+                LogStateReadFailed(_logger, exception);
+
+                profiles = [.. profiles.Where(profile => profile.Id != profileId)];
+                held = held.Where(pair => pair.Key != profileId).ToDictionary();
+            }
+
             _markedProfiles.Clear();
             Swap(new ServerStateSnapshot
                  {
                      Profiles = profiles,
                      Held = held,
-                     Catalog = GetSnapshot().Catalog
+                     Catalog = snapshot.Catalog
                  });
             Notify(ServerStateChangeKind.Profile, profileId);
 

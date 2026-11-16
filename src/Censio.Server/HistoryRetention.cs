@@ -114,6 +114,7 @@ public sealed partial class HistoryRetention : IDisposable
             return;
         }
 
+        var clearFailed = await ClearRequestedAsync(cancellationToken).ConfigureAwait(false) == false;
         var now = _timeProvider.GetUtcNow();
         var hours = new HashSet<(Guid ProfileId, DateTimeOffset Hour)>();
 
@@ -131,9 +132,9 @@ public sealed partial class HistoryRetention : IDisposable
             return;
         }
 
-        if (Interlocked.Exchange(ref _cleanUpRequested, 0) == 1)
+        if (clearFailed == false)
         {
-            await ClearAsync(cancellationToken).ConfigureAwait(false);
+            await ClearRequestedAsync(cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -322,24 +323,31 @@ public sealed partial class HistoryRetention : IDisposable
     }
 
     /// <summary>
-    /// Clears the deleted history from the database file, and asks for the next run when that cannot finish.
+    /// Clears the deleted history from the database file when a clean-up is requested, and keeps the request when that cannot finish.
     /// </summary>
     /// <param name="cancellationToken">The cancellation token</param>
-    /// <returns>A task that represents the asynchronous operation</returns>
-    private async Task ClearAsync(CancellationToken cancellationToken)
+    /// <returns><see langword="false"/> when the attempt did not finish, otherwise <see langword="true"/></returns>
+    private async Task<bool> ClearRequestedAsync(CancellationToken cancellationToken)
     {
+        if (Interlocked.Exchange(ref _cleanUpRequested, 0) == 0)
+        {
+            return true;
+        }
+
         var result = await _store.ClearDeletedAsync(cancellationToken).ConfigureAwait(false);
 
         if (result.Outcome == HistoryOutcome.Done)
         {
             LogCleared(_logger);
 
-            return;
+            return true;
         }
 
         cancellationToken.ThrowIfCancellationRequested();
         Volatile.Write(ref _cleanUpRequested, 1);
         LogClearIncomplete(_logger, result.Failure);
+
+        return false;
     }
 
     #endregion // Methods
