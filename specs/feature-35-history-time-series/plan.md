@@ -46,30 +46,18 @@ Data tests build ticks with the helpers of `ServerStoreTests` and use a `FakeTim
 | AC4 | HistoryStoreReadSeriesTicksGiveOnePointPerTickOldestFirst, HistoryStoreReadSeriesMissingIslandOrGoodGivesPointWithoutValues, HistoryStoreReadSeriesSpanningFoldedHoursGivesPointsInTimeOrder, HistoryStoreReadSeriesLateTickReturnedBesideHourlyPointUntilFolded, HistoryStoreReadSeriesRangeEndIsExclusive | tests/Censio.Server.Data.Tests/HistoryStoreTests.cs |
 | AC5 | HistoryStoreFoldNextTickFailureLeavesTickWhole, HistoryRetentionRunFoldFailureLogsWarningAndNextRunContinues, HistoryRetentionRunFoldedTicksLogsReducedLine, HistoryRetentionStartRunsAfterStartAndEveryHour, HistoryRetentionStopDuringRunLogsNoWarningAndDisposeWaits | tests/Censio.Server.Data.Tests/HistoryStoreTests.cs, tests/Censio.Server.Tests/HistoryRetentionTests.cs |
 | AC6 | ServerStoreDeleteProfileRemovesProfileAndIslandsAndHidesTicks, HistoryRetentionDeleteProfileDuringFoldsSweepsBeforeNextFoldStep, HistoryStoreSweepNextRemovesEveryRowOfDeletedProfile, HistoryStoreSweepNextKeepsRowsOfRecreatedProfile, ServerStoreDeleteProfileKeepsOtherProfilesCatalogAndIcons, ServerStoreDeleteProfileUnknownProfileChangesNothing | tests/Censio.Server.Data.Tests/ServerStoreTests.cs, tests/Censio.Server.Data.Tests/HistoryStoreTests.cs, tests/Censio.Server.Tests/HistoryRetentionTests.cs |
-| AC7 | ServerStateDeleteProfileDropsHeldStateAndNotifies, ServerStateDeleteProfileHoldsNextNewestProfile, ServerStateStoreTickAfterDeletionCreatesUnnamedProfile, RegionsDeletedProfileShowsNotFound | tests/Censio.Server.Tests/ServerStateTests.cs, tests/Censio.Server.Tests/RegionsTests.cs |
-| AC8 | HistoryStoreClearDeletedLeavesNoNameInFiles, HistoryStoreClearDeletedHeldReadReportsBlocked, HistoryRetentionRunBlockedClearLogsWarningAndNextRunClears | tests/Censio.Server.Data.Tests/HistoryStoreTests.cs, tests/Censio.Server.Tests/HistoryRetentionTests.cs |
+| AC7 | ServerStateDeleteProfileDropsHeldStateAndNotifies, ServerStateDeleteProfileHoldsNextNewestProfile, ServerStateDeleteProfileFailedRebuildDropsProfileAndNotifies, ServerStateStoreTickAfterDeletionCreatesUnnamedProfile, RegionsDeletedProfileShowsNotFound | tests/Censio.Server.Tests/ServerStateTests.cs, tests/Censio.Server.Tests/RegionsTests.cs |
+| AC8 | HistoryStoreClearDeletedLeavesNoNameInFiles, HistoryStoreClearDeletedHeldReadReportsBlocked, HistoryRetentionRunBlockedClearLogsWarningAndNextRunClears, HistoryRetentionRunFailingFoldStillClearsDeletedHistory | tests/Censio.Server.Data.Tests/HistoryStoreTests.cs, tests/Censio.Server.Tests/HistoryRetentionTests.cs |
 | AC9 | RegionsProfileAddressOffersDeleteHistory, RegionsNewestAddressOffersNoDeleteHistory, RegionsDeleteConfirmedDeletesProfileOfDialog, RegionsDeleteCancelledDeletesNothing, RegionsDeleteFailedShowsFailureText, RegionsUntrustedHostDisablesButtonAndIgnoresEvent, DeletionHostRuleIsTrustedDecidesByHostForm, AppPassesDeletionAllowedOfRequestHost, UiTextsForDeletionTextsMatchSpec, ProgramGetDataPageForbidsFramingByOtherSites | tests/Censio.Server.Tests/RegionsTests.cs, tests/Censio.Server.Tests/DeletionHostRuleTests.cs, tests/Censio.Server.Tests/AppTests.cs, tests/Censio.Server.Tests/UiTextsTests.cs, tests/Censio.Server.Tests/ProgramTests.cs |
 | AC10 | HistoryRetentionDeleteProfileLogsLinesWithoutName, HistoryRetentionDeleteProfileFailureLogsWarning | tests/Censio.Server.Tests/HistoryRetentionTests.cs |
 | AC11 | HistoryStoreFoldNextTickWaitingStoreRunsBetweenSteps | tests/Censio.Server.Data.Tests/HistoryStoreTests.cs |
 | AC12 | HistoryStoreReadSeriesRepeatedGoodUsesFirstEntry, HistoryStoreFoldNextTickRepeatedGoodFoldsFirstEntry | tests/Censio.Server.Data.Tests/HistoryStoreTests.cs |
 
-Cases the tests must hold:
-- AC1: the boundary on both sides, with an hour `H` whose end `H + 1 h` is on the hour: at the clock `H + 1 h + 7 d` its
-  tick folds (the end lies exactly 7 days back, spec AC1), at `H + 1 h + 7 d − 1 tick` it does not.
-- AC3: values whose double sums are exact in every order, plus one case with cancelling floats checked against the bound
-  `n × 2^-52 × Σ|x|`.
-- AC6: `ServerStoreDeleteProfileRemovesProfileAndIslandsAndHidesTicks` also asserts that `ReadTickAsync` of a deleted
-  tick's identity gives nothing.
-- AC12: the second entry of the repeated good has other workforce and building GUIDs, and the test asserts they are
-  absent from the hourly point.
-- AC8: a file database in a scratch folder, names unique to the deleted profile (island name and profile name, also
-  renamed once), ticks folded before the deletion; the bytes of `censio.db`, `-wal` and `-shm` searched as UTF-8.
+Cases the tests must hold (the G1 cases are built and pinned by their tests):
 - `DeletionHostRuleIsTrustedDecidesByHostForm` (data rows): `127.0.0.1`, `192.168.1.10`, `[::1]`, `[fe80::1]`,
   `localhost`, `LOCALHOST` → trusted; `evil.example`, `localhost.`, `foo.localhost`, `192.168.1.10.nip.io`, `nas`,
   empty, `null` → not trusted with `AllowedHosts` `*`, unset or empty; `nas` with `nas;127.0.0.1` and
   `censio.example.com` with `*.example.com` → trusted, `example.com` with `*.example.com` → not.
-- AC11: the test holds `ServerDatabase.Gate`, queues a fold step, a `StoreTickAsync` and a second fold step, releases,
-  and asserts the order fold, store, fold.
 
 ## Approach
 
@@ -125,6 +113,10 @@ for the in-memory database) `Done`.
 
 **State.** `ServerState.DeleteProfileAsync(profileId)` takes its write gate, calls the store and, on `Done`, rebuilds
 the held profiles and the profile list as `RestoreAsync` does (catalog kept), then notifies `Profile` with the profile.
+Once the store reported `Done` the deletion counts as done (E9 covers only a failure before the rows are gone): the
+rebuild reads with `CancellationToken.None`, and a `SqliteException` from it is logged as a failed state read and
+replaced by removing the profile from the held list, the held states and the marks in memory; it still notifies and
+returns the store's `Done` (lead decision, G2).
 
 **Job** (`HistoryRetention`, logger category `Censio.Server.History`). `Start` begins one loop on the injected
 `TimeProvider`: a run at once, then one an hour after each run ends, and one more whenever a deletion asks; runs never
@@ -134,10 +126,13 @@ first (fact 22), and calls `Start` from `ApplicationStarted`, so the start never
 loop and waits for it to end; a step cut off by that cancellation rolls back and logs nothing. A run:
 1. Sweep steps until `NothingToDo`; a failed step logs the clean-up warning (E10) with the exception and ends the run.
 2. Per profile of `ServerStore.ListProfilesAsync`, fold steps until `NothingToDo`; a failed step logs the E6 warning
-   and ends the run. Before each fold step the run checks for a deletion asked meanwhile and, if one is, does steps 1
-   and 3 first, so a deletion waits at most for one fold step, not for a backlog of folds (N6). Counts distinct (profile, hour) pairs and ticks; logs the reduced line when ticks > 0.
-3. When this run swept a step or a deletion asked for it: `ClearDeletedAsync`; `Done` logs the cleared line, `Blocked`
-   or `Failed` the clean-up warning (with the exception when failed) and keeps the request for the next run.
+   and ends the run. Before each fold step the run checks for a deletion asked meanwhile and, if one is, does step 1
+   first, so a deletion waits at most for one fold step, not for a backlog of folds (N6). Counts distinct (profile, hour) pairs and ticks; logs the reduced line when ticks > 0
+   (after the E6 warning when a later step failed).
+3. When a clean-up is requested (a swept step or a deletion): `ClearDeletedAsync` right after step 1, before any fold,
+   and again after step 2 when that completed; `Done` logs the cleared line, `Blocked` or `Failed` the clean-up warning
+   (with the exception when failed) and keeps the request for the next run, so a fold that keeps failing never holds
+   back the clean-up (N5, E10).
 
 `HistoryRetention.DeleteProfileAsync` calls `ServerState.DeleteProfileAsync`, logs the deleted line on `Done` or the
 deletion warning on `Failed` (nothing for `NothingToDo`), asks for a run with clean-up and returns the outcome. Log
@@ -241,7 +236,9 @@ and an `IConfiguration`, and cascades `DeletionAllowed`; `UiTextsTests` that enu
 ones; `CensioDbContextFactoryCreateDbContextHasNoPendingModelChanges` passes once the migration exists (Dev). A test that
 stores and reads ticks keeps its inputs: no stored tick is older than 7 days unless a test makes it so.
 
-Files no unit test can cover: none (generated migration code, row classes: as `InitialSchema`'s).
+Files no unit test can cover: none (generated migration code, row classes: as `InitialSchema`'s). Accepted uncovered
+lines: the retention factory's guard in `Program.cs` (as the state's); the held-state condition in
+`ServerState.ReadProfilesAsync` whose false branch needs a tick removed between two reads the write gate serializes.
 
 ## Areas
 
