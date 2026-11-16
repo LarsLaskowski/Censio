@@ -133,6 +133,29 @@ public abstract class DataPageBase : ComponentBase, IDisposable
     protected abstract bool IsKnown(ProfileView view);
 
     /// <summary>
+    /// Reads what a page shows beyond the profile's view, once the view is ready.
+    /// </summary>
+    /// <param name="view">The view</param>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>A task that completes when the details are read</returns>
+#pragma warning disable RH2003 // Skeleton: removed with the implementation
+    protected virtual Task ReadDetailsAsync(ProfileView view, CancellationToken cancellationToken)
+    {
+        throw new NotImplementedException();
+    }
+#pragma warning restore RH2003
+
+    /// <summary>
+    /// Clears what <see cref="ReadDetailsAsync" /> read.
+    /// </summary>
+#pragma warning disable RH2003 // Skeleton: removed with the implementation
+    protected virtual void ClearDetails()
+    {
+        throw new NotImplementedException();
+    }
+#pragma warning restore RH2003
+
+    /// <summary>
     /// Gives the shown name of the profile.
     /// </summary>
     /// <param name="view">The view</param>

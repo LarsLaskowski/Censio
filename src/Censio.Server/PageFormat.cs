@@ -42,6 +42,19 @@ public static class PageFormat
     }
 
     /// <summary>
+    /// Formats a rate.
+    /// </summary>
+    /// <param name="value">The value</param>
+    /// <param name="language">The language</param>
+    /// <returns>The text</returns>
+#pragma warning disable RH2003 // Skeleton: removed with the implementation
+    public static string Rate(double? value, UiLanguage language)
+    {
+        throw new NotImplementedException();
+    }
+#pragma warning restore RH2003
+
+    /// <summary>
     /// Formats a delta, with its sign.
     /// </summary>
     /// <param name="value">The value</param>
@@ -58,6 +71,19 @@ public static class PageFormat
 
         return Localize(rounded > 0 ? "+" + Group(rounded) : Group(rounded), language);
     }
+
+    /// <summary>
+    /// Formats a delta, with its sign.
+    /// </summary>
+    /// <param name="value">The value</param>
+    /// <param name="language">The language</param>
+    /// <returns>The text</returns>
+#pragma warning disable RH2003 // Skeleton: removed with the implementation
+    public static string Delta(double? value, UiLanguage language)
+    {
+        throw new NotImplementedException();
+    }
+#pragma warning restore RH2003
 
     /// <summary>
     /// Formats a percentage.
