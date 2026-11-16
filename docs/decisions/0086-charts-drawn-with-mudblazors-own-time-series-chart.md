@@ -36,7 +36,7 @@ package or chart script is added. The rules of the charts are in [`web-charts.md
 ## Consequences
 
 - No new dependency and no new script; the page's resources stay those of [`web-ui.md`](../areas/web-ui.md).
-- MudBlazor draws no animation: the charts' animation is a style rule of our own, if the Product Manager keeps it
-  (#36, spec Q8).
+- MudBlazor draws no animation: a style rule of our own reveals each line when a chart is drawn, as the Product
+  Manager chose; no script is added for it.
 - One value axis per chart: the overview's buildings and goods counts share it.
 - A MudBlazor update can change the chart's markup; the page tests pin what the charts must show.
