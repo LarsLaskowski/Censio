@@ -95,10 +95,10 @@ public sealed class TrendSeriesBuilderTests
 
         // Assert
         var production = series[0].Data.Points;
-        var describedPairs = Enumerable.Range(1, view.Points.Count - 2).Select(index => Describe(view, production, index)).ToList();
+        var describedPairs = Enumerable.Range(1, view.Points.Count - 3).Select(index => Describe(view, production, index)).ToList();
         var valuedMinimum = production.Where(point => point.HasValue).Min(point => point.Y);
         var valuedMaximum = production.Where(point => point.HasValue).Max(point => point.Y);
-        var expectedPairs = Enumerable.Range(1, view.Points.Count - 2).Select(index => index == BeforePause ? "interrupted" : "joined").ToList();
+        var expectedPairs = Enumerable.Range(1, view.Points.Count - 3).Select(index => index == BeforePause ? "interrupted" : "joined").ToList();
 
         Assert.HasCount(_lineNames.Length, series, "A chart should have a series for each line");
         Assert.HasCount(33, view.Points, "The fixture should hold 33 ticks");

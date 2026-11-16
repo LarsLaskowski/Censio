@@ -19,7 +19,7 @@ namespace Censio.Server.Tests;
 /// Tests for the trend chart of a data page, <see cref="TrendChart" />.
 /// </summary>
 [TestClass]
-public sealed class TrendChartTests
+public sealed partial class TrendChartTests
 {
     #region Constants
 
@@ -221,6 +221,54 @@ public sealed class TrendChartTests
     }
 
     /// <summary>
+    /// A chart without a receive time asks the browser for no offset and shows its times in UTC.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC9")]
+    public async Task TrendChartWithoutAsOfShowsUtcTimes()
+    {
+        // Arrange
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken);
+
+        host.Context.JSInterop.Setup<int>(UtcOffsetMinutes, _ => true).SetResult(60);
+
+        var chart = RenderChart(host, UiLanguage.English, TrendKind.Good, CreateRead(TooltipView(TrendKind.Good)), null, 1);
+
+        await chart.WaitForAssertionAsync(() => Assert.HasCount(9, chart.FindAll(PointSelector), "The chart should be drawn"), PageTestHost.WaitBound);
+
+        // Act
+        await chart.FindAll(PointSelector)[1].TriggerEventAsync("onmouseover", new MouseEventArgs());
+
+        // Assert
+        Assert.Contains("2026-11-13 11:02 UTC", chart.Find(".mud-charts-tooltip").TextContent, "The time should be shown in UTC when there is no receive time to ask the offset at");
+    }
+
+    /// <summary>
+    /// A chart of one point shows the tooltip of that point.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC9")]
+    public async Task TrendChartSinglePointShowsTooltip()
+    {
+        // Arrange
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken);
+
+        host.Context.JSInterop.Setup<int>(UtcOffsetMinutes, _ => true).SetResult(60);
+
+        var chart = RenderChart(host, UiLanguage.English, TrendKind.Good, CreateRead(TickView(1, 1)), _asOf, 1);
+
+        await chart.WaitForAssertionAsync(() => Assert.IsNotEmpty(chart.FindAll(PointSelector), "The chart should be drawn"), PageTestHost.WaitBound);
+
+        // Act
+        await chart.FindAll(PointSelector)[0].TriggerEventAsync("onmouseover", new MouseEventArgs());
+
+        // Assert
+        Assert.Contains("Production: 1.50", chart.Find(".mud-charts-tooltip").TextContent, "The tooltip of the only point should show its values");
+    }
+
+    /// <summary>
     /// The chart's lines and legend carry the palette of the shown theme, in line order, and the chart sits in the element
     /// whose style animates the lines.
     /// </summary>
@@ -249,7 +297,7 @@ public sealed class TrendChartTests
         var expected = TrendPalette.For(kind, theme).ToList();
 
         Assert.AreSequenceEqual(expected, chart.FindAll("path.mud-chart-line").Select(line => line.GetAttribute("stroke")!).ToList(), $"The lines should take the {theme} palette in line order");
-        Assert.AreSequenceEqual(expected, chart.FindAll(".mud-chart-legend-marker").Select(marker => Regex.Match(marker.GetAttribute("style") ?? string.Empty, "background-color:\\s*([^;]+)").Groups[1].Value.Trim()).ToList(), $"The legend should take the {theme} palette in line order");
+        Assert.AreSequenceEqual(expected, chart.FindAll(".mud-chart-legend-marker").Select(marker => MarkerColor().Match(marker.GetAttribute("style") ?? string.Empty).Groups[1].Value.Trim()).ToList(), $"The legend should take the {theme} palette in line order");
         Assert.HasCount(1, chart.FindAll(".censio-chart svg.mud-chart-line"), "The chart should sit in the element that animates its lines");
     }
 
@@ -304,8 +352,8 @@ public sealed class TrendChartTests
 
         Assert.IsNotEmpty(valueLabels, "The value axis should have labels");
         Assert.IsNotEmpty(timeLabels, "The time axis should have labels");
-        Assert.IsTrue(valueLabels.All(label => label.LocalName == "text" && Regex.IsMatch(label.TextContent, "^[0-9.,+\\-–]+$")), $"Each value label should be a number: {string.Join(" ", valueLabels.Select(label => label.OuterHtml))}");
-        Assert.IsTrue(timeLabels.All(label => label.LocalName == "text" && Regex.IsMatch(label.TextContent, "^[0-9]{2}:[0-9]{2}$")), $"Each time label should be an hour and minute: {string.Join(" ", timeLabels.Select(label => label.OuterHtml))}");
+        Assert.IsTrue(valueLabels.All(label => label.LocalName == "text" && NumberText().IsMatch(label.TextContent)), $"Each value label should be a number: {string.Join(" ", valueLabels.Select(label => label.OuterHtml))}");
+        Assert.IsTrue(timeLabels.All(label => label.LocalName == "text" && TimeText().IsMatch(label.TextContent)), $"Each time label should be an hour and minute: {string.Join(" ", timeLabels.Select(label => label.OuterHtml))}");
     }
 
     /// <summary>
@@ -414,6 +462,27 @@ public sealed class TrendChartTests
                                                                .Add(component => component.AsOf, asOf)
                                                                .Add(component => component.ReadNumber, readNumber));
     }
+
+    /// <summary>
+    /// Gets the expression of the background color of a legend marker.
+    /// </summary>
+    /// <returns>The expression</returns>
+    [GeneratedRegex("background-color:\\s*([^;]+)")]
+    private static partial Regex MarkerColor();
+
+    /// <summary>
+    /// Gets the expression of a value label: a signed number.
+    /// </summary>
+    /// <returns>The expression</returns>
+    [GeneratedRegex("^[0-9.,+\\-–]+$")]
+    private static partial Regex NumberText();
+
+    /// <summary>
+    /// Gets the expression of a time label: an hour and a minute.
+    /// </summary>
+    /// <returns>The expression</returns>
+    [GeneratedRegex("^[0-9]{2}:[0-9]{2}$")]
+    private static partial Regex TimeText();
 
     #endregion // Methods
 }

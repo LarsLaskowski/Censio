@@ -7,6 +7,7 @@ using Bunit.TestDoubles;
 using Censio.Contracts;
 using Censio.Server.Components.Layout;
 using Censio.Server.Components.Pages;
+using Censio.Server.Data;
 
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Rendering;
@@ -39,6 +40,16 @@ public sealed class IslandDetailTests
     /// The index of the delta cell in a row.
     /// </summary>
     private const int DeltaCell = 4;
+
+    /// <summary>
+    /// The selector of the drawn charts.
+    /// </summary>
+    private const string ChartSelector = "svg.mud-chart-line";
+
+    /// <summary>
+    /// How long the test waits to see that nothing changes, in milliseconds.
+    /// </summary>
+    private const int NegativeWaitMilliseconds = 400;
 
     #endregion // Constants
 
@@ -233,6 +244,132 @@ public sealed class IslandDetailTests
         await page.WaitForAssertionAsync(() => Assert.Contains("No values for this island in the latest tick.", PageTestHost.Text(page), "An island without values should show the no-values text"), PageTestHost.WaitBound);
         Assert.IsEmpty(page.FindAll("table"), "An island without values should show no table");
         Assert.AreEqual("Isle A", page.Find("h1").TextContent.Trim(), "The heading should still name the island");
+    }
+
+    /// <summary>
+    /// The island's overview chart is drawn from the read of its key figures.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC3")]
+    public async Task IslandDetailOverviewReadDrawsChart()
+    {
+        // Arrange
+        var fake = new FakeHistoryTrends
+                   {
+                       FiguresTrend = CreateFiguresTrend(3)
+                   };
+
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken, trends: fake);
+
+        await StoreIslandAsync(host, "Isle A", PageTestHost.Entry(1001, 1f, 1f, 0f, 1, 100f));
+
+        // Act
+        var page = RenderIsland(host, UiLanguage.English);
+
+        // Assert
+        await page.WaitForAssertionAsync(() => Assert.HasCount(1, page.FindAll(ChartSelector), "The overview chart should be drawn"), PageTestHost.WaitBound);
+        Assert.HasCount(1, fake.FiguresQueries, "The overview should be read once");
+    }
+
+    /// <summary>
+    /// After the overview read failed, the chart shows the reload text, the goods table stays, and a notice of the server
+    /// state reads no overview again.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public async Task IslandDetailOverviewFailedReadShowsReloadTextAndReadsNoMore()
+    {
+        // Arrange
+        var fake = new FakeHistoryTrends
+                   {
+                       Failure = new InvalidOperationException("The history is gone")
+                   };
+
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken, trends: fake);
+
+        await StoreIslandAsync(host, "Isle A", PageTestHost.Entry(1001, 1f, 1f, 0f, 1, 100f));
+
+        var page = RenderIsland(host, UiLanguage.English);
+
+        await page.WaitForAssertionAsync(() => Assert.Contains(UiTexts.For(UiLanguage.English).ReadFailed, PageTestHost.Text(page), "The chart should show the reload text"), PageTestHost.WaitBound);
+
+        var callsAfterFailure = fake.CallCount;
+
+        // Act
+        await host.StoreTicksAsync(PageTestHost.Tick(_profile, 120, PageTestHost.Island(Session, 1, "Isle A", PageTestHost.Entry(1001, 2f, 1f, 0f, 1, 100f))));
+        await Task.Delay(NegativeWaitMilliseconds, TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(callsAfterFailure, fake.CallCount, "A notice should not read the overview again after a read failed");
+        Assert.IsEmpty(page.FindAll(ChartSelector), "No chart should be drawn after a failed read");
+        Assert.HasCount(1, page.FindAll("table"), "The goods table should still be shown");
+    }
+
+    /// <summary>
+    /// An overview read that ends after the page moved to another island is dropped: the chart of the new island is shown once.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC8")]
+    public async Task IslandDetailOverviewReadOfIslandLeftBehindIsDropped()
+    {
+        // Arrange
+        var fake = new FakeHistoryTrends
+                   {
+                       FiguresTrend = CreateFiguresTrend(3)
+                   };
+
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken, trends: fake);
+
+        await host.StoreTicksAsync(PageTestHost.Tick(_profile, 0, PageTestHost.Island(Session, 1, "Isle A", PageTestHost.Entry(1001, 1f, 1f, 0f, 1, 100f)), PageTestHost.Island(Session, 2, "Isle B", PageTestHost.Entry(1001, 1f, 1f, 0f, 1, 100f))));
+
+        fake.Hold();
+
+        var page = RenderIsland(host, UiLanguage.English);
+
+        await fake.WaitForCallsAsync(1, PageTestHost.WaitBound, TestContext.CancellationToken);
+
+        page.Render(parameters => parameters.Add(component => component.Island, "2"));
+
+        // Act
+        fake.Release();
+
+        // Assert
+        await page.WaitForAssertionAsync(() => Assert.HasCount(1, page.FindAll(ChartSelector), "Only the chart of the other island should be drawn"), PageTestHost.WaitBound);
+        Assert.AreEqual("Isle B", page.Find("h1").TextContent.Trim(), "The page should show the other island");
+    }
+
+    /// <summary>
+    /// A new tick of the profile reads the overview once more.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC8")]
+    public async Task IslandDetailTickReadsOverviewAgain()
+    {
+        // Arrange
+        var fake = new FakeHistoryTrends
+                   {
+                       FiguresTrend = CreateFiguresTrend(2)
+                   };
+
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken, trends: fake);
+
+        await StoreIslandAsync(host, "Isle A", PageTestHost.Entry(1001, 1f, 1f, 0f, 1, 100f));
+
+        var page = RenderIsland(host, UiLanguage.English);
+
+        await page.WaitForAssertionAsync(() => Assert.HasCount(1, page.FindAll(ChartSelector), "The overview chart should be drawn"), PageTestHost.WaitBound);
+
+        fake.FiguresTrend = CreateFiguresTrend(4);
+
+        // Act
+        await host.StoreTicksAsync(PageTestHost.Tick(_profile, 120, PageTestHost.Island(Session, 1, "Isle A", PageTestHost.Entry(1001, 2f, 1f, 0f, 1, 100f))));
+
+        // Assert
+        await page.WaitForAssertionAsync(() => Assert.HasCount(2, fake.FiguresQueries, "The notice should read the overview once more"), PageTestHost.WaitBound);
     }
 
     /// <summary>
@@ -476,6 +613,31 @@ public sealed class IslandDetailTests
     private static Task StoreIslandAsync(PageTestHost host, string name, params ContractTickEntry[] entries)
     {
         return host.StoreTicksAsync(PageTestHost.Tick(_profile, 0, PageTestHost.Island(Session, 1, name, entries)));
+    }
+
+    /// <summary>
+    /// Creates a figures trend of points two minutes apart.
+    /// </summary>
+    /// <param name="count">The number of points</param>
+    /// <returns>The trend</returns>
+    private static HistoryTrend<HistoryFiguresPoint> CreateFiguresTrend(int count)
+    {
+        var end = new DateTimeOffset(2026, 11, 13, 12, 0, 0, TimeSpan.Zero);
+
+        return new HistoryTrend<HistoryFiguresPoint>
+               {
+                   Points = [
+                                .. Enumerable.Range(0, count).Select(index => new HistoryFiguresPoint
+                                                                              {
+                                                                                  Time = end.AddMinutes(2 * (index - count + 1)),
+                                                                                  IsHourly = false,
+                                                                                  Buildings = 10 + index,
+                                                                                  ProducedGoods = 5 + index,
+                                                                                  GoodsInDeficit = index
+                                                                              })
+                            ],
+                   TotalCount = count
+               };
     }
 
     /// <summary>

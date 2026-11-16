@@ -346,6 +346,7 @@ public sealed class TrendReaderTests
     {
         var good = tick.Islands.SelectMany(island => island.Entries.Select(entry => entry.ProductGuid))
                                .Distinct()
+                               .Where(candidate => candidate != 0)
                                .Order()
                                .FirstOrDefault(candidate => islands.Count(island => TrendFixture.FirstEntry(tick, island, candidate) is not null) is > 1 and var carriers && carriers < islands.Count);
 

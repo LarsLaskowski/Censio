@@ -20,7 +20,7 @@ namespace Censio.Server.Tests;
 /// Tests for the charts of one good of an island, <see cref="GoodTrend" />.
 /// </summary>
 [TestClass]
-public sealed class GoodTrendTests
+public sealed partial class GoodTrendTests
 {
     #region Constants
 
@@ -159,7 +159,7 @@ public sealed class GoodTrendTests
 
         Assert.AreEqual(goodName, page.Find("h1").TextContent.Trim(), "The heading should be the good's shown name");
         Assert.AreEqual($"Censio – {goodName}", head.Find("title").TextContent, "The page title should name the good");
-        Assert.AreEqual($"Isle A · {regionName} · Test profile", Regex.Replace(line.TextContent, "\\s+", " ").Trim(), "The line should name the island, the region and the profile");
+        Assert.AreEqual($"Isle A · {regionName} · Test profile", WhitespaceRun().Replace(line.TextContent, " ").Trim(), "The line should name the island, the region and the profile");
         Assert.AreSequenceEqual(new[] { PageAddress.IslandLink(_profile, new IslandKey(Session, 1, 0)), PageAddress.RegionLink(_profile, Session) }, line.QuerySelectorAll("a").Select(link => link.GetAttribute("href")).ToList(), "The island should link to its detail and the region to its islands");
         Assert.Contains(range, page.FindAll("p").Select(paragraph => paragraph.TextContent.Trim()).ToList(), $"The page should show the range line '{range}'");
         Assert.AreSequenceEqual(headings.Split('|'), page.FindAll("h2").Select(heading => heading.TextContent.Trim()).ToList(), "The page should show the heading of each chart");
@@ -493,6 +493,40 @@ public sealed class GoodTrendTests
     }
 
     /// <summary>
+    /// A read that ends after the page moved to another good is dropped: only the charts of the new good are shown.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC8")]
+    public async Task GoodTrendReadOfGoodLeftBehindIsDropped()
+    {
+        // Arrange
+        var fake = new FakeHistoryTrends
+                   {
+                       GoodTrend = FakeHistoryTrends.CreateGoodTrend(_pointEnd, 2)
+                   };
+
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken, trends: fake);
+
+        await StoreProfileAsync(host);
+
+        fake.Hold();
+
+        var page = RenderGood(host, UiLanguage.English);
+
+        await fake.WaitForCallsAsync(1, PageTestHost.WaitBound, TestContext.CancellationToken);
+
+        page.Render(parameters => parameters.Add(component => component.Good, "1002"));
+
+        // Act
+        fake.Release();
+
+        // Assert
+        await page.WaitForAssertionAsync(() => Assert.AreSequenceEqual(_twoSmallCharts, PointCounts(page), "Only the charts of the other good should be drawn"), PageTestHost.WaitBound);
+        Assert.AreEqual(1002, fake.GoodQueries[^1].ProductGuid, "The last read should be the one of the other good");
+    }
+
+    /// <summary>
     /// Names that hold markup or script are shown as text on the page.
     /// </summary>
     /// <returns>A task that represents the asynchronous test</returns>
@@ -521,7 +555,7 @@ public sealed class GoodTrendTests
         var line = page.FindAll("p").Single(paragraph => paragraph.QuerySelector("a") is not null);
 
         Assert.AreEqual(goodName, page.Find("h1").TextContent.Trim(), "The heading should show the good's characters");
-        Assert.AreEqual($"{islandName} · {regionName} · {profileName}", Regex.Replace(line.TextContent, "\\s+", " ").Trim(), "The line should show the names' characters");
+        Assert.AreEqual($"{islandName} · {regionName} · {profileName}", WhitespaceRun().Replace(line.TextContent, " ").Trim(), "The line should show the names' characters");
         Assert.IsEmpty(page.FindAll("img, b, i, script, [onerror], [onclick]"), "The page should hold no element a name could bring in");
     }
 
@@ -744,6 +778,13 @@ public sealed class GoodTrendTests
                 }
         }
     }
+
+    /// <summary>
+    /// Gets the expression of a run of whitespace.
+    /// </summary>
+    /// <returns>The expression</returns>
+    [GeneratedRegex("\\s+")]
+    private static partial Regex WhitespaceRun();
 
     #endregion // Methods
 }
