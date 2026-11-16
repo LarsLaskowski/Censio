@@ -48,4 +48,6 @@ tick is never folded. The rules are in [`history.md`](../areas/history.md).
   tick beside the point that holds it.
 - A step at the bounds must stay below 10 seconds; the measured figure stands in the area document. If it does not, a
   tick is folded in smaller steps, which this record would have to describe.
+- The kept identities grow by one row per folded tick without end; the measured bytes per tick stand in the area
+  document.
 - A negative zero becomes a sum of zero: an hourly mean does not keep the bit pattern that a tick keeps.

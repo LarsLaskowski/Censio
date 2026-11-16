@@ -37,6 +37,11 @@ in the protected root parameters, and the page offers no deletion otherwise. The
 ## Consequences
 
 - Reading stays open to a rebinding page as record 0006 accepted; only the deletion is guarded.
+- Behind a reverse proxy the rule sees the host the proxy sends: a proxy that replaces it with an address or a listed
+  name (nginx's default `$proxy_host`) makes every page it serves trusted, so the proxy passes the client's host
+  (`proxy_set_header Host $host;`) and answers only its own names.
+- The guard relies on the framework's `frame-ancestors 'self'` for interactive pages, so another site cannot frame a
+  trusted page and have it clicked; a test pins the header.
 - An operator who reaches the server by a name lists it in `AllowedHosts`, which also turns ASP.NET Core's host
   filtering on for every request, so the list must hold every name and address used, `127.0.0.1` for the image's
   health check included.

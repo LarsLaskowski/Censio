@@ -15,7 +15,7 @@ hourly averages kept without limit, deletion per profile) and left its details t
 
 - S1: Given a profile with stored ticks, when the history of one island and good over a time range is read, then it holds one point per tick of the profile in the range, oldest first, each with its real
   time (the tick's receive time) and game time and every value of that good on that island.
-- S2: Given ticks whose whole UTC hour lies more than 7 days in the past, when the retention job runs, then the ticks of
+- S2: Given ticks whose whole UTC hour ended at least 7 days ago, when the retention job runs, then the ticks of
   each such hour of a profile are folded into one hourly point of their averages, kept without limit; younger ticks
   stay.
 - S3: Given a read whose range spans both, then it returns the hourly points of the reduced hours and the ticks of the
@@ -70,8 +70,8 @@ hourly averages kept without limit, deletion per profile) and left its details t
   logs `The history of a profile could not be deleted.` (Warning, with the exception). No log line
   names a profile or island or holds a value (`.squad/project.md`, *Security areas*, server database).
 - N4: A reduced hour stores one row per island and good and one per map GUID of that hour, whatever the number of its
-  ticks; each holds a sum and a count per value. The plan measures the bytes of a reduced hour of the fixture against
-  the ticks it replaced.
+  ticks, each with a sum and a count per value, plus one identity row per folded tick (E5).
+  The plan measures both against the ticks they replaced.
 - N5: Once the clean-up after a deletion finished (N3), no profile or island name that only the deleted profile held
   can be read from the database file or the files SQLite keeps beside it. Older copies of names that a version before
   this one left in the file's free space are the exception; the user guide says how to remove them.
@@ -85,7 +85,7 @@ hourly averages kept without limit, deletion per profile) and left its details t
 
 ## Acceptance criteria
 
-- AC1: A run folds the ticks of every profile-hour whose end lies more than 7 days before the server's clock into that
+- AC1: A run folds the ticks of every profile-hour whose end lies 7 days or more before the server's clock into that
   hour's hourly point, except the hour of the profile's latest tick; the point has one row per island and good and one
   per map GUID of the hour; ticks of younger hours stay unchanged (S2, E3, N1, N4).
 - AC2: An hourly point carries the hour's start (UTC), the smallest and largest game time of its ticks, their number,
