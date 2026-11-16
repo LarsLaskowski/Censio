@@ -316,6 +316,51 @@ public sealed class ProgramTests
     }
 
     /// <summary>
+    /// A data page of the real host forbids other sites to frame it, so a page of a trusted host cannot be framed by
+    /// another site to make its deletion button pressed there.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC9")]
+    public async Task ProgramGetDataPageForbidsFramingByOtherSites()
+    {
+        // Arrange
+        using var factory = new CensioServerFactory("Production");
+        using var client = factory.CreateClient();
+
+        // Act
+        using var response = await client.GetAsync("/regions", TestContext.CancellationToken);
+
+        // Assert
+        var policies = response.Headers.TryGetValues("Content-Security-Policy", out var values) ? string.Join(" | ", values) : string.Empty;
+
+        Assert.AreEqual(HttpStatusCode.OK, response.StatusCode, "The region overview should answer 200");
+        Assert.AreEqual("frame-ancestors 'self'", policies, "The data page should carry one policy that allows framing only by the server itself");
+    }
+
+    /// <summary>
+    /// The started real host gives the one history retention job it created, through the late-bound registration.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    public async Task ProgramStartResolvesHistoryRetention()
+    {
+        // Arrange
+        using var factory = new CensioServerFactory("Production");
+        using var client = factory.CreateClient();
+        using var response = await client.GetAsync("/health", TestContext.CancellationToken);
+
+        // Act
+        var first = factory.Services.GetService<HistoryRetention>();
+        var second = factory.Services.GetService<HistoryRetention>();
+
+        // Assert
+        Assert.AreEqual(HttpStatusCode.OK, response.StatusCode, "The started host should answer its health endpoint");
+        Assert.IsNotNull(first, "The started host should give the history retention job");
+        Assert.AreSame(first, second, "The host should give the same job every time");
+    }
+
+    /// <summary>
     /// A malformed profile in the address of the real host shows the not-found text inside the frame, without echoing the
     /// address.
     /// </summary>

@@ -10,6 +10,7 @@ using Censio.Contracts;
 using Censio.Server.Components.Pages;
 using Censio.Server.Data;
 
+using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
@@ -344,6 +345,123 @@ public sealed class RegionsTests
         Assert.Contains(refusal, PageTestHost.Text(page), "The page should show the refusal text");
         Assert.IsEmpty(dialogs.FindAll(".mud-dialog"), "Clicking the disabled button should open no dialog");
         Assert.AreSequenceEqual(new[] { _firstProfile }, ProfileIds(host), "Nothing should be deleted");
+    }
+
+    /// <summary>
+    /// On a page of an untrusted host, a click event that reaches the disabled button's handler anyway, as a crafted
+    /// event of the circuit could, opens no dialog and deletes nothing.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC9")]
+    public async Task RegionsUntrustedHostEventAtButtonHandlerOpensNoDialog()
+    {
+        // Arrange
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken);
+
+        host.DeletionAllowed = false;
+
+        await StoreNamedProfileAsync(host, _firstProfile, FirstProfileName, 0);
+
+        var dialogs = host.Context.Render<MudDialogProvider>();
+        var page = await RenderReadyAsync(host, _firstProfile, UiLanguage.English);
+        var button = page.FindComponents<MudButton>().Single();
+
+        // Act
+        await page.InvokeAsync(() => button.Instance.OnClick.InvokeAsync(new MouseEventArgs()));
+
+        // Assert
+        Assert.IsTrue(button.Instance.Disabled, "The handler should belong to the disabled Delete history button");
+        Assert.IsEmpty(dialogs.FindAll(".mud-dialog"), "An event at the handler of an untrusted page should open no dialog");
+        Assert.AreSequenceEqual(new[] { _firstProfile }, ProfileIds(host), "Nothing should be deleted");
+    }
+
+    /// <summary>
+    /// The button opened while the page still waits for its read names the profile in the dialog as the profile switch
+    /// names it.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC9")]
+    public async Task RegionsDeleteDialogWhileLoadingNamesProfileAsSwitch()
+    {
+        // Arrange
+        using var source = new FakeProfileStateSource(true);
+
+        source.Store(_firstProfile, StoredRead(CreateState(_firstProfile)));
+
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken, source);
+
+        await host.StoreProfileAsync(_firstProfile, FirstProfileName);
+
+        var dialogs = host.Context.Render<MudDialogProvider>();
+        var page = RenderPicked(host, _firstProfile);
+
+        await source.WaitForReadAsync(PageTestHost.WaitBound, TestContext.CancellationToken);
+        await page.WaitForAssertionAsync(() => Assert.Contains("Loading…", PageTestHost.Text(page), "The page should still wait for its read"), PageTestHost.WaitBound);
+
+        // Act
+        ClickDeleteHistory(page, UiLanguage.English);
+
+        // Assert
+        await dialogs.WaitForStateAsync(() => dialogs.FindAll(".mud-dialog").Count == 1, PageTestHost.WaitBound);
+
+        var text = dialogs.Find(".mud-dialog-content").TextContent.Trim();
+
+        source.ReleaseReads();
+
+        Assert.AreEqual(FirstProfileDialogText, text, "The dialog should name the profile as the profile switch names it, before the page shows it");
+    }
+
+    /// <summary>
+    /// The overview without a profile in its address, which follows the newest profile, offers no <c>Delete history</c>
+    /// button and no refusal text.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC9")]
+    public async Task RegionsNewestAddressOffersNoDeleteHistory()
+    {
+        // Arrange
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken);
+
+        await StoreNamedProfileAsync(host, _firstProfile, FirstProfileName, 0);
+
+        // Act
+        var page = RenderUnpicked(host, UiLanguage.English);
+
+        // Assert
+        await page.WaitForStateAsync(() => page.FindAll("tbody tr").Count == 1, PageTestHost.WaitBound);
+
+        Assert.IsEmpty(Buttons(page, "Delete history"), "The overview of the newest profile should offer no Delete history button");
+        Assert.DoesNotContain("Deleting needs this page", PageTestHost.Text(page), "The overview of the newest profile should show no refusal text");
+    }
+
+    /// <summary>
+    /// A page that shows a profile shows the not-found text and no table once that profile is deleted.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public async Task RegionsDeletedProfileShowsNotFound()
+    {
+        // Arrange
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken);
+
+        await StoreNamedProfileAsync(host, _firstProfile, FirstProfileName, 0);
+        await StoreNamedProfileAsync(host, _secondProfile, SecondProfileName, 10);
+
+        var page = await RenderReadyAsync(host, _firstProfile, UiLanguage.English);
+        var retention = host.Context.Services.GetRequiredService<HistoryRetention>();
+
+        // Act
+        var outcome = await retention.DeleteProfileAsync(_firstProfile, TestContext.CancellationToken);
+
+        // Assert
+        await page.WaitForAssertionAsync(() => Assert.Contains("Not found.", PageTestHost.Text(page), "The page of the deleted profile should show the not-found text"), PageTestHost.WaitBound);
+
+        Assert.AreEqual(HistoryOutcome.Done, outcome, "The deletion should be done");
+        Assert.IsEmpty(page.FindAll("table"), "The page of the deleted profile should show no table");
     }
 
     /// <summary>

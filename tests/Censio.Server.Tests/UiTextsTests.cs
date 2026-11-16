@@ -101,6 +101,30 @@ public sealed class UiTextsTests
     }
 
     /// <summary>
+    /// Every text of the deletion exists in English and German, each exactly the one of spec AC9 and E9.
+    /// </summary>
+    /// <param name="textName">The name of the text property</param>
+    /// <param name="english">The English text</param>
+    /// <param name="german">The German text</param>
+    [TestMethod]
+    [TestCategory("AC9")]
+    [DataRow(nameof(UiTexts.DeleteHistory), "Delete history", "Verlauf löschen")]
+    [DataRow(nameof(UiTexts.DeleteHistoryTitle), "Delete history?", "Verlauf löschen?")]
+    [DataRow(nameof(UiTexts.DeleteHistoryTextFormat), "All data of the profile {0} is removed from the server: its regions, islands, goods and history. This cannot be undone.", "Alle Daten des Profils {0} werden vom Server entfernt: seine Regionen, Inseln, Waren und sein Verlauf. Das lässt sich nicht rückgängig machen.")]
+    [DataRow(nameof(UiTexts.DeleteHistoryConfirm), "Delete", "Löschen")]
+    [DataRow(nameof(UiTexts.DeleteHistoryCancel), "Cancel", "Abbrechen")]
+    [DataRow(nameof(UiTexts.DeleteHistoryFailed), "The history could not be deleted.", "Der Verlauf konnte nicht gelöscht werden.")]
+    [DataRow(nameof(UiTexts.DeleteHistoryHostRefused), "Deleting needs this page opened by IP address or as localhost, or by a host name the setting AllowedHosts lists.", "Löschen setzt voraus, dass diese Seite über die IP-Adresse oder localhost geöffnet wurde, oder über einen Hostnamen, den die Einstellung AllowedHosts nennt.")]
+    public void UiTextsForDeletionTextsMatchSpec(string textName, string english, string german)
+    {
+        // Act
+        var texts = $"{ReadText(UiTexts.For(UiLanguage.English), textName)}|{ReadText(UiTexts.For(UiLanguage.German), textName)}";
+
+        // Assert
+        Assert.AreEqual($"{english}|{german}", texts, $"The text {textName} should exist in English and German as spec AC9 and E9 give it");
+    }
+
+    /// <summary>
     /// Reads a text property by its name.
     /// </summary>
     /// <param name="texts">The texts</param>

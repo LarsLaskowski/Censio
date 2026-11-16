@@ -50,6 +50,8 @@ public sealed class DeletionHostRuleTests
     [DataRow("nas", "", false)]
     [DataRow("", "", false)]
     [DataRow(null, "", false)]
+    [DataRow("[]", "*", false)]
+    [DataRow("[::1", "*", false)]
     [DataRow("nas", "nas;127.0.0.1", true)]
     [DataRow("NAS", "nas;127.0.0.1", true)]
     [DataRow("censio.example.com", "*.example.com", true)]
