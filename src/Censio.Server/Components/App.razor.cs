@@ -19,6 +19,11 @@ public partial class App
     /// </summary>
     private UiLanguage _language;
 
+    /// <summary>
+    /// Whether the host of the request may delete a profile's history.
+    /// </summary>
+    private bool _deletionAllowed;
+
     #endregion // Fields
 
     #region Properties
@@ -29,10 +34,10 @@ public partial class App
     [CascadingParameter]
     public HttpContext? HttpContext { get; set; }
 
-    // Skeleton: removed with the implementation, which adds [Inject]: an [Inject] here would fail the existing App test, which registers no configuration
     /// <summary>
     /// Gets or sets the configuration.
     /// </summary>
+    [Inject]
     public IConfiguration Configuration { get; set; } = null!;
 
     #endregion // Properties
@@ -46,6 +51,7 @@ public partial class App
 
         _theme = UiPreferences.ReadTheme(request?.Cookies[UiPreferences.ThemeCookieName]);
         _language = UiPreferences.ReadLanguage(request?.Cookies[UiPreferences.LanguageCookieName], request?.Headers.AcceptLanguage.ToString());
+        _deletionAllowed = request is not null && DeletionHostRule.IsTrusted(request.Host.Host, Configuration["AllowedHosts"]);
     }
 
     #endregion // ComponentBase

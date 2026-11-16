@@ -14,6 +14,14 @@
 {
     <DataStatus AsOf="View?.AsOf" />
 }
+@if (Profile is not null && Mode != PageMode.NotFound)
+{
+    <MudButton Variant="Variant.Outlined" Color="Color.Error" Disabled="@(DeletionAllowed == false)" OnClick="OpenDeleteDialog">@Texts.DeleteHistory</MudButton>
+    @if (DeletionAllowed == false)
+    {
+        <span class="mud-typography mud-typography-body2">@Texts.DeleteHistoryHostRefused</span>
+    }
+}
 @if (StatusText is { } status)
 {
     <p>@status</p>
@@ -43,4 +51,21 @@ else if (View is { } shown)
             }
         </tbody>
     </MudSimpleTable>
+}
+@if (Profile is not null)
+{
+    <MudDialog @bind-Visible="_dialogOpen">
+        <TitleContent>@Texts.DeleteHistoryTitle</TitleContent>
+        <DialogContent>
+            <p>@string.Format(System.Globalization.CultureInfo.InvariantCulture, Texts.DeleteHistoryTextFormat, _dialogName)</p>
+            @if (_deleteFailed)
+            {
+                <p>@Texts.DeleteHistoryFailed</p>
+            }
+        </DialogContent>
+        <DialogActions>
+            <MudButton OnClick="CancelDelete">@Texts.DeleteHistoryCancel</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Error" Disabled="_deleting" OnClick="ConfirmDeleteAsync">@Texts.DeleteHistoryConfirm</MudButton>
+        </DialogActions>
+    </MudDialog>
 }
