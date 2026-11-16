@@ -296,14 +296,14 @@ public sealed class HistoryRetentionTests
     }
 
     /// <summary>
-    /// A fold step that fails after an earlier step of the run folded logs the warning of spec E6 and the reduced line
-    /// of the folded tick, and ends the run before the clean-up a deletion asked for; the next run folds the rest and
-    /// does the clean-up.
+    /// A fold step that fails after an earlier step of the run folded logs the warning of spec E6, then the reduced line
+    /// of the folded tick; the clean-up a deletion asked for is done right after the run's opening sweep, before the
+    /// folds, so the failure does not hold it back, and the next run folds the rest without clearing again.
     /// </summary>
     /// <returns>A task that represents the asynchronous test</returns>
     [TestMethod]
     [TestCategory("AC5")]
-    public async Task HistoryRetentionRunFoldFailureAfterFoldLogsReducedLineAndDefersClear()
+    public async Task HistoryRetentionRunFoldFailureAfterFoldLogsWarningThenReducedLine()
     {
         // Arrange
         var (state, history, databaseFile) = await OpenAsync();
@@ -335,19 +335,65 @@ public sealed class HistoryRetentionTests
         var failedRun = new[]
                         {
                             Describe(LogLevel.Information, DeletedLine, null),
+                            Describe(LogLevel.Information, ClearedLine, null),
                             Describe(LogLevel.Warning, ReduceFailedLine, typeof(SqliteException)),
                             Describe(LogLevel.Information, ReducedLine(1, 1), null)
                         };
 
-        Assert.AreSequenceEqual(failedRun, afterFailedRun, "The failed run should log the warning and the reduced line of its one fold, and no clean-up line");
+        Assert.AreSequenceEqual(failedRun, afterFailedRun, "The failed run should clear after its sweep, then log the warning and the reduced line of its one fold");
         Assert.AreEqual("2 1 1 0", rowsAfterFailedRun, "The failed run should have folded one tick and swept the deleted profile");
-        Assert.AreSequenceEqual(failedRun.Concat([Describe(LogLevel.Information, ReducedLine(1, 1), null), Describe(LogLevel.Information, ClearedLine, null)]).ToList(), DescribeEntries(), "The next run should fold the rest and do the deferred clean-up");
+        Assert.AreSequenceEqual(failedRun.Append(Describe(LogLevel.Information, ReducedLine(1, 1), null)).ToList(), DescribeEntries(), "The next run should fold the rest without clearing again");
         Assert.AreEqual("1 2 2 0", CountRows(databaseFile), "The next run should fold the remaining old tick");
     }
 
     /// <summary>
+    /// A fold that keeps failing does not hold back the clean-up a deletion asked for: the run sweeps the deleted
+    /// profile, clears and logs the cleared line before its failing fold, and the next run, failing again, does not
+    /// clear again.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC8")]
+    public async Task HistoryRetentionRunFailingFoldStillClearsDeletedHistory()
+    {
+        // Arrange
+        var (state, history, databaseFile) = await OpenAsync();
+
+        var keptId = Guid.NewGuid();
+        var deletedId = Guid.NewGuid();
+
+        await state.StoreProfileAsync(deletedId, DeletedProfileName, TestContext.CancellationToken);
+        await StoreTicksAsync(state,
+                              Tick(keptId, _hour.AddMinutes(10), IslandName),
+                              LatestTick(keptId),
+                              Tick(deletedId, _hour.AddMinutes(20), DeletedIslandName));
+
+        using var retention = new HistoryRetention(state, history, new FakeTimeProvider(_foldTime), _logger);
+
+        await retention.DeleteProfileAsync(deletedId, TestContext.CancellationToken);
+        Execute(databaseFile, CreateFailingFoldTriggerSql);
+        await retention.RunAsync(TestContext.CancellationToken).WaitAsync(_waitBound, TestContext.CancellationToken);
+
+        // Act
+        await retention.RunAsync(TestContext.CancellationToken).WaitAsync(_waitBound, TestContext.CancellationToken);
+
+        // Assert
+        var expected = new[]
+                       {
+                           Describe(LogLevel.Information, DeletedLine, null),
+                           Describe(LogLevel.Information, ClearedLine, null),
+                           Describe(LogLevel.Warning, ReduceFailedLine, typeof(SqliteException)),
+                           Describe(LogLevel.Warning, ReduceFailedLine, typeof(SqliteException))
+                       };
+
+        Assert.AreSequenceEqual(expected, DescribeEntries(), "The clean-up should be done after the sweep although every fold fails, and only once");
+        Assert.AreEqual("2 0 0 0", CountRows(databaseFile), "The deleted profile should be swept and the kept ticks left whole");
+        Assert.IsEmpty(FindNamesInFiles(databaseFile, DeletedProfileName, DeletedIslandName), "No name only the deleted profile held should be left in the database files");
+    }
+
+    /// <summary>
     /// A sweep step that fails at the start of a run logs the clean-up warning of spec E10 with its exception and ends
-    /// the run before any fold; the next run, with the failure gone, sweeps, folds and clears.
+    /// the run before any fold; the next run, with the failure gone, sweeps, clears and folds.
     /// </summary>
     /// <returns>A task that represents the asynchronous test</returns>
     [TestMethod]
@@ -389,7 +435,7 @@ public sealed class HistoryRetentionTests
 
         Assert.AreSequenceEqual(failedRun, afterFailedRun, "The failed sweep should log the clean-up warning with its exception and end the run");
         Assert.AreEqual("3 0 0 1", rowsAfterFailedRun, "The failed run should fold nothing and leave the deleted profile unswept");
-        Assert.AreSequenceEqual(failedRun.Concat([Describe(LogLevel.Information, ReducedLine(1, 1), null), Describe(LogLevel.Information, ClearedLine, null)]).ToList(), DescribeEntries(), "The next run should sweep, fold and clear");
+        Assert.AreSequenceEqual(failedRun.Concat([Describe(LogLevel.Information, ClearedLine, null), Describe(LogLevel.Information, ReducedLine(1, 1), null)]).ToList(), DescribeEntries(), "The next run should sweep, clear right after the sweep, then fold");
         Assert.AreEqual("1 1 1 0", CountRows(databaseFile), "The next run should remove the deleted profile's rows and fold the kept old tick");
     }
 

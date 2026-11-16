@@ -130,7 +130,8 @@ loop and waits for it to end; a step cut off by that cancellation rolls back and
    first, so a deletion waits at most for one fold step, not for a backlog of folds (N6). Counts distinct (profile, hour) pairs and ticks; logs the reduced line when ticks > 0
    (after the E6 warning when a later step failed).
 3. When a clean-up is requested (a swept step or a deletion): `ClearDeletedAsync` right after step 1, before any fold,
-   and again after step 2 when that completed; `Done` logs the cleared line, `Blocked` or `Failed` the clean-up warning
+   and again after step 2 when that completed and a sweep during it asked anew; a run makes no attempt after one
+   that did not finish; `Done` logs the cleared line, `Blocked` or `Failed` the clean-up warning
    (with the exception when failed) and keeps the request for the next run, so a fold that keeps failing never holds
    back the clean-up (N5, E10).
 

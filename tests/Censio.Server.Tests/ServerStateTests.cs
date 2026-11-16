@@ -1725,6 +1725,47 @@ public sealed class ServerStateTests
     }
 
     /// <summary>
+    /// A deletion whose rows are gone but whose re-read of the held profiles fails still counts as done: the failed state
+    /// read is logged with its exception, the deleted profile is dropped from the profile list and the held states in
+    /// memory, the other profile stays held, and the followers are told once that the deleted profile changed.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public async Task ServerStateDeleteProfileFailedRebuildDropsProfileAndNotifies()
+    {
+        // Arrange
+        var databaseFile = CreateDatabaseFile();
+        var (_, state) = await OpenRestoredAsync(databaseFile);
+
+        var deletedId = Guid.NewGuid();
+        var keptId = Guid.NewGuid();
+
+        await state.StoreProfileAsync(deletedId, ProfileName, TestContext.CancellationToken);
+        await StoreTicksAsync(state,
+                              CreateTick(deletedId, 1, CreateIsland(1, IslandName, CreateEntry(1))),
+                              CreateTick(keptId, 2, CreateIsland(2, "Island of the kept profile", CreateEntry(2))));
+        ExecutePooled(databaseFile, BreakIslandReadsSql);
+
+        var heldBefore = state.HeldProfiles.Order().ToList();
+        var (notices, told) = Follow(state, 1);
+
+        // Act
+        var result = await state.DeleteProfileAsync(deletedId, TestContext.CancellationToken);
+
+        // Assert
+        await told.WaitAsync(_waitBound, TestContext.CancellationToken);
+
+        Assert.AreSequenceEqual(new[] { deletedId, keptId }.Order().ToList(), heldBefore, "Both profiles should be held before the deletion, or the checks below would prove less");
+        Assert.AreEqual(HistoryOutcome.Done, result.Outcome, "A deletion whose rows are gone should be done although the re-read failed");
+        Assert.AreSequenceEqual(new[] { DescribeProfile(keptId, null) }, DescribeProfiles(state.Profiles), "Only the kept profile should be listed");
+        Assert.AreSequenceEqual(new[] { keptId }, state.HeldProfiles.ToList(), "Only the kept profile should stay held");
+        Assert.IsFalse(state.TryGetHeld(deletedId, out _), "The deleted profile should give no held state");
+        Assert.AreSequenceEqual(new[] { DescribeNotice(ServerStateChangeKind.Profile, deletedId) }, notices.ToList(), "The followers should be told once that the deleted profile changed");
+        Assert.AreSequenceEqual(new[] { (LogLevel.Error, ReadFailureLine, true) }, _logger.Entries.Select(entry => (entry.Level, entry.Message, entry.Exception is SqliteException)).ToList(), "The failed re-read should be logged once as a failed state read with its exception");
+    }
+
+    /// <summary>
     /// Deleting the newest of three profiles, of which two are held, holds the two remaining ones, as a restore would, and
     /// makes the next newest the newest profile.
     /// </summary>
