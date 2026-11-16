@@ -1,6 +1,6 @@
 # 0085: A profile's history can be deleted only from a page opened by IP address, as localhost or by a listed host name
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-16
 - **Area:** web-pages
 - **Source:** Issue #35

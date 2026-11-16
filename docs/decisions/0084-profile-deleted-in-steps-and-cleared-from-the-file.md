@@ -1,6 +1,6 @@
 # 0084: A profile is deleted at once for its readers, its rows are removed in steps, and the file is cleared of them
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-16
 - **Area:** history
 - **Source:** Issue #35

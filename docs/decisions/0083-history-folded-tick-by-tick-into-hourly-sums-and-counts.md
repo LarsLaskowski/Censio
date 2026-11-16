@@ -1,6 +1,6 @@
 # 0083: The history is folded tick by tick into hourly sums and counts; the latest hour and the tick identities are kept
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-16
 - **Area:** history
 - **Source:** Issue #35
