@@ -191,14 +191,13 @@ public sealed class MainLayoutTests
     public async Task MainLayoutThemeSwitchWhenStoreFailsKeepsThemeAndLogsKindOnly()
     {
         // Arrange
-        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken);
-
-        var context = host.Context;
         var loggerProvider = new Censio.Server.Data.Tests.RecordingLoggerProvider();
         using var loggerFactory = LoggerFactory.Create(builder => builder.AddProvider(loggerProvider).SetMinimumLevel(LogLevel.Trace));
 
-        context.Services.AddSingleton(loggerFactory);
-        context.Services.AddSingleton(typeof(ILogger<>), typeof(Logger<>));
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken, configureServices: services => services.AddSingleton(loggerFactory).AddSingleton(typeof(ILogger<>), typeof(Logger<>)));
+
+        var context = host.Context;
+
         context.JSInterop.SetupVoid(StorePreference, _ => true).SetException(new JSException("The browser refused the cookie dark"));
 
         var layout = RenderLayout(context, UiTheme.Light, UiLanguage.English);

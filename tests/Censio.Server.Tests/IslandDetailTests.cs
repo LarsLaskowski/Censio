@@ -441,6 +441,32 @@ public sealed class IslandDetailTests
     }
 
     /// <summary>
+    /// Every good name in the goods table links to the good's page on the island.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC5")]
+    public async Task IslandDetailGoodNameLinksToGoodPage()
+    {
+        // Arrange
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken);
+
+        await StoreIslandAsync(host, "Isle A", PageTestHost.Entry(1001, 1f, 1f, 0f, 1, 100f), PageTestHost.Entry(-7, 2f, 1f, 0f, 1, 100f));
+
+        // Act
+        var page = RenderIsland(host, UiLanguage.English);
+
+        // Assert
+        await page.WaitForStateAsync(() => page.FindAll("tbody tr").Count == 2, PageTestHost.WaitBound);
+
+        var links = page.FindAll("tbody tr").Select(row => row.QuerySelectorAll("td")[1].QuerySelector("a")).ToList();
+        var island = new IslandKey(Session, 1, 0);
+
+        Assert.AreSequenceEqual(PageTestHost.Expect("Good -7", "Good 1001"), links.Select(link => link?.TextContent.Trim() ?? string.Empty).ToList(), "Each good name should be a link, ordered by name");
+        Assert.AreSequenceEqual(PageTestHost.Expect(PageAddress.GoodLink(_profile, island, -7), PageAddress.GoodLink(_profile, island, 1001)), links.Select(link => link?.GetAttribute("href") ?? string.Empty).ToList(), "Each link should lead to the good's page on the island");
+    }
+
+    /// <summary>
     /// Stores a tick with the shown island (session 3245, island 1, area 0).
     /// </summary>
     /// <param name="host">The host</param>

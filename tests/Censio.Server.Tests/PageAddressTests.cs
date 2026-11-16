@@ -175,6 +175,59 @@ public sealed class PageAddressTests
     }
 
     /// <summary>
+    /// A good segment is read like a session segment: digits with an optional leading minus over the range of a 32-bit
+    /// integer; anything else is refused.
+    /// </summary>
+    /// <param name="text">The text</param>
+    /// <param name="expectedParsed">Whether the text is a good</param>
+    /// <param name="expectedGuid">The expected product GUID of a good</param>
+    [TestMethod]
+    [TestCategory("AC5")]
+    [DataRow("2077", true, 2077)]
+    [DataRow("0", true, 0)]
+    [DataRow("-5", true, -5)]
+    [DataRow("2147483647", true, int.MaxValue)]
+    [DataRow("-2147483648", true, int.MinValue)]
+    [DataRow(null, false, 0)]
+    [DataRow("", false, 0)]
+    [DataRow("-", false, 0)]
+    [DataRow("+5", false, 0)]
+    [DataRow(" 5", false, 0)]
+    [DataRow("1,000", false, 0)]
+    [DataRow("1e3", false, 0)]
+    [DataRow("٣", false, 0)]
+    [DataRow("2147483648", false, 0)]
+    [DataRow("12345678901", false, 0)]
+    [DataRow("%3Cb%3E", false, 0)]
+    public void PageAddressTryParseGoodAcceptsSessionForm(string? text, bool expectedParsed, int expectedGuid)
+    {
+        // Act
+        var parsed = PageAddress.TryParseGood(text, out var productGuid);
+
+        // Assert
+        Assert.AreEqual(expectedParsed, parsed, $"The good segment '{text}' should be {(expectedParsed ? "accepted" : "refused")}");
+        Assert.AreEqual(expectedGuid, productGuid, "The product GUID should be the one given, or 0 for a refused text");
+    }
+
+    /// <summary>
+    /// The address of a good's page carries the profile, the island's session, ID and area, and the good.
+    /// </summary>
+    /// <param name="productGuid">The product GUID</param>
+    /// <param name="expectedSuffix">The expected end of the address</param>
+    [TestMethod]
+    [TestCategory("AC5")]
+    [DataRow(2077, "/islands/3245/1/0/goods/2077")]
+    [DataRow(-5, "/islands/3245/1/0/goods/-5")]
+    public void PageAddressGoodLinkCarriesProfileIslandAndGood(int productGuid, string expectedSuffix)
+    {
+        // Act
+        var link = PageAddress.GoodLink(new Guid(ProfileText), new IslandKey(3245, 1, 0), productGuid);
+
+        // Assert
+        Assert.AreEqual($"/profiles/{ProfileText}{expectedSuffix}", link, "The good's address should carry the profile, the island and the good");
+    }
+
+    /// <summary>
     /// On an address that carries a profile, the Regions entry links to that profile's overview, query and fragment
     /// ignored.
     /// </summary>

@@ -9,12 +9,15 @@ using Censio.Contracts;
 using Censio.Server.Data;
 
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 
+using MudBlazor.Interop;
 using MudBlazor.Services;
 
 namespace Censio.Server.Tests;
@@ -22,8 +25,10 @@ namespace Censio.Server.Tests;
 /// <summary>
 /// A bUnit context for the data pages: MudBlazor's services, loose JavaScript interop, a restored <see cref="ServerState" />
 /// over an in-memory database (or a given file), a <see cref="PageReader" /> over that state or over a fake source, a
-/// <see cref="HistoryRetention" /> over that state registered by a late-bound factory as the server registers it, and a
-/// configuration; pages get the language, its texts and whether they may delete cascaded, as the frame cascades them.
+/// <see cref="HistoryRetention" /> over that state registered by a late-bound factory as the server registers it, the chart
+/// reads (<see cref="IHistoryTrends" /> over the database or a fake, and a <see cref="TrendReader" />), an interactive
+/// renderer, a measured chart SVG and a configuration; pages get the language, its texts, the theme and whether they may
+/// delete cascaded, as the frame cascades them.
 /// </summary>
 public sealed class PageTestHost : IAsyncDisposable
 {
@@ -109,6 +114,12 @@ public sealed class PageTestHost : IAsyncDisposable
     /// </summary>
     public bool DeletionAllowed { get; set; } = true;
 
+    /// <summary>
+    /// Gets or sets the theme a page rendered by <see cref="Render{TPage}" /> gets cascaded, as the frame cascades it;
+    /// <see cref="UiTheme.Light" /> unless a test sets it.
+    /// </summary>
+    public UiTheme Theme { get; set; } = UiTheme.Light;
+
     #endregion // Properties
 
     #region Methods
@@ -119,8 +130,11 @@ public sealed class PageTestHost : IAsyncDisposable
     /// <param name="cancellationToken">The cancellation token of the test</param>
     /// <param name="source">The fake source the page reader reads, or <see langword="null" /> for the state</param>
     /// <param name="databaseFile">The database file, or <see langword="null" /> for an in-memory database</param>
+    /// <param name="trends">The fake chart reads, or <see langword="null" /> for the history store over the database</param>
+    /// <param name="trendLogger">The logger of the chart reader, or <see langword="null" /> for none</param>
+    /// <param name="configureServices">Registers further services before the renderer is set up, or <see langword="null" /> for none</param>
     /// <returns>The host</returns>
-    public static async Task<PageTestHost> CreateAsync(CancellationToken cancellationToken, FakeProfileStateSource? source = null, string? databaseFile = null)
+    public static async Task<PageTestHost> CreateAsync(CancellationToken cancellationToken, FakeProfileStateSource? source = null, string? databaseFile = null, FakeHistoryTrends? trends = null, ILogger<TrendReader>? trendLogger = null, Action<IServiceCollection>? configureServices = null)
     {
         var opened = await ServerDatabase.OpenAsync(databaseFile, NullLoggerFactory.Instance, cancellationToken).ConfigureAwait(false);
         var database = opened.Database ?? throw new InvalidOperationException($"The database could not be opened: {opened.Kind}", opened.Failure);
@@ -132,12 +146,25 @@ public sealed class PageTestHost : IAsyncDisposable
         var configuration = new ConfigurationManager();
 
         context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.JSInterop.Setup<ElementSize>("mudGetSvgBBox", _ => true).SetResult(new ElementSize
+                                                                                   {
+                                                                                       Width = 40,
+                                                                                       Height = 12
+                                                                                   });
         context.Services.AddMudServices();
         context.Services.AddSingleton(state);
         context.Services.AddSingleton<IProfileStateSource>(state);
         context.Services.AddSingleton(new PageReader(source ?? (IProfileStateSource)state));
         context.Services.AddSingleton<IConfiguration>(configuration);
         context.Services.AddSingleton(_ => new HistoryRetention(state, new HistoryStore(database), new FakeTimeProvider(_baseReceiveTime), NullLogger.Instance));
+
+        IHistoryTrends historyTrends = trends is null ? new HistoryStore(database) : trends;
+
+        context.Services.AddSingleton(historyTrends);
+        context.Services.AddSingleton(provider => new TrendReader(provider.GetRequiredService<IHistoryTrends>(), trendLogger ?? NullLogger<TrendReader>.Instance));
+
+        configureServices?.Invoke(context.Services);
+        context.SetRendererInfo(new RendererInfo("Server", true));
 
         return new PageTestHost(database, state, context, configuration, cancellationToken);
     }
@@ -331,7 +358,7 @@ public sealed class PageTestHost : IAsyncDisposable
     }
 
     /// <summary>
-    /// Renders a page with the language, its texts and <see cref="DeletionAllowed" /> cascaded, as the frame cascades them.
+    /// Renders a page with the language, its texts, <see cref="Theme" /> and <see cref="DeletionAllowed" /> cascaded, as the frame cascades them.
     /// </summary>
     /// <typeparam name="TPage">The type of the page</typeparam>
     /// <param name="language">The language shown</param>
@@ -343,6 +370,7 @@ public sealed class PageTestHost : IAsyncDisposable
         return Context.Render<TPage>(builder =>
                                      {
                                          builder.AddCascadingValue(language)
+                                                .AddCascadingValue(Theme)
                                                 .AddCascadingValue(UiTexts.For(language))
                                                 .AddCascadingValue(DeletionAllowedName, DeletionAllowed);
                                          parameters(builder);
