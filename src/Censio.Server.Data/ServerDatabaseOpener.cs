@@ -252,6 +252,13 @@ internal static class ServerDatabaseOpener
             }
         }
 
+        var secureDeleteFailure = await EnableSecureDeleteAsync(keeper, cancellationToken).ConfigureAwait(false);
+
+        if (secureDeleteFailure is not null)
+        {
+            return Failed(ServerDatabaseOpenKind.NotWritable, databaseFile, secureDeleteFailure);
+        }
+
         var kind = ResolveKind(databaseFile, created, pending.Count);
 
         return new ServerDatabaseOpenResult(kind, databaseFile, new ServerDatabase(databaseFile, keeper), null);
@@ -410,6 +417,26 @@ internal static class ServerDatabaseOpener
 
             // The side files appear with the first access in the new mode, so the kept connection makes it now
             await ReadColumnAsync(connection, UserEntriesSql, cancellationToken).ConfigureAwait(false);
+
+            return null;
+        }
+        catch (SqliteException exception)
+        {
+            return exception;
+        }
+    }
+
+    /// <summary>
+    /// Makes SQLite overwrite what a deletion removes, so deleted names do not stay in the file.
+    /// </summary>
+    /// <param name="connection">The opened connection</param>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>The exception behind a failure, or <see langword="null"/></returns>
+    private static async Task<Exception?> EnableSecureDeleteAsync(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await ExecuteAsync(connection, "PRAGMA secure_delete = ON;", cancellationToken).ConfigureAwait(false);
 
             return null;
         }
