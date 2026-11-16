@@ -43,6 +43,11 @@ public sealed class HistoryStoreTests
     private const int ProductGuid = 1010;
 
     /// <summary>
+    /// The product GUID of a third good.
+    /// </summary>
+    private const int ThirdProductGuid = 1012;
+
+    /// <summary>
     /// The product GUID of another good.
     /// </summary>
     private const int OtherProductGuid = 1011;
@@ -140,6 +145,11 @@ public sealed class HistoryStoreTests
     /// The longest the test waits for queued steps to finish once the gate is released.
     /// </summary>
     private static readonly TimeSpan _stepBound = TimeSpan.FromSeconds(30);
+
+    /// <summary>
+    /// The longest the test waits to see that a task that should wait has not completed.
+    /// </summary>
+    private static readonly TimeSpan _waitBound = TimeSpan.FromMilliseconds(300);
 
     /// <summary>
     /// The plain floats of an entry, in the order of <see cref="HistoryPoint" />: Generation, Consumption, Delta,
@@ -1176,6 +1186,408 @@ public sealed class HistoryStoreTests
     }
 
     /// <summary>
+    /// A point of a good's trend has no value where no island of the set carries the good, for a tick and for an hourly
+    /// point alike; where several islands carry it, the values are summed over them.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC2")]
+    public async Task HistoryStoreGoodTrendPointWithoutCarrierHasNoValue()
+    {
+        // Arrange
+        var (store, history, _) = await OpenAsync();
+
+        var profileId = Guid.NewGuid();
+
+        await StoreAsync(store,
+                         Tick(profileId, 10 * Minute, 10, Island(IslandKey, IslandName, TrendEntry(OtherProductGuid, 9f, 9f, 9f, 1)), Island(OtherIslandKey, "Second island", TrendEntry(OtherProductGuid, 9f, 9f, 9f, 1))),
+                         Tick(profileId, Hour + (10 * Minute), 100, Island(IslandKey, IslandName, TrendEntry(ProductGuid, 1.5f, 2.5f, -1f, 1)), Island(OtherIslandKey, "Second island", TrendEntry(ProductGuid, 2.25f, 0.5f, 0.25f, 1))),
+                         Tick(profileId, Hour + (20 * Minute), 200, Island(IslandKey, IslandName, TrendEntry(OtherProductGuid, 9f, 9f, 9f, 1)), Island(OtherIslandKey, "Second island", TrendEntry(ProductGuid, 4f, 1f, 3f, 1))),
+                         Tick(profileId, Hour + (30 * Minute), 300, Island(IslandKey, IslandName, TrendEntry(OtherProductGuid, 9f, 9f, 9f, 1)), Island(OtherIslandKey, "Second island", TrendEntry(OtherProductGuid, 9f, 9f, 9f, 1))));
+        await FoldAllAsync(history, profileId);
+
+        var query = GoodQuery(profileId, [TrendIsland(IslandKey), TrendIsland(OtherIslandKey)], _hour, _hour.AddHours(2), 100);
+
+        // Act
+        var trend = await history.ReadGoodTrendAsync(query, TestContext.CancellationToken);
+
+        // Assert
+        var expected = new[]
+                       {
+                           $"hourly {FormatTime(_hour)} null null null",
+                           $"tick {FormatTime(_hour.AddSeconds(Hour + (10 * Minute)))} 3.75 3 -0.75",
+                           $"tick {FormatTime(_hour.AddSeconds(Hour + (20 * Minute)))} 4 1 3",
+                           $"tick {FormatTime(_hour.AddSeconds(Hour + (30 * Minute)))} null null null"
+                       };
+
+        Assert.AreSequenceEqual(expected, trend.Points.Select(DescribeGoodPoint), "The islands that carry the good should be summed and a point no island carries should have no value");
+        Assert.AreEqual(4, trend.TotalCount, "The range should hold the hourly point and the three ticks");
+    }
+
+    /// <summary>
+    /// The figures of an hourly point follow the hourly rules: the buildings are the sum of the mean building counts
+    /// rounded away from zero, the produced goods those with a mean above 0, the goods in deficit those with a rounded
+    /// mean delta below 0 and at least one delta; a tick without the island or without entries has no value.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC3")]
+    public async Task HistoryStoreFiguresTrendHourlyPointFollowsHourlyRules()
+    {
+        // Arrange
+        var (store, history, _) = await OpenAsync();
+
+        var profileId = Guid.NewGuid();
+
+        await StoreAsync(store,
+                         Tick(profileId, 10 * Minute, 10, Island(IslandKey, IslandName, TrendEntry(ProductGuid, 0f, 0f, -1f, 1), TrendEntry(OtherProductGuid, 0f, 0f, 0.5f, 1), TrendEntry(ThirdProductGuid, 0f, 0f, null, 0))),
+                         Tick(profileId, 20 * Minute, 20, Island(IslandKey, IslandName, TrendEntry(ProductGuid, 0f, 0f, -1f, 2), TrendEntry(OtherProductGuid, 0f, 0f, -0.5f, 1), TrendEntry(ThirdProductGuid, 0f, 0f, null, 0))),
+                         Tick(profileId, Hour + (10 * Minute), 30, Island(OtherIslandKey, "Second island", TrendEntry(ProductGuid, 0f, 0f, 0f, 1))),
+                         Tick(profileId, Hour + (20 * Minute), 40, Island(IslandKey, IslandName)));
+        await FoldAllAsync(history, profileId);
+
+        var query = FiguresQuery(profileId, TrendIsland(IslandKey), _hour, _hour.AddHours(2), 100);
+
+        // Act
+        var trend = await history.ReadFiguresTrendAsync(query, TestContext.CancellationToken);
+
+        // Assert
+        var expected = new[]
+                       {
+                           $"hourly {FormatTime(_hour)} 3 2 1",
+                           $"tick {FormatTime(_hour.AddSeconds(Hour + (10 * Minute)))} null null null",
+                           $"tick {FormatTime(_hour.AddSeconds(Hour + (20 * Minute)))} null null null"
+                       };
+
+        Assert.AreSequenceEqual(expected, trend.Points.Select(DescribeFiguresPoint), "The hourly point should round the buildings' sum of means up from 2.5, count the goods with a mean above 0 and the goods with a mean delta below 0");
+    }
+
+    /// <summary>
+    /// The deficit of a figures point rounds the delta to two decimals first: -0.004 is no deficit, -0.006 is, for a
+    /// tick and for an hourly point.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC3")]
+    public async Task HistoryStoreFiguresTrendDeficitRoundsDelta()
+    {
+        // Arrange
+        var (store, history, _) = await OpenAsync();
+
+        var profileId = Guid.NewGuid();
+
+        await StoreAsync(store,
+                         Tick(profileId, 10 * Minute, 10, Island(IslandKey, IslandName, TrendEntry(ProductGuid, 0f, 0f, -0.004f, 1), TrendEntry(OtherProductGuid, 0f, 0f, -0.006f, 1), TrendEntry(ThirdProductGuid, 0f, 0f, 0.006f, 1))),
+                         Tick(profileId, 20 * Minute, 20, Island(IslandKey, IslandName, TrendEntry(ProductGuid, 0f, 0f, -0.004f, 1), TrendEntry(OtherProductGuid, 0f, 0f, -0.006f, 1), TrendEntry(ThirdProductGuid, 0f, 0f, 0.006f, 1))),
+                         Tick(profileId, Hour + (10 * Minute), 30, Island(IslandKey, IslandName, TrendEntry(ProductGuid, 0f, 0f, -0.004f, 1), TrendEntry(OtherProductGuid, 0f, 0f, -0.006f, 1), TrendEntry(ThirdProductGuid, 0f, 0f, 0.006f, 1))));
+        await FoldAllAsync(history, profileId);
+
+        var query = FiguresQuery(profileId, TrendIsland(IslandKey), _hour, _hour.AddHours(2), 100);
+
+        // Act
+        var trend = await history.ReadFiguresTrendAsync(query, TestContext.CancellationToken);
+
+        // Assert
+        var expected = new[]
+                       {
+                           $"hourly {FormatTime(_hour)} 3 3 1",
+                           $"tick {FormatTime(_hour.AddSeconds(Hour + (10 * Minute)))} 3 3 1"
+                       };
+
+        Assert.AreSequenceEqual(expected, trend.Points.Select(DescribeFiguresPoint), "Only the good with a delta that rounds below 0 should count as in deficit");
+    }
+
+    /// <summary>
+    /// A trend read holds exactly the points of its range: the start is inclusive, the end exclusive, for ticks and for
+    /// hourly points, and the hourly point of the hour before the start is not read.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC6")]
+    public async Task HistoryStoreGoodTrendReadsRangeOnly()
+    {
+        // Arrange
+        var (store, history, _) = await OpenAsync();
+
+        var profileId = Guid.NewGuid();
+
+        await StoreAsync(store,
+                         GoodTick(profileId, 10 * Minute, 1),
+                         GoodTick(profileId, Hour + (10 * Minute), 2),
+                         GoodTick(profileId, (2 * Hour) + (10 * Minute), 3),
+                         GoodTick(profileId, (2 * Hour) + (20 * Minute), 5),
+                         GoodTick(profileId, (3 * Hour) + (5 * Minute), 6),
+                         GoodTick(profileId, (3 * Hour) + (10 * Minute), 7),
+                         GoodTick(profileId, (3 * Hour) + (20 * Minute), 8));
+        _clock.SetUtcNow(_hour.AddDays(30));
+        await FoldAllAsync(history, profileId);
+
+        var query = GoodQuery(profileId, [TrendIsland(IslandKey)], _hour.AddHours(1), _hour.AddSeconds((3 * Hour) + (10 * Minute)), 100);
+
+        // Act
+        var trend = await history.ReadGoodTrendAsync(query, TestContext.CancellationToken);
+
+        // Assert
+        var expected = new[]
+                       {
+                           $"hourly {FormatTime(_hour.AddHours(1))} 2 1 0",
+                           $"hourly {FormatTime(_hour.AddHours(2))} 4 1 0",
+                           $"tick {FormatTime(_hour.AddSeconds((3 * Hour) + (5 * Minute)))} 6 1 0"
+                       };
+
+        Assert.AreSequenceEqual(expected, trend.Points.Select(DescribeGoodPoint), "The range should hold the hourly points of its hours and the ticks from its start up to, not including, its end");
+        Assert.AreEqual(3, trend.TotalCount, "The count should be the points of the range only");
+    }
+
+    /// <summary>
+    /// A read with a maximum returns the newest points of the range in time order and the count of all points of the
+    /// range.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC13")]
+    public async Task HistoryStoreGoodTrendReadsNewestMaxPointsAndCount()
+    {
+        // Arrange
+        var (store, history, _) = await OpenAsync();
+
+        var profileId = Guid.NewGuid();
+
+        await StoreAsync(store,
+                         GoodTick(profileId, 10 * Minute, 1),
+                         GoodTick(profileId, Hour + Minute, 11),
+                         GoodTick(profileId, Hour + (2 * Minute), 12),
+                         GoodTick(profileId, Hour + (3 * Minute), 13),
+                         GoodTick(profileId, Hour + (4 * Minute), 14),
+                         GoodTick(profileId, Hour + (5 * Minute), 15));
+        await FoldAllAsync(history, profileId);
+
+        var query = GoodQuery(profileId, [TrendIsland(IslandKey)], _hour, _hour.AddHours(2), 4);
+
+        // Act
+        var trend = await history.ReadGoodTrendAsync(query, TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreSequenceEqual(new double?[] { 12, 13, 14, 15 }, trend.Points.Select(point => point.Generation), "The newest points should be returned, oldest first");
+        Assert.AreEqual(6, trend.TotalCount, "The count should hold the hourly point and the five ticks of the range");
+    }
+
+    /// <summary>
+    /// A range of more points than one part holds is read in several parts and gives every point once, in time order.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC13")]
+    public async Task HistoryStoreTrendPartsGiveSamePointsAsOneRead()
+    {
+        // Arrange
+        var (store, history, _) = await OpenAsync();
+
+        var profileId = Guid.NewGuid();
+        var count = (2 * HistoryStore.TrendPartSize) + 30;
+        var maxPoints = count - 5;
+
+        await StoreAsync(store, Enumerable.Range(1, count).Select(index => GoodTick(profileId, index * 5, index)).ToArray());
+
+        var query = GoodQuery(profileId, [TrendIsland(IslandKey)], _hour, _hour.AddHours(2), maxPoints);
+
+        // Act
+        var trend = await history.ReadGoodTrendAsync(query, TestContext.CancellationToken);
+
+        // Assert
+        var expected = Enumerable.Range(count - maxPoints + 1, maxPoints).Select(index => (double?)index);
+
+        Assert.AreSequenceEqual(expected, trend.Points.Select(point => point.Generation), "The points of all parts should follow each other in time order without a gap or a repeat");
+        Assert.AreEqual(count, trend.TotalCount, "The count should hold every point of the range");
+    }
+
+    /// <summary>
+    /// A trend part asked for while the trend gate is held waits for it, then reads.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC16")]
+    public async Task HistoryStoreTrendPartWaitsForTrendGate()
+    {
+        // Arrange
+        var (store, history, _) = await OpenAsync();
+
+        var gate = _databases[^1].TrendGate;
+        var profileId = Guid.NewGuid();
+        var cancellationToken = TestContext.CancellationToken;
+
+        await StoreAsync(store, GoodTick(profileId, 10 * Minute, 1));
+
+        var query = GoodQuery(profileId, [TrendIsland(IslandKey)], _hour, _hour.AddHours(2), 100);
+
+        await gate.WaitAsync(cancellationToken);
+
+        // Act
+        Task<HistoryTrend<HistoryGoodPoint>> read;
+        bool completedWhileHeld;
+
+        try
+        {
+            read = history.ReadGoodTrendAsync(query, cancellationToken);
+            completedWhileHeld = await CompletesWithinWaitAsync(read);
+        }
+        finally
+        {
+            gate.Release();
+        }
+
+        var trend = await read.WaitAsync(_stepBound, cancellationToken);
+
+        // Assert
+        Assert.IsFalse(completedWhileHeld, "The read should wait while the trend gate is held");
+        Assert.AreSequenceEqual(new double?[] { 1 }, trend.Points.Select(point => point.Generation), "The read should give its point once the gate is free");
+    }
+
+    /// <summary>
+    /// A clean-up of a swept profile waits while the trend gate is held, as it is during a trend part, and truncates the
+    /// write-ahead log to 0 bytes once the gate is free.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC16")]
+    public async Task HistoryStoreClearDeletedWaitsForTrendPartThenTruncates()
+    {
+        // Arrange
+        var (store, history, databaseFile) = await OpenAsync();
+
+        var gate = _databases[^1].TrendGate;
+        var profileId = Guid.NewGuid();
+        var cancellationToken = TestContext.CancellationToken;
+
+        await StoreAsync(store, PlainTick(profileId, 10 * Minute, 10), LatestTick(profileId));
+        await store.DeleteProfileAsync(profileId, cancellationToken);
+        await SweepAllAsync(history);
+        await gate.WaitAsync(cancellationToken);
+
+        // Act
+        Task<HistoryResult> clearing;
+        bool completedWhileHeld;
+
+        try
+        {
+            clearing = history.ClearDeletedAsync(cancellationToken);
+            completedWhileHeld = await CompletesWithinWaitAsync(clearing);
+        }
+        finally
+        {
+            gate.Release();
+        }
+
+        var result = await clearing.WaitAsync(_stepBound, cancellationToken);
+
+        // Assert
+        var walFile = databaseFile + "-wal";
+
+        Assert.IsFalse(completedWhileHeld, "The clean-up should wait while the trend gate is held");
+        Assert.AreEqual(HistoryOutcome.Done, result.Outcome, "The clean-up should be done once the gate is free");
+        Assert.AreEqual(0L, File.Exists(walFile) ? new FileInfo(walFile).Length : 0L, "The write-ahead log should be truncated to 0 bytes");
+    }
+
+    /// <summary>
+    /// Creates an entry for a trend: the generation, consumption, delta and building count, everything else zero.
+    /// </summary>
+    /// <param name="productGuid">The product GUID</param>
+    /// <param name="generation">The generation</param>
+    /// <param name="consumption">The consumption</param>
+    /// <param name="delta">The delta, or <see langword="null" /></param>
+    /// <param name="buildingCount">The building count</param>
+    /// <returns>The entry</returns>
+    private static ContractTickEntry TrendEntry(int productGuid, float generation, float consumption, float? delta, int buildingCount)
+    {
+        return Entry(productGuid, [generation, consumption, delta, 0f, 0f, 0f, 0f, 0f], [buildingCount, 0, 0], Map(), Map());
+    }
+
+    /// <summary>
+    /// Creates a tick of the island and good of the tests with a generation, consumption 1 and delta 0.
+    /// </summary>
+    /// <param name="profileId">The profile identity</param>
+    /// <param name="seconds">The receive time in seconds after the hour <c>H</c></param>
+    /// <param name="generation">The generation</param>
+    /// <returns>The tick</returns>
+    private static ContractTick GoodTick(Guid profileId, long seconds, float generation)
+    {
+        return Tick(profileId, seconds, seconds, Island(IslandKey, IslandName, TrendEntry(ProductGuid, generation, 1f, 0f, 1)));
+    }
+
+    /// <summary>
+    /// Creates the key of an island made by <see cref="Island" /> from one number.
+    /// </summary>
+    /// <param name="key">The number of the key</param>
+    /// <returns>The key</returns>
+    private static HistoryIslandKey TrendIsland(int key)
+    {
+        return new HistoryIslandKey(key, (byte)key, 0);
+    }
+
+    /// <summary>
+    /// Creates the trend query of the good of the tests.
+    /// </summary>
+    /// <param name="profileId">The profile identity</param>
+    /// <param name="islands">The islands to sum</param>
+    /// <param name="rangeStart">The range start, inclusive</param>
+    /// <param name="rangeEnd">The range end, exclusive</param>
+    /// <param name="maxPoints">The maximum number of points</param>
+    /// <returns>The query</returns>
+    private static HistoryGoodTrendQuery GoodQuery(Guid profileId, IReadOnlyList<HistoryIslandKey> islands, DateTimeOffset rangeStart, DateTimeOffset rangeEnd, int maxPoints)
+    {
+        return new HistoryGoodTrendQuery
+               {
+                   ProfileId = profileId,
+                   Islands = islands,
+                   ProductGuid = ProductGuid,
+                   RangeStart = rangeStart,
+                   RangeEnd = rangeEnd,
+                   MaxPoints = maxPoints
+               };
+    }
+
+    /// <summary>
+    /// Creates the figures query of an island.
+    /// </summary>
+    /// <param name="profileId">The profile identity</param>
+    /// <param name="island">The island</param>
+    /// <param name="rangeStart">The range start, inclusive</param>
+    /// <param name="rangeEnd">The range end, exclusive</param>
+    /// <param name="maxPoints">The maximum number of points</param>
+    /// <returns>The query</returns>
+    private static HistoryFiguresTrendQuery FiguresQuery(Guid profileId, HistoryIslandKey island, DateTimeOffset rangeStart, DateTimeOffset rangeEnd, int maxPoints)
+    {
+        return new HistoryFiguresTrendQuery
+               {
+                   ProfileId = profileId,
+                   Island = island,
+                   RangeStart = rangeStart,
+                   RangeEnd = rangeEnd,
+                   MaxPoints = maxPoints
+               };
+    }
+
+    /// <summary>
+    /// Describes a point of a good's trend: kind, time, generation, consumption and delta.
+    /// </summary>
+    /// <param name="point">The point</param>
+    /// <returns>The text</returns>
+    private static string DescribeGoodPoint(HistoryGoodPoint point)
+    {
+        return $"{(point.IsHourly ? "hourly" : "tick")} {FormatTime(point.Time)} {FormatValue(point.Generation)} {FormatValue(point.Consumption)} {FormatValue(point.Delta)}";
+    }
+
+    /// <summary>
+    /// Describes a point of the figures: kind, time, buildings, produced goods and goods in deficit.
+    /// </summary>
+    /// <param name="point">The point</param>
+    /// <returns>The text</returns>
+    private static string DescribeFiguresPoint(HistoryFiguresPoint point)
+    {
+        return $"{(point.IsHourly ? "hourly" : "tick")} {FormatTime(point.Time)} {point.Buildings?.ToString(CultureInfo.InvariantCulture) ?? "null"} {point.ProducedGoods?.ToString(CultureInfo.InvariantCulture) ?? "null"} {point.GoodsInDeficit?.ToString(CultureInfo.InvariantCulture) ?? "null"}";
+    }
+
+    /// <summary>
     /// Builds a map from alternating keys and values.
     /// </summary>
     /// <param name="pairs">The keys and values, alternating</param>
@@ -1723,6 +2135,25 @@ public sealed class HistoryStoreTests
         }
 
         return steps;
+    }
+
+    /// <summary>
+    /// Waits a short time for a task and tells whether it completed.
+    /// </summary>
+    /// <param name="task">The task</param>
+    /// <returns><see langword="true" /> when the task completed within the wait</returns>
+    private async Task<bool> CompletesWithinWaitAsync(Task task)
+    {
+        try
+        {
+            await task.WaitAsync(_waitBound, TestContext.CancellationToken);
+
+            return true;
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
     }
 
     /// <summary>
