@@ -241,7 +241,7 @@ and an `IConfiguration`, and cascades `DeletionAllowed`; `UiTextsTests` that enu
 ones; `CensioDbContextFactoryCreateDbContextHasNoPendingModelChanges` passes once the migration exists (Dev). A test that
 stores and reads ticks keeps its inputs: no stored tick is older than 7 days unless a test makes it so.
 
-Files no unit test can cover: none (the migration's `Down` and designer file are generated, as `InitialSchema`'s are).
+Files no unit test can cover: none (generated migration code, row classes: as `InitialSchema`'s).
 
 ## Areas
 
