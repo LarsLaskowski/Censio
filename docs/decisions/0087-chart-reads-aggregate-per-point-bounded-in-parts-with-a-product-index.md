@@ -14,7 +14,10 @@ and amount, and is unbounded in time. A tick at the contract's bounds holds 256 
 a tick is found by its good only by scanning its island's entries (the tick entries are indexed by island and
 position); the hourly entries are indexed by island and good. On the in-memory database every read takes the write gate
 ([`server-data.md`](../areas/server-data.md)), which the ingest waits for within the Companion's 30 seconds
-([0068](0068-ingest-acknowledges-a-message-only-after-it-is-stored.md)). The pages can be opened by anyone.
+([0068](0068-ingest-acknowledges-a-message-only-after-it-is-stored.md)). The pages can be opened by anyone, and an open
+chart page reads again on every tick. After a deletion, the clean-up truncates the write-ahead log once per retention
+run, and a reader open on the database file blocks that truncation
+([0084](0084-profile-deleted-in-steps-and-cleared-from-the-file.md)).
 
 ## Options considered
 
@@ -28,17 +31,23 @@ position); the hourly entries are indexed by island and good. On the in-memory d
 4. **Keep pre-computed region and island series at ingest** — cheap reads; a second store of the history that the
    fold and the deletion must keep in step.
 
+For the clean-up: **let it retry an hour later when a chart read blocks it**, as for any reader — chart pages re-read
+on every tick, so any visitor could keep a deleted profile's names in the `-wal` file indefinitely
+([0021](0021-sqlite-history-with-retention.md)); **a gate of the chart reads that the clean-up takes** (chosen).
+
 ## Decision
 
 Option 3. The history offers two reads that return one aggregated point per tick or hourly point: a good summed over a
 set of islands, and the key figures of one island. Each reads at most the newest 2,880 points of its range and their
 total count, in parts of at most 240 points with a read transaction each, and a migration adds an index of the tick
-entries by island, good and position. The rules are in [`history.md`](../areas/history.md) and
+entries by island, good and position. Each part's transaction runs under a trend gate of the database that the
+clean-up takes before the write gate and holds through the truncation. The rules are in [`history.md`](../areas/history.md) and
 [`web-charts.md`](../areas/web-charts.md).
 
 ## Consequences
 
 - The in-memory database's write gate is held for one part at a time, so the ingest waits at most for a part.
+- The clean-up waits at most for one part, and no chart read holds the deleted rows in the write-ahead log.
 - A fold that runs between two parts of one read can show a tick twice or miss it in that drawing, only for a profile
   whose range reaches back 7 days (idle); the next read draws it right.
 - Every stored tick entry writes the index as well, and the migration builds it over the stored ticks at the first

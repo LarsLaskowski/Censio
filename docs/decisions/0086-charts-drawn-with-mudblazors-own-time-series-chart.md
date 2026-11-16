@@ -16,7 +16,8 @@ $2 million revenue and asks for a paid OEM licence to embed it in a product used
 redistributed as a Docker image, and moves to every current .NET major ([0054](0054-censio-moves-to-every-current-dotnet-major.md)).
 ApexCharts also renders tooltips and legends as HTML in the browser, where island names, which the game's players
 choose, would need escaping of our own. MudBlazor 9.13.0, already referenced, has a time-series chart that the server
-renders as SVG through Blazor, which breaks a line at a point without a value.
+renders as SVG through Blazor, which breaks a line at a point without a value; it writes its legend and a tooltip
+template as escaped text, but its axis labels as raw markup.
 
 ## Options considered
 
@@ -25,8 +26,9 @@ renders as SVG through Blazor, which breaks a line at a point without a value.
 2. **Blazor-ApexCharts 6.0.2 pinned with the MIT ApexCharts 4.7.0** — MIT; built for .NET 8 and 9 only, frozen without
    fixes, and every later update brings the licence back.
 3. **Own SVG charts** — no dependency; axes, scaling, tooltips and legends to write and test ourselves.
-4. **MudBlazor's own time-series chart** (chosen by the Product Manager) — MIT, already referenced, no script, names
-   rendered as text by Blazor, theme colours from the palette; no animation of its own, one value axis.
+4. **MudBlazor's own time-series chart** (chosen by the Product Manager) — MIT, already referenced, no script, legend
+   and tooltip template rendered as text by Blazor, axis labels as raw markup, theme colours from the palette; no
+   animation of its own, one value axis.
 
 ## Decision
 
@@ -39,4 +41,5 @@ package or chart script is added. The rules of the charts are in [`web-charts.md
 - MudBlazor draws no animation: a style rule of our own reveals each line when a chart is drawn, as the Product
   Manager chose; no script is added for it.
 - One value axis per chart: the overview's buildings and goods counts share it.
+- The axis labels are raw markup, so they only ever take number and time text of our own formatting, never a name.
 - A MudBlazor update can change the chart's markup; the page tests pin what the charts must show.

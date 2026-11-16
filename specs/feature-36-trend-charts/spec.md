@@ -73,7 +73,8 @@ has no caller outside the tests, and no chart package is referenced.
   Each reads at most the newest 2,880 points and the count of all, never more (E6), and keeps no tick in memory beyond
   the one it folds into a point. The charts' reads run one at a time across the server, through a gate of their own,
   not the pages' profile reader (record 0074), so a long chart read never leaves the other pages on `Loading…`; a
-  page's reads are cancelled with the page.
+  page's reads are cancelled with the page. A prerendered page reads no chart: its charts show `Loading…` until the page
+  is interactive.
 - N3: Time: at the contract's bounds (256 islands of 512 entries per tick) each read of N2 over 2,880 points finishes
   within 10 seconds, measured as `history.md` (*Measurements*) measures on ticks at the bounds and scaled to 2,880. On the in-memory database, where every read
   takes the write gate, a chart read holds that gate no longer than a fold step at the bounds does (about 4 seconds),
@@ -87,8 +88,10 @@ has no caller outside the tests, and no chart package is referenced.
   data (record 0072); times at the browser's UTC offset for the latest tick (record 0078).
 - N7: Look: the chart's text, grid and lines take the theme's palette; each line colour reaches 3:1 against the surface
   in both themes (the *Lines* level of `web-ui.md`, *Contrast*). Desktop browsers only.
-- N8: Logging: the charts log nothing of their own; a failed read is logged without a name or value, as
-  `web-pages.md` (*Logging*) says.
+- N8: Logging: a failed chart read logs one warning, `A chart could not be read from the database.`, with the exception
+  and no other argument (no name, value, address or offset); the charts log nothing else.
+- N9: Deletion: a chart read never holds the clean-up of a deleted profile back ([`history.md`](../../docs/areas/history.md),
+  *Deleting a profile*): the clean-up waits for the chart read's part in progress and no part starts during it.
 
 ## Acceptance criteria
 
@@ -121,8 +124,8 @@ AC1 to AC3 check the history as stored by the replay, before any retention run.
 - AC11: A name holding markup appears on the page and in the chart as text only, checked with a name of E7 (E7, N4).
 - AC12: The server adds no chart package, script or style beyond MudBlazor's, and a chart page loads resources from
   the server's own paths only (N5).
-- AC13: Each read of N2 reads at most 2,880 points; the reads run one at a time on their own gate and end when the page
-  is disposed; their time at the contract's bounds and the write gate's hold on the in-memory database are measured
+- AC13: Each read of N2 reads at most 2,880 points; the reads run one at a time on their own gate, end when the page
+  is disposed, and a prerendered page makes none; their time at the contract's bounds and the write gate's hold on the in-memory database are measured
   against N3 (N2, N3).
 - AC14: manual (Product Manager, on a build of the branch, the fixture replayed after the server's first retention run
   and checked before the next, the log line `History reduced …` absent since the replay): in the light and the dark
@@ -130,6 +133,8 @@ AC1 to AC3 check the history as stored by the replay, before any retention run.
 - AC15: README and user guide, English first, then German, describe the good page, the overview chart, the range, the
   gaps, the hourly means and that an old recording shows as hourly means after the next retention run, and the README's
   "no trend charts" line is gone.
+- AC16: With a deleted profile swept and a chart read's part in progress on the database file, the clean-up waits for
+  the part, then truncates the write-ahead log to 0 bytes; a part asked for during the clean-up waits for it (N9).
 
 ## Out of scope
 
