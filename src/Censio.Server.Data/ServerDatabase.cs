@@ -41,6 +41,11 @@ public sealed class ServerDatabase : IDisposable
     /// </summary>
     internal SemaphoreSlim Gate { get; } = new(1, 1);
 
+    /// <summary>
+    /// Gets the gate that lets one trend read run at a time.
+    /// </summary>
+    internal SemaphoreSlim TrendGate { get; } = new(1, 1);
+
     #endregion // Properties
 
     #region Methods
@@ -84,6 +89,7 @@ public sealed class ServerDatabase : IDisposable
     {
         ServerDatabaseOpener.Release(Connection);
         Gate.Dispose();
+        TrendGate.Dispose();
     }
 
     #endregion // IDisposable

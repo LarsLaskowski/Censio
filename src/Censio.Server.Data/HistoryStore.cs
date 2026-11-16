@@ -5,9 +5,14 @@ namespace Censio.Server.Data;
 /// <summary>
 /// Folds, sweeps and reads the history of the server database.
 /// </summary>
-public sealed class HistoryStore
+public sealed class HistoryStore : IHistoryTrends
 {
     #region Constants
+
+    /// <summary>
+    /// The number of points a trend read takes in one part.
+    /// </summary>
+    public const int TrendPartSize = 240;
 
     /// <summary>
     /// The statement that selects the latest receive time of a profile.
@@ -470,4 +475,26 @@ public sealed class HistoryStore
     }
 
     #endregion // Methods
+
+    #region IHistoryTrends
+
+    /// <inheritdoc/>
+    public Task<HistoryTrend<HistoryGoodPoint>> ReadGoodTrendAsync(HistoryGoodTrendQuery query, CancellationToken cancellationToken)
+    {
+        // Skeleton: removed with the implementation
+#pragma warning disable RH2003
+        throw new NotImplementedException();
+#pragma warning restore RH2003
+    }
+
+    /// <inheritdoc/>
+    public Task<HistoryTrend<HistoryFiguresPoint>> ReadFiguresTrendAsync(HistoryFiguresTrendQuery query, CancellationToken cancellationToken)
+    {
+        // Skeleton: removed with the implementation
+#pragma warning disable RH2003
+        throw new NotImplementedException();
+#pragma warning restore RH2003
+    }
+
+    #endregion // IHistoryTrends
 }
