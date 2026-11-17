@@ -1,3 +1,5 @@
+using Censio.Server.Data;
+
 namespace Censio.Server;
 
 /// <summary>
@@ -31,11 +33,13 @@ public sealed class TrendRange
     #region Methods
 
     /// <summary>
-    /// Gives the range of the day up to the latest tick.
+    /// Gives the range of a choice up to the latest tick.
     /// </summary>
+    /// <param name="range">The range of the choice</param>
     /// <param name="latestTick">The receive time of the latest tick</param>
     /// <returns>The range</returns>
-    public static TrendRange Before(DateTimeOffset latestTick)
+#pragma warning disable S1172 // Skeleton: removed with the implementation
+    public static TrendRange For(ChartRange range, DateTimeOffset latestTick)
     {
         var back = latestTick.UtcTicks - TimeSpan.TicksPerDay;
         var start = back - (back % TimeSpan.TicksPerHour);
@@ -46,6 +50,17 @@ public sealed class TrendRange
                    End = new DateTimeOffset(latestTick.UtcTicks + 1, TimeSpan.Zero)
                };
     }
+
+    /// <summary>
+    /// Gives the resolution a range is read at.
+    /// </summary>
+    /// <param name="range">The range of the choice</param>
+    /// <returns>The resolution</returns>
+    public static HistoryTrendResolution ResolutionOf(ChartRange range)
+    {
+        return HistoryTrendResolution.Points;
+    }
+#pragma warning restore S1172
 
     #endregion // Methods
 }

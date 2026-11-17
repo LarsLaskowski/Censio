@@ -20,6 +20,16 @@ public static class UiPreferences
     public const string LanguageCookieName = "censio-language";
 
     /// <summary>
+    /// The name of the cookie that holds the chart range.
+    /// </summary>
+    public const string ChartRangeCookieName = "censio-chart-range";
+
+    /// <summary>
+    /// The name of the cookie that holds the chart time axis.
+    /// </summary>
+    public const string ChartAxisCookieName = "censio-chart-axis";
+
+    /// <summary>
     /// The stored value of the light theme.
     /// </summary>
     private const string LightValue = "light";
@@ -102,6 +112,19 @@ public static class UiPreferences
     }
 
     /// <summary>
+    /// Reads the chart choice of the stored cookie values; a missing or unknown value gives the default of its part.
+    /// </summary>
+    /// <param name="storedRange">The stored range, or <c>null</c> when the cookie is absent.</param>
+    /// <param name="storedAxis">The stored axis, or <c>null</c> when the cookie is absent.</param>
+    /// <returns>The choice</returns>
+#pragma warning disable S1172, RH2003 // Skeleton: removed with the implementation
+    public static ChartChoice ReadChartChoice(string? storedRange, string? storedAxis)
+    {
+        throw new NotImplementedException();
+    }
+#pragma warning restore S1172, RH2003
+
+    /// <summary>
     /// Gets the value stored for a theme.
     /// </summary>
     /// <param name="theme">The theme.</param>
@@ -120,6 +143,27 @@ public static class UiPreferences
     {
         return language == UiLanguage.German ? GermanValue : EnglishValue;
     }
+
+    /// <summary>
+    /// Gives the stored value of a range.
+    /// </summary>
+    /// <param name="range">The range</param>
+    /// <returns>The value</returns>
+    public static string StoredValue(ChartRange range)
+    {
+        throw new NotImplementedException();
+    }
+
+    /// <summary>
+    /// Gives the stored value of a time axis.
+    /// </summary>
+    /// <param name="axis">The axis</param>
+    /// <returns>The value</returns>
+    public static string StoredValue(ChartAxis axis)
+    {
+        throw new NotImplementedException();
+    }
+#pragma warning restore S1172, RH2003
 
     #endregion // Methods
 }

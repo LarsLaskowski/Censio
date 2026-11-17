@@ -17,7 +17,6 @@
 @if (Mode == PageMode.Ready && View is { } overviewView)
 {
     <TrendChart Heading="@Texts.ChartOverview" Kind="TrendKind.Figures" Read="@(_isOverviewFailed ? _failedRead : _overviewRead)" AsOf="overviewView.AsOf" ReadNumber="_overviewNumber">
-        <p>@Texts.ChartRange</p>
     </TrendChart>
 }
 @if (StatusText is { } status)

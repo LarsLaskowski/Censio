@@ -52,7 +52,17 @@ public sealed class UiTexts
                                                    DeleteHistoryCancel = "Cancel",
                                                    DeleteHistoryFailed = "The history could not be deleted.",
                                                    DeleteHistoryHostRefused = "Deleting needs this page opened by IP address or as localhost, or by a host name the setting AllowedHosts lists.",
-                                                   ChartRange = "Last 24 hours up to the latest tick",
+                                                   ChartRangeFormat = "{0} up to the latest tick",
+                                                   RangeLastHour = "Last hour",
+                                                   RangeLastDay = "Last 24 hours",
+                                                   RangeLastWeek = "Last 7 days",
+                                                   RangeAll = "All",
+                                                   RangeAllHistory = "All history",
+                                                   AxisRealTime = "Real time",
+                                                   AxisGameTime = "Game time",
+                                                   ChartRangeLabel = "Period",
+                                                   ChartAxisLabel = "Time axis",
+                                                   GameTimeFormat = "Game time {0}",
                                                    ChartThisIsland = "This island",
                                                    ChartRegionTotal = "All islands of the region",
                                                    ChartOverview = "Overview",
@@ -106,7 +116,17 @@ public sealed class UiTexts
                                                   DeleteHistoryCancel = "Abbrechen",
                                                   DeleteHistoryFailed = "Der Verlauf konnte nicht gelöscht werden.",
                                                   DeleteHistoryHostRefused = "Löschen setzt voraus, dass diese Seite über die IP-Adresse oder localhost geöffnet wurde, oder über einen Hostnamen, den die Einstellung AllowedHosts nennt.",
-                                                  ChartRange = "Letzte 24 Stunden bis zum letzten Tick",
+                                                  ChartRangeFormat = "{0} bis zum letzten Tick",
+                                                  RangeLastHour = "Letzte Stunde",
+                                                  RangeLastDay = "Letzte 24 Stunden",
+                                                  RangeLastWeek = "Letzte 7 Tage",
+                                                  RangeAll = "Gesamt",
+                                                  RangeAllHistory = "Gesamter Verlauf",
+                                                  AxisRealTime = "Echtzeit",
+                                                  AxisGameTime = "Spielzeit",
+                                                  ChartRangeLabel = "Zeitraum",
+                                                  ChartAxisLabel = "Zeitachse",
+                                                  GameTimeFormat = "Spielzeit {0}",
                                                   ChartThisIsland = "Diese Insel",
                                                   ChartRegionTotal = "Alle Inseln der Region",
                                                   ChartOverview = "Übersicht",
@@ -320,9 +340,59 @@ public sealed class UiTexts
     public required string DeleteHistoryHostRefused { get; init; }
 
     /// <summary>
-    /// Gets the chart text ChartRange.
+    /// Gets the chart text ChartRangeFormat.
     /// </summary>
-    public required string ChartRange { get; init; }
+    public required string ChartRangeFormat { get; init; }
+
+    /// <summary>
+    /// Gets the chart text RangeLastHour.
+    /// </summary>
+    public required string RangeLastHour { get; init; }
+
+    /// <summary>
+    /// Gets the chart text RangeLastDay.
+    /// </summary>
+    public required string RangeLastDay { get; init; }
+
+    /// <summary>
+    /// Gets the chart text RangeLastWeek.
+    /// </summary>
+    public required string RangeLastWeek { get; init; }
+
+    /// <summary>
+    /// Gets the chart text RangeAll.
+    /// </summary>
+    public required string RangeAll { get; init; }
+
+    /// <summary>
+    /// Gets the chart text RangeAllHistory.
+    /// </summary>
+    public required string RangeAllHistory { get; init; }
+
+    /// <summary>
+    /// Gets the chart text AxisRealTime.
+    /// </summary>
+    public required string AxisRealTime { get; init; }
+
+    /// <summary>
+    /// Gets the chart text AxisGameTime.
+    /// </summary>
+    public required string AxisGameTime { get; init; }
+
+    /// <summary>
+    /// Gets the chart text ChartRangeLabel.
+    /// </summary>
+    public required string ChartRangeLabel { get; init; }
+
+    /// <summary>
+    /// Gets the chart text ChartAxisLabel.
+    /// </summary>
+    public required string ChartAxisLabel { get; init; }
+
+    /// <summary>
+    /// Gets the chart text GameTimeFormat.
+    /// </summary>
+    public required string GameTimeFormat { get; init; }
 
     /// <summary>
     /// Gets the chart text ChartThisIsland.

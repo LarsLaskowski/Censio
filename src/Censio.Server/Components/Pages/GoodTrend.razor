@@ -19,7 +19,6 @@
 }
 else if (View is { } shown)
 {
-    <p>@Texts.ChartRange</p>
     <TrendChart Heading="@Texts.ChartThisIsland" Kind="TrendKind.Good" Read="@(_isFailed ? _failedRead : _islandRead)" AsOf="shown.AsOf" ReadNumber="_islandNumber" />
     <TrendChart Heading="@Texts.ChartRegionTotal" Kind="TrendKind.Good" Read="@(_isFailed ? _failedRead : _regionRead)" AsOf="shown.AsOf" ReadNumber="_regionNumber" />
 }

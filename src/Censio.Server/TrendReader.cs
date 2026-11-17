@@ -50,12 +50,12 @@ public sealed class TrendReader
     /// <param name="profileId">The profile identity</param>
     /// <param name="islands">The islands to sum</param>
     /// <param name="productGuid">The product GUID of the good</param>
-    /// <param name="latestTick">The receive time of the latest tick</param>
+    /// <param name="request">The request</param>
     /// <param name="cancellationToken">The cancellation token</param>
     /// <returns>The read, which is failed when the history could not be read</returns>
-    public Task<TrendRead> ReadGoodAsync(Guid profileId, IReadOnlyList<IslandKey> islands, int productGuid, DateTimeOffset latestTick, CancellationToken cancellationToken)
+    public Task<TrendRead> ReadGoodAsync(Guid profileId, IReadOnlyList<IslandKey> islands, int productGuid, TrendRequest request, CancellationToken cancellationToken)
     {
-        var range = TrendRange.Before(latestTick);
+        var range = TrendRange.For(request.Choice.Range, request.LatestTick);
         var query = new HistoryGoodTrendQuery
                     {
                         ProfileId = profileId,
@@ -63,7 +63,8 @@ public sealed class TrendReader
                         ProductGuid = productGuid,
                         RangeStart = range.Start,
                         RangeEnd = range.End,
-                        MaxPoints = TrendRange.MaxPoints
+                        MaxPoints = TrendRange.MaxPoints,
+                        Resolution = TrendRange.ResolutionOf(request.Choice.Range)
                     };
 
         return ReadAsync(async () =>
@@ -80,19 +81,20 @@ public sealed class TrendReader
     /// </summary>
     /// <param name="profileId">The profile identity</param>
     /// <param name="island">The island</param>
-    /// <param name="latestTick">The receive time of the latest tick</param>
+    /// <param name="request">The request</param>
     /// <param name="cancellationToken">The cancellation token</param>
     /// <returns>The read, which is failed when the history could not be read</returns>
-    public Task<TrendRead> ReadFiguresAsync(Guid profileId, IslandKey island, DateTimeOffset latestTick, CancellationToken cancellationToken)
+    public Task<TrendRead> ReadFiguresAsync(Guid profileId, IslandKey island, TrendRequest request, CancellationToken cancellationToken)
     {
-        var range = TrendRange.Before(latestTick);
+        var range = TrendRange.For(request.Choice.Range, request.LatestTick);
         var query = new HistoryFiguresTrendQuery
                     {
                         ProfileId = profileId,
                         Island = new HistoryIslandKey(island.SessionGuid, island.IslandId, island.AreaIndex),
                         RangeStart = range.Start,
                         RangeEnd = range.End,
-                        MaxPoints = TrendRange.MaxPoints
+                        MaxPoints = TrendRange.MaxPoints,
+                        Resolution = TrendRange.ResolutionOf(request.Choice.Range)
                     };
 
         return ReadAsync(async () =>

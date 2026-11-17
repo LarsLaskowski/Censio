@@ -148,6 +148,18 @@ public static class PageFormat
     }
 
     /// <summary>
+    /// Formats a game time in milliseconds as hours and minutes.
+    /// </summary>
+    /// <param name="milliseconds">The game time in milliseconds</param>
+    /// <returns>The text</returns>
+#pragma warning disable S1172, RH2003 // Skeleton: removed with the implementation
+    public static string GameTime(long milliseconds)
+    {
+        throw new NotImplementedException();
+    }
+#pragma warning restore S1172, RH2003
+
+    /// <summary>
     /// Rounds a value to two decimals, midpoints away from zero; a rounded negative zero is zero.
     /// </summary>
     /// <param name="value">The value</param>
