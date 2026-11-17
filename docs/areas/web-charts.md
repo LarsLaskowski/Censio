@@ -86,8 +86,9 @@ English and German. Users of the web application rely on it; the pages around th
 | a failed read | the reload text of [`web-pages.md`](web-pages.md), for every chart of the page | the German text there |
 
 - A page whose read failed shows the reload text in every chart and reads no chart again until it is loaded again; a
-  notice of the server state does not retry it. A cancelled read (the page is disposed or its address changes) shows and
-  logs nothing.
+  notice of the server state does not retry it. A cancelled read (the page is disposed) shows and logs nothing; a read
+  of an address the page has left runs to its end and is dropped, shown nowhere, and only its failure logs the warning
+  of *Logging*.
 - A chart keeps the series it draws when a new read for the same address arrives, until the browser has answered the
   offset for the new read's as-of time, then replaces it. A change of the address shows `Loading…` until its read has
   answered.
