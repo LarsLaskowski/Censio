@@ -1,6 +1,6 @@
 # 0087: Chart reads aggregate per point, read the newest 2,880 points in parts, and use an index of tick entries by good
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-16
 - **Area:** history
 - **Source:** Issue #36

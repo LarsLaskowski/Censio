@@ -1,6 +1,6 @@
 # 0086: Charts are drawn with MudBlazor's own time-series chart, not Blazor-ApexCharts
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-16
 - **Area:** web-charts
 - **Source:** Issue #36

@@ -1,6 +1,6 @@
 # 0088: Charts show the day up to a profile's latest tick and break a line after 15 minutes without a point
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-16
 - **Area:** web-charts
 - **Source:** Issue #36
