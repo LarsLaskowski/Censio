@@ -137,6 +137,12 @@ public sealed partial class TrendChart : IDisposable
     public DateTimeOffset? AsOf { get; set; }
 
     /// <summary>
+    /// Gets or sets the time axis the chart is drawn on.
+    /// </summary>
+    [Parameter]
+    public ChartAxis Axis { get; set; } = ChartAxis.RealTime;
+
+    /// <summary>
     /// Gets or sets the number of the read, which grows with every read.
     /// </summary>
     [Parameter]
@@ -357,7 +363,7 @@ public sealed partial class TrendChart : IDisposable
                    PointsByTime = pointsByTime,
                    First = pointsByTime.Keys.Min(),
                    Last = pointsByTime.Keys.Max(),
-                   Series = [.. TrendSeriesBuilder.Build(view, LineNames, offsetMinutes)],
+                   Series = [.. TrendSeriesBuilder.Build(view, LineNames, offsetMinutes, Axis)],
                    SeriesTexts = Texts
                };
     }

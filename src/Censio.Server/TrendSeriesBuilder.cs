@@ -33,13 +33,64 @@ public static class TrendSeriesBuilder
     /// <param name="view">The view</param>
     /// <param name="lineNames">The names of the lines</param>
     /// <param name="offsetMinutes">The UTC offset of the browser in minutes, or <see langword="null"/> for UTC</param>
+    /// <param name="axis">The time axis</param>
     /// <returns>The series</returns>
-    public static IReadOnlyList<ChartSeries<double>> Build(TrendView view, IReadOnlyList<string> lineNames, int? offsetMinutes)
+    public static IReadOnlyList<ChartSeries<double>> Build(TrendView view, IReadOnlyList<string> lineNames, int? offsetMinutes, ChartAxis axis)
     {
+        if (axis == ChartAxis.GameTime)
+        {
+            // Skeleton: removed with the implementation
+            throw new NotImplementedException();
+        }
+
         var offset = OffsetOf(offsetMinutes);
 
         return [.. lineNames.Select((name, line) => BuildLine(view, name, line, offset))];
     }
+
+    /// <summary>
+    /// Maps a game time in milliseconds to its place on the game-time axis.
+    /// </summary>
+    /// <param name="gameTime">The game time in milliseconds</param>
+    /// <returns>The place, or <see langword="null"/> when it lies outside <see cref="DateTime"/></returns>
+#pragma warning disable S1172, RH2003 // Skeleton: removed with the implementation
+    public static DateTime? GameAxisTime(long gameTime)
+    {
+        throw new NotImplementedException();
+    }
+
+    /// <summary>
+    /// Tells whether a line is interrupted between two points on the game-time axis.
+    /// </summary>
+    /// <param name="earlier">The earlier point</param>
+    /// <param name="later">The later point</param>
+    /// <returns><see langword="true"/> when the line breaks before the later point</returns>
+    public static bool BreaksBeforeInGameTime(TrendPoint earlier, TrendPoint later)
+    {
+        throw new NotImplementedException();
+    }
+
+    /// <summary>
+    /// Gives the step between the time labels of a span.
+    /// </summary>
+    /// <param name="span">The span the chart shows</param>
+    /// <returns>The smallest step of the step list that gives at most eight intervals</returns>
+    public static TimeSpan LabelSpacing(TimeSpan span)
+    {
+        throw new NotImplementedException();
+    }
+
+    /// <summary>
+    /// Gives the format of the time labels of an axis and span.
+    /// </summary>
+    /// <param name="axis">The time axis</param>
+    /// <param name="span">The span the chart shows</param>
+    /// <returns>The <see cref="DateTime"/> format</returns>
+    public static string TimeLabelFormat(ChartAxis axis, TimeSpan span)
+    {
+        throw new NotImplementedException();
+    }
+#pragma warning restore S1172, RH2003
 
     /// <summary>
     /// Gives the clock time of an instant at the browser's offset, or in UTC without a usable offset: the time the chart's axis shows.
