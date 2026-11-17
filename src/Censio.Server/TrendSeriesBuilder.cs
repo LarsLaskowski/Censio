@@ -39,8 +39,9 @@ public static class TrendSeriesBuilder
     {
         if (axis == ChartAxis.GameTime)
         {
-            // Skeleton: removed with the implementation
+#pragma warning disable RH2003 // Skeleton: removed with the implementation
             throw new NotImplementedException();
+#pragma warning restore RH2003
         }
 
         var offset = OffsetOf(offsetMinutes);
