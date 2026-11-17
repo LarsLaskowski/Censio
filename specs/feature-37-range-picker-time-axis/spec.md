@@ -1,7 +1,7 @@
 # Spec: Range picker and real-time / game-time switch
 
 Source: Issue #37
-Status: Draft
+Status: Approved by Lead
 
 ## Problem
 
@@ -46,7 +46,7 @@ while the game is paused ([`protocol.md`](../../docs/protocol.md), *Timestamp*, 
   smallest.
 - E8: Game time that does not rise with receive time (an older save played under the same profile, a tick split by a stall
   with one game time, [`pipe.md`](../../docs/areas/pipe.md)): on the game-time axis the points are drawn in game-time order,
-  points of equal game time side by side; the real-time axis is unchanged.
+  points of equal game time at the same place (the tooltip names the first); the real-time axis is unchanged.
 - E9: One browser offset serves the whole period ([record 0078](../../docs/decisions/0078-times-shown-at-the-browsers-utc-offset.md)),
   so on `Last 7 days` and `All` a daylight-saving change inside the period shows every point before it one hour off, and an
   offset that is no whole hour (+5:30) puts the hourly points between the labels (`:30`).
