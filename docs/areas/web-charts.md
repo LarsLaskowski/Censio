@@ -134,10 +134,10 @@ English and German. Users of the web application rely on it; the pages around th
 | the charts' read has not answered, or the page is prerendered, or the browser's offset has not answered for the first drawing | `Loading…` | `Wird geladen…` |
 | a failed read | the reload text of [`web-pages.md`](web-pages.md), for every chart of the page | the German text there |
 
-- A page whose read failed shows the reload text in every chart and reads no chart again until it is loaded again; a
-  notice of the server state does not retry it. A cancelled read (the page is disposed) shows and logs nothing; a read
-  of an address the page has left runs to its end and is dropped, shown nowhere, and only its failure logs the warning
-  of *Logging*.
+- A page whose read failed shows the reload text in every chart and reads no chart again until it is loaded again or a
+  new range is chosen; a notice of the server state does not retry it. A cancelled read (the page is disposed, or its
+  address or range changed) shows and logs nothing: a read of an address or range the page has left is cancelled at its
+  next part, shown nowhere, and only a failure before that logs the warning of *Logging*.
 - A chart keeps the series it draws when a new read for the same address arrives, until the browser has answered the
   offset for the new read's as-of time, then replaces it. A change of the address shows `Loading…` until its read has
   answered.
@@ -167,12 +167,13 @@ English and German. Users of the web application rely on it; the pages around th
   formats* of [`web-pages.md`](web-pages.md) says: production and consumption with two decimals, delta with a sign, the
   overview's counts as whole numbers, `–` for no value. MudBlazor draws one hover point per point of a line, which is
   17,280 on a good page with both charts at 2,880 points.
-- Times are shown at the UTC offset the browser gives for the receive time of the latest tick, the one the as-of line uses
-  ([record 0078](../decisions/0078-times-shown-at-the-browsers-utc-offset.md)); the page asks the browser once for each new
-  as-of time of a chart (`censio.utcOffsetMinutes`, [`web-ui.md`](web-ui.md), *Resources*), also for the tooltip's time and
-  the axis labels, and a single offset serves the whole range, so a daylight-saving change inside the 24 hours shifts the
-  hours before it by one hour. An answer that is unusable (a failed call, no number, an offset outside -840 to 840 minutes)
-  counts as none: the tooltip's time is then UTC with the suffix ` UTC`, and the axis labels are UTC.
+- Times are shown at the UTC offset the browser gives for the receive time of the latest tick, the one the as-of line
+  uses ([record 0078](../decisions/0078-times-shown-at-the-browsers-utc-offset.md)); the page asks the browser once for
+  each new as-of time of a chart (`censio.utcOffsetMinutes`, [`web-ui.md`](web-ui.md), *Resources*), also for the
+  tooltip's time and the axis labels, and a single offset serves the whole range, so a daylight-saving change inside the
+  range shifts the hours before it by one hour. An answer that is unusable (a failed call, no number, an offset outside
+  -840 to 840 minutes) counts as none: the tooltip's time is then UTC with the suffix ` UTC`, and the axis labels are
+  UTC.
 - The time axis labels of `Real time` are `HH:mm` at that offset, and `MM-dd HH:mm` when the points span more than one day.
   Their spacing follows the span the points cover: the smallest of 10, 15 and 30 minutes, 1, 2, 3, 6 and 12 hours and 1, 2,
   7, 14, 30, 90 and 365 days that gives at most 8 intervals over the span, and 365 days beyond that (a span of 169 hours: 1

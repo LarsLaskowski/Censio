@@ -134,8 +134,9 @@ the Docker health probe rely on it.
 
 ## Limits and errors
 
-- The server reads no request body and takes no input on `/health`; on `/` it reads the two preference cookies and the
-  `Accept-Language` header and handles unknown values as [`web-ui.md`](web-ui.md) says; what `/ingest` reads is in [`ingest.md`](ingest.md).
+- The server reads no request body and takes no input on `/health`; on `/` it reads the four preference cookies and the
+  `Accept-Language` header and handles unknown values as [`web-ui.md`](web-ui.md) says; what `/ingest` reads is in
+  [`ingest.md`](ingest.md).
 - The data pages read the segments of their address, and `/icons/{reference}` its reference, parsed whole and
   checked before any read as [`web-pages.md`](web-pages.md) says (a profile in its 36-character form, numbers of at most
   ten digits, a reference of 64 lowercase hex characters); a segment that does not match shows `Not found.` on a page
