@@ -80,6 +80,16 @@ public sealed class HistoryStore : IHistoryTrends
     private const string ProfileParameter = "$profile";
 
     /// <summary>
+    /// The name of the product parameter of the statements.
+    /// </summary>
+    private const string ProductParameter = "$product";
+
+    /// <summary>
+    /// The name of the parameter of the row numbers of the statements.
+    /// </summary>
+    private const string NumbersParameter = "$numbers";
+
+    /// <summary>
     /// The expression that makes one number of an island key of a tick entry's island.
     /// </summary>
     private const string TickIslandKeySql = "(ti.\"SessionGuid\" * 65536 + ti.\"IslandId\" * 256 + ti.\"AreaIndex\")";
@@ -112,40 +122,124 @@ public sealed class HistoryStore : IHistoryTrends
     /// <summary>
     /// The statement that selects the first entry of a good on each island of a set for some ticks.
     /// </summary>
-    private const string TickGoodTrendSql = "SELECT t.\"Number\", e.\"Generation\", e.\"Consumption\", e.\"Delta\" "
-                                            + "FROM \"Ticks\" t "
-                                            + "JOIN \"TickIslands\" ti ON ti.\"TickNumber\" = t.\"Number\" "
-                                            + "JOIN \"TickEntries\" e ON e.\"Id\" = (SELECT x.\"Id\" FROM \"TickEntries\" x WHERE x.\"TickIslandId\" = ti.\"Id\" AND x.\"ProductGuid\" = $product ORDER BY x.\"Position\" LIMIT 1) "
-                                            + "WHERE t.\"ProfileId\" = $profile AND t.\"Number\" IN (SELECT \"value\" FROM json_each($numbers)) AND " + TickIslandKeySql + " IN (SELECT \"value\" FROM json_each($islands)) "
-                                            + "ORDER BY t.\"Number\", ti.\"SessionGuid\", ti.\"IslandId\", ti.\"AreaIndex\";";
+    private const string TickGoodTrendSql = "SELECT t.\"Number\", e.\"Generation\", e.\"Consumption\", e.\"Delta\" " + TickGoodFromSql + ";";
+
+    /// <summary>
+    /// The statement that selects the first entry of a good on each island of a set for some ticks, with the island key.
+    /// </summary>
+    private const string TickGoodHourSql = "SELECT t.\"Number\", e.\"Generation\", e.\"Consumption\", e.\"Delta\", " + TickIslandKeySql + " " + TickGoodFromSql + ";";
 
     /// <summary>
     /// The statement that selects the entry of a good on each island of a set for some hourly points.
     /// </summary>
-    private const string HourlyGoodTrendSql = "SELECT p.\"Number\", e.\"GenerationSum\", e.\"GenerationCount\", e.\"ConsumptionSum\", e.\"ConsumptionCount\", e.\"DeltaSum\", e.\"DeltaCount\" "
-                                              + "FROM \"HourlyPoints\" p "
-                                              + "JOIN \"HourlyIslands\" hi ON hi.\"PointNumber\" = p.\"Number\" "
-                                              + "JOIN \"HourlyEntries\" e ON e.\"HourlyIslandId\" = hi.\"Id\" AND e.\"ProductGuid\" = $product "
-                                              + "WHERE p.\"ProfileId\" = $profile AND p.\"Number\" IN (SELECT \"value\" FROM json_each($numbers)) AND " + HourlyIslandKeySql + " IN (SELECT \"value\" FROM json_each($islands)) "
-                                              + "ORDER BY p.\"Number\", hi.\"SessionGuid\", hi.\"IslandId\", hi.\"AreaIndex\";";
+    private const string HourlyGoodTrendSql = "SELECT p.\"Number\", e.\"GenerationSum\", e.\"GenerationCount\", e.\"ConsumptionSum\", e.\"ConsumptionCount\", e.\"DeltaSum\", e.\"DeltaCount\" " + HourlyGoodFromSql + ";";
+
+    /// <summary>
+    /// The statement that selects the entry of a good on each island of a set for some hourly points, with the island key.
+    /// </summary>
+    private const string HourlyGoodHourSql = "SELECT p.\"Number\", e.\"GenerationSum\", e.\"GenerationCount\", e.\"ConsumptionSum\", e.\"ConsumptionCount\", e.\"DeltaSum\", e.\"DeltaCount\", " + HourlyIslandKeySql + " " + HourlyGoodFromSql + ";";
 
     /// <summary>
     /// The statement that selects the entries of an island for some ticks.
     /// </summary>
-    private const string TickFiguresTrendSql = "SELECT t.\"Number\", e.\"BuildingCount\", e.\"Delta\" "
-                                               + "FROM \"Ticks\" t "
-                                               + "JOIN \"TickIslands\" ti ON ti.\"TickNumber\" = t.\"Number\" AND ti.\"SessionGuid\" = $session AND ti.\"IslandId\" = $island AND ti.\"AreaIndex\" = $area "
-                                               + "JOIN \"TickEntries\" e ON e.\"TickIslandId\" = ti.\"Id\" "
-                                               + "WHERE t.\"ProfileId\" = $profile AND t.\"Number\" IN (SELECT \"value\" FROM json_each($numbers));";
+    private const string TickFiguresTrendSql = "SELECT t.\"Number\", e.\"BuildingCount\", e.\"Delta\" " + TickFiguresFromSql + ";";
+
+    /// <summary>
+    /// The statement that selects the entries of an island for some ticks with their good, in the order of the entries.
+    /// </summary>
+    private const string TickFiguresHourSql = "SELECT t.\"Number\", e.\"BuildingCount\", e.\"Delta\", e.\"ProductGuid\" " + TickFiguresFromSql + " ORDER BY t.\"Number\", e.\"Position\";";
 
     /// <summary>
     /// The statement that selects the entries of an island for some hourly points.
     /// </summary>
-    private const string HourlyFiguresTrendSql = "SELECT p.\"Number\", e.\"EntryCount\", e.\"BuildingCountSum\", e.\"DeltaSum\", e.\"DeltaCount\" "
-                                                 + "FROM \"HourlyPoints\" p "
-                                                 + "JOIN \"HourlyIslands\" hi ON hi.\"PointNumber\" = p.\"Number\" AND hi.\"SessionGuid\" = $session AND hi.\"IslandId\" = $island AND hi.\"AreaIndex\" = $area "
-                                                 + "JOIN \"HourlyEntries\" e ON e.\"HourlyIslandId\" = hi.\"Id\" "
-                                                 + "WHERE p.\"ProfileId\" = $profile AND p.\"Number\" IN (SELECT \"value\" FROM json_each($numbers));";
+    private const string HourlyFiguresTrendSql = "SELECT p.\"Number\", e.\"EntryCount\", e.\"BuildingCountSum\", e.\"DeltaSum\", e.\"DeltaCount\" " + HourlyFiguresFromSql + ";";
+
+    /// <summary>
+    /// The statement that selects the entries of an island for some hourly points with their good.
+    /// </summary>
+    private const string HourlyFiguresHourSql = "SELECT p.\"Number\", e.\"EntryCount\", e.\"BuildingCountSum\", e.\"DeltaSum\", e.\"DeltaCount\", e.\"ProductGuid\" " + HourlyFiguresFromSql + ";";
+
+    /// <summary>
+    /// The expression that tells whether an island of a tick holds an entry.
+    /// </summary>
+    private const string TickHasEntrySql = "EXISTS (SELECT 1 FROM \"TickIslands\" xi JOIN \"TickEntries\" xe ON xe.\"TickIslandId\" = xi.\"Id\" WHERE xi.\"TickNumber\" = t.\"Number\")";
+
+    /// <summary>
+    /// The expression that tells whether an island of an hourly point holds an entry.
+    /// </summary>
+    private const string HourlyHasEntrySql = "EXISTS (SELECT 1 FROM \"HourlyIslands\" xi JOIN \"HourlyEntries\" xe ON xe.\"HourlyIslandId\" = xi.\"Id\" WHERE xi.\"PointNumber\" = p.\"Number\")";
+
+    /// <summary>
+    /// The statement that selects the game time of some ticks and whether an island of each holds an entry.
+    /// </summary>
+    private const string TickGameTimesSql = "SELECT t.\"Number\", t.\"GameTime\", " + TickHasEntrySql + " FROM \"Ticks\" t WHERE t.\"Number\" IN (SELECT \"value\" FROM json_each($numbers));";
+
+    /// <summary>
+    /// The statement that selects the game times of some hourly points and whether an island of each holds an entry.
+    /// </summary>
+    private const string HourlyGameTimesSql = "SELECT p.\"Number\", p.\"FirstGameTime\", p.\"LastGameTime\", " + HourlyHasEntrySql + " FROM \"HourlyPoints\" p WHERE p.\"Number\" IN (SELECT \"value\" FROM json_each($numbers));";
+
+    /// <summary>
+    /// The statement that selects the newest hours of a range that hold an hourly point.
+    /// </summary>
+    private const string HourlyHoursSql = "SELECT \"HourTicks\" FROM \"HourlyPoints\" WHERE \"ProfileId\" = $profile AND \"HourTicks\" >= $start AND \"HourTicks\" < $end ORDER BY \"HourTicks\" DESC LIMIT $max;";
+
+    /// <summary>
+    /// The statement that selects the newest hours of a range that hold a tick, with the number of ticks of each.
+    /// </summary>
+    private const string TickHoursSql = "SELECT (\"ReceiveTicks\" / $hour) * $hour AS \"Hour\", count(*) FROM \"Ticks\" WHERE \"ProfileId\" = $profile AND \"ReceiveTicks\" >= $start AND \"ReceiveTicks\" < $end GROUP BY \"Hour\" ORDER BY \"Hour\" DESC LIMIT $max;";
+
+    /// <summary>
+    /// The statement that counts the hours of a range that hold a tick or an hourly point.
+    /// </summary>
+    private const string HourCountSql = "SELECT count(*) FROM (SELECT \"HourTicks\" AS \"Hour\" FROM \"HourlyPoints\" WHERE \"ProfileId\" = $profile AND \"HourTicks\" >= $start AND \"HourTicks\" < $end "
+                                        + "UNION SELECT (\"ReceiveTicks\" / $hour) * $hour FROM \"Ticks\" WHERE \"ProfileId\" = $profile AND \"ReceiveTicks\" >= $start AND \"ReceiveTicks\" < $end);";
+
+    /// <summary>
+    /// The statement that selects the next ticks of a range of receive times, after a tick, with their game time and whether an island holds an entry.
+    /// </summary>
+    private const string TickSliceSql = "SELECT t.\"Number\", t.\"ReceiveTicks\", t.\"GameTime\", " + TickHasEntrySql + " FROM \"Ticks\" t "
+                                        + "WHERE t.\"ProfileId\" = $profile AND t.\"ReceiveTicks\" >= $from AND t.\"ReceiveTicks\" < $to AND (t.\"ReceiveTicks\", t.\"Number\") > ($lastReceive, $lastNumber) "
+                                        + "ORDER BY t.\"ReceiveTicks\", t.\"Number\" LIMIT $limit;";
+
+    /// <summary>
+    /// The statement that selects the hourly points of some hours with their game times and whether an island holds an entry.
+    /// </summary>
+    private const string HourlyHeadsSql = "SELECT p.\"Number\", p.\"HourTicks\", p.\"FirstGameTime\", p.\"LastGameTime\", " + HourlyHasEntrySql + " FROM \"HourlyPoints\" p WHERE p.\"ProfileId\" = $profile AND p.\"HourTicks\" IN (SELECT \"value\" FROM json_each($hours));";
+
+    /// <summary>
+    /// The statement that selects the entry of a good on each island of a set for some ticks, without the columns.
+    /// </summary>
+    private const string TickGoodFromSql = "FROM \"Ticks\" t "
+                                           + "JOIN \"TickIslands\" ti ON ti.\"TickNumber\" = t.\"Number\" "
+                                           + "JOIN \"TickEntries\" e ON e.\"Id\" = (SELECT x.\"Id\" FROM \"TickEntries\" x WHERE x.\"TickIslandId\" = ti.\"Id\" AND x.\"ProductGuid\" = $product ORDER BY x.\"Position\" LIMIT 1) "
+                                           + "WHERE t.\"ProfileId\" = $profile AND t.\"Number\" IN (SELECT \"value\" FROM json_each($numbers)) AND " + TickIslandKeySql + " IN (SELECT \"value\" FROM json_each($islands)) "
+                                           + "ORDER BY t.\"Number\", ti.\"SessionGuid\", ti.\"IslandId\", ti.\"AreaIndex\"";
+
+    /// <summary>
+    /// The statement that selects the entry of a good on each island of a set for some hourly points, without the columns.
+    /// </summary>
+    private const string HourlyGoodFromSql = "FROM \"HourlyPoints\" p "
+                                             + "JOIN \"HourlyIslands\" hi ON hi.\"PointNumber\" = p.\"Number\" "
+                                             + "JOIN \"HourlyEntries\" e ON e.\"HourlyIslandId\" = hi.\"Id\" AND e.\"ProductGuid\" = $product "
+                                             + "WHERE p.\"ProfileId\" = $profile AND p.\"Number\" IN (SELECT \"value\" FROM json_each($numbers)) AND " + HourlyIslandKeySql + " IN (SELECT \"value\" FROM json_each($islands)) "
+                                             + "ORDER BY p.\"Number\", hi.\"SessionGuid\", hi.\"IslandId\", hi.\"AreaIndex\"";
+
+    /// <summary>
+    /// The statement that selects the entries of an island for some ticks, without the columns.
+    /// </summary>
+    private const string TickFiguresFromSql = "FROM \"Ticks\" t "
+                                              + "JOIN \"TickIslands\" ti ON ti.\"TickNumber\" = t.\"Number\" AND ti.\"SessionGuid\" = $session AND ti.\"IslandId\" = $island AND ti.\"AreaIndex\" = $area "
+                                              + "JOIN \"TickEntries\" e ON e.\"TickIslandId\" = ti.\"Id\" "
+                                              + "WHERE t.\"ProfileId\" = $profile AND t.\"Number\" IN (SELECT \"value\" FROM json_each($numbers))";
+
+    /// <summary>
+    /// The statement that selects the entries of an island for some hourly points, without the columns.
+    /// </summary>
+    private const string HourlyFiguresFromSql = "FROM \"HourlyPoints\" p "
+                                                + "JOIN \"HourlyIslands\" hi ON hi.\"PointNumber\" = p.\"Number\" AND hi.\"SessionGuid\" = $session AND hi.\"IslandId\" = $island AND hi.\"AreaIndex\" = $area "
+                                                + "JOIN \"HourlyEntries\" e ON e.\"HourlyIslandId\" = hi.\"Id\" "
+                                                + "WHERE p.\"ProfileId\" = $profile AND p.\"Number\" IN (SELECT \"value\" FROM json_each($numbers))";
 
     #endregion // Constants
 
@@ -316,12 +410,44 @@ public sealed class HistoryStore : IHistoryTrends
     /// <param name="hours">The hours with their tick counts and whether an hourly point exists.</param>
     /// <param name="partSize">The maximum number of rows per part.</param>
     /// <returns>The parts, each a list of hour slices.</returns>
-#pragma warning disable RH2003 // Skeleton: removed with the implementation
     internal static List<List<TrendHourSlice>> PlanHourParts(IReadOnlyList<(long HourTicks, int Ticks, bool WithHourly)> hours, int partSize)
     {
-        throw new NotImplementedException();
+        var size = Math.Max(1, partSize);
+        var parts = new List<List<TrendHourSlice>>();
+        var part = new List<TrendHourSlice>();
+        var room = size;
+
+        foreach (var (hourTicks, ticks, withHourly) in hours)
+        {
+            var remaining = ticks;
+            var hourly = withHourly;
+
+            while (remaining > 0 || hourly)
+            {
+                var taken = Math.Min(remaining, room - (hourly ? 1 : 0));
+
+                part.Add(new TrendHourSlice(hourTicks, taken, hourly));
+
+                room -= taken + (hourly ? 1 : 0);
+                remaining -= taken;
+                hourly = false;
+
+                if (room == 0)
+                {
+                    parts.Add(part);
+                    part = [];
+                    room = size;
+                }
+            }
+        }
+
+        if (part.Count > 0)
+        {
+            parts.Add(part);
+        }
+
+        return parts;
     }
-#pragma warning restore RH2003
 
     /// <summary>
     /// Merges the hourly points and the tick points, both in time order, the hourly point first on equal times.
@@ -368,7 +494,7 @@ public sealed class HistoryStore : IHistoryTrends
                                          ("$session", query.SessionGuid),
                                          ("$island", (int)query.IslandId),
                                          ("$area", (int)query.AreaIndex),
-                                         ("$product", query.ProductGuid),
+                                         (ProductParameter, query.ProductGuid),
                                          ("$start", query.RangeStart.UtcTicks),
                                          ("$end", query.RangeEnd.UtcTicks));
     }
@@ -668,10 +794,11 @@ public sealed class HistoryStore : IHistoryTrends
     private static async Task<List<HistoryGoodPoint>> ReadGoodPartAsync(SqliteConnection connection, HistoryGoodTrendQuery query, List<TrendTime> part, CancellationToken cancellationToken)
     {
         var islands = SerializeIslands(query.Islands);
+        var gameTimes = await ReadGameTimesAsync(connection, part, cancellationToken).ConfigureAwait(false);
         var ticks = new Dictionary<long, (double? Generation, double? Consumption, double? Delta)>();
         var hourly = new Dictionary<long, (double? Generation, double? Consumption, double? Delta)>();
 
-        using (var command = StoreAccess.CreateCommand(connection, TickGoodTrendSql, (ProfileParameter, query.ProfileId), ("$product", query.ProductGuid), ("$numbers", SerializeNumbers(part, false)), ("$islands", islands)))
+        using (var command = StoreAccess.CreateCommand(connection, TickGoodTrendSql, (ProfileParameter, query.ProfileId), (ProductParameter, query.ProductGuid), (NumbersParameter, SerializeNumbers(part, false)), ("$islands", islands)))
             using (var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
             {
                 while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
@@ -682,7 +809,7 @@ public sealed class HistoryStore : IHistoryTrends
                 }
             }
 
-        using (var command = StoreAccess.CreateCommand(connection, HourlyGoodTrendSql, (ProfileParameter, query.ProfileId), ("$product", query.ProductGuid), ("$numbers", SerializeNumbers(part, true)), ("$islands", islands)))
+        using (var command = StoreAccess.CreateCommand(connection, HourlyGoodTrendSql, (ProfileParameter, query.ProfileId), (ProductParameter, query.ProductGuid), (NumbersParameter, SerializeNumbers(part, true)), ("$islands", islands)))
             using (var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
             {
                 while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
@@ -697,6 +824,7 @@ public sealed class HistoryStore : IHistoryTrends
                    .. part.Select(time =>
                                   {
                                       var sums = (time.IsHourly ? hourly : ticks).GetValueOrDefault(time.Number);
+                                      var found = gameTimes.TryGetValue((time.IsHourly, time.Number), out var head);
 
                                       return new HistoryGoodPoint
                                              {
@@ -704,7 +832,10 @@ public sealed class HistoryStore : IHistoryTrends
                                                  IsHourly = time.IsHourly,
                                                  Generation = sums.Generation,
                                                  Consumption = sums.Consumption,
-                                                 Delta = sums.Delta
+                                                 Delta = sums.Delta,
+                                                 GameTime = found ? head.Last : null,
+                                                 FirstGameTime = found ? head.First : null,
+                                                 HasNoEntries = found && head.HasEntries == false
                                              };
                                   })
                ];
@@ -747,11 +878,13 @@ public sealed class HistoryStore : IHistoryTrends
     {
         var ticks = await ReadTickFiguresAsync(connection, query, part, cancellationToken).ConfigureAwait(false);
         var hourly = await ReadHourlyFiguresAsync(connection, query, part, cancellationToken).ConfigureAwait(false);
+        var gameTimes = await ReadGameTimesAsync(connection, part, cancellationToken).ConfigureAwait(false);
 
         return [
                    .. part.Select(time =>
                                   {
                                       var found = (time.IsHourly ? hourly : ticks).TryGetValue(time.Number, out var sums);
+                                      var headFound = gameTimes.TryGetValue((time.IsHourly, time.Number), out var head);
 
                                       return new HistoryFiguresPoint
                                              {
@@ -759,7 +892,10 @@ public sealed class HistoryStore : IHistoryTrends
                                                  IsHourly = time.IsHourly,
                                                  Buildings = found ? (long)Math.Round(sums.Buildings, MidpointRounding.AwayFromZero) : null,
                                                  ProducedGoods = found ? sums.Produced : null,
-                                                 GoodsInDeficit = found ? sums.Deficit : null
+                                                 GoodsInDeficit = found ? sums.Deficit : null,
+                                                 GameTime = headFound ? head.Last : null,
+                                                 FirstGameTime = headFound ? head.First : null,
+                                                 HasNoEntries = headFound && head.HasEntries == false
                                              };
                                   })
                ];
@@ -837,7 +973,420 @@ public sealed class HistoryStore : IHistoryTrends
                                          ("$session", query.Island.SessionGuid),
                                          ("$island", (int)query.Island.IslandId),
                                          ("$area", (int)query.Island.AreaIndex),
-                                         ("$numbers", numbers));
+                                         (NumbersParameter, numbers));
+    }
+
+    /// <summary>
+    /// Reads the game times of the points of a part and whether an island of each holds an entry.
+    /// </summary>
+    /// <param name="connection">The opened connection inside a read transaction</param>
+    /// <param name="part">The points of the part</param>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>The smallest and largest game time and the entry flag by kind and row number; a tick has the same game time twice</returns>
+    private static async Task<Dictionary<(bool IsHourly, long Number), (long First, long Last, bool HasEntries)>> ReadGameTimesAsync(SqliteConnection connection, List<TrendTime> part, CancellationToken cancellationToken)
+    {
+        var heads = new Dictionary<(bool IsHourly, long Number), (long First, long Last, bool HasEntries)>();
+
+        foreach (var (isHourly, sql) in new[] { (false, TickGameTimesSql), (true, HourlyGameTimesSql) })
+        {
+            using var command = StoreAccess.CreateCommand(connection, sql, (NumbersParameter, SerializeNumbers(part, isHourly)));
+            using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+
+            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            {
+                var first = reader.GetInt64(1);
+
+                heads[(isHourly, reader.GetInt64(0))] = isHourly
+                                                            ? (first, reader.GetInt64(2), reader.GetInt64(3) != 0)
+                                                            : (first, first, reader.GetInt64(2) != 0);
+            }
+        }
+
+        return heads;
+    }
+
+    /// <summary>
+    /// Reads the newest hours of a range that hold a tick or an hourly point, and the number of all such hours.
+    /// </summary>
+    /// <param name="connection">The opened connection inside a read transaction</param>
+    /// <param name="profileId">The profile identity</param>
+    /// <param name="range">The range start, inclusive, and end, exclusive</param>
+    /// <param name="maxPoints">The maximum number of hours</param>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>The newest hours, oldest first, with their tick counts and whether an hourly point exists, and the number of all hours</returns>
+    private static async Task<(List<(long HourTicks, int Ticks, bool WithHourly)> Hours, int Total)> ReadHourTimesAsync(SqliteConnection connection, Guid profileId, (DateTimeOffset Start, DateTimeOffset End) range, int maxPoints, CancellationToken cancellationToken)
+    {
+        var found = new Dictionary<long, (int Ticks, bool WithHourly)>();
+
+        using var countCommand = CreateRangeCommand(connection, HourCountSql, profileId, range.Start, range.End, ("$hour", TimeSpan.TicksPerHour));
+
+        var total = Convert.ToInt32(await countCommand.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false), System.Globalization.CultureInfo.InvariantCulture);
+
+        using (var command = CreateRangeCommand(connection, HourlyHoursSql, profileId, range.Start, range.End, ("$max", maxPoints)))
+            using (var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
+            {
+                while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                {
+                    found[reader.GetInt64(0)] = (0, true);
+                }
+            }
+
+        using (var command = CreateRangeCommand(connection, TickHoursSql, profileId, range.Start, range.End, ("$hour", TimeSpan.TicksPerHour), ("$max", maxPoints)))
+            using (var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
+            {
+                while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                {
+                    var hour = reader.GetInt64(0);
+
+                    found[hour] = (reader.GetInt32(1), found.TryGetValue(hour, out var existing) && existing.WithHourly);
+                }
+            }
+
+        return ([.. found.OrderByDescending(pair => pair.Key).Take(maxPoints).OrderBy(pair => pair.Key).Select(pair => (pair.Key, pair.Value.Ticks, pair.Value.WithHourly))], total);
+    }
+
+    /// <summary>
+    /// Reads the hourly points of the hours of a part, with their game times and whether an island holds an entry.
+    /// </summary>
+    /// <param name="connection">The opened connection inside a read transaction</param>
+    /// <param name="profileId">The profile identity</param>
+    /// <param name="part">The slices of the part</param>
+    /// <param name="totalsByHour">The totals of the hours of the part</param>
+    /// <param name="owners">Receives the totals of each hourly point by its row number</param>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>A task that represents the asynchronous operation</returns>
+    private static async Task ReadHourlyHeadsAsync(SqliteConnection connection, Guid profileId, List<TrendHourSlice> part, Dictionary<long, HourTotals> totalsByHour, Dictionary<long, HourTotals> owners, CancellationToken cancellationToken)
+    {
+        var hours = JsonSerializer.Serialize(part.Where(slice => slice.WithHourly).Select(slice => slice.HourTicks).ToArray());
+
+        using var command = StoreAccess.CreateCommand(connection, HourlyHeadsSql, (ProfileParameter, profileId), ("$hours", hours));
+        using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            var totals = totalsByHour[reader.GetInt64(1)];
+
+            owners[reader.GetInt64(0)] = totals;
+            totals.AddGameTimes(reader.GetInt64(2), reader.GetInt64(3), reader.GetInt64(4) != 0);
+        }
+    }
+
+    /// <summary>
+    /// Reads the next ticks of an hour after the last one read, with their game times and whether an island holds an entry.
+    /// </summary>
+    /// <param name="connection">The opened connection inside a read transaction</param>
+    /// <param name="profileId">The profile identity</param>
+    /// <param name="range">The range start, inclusive, and end, exclusive</param>
+    /// <param name="slice">The slice of the hour to read</param>
+    /// <param name="totals">The totals of the hour, which take the game times and the position of the last tick</param>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>The row numbers of the ticks read</returns>
+    private static async Task<List<long>> ReadTickSliceAsync(SqliteConnection connection, Guid profileId, (DateTimeOffset Start, DateTimeOffset End) range, TrendHourSlice slice, HourTotals totals, CancellationToken cancellationToken)
+    {
+        var numbers = new List<long>(slice.Ticks);
+        var from = Math.Max(slice.HourTicks, range.Start.UtcTicks);
+        var to = Math.Min(slice.HourTicks + TimeSpan.TicksPerHour, range.End.UtcTicks);
+
+        using var command = StoreAccess.CreateCommand(connection,
+                                                      TickSliceSql,
+                                                      (ProfileParameter, profileId),
+                                                      ("$from", from),
+                                                      ("$to", to),
+                                                      ("$lastReceive", totals.LastReceiveTicks ?? from),
+                                                      ("$lastNumber", totals.LastReceiveTicks is null ? -1L : totals.LastNumber),
+                                                      ("$limit", slice.Ticks));
+        using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            var gameTime = reader.GetInt64(2);
+
+            numbers.Add(reader.GetInt64(0));
+            totals.LastNumber = reader.GetInt64(0);
+            totals.LastReceiveTicks = reader.GetInt64(1);
+            totals.AddGameTimes(gameTime, gameTime, reader.GetInt64(3) != 0);
+        }
+
+        return numbers;
+    }
+
+    /// <summary>
+    /// Reads one part of an hourly trend: the hourly points and ticks of its slices, their game times and their values.
+    /// </summary>
+    /// <param name="connection">The opened connection inside a read transaction</param>
+    /// <param name="profileId">The profile identity</param>
+    /// <param name="range">The range start, inclusive, and end, exclusive</param>
+    /// <param name="part">The slices of the part</param>
+    /// <param name="carry">The totals of the last hour of the part before, which this part may continue</param>
+    /// <param name="accumulate">Adds the values of the hourly points and the ticks, given the totals by row number, to the totals</param>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>The totals of the hours of the part, oldest first</returns>
+    private static async Task<List<HourTotals>> ReadHourPartAsync(SqliteConnection connection,
+                                                                  Guid profileId,
+                                                                  (DateTimeOffset Start, DateTimeOffset End) range,
+                                                                  List<TrendHourSlice> part,
+                                                                  HourTotals? carry,
+                                                                  Func<SqliteConnection, Dictionary<long, HourTotals>, Dictionary<long, HourTotals>, CancellationToken, Task> accumulate,
+                                                                  CancellationToken cancellationToken)
+    {
+        var totalsByHour = new Dictionary<long, HourTotals>();
+        var order = new List<HourTotals>();
+
+        foreach (var hourTicks in part.Select(slice => slice.HourTicks).Distinct())
+        {
+            var totals = carry is not null && carry.HourTicks == hourTicks
+                             ? carry
+                             : new HourTotals(hourTicks);
+
+            totalsByHour[hourTicks] = totals;
+            order.Add(totals);
+        }
+
+        var pointOwners = new Dictionary<long, HourTotals>();
+        var tickOwners = new Dictionary<long, HourTotals>();
+
+        if (part.Any(slice => slice.WithHourly))
+        {
+            await ReadHourlyHeadsAsync(connection, profileId, part, totalsByHour, pointOwners, cancellationToken).ConfigureAwait(false);
+        }
+
+        foreach (var slice in part.Where(slice => slice.Ticks > 0))
+        {
+            var totals = totalsByHour[slice.HourTicks];
+
+            foreach (var number in await ReadTickSliceAsync(connection, profileId, range, slice, totals, cancellationToken).ConfigureAwait(false))
+            {
+                tickOwners[number] = totals;
+            }
+        }
+
+        await accumulate(connection, pointOwners, tickOwners, cancellationToken).ConfigureAwait(false);
+
+        return order;
+    }
+
+    /// <summary>
+    /// Adds the generation, consumption and delta of a good on the islands to the hours of a part.
+    /// </summary>
+    /// <param name="connection">The opened connection inside a read transaction</param>
+    /// <param name="query">The query</param>
+    /// <param name="pointOwners">The totals by row number of the hourly points of the part</param>
+    /// <param name="tickOwners">The totals by row number of the ticks of the part</param>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>A task that represents the asynchronous operation</returns>
+    private static async Task AccumulateGoodAsync(SqliteConnection connection, HistoryGoodTrendQuery query, Dictionary<long, HourTotals> pointOwners, Dictionary<long, HourTotals> tickOwners, CancellationToken cancellationToken)
+    {
+        var islands = SerializeIslands(query.Islands);
+
+        foreach (var (isHourly, sql, owners) in new[] { (true, HourlyGoodHourSql, pointOwners), (false, TickGoodHourSql, tickOwners) })
+        {
+            if (owners.Count == 0)
+            {
+                continue;
+            }
+
+            using var command = StoreAccess.CreateCommand(connection, sql, (ProfileParameter, query.ProfileId), (ProductParameter, query.ProductGuid), (NumbersParameter, JsonSerializer.Serialize(owners.Keys.ToArray())), ("$islands", islands));
+            using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+
+            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            {
+                var totals = owners[reader.GetInt64(0)];
+                var islandKey = reader.GetInt64(isHourly ? 7 : 4);
+
+                if (totals.Islands.TryGetValue(islandKey, out var sums) == false)
+                {
+                    sums = new HourIslandSums();
+                    totals.Islands[islandKey] = sums;
+                }
+
+                for (var index = 0; index < 3; index++)
+                {
+                    if (isHourly)
+                    {
+                        sums.Add(index, reader.GetDouble(1 + (2 * index)), reader.GetInt32(2 + (2 * index)));
+                    }
+                    else if (ReadFloat(reader, 1 + index) is { } value)
+                    {
+                        sums.Add(index, value, 1);
+                    }
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Adds the entries of an island, the first of each good, to the hours of a part.
+    /// </summary>
+    /// <param name="connection">The opened connection inside a read transaction</param>
+    /// <param name="query">The query</param>
+    /// <param name="pointOwners">The totals by row number of the hourly points of the part</param>
+    /// <param name="tickOwners">The totals by row number of the ticks of the part</param>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>A task that represents the asynchronous operation</returns>
+    private static async Task AccumulateFiguresAsync(SqliteConnection connection, HistoryFiguresTrendQuery query, Dictionary<long, HourTotals> pointOwners, Dictionary<long, HourTotals> tickOwners, CancellationToken cancellationToken)
+    {
+        foreach (var (isHourly, sql, owners) in new[] { (true, HourlyFiguresHourSql, pointOwners), (false, TickFiguresHourSql, tickOwners) })
+        {
+            if (owners.Count == 0)
+            {
+                continue;
+            }
+
+            using var command = CreateFiguresCommand(connection, sql, query, JsonSerializer.Serialize(owners.Keys.ToArray()));
+            using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+
+            var seen = new HashSet<(long Number, int Product)>();
+
+            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            {
+                var number = reader.GetInt64(0);
+                var product = reader.GetInt32(isHourly ? 5 : 3);
+
+                if (isHourly == false && seen.Add((number, product)) == false)
+                {
+                    continue;
+                }
+
+                var totals = owners[number];
+
+                if (totals.Goods.TryGetValue(product, out var sums) == false)
+                {
+                    sums = new HourGoodSums();
+                    totals.Goods[product] = sums;
+                }
+
+                if (isHourly)
+                {
+                    sums.EntryCount += reader.GetInt32(1);
+                    sums.BuildingSum += reader.GetInt64(2);
+                    sums.DeltaSum += reader.GetDouble(3);
+                    sums.DeltaCount += reader.GetInt32(4);
+                }
+                else
+                {
+                    sums.EntryCount++;
+                    sums.BuildingSum += reader.GetInt32(1);
+
+                    if (ReadFloat(reader, 2) is { } delta)
+                    {
+                        sums.DeltaSum += delta;
+                        sums.DeltaCount++;
+                    }
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Makes the point of an hour of a good's trend, as the hourly point after the fold would read.
+    /// </summary>
+    /// <param name="totals">The totals of the hour</param>
+    /// <returns>The point</returns>
+    private static HistoryGoodPoint CreateGoodHour(HourTotals totals)
+    {
+        double? generation = null;
+        double? consumption = null;
+        double? delta = null;
+
+        foreach (var sums in totals.Islands.Values)
+        {
+            generation = Add(generation, sums.Mean(0));
+            consumption = Add(consumption, sums.Mean(1));
+            delta = Add(delta, sums.Mean(2));
+        }
+
+        return new HistoryGoodPoint
+               {
+                   Time = new DateTimeOffset(totals.HourTicks, TimeSpan.Zero),
+                   IsHourly = true,
+                   Generation = generation,
+                   Consumption = consumption,
+                   Delta = delta,
+                   GameTime = totals.LastGameTime,
+                   FirstGameTime = totals.FirstGameTime,
+                   HasNoEntries = totals.HasEntries == false
+               };
+    }
+
+    /// <summary>
+    /// Makes the point of an hour of an island's figures, as the hourly point after the fold would read.
+    /// </summary>
+    /// <param name="totals">The totals of the hour</param>
+    /// <returns>The point</returns>
+    private static HistoryFiguresPoint CreateFiguresHour(HourTotals totals)
+    {
+        var found = totals.Goods.Count > 0;
+        var buildings = 0d;
+        var produced = 0;
+        var deficit = 0;
+
+        foreach (var sums in totals.Goods.Values)
+        {
+            buildings += sums.BuildingSum / (double)sums.EntryCount;
+            produced += sums.BuildingSum > 0 ? 1 : 0;
+            deficit += sums.DeltaCount > 0 && IsDeficit(sums.DeltaSum / sums.DeltaCount) ? 1 : 0;
+        }
+
+        return new HistoryFiguresPoint
+               {
+                   Time = new DateTimeOffset(totals.HourTicks, TimeSpan.Zero),
+                   IsHourly = true,
+                   Buildings = found ? (long)Math.Round(buildings, MidpointRounding.AwayFromZero) : null,
+                   ProducedGoods = found ? produced : null,
+                   GoodsInDeficit = found ? deficit : null,
+                   GameTime = totals.LastGameTime,
+                   FirstGameTime = totals.FirstGameTime,
+                   HasNoEntries = totals.HasEntries == false
+               };
+    }
+
+    /// <summary>
+    /// Reads a trend by hour: the hours with their tick counts in one transaction, then each part of at most the part size rows in a transaction of its own.
+    /// </summary>
+    /// <typeparam name="TPoint">The type of a point</typeparam>
+    /// <param name="profileId">The profile identity</param>
+    /// <param name="range">The range start, inclusive, and end, exclusive</param>
+    /// <param name="maxPoints">The maximum number of hours</param>
+    /// <param name="accumulate">Adds the values of the hourly points and the ticks of a part, given the totals by row number, to the totals</param>
+    /// <param name="createPoint">Makes the point of an hour</param>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>The newest hours in time order and the number of all hours of the range</returns>
+    private async Task<HistoryTrend<TPoint>> ReadHoursAsync<TPoint>(Guid profileId,
+                                                                    (DateTimeOffset Start, DateTimeOffset End) range,
+                                                                    int maxPoints,
+                                                                    Func<SqliteConnection, Dictionary<long, HourTotals>, Dictionary<long, HourTotals>, CancellationToken, Task> accumulate,
+                                                                    Func<HourTotals, TPoint> createPoint,
+                                                                    CancellationToken cancellationToken)
+    {
+        var (hours, total) = await ReadTrendTransactionAsync(connection => ReadHourTimesAsync(connection, profileId, range, Math.Max(0, maxPoints), cancellationToken), cancellationToken).ConfigureAwait(false);
+
+        var points = new List<TPoint>(hours.Count);
+        HourTotals? carry = null;
+
+        foreach (var part in PlanHourParts(hours, TrendPartSize))
+        {
+            var before = carry;
+            var touched = await ReadTrendTransactionAsync(connection => ReadHourPartAsync(connection, profileId, range, part, before, accumulate, cancellationToken), cancellationToken).ConfigureAwait(false);
+
+            if (before is not null && ReferenceEquals(before, touched[0]) == false)
+            {
+                points.Add(createPoint(before));
+            }
+
+            points.AddRange(touched.Take(touched.Count - 1).Select(createPoint));
+            carry = touched[^1];
+        }
+
+        if (carry is not null)
+        {
+            points.Add(createPoint(carry));
+        }
+
+        return new HistoryTrend<TPoint>
+               {
+                   Points = points,
+                   TotalCount = total
+               };
     }
 
     /// <summary>
@@ -953,6 +1502,16 @@ public sealed class HistoryStore : IHistoryTrends
     /// <inheritdoc/>
     public Task<HistoryTrend<HistoryGoodPoint>> ReadGoodTrendAsync(HistoryGoodTrendQuery query, CancellationToken cancellationToken)
     {
+        if (query.Resolution == HistoryTrendResolution.Hours)
+        {
+            return ReadHoursAsync(query.ProfileId,
+                                  (query.RangeStart, query.RangeEnd),
+                                  query.MaxPoints,
+                                  (connection, pointOwners, tickOwners, token) => AccumulateGoodAsync(connection, query, pointOwners, tickOwners, token),
+                                  CreateGoodHour,
+                                  cancellationToken);
+        }
+
         return ReadTrendAsync(query.ProfileId,
                               query.RangeStart,
                               query.RangeEnd,
@@ -964,6 +1523,16 @@ public sealed class HistoryStore : IHistoryTrends
     /// <inheritdoc/>
     public Task<HistoryTrend<HistoryFiguresPoint>> ReadFiguresTrendAsync(HistoryFiguresTrendQuery query, CancellationToken cancellationToken)
     {
+        if (query.Resolution == HistoryTrendResolution.Hours)
+        {
+            return ReadHoursAsync(query.ProfileId,
+                                  (query.RangeStart, query.RangeEnd),
+                                  query.MaxPoints,
+                                  (connection, pointOwners, tickOwners, token) => AccumulateFiguresAsync(connection, query, pointOwners, tickOwners, token),
+                                  CreateFiguresHour,
+                                  cancellationToken);
+        }
+
         return ReadTrendAsync(query.ProfileId,
                               query.RangeStart,
                               query.RangeEnd,
