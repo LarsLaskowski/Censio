@@ -174,3 +174,36 @@ Verdict APPROVED; the four non-blocking findings are taken now:
 4. A wide read scans every tick of its range — stated in *Limits and errors* (*Areas*).
 
 For the Reviewer (no Security diff review in tier `standard`): the Dev's fact-15 report names the commands it ran and quotes their output; a figure without them is a blocking finding.
+
+## Security notes
+
+Security delta confirmation, feature #37, mode `plan`. I reviewed revision `6b28840` of `/home/user/Censio/specs/feature-37-range-picker-time-axis/plan.md` against `833d11a`.
+
+**Verdict:** the revision adds no new security issue. All four of my earlier findings are resolved. There is one new non-blocking finding.
+
+**My earlier four findings:**
+1. **`TrendRange.For` throwing at the time limits.** Resolved. The start is clamped at `DateTimeOffset.MinValue.UtcTicks` and the end at `MaxValue.UtcTicks`, and there are DataRows at both bounds (*Reads*; AC1 row).
+2. **Game-time gap rule wrapping on extreme values.** Resolved. The rule now compares mapped `DateTime`s and never subtracts raw game times, with a fallback when the first game time cannot be mapped.
+   - `GameAxisTime` has bounds rows: −62,135,596,800,000, one less, and `long.MaxValue`.
+   - There is a test for a `long.MinValue` first game time.
+   - The negative format of `PageFormat.GameTime` is stated, with rows for −90,000, the lower bound and `long.MinValue`.
+3. **Fact 15 did not cover the `Hours` times transaction.** Resolved. It now measures that transaction on `All` under the write gate, sets a 1 s threshold, and requires the report to name the commands and quote their output.
+4. **A wide read scans every tick.** Resolved. It is stated for `web-charts.md` *Limits and errors* under *Areas*.
+
+**The new redraw path (axis change).** No issue. An axis change only sets `TrendChart.Axis` and redraws from the read the page already holds. It does no database read, takes no gate, and writes no new log line. It shows no new data: the cookie value is parsed into an enum before it is used, and only the range goes into `AddressKey`. Memory stays the same as today, one held view of at most 2,880 points per chart.
+
+**Cancellation.**
+- **Gates are released.** Both gates already release on cancellation:
+  - `TrendReader.ReadAsync` (`/home/user/Censio/src/Censio.Server/TrendReader.cs:140-167`) waits for the gate outside its `try`, rethrows `OperationCanceledException` and releases in `finally`.
+  - `HistoryStore.ReadTrendTransactionAsync` (`/home/user/Censio/src/Censio.Server.Data/HistoryStore.cs:877-898`) does the same with `TrendGate`.
+  - A cancelled read therefore never leaves the trend gate held, and it does not reach `ChartReadFailed`, so no warning is logged.
+- **"Stops at its next part" holds.** I ran a scratch program (`/tmp/claude-0/-home-user-Censio/cfc462e1-2c3e-5a4c-b263-c5322e2f56b7/scratchpad/sqlcancel/Program.cs`) against Microsoft.Data.Sqlite 11.0.0, the repository's version, with SQLitePCLRaw 3.0.5. It runs a recursive-CTE `count(*)` up to 300,000,000 through `ExecuteScalarAsync` with a token set to cancel after 300 ms. Command: `dotnet build -o out && timeout 120 dotnet out/sqlcancel.dll`. Output: `completed after 53793 ms`.
+  - The library does not interrupt a statement that is already running when the token is cancelled, so there is no `SqliteException` (interrupt) that `TrendReader` would log as a failed chart read.
+  - The current part runs to the end, which fact 15 bounds at 1 s or less, and the cancellation takes effect at the next part's wait for the gate.
+- **Not run:** there is no detail-read cancellation code yet, so the page-level path is checked only by reading the plan. `GoodTrendRangeChangeCancelsEarlierRead` is the test that pins it.
+
+**New finding [NON-BLOCKING]: the plan does not say how the details `CancellationTokenSource` is replaced or disposed.**
+- **Where:** plan, *Approach*, *Cancelling*: "`OnParametersSetAsync` cancels and replaces it before `ClearDetails`, and `ReadOnceAsync` passes its token to `ReadDetailsAsync`".
+- **Risk:** `/home/user/Censio/src/Censio.Server/Components/Pages/DataPageBase.cs:21-23` already reads the page token once "so that no notice reads a disposed source". A details source that is disposed while a state-change notice or the pending loop still reads `.Token` from it throws `ObjectDisposedException` in the page. A source that is never disposed leaves one registration on the page token per range change until the page closes.
+- **Smallest fix:** add to *Cancelling*: "the old source is cancelled, then disposed; `ReadOnceAsync` reads the details token once at its start into a local and filters its catch on that local; `Dispose` cancels and disposes the current details source."
+- **Recommendation:** fix now; it is one sentence in the plan.
