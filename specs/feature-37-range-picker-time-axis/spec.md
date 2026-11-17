@@ -65,7 +65,7 @@ time played.
 
 ## Acceptance criteria
 
-- AC1: Each range shows the points from the start of the UTC hour that holds the latest tick's receive time minus 1 hour,
+- AC1: On either axis, each range shows the points from the start of the UTC hour that holds the latest tick's receive time minus 1 hour,
   24 hours or 7 days, up to and including that tick, and `All` every point of the profile up to it (S1, S5).
 - AC2: `Last 7 days` and `All` show one point per UTC hour that holds a tick, folded or not, with each value the mean over
   the hour's ticks that carried it (for the region the sum of the islands' means, the overview's figures as
@@ -92,7 +92,8 @@ time played.
 ## Open questions
 
 - Q1: On `Game time`, is a range a period of game time (the last hour of game time up to the latest tick's game time) or
-  the same period of receive time as on `Real time`, with only the positions changed? Unanswered; escalated. The criteria above assume the second (AC1 holds on both axes).
+  the same period of receive time as on `Real time`, with only the positions changed? Answered: the same receive-time period (Product Manager, 2026-11-17); AC1 holds on
+  both axes.
 - Q2: Does `Last 7 days` show the whole week? Answered: yes — the issue names a week, and the cap of 2,880 points
   ([record 0087](../../docs/decisions/0087-chart-reads-aggregate-per-point-bounded-in-parts-with-a-product-index.md)) would cut a
   week of ticks (about 5,040) to about four days, so the wide ranges show hourly means (AC2) as older history already is.
