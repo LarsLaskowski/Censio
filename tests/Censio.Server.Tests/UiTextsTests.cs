@@ -132,7 +132,6 @@ public sealed class UiTextsTests
     /// <param name="german">The German text</param>
     [TestMethod]
     [TestCategory("AC7")]
-    [DataRow(nameof(UiTexts.ChartRange), "Last 24 hours up to the latest tick", "Letzte 24 Stunden bis zum letzten Tick")]
     [DataRow(nameof(UiTexts.ChartThisIsland), "This island", "Diese Insel")]
     [DataRow(nameof(UiTexts.ChartRegionTotal), "All islands of the region", "Alle Inseln der Region")]
     [DataRow(nameof(UiTexts.ChartOverview), "Overview", "Übersicht")]

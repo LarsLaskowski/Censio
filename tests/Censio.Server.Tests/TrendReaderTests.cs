@@ -104,7 +104,7 @@ public sealed class TrendReaderTests
         // Act
         foreach (var good in goods)
         {
-            var read = await fixture.Reader.ReadGoodAsync(TrendFixture.ProfileId, [_island], good, fixture.LatestTick, TestContext.CancellationToken);
+            var read = await fixture.Reader.ReadGoodAsync(TrendFixture.ProfileId, [_island], good, Request(fixture.LatestTick), TestContext.CancellationToken);
 
             actual.AddRange(DescribeRead(good, read));
             expected.Add($"{good} total {fixture.Ticks.Count}");
@@ -132,7 +132,7 @@ public sealed class TrendReaderTests
         var good = FindPartlyCarriedGood(fixture.Ticks[1], islands);
 
         // Act
-        var read = await fixture.Reader.ReadGoodAsync(TrendFixture.ProfileId, islands, good, fixture.LatestTick, TestContext.CancellationToken);
+        var read = await fixture.Reader.ReadGoodAsync(TrendFixture.ProfileId, islands, good, Request(fixture.LatestTick), TestContext.CancellationToken);
 
         // Assert
         var expected = new List<string>
@@ -164,7 +164,7 @@ public sealed class TrendReaderTests
         // Act
         foreach (var island in islands)
         {
-            var read = await fixture.Reader.ReadFiguresAsync(TrendFixture.ProfileId, island, fixture.LatestTick, TestContext.CancellationToken);
+            var read = await fixture.Reader.ReadFiguresAsync(TrendFixture.ProfileId, island, Request(fixture.LatestTick), TestContext.CancellationToken);
 
             actual.AddRange(DescribeFigures(island, read));
             expected.Add($"{island} total {fixture.Ticks.Count}");
@@ -193,7 +193,7 @@ public sealed class TrendReaderTests
         await FoldAllAsync(fixture, new DateTimeOffset(2026, 6, 20, 0, 0, 0, TimeSpan.Zero));
 
         // Act
-        var read = await fixture.Reader.ReadGoodAsync(TrendFixture.ProfileId, [_island], good, fixture.LatestTick, TestContext.CancellationToken);
+        var read = await fixture.Reader.ReadGoodAsync(TrendFixture.ProfileId, [_island], good, Request(fixture.LatestTick), TestContext.CancellationToken);
 
         // Assert
         var view = read.View ?? throw new AssertFailedException("The chart should be read");
@@ -229,11 +229,11 @@ public sealed class TrendReaderTests
         fake.Hold();
 
         // Act
-        var first = reader.ReadGoodAsync(profileId, [new IslandKey(3245, 1, 0), new IslandKey(3245, 2, 1)], 2077, _latest, token);
+        var first = reader.ReadGoodAsync(profileId, [new IslandKey(3245, 1, 0), new IslandKey(3245, 2, 1)], 2077, Request(_latest), token);
 
         await fake.WaitForCallsAsync(1, wait, token);
 
-        var second = reader.ReadFiguresAsync(profileId, new IslandKey(3245, 1, 0), _latest, token);
+        var second = reader.ReadFiguresAsync(profileId, new IslandKey(3245, 1, 0), Request(_latest), token);
 
         await Task.Delay(NegativeWaitMilliseconds, token);
 
@@ -243,7 +243,7 @@ public sealed class TrendReaderTests
         await Task.WhenAll(first, second).WaitAsync(wait, token);
 
         // Assert
-        var range = TrendRange.Before(_latest);
+        var range = TrendRange.For(ChartRange.LastDay, _latest);
 
         Assert.AreEqual(1, startedWhileFirstHeld, "The second read should not start while the first one runs");
         Assert.AreEqual(2, fake.CallCount, "Both reads should run in the end");
@@ -281,11 +281,11 @@ public sealed class TrendReaderTests
         using var runningPage = CancellationTokenSource.CreateLinkedTokenSource(token);
         using var waitingPage = CancellationTokenSource.CreateLinkedTokenSource(token);
 
-        var running = reader.ReadGoodAsync(Guid.NewGuid(), [new IslandKey(1, 1, 0)], 1, _latest, runningPage.Token);
+        var running = reader.ReadGoodAsync(Guid.NewGuid(), [new IslandKey(1, 1, 0)], 1, Request(_latest), runningPage.Token);
 
         await fake.WaitForCallsAsync(1, wait, token);
 
-        var waiting = reader.ReadFiguresAsync(Guid.NewGuid(), new IslandKey(1, 1, 0), _latest, waitingPage.Token);
+        var waiting = reader.ReadFiguresAsync(Guid.NewGuid(), new IslandKey(1, 1, 0), Request(_latest), waitingPage.Token);
 
         // Act
         await waitingPage.CancelAsync();
@@ -295,7 +295,7 @@ public sealed class TrendReaderTests
 
         fake.Release();
 
-        var next = await reader.ReadFiguresAsync(Guid.NewGuid(), new IslandKey(1, 1, 0), _latest, token).WaitAsync(wait, token);
+        var next = await reader.ReadFiguresAsync(Guid.NewGuid(), new IslandKey(1, 1, 0), Request(_latest), token).WaitAsync(wait, token);
 
         // Assert
         Assert.AreEqual(1, fake.CancelledCount, "The running read should have been cancelled in the history");
@@ -325,7 +325,7 @@ public sealed class TrendReaderTests
         var reader = new TrendReader(fake, factory.CreateLogger<TrendReader>());
 
         // Act
-        var read = await reader.ReadGoodAsync(Guid.NewGuid(), [new IslandKey(3245, 33, 1)], 2077, _latest, TestContext.CancellationToken);
+        var read = await reader.ReadGoodAsync(Guid.NewGuid(), [new IslandKey(3245, 33, 1)], 2077, Request(_latest), TestContext.CancellationToken);
 
         // Assert
         Assert.IsTrue(read.IsFailed, "A failed read should be reported as failed");
@@ -334,6 +334,180 @@ public sealed class TrendReaderTests
         Assert.AreEqual(LogLevel.Warning, provider.Logger.Entries[0].Level, "The entry should be a warning");
         Assert.AreEqual(FailedReadMessage, provider.Logger.Entries[0].Message, "The entry should carry the text and no argument");
         Assert.AreSame(failure, provider.Logger.Entries[0].Exception, "The entry should carry the exception");
+    }
+
+    /// <summary>
+    /// A good read asks the history for the range of the choice up to the latest tick and for the resolution of the range:
+    /// ticks for an hour and a day, hourly means for a week and for all.
+    /// </summary>
+    /// <param name="range">The range of the choice</param>
+    /// <param name="expectedStartText">The start the read asks for</param>
+    /// <param name="expectedResolution">The resolution the read asks for</param>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC1")]
+    [DataRow(ChartRange.LastHour, "2026-11-13T11:00:00+00:00", HistoryTrendResolution.Points)]
+    [DataRow(ChartRange.LastDay, "2026-11-12T12:00:00+00:00", HistoryTrendResolution.Points)]
+    [DataRow(ChartRange.LastWeek, "2026-11-06T12:00:00+00:00", HistoryTrendResolution.Hours)]
+    [DataRow(ChartRange.All, "0001-01-01T00:00:00+00:00", HistoryTrendResolution.Hours)]
+    public async Task TrendReaderReadGoodPassesRangeAndResolutionOfChoice(ChartRange range, string expectedStartText, HistoryTrendResolution expectedResolution)
+    {
+        // Arrange
+        var fake = new FakeHistoryTrends();
+        var reader = new TrendReader(fake, NullLogger<TrendReader>.Instance);
+
+        // Act
+        await reader.ReadGoodAsync(Guid.NewGuid(), [_island], 2077, Request(_latest, range, null), TestContext.CancellationToken);
+
+        // Assert
+        var query = fake.GoodQueries[0];
+
+        Assert.AreEqual(DateTimeOffset.Parse(expectedStartText, CultureInfo.InvariantCulture).UtcDateTime, query.RangeStart.UtcDateTime, $"The read of {range} should start at its range start");
+        Assert.AreEqual(_latest.AddTicks(1).UtcDateTime, query.RangeEnd.UtcDateTime, "The read should end right after the latest tick");
+        Assert.AreEqual(expectedResolution, query.Resolution, $"The read of {range} should ask for its resolution");
+    }
+
+    /// <summary>
+    /// A figures read asks the history for the range of the choice up to the latest tick and for the resolution of the
+    /// range.
+    /// </summary>
+    /// <param name="range">The range of the choice</param>
+    /// <param name="expectedStartText">The start the read asks for</param>
+    /// <param name="expectedResolution">The resolution the read asks for</param>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC1")]
+    [DataRow(ChartRange.LastHour, "2026-11-13T11:00:00+00:00", HistoryTrendResolution.Points)]
+    [DataRow(ChartRange.LastDay, "2026-11-12T12:00:00+00:00", HistoryTrendResolution.Points)]
+    [DataRow(ChartRange.LastWeek, "2026-11-06T12:00:00+00:00", HistoryTrendResolution.Hours)]
+    [DataRow(ChartRange.All, "0001-01-01T00:00:00+00:00", HistoryTrendResolution.Hours)]
+    public async Task TrendReaderReadFiguresPassesRangeAndResolutionOfChoice(ChartRange range, string expectedStartText, HistoryTrendResolution expectedResolution)
+    {
+        // Arrange
+        var fake = new FakeHistoryTrends();
+        var reader = new TrendReader(fake, NullLogger<TrendReader>.Instance);
+
+        // Act
+        await reader.ReadFiguresAsync(Guid.NewGuid(), _island, Request(_latest, range, null), TestContext.CancellationToken);
+
+        // Assert
+        var query = fake.FiguresQueries[0];
+
+        Assert.AreEqual(DateTimeOffset.Parse(expectedStartText, CultureInfo.InvariantCulture).UtcDateTime, query.RangeStart.UtcDateTime, $"The read of {range} should start at its range start");
+        Assert.AreEqual(_latest.AddTicks(1).UtcDateTime, query.RangeEnd.UtcDateTime, "The read should end right after the latest tick");
+        Assert.AreEqual(expectedResolution, query.Resolution, $"The read of {range} should ask for its resolution");
+    }
+
+    /// <summary>
+    /// A wide range with a held view reads only from the hour of the held view's last point and merges the newest hours
+    /// into the held ones: the last held hour is replaced, the older ones stay, the total follows.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC2")]
+    public async Task TrendReaderWideRangeWithHeldViewReadsFromNewestHour()
+    {
+        // Arrange
+        var fake = new FakeHistoryTrends
+                   {
+                       GoodTrend = new HistoryTrend<HistoryGoodPoint>
+                                   {
+                                       Points = [HourPoint(_latest.AddHours(-1), 5), HourPoint(_latest, 6)],
+                                       TotalCount = 2
+                                   }
+                   };
+        var reader = new TrendReader(fake, NullLogger<TrendReader>.Instance);
+        var held = new TrendView
+                   {
+                       Points = [HeldPoint(_latest.AddHours(-3), 1), HeldPoint(_latest.AddHours(-2), 2), HeldPoint(_latest.AddHours(-1), 3)],
+                       TotalCount = 3
+                   };
+
+        // Act
+        var read = await reader.ReadGoodAsync(Guid.NewGuid(), [_island], 2077, Request(_latest, ChartRange.LastWeek, held), TestContext.CancellationToken);
+
+        // Assert
+        var view = read.View ?? throw new AssertFailedException("The chart should be read");
+
+        Assert.AreEqual(_latest.AddHours(-1).UtcDateTime, fake.GoodQueries[0].RangeStart.UtcDateTime, "The read should start at the hour of the held view's last point");
+        Assert.AreEqual(HistoryTrendResolution.Hours, fake.GoodQueries[0].Resolution, "The read should be hourly");
+
+        var expected = new[] { $"{Time(_latest.AddHours(-3))} 1", $"{Time(_latest.AddHours(-2))} 2", $"{Time(_latest.AddHours(-1))} 5", $"{Time(_latest)} 6" };
+
+        Assert.AreSequenceEqual(expected, view.Points.Select(point => $"{Time(point.Time)} {Value(point.Values[0])}"), "The newest hours should replace the last held hour and follow the older held ones");
+        Assert.AreEqual(4, view.TotalCount, "The total should be the held total minus the replaced hour plus the new total");
+    }
+
+    /// <summary>
+    /// A wide range with a held view without a point reads the whole range.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC2")]
+    public async Task TrendReaderWideRangeWithEmptyHeldViewReadsWholeRange()
+    {
+        // Arrange
+        var fake = new FakeHistoryTrends();
+        var reader = new TrendReader(fake, NullLogger<TrendReader>.Instance);
+        var held = new TrendView
+                   {
+                       Points = [],
+                       TotalCount = 0
+                   };
+
+        // Act
+        await reader.ReadGoodAsync(Guid.NewGuid(), [_island], 2077, Request(_latest, ChartRange.LastWeek, held), TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(_latest.AddDays(-7).UtcDateTime, fake.GoodQueries[0].RangeStart.UtcDateTime, "A held view without a point should leave the whole week to read");
+    }
+
+    /// <summary>
+    /// A narrow range reads its whole range and shows what the history gives, whatever view the page holds.
+    /// </summary>
+    /// <param name="range">The narrow range</param>
+    /// <param name="expectedStartText">The start the read asks for</param>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC2")]
+    [DataRow(ChartRange.LastHour, "2026-11-13T11:00:00+00:00")]
+    [DataRow(ChartRange.LastDay, "2026-11-12T12:00:00+00:00")]
+    public async Task TrendReaderNarrowRangeIgnoresHeldView(ChartRange range, string expectedStartText)
+    {
+        // Arrange
+        var fake = new FakeHistoryTrends
+                   {
+                       FiguresTrend = new HistoryTrend<HistoryFiguresPoint>
+                                      {
+                                          Points = [
+                                                       new HistoryFiguresPoint
+                                                       {
+                                                           Time = _latest,
+                                                           IsHourly = false,
+                                                           Buildings = 7,
+                                                           ProducedGoods = 1,
+                                                           GoodsInDeficit = 0
+                                                       }
+                                                   ],
+                                          TotalCount = 1
+                                      }
+                   };
+        var reader = new TrendReader(fake, NullLogger<TrendReader>.Instance);
+        var held = new TrendView
+                   {
+                       Points = [HeldPoint(_latest.AddMinutes(-30), 1)],
+                       TotalCount = 1
+                   };
+
+        // Act
+        var read = await reader.ReadFiguresAsync(Guid.NewGuid(), _island, Request(_latest, range, held), TestContext.CancellationToken);
+
+        // Assert
+        var view = read.View ?? throw new AssertFailedException("The chart should be read");
+
+        Assert.AreEqual(DateTimeOffset.Parse(expectedStartText, CultureInfo.InvariantCulture).UtcDateTime, fake.FiguresQueries[0].RangeStart.UtcDateTime, "The read should start at the start of its range");
+        Assert.HasCount(1, view.Points, "The view should hold the points the history gave and none of the held view");
+        Assert.AreEqual(1, view.TotalCount, "The total should be the history's");
     }
 
     /// <summary>
@@ -462,6 +636,71 @@ public sealed class TrendReaderTests
         }
 
         return total;
+    }
+
+    /// <summary>
+    /// Creates a request of the default choice without a held view.
+    /// </summary>
+    /// <param name="latest">The receive time of the latest tick</param>
+    /// <returns>The request</returns>
+    private static TrendRequest Request(DateTimeOffset latest)
+    {
+        return Request(latest, ChartChoice.Default.Range, null);
+    }
+
+    /// <summary>
+    /// Creates a request on the real-time axis.
+    /// </summary>
+    /// <param name="latest">The receive time of the latest tick</param>
+    /// <param name="range">The range</param>
+    /// <param name="held">The held view, or <see langword="null" /></param>
+    /// <returns>The request</returns>
+    private static TrendRequest Request(DateTimeOffset latest, ChartRange range, TrendView? held)
+    {
+        return new TrendRequest
+               {
+                   LatestTick = latest,
+                   Choice = new ChartChoice
+                            {
+                                Range = range,
+                                Axis = ChartAxis.RealTime
+                            },
+                   Held = held
+               };
+    }
+
+    /// <summary>
+    /// Creates an hourly point of the history with a generation.
+    /// </summary>
+    /// <param name="time">The start of the hour</param>
+    /// <param name="generation">The generation</param>
+    /// <returns>The point</returns>
+    private static HistoryGoodPoint HourPoint(DateTimeOffset time, double generation)
+    {
+        return new HistoryGoodPoint
+               {
+                   Time = time,
+                   IsHourly = true,
+                   Generation = generation,
+                   Consumption = 0,
+                   Delta = 0
+               };
+    }
+
+    /// <summary>
+    /// Creates an hourly point of a held view with a first value.
+    /// </summary>
+    /// <param name="time">The start of the hour</param>
+    /// <param name="value">The first value</param>
+    /// <returns>The point</returns>
+    private static TrendPoint HeldPoint(DateTimeOffset time, double value)
+    {
+        return new TrendPoint
+               {
+                   Time = time,
+                   IsHourly = true,
+                   Values = [value, 0, 0]
+               };
     }
 
     /// <summary>

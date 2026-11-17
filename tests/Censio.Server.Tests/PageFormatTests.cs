@@ -214,5 +214,28 @@ public sealed class PageFormatTests
         Assert.AreEqual("2026-11-13 12:34 UTC", text, "Without a usable offset the time should be shown in UTC, marked as such");
     }
 
+    /// <summary>
+    /// A game time shows as hours and minutes, the hours not limited to a day, the minutes truncated, a negative time with
+    /// a leading minus before the magnitude.
+    /// </summary>
+    /// <param name="milliseconds">The game time in milliseconds</param>
+    /// <param name="expected">The expected text</param>
+    [TestMethod]
+    [TestCategory("AC3")]
+    [DataRow(0L, "0:00")]
+    [DataRow(1_750_000_000L, "486:06")]
+    [DataRow(359_999_999_999L, "99999:59")]
+    [DataRow(-90_000L, "-0:01")]
+    [DataRow(-62_135_596_800_000L, "-17259888:00")]
+    [DataRow(long.MinValue, "-2562047788015:12")]
+    public void PageFormatGameTimeWritesHoursAndMinutes(long milliseconds, string expected)
+    {
+        // Act
+        var text = PageFormat.GameTime(milliseconds);
+
+        // Assert
+        Assert.AreEqual(expected, text, $"The game time {milliseconds} ms should read as hours and minutes");
+    }
+
     #endregion // Methods
 }

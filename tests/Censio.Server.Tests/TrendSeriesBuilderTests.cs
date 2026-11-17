@@ -87,7 +87,16 @@ public sealed class TrendSeriesBuilderTests
         // Arrange
         using var fixture = await TrendFixture.CreateAsync(TestContext.CancellationToken);
 
-        var read = await fixture.Reader.ReadGoodAsync(TrendFixture.ProfileId, [_fixtureIsland], FixtureGood, fixture.LatestTick, TestContext.CancellationToken);
+        var read = await fixture.Reader.ReadGoodAsync(TrendFixture.ProfileId,
+                                                      [_fixtureIsland],
+                                                      FixtureGood,
+                                                      new TrendRequest
+                                                      {
+                                                          LatestTick = fixture.LatestTick,
+                                                          Choice = ChartChoice.Default,
+                                                          Held = null
+                                                      },
+                                                      TestContext.CancellationToken);
         var view = read.View ?? throw new AssertFailedException("The fixture's chart should be read");
 
         // Act

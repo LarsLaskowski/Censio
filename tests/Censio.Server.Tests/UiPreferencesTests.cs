@@ -32,6 +32,19 @@ public sealed class UiPreferencesTests
                                                                     [string.Empty]
                                                                 ];
 
+    /// <summary>
+    /// Gets the stored values that are no known range and no known axis: other case, an encoded or control character,
+    /// an overlong text, the empty text and none.
+    /// </summary>
+    private static IEnumerable<object?[]> UnknownChartValues => [
+                                                                    ["Week"],
+                                                                    ["%3Cb%3E"],
+                                                                    ["week\u0001"],
+                                                                    [new string('a', 2000)],
+                                                                    [string.Empty],
+                                                                    [null]
+                                                                ];
+
     #endregion // Properties
 
     #region Methods
@@ -97,6 +110,95 @@ public sealed class UiPreferencesTests
 
         // Assert
         Assert.AreEqual(UiLanguage.German, language, "An unknown stored language should leave the choice to the language list");
+    }
+
+    /// <summary>
+    /// The known stored values give their range and axis.
+    /// </summary>
+    /// <param name="storedRange">The stored range</param>
+    /// <param name="storedAxis">The stored axis</param>
+    /// <param name="expectedRange">The expected range</param>
+    /// <param name="expectedAxis">The expected axis</param>
+    [TestMethod]
+    [TestCategory("AC5")]
+    [DataRow("hour", "real", ChartRange.LastHour, ChartAxis.RealTime)]
+    [DataRow("day", "game", ChartRange.LastDay, ChartAxis.GameTime)]
+    [DataRow("week", "real", ChartRange.LastWeek, ChartAxis.RealTime)]
+    [DataRow("all", "game", ChartRange.All, ChartAxis.GameTime)]
+    public void UiPreferencesReadChartChoiceKnownValues(string storedRange, string storedAxis, ChartRange expectedRange, ChartAxis expectedAxis)
+    {
+        // Act
+        var choice = UiPreferences.ReadChartChoice(storedRange, storedAxis);
+
+        // Assert
+        Assert.AreEqual(expectedRange, choice.Range, $"The stored range {storedRange} should be read");
+        Assert.AreEqual(expectedAxis, choice.Axis, $"The stored axis {storedAxis} should be read");
+    }
+
+    /// <summary>
+    /// A stored value that is no exact known value gives the default range and axis.
+    /// </summary>
+    /// <param name="storedValue">The stored value</param>
+    [TestMethod]
+    [TestCategory("AC5")]
+    [DynamicData(nameof(UnknownChartValues))]
+    public void UiPreferencesReadChartChoiceUnknownValueGivesDefault(string? storedValue)
+    {
+        // Act
+        var choice = UiPreferences.ReadChartChoice(storedValue, storedValue);
+
+        // Assert
+        Assert.AreEqual(ChartChoice.Default, choice, "An absent or unknown stored value should give the default choice");
+    }
+
+    /// <summary>
+    /// An unknown or absent value of one cookie gives the default of its own part and leaves the other part as stored.
+    /// </summary>
+    /// <param name="storedRange">The stored range</param>
+    /// <param name="storedAxis">The stored axis</param>
+    /// <param name="expectedRange">The expected range</param>
+    /// <param name="expectedAxis">The expected axis</param>
+    [TestMethod]
+    [TestCategory("AC5")]
+    [DataRow("Week", "game", ChartRange.LastDay, ChartAxis.GameTime)]
+    [DataRow(null, "game", ChartRange.LastDay, ChartAxis.GameTime)]
+    [DataRow("week", "Game", ChartRange.LastWeek, ChartAxis.RealTime)]
+    [DataRow("all", null, ChartRange.All, ChartAxis.RealTime)]
+    public void UiPreferencesReadChartChoiceUnknownPartKeepsOtherPart(string? storedRange, string? storedAxis, ChartRange expectedRange, ChartAxis expectedAxis)
+    {
+        // Act
+        var choice = UiPreferences.ReadChartChoice(storedRange, storedAxis);
+
+        // Assert
+        Assert.AreEqual(expectedRange, choice.Range, "The range should be the stored one or the default of its part");
+        Assert.AreEqual(expectedAxis, choice.Axis, "The axis should be the stored one or the default of its part");
+    }
+
+    /// <summary>
+    /// The stored value of a range and of an axis is a fixed text, and reading it gives the choice back.
+    /// </summary>
+    /// <param name="range">The range</param>
+    /// <param name="axis">The axis</param>
+    /// <param name="expectedRange">The stored range</param>
+    /// <param name="expectedAxis">The stored axis</param>
+    [TestMethod]
+    [TestCategory("AC5")]
+    [DataRow(ChartRange.LastHour, ChartAxis.RealTime, "hour", "real")]
+    [DataRow(ChartRange.LastDay, ChartAxis.GameTime, "day", "game")]
+    [DataRow(ChartRange.LastWeek, ChartAxis.RealTime, "week", "real")]
+    [DataRow(ChartRange.All, ChartAxis.GameTime, "all", "game")]
+    public void UiPreferencesStoredValueOfChartChoiceRoundTrips(ChartRange range, ChartAxis axis, string expectedRange, string expectedAxis)
+    {
+        // Act
+        var storedRange = UiPreferences.StoredValue(range);
+        var storedAxis = UiPreferences.StoredValue(axis);
+        var choice = UiPreferences.ReadChartChoice(storedRange, storedAxis);
+
+        // Assert
+        Assert.AreEqual(expectedRange, storedRange, "The range should be stored as its fixed value");
+        Assert.AreEqual(expectedAxis, storedAxis, "The axis should be stored as its fixed value");
+        Assert.AreEqual(range, choice.Range, "The stored range should read back");
+        Assert.AreEqual(axis, choice.Axis, "The stored axis should read back");
     }
 
     #endregion // Methods
