@@ -14,12 +14,26 @@ public static class TrendWindow
     /// <param name="newest">The view of the newest hours</param>
     /// <param name="range">The range</param>
     /// <returns>The extended view</returns>
-#pragma warning disable S1172, RH2003 // Skeleton: removed with the implementation
     public static TrendView Extend(TrendView held, TrendView newest, TrendRange range)
     {
-        throw new NotImplementedException();
+        var replacedFrom = newest.Points.Count > 0
+                               ? newest.Points[0].Time
+                               : DateTimeOffset.MaxValue;
+        var kept = held.Points.Where(point => point.Time >= range.Start && point.Time < replacedFrom).ToList();
+        var removed = held.Points.Count - kept.Count;
+        var points = kept.Concat(newest.Points).ToList();
+
+        if (points.Count > TrendRange.MaxPoints)
+        {
+            points.RemoveRange(0, points.Count - TrendRange.MaxPoints);
+        }
+
+        return new TrendView
+               {
+                   Points = points,
+                   TotalCount = Math.Max(0, held.TotalCount - removed) + newest.TotalCount
+               };
     }
-#pragma warning restore S1172, RH2003
 
     #endregion // Methods
 }

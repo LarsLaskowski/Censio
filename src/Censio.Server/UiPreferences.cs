@@ -49,6 +49,36 @@ public static class UiPreferences
     /// </summary>
     private const string GermanValue = "de";
 
+    /// <summary>
+    /// The stored value of the last hour.
+    /// </summary>
+    private const string HourValue = "hour";
+
+    /// <summary>
+    /// The stored value of the last day.
+    /// </summary>
+    private const string DayValue = "day";
+
+    /// <summary>
+    /// The stored value of the last week.
+    /// </summary>
+    private const string WeekValue = "week";
+
+    /// <summary>
+    /// The stored value of all history.
+    /// </summary>
+    private const string AllValue = "all";
+
+    /// <summary>
+    /// The stored value of the real-time axis.
+    /// </summary>
+    private const string RealValue = "real";
+
+    /// <summary>
+    /// The stored value of the game-time axis.
+    /// </summary>
+    private const string GameValue = "game";
+
     #endregion // Constants
 
     #region Methods
@@ -117,12 +147,20 @@ public static class UiPreferences
     /// <param name="storedRange">The stored range, or <c>null</c> when the cookie is absent.</param>
     /// <param name="storedAxis">The stored axis, or <c>null</c> when the cookie is absent.</param>
     /// <returns>The choice</returns>
-#pragma warning disable S1172, RH2003 // Skeleton: removed with the implementation
     public static ChartChoice ReadChartChoice(string? storedRange, string? storedAxis)
     {
-        throw new NotImplementedException();
+        return new ChartChoice
+               {
+                   Range = storedRange switch
+                           {
+                               HourValue => ChartRange.LastHour,
+                               WeekValue => ChartRange.LastWeek,
+                               AllValue => ChartRange.All,
+                               _ => ChartRange.LastDay
+                           },
+                   Axis = string.Equals(storedAxis, GameValue, StringComparison.Ordinal) ? ChartAxis.GameTime : ChartAxis.RealTime
+               };
     }
-#pragma warning restore S1172, RH2003
 
     /// <summary>
     /// Gets the value stored for a theme.
@@ -144,7 +182,6 @@ public static class UiPreferences
         return language == UiLanguage.German ? GermanValue : EnglishValue;
     }
 
-#pragma warning disable RH2003 // Skeleton: removed with the implementation
     /// <summary>
     /// Gives the stored value of a range.
     /// </summary>
@@ -152,7 +189,13 @@ public static class UiPreferences
     /// <returns>The value</returns>
     public static string StoredValue(ChartRange range)
     {
-        throw new NotImplementedException();
+        return range switch
+               {
+                   ChartRange.LastHour => HourValue,
+                   ChartRange.LastWeek => WeekValue,
+                   ChartRange.All => AllValue,
+                   _ => DayValue
+               };
     }
 
     /// <summary>
@@ -162,9 +205,8 @@ public static class UiPreferences
     /// <returns>The value</returns>
     public static string StoredValue(ChartAxis axis)
     {
-        throw new NotImplementedException();
+        return axis == ChartAxis.GameTime ? GameValue : RealValue;
     }
-#pragma warning restore RH2003
 
     #endregion // Methods
 }

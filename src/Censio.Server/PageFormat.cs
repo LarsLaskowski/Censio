@@ -152,12 +152,17 @@ public static class PageFormat
     /// </summary>
     /// <param name="milliseconds">The game time in milliseconds</param>
     /// <returns>The text</returns>
-#pragma warning disable S1172, RH2003 // Skeleton: removed with the implementation
     public static string GameTime(long milliseconds)
     {
-        throw new NotImplementedException();
+        var magnitude = milliseconds < 0
+                            ? (ulong)~milliseconds + 1
+                            : (ulong)milliseconds;
+        var minutes = magnitude / 60_000;
+
+        var sign = milliseconds < 0 ? "-" : string.Empty;
+
+        return string.Create(CultureInfo.InvariantCulture, $"{sign}{minutes / 60}:{minutes % 60:00}");
     }
-#pragma warning restore S1172, RH2003
 
     /// <summary>
     /// Rounds a value to two decimals, midpoints away from zero; a rounded negative zero is zero.

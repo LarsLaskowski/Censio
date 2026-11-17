@@ -38,16 +38,28 @@ public sealed class TrendRange
     /// <param name="range">The range of the choice</param>
     /// <param name="latestTick">The receive time of the latest tick</param>
     /// <returns>The range</returns>
-#pragma warning disable S1172 // Skeleton: removed with the implementation
     public static TrendRange For(ChartRange range, DateTimeOffset latestTick)
     {
-        var back = latestTick.UtcTicks - TimeSpan.TicksPerDay;
-        var start = back - (back % TimeSpan.TicksPerHour);
+        var latest = latestTick.UtcTicks;
+        var start = 0L;
+
+        if (range != ChartRange.All)
+        {
+            var back = Math.Max(0L,
+                                latest - (range switch
+                                          {
+                                              ChartRange.LastHour => TimeSpan.TicksPerHour,
+                                              ChartRange.LastDay => TimeSpan.TicksPerDay,
+                                              _ => 7 * TimeSpan.TicksPerDay
+                                          }));
+
+            start = back - (back % TimeSpan.TicksPerHour);
+        }
 
         return new TrendRange
                {
                    Start = new DateTimeOffset(start, TimeSpan.Zero),
-                   End = new DateTimeOffset(latestTick.UtcTicks + 1, TimeSpan.Zero)
+                   End = new DateTimeOffset(Math.Min(latest + 1, DateTimeOffset.MaxValue.UtcTicks), TimeSpan.Zero)
                };
     }
 
@@ -58,9 +70,10 @@ public sealed class TrendRange
     /// <returns>The resolution</returns>
     public static HistoryTrendResolution ResolutionOf(ChartRange range)
     {
-        return HistoryTrendResolution.Points;
+        return range is ChartRange.LastWeek or ChartRange.All
+                   ? HistoryTrendResolution.Hours
+                   : HistoryTrendResolution.Points;
     }
-#pragma warning restore S1172
 
     #endregion // Methods
 }
