@@ -91,6 +91,12 @@ public sealed partial class MainLayout : IDisposable
     public UiLanguage InitialLanguage { get; set; }
 
     /// <summary>
+    /// Gets or sets the chart choice the page starts with.
+    /// </summary>
+    [CascadingParameter]
+    public ChartChoice InitialChartChoice { get; set; } = ChartChoice.Default;
+
+    /// <summary>
     /// Gets or sets the JavaScript runtime.
     /// </summary>
     [Inject]

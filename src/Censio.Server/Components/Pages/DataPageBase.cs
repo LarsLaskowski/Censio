@@ -64,6 +64,12 @@ public abstract class DataPageBase : ComponentBase, IDisposable
     public UiTexts Texts { get; set; } = UiTexts.For(UiLanguage.English);
 
     /// <summary>
+    /// Gets or sets the chart choice of range and time axis.
+    /// </summary>
+    [CascadingParameter]
+    public ChartChoice ChartChoice { get; set; } = ChartChoice.Default;
+
+    /// <summary>
     /// Gets or sets the request the page is rendered for; its abort cancels the page's reads during prerendering.
     /// </summary>
     [CascadingParameter]
