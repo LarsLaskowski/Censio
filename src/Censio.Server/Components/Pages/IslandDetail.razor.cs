@@ -187,7 +187,15 @@ public partial class IslandDetail
         }
 
         var generation = _generation;
-        var read = await Trends.ReadFiguresAsync(view.ProfileId, island, new TrendRequest { LatestTick = asOf, Choice = ChartChoice.Default, Held = null }, cancellationToken).ConfigureAwait(true);
+        var read = await Trends.ReadFiguresAsync(view.ProfileId,
+                                                 island,
+                                                 new TrendRequest
+                                                 {
+                                                     LatestTick = asOf,
+                                                     Choice = ChartChoice.Default,
+                                                     Held = null
+                                                 },
+                                                 cancellationToken).ConfigureAwait(true);
 
         if (generation != _generation)
         {

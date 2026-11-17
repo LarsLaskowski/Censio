@@ -177,14 +177,32 @@ public partial class GoodTrend
         }
 
         var generation = _generation;
-        var islandRead = await Trends.ReadGoodAsync(view.ProfileId, [island], productGuid, new TrendRequest { LatestTick = asOf, Choice = ChartChoice.Default, Held = null }, cancellationToken).ConfigureAwait(true);
+        var islandRead = await Trends.ReadGoodAsync(view.ProfileId,
+                                                    [island],
+                                                    productGuid,
+                                                    new TrendRequest
+                                                    {
+                                                        LatestTick = asOf,
+                                                        Choice = ChartChoice.Default,
+                                                        Held = null
+                                                    },
+                                                    cancellationToken).ConfigureAwait(true);
 
         if (Accept(islandRead, generation, read => (_islandRead, _islandNumber) = (read, ++_readCount)) == false)
         {
             return;
         }
 
-        var regionRead = await Trends.ReadGoodAsync(view.ProfileId, [.. region.Islands.Select(regionIsland => regionIsland.Key)], productGuid, new TrendRequest { LatestTick = asOf, Choice = ChartChoice.Default, Held = null }, cancellationToken).ConfigureAwait(true);
+        var regionRead = await Trends.ReadGoodAsync(view.ProfileId,
+                                                    [.. region.Islands.Select(regionIsland => regionIsland.Key)],
+                                                    productGuid,
+                                                    new TrendRequest
+                                                    {
+                                                        LatestTick = asOf,
+                                                        Choice = ChartChoice.Default,
+                                                        Held = null
+                                                    },
+                                                    cancellationToken).ConfigureAwait(true);
 
         Accept(regionRead, generation, read => (_regionRead, _regionNumber) = (read, ++_readCount));
     }

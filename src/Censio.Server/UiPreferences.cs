@@ -144,6 +144,7 @@ public static class UiPreferences
         return language == UiLanguage.German ? GermanValue : EnglishValue;
     }
 
+#pragma warning disable RH2003 // Skeleton: removed with the implementation
     /// <summary>
     /// Gives the stored value of a range.
     /// </summary>
@@ -163,7 +164,7 @@ public static class UiPreferences
     {
         throw new NotImplementedException();
     }
-#pragma warning restore S1172, RH2003
+#pragma warning restore RH2003
 
     #endregion // Methods
 }
