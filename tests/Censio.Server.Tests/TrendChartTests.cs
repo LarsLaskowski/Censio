@@ -404,9 +404,11 @@ public sealed partial class TrendChartTests
         // Assert
         await chart.WaitForAssertionAsync(() => Assert.HasCount(1, chart.FindAll(ChartSelector), "The chart should be drawn"), PageTestHost.WaitBound);
 
-        var labels = chart.FindAll(".mud-charts-xaxis > *").Select(label => label.TextContent).ToList();
+        var timeAxes = chart.FindAll(".mud-charts-xaxis");
 
-        Assert.IsTrue(labels.All(label => label.Length == 0), $"The game-time axis should carry no time label, but holds '{string.Join("', '", labels)}'");
+        Assert.HasCount(1, timeAxes, "The game-time axis element should exist");
+        Assert.IsEmpty(chart.FindAll(".mud-charts-xaxis > *"), $"The game-time axis should carry no label and no guide line, but holds {timeAxes[0].InnerHtml}");
+        Assert.IsNotEmpty(chart.FindAll(".mud-charts-gridlines-yaxis path"), "The value axis should keep its horizontal grid lines");
     }
 
     /// <summary>
@@ -433,7 +435,12 @@ public sealed partial class TrendChartTests
         chart.Render(parameters => parameters.Add(component => component.Axis, ChartAxis.GameTime));
 
         // Assert
-        await chart.WaitForAssertionAsync(() => Assert.IsTrue(chart.FindAll(".mud-charts-xaxis > *").All(label => label.TextContent.Length == 0), "The game-time axis should carry no time label"), PageTestHost.WaitBound);
+        await chart.WaitForAssertionAsync(() =>
+                                          {
+                                              Assert.HasCount(1, chart.FindAll(".mud-charts-xaxis"), "The game-time axis element should still exist");
+                                              Assert.IsEmpty(chart.FindAll(".mud-charts-xaxis > *"), "The game-time axis should carry no time label");
+                                          },
+                                          PageTestHost.WaitBound);
 
         Assert.HasCount(1, chart.FindAll(ChartSelector), "The chart should stay drawn from the same read");
         Assert.AreEqual(asked, host.Context.JSInterop.Invocations.Count(invocation => invocation.Identifier == UtcOffsetMinutes), "The browser should not be asked again for an axis change");
