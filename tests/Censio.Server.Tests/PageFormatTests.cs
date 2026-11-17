@@ -81,6 +81,56 @@ public sealed class PageFormatTests
     }
 
     /// <summary>
+    /// Rates of a chart, given as doubles, show two decimals with grouped thousands, the separators of the language, and a
+    /// dash for no value.
+    /// </summary>
+    /// <param name="value">The rate, or <see langword="null" /></param>
+    /// <param name="language">The language</param>
+    /// <param name="expected">The expected text</param>
+    [TestMethod]
+    [TestCategory("AC9")]
+    [DataRow(1234.5, UiLanguage.English, "1,234.50")]
+    [DataRow(1234.5, UiLanguage.German, "1.234,50")]
+    [DataRow(-1234567.25, UiLanguage.English, "-1,234,567.25")]
+    [DataRow(0.5, UiLanguage.German, "0,50")]
+    [DataRow(null, UiLanguage.English, Dash)]
+    [DataRow(null, UiLanguage.German, Dash)]
+    public void PageFormatFormatsDoubleRatesPerLanguage(double? value, UiLanguage language, string expected)
+    {
+        // Act
+        var text = PageFormat.Rate(value, language);
+
+        // Assert
+        Assert.AreEqual(expected, text, "The rate should be formatted with two decimals and the language's separators");
+    }
+
+    /// <summary>
+    /// Deltas of a chart, given as doubles, show two decimals with their sign, following the value rounded to two decimals.
+    /// </summary>
+    /// <param name="value">The delta, or <see langword="null" /></param>
+    /// <param name="language">The language</param>
+    /// <param name="expected">The expected text</param>
+    [TestMethod]
+    [TestCategory("AC9")]
+    [DataRow(1.25, UiLanguage.English, "+1.25")]
+    [DataRow(-0.5, UiLanguage.English, "-0.50")]
+    [DataRow(0.0, UiLanguage.English, "0.00")]
+    [DataRow(-0.004, UiLanguage.English, "0.00")]
+    [DataRow(0.004, UiLanguage.English, "0.00")]
+    [DataRow(-0.006, UiLanguage.English, "-0.01")]
+    [DataRow(1234.5, UiLanguage.German, "+1.234,50")]
+    [DataRow(-0.5, UiLanguage.German, "-0,50")]
+    [DataRow(null, UiLanguage.German, Dash)]
+    public void PageFormatFormatsDoubleDeltaWithSign(double? value, UiLanguage language, string expected)
+    {
+        // Act
+        var text = PageFormat.Delta(value, language);
+
+        // Assert
+        Assert.AreEqual(expected, text, "The delta should carry its sign after rounding to two decimals");
+    }
+
+    /// <summary>
     /// Productivity is stored as a percent and shown rounded to a whole percent, not multiplied, with the language's
     /// spacing.
     /// </summary>

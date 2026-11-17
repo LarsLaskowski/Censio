@@ -24,3 +24,25 @@
 .censio-frame .mud-appbar .mud-button-root:disabled .mud-button-label {
     color: var(--mud-palette-appbar-text);
 }
+
+.censio-chart path.mud-chart-line {
+    animation: censio-chart-reveal 0.8s ease-out both;
+}
+
+@keyframes censio-chart-reveal {
+    from {
+        clip-path: inset(0 100% 0 0);
+        opacity: 0;
+    }
+
+    to {
+        clip-path: inset(0);
+        opacity: 1;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .censio-chart path.mud-chart-line {
+        animation: none;
+    }
+}

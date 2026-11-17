@@ -134,6 +134,29 @@ public static class PageAddress
     }
 
     /// <summary>
+    /// Tries to parse the product GUID of a good.
+    /// </summary>
+    /// <param name="text">The text</param>
+    /// <param name="productGuid">The product GUID</param>
+    /// <returns><see langword="true"/> when the text is a product GUID</returns>
+    public static bool TryParseGood(string? text, out int productGuid)
+    {
+        return TryParseSession(text, out productGuid);
+    }
+
+    /// <summary>
+    /// Gives the address of a good's page on an island.
+    /// </summary>
+    /// <param name="profileId">The profile identity</param>
+    /// <param name="island">The island</param>
+    /// <param name="productGuid">The product GUID of the good</param>
+    /// <returns>The address</returns>
+    public static string GoodLink(Guid profileId, IslandKey island, int productGuid)
+    {
+        return string.Create(CultureInfo.InvariantCulture, $"{IslandLink(profileId, island)}/goods/{productGuid}");
+    }
+
+    /// <summary>
     /// Tells whether a text is one or more ASCII digits.
     /// </summary>
     /// <param name="text">The text</param>

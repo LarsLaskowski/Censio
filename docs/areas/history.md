@@ -2,12 +2,12 @@
 
 ## Scope
 
-The time series the server keeps per profile, island and good: the read of a series and its points and gaps, the
-retention rule (ticks at full resolution for 7 days, then hourly sums and counts without limit), the fold and its cutoff,
+The time series the server keeps per profile, island and good: the read of a series and its points and gaps, the two
+trend reads of the charts with the trend gate, the retention rule (ticks at full resolution for 7 days, then hourly sums and counts without limit), the fold and its cutoff,
 the latest hour, late and resent ticks, repeated goods, the retention job with its schedule and log lines, deleting a
 profile's history with its removal steps, secure delete and the clean-up of the database file, the legacy residue and the
-measurements. Operators who run the server rely on the retention and the deletion; the charts of later features (#36 to
-#38) call the series read.
+measurements. Operators who run the server rely on the retention and the deletion; the charts ([`web-charts.md`](web-charts.md))
+call the trend reads, and the charts of later features (#37, #38, #49 to #51) call these or the series read.
 
 ## Behavior
 
@@ -52,6 +52,44 @@ measurements. Operators who run the server rely on the retention and the deletio
   missing: a gap in the values, not in the time. A value a tick did not carry is no value, never 0.
 - An hour can hold an hourly point and ticks at once (a fold in progress, a late tick). The read returns both, the hourly
   point first on equal times, then by storing order.
+
+### The trend reads
+
+- Two reads serve the charts of [`web-charts.md`](web-charts.md), and each returns one point per tick or hourly point of a
+  range, never more than the maximum its caller names (the server asks for 2,880). The good read names a profile, a set of
+  islands, a good and the range; the figures read names a profile, one island and the range. Each also returns the number
+  of all points of the range, so a caller can say that it shows the newest only.
+- **Times first.** One read transaction takes the count of all points of the range and the times of the newest points up to
+  the maximum: the ticks by receive time and storing order, the hourly points by hour, merged oldest first, an hourly point
+  before a tick of equal time. A range holds hourly points and ticks as the series read says: a folded tick is never
+  beside the hourly point that holds it.
+- **A good point.** For a tick: production (generation), consumption and delta, each the sum over the islands of the set
+  that carry the value in their first entry of the good in stored position, and no value where none does. For an hourly
+  point: the same sum of the islands' hourly means (the sum divided by the number of ticks that carried it, no value when
+  that number is 0). A float is read as its stored bit pattern, widened to a double in C# and summed there in island key
+  order; no float goes through SQL `SUM`, `AVG` or `ROUND` (integers may).
+- **A figures point.** For a tick: the island's key figures as *Key figures* of [`web-pages.md`](web-pages.md) count them
+  (buildings the sum of the entries' building counts, produced goods the entries with a building count above 0, goods in
+  deficit the entries whose delta rounded to two decimals, midpoint away from zero, is below 0), and no value when the tick
+  lacks the island or the island has no entries. For an hourly point: buildings `Math.Round(Σ BuildingCountSum / EntryCount,
+  MidpointRounding.AwayFromZero)` over the island's goods, produced goods the goods with `BuildingCountSum > 0`, goods in
+  deficit the goods with at least one delta whose mean `DeltaSum / DeltaCount`, rounded as above, is below 0.
+- The island set is one JSON parameter read through SQLite's `json_each`, never one parameter per island and never
+  formatted into the statement; the rows a tick adds stay bounded by the tick's islands (256). The reads use the index of
+  the tick entries by tick island, good and position ([`server-data.md`](server-data.md)); the series read keeps its
+  statement.
+- **Parts.** After the times, the values are read oldest first in parts of at most 240 consecutive points (`TrendPartSize`),
+  one read transaction each. A part keeps only its points, and no tick is held beyond the one folded into a point.
+- **The trend gate.** Every transaction of a trend read, the times' and each part's, runs under the database's trend gate,
+  taken before the in-memory database's write gate, so the trend reads of the whole server run one at a time and the
+  clean-up of a deleted profile (*Deleting a profile*) waits for the part in progress and lets none start until it has
+  truncated the write-ahead log. On the in-memory database every transaction also takes the write gate, so the ingest waits
+  at most for one part (*Measurements*).
+- **A fold or a deletion between two parts.** A fold can remove a tick whose time a read already holds. The tick's point then
+  has no value (a gap in the drawing), and the hourly point that now holds the tick was read in an earlier part, or did not
+  exist when the times were read, so it does not count it: the drawing misses the tick and never shows it twice. This
+  concerns only a profile whose range reaches back 7 days (idle, or a replayed old recording), and the next read draws
+  the hour as one mean. The points of a profile deleted between two parts have no value in the same way.
 
 ### Retention
 
@@ -109,7 +147,9 @@ measurements. Operators who run the server rely on the retention and the deletio
 - **Clean-up.** The server's connection runs with secure delete, so SQLite overwrites everything this version deletes
   (retention included), and after the steps the write-ahead log is checkpointed and truncated, under the write gate. A
   reader that holds an older snapshot blocks the truncation: the clean-up then logs the warning below and the next run
-  tries again until it succeeds. The in-memory database has no file and counts as cleared. The decision that nothing is
+  tries again until it succeeds. A chart read's part never overlaps the truncation: the clean-up waits for the part in
+  progress, takes the trend gate before the write gate and holds it through the checkpoint, so no part starts during it
+  and no chart read can keep a deleted profile's names in the write-ahead log (*The trend reads*). The in-memory database has no file and counts as cleared. The decision that nothing is
   left to sweep is made under the same write gate: while a tombstone exists (a deletion arrived after the last sweep step)
   the clean-up does nothing, logs nothing and keeps its request, and the run the deletion asked for sweeps the rows
   first. Once the clean-up line is
@@ -171,6 +211,42 @@ three runs unless a row says otherwise. The limit is 10 seconds a step at the bo
 The tick rows of the deletion's measurement over a year were written as rows of the tick table alone, since the first
 transaction changes only the profile of those rows and of the hourly points; no figure here extends beyond those sizes.
 
+The rows above were measured before the index of the tick entries by good (record 0087). A second scratch program measured
+the steps again with and without it (the index dropped from a copy of the schema, the same ticks at the bounds, three
+runs of four stores, three fold steps and the removal steps each), the trend reads and the migration, on the same machine:
+
+| What | With the index | Without it |
+| ---- | -------------- | ---------- |
+| Store of a tick at the bounds | median 2.21 s (1.85 to 2.59, 12 stores) | median 2.07 s (1.98 to 2.30) |
+| Fold step, tick at the bounds | median 3.92 s (3.75 to 4.24, 9 steps) | median 3.85 s (3.63 to 4.20) |
+| Removal step, tick at the bounds | median 0.49 s (0.48 to 0.53, 3 steps) | median 0.42 s (0.41 to 0.44) |
+| Removal step, hourly point at the bounds | 0.45 to 0.50 s | 0.46 to 0.50 s |
+
+The index costs about 7 % of a store, 2 % of a fold step and 17 % of a tick's removal step at the bounds; the fold step stays
+at about 4 seconds, the figure the gate's guarantee names. Its size is 9,928,704 bytes for the 524,288 entries of four ticks at
+the bounds (18.9 bytes an entry; the file 100,585,472 bytes against 90,656,768 without it, 10.9 % more) and 61,493,248 bytes
+for the about 3.22 million entries of 7 days of fixture ticks (19.1 bytes an entry), measured as the pages that dropping the
+index freed.
+
+| What | Result |
+| ---- | ------ |
+| The migration that builds the index, 7 days of fixture ticks (5,040 ticks, about 3.22 million entries) | 1.59, 1.67 and 1.58 s; the open of a database that has it 2 to 62 ms |
+| The same, 60 ticks at the bounds (7.86 million entries) | 4.60, 3.73 and 3.69 s |
+| Region read, 2,880 points of ticks at the bounds (256 islands), 60 ticks read in one part and scaled | 4.4, 3.8 and 3.5 s |
+| Island read, same | 0.2 s (2.2 s for the first read of a process, which includes the JIT) |
+| Figures read, same | 2.0, 1.3 and 1.3 s |
+| The same three reads with the page cache dropped before a fresh process (`drop_caches`), scaled | region 73.5, 68.3 and 70.0 s; island 5.4, 3.4 and 2.9 s; figures 3.4, 3.6 and 4.5 s |
+| Reads of 2,880 of 5,040 fixture ticks (24 islands in the region), no scaling | island 36 to 116 ms, region 167 to 199 ms, figures 99 to 116 ms; with the page cache dropped: 318 and 387 ms, 1.01 and 1.03 s, 207 and 168 ms |
+| One part on the in-memory database: a read of 20 ticks at the bounds, scaled to a part of 240 | region 0.28 to 0.46 s, figures 0.14 to 0.29 s, island 0.04 s (0.6 s for the first read); the slowest store of a fixture tick queued meanwhile waited 4 to 38 ms, until the 20-tick read ended |
+
+The reads are linear in their points (a part is at most 240 points), so the tick-at-the-bounds rows read 60 ticks and scale
+by 2,880 / 60; 2,880 ticks at the bounds would be a file of about 63 GB, which the sandbox cannot hold. Where the index
+pages are in the page cache (the way the rows above measure, with the file just written) each read is within the limit of
+10 seconds; the region read at the bounds is the slowest. With the page cache dropped the region read at the bounds takes
+1.42 to 1.53 s for the 15,360 index lookups of 60 ticks (256 islands each), which scales to more than 10 seconds; the same
+read over the fixture's 24 islands takes 1 second. A part holds the in-memory database's write gate for its transaction only,
+0.6 seconds at most in these rows, against about 3.9 seconds of a fold step.
+
 Size, measured on the file after a truncating checkpoint, by the pages of each table and its indexes:
 
 | What | Ticks | Hourly rows |
@@ -191,11 +267,12 @@ ticks are gone.
 - [`decisions/0083-history-folded-tick-by-tick-into-hourly-sums-and-counts.md`](../decisions/0083-history-folded-tick-by-tick-into-hourly-sums-and-counts.md) — the fold, one tick per transaction, sums and counts, the latest hour and the kept identities.
 - [`decisions/0084-profile-deleted-in-steps-and-cleared-from-the-file.md`](../decisions/0084-profile-deleted-in-steps-and-cleared-from-the-file.md) — a profile is gone at once for its readers, its rows are removed in steps, the file is cleared of them.
 - [`decisions/0085-deletion-only-from-pages-opened-by-a-trusted-host.md`](../decisions/0085-deletion-only-from-pages-opened-by-a-trusted-host.md) — the deletion needs a page opened by a trusted host.
+- [`decisions/0087-chart-reads-aggregate-per-point-bounded-in-parts-with-a-product-index.md`](../decisions/0087-chart-reads-aggregate-per-point-bounded-in-parts-with-a-product-index.md) — the chart reads aggregate per point, read the newest 2,880 points in parts under a trend gate and use an index of tick entries by good.
 
 ## Not here
 
 - The tables, the file, the start and the rules of storing: [`server-data.md`](server-data.md).
 - The state a deletion drops and rebuilds: [`server-state.md`](server-state.md).
 - The button, the dialog and the host rule: [`web-pages.md`](web-pages.md); the setting `AllowedHosts`: [`server.md`](server.md).
-- Charts and how they draw time without points (#36 to #38).
+- The charts, their range, gaps and states: [`web-charts.md`](web-charts.md); a range picker, sparklines and trend arrows (#37, #38).
 - Shrinking the database file and removing the residue of older versions: the user guide.

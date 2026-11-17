@@ -125,6 +125,32 @@ public sealed class UiTextsTests
     }
 
     /// <summary>
+    /// Every text of the trend charts exists in English and German, each exactly the one of the spec.
+    /// </summary>
+    /// <param name="textName">The name of the text property</param>
+    /// <param name="english">The English text</param>
+    /// <param name="german">The German text</param>
+    [TestMethod]
+    [TestCategory("AC7")]
+    [DataRow(nameof(UiTexts.ChartRange), "Last 24 hours up to the latest tick", "Letzte 24 Stunden bis zum letzten Tick")]
+    [DataRow(nameof(UiTexts.ChartThisIsland), "This island", "Diese Insel")]
+    [DataRow(nameof(UiTexts.ChartRegionTotal), "All islands of the region", "Alle Inseln der Region")]
+    [DataRow(nameof(UiTexts.ChartOverview), "Overview", "Übersicht")]
+    [DataRow(nameof(UiTexts.ChartNoValues), "No values in this period.", "Keine Werte in diesem Zeitraum.")]
+    [DataRow(nameof(UiTexts.ChartCapFormat), "Showing the newest 2,880 of {0} points.", "Die neuesten 2.880 von {0} Punkten angezeigt.")]
+    [DataRow(nameof(UiTexts.HourlyAverage), "Hourly average", "Stundenmittel")]
+    public void UiTextsChartTextsInBothLanguages(string textName, string english, string german)
+    {
+        // Act
+        var shownInEnglish = ReadText(UiTexts.For(UiLanguage.English), textName);
+        var shownInGerman = ReadText(UiTexts.For(UiLanguage.German), textName);
+
+        // Assert
+        Assert.AreEqual(english, shownInEnglish, $"The chart text {textName} should read as the spec gives it in English");
+        Assert.AreEqual(german, shownInGerman, $"The chart text {textName} should read as the spec gives it in German");
+    }
+
+    /// <summary>
     /// Reads a text property by its name.
     /// </summary>
     /// <param name="texts">The texts</param>

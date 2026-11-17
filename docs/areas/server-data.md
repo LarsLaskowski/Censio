@@ -80,7 +80,10 @@ The schema has these tables; the server's store is the only code that reads or w
 - **Islands:** per profile and island key (session GUID, island ID, area index), the latest name with the receive time and
   tick number it came from.
 - **Tick islands, entries and map pairs:** the rows of a tick in stored positions; an entry's eight floats and three
-  integers, and its workforce and building amounts as pairs.
+  integers, and its workforce and building amounts as pairs. The entries are indexed by tick island and position, and by
+  tick island, product GUID and position: the second index serves the trend reads of the charts, which find a good's
+  entry on each island of a tick without scanning the island's entries ([`history.md`](history.md), *The trend reads*;
+  record 0087). Its bytes and cost are measured in [`history.md`](history.md) (*Measurements*).
 - **Catalog:** one row, the catalog identity (the SHA-256 of the document's bytes, as the hello reply names it) and the
   document's bytes.
 - **Icons:** the PNG bytes by reference key.
@@ -99,6 +102,9 @@ bit for bit, negative zero included, and a missing value never reads back as zer
   not at all, also when the server stops during the write. A read from a file runs on its own connection in a deferred
   read transaction, sees the state before or after a write, and neither waits for it nor delays the next one. An
   in-memory database has no write-ahead log, so every read and every write takes the gate in turn and the same holds.
+- **Trend gate.** Besides the write gate a database has a trend gate, one waiter at a time: every transaction of a trend
+  read takes it first ([`history.md`](history.md), *The trend reads*), and so does the clean-up of a deleted profile, before the
+  write gate and through the truncation of the write-ahead log. No store of a message and no read of the pages takes it.
 - **Profile.** Storing a profile identity and name creates the profile or, for a known identity, keeps it and takes the
   new name. A tick of an identity the store does not hold yet is stored and creates that profile without a name; its next
   hello gives it the name. Listing returns every profile with identity and name.
@@ -179,4 +185,4 @@ the bounds; the retention job folds ticks 7 days old or older into hourly points
 - The data directory and the Docker image: [`server.md`](server.md).
 - What the ingest accepts and answers and when it stores: [`ingest.md`](ingest.md); the state kept from the store: [`server-state.md`](server-state.md).
 - The contract's messages and bounds: [`contract.md`](contract.md); the catalog document: [`game-catalog-format.md`](game-catalog-format.md).
-- Retention, hourly averages, deleting a profile's history and the series read: [`history.md`](history.md); the pages that show the data: [`web-pages.md`](web-pages.md).
+- Retention, hourly averages, deleting a profile's history, the series read and the trend reads: [`history.md`](history.md); the pages that show the data: [`web-pages.md`](web-pages.md); the charts: [`web-charts.md`](web-charts.md).

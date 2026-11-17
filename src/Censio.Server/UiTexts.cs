@@ -51,7 +51,14 @@ public sealed class UiTexts
                                                    DeleteHistoryConfirm = "Delete",
                                                    DeleteHistoryCancel = "Cancel",
                                                    DeleteHistoryFailed = "The history could not be deleted.",
-                                                   DeleteHistoryHostRefused = "Deleting needs this page opened by IP address or as localhost, or by a host name the setting AllowedHosts lists."
+                                                   DeleteHistoryHostRefused = "Deleting needs this page opened by IP address or as localhost, or by a host name the setting AllowedHosts lists.",
+                                                   ChartRange = "Last 24 hours up to the latest tick",
+                                                   ChartThisIsland = "This island",
+                                                   ChartRegionTotal = "All islands of the region",
+                                                   ChartOverview = "Overview",
+                                                   ChartNoValues = "No values in this period.",
+                                                   ChartCapFormat = "Showing the newest 2,880 of {0} points.",
+                                                   HourlyAverage = "Hourly average"
                                                };
 
     /// <summary>
@@ -98,7 +105,14 @@ public sealed class UiTexts
                                                   DeleteHistoryConfirm = "Löschen",
                                                   DeleteHistoryCancel = "Abbrechen",
                                                   DeleteHistoryFailed = "Der Verlauf konnte nicht gelöscht werden.",
-                                                  DeleteHistoryHostRefused = "Löschen setzt voraus, dass diese Seite über die IP-Adresse oder localhost geöffnet wurde, oder über einen Hostnamen, den die Einstellung AllowedHosts nennt."
+                                                  DeleteHistoryHostRefused = "Löschen setzt voraus, dass diese Seite über die IP-Adresse oder localhost geöffnet wurde, oder über einen Hostnamen, den die Einstellung AllowedHosts nennt.",
+                                                  ChartRange = "Letzte 24 Stunden bis zum letzten Tick",
+                                                  ChartThisIsland = "Diese Insel",
+                                                  ChartRegionTotal = "Alle Inseln der Region",
+                                                  ChartOverview = "Übersicht",
+                                                  ChartNoValues = "Keine Werte in diesem Zeitraum.",
+                                                  ChartCapFormat = "Die neuesten 2.880 von {0} Punkten angezeigt.",
+                                                  HourlyAverage = "Stundenmittel"
                                               };
 
     #endregion // Fields
@@ -304,6 +318,41 @@ public sealed class UiTexts
     /// Gets the text shown when the page was opened by a host that may not delete.
     /// </summary>
     public required string DeleteHistoryHostRefused { get; init; }
+
+    /// <summary>
+    /// Gets the chart text ChartRange.
+    /// </summary>
+    public required string ChartRange { get; init; }
+
+    /// <summary>
+    /// Gets the chart text ChartThisIsland.
+    /// </summary>
+    public required string ChartThisIsland { get; init; }
+
+    /// <summary>
+    /// Gets the chart text ChartRegionTotal.
+    /// </summary>
+    public required string ChartRegionTotal { get; init; }
+
+    /// <summary>
+    /// Gets the chart text ChartOverview.
+    /// </summary>
+    public required string ChartOverview { get; init; }
+
+    /// <summary>
+    /// Gets the chart text ChartNoValues.
+    /// </summary>
+    public required string ChartNoValues { get; init; }
+
+    /// <summary>
+    /// Gets the chart text ChartCapFormat.
+    /// </summary>
+    public required string ChartCapFormat { get; init; }
+
+    /// <summary>
+    /// Gets the chart text HourlyAverage.
+    /// </summary>
+    public required string HourlyAverage { get; init; }
 
     #endregion // Properties
 

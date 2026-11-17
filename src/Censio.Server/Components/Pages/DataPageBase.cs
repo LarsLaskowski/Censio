@@ -133,6 +133,24 @@ public abstract class DataPageBase : ComponentBase, IDisposable
     protected abstract bool IsKnown(ProfileView view);
 
     /// <summary>
+    /// Reads what a page shows beyond the profile's view, once the view is ready.
+    /// </summary>
+    /// <param name="view">The view</param>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>A task that completes when the details are read</returns>
+    protected virtual Task ReadDetailsAsync(ProfileView view, CancellationToken cancellationToken)
+    {
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Clears what <see cref="ReadDetailsAsync" /> read.
+    /// </summary>
+    protected virtual void ClearDetails()
+    {
+    }
+
+    /// <summary>
     /// Gives the shown name of the profile.
     /// </summary>
     /// <param name="view">The view</param>
@@ -226,6 +244,19 @@ public abstract class DataPageBase : ComponentBase, IDisposable
             return;
         }
 
+        if (ShowRead(read) is { } ready && RendererInfo.IsInteractive)
+        {
+            await ReadDetailsAsync(ready, _cancellationToken).ConfigureAwait(true);
+        }
+    }
+
+    /// <summary>
+    /// Shows the result of the read of the profile.
+    /// </summary>
+    /// <param name="read">The read</param>
+    /// <returns>The view when the page shows it, otherwise <see langword="null" /></returns>
+    private ProfileView? ShowRead(PageRead read)
+    {
         if (read.IsFailed)
         {
             Show(PageMode.Failed, null);
@@ -241,11 +272,15 @@ public abstract class DataPageBase : ComponentBase, IDisposable
         else if (IsKnown(view))
         {
             Show(PageMode.Ready, view);
+
+            return view;
         }
         else
         {
             Show(PageMode.NotFound, null);
         }
+
+        return null;
     }
 
     /// <summary>
@@ -322,6 +357,8 @@ public abstract class DataPageBase : ComponentBase, IDisposable
         }
 
         _addressKey = key;
+
+        ClearDetails();
 
         return LoadAsync();
     }

@@ -78,6 +78,12 @@ internal sealed class CensioDbContext : DbContext
                                                                          row.TickIslandId,
                                                                          row.Position
                                                                      }).IsUnique();
+                                              entity.HasIndex(row => new
+                                                                     {
+                                                                         row.TickIslandId,
+                                                                         row.ProductGuid,
+                                                                         row.Position
+                                                                     });
                                           });
 
         modelBuilder.Entity<TickMapPairRow>(entity =>

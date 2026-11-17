@@ -35,6 +35,15 @@ public sealed class PageReader
 
     #endregion // Constructors
 
+    #region Properties
+
+    /// <summary>
+    /// Gets the lookup over the catalog document, or <see langword="null"/> when the catalog is not usable.
+    /// </summary>
+    public PageCatalog? Catalog => _source.Catalog.Lookup;
+
+    #endregion // Properties
+
     #region Methods
 
     /// <summary>

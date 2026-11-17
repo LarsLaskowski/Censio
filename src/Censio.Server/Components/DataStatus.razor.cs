@@ -1,6 +1,3 @@
-using System.Globalization;
-using System.Text.Json;
-
 using Censio.Contracts;
 
 using Microsoft.AspNetCore.Components;
@@ -13,15 +10,6 @@ namespace Censio.Server.Components;
 /// </summary>
 public sealed partial class DataStatus : IDisposable
 {
-    #region Constants
-
-    /// <summary>
-    /// The greatest UTC offset in minutes the browser may give, in either direction.
-    /// </summary>
-    private const int MaxOffsetMinutes = 840;
-
-    #endregion // Constants
-
     #region Fields
 
     /// <summary>
@@ -128,18 +116,7 @@ public sealed partial class DataStatus : IDisposable
     /// <returns>A task that completes when the browser answered</returns>
     private async Task AskOffsetAsync(DateTimeOffset instant)
     {
-        try
-        {
-            var offset = await JsRuntime.InvokeAsync<int>("censio.utcOffsetMinutes", _cancellation.Token, instant.UtcDateTime.ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'", CultureInfo.InvariantCulture)).ConfigureAwait(true);
-
-            _offsetMinutes = offset is >= -MaxOffsetMinutes and <= MaxOffsetMinutes
-                                 ? offset
-                                 : null;
-        }
-        catch (Exception exception) when (exception is JSException or JsonException or JSDisconnectedException or OperationCanceledException)
-        {
-            _offsetMinutes = null;
-        }
+        _offsetMinutes = await BrowserOffset.AskAsync(JsRuntime, instant, _cancellation.Token).ConfigureAwait(true);
 
         _isOffsetSettled = true;
     }
