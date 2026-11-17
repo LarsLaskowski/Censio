@@ -128,7 +128,7 @@ public sealed class TrendReaderTests
         // Arrange
         using var fixture = await TrendFixture.CreateAsync(TestContext.CancellationToken);
 
-        var islands = fixture.Ticks[1].Islands.Where(island => island.SessionGuid == RegionSession).Select(TrendFixture.KeyOf).Order().ToList();
+        var islands = fixture.Ticks[1].Islands.Where(island => island.SessionGuid == RegionSession).Select(TrendFixture.KeyOf).OrderBy(key => key.SessionGuid).ThenBy(key => key.IslandId).ThenBy(key => key.AreaIndex).ToList();
         var good = FindPartlyCarriedGood(fixture.Ticks[1], islands);
 
         // Act
@@ -157,7 +157,7 @@ public sealed class TrendReaderTests
         // Arrange
         using var fixture = await TrendFixture.CreateAsync(TestContext.CancellationToken);
 
-        var islands = fixture.Ticks[1].Islands.Select(TrendFixture.KeyOf).Order().ToList();
+        var islands = fixture.Ticks[1].Islands.Select(TrendFixture.KeyOf).OrderBy(key => key.SessionGuid).ThenBy(key => key.IslandId).ThenBy(key => key.AreaIndex).ToList();
         var expected = new List<string>();
         var actual = new List<string>();
 
