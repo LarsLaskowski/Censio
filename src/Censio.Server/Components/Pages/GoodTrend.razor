@@ -19,6 +19,7 @@
 }
 else if (View is { } shown)
 {
-    <TrendChart Heading="@Texts.ChartThisIsland" Kind="TrendKind.Good" Read="@(_isFailed ? _failedRead : _islandRead)" AsOf="shown.AsOf" ReadNumber="_islandNumber" />
-    <TrendChart Heading="@Texts.ChartRegionTotal" Kind="TrendKind.Good" Read="@(_isFailed ? _failedRead : _regionRead)" AsOf="shown.AsOf" ReadNumber="_regionNumber" />
+    <TrendControls />
+    <TrendChart Heading="@Texts.ChartThisIsland" Kind="TrendKind.Good" Read="@(_isFailed ? _failedRead : _islandRead)" AsOf="shown.AsOf" ReadNumber="_islandNumber" Axis="ChartChoice.Axis" />
+    <TrendChart Heading="@Texts.ChartRegionTotal" Kind="TrendKind.Good" Read="@(_isFailed ? _failedRead : _regionRead)" AsOf="shown.AsOf" ReadNumber="_regionNumber" Axis="ChartChoice.Axis" />
 }

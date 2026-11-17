@@ -7,7 +7,7 @@ trend reads of the charts with the trend gate, the retention rule (ticks at full
 the latest hour, late and resent ticks, repeated goods, the retention job with its schedule and log lines, deleting a
 profile's history with its removal steps, secure delete and the clean-up of the database file, the legacy residue and the
 measurements. Operators who run the server rely on the retention and the deletion; the charts ([`web-charts.md`](web-charts.md))
-call the trend reads, and the charts of later features (#37, #38, #49 to #51) call these or the series read.
+call the trend reads, and the charts of later features (#38, #49 to #51) call these or the series read.
 
 ## Behavior
 
@@ -58,7 +58,9 @@ call the trend reads, and the charts of later features (#37, #38, #49 to #51) ca
 - Two reads serve the charts of [`web-charts.md`](web-charts.md), and each returns one point per tick or hourly point of a
   range, never more than the maximum its caller names (the server asks for 2,880). The good read names a profile, a set of
   islands, a good and the range; the figures read names a profile, one island and the range. Each also returns the number
-  of all points of the range, so a caller can say that it shows the newest only.
+  of all points of the range, so a caller can say that it shows the newest only. A query names a resolution:
+  `Points` (the default, the points just described) or `Hours` (*Hourly resolution*). A point also carries its game
+  time, its first game time and whether no island of it holds an entry (*Game times*).
 - **Times first.** One read transaction takes the count of all points of the range and the times of the newest points up to
   the maximum: the ticks by receive time and storing order, the hourly points by hour, merged oldest first, an hourly point
   before a tick of equal time. A range holds hourly points and ticks as the series read says: a folded tick is never
@@ -78,8 +80,31 @@ call the trend reads, and the charts of later features (#37, #38, #49 to #51) ca
   formatted into the statement; the rows a tick adds stay bounded by the tick's islands (256). The reads use the index of
   the tick entries by tick island, good and position ([`server-data.md`](server-data.md)); the series read keeps its
   statement.
+- **Game times.** A tick gives its game time (the first game time is the same). An hourly point gives its smallest and
+  largest game time, those of all ticks folded into it. `HasNoEntries` is set for a tick or hourly point none of whose
+  islands holds an entry (the tick the game sends after a load, [`pipe.md`](pipe.md)); it is read with an `EXISTS` in the part's own
+  transaction, so the times transaction reads no more than before.
 - **Parts.** After the times, the values are read oldest first in parts of at most 240 consecutive points (`TrendPartSize`),
   one read transaction each. A part keeps only its points, and no tick is held beyond the one folded into a point.
+- **Hourly resolution (`Hours`).** The read gives one point per UTC hour of the range that holds a tick or an hourly
+  point, folded or not; the cap is 2,880 hours, the count is that of all such hours.
+  - *Times.* One read transaction reads, from the indexes only, the newest hours that hold an hourly point, the newest hours
+    that hold a tick with their tick counts (a `GROUP BY` of the receive time floored to the hour over every tick of the
+    range) and the count of all distinct hours (a `UNION` of both); the newest 2,880 distinct hours are kept.
+  - *Parts of scanned rows.* The hours, oldest first, are cut into parts of at most `TrendPartSize` rows (240), an hourly
+    point and a tick counting one row each, so a part scans at most 240 ticks or hourly points; an hour with more ticks
+    continues in the next part, and a part may hold several hours. A part selects the ticks of its slice by a keyset on the
+    receive time and storing order.
+  - *Values.* The hour's values are accumulated in C# from the hourly point of the hour, if any, and then the ticks, per
+    island (good read) or per good (figures read), and the hour's point is formed as the hourly point after the fold would
+    read: each value the mean over the ticks that carried it, summed over the islands in key order; for the figures the
+    first entry of each good of the island, as the fold keeps. A late tick of a folded hour counts on top of the folded point.
+  - *Game times of an hour.* The largest game time and the smallest over the ticks that hold an entry and over the folded
+    point when it holds one; an hour with no entry anywhere is flagged `HasNoEntries` and takes the smallest and largest over
+    all its rows. The smallest of a folded hour covers all its folded ticks, a no-entry tick included, so it can be that
+    tick's (*Game-time axis* of [`web-charts.md`](web-charts.md)).
+  - The read scans every tick of its range, so its time grows with the tick rate and the range, not with the cap
+    ([`web-charts.md`](web-charts.md), *Limits and errors*).
 - **The trend gate.** Every transaction of a trend read, the times' and each part's, runs under the database's trend gate,
   taken before the in-memory database's write gate, so the trend reads of the whole server run one at a time and the
   clean-up of a deleted profile (*Deleting a profile*) waits for the part in progress and lets none start until it has
@@ -268,11 +293,12 @@ ticks are gone.
 - [`decisions/0084-profile-deleted-in-steps-and-cleared-from-the-file.md`](../decisions/0084-profile-deleted-in-steps-and-cleared-from-the-file.md) — a profile is gone at once for its readers, its rows are removed in steps, the file is cleared of them.
 - [`decisions/0085-deletion-only-from-pages-opened-by-a-trusted-host.md`](../decisions/0085-deletion-only-from-pages-opened-by-a-trusted-host.md) — the deletion needs a page opened by a trusted host.
 - [`decisions/0087-chart-reads-aggregate-per-point-bounded-in-parts-with-a-product-index.md`](../decisions/0087-chart-reads-aggregate-per-point-bounded-in-parts-with-a-product-index.md) — the chart reads aggregate per point, read the newest 2,880 points in parts under a trend gate and use an index of tick entries by good.
+- [`decisions/0089-chart-ranges-wide-ones-as-hourly-means-read-at-request.md`](../decisions/0089-chart-ranges-wide-ones-as-hourly-means-read-at-request.md) — the wide ranges read one mean per hour from ticks and hourly points when asked.
 
 ## Not here
 
 - The tables, the file, the start and the rules of storing: [`server-data.md`](server-data.md).
 - The state a deletion drops and rebuilds: [`server-state.md`](server-state.md).
 - The button, the dialog and the host rule: [`web-pages.md`](web-pages.md); the setting `AllowedHosts`: [`server.md`](server.md).
-- The charts, their range, gaps and states: [`web-charts.md`](web-charts.md); a range picker, sparklines and trend arrows (#37, #38).
+- The charts, their range, gaps and states: [`web-charts.md`](web-charts.md); sparklines and trend arrows (#38).
 - Shrinking the database file and removing the residue of older versions: the user guide.

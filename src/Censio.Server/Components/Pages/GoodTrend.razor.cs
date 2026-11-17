@@ -137,7 +137,7 @@ public partial class GoodTrend
     #region DataPageBase
 
     /// <inheritdoc />
-    protected override object AddressKey => ValueTuple.Create(Profile, Session, Island, Area, Good);
+    protected override object AddressKey => ValueTuple.Create(Profile, Session, Island, Area, Good, ChartChoice.Range);
 
     /// <inheritdoc />
     protected override PageMode ResolveTarget(out Guid profileId, out IslandKey? island)
@@ -183,8 +183,8 @@ public partial class GoodTrend
                                                     new TrendRequest
                                                     {
                                                         LatestTick = asOf,
-                                                        Choice = ChartChoice.Default,
-                                                        Held = null
+                                                        Choice = ChartChoice,
+                                                        Held = _islandRead?.View
                                                     },
                                                     cancellationToken).ConfigureAwait(true);
 
@@ -199,8 +199,8 @@ public partial class GoodTrend
                                                     new TrendRequest
                                                     {
                                                         LatestTick = asOf,
-                                                        Choice = ChartChoice.Default,
-                                                        Held = null
+                                                        Choice = ChartChoice,
+                                                        Held = _regionRead?.View
                                                     },
                                                     cancellationToken).ConfigureAwait(true);
 

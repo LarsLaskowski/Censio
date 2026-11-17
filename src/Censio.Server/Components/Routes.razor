@@ -1,11 +1,13 @@
 <CascadingValue Value="Theme">
     <CascadingValue Value="Language">
         <CascadingValue Value="DeletionAllowed" Name="DeletionAllowed">
-            <Router AppAssembly="typeof(Program).Assembly">
-                <Found Context="routeData">
-                    <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
-                </Found>
-            </Router>
+            <CascadingValue Value="ChartChoice">
+                <Router AppAssembly="typeof(Program).Assembly">
+                    <Found Context="routeData">
+                        <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
+                    </Found>
+                </Router>
+            </CascadingValue>
         </CascadingValue>
     </CascadingValue>
 </CascadingValue>

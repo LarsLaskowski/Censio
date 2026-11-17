@@ -20,6 +20,11 @@ public partial class App
     private UiLanguage _language;
 
     /// <summary>
+    /// The chart choice read from the request.
+    /// </summary>
+    private ChartChoice _chartChoice = ChartChoice.Default;
+
+    /// <summary>
     /// Whether the host of the request may delete a profile's history.
     /// </summary>
     private bool _deletionAllowed;
@@ -51,6 +56,7 @@ public partial class App
 
         _theme = UiPreferences.ReadTheme(request?.Cookies[UiPreferences.ThemeCookieName]);
         _language = UiPreferences.ReadLanguage(request?.Cookies[UiPreferences.LanguageCookieName], request?.Headers.AcceptLanguage.ToString());
+        _chartChoice = UiPreferences.ReadChartChoice(request?.Cookies[UiPreferences.ChartRangeCookieName], request?.Cookies[UiPreferences.ChartAxisCookieName]);
         _deletionAllowed = request is not null && DeletionHostRule.IsTrusted(request.Host.Host, Configuration["AllowedHosts"]);
     }
 

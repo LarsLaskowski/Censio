@@ -25,6 +25,12 @@
     color: var(--mud-palette-appbar-text);
 }
 
+.censio-frame .censio-chart-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
 .censio-chart path.mud-chart-line {
     animation: censio-chart-reveal 0.8s ease-out both;
 }

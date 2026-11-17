@@ -1,3 +1,5 @@
+using System.Globalization;
+
 using Microsoft.AspNetCore.Components;
 
 namespace Censio.Server.Components;
@@ -27,5 +29,48 @@ public sealed partial class TrendControls
     [CascadingParameter]
     public UiTexts Texts { get; set; } = UiTexts.For(UiLanguage.English);
 
+    /// <summary>
+    /// Gets the range line: the range, up to the latest tick.
+    /// </summary>
+    private string RangeLine => string.Format(CultureInfo.InvariantCulture,
+                                              Texts.ChartRangeFormat,
+                                              Choice.Range switch
+                                              {
+                                                  ChartRange.LastHour => Texts.RangeLastHour,
+                                                  ChartRange.LastWeek => Texts.RangeLastWeek,
+                                                  ChartRange.All => Texts.RangeAllHistory,
+                                                  _ => Texts.RangeLastDay
+                                              });
+
     #endregion // Properties
+
+    #region Methods
+
+    /// <summary>
+    /// Hands a new range, with the axis unchanged, to the callback.
+    /// </summary>
+    /// <param name="range">The range chosen</param>
+    /// <returns>A task that completes when the callback is done</returns>
+    private Task ChooseRangeAsync(ChartRange range)
+    {
+        return ChooseChart.InvokeAsync(Choice with
+                                              {
+                                                  Range = range
+                                              });
+    }
+
+    /// <summary>
+    /// Hands a new axis, with the range unchanged, to the callback.
+    /// </summary>
+    /// <param name="axis">The axis chosen</param>
+    /// <returns>A task that completes when the callback is done</returns>
+    private Task ChooseAxisAsync(ChartAxis axis)
+    {
+        return ChooseChart.InvokeAsync(Choice with
+                                              {
+                                                  Axis = axis
+                                              });
+    }
+
+    #endregion // Methods
 }

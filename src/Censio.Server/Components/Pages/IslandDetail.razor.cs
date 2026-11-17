@@ -152,7 +152,7 @@ public partial class IslandDetail
     #region DataPageBase
 
     /// <inheritdoc />
-    protected override object AddressKey => ValueTuple.Create(Profile, Session, Island, Area);
+    protected override object AddressKey => ValueTuple.Create(Profile, Session, Island, Area, ChartChoice.Range);
 
     /// <inheritdoc />
     protected override PageMode ResolveTarget(out Guid profileId, out IslandKey? island)
@@ -192,8 +192,8 @@ public partial class IslandDetail
                                                  new TrendRequest
                                                  {
                                                      LatestTick = asOf,
-                                                     Choice = ChartChoice.Default,
-                                                     Held = null
+                                                     Choice = ChartChoice,
+                                                     Held = _overviewRead?.View
                                                  },
                                                  cancellationToken).ConfigureAwait(true);
 
