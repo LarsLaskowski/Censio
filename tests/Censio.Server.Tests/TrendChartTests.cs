@@ -357,6 +357,150 @@ public sealed partial class TrendChartTests
     }
 
     /// <summary>
+    /// On the game-time axis the tooltip shows the point's real time as on the real-time axis, the mark of an hourly point,
+    /// then the game time as hours and minutes in the language shown, then the values.
+    /// </summary>
+    /// <param name="language">The language shown</param>
+    /// <param name="pointIndex">The index of the hovered point</param>
+    /// <param name="expectedLines">The lines the tooltip holds, joined by <c>|</c></param>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC3")]
+    [DataRow(UiLanguage.English, 0, "2026-11-13 10:00 UTC|Hourly average|Game time 486:06|Production: 10.50|Consumption: 20.25|Delta: -3.00")]
+    [DataRow(UiLanguage.English, 1, "2026-11-13 11:02 UTC|Game time 486:08|Production: 1,234.50|Consumption: 2.50|Delta: +1.25")]
+    [DataRow(UiLanguage.German, 1, "2026-11-13 11:02 UTC|Spielzeit 486:08|Produktion: 1.234,50|Verbrauch: 2,50|Delta: +1,25")]
+    public async Task TrendChartGameAxisTooltipShowsRealTimeThenGameTime(UiLanguage language, int pointIndex, string expectedLines)
+    {
+        // Arrange
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken);
+
+        var chart = RenderChart(host, language, TrendKind.Good, CreateRead(WithGameTimes(TooltipView(TrendKind.Good))), null, 1, axis: ChartAxis.GameTime);
+
+        await chart.WaitForAssertionAsync(() => Assert.HasCount(9, chart.FindAll(PointSelector), "The chart should be drawn with three lines of three points"), PageTestHost.WaitBound);
+
+        // Act
+        await chart.FindAll(PointSelector)[pointIndex].TriggerEventAsync("onmouseover", new MouseEventArgs());
+
+        // Assert
+        var lines = chart.Find(".mud-charts-tooltip").QuerySelectorAll("text").Select(line => line.TextContent).ToList();
+
+        Assert.AreSequenceEqual(expectedLines.Split('|'), lines, "The tooltip should name the real time, the hourly mark, the game time and the values, in this order");
+    }
+
+    /// <summary>
+    /// The game-time axis writes no time label.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC3")]
+    public async Task TrendChartGameAxisLabelsCarryNoTime()
+    {
+        // Arrange
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken);
+
+        // Act
+        var chart = RenderChart(host, UiLanguage.English, TrendKind.Good, CreateRead(WithGameTimes(TooltipView(TrendKind.Good))), _asOf, 1, axis: ChartAxis.GameTime);
+
+        // Assert
+        await chart.WaitForAssertionAsync(() => Assert.HasCount(1, chart.FindAll(ChartSelector), "The chart should be drawn"), PageTestHost.WaitBound);
+
+        var labels = chart.FindAll(".mud-charts-xaxis > *").Select(label => label.TextContent).ToList();
+
+        Assert.IsTrue(labels.All(label => label.Length == 0), $"The game-time axis should carry no time label, but holds '{string.Join("', '", labels)}'");
+    }
+
+    /// <summary>
+    /// A change of the axis redraws the chart from the read it holds, without a new read or a new question to the browser:
+    /// the labels change from times to none.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC3")]
+    public async Task TrendChartAxisChangeRedrawsSameRead()
+    {
+        // Arrange
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken);
+
+        SetupOffsetFor(host, _asOf).SetResult(60);
+
+        var chart = RenderChart(host, UiLanguage.English, TrendKind.Good, CreateRead(WithGameTimes(TooltipView(TrendKind.Good))), _asOf, 1);
+
+        await chart.WaitForAssertionAsync(() => Assert.Contains(label => TimeText().IsMatch(label.TextContent), chart.FindAll(".mud-charts-xaxis > *"), "The real-time axis should carry time labels"), PageTestHost.WaitBound);
+
+        var asked = host.Context.JSInterop.Invocations.Count(invocation => invocation.Identifier == UtcOffsetMinutes);
+
+        // Act
+        chart.Render(parameters => parameters.Add(component => component.Axis, ChartAxis.GameTime));
+
+        // Assert
+        await chart.WaitForAssertionAsync(() => Assert.IsTrue(chart.FindAll(".mud-charts-xaxis > *").All(label => label.TextContent.Length == 0), "The game-time axis should carry no time label"), PageTestHost.WaitBound);
+
+        Assert.HasCount(1, chart.FindAll(ChartSelector), "The chart should stay drawn from the same read");
+        Assert.AreEqual(asked, host.Context.JSInterop.Invocations.Count(invocation => invocation.Identifier == UtcOffsetMinutes), "The browser should not be asked again for an axis change");
+    }
+
+    /// <summary>
+    /// Over a week of hourly points the labels carry the date and the step is a day, not three hours.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public async Task TrendChartWeekSpanShowsDateLabels()
+    {
+        // Arrange
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken);
+
+        var view = new TrendView
+                   {
+                       Points = [
+                                    .. Enumerable.Range(0, 169).Select(index => new TrendPoint
+                                                                                {
+                                                                                    Time = _start.AddHours(index),
+                                                                                    IsHourly = true,
+                                                                                    Values = [index + 1.5, 2, 3]
+                                                                                })
+                                ],
+                       TotalCount = 169
+                   };
+
+        // Act
+        var chart = RenderChart(host, UiLanguage.English, TrendKind.Good, CreateRead(view), null, 1);
+
+        // Assert
+        await chart.WaitForAssertionAsync(() => Assert.HasCount(1, chart.FindAll(ChartSelector), "The chart should be drawn"), PageTestHost.WaitBound);
+
+        var labels = chart.FindAll(".mud-charts-xaxis > *").Select(label => label.TextContent).ToList();
+
+        Assert.IsNotEmpty(labels, "The time axis should have labels");
+        Assert.IsLessThanOrEqualTo(9, labels.Count, "A step of a day should give at most nine labels over the week");
+        Assert.IsTrue(labels.All(label => DateTimeText().IsMatch(label)), $"Each label should be a date and a time, but the labels are '{string.Join("', '", labels)}'");
+    }
+
+    /// <summary>
+    /// Gives a view the game times of a view of ticks: the largest of an hourly point and the tick's own, 2 minutes of game
+    /// time apart.
+    /// </summary>
+    /// <param name="view">The view</param>
+    /// <returns>The view with game times</returns>
+    private static TrendView WithGameTimes(TrendView view)
+    {
+        return new TrendView
+               {
+                   Points = [
+                                .. view.Points.Select((point, index) => new TrendPoint
+                                                                        {
+                                                                            Time = point.Time,
+                                                                            IsHourly = point.IsHourly,
+                                                                            Values = point.Values,
+                                                                            GameTime = 1_750_000_000 + (index * 120_000),
+                                                                            FirstGameTime = point.IsHourly ? 1_740_000_000 : null
+                                                                        })
+                            ],
+                   TotalCount = view.TotalCount
+               };
+    }
+
+    /// <summary>
     /// Sets up the answer of the browser for the offset at an instant; the answer is outstanding until it is given.
     /// </summary>
     /// <param name="host">The host</param>
@@ -452,15 +596,17 @@ public sealed partial class TrendChartTests
     /// <param name="asOf">The receive time of the latest tick</param>
     /// <param name="readNumber">The number of the read</param>
     /// <param name="heading">The heading of the chart</param>
+    /// <param name="axis">The time axis</param>
     /// <returns>The rendered chart</returns>
-    private static IRenderedComponent<TrendChart> RenderChart(PageTestHost host, UiLanguage language, TrendKind kind, TrendRead? read, DateTimeOffset? asOf, int readNumber, string heading = Heading)
+    private static IRenderedComponent<TrendChart> RenderChart(PageTestHost host, UiLanguage language, TrendKind kind, TrendRead? read, DateTimeOffset? asOf, int readNumber, string heading = Heading, ChartAxis axis = ChartAxis.RealTime)
     {
         return host.Render<TrendChart>(language,
                                        parameters => parameters.Add(component => component.Heading, heading)
                                                                .Add(component => component.Kind, kind)
                                                                .Add(component => component.Read, read)
                                                                .Add(component => component.AsOf, asOf)
-                                                               .Add(component => component.ReadNumber, readNumber));
+                                                               .Add(component => component.ReadNumber, readNumber)
+                                                               .Add(component => component.Axis, axis));
     }
 
     /// <summary>
@@ -476,6 +622,13 @@ public sealed partial class TrendChartTests
     /// <returns>The expression</returns>
     [GeneratedRegex("^[0-9.,+\\-–]+$")]
     private static partial Regex NumberText();
+
+    /// <summary>
+    /// Gets the expression of a time label with a date: month, day, hour and minute.
+    /// </summary>
+    /// <returns>The expression</returns>
+    [GeneratedRegex("^[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}$")]
+    private static partial Regex DateTimeText();
 
     /// <summary>
     /// Gets the expression of a time label: an hour and a minute.
