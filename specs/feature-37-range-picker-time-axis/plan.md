@@ -27,8 +27,8 @@ The feature of [spec.md](spec.md) (AC1 to AC7).
 | 12 | A changed `AddressKey` clears the details and runs `LoadAsync`, which keeps the shown `View` for the same profile and island; a read during a read sets a pending read | `DataPageBase.OnParametersSetAsync`, `LoadAsync`, `ReadOnceAsync` | confirmed |
 | 13 | `GoodTrend`/`IslandDetail` drop a read of an older generation and stop reading after a failed read until `ClearDetails` | `GoodTrend.Accept`, `ClearDetails`; `IslandDetail.razor.cs` line 190 | confirmed |
 | 14 | Records 0087 and 0088 are unreleased; 0071 is released (v0.3.0) | `git tag --contains` of the commits that added them | confirmed |
-| 15 | A region read of a week at the contract's bounds, cold cache, takes about two minutes | to verify: Dev, step 6, estimated from 68–74 s for 2,880 ticks (`web-charts.md` *Limits and errors*), measured by a scratch program as in `history.md` *Measurements*, three runs warm and cold, plus the longest part's hold of the in-memory write gate and the `Hours` times transaction (`GROUP BY` and distinct-hour count over every tick of the range) on `All` under that gate; the report names the commands and quotes their output; above five minutes, or a part or the times transaction above 1 s, back to the Lead | unverified |
-| 16 | The game time is milliseconds | to verify: the Product Manager, step 9 on the branch build, compares the tooltip's game time over one played hour with the game's speed; `docs/protocol.md` *Timestamp* assumes it (spec N4) | unverified |
+| 15 | A region read of a week at the contract's bounds, cold cache, takes about two minutes | Dev, step 6 (G1), scratch program as in `history.md` *Measurements*, three runs warm and cold, commands and output in the report (checked by the Reviewer, step 8): longest in-memory write-gate hold 0.30 s per 240-tick part, `Hours` times transaction on `All` 49 ms at most, cold week region read about 114 to 128 s scaled; all below the thresholds (5 min, 1 s); stated in `web-charts.md` *Limits and errors* | confirmed |
+| 16 | The game time is milliseconds | to verify: after merge, the Product Manager compares the tooltip's game time over one played hour with the game's speed, in a linked verification issue (step 10, Lead decision in step 9); `docs/protocol.md` *Timestamp* assumes it (spec N4); no criterion rests on it (the tests fix the mapping, not the unit), and the documents call it unconfirmed (`web-charts.md` *Game-time axis*, `USER_GUIDE.md` *Charts*) | unverified |
 
 ## Tests per criterion
 
@@ -55,7 +55,7 @@ The feature of [spec.md](spec.md) (AC1 to AC7).
 | AC7 | `TrendSeriesBuilderLabelSpacingGivesSmallestStepOfAtMostEightIntervals` (DataRows: 1 h → 10 min, 25 h → 6 h, 169 h → 1 day, 2,880 h → 30 days, 400 days → 90 days, 5,000 days → 365 days), `TrendSeriesBuilderTimeLabelFormatDependsOnAxisAndSpan` | `tests/Censio.Server.Tests/TrendSeriesBuilderTests.cs` |
 | AC7 | `TrendChartWeekSpanShowsDateLabels` | `tests/Censio.Server.Tests/TrendChartTests.cs` |
 
-`manual:` the Product Manager, on a build of the branch with `long-session.jsonl` replayed: the picker, the game-time axis (pause joined, tooltip) and the week view in both themes (step 9, user guide's *Not yet tried*).
+`after merge:` the Product Manager, on a build of `main` with `long-session.jsonl` replayed: the picker, the game-time axis (pause joined, tooltip, fact 16) and the week view in both themes and both languages, in a real browser, clicking an already selected item included; a linked verification issue (step 10), the user guide's *Not yet tried* until then (Lead decision in step 9).
 
 ## Approach
 

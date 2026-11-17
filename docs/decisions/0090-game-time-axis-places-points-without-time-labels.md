@@ -1,6 +1,6 @@
 # 0090: The game-time axis places the range's points at their game time, without time labels
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-17
 - **Area:** web-charts
 - **Source:** Issue #37

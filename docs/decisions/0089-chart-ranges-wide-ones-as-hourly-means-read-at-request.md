@@ -1,6 +1,6 @@
 # 0089: Charts offer four ranges kept in the browser, and the wide ones show hourly means computed when read
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-17
 - **Area:** web-charts
 - **Source:** Issue #37
