@@ -77,7 +77,8 @@ while the game is paused ([`protocol.md`](../../docs/protocol.md), *Timestamp*, 
   the hour's ticks that carried it (for the region the sum of the islands' means, the overview's figures as
   [`web-charts.md`](../../docs/areas/web-charts.md) computes them for an hourly point); consecutive hours are joined, a
   missing hour is a gap; a new tick redraws the newest hour and keeps the older ones (S2, S5, E5, E10, N1).
-- AC3: On `Game time` each point sits at its game time; the axis shows grid lines without time labels, and the tooltip
+- AC3: On `Game time` each point sits at its game time; the time axis carries no labels and no guide lines of its own, the
+  value axis keeps its horizontal grid lines as on `Real time`, and the tooltip
   shows the point's real time as on `Real time`, then the line `Game time <h>:<mm>` / `Spielzeit <h>:<mm>` (the tick's game
   time as hours and minutes, hours not limited; for an hourly mean its largest); a line breaks only where a value is
   missing or more than 15 minutes of game time pass between two points; E6, E7 and E8 hold (S3, N4).
@@ -89,9 +90,9 @@ while the game is paused ([`protocol.md`](../../docs/protocol.md), *Timestamp*, 
   `Letzte 7 Tage`, `Gesamt`) and the switch `Real time`, `Game time` (`Echtzeit`, `Spielzeit`); the range line reads
   `<range> up to the latest tick` / `<range> bis zum letzten Tick` (`All` as `All history` / `Gesamter Verlauf`) (S1, N3).
 - AC7: The real-time axis labels are `HH:mm`, and `MM-dd HH:mm` when the points span more than one day, at the offset of
-  E9. On both axes the spacing of labels or grid lines is the smallest of 10, 15 and 30 minutes, 1, 2, 3, 6 and 12 hours
+  E9. Their spacing is the smallest of 10, 15 and 30 minutes, 1, 2, 3, 6 and 12 hours
   and 1, 2, 7, 14, 30, 90 and 365 days that gives at most 8 intervals over the span the points cover, and 365 days beyond
-  that (a span of 169 hours: 1 day) (S1, S2, S3, E9).
+  that (a span of 169 hours: 1 day) (S1, S2, E9).
 
 ## Out of scope
 
@@ -138,3 +139,10 @@ while the game is paused ([`protocol.md`](../../docs/protocol.md), *Timestamp*, 
 - MINOR 4 — accepted: E6 is the no-data-yet tick (`PipeTick.IsNoDataYet`); other no-value points stay breaks.
 - MINOR 5 — accepted: AC3 says the tick's game time as hours and minutes, no origin.
 - MINOR 6 — accepted: E9 (daylight saving and half-hour offsets), named by AC7 and in the area document.
+
+## Amendments
+
+| Criterion | Change | Reason | Step | Decided by |
+| --------- | ------ | ------ | ---- | ---------- |
+| AC3 | "the axis shows grid lines without time labels" becomes: the time axis carries no labels and no guide lines of its own, the value axis keeps its horizontal grid lines as on `Real time` | Plan fact 10: MudBlazor 9.13.0 draws no vertical grid lines on either axis, only the value axis's horizontal ones, and with the format `''` writes no x label at all | 6 (G3) | Lead |
+| AC7 | the spacing applies to the real-time axis labels only (was "on both axes … labels or grid lines"); S3 leaves its references | Plan fact 10: the game-time axis has neither labels nor vertical grid lines, so no spacing is visible on it | 6 (G3) | Lead |

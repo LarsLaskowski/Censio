@@ -37,6 +37,8 @@ and the tooltip adds `Game time <h>:<mm>`. The rules are in [`web-charts.md`](..
 ## Consequences
 
 - A pause no longer shows as a gap on `Game time`; an outage while the game runs still does.
-- Reading a time off the game-time axis needs the tooltip.
+- Reading a time off the game-time axis needs the tooltip. MudBlazor 9.13.0 draws no vertical grid lines on either axis,
+  so the game-time axis has no guide on x at all; only the value axis's horizontal grid lines remain. An own guide row was
+  not added, for the reason of option 2.
 - Should the game time's unit prove other than milliseconds, the tooltip's game time and the 15-minute rule are off by
   that factor.
