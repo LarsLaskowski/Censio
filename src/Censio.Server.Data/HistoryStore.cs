@@ -311,6 +311,19 @@ public sealed class HistoryStore : IHistoryTrends
     }
 
     /// <summary>
+    /// Cuts the hours of a range, oldest first, into parts of at most the part size rows.
+    /// </summary>
+    /// <param name="hours">The hours with their tick counts and whether an hourly point exists.</param>
+    /// <param name="partSize">The maximum number of rows per part.</param>
+    /// <returns>The parts, each a list of hour slices.</returns>
+#pragma warning disable RH2003 // Skeleton: removed with the implementation
+    internal static List<List<TrendHourSlice>> PlanHourParts(IReadOnlyList<(long HourTicks, int Ticks, bool WithHourly)> hours, int partSize)
+    {
+        throw new NotImplementedException();
+    }
+#pragma warning restore RH2003
+
+    /// <summary>
     /// Merges the hourly points and the tick points, both in time order, the hourly point first on equal times.
     /// </summary>
     /// <param name="hourly">The hourly points</param>

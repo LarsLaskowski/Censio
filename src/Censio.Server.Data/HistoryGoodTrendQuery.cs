@@ -37,5 +37,10 @@ public sealed class HistoryGoodTrendQuery
     /// </summary>
     public required int MaxPoints { get; init; }
 
+    /// <summary>
+    /// Gets the resolution of the points.
+    /// </summary>
+    public HistoryTrendResolution Resolution { get; init; } = HistoryTrendResolution.Points;
+
     #endregion // Properties
 }
