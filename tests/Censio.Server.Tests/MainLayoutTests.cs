@@ -307,6 +307,94 @@ public sealed class MainLayoutTests
     }
 
     /// <summary>
+    /// A choice of range and axis, handed to the callback the frame cascades, stores both cookies with the fixed values.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC5")]
+    public async Task MainLayoutChartChoiceStoresBothCookies()
+    {
+        // Arrange
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken);
+
+        var context = host.Context;
+        var layout = RenderLayout(context, UiTheme.Light, UiLanguage.English, RenderChoiceProbe);
+
+        // Act
+        await layout.Find(".probe-choose").ClickAsync(new MouseEventArgs());
+
+        // Assert
+        var stored = context.JSInterop.Invocations[StorePreference].Select(invocation => $"{invocation.Arguments[0]}={invocation.Arguments[1]}").Order().ToList();
+        var expected = new[] { $"{UiPreferences.ChartAxisCookieName}=game", $"{UiPreferences.ChartRangeCookieName}=week" };
+
+        Assert.AreSequenceEqual(expected, stored, "The choice should store the axis cookie and the range cookie once each, with their fixed values");
+    }
+
+    /// <summary>
+    /// When the browser cannot store the choice, the page keeps it and logs only the kinds of the two choices.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC5")]
+    public async Task MainLayoutChartChoiceWhenStoreFailsKeepsChoiceAndLogsKindOnly()
+    {
+        // Arrange
+        var loggerProvider = new Censio.Server.Data.Tests.RecordingLoggerProvider();
+        using var loggerFactory = LoggerFactory.Create(builder => builder.AddProvider(loggerProvider).SetMinimumLevel(LogLevel.Trace));
+
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken, configureServices: services => services.AddSingleton(loggerFactory).AddSingleton(typeof(ILogger<>), typeof(Logger<>)));
+
+        var context = host.Context;
+
+        context.JSInterop.SetupVoid(StorePreference, _ => true).SetException(new JSException("The browser refused the cookie week"));
+
+        var layout = RenderLayout(context, UiTheme.Light, UiLanguage.English, RenderChoiceProbe);
+
+        // Act
+        await layout.Find(".probe-choose").ClickAsync(new MouseEventArgs());
+
+        // Assert
+        var entries = loggerProvider.Logger.Entries;
+        var choiceEntries = entries.Where(entry => entry.Message.StartsWith("The browser did not store", StringComparison.Ordinal)).ToList();
+
+        Assert.AreEqual("LastWeek GameTime", layout.Find(".probe-choice").TextContent, "The page should keep the choice although it was not stored");
+
+        var expectedMessages = new[] { "The browser did not store the chart range choice.", "The browser did not store the time axis choice." };
+
+        Assert.AreSequenceEqual(expectedMessages, choiceEntries.Select(entry => entry.Message).Order(StringComparer.Ordinal).ToList(), "Each failed store should be logged once, by its kind");
+        Assert.IsTrue(choiceEntries.All(entry => entry.Level == LogLevel.Debug && entry.Exception is null), "The failed stores should be logged at Debug without the exception");
+        Assert.IsEmpty(entries.Where(entry => entry.Message.Contains("week", StringComparison.Ordinal) || entry.Message.Contains("game", StringComparison.Ordinal)), "No log entry should hold a chosen value");
+    }
+
+    /// <summary>
+    /// The page inside the frame receives the choice the page started with, then the choice made, not the one it started with.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC5")]
+    public async Task MainLayoutChartChoiceCascadesToPage()
+    {
+        // Arrange
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken);
+
+        var context = host.Context;
+        var start = new ChartChoice
+                    {
+                        Range = ChartRange.LastHour,
+                        Axis = ChartAxis.RealTime
+                    };
+        var layout = RenderLayout(context, UiTheme.Light, UiLanguage.English, RenderChoiceProbe, start);
+        var before = layout.Find(".probe-choice").TextContent;
+
+        // Act
+        await layout.Find(".probe-choose").ClickAsync(new MouseEventArgs());
+
+        // Assert
+        Assert.AreEqual("LastHour RealTime", before, "The page should start with the choice the frame was given");
+        Assert.AreEqual("LastWeek GameTime", layout.Find(".probe-choice").TextContent, "The page should receive the choice made");
+    }
+
+    /// <summary>
     /// Without a profile the profile switch is disabled and shows only its label.
     /// </summary>
     /// <param name="language">The language shown</param>
@@ -573,12 +661,21 @@ public sealed class MainLayoutTests
     /// <param name="theme">The theme the page starts with</param>
     /// <param name="language">The language the page starts with</param>
     /// <param name="body">The page body, or <c>null</c> for a plain text</param>
+    /// <param name="choice">The chart choice the page starts with, or <see langword="null" /> for none</param>
     /// <returns>The rendered layout</returns>
-    private static IRenderedComponent<MainLayout> RenderLayout(BunitContext context, UiTheme theme, UiLanguage language, RenderFragment? body = null)
+    private static IRenderedComponent<MainLayout> RenderLayout(BunitContext context, UiTheme theme, UiLanguage language, RenderFragment? body = null, ChartChoice? choice = null)
     {
-        return context.Render<MainLayout>(parameters => parameters.AddCascadingValue(theme)
-                                                                  .AddCascadingValue(language)
-                                                                  .Add(layout => layout.Body, body ?? RenderPlainBody));
+        return context.Render<MainLayout>(parameters =>
+                                          {
+                                              parameters.AddCascadingValue(theme)
+                                                        .AddCascadingValue(language)
+                                                        .Add(layout => layout.Body, body ?? RenderPlainBody);
+
+                                              if (choice is not null)
+                                              {
+                                                  parameters.AddCascadingValue(choice);
+                                              }
+                                          });
     }
 
     /// <summary>
@@ -588,6 +685,16 @@ public sealed class MainLayoutTests
     private static void RenderPlainBody(Microsoft.AspNetCore.Components.Rendering.RenderTreeBuilder builder)
     {
         builder.AddContent(0, "Page");
+    }
+
+    /// <summary>
+    /// Renders a page stand-in that shows the chart choice it receives and chooses a week on the game-time axis.
+    /// </summary>
+    /// <param name="builder">The render tree builder</param>
+    private static void RenderChoiceProbe(Microsoft.AspNetCore.Components.Rendering.RenderTreeBuilder builder)
+    {
+        builder.OpenComponent<CascadedChartChoiceProbe>(0);
+        builder.CloseComponent();
     }
 
     /// <summary>

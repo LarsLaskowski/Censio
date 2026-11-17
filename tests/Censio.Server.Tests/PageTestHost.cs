@@ -44,6 +44,11 @@ public sealed class PageTestHost : IAsyncDisposable
     /// </summary>
     public const string DeletionAllowedName = "DeletionAllowed";
 
+    /// <summary>
+    /// The name under which the frame cascades the callback that takes a new chart choice.
+    /// </summary>
+    public const string ChooseChartName = "ChooseChart";
+
     #endregion // Constants
 
     #region Fields
@@ -119,6 +124,17 @@ public sealed class PageTestHost : IAsyncDisposable
     /// <see cref="UiTheme.Light" /> unless a test sets it.
     /// </summary>
     public UiTheme Theme { get; set; } = UiTheme.Light;
+
+    /// <summary>
+    /// Gets or sets the chart choice a page rendered by <see cref="Render{TPage}" /> gets cascaded, as the frame cascades
+    /// it; <see cref="ChartChoice.Default" /> unless a test sets it.
+    /// </summary>
+    public ChartChoice ChartChoice { get; set; } = ChartChoice.Default;
+
+    /// <summary>
+    /// Gets the choices the page rendered by <see cref="Render{TPage}" /> handed to the cascaded callback, in order.
+    /// </summary>
+    public List<ChartChoice> Chosen { get; } = [];
 
     #endregion // Properties
 
@@ -358,7 +374,49 @@ public sealed class PageTestHost : IAsyncDisposable
     }
 
     /// <summary>
-    /// Renders a page with the language, its texts, <see cref="Theme" /> and <see cref="DeletionAllowed" /> cascaded, as the frame cascades them.
+    /// Clicks an item of a toggle group of the chart controls.
+    /// </summary>
+    /// <typeparam name="TComponent">The type of the rendered component</typeparam>
+    /// <param name="component">The rendered component</param>
+    /// <param name="group">The accessible name of the group</param>
+    /// <param name="item">The text of the item</param>
+    /// <returns>A task that completes when the click was handled</returns>
+    public static async Task ChooseAsync<TComponent>(IRenderedComponent<TComponent> component, string group, string item)
+        where TComponent : IComponent
+    {
+        var button = component.FindAll($"[role='group'][aria-label='{group}'] button").Single(candidate => candidate.TextContent.Trim() == item);
+
+        await button.ClickAsync(new MouseEventArgs()).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Gives the texts of the items of a toggle group of the chart controls.
+    /// </summary>
+    /// <typeparam name="TComponent">The type of the rendered component</typeparam>
+    /// <param name="component">The rendered component</param>
+    /// <param name="group">The accessible name of the group</param>
+    /// <returns>The texts, in order</returns>
+    public static List<string> Items<TComponent>(IRenderedComponent<TComponent> component, string group)
+        where TComponent : IComponent
+    {
+        return [.. component.FindAll($"[role='group'][aria-label='{group}'] button").Select(button => button.TextContent.Trim())];
+    }
+
+    /// <summary>
+    /// Gives the texts of the selected items of a toggle group of the chart controls.
+    /// </summary>
+    /// <typeparam name="TComponent">The type of the rendered component</typeparam>
+    /// <param name="component">The rendered component</param>
+    /// <param name="group">The accessible name of the group</param>
+    /// <returns>The texts of the selected items</returns>
+    public static List<string> Selected<TComponent>(IRenderedComponent<TComponent> component, string group)
+        where TComponent : IComponent
+    {
+        return [.. component.FindAll($"[role='group'][aria-label='{group}'] button[aria-checked='true']").Select(button => button.TextContent.Trim())];
+    }
+
+    /// <summary>
+    /// Renders a page with the language, its texts, <see cref="Theme" />, <see cref="DeletionAllowed" />, <see cref="ChartChoice" /> and a callback that records into <see cref="Chosen" /> cascaded, as the frame cascades them.
     /// </summary>
     /// <typeparam name="TPage">The type of the page</typeparam>
     /// <param name="language">The language shown</param>
@@ -372,7 +430,9 @@ public sealed class PageTestHost : IAsyncDisposable
                                          builder.AddCascadingValue(language)
                                                 .AddCascadingValue(Theme)
                                                 .AddCascadingValue(UiTexts.For(language))
-                                                .AddCascadingValue(DeletionAllowedName, DeletionAllowed);
+                                                .AddCascadingValue(DeletionAllowedName, DeletionAllowed)
+                                                .AddCascadingValue(ChartChoice)
+                                                .AddCascadingValue(ChooseChartName, EventCallback.Factory.Create<ChartChoice>(this, Chosen.Add));
                                          parameters(builder);
                                      });
     }
