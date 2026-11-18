@@ -35,6 +35,18 @@ public static class TrendPalette
     }
 
     /// <summary>
+    /// Gives the colour of the sparklines in a theme.
+    /// </summary>
+    /// <param name="theme">The theme</param>
+    /// <returns>The colour</returns>
+    public static string Sparkline(UiTheme theme)
+    {
+#pragma warning disable RH2003 // Skeleton: removed with the implementation
+        throw new NotImplementedException();
+#pragma warning restore RH2003
+    }
+
+    /// <summary>
     /// Gives the palette of a theme.
     /// </summary>
     /// <param name="theme">The theme</param>

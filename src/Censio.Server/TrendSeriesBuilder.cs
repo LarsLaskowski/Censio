@@ -171,6 +171,20 @@ public static class TrendSeriesBuilder
     }
 
     /// <summary>
+    /// Tells whether a line is interrupted between two points given by their times: the later one starts more than <see cref="GapAfter"/> after the end of the earlier one.
+    /// </summary>
+    /// <param name="earlierTime">The time of the earlier point</param>
+    /// <param name="isEarlierHourly">Whether the earlier point is an hourly mean</param>
+    /// <param name="laterTime">The time of the later point</param>
+    /// <returns><see langword="true"/> when the line breaks before the later point</returns>
+    public static bool BreaksBefore(DateTimeOffset earlierTime, bool isEarlierHourly, DateTimeOffset laterTime)
+    {
+#pragma warning disable RH2003 // Skeleton: removed with the implementation
+        throw new NotImplementedException();
+#pragma warning restore RH2003
+    }
+
+    /// <summary>
     /// Gives the offset the times are shown at.
     /// </summary>
     /// <param name="offsetMinutes">The UTC offset of the browser in minutes, or <see langword="null"/> for UTC</param>

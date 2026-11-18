@@ -107,6 +107,39 @@ public sealed class TrendReader
     }
 
     /// <summary>
+    /// Reads the sparklines of the deltas of several goods of one island.
+    /// </summary>
+    /// <param name="profileId">The profile identity</param>
+    /// <param name="island">The island</param>
+    /// <param name="productGuids">The product GUIDs of the goods</param>
+    /// <param name="latestTick">The receive time of the latest tick</param>
+    /// <param name="held">The read held for the address, or <see langword="null"/> for none</param>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>The read, which is failed when the history could not be read</returns>
+#pragma warning disable RH2003, S2325 // Skeleton: removed with the implementation
+    public Task<SparklineRead<int>> ReadGoodSparklinesAsync(Guid profileId, IslandKey island, IReadOnlyList<int> productGuids, DateTimeOffset latestTick, SparklineRead<int>? held, CancellationToken cancellationToken)
+    {
+        throw new NotImplementedException();
+    }
+#pragma warning restore RH2003, S2325
+
+    /// <summary>
+    /// Reads the sparklines of the building counts of several islands.
+    /// </summary>
+    /// <param name="profileId">The profile identity</param>
+    /// <param name="islands">The islands</param>
+    /// <param name="latestTick">The receive time of the latest tick</param>
+    /// <param name="held">The read held for the address, or <see langword="null"/> for none</param>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>The read, which is failed when the history could not be read</returns>
+#pragma warning disable RH2003, S2325 // Skeleton: removed with the implementation
+    public Task<SparklineRead<IslandKey>> ReadIslandSparklinesAsync(Guid profileId, IReadOnlyList<IslandKey> islands, DateTimeOffset latestTick, SparklineRead<IslandKey>? held, CancellationToken cancellationToken)
+    {
+        throw new NotImplementedException();
+    }
+#pragma warning restore RH2003, S2325
+
+    /// <summary>
     /// Gives the start a read asks for: the range start, or for a wide range with a held view the hour of the held view's last point.
     /// </summary>
     /// <param name="request">The request</param>

@@ -14,6 +14,16 @@ public sealed class TrendRange
     /// </summary>
     public const int MaxPoints = 2880;
 
+    /// <summary>
+    /// The most points a sparkline read returns.
+    /// </summary>
+    public const int SparklineMaxPoints = 240;
+
+    /// <summary>
+    /// The hours a sparkline spans.
+    /// </summary>
+    public const int SparklineHours = 4;
+
     #endregion // Constants
 
     #region Properties
@@ -61,6 +71,18 @@ public sealed class TrendRange
                    Start = new DateTimeOffset(start, TimeSpan.Zero),
                    End = new DateTimeOffset(Math.Min(latest + 1, DateTimeOffset.MaxValue.UtcTicks), TimeSpan.Zero)
                };
+    }
+
+    /// <summary>
+    /// Gives the range of the sparklines up to the latest tick.
+    /// </summary>
+    /// <param name="latestTick">The receive time of the latest tick</param>
+    /// <returns>The range</returns>
+    public static TrendRange ForSparklines(DateTimeOffset latestTick)
+    {
+#pragma warning disable RH2003 // Skeleton: removed with the implementation
+        throw new NotImplementedException();
+#pragma warning restore RH2003
     }
 
     /// <summary>

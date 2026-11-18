@@ -29,6 +29,12 @@ public sealed class UiTexts
                                                    ColumnProducedGoods = "Produced goods",
                                                    ColumnGoodsInDeficit = "Goods in deficit",
                                                    ColumnIsland = "Island",
+                                                   ColumnTrend = "Trend",
+                                                   TrendColumnTooltip = "Last 4 hours up to the latest tick",
+                                                   TrendRising = "Rising",
+                                                   TrendFalling = "Falling",
+                                                   TrendStable = "Stable",
+                                                   TrendsReadFailed = "The trends cannot be read right now. Reload the page to try again.",
                                                    ColumnGood = "Good",
                                                    ColumnProduction = "Production",
                                                    ColumnConsumption = "Consumption",
@@ -93,6 +99,12 @@ public sealed class UiTexts
                                                   ColumnProducedGoods = "Produzierte Waren",
                                                   ColumnGoodsInDeficit = "Waren im Defizit",
                                                   ColumnIsland = "Insel",
+                                                  ColumnTrend = "Trend",
+                                                  TrendColumnTooltip = "Letzte 4 Stunden bis zum letzten Tick",
+                                                  TrendRising = "Steigend",
+                                                  TrendFalling = "Fallend",
+                                                  TrendStable = "Gleichbleibend",
+                                                  TrendsReadFailed = "Die Trends können gerade nicht gelesen werden. Laden Sie die Seite neu, um es erneut zu versuchen.",
                                                   ColumnGood = "Ware",
                                                   ColumnProduction = "Produktion",
                                                   ColumnConsumption = "Verbrauch",
@@ -223,6 +235,36 @@ public sealed class UiTexts
     /// Gets the heading of the island column.
     /// </summary>
     public required string ColumnIsland { get; init; }
+
+    /// <summary>
+    /// Gets the heading of the trend column.
+    /// </summary>
+    public required string ColumnTrend { get; init; }
+
+    /// <summary>
+    /// Gets the tooltip of the trend column heading.
+    /// </summary>
+    public required string TrendColumnTooltip { get; init; }
+
+    /// <summary>
+    /// Gets the text of a rising trend.
+    /// </summary>
+    public required string TrendRising { get; init; }
+
+    /// <summary>
+    /// Gets the text of a falling trend.
+    /// </summary>
+    public required string TrendFalling { get; init; }
+
+    /// <summary>
+    /// Gets the text of a stable trend.
+    /// </summary>
+    public required string TrendStable { get; init; }
+
+    /// <summary>
+    /// Gets the text shown when the trends cannot be read.
+    /// </summary>
+    public required string TrendsReadFailed { get; init; }
 
     /// <summary>
     /// Gets the heading of the good column.
