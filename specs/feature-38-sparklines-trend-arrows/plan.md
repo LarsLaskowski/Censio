@@ -30,7 +30,7 @@ Feature: [spec.md](spec.md) (approved by the Lead, the window and values by the 
 | 16 | Ticks arrive about 120 s apart | `docs/protocol.md:80` | confirmed |
 | 17 | A zero-length subpath with round caps is drawn as a dot | SVG 2, *Painting*, `stroke-linecap` (zero-length subpaths) | confirmed |
 | 18 | A part of 240 island points takes about as long as a part of the figures read; the island list's whole opening read at the bounds is over the 10 s of `history.md` *Measurements* | Dev, G1, 60 ticks at the bounds scaled to 240: a part 90-150 ms; the opening read of 256 islands by 240 points 12.8-13.4 s warm, 17-19.7 s cold; a refresh 100-120 ms; the goods opening read 0.36-0.7 s | confirmed |
-| 19 | A goods table of 500 rows by 240 points renders its trend cells in about 2 MB and adds a few MB of heap | to verify: Dev, step 6, scratch render as `web-charts.md` *Memory and size of a page*: the render batch of the trend cells; the heap held by the page's trends; the peak during one goods read (the `HistoryGoodsPoint` dictionaries of 240 points by up to 500 goods plus the sample lists); the heap while a refresh is in flight and the held read is still shown; results into `web-charts.md` | unverified |
+| 19 | A goods table of 500 rows by 240 points renders its trend cells in about 2 MB and adds a few MB of heap | to verify: Dev, step 6, scratch render as `web-charts.md` *Memory and size of a page*: the render batch of the trend cells; the heap held by the page's trends; the peak during one goods read (the `HistoryGoodsPoint` dictionaries of 240 points by up to 500 goods plus the sample lists); the heap while a refresh is in flight and the held read is still shown; results into `web-trends.md` | unverified |
 | 21 | A page's load loop awaits `ReadDetailsAsync`, so a notice during it only marks one more load and the next tick's figures wait for the details | `DataPageBase.cs:191-210` `LoadAsync`, `ReadOnceAsync` (`await ReadDetailsAsync`) | confirmed |
 | 22 | A range choice cancels the details' token through `ReplaceDetailsCancellation`, and `ClearDetails` raises the island page's `_generation` | `DataPageBase.OnParametersSetAsync`; `IslandDetail.razor.cs` `ClearDetails` | confirmed |
 | 20 | Records 0086 to 0090 are unreleased | `git ls-remote --tags origin`: `v0.3.0` is `7646dd5`, before #212 | confirmed |
@@ -246,23 +246,23 @@ Files no unit test can cover: `wwwroot/css/censio.css` (one rule; outside `COVER
 
 ## Areas
 
-- `web-charts`: new section *Sparklines and trend arrows* (window, points, cap, arrow rule, cell layout, texts, states,
-  live updates, reads and their order, the refresh of the new points only, colour, no animation, accessibility, sizes of
-  fact 19), and under *Limits and errors* the measured opening read of an island list at the bounds (fact 18): every open
-  island list holds `TrendReader`'s gate that long when opened and for its refresh at every tick, and the time grows with
-  the region's islands, whose number the island list does not limit ([`server-state.md`](../../docs/areas/server-state.md)); *Scope*, *The reads*
-  ("Three reads feed the charts" gains the two), *Not here* drop #38; *Related decisions* 0091, 0093.
+- `web-trends` (new, split off for the area word limit; Lead decision, review round 1): *Sparklines and trend arrows* (window, points, cap, arrow rule, cell layout, texts, states, live updates, reads and
+  their order, the refresh of the new points only, colour, no animation, accessibility, sizes of fact 19), *The batch reads
+  of the trend column* (the two reads and their island-point parts), and under *Limits and errors* and *Measurements* the
+  measured reads of fact 18: every open island list holds `TrendReader`'s gate that long when opened and for its refresh at
+  every tick, the time grows with the region's islands, whose number the island list does not limit
+  ([`server-state.md`](../../docs/areas/server-state.md)), the opening read at the bounds exceeds 10 seconds while each part
+  stays far within, and the page shows its figures meanwhile; *Related decisions* 0091 to 0093.
+- `web-charts`: points to `web-trends.md`; *Scope*, *The reads* and *Not here* drop #38.
 - `web-pages`: the column lists of the island list and goods table; *Live updates* and *Reads and memory* name the trends;
   *Not here* drops sparklines; *Logging* names the warning for a trend read too.
-- `history`: *The trend reads* ("Two reads serve the charts" becomes four) with the two reads, the island-point parts and
-  the measurements of fact 18 under *Measurements*, saying that the island list's whole opening read at the bounds is
-  over the 10 seconds a step while each part stays far within, and that the page shows its figures meanwhile; *Scope* line 10 and *Not here* drop #38; *Related decisions* 0092.
-- `docs/areas/README.md`: the rows of web-charts and history drop "(#38)" and name the trends.
+- `history`: *The trend reads* points to the batch reads in `web-trends.md`; *Scope* line 10 and *Not here* drop #38.
+- `docs/areas/README.md`: a row for web-trends; the rows of web-charts and history drop "(#38)" and point to it.
 
 ## Documentation updates
 
 Dev, once the code is green:
-- the four area documents above;
+- the area documents above (web-trends, web-charts, web-pages, history, the README index);
 - `README.md` lines 22 and 204 (English and German): the limit names the trend column, its fixed 4 hours and the newest
   240 points of a fast replay instead of "no sparklines or trend arrows";
 - `docs/USER_GUIDE.md`, English and German: the pages item describes the `Trend` column (sparkline, arrow and its names,
@@ -291,7 +291,7 @@ needs no new paragraph.
   the log through `UiLog.ChartReadFailed` without arguments. None else.
 - The island list's opening read at the bounds takes about 13 s warm and up to 20 s cold (fact 18), each part 150 ms at most, and holds `TrendReader`'s gate, so a chart
   read can wait behind it; a refresh reads only the new points; each transaction is bounded as before. Stated in
-  `web-charts.md` and record 0092.
+  `web-trends.md` and record 0092.
 - The cell writes only numbers, the hex colour and fixed texts; `Path` is built from doubles in invariant culture.
 
 ## Decision records

@@ -5,9 +5,8 @@ Status: Approved by Lead
 
 ## Problem
 
-The goods table and the island list show only the latest tick: whether a good's balance or an island's growth is
-rising needs a chart, one row at a time. The issue asks for every row's trend at a glance: a sparkline and an arrow
-(up, down, stable) over a defined window.
+The goods table and the island list show only the latest tick; a row's trend needs a chart. The issue asks for every
+row's trend at a glance: a sparkline and an arrow (up, down, stable) over a defined window.
 
 ## Scenarios
 
@@ -35,18 +34,18 @@ rising needs a chart, one row at a time. The issue asks for every row's trend at
   arrow (a new good, an island the history lacks).
 - E2: The sparkline breaks by the charts' one rule, *Gaps* of [`web-charts.md`](../../docs/areas/web-charts.md) (*Points,
   gaps and hourly means*), never drawn as zero; the arrow skips points without a value.
-- E3: Before the trends are read, and when prerendered, the trend cells are empty.
+- E3: Before the read, and when prerendered, the trend cells are empty.
 - E4: A failed read shows `–` in every trend cell and under the table `The trends cannot be read right now. Reload the
   page to try again.` / `Die Trends können gerade nicht gelesen werden. Laden Sie die Seite neu, um es erneut zu
   versuchen.`; it logs the charts' warning (`web-charts.md`, *Logging*), is not retried until a reload. A cancelled read shows and logs nothing.
 - E5: An island the latest tick lacks keeps its `–` figures in the island list and still gets its trend from the history.
   An island page that shows `No values for this island in the latest tick.` instead of the goods table has no trend
   cells and reads no trends.
-- E6: Only the shown rows of the goods table (at most 500) get trends.
+- E6: Only the goods table's shown rows (at most 500) get trends.
 - E7: Values whose rounded figures stay equal while the raw values drift (delta -0.004 to 0.004) give `Stable`.
 - E8: A good the island carries twice in the latest tick has two rows; the history keeps the first entry of a good
-  ([`history.md`](../../docs/areas/history.md), *The series read*), so the row of that first entry (the first of the two
-  in the tick's order) gets the trend and the other row shows `–`.
+  ([`history.md`](../../docs/areas/history.md), *The series read*), so the row of that first entry (the first in tick
+  order) gets the trend and the other row shows `–`.
 
 ## Non-functional requirements
 
@@ -63,7 +62,7 @@ rising needs a chart, one row at a time. The issue asks for every row's trend at
 - N4: No number is formatted with a culture; every new text is in English and German in `UiTexts`.
 - N5: The sparkline's colour reaches 3:1 against the surface in both themes. A sparkline has no animation and is hidden
   from the accessibility tree: the arrow's name is the row's only trend text.
-- N6: No new setting; the history already stored shows trends at once.
+- N6: No new setting; stored history shows trends at once.
 - N7: A sparkline is one SVG line of coordinates only: no hover points, tooltip, axes, labels or legend (not MudBlazor's
   chart). Its markup at 240 points is at most 4,000 characters, so 500 rows render at most about 2 MB; the plan measures
   the render batch and heap of 500 rows by 240 points as [`web-charts.md`](../../docs/areas/web-charts.md) (*Memory and
@@ -90,8 +89,7 @@ rising needs a chart, one row at a time. The issue asks for every row's trend at
 
 ## Out of scope
 
-- Trends in the region overview, on the good's page and for production, consumption, productivity, produced goods or
-  goods in deficit.
+- Trends in the region overview, on the good's page and of other columns.
 - Another or user-chosen window, 15-minute or hourly means, game time, a tooltip per point, sorting by trend.
 
 ## Open questions
@@ -104,9 +102,11 @@ rising needs a chart, one row at a time. The issue asks for every row's trend at
 
 ## Area documents
 
-- `docs/areas/web-charts.md`: a section *Sparklines and trend arrows*; *Scope* and *Not here* drop #38.
+- `docs/areas/web-trends.md` (new, split off for the area word limit): the sections *Sparklines and trend arrows* and *The
+  batch reads of the trend column* with N1's batch reads and their measurements; `web-charts.md` points to it, and its
+  *Scope* and *Not here* drop #38.
 - `docs/areas/web-pages.md`: the `Trend` column of both tables; *Not here* drops sparklines.
-- `docs/areas/history.md`: N1's batch reads under *The trend reads*; *Scope* and *Not here* drop #38.
+- `docs/areas/history.md`: *The trend reads* points to N1's batch reads in `web-trends.md`; *Scope* and *Not here* drop #38.
 - `README.md` (lines 22 and 204): the limit "no sparklines or trend arrows (#38)" gives way to the trend column, its
   window and the 240-point limit of a fast replay.
 - `docs/USER_GUIDE.md`, English and German: the pages item describes the column; *Latest data only* (line 441, "the one
