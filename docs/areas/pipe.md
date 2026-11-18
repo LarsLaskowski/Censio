@@ -178,7 +178,7 @@ The reference reads leniently; this reader is strict and fails closed (record 00
 
 ### Residual risks
 
-Until more fixtures from real recordings test the reader (one anonymised fixture exists, [`pipe-recording.md`](pipe-recording.md), *Fixtures*):
+Until more fixtures from real recordings test the reader (two anonymised fixtures exist, one of protocol version 2 and one of protocol version 3, [`pipe-recording.md`](pipe-recording.md), *Fixtures*):
 
 - The format is known from the reference source as read on 2026-11-01 and one recording of 2026-11-07
   ([`../protocol.md`](../protocol.md)); a single recording cannot show a single reader or the units of the rates.
@@ -189,7 +189,8 @@ Until more fixtures from real recordings test the reader (one anonymised fixture
 - A game update that changes the format without a new protocol version is misread as long as every field still
   fits; one that bumps the version beyond 3 is refused with a protocol-mismatch error.
 - The island layout under version 3 rests on the reference at commit `4cc8ad7` (which decodes versions, session events
-  and islands as before) and one recording of the game after the update; a field added at the end of an island frame
+  and islands as before) and one real recording of the game after the update, whose 101 island frames decode without
+  an error ([`../protocol.md`](../protocol.md)); a field added at the end of an island frame
   is ignored, one inserted earlier is misread or rejected as malformed.
 - The reference reads a missing count of a type 4 or 5 frame as 0 and a negative one as no entries; this reader
   rejects both, so a game that ever sends such a frame has it skipped.

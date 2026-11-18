@@ -233,8 +233,9 @@ game times, close reasons and session events as the original's, with every recei
 
 ### Fixtures
 
-Anonymised recordings under `tests/Censio.Pipe.Tests/Fixtures/` are read by the tests of the message reader and the
-tick assembler; their `README.md` says how each was made and which facts it shows, never an original name, file name
+Anonymised recordings under `tests/Censio.Pipe.Tests/Fixtures/` (`long-session.jsonl` of protocol version 2 and
+`protocol-3-session.jsonl` of protocol version 3, with trade routes and item offers emptied) are read by the tests of
+the message reader and the tick assembler; their `README.md` says how each was made and which facts it shows, never an original name, file name
 or time. A maintainer may keep a local deny list (names that must not appear and the path of each fixture's original,
 named by the environment variable `CENSIO_FIXTURE_DENY_LIST`); the test that uses it is inconclusive where it is
 missing, compares each fixture with its original by position and reports counts, line numbers and field names only.

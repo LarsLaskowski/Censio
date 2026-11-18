@@ -13,8 +13,12 @@ Sources:
   unless a statement names the others.
 - Three more recordings of #17 (2026-11-03, 2026-11-04 and 2026-11-07), about 1,360 frames in all four. Only the
   statements on the session start text and the connect sequence rest on all four.
+- One version 3 recording supplied by a user (about 113 frames, started mid-connection, build `26.39954.4.58957`).
+  Derived facts only: 1 version frame (`3`), 1 session start, 1 session end, 101 island frames, 5 trade-route frames
+  (each: count 57, 8,186 bytes) and 4 item-offer frames (each: count 7, 229 bytes); these are this recording's values, not protocol constants. Its island frames decode with the
+  version 2 layout, without an error. It is the source of the statements that name version 3 or types 4 and 5.
 
-None is published; one anonymised fixture made from them lies under `tests/Censio.Pipe.Tests/Fixtures/` (`Censio.Anonymiser`, [`areas/pipe-recording.md`](areas/pipe-recording.md), *Anonymising*). This document states derived facts only: no frame, name or path.
+None is published; anonymised fixtures made from them (one of protocol version 2, one of version 3) lie under `tests/Censio.Pipe.Tests/Fixtures/` (`Censio.Anonymiser`, [`areas/pipe-recording.md`](areas/pipe-recording.md), *Anonymising*). This document states derived facts only: no frame, name or path.
 
 Each statement is marked *confirmed* (the 90-minute recording of 2026-11-07, or all four where stated) or *assumed* (with its source). What a single
 recording cannot show stays *assumed*.
@@ -30,7 +34,8 @@ no island frame has trailing bytes, and no float is NaN.
 ### Version
 
 - Payload: the protocol version. *Confirmed*: `2`, the first frame of the connection, sent once. Version `3`: *confirmed*
-  by the Companion's log on build `26.39954.4.58957` (2026-11-18, `received version 3`; not in a recording).
+  by the Companion's log on build `26.39954.4.58957` (`received version 3`) and by the version 3 recording (its only
+  version frame, the first of the connection it shows).
 
 ### SessionStart
 
@@ -77,9 +82,9 @@ One island per frame; the frames of one tick follow each other. *Confirmed*: 789
 
 ### TradeRoutes and ItemOffers
 
-- Types 4 and 5 of protocol version 3. *Assumed* (reference at commit `4cc8ad7`, not yet seen in a recording): the
-  payload starts with an int32 count (routes; traders), followed by nested data with strings (route name, folder) and
-  further counts. The reader checks the leading count only and skips the rest ([`areas/pipe.md`](areas/pipe.md),
+- Types 4 and 5 of protocol version 3. *Confirmed* (version 3 recording): every such frame starts with a non-negative
+  int32 count (each type 4 frame: count 57, 8,186 bytes; each type 5 frame: count 7, 229 bytes; this recording's values, not protocol constants) and stays far within 1 MiB. *Assumed*
+  (reference at commit `4cc8ad7`): the rest is nested data with strings (route name, folder) and further counts. The reader checks the leading count only and skips the rest ([`areas/pipe.md`](areas/pipe.md),
   *Message types*).
 
 ## Timing
