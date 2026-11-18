@@ -2,7 +2,7 @@
 
 - **Status:** Proposed
 - **Date:** 2026-11-18
-- **Area:** web-charts
+- **Area:** web-trends
 - **Source:** Issue #38
 - **Supersedes:** —
 
@@ -31,7 +31,7 @@ about every 120 seconds. The Product Manager chose the values and the window.
 A goods row shows the good's delta and an island row the island's buildings, at every point of the fixed window
 `Last 4 hours` up to the latest tick, at most the newest 240 points, independent of the range picker and the time axis;
 the arrow compares the rounded oldest and newest valued points. The rules are in
-[`web-charts.md`](../areas/web-charts.md), *Sparklines and trend arrows*.
+[`web-trends.md`](../areas/web-trends.md), *Sparklines and trend arrows*.
 
 ## Consequences
 

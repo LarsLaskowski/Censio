@@ -78,7 +78,7 @@ application rely on it.
   24 pixels, then) `Good`, `Production`, `Consumption`, `Delta`, `Trend`, `Buildings`, `Productivity` (German `Ware`,
   `Produktion`, `Verbrauch`, `Delta`, `Trend`, `Gebäude`, `Produktivität`). The `Trend` cell of a row is the sparkline of the
   good's delta on the island over the last 4 hours with an arrow, in the row of the good's first entry only; the figures show
-  before the trends are read and never wait for them ([`web-charts.md`](web-charts.md), *Sparklines and trend arrows*).
+  before the trends are read and never wait for them ([`web-trends.md`](web-trends.md), *Sparklines and trend arrows*).
 - At most 500 rows are shown: the first 500 entries of the island in the tick's order, shown ordered by shown good
   name (ordinal, letter case ignored), ties by product GUID. For an island with more entries the line
   `Showing 500 of <n> goods.` / `500 von <n> Waren angezeigt.` follows the table; after a failed read of the trends the line
@@ -156,7 +156,7 @@ text and is not retried until the page is loaded again: a notice of the server s
 - A language switch, a theme switch and a banner change re-render from the figures a page holds, without a read.
 - The trends of the island list and of the goods table are read beside the page's load, never inside it: a notice that
   arrives while they are read still updates the figures at once, and the trends of the new tick follow when their read
-  answers ([`web-charts.md`](web-charts.md), *Sparklines and trend arrows*). A range or axis choice reads no trends.
+  answers ([`web-trends.md`](web-trends.md), *Sparklines and trend arrows*). A range or axis choice reads no trends.
 - A notice reaches a page through its own work item and never blocks the follower that delivers it.
 
 ### Profile switch
@@ -257,7 +257,7 @@ value ([`server-state.md`](server-state.md), *Logging*); a failed read of a char
   *Memory*), and a worst island of 92,097 entries shows 500 rows. The reads of the charts are bounded and gated apart
   from this reader ([`web-charts.md`](web-charts.md), *The reads*); a page keeps the points of its charts besides the view,
   and the island list and the goods table keep their trends: at most 240 samples for each shown row, which are at most 500
-  goods or the region's islands ([`web-charts.md`](web-charts.md), *Memory and size of a page*).
+  goods or the region's islands ([`web-trends.md`](web-trends.md), *Limits and errors*).
 - The bytes of an icon stay in memory after the icon read is released, until the response is written: up to 17,825,792
   bytes for each request in flight ([`contract.md`](contract.md), *Bounds*). The number of requests in flight is not
   limited, like the uploads of an accepted risk of [`ingest.md`](ingest.md) (*Accepted risks*).

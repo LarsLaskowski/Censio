@@ -2,7 +2,7 @@
 
 - **Status:** Proposed
 - **Date:** 2026-11-18
-- **Area:** web-charts
+- **Area:** web-trends
 - **Source:** Issue #38
 - **Supersedes:** —
 
@@ -10,7 +10,7 @@
 
 The charts use MudBlazor's time-series chart ([0086](0086-charts-drawn-with-mudblazors-own-time-series-chart.md)), which
 draws a hover point per point, axes, a legend and a tooltip; a chart of 100 points renders a batch of about 120 KB
-([`web-charts.md`](../areas/web-charts.md), *Memory and size of a page*). A table of 500 rows with up to 240 points each
+([`web-trends.md`](../areas/web-trends.md), *Limits and errors*). A table of 500 rows with up to 240 points each
 re-renders on every tick ([0091](0091-row-trends-show-delta-and-buildings-over-a-fixed-four-hours.md)).
 
 ## Options considered
@@ -25,7 +25,7 @@ re-renders on every tick ([0091](0091-row-trends-show-delta-and-buildings-over-a
 
 A sparkline is one `svg` element holding one `path` whose data the server writes from the points' times and values,
 hidden from the accessibility tree; the arrow beside it carries the trend's name. The layout and limits are in
-[`web-charts.md`](../areas/web-charts.md), *Sparklines and trend arrows*.
+[`web-trends.md`](../areas/web-trends.md), *Sparklines and trend arrows*.
 
 ## Consequences
 

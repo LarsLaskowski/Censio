@@ -2,12 +2,12 @@
 
 ## Scope
 
-The time series the server keeps per profile, island and good: the read of a series and its points and gaps, the four
-trend reads of the charts and the tables' trend column with the trend gate, the retention rule (ticks at full resolution for 7 days, then hourly sums and counts without limit), the fold and its cutoff,
+The time series the server keeps per profile, island and good: the read of a series and its points and gaps, the
+trend reads of the charts with the trend gate, the retention rule (ticks at full resolution for 7 days, then hourly sums and counts without limit), the fold and its cutoff,
 the latest hour, late and resent ticks, repeated goods, the retention job with its schedule and log lines, deleting a
 profile's history with its removal steps, secure delete and the clean-up of the database file, the legacy residue and the
-measurements. Operators who run the server rely on the retention and the deletion; the charts and the trend column
-([`web-charts.md`](web-charts.md)) call the trend reads, and the charts of later features (#49 to #51) call these or the
+measurements. Operators who run the server rely on the retention and the deletion; the charts ([`web-charts.md`](web-charts.md))
+and the trend column ([`web-trends.md`](web-trends.md)) call the trend reads, and the charts of later features (#49 to #51) call these or the
 series read.
 
 ## Behavior
@@ -56,9 +56,9 @@ series read.
 
 ### The trend reads
 
-- Four reads serve [`web-charts.md`](web-charts.md): two for the charts, two for the sparklines of the tables (*The
-  batch reads of the trend column*). Each returns one point per tick or hourly point of a
-  range, never more than the maximum its caller names (the server asks for 2,880 for a chart and 240 for a table). The good
+- Two reads serve the charts of [`web-charts.md`](web-charts.md) (the batch reads of the trend column are in
+  [`web-trends.md`](web-trends.md)). Each returns one point per tick or hourly point of a
+  range, never more than the maximum its caller names (the server asks for 2,880). The good
   read names a profile, a set of islands, a good and the range; the figures read names a profile, one island and the range.
   Each also returns the number
   of all points of the range, so a caller can say that it shows the newest only. A query names a resolution:
@@ -108,26 +108,6 @@ series read.
     tick's (*Game-time axis* of [`web-charts.md`](web-charts.md)).
   - The read scans every tick of its range, so its time grows with the tick rate and the range, not with the cap
     ([`web-charts.md`](web-charts.md), *Limits and errors*).
-- **The batch reads of the trend column.** Two more reads give a table's sparklines in one read for all its rows, each of
-  one profile, a range and the newest `MaxPoints` points (the server asks for 240, over the fixed four hours of
-  [`web-charts.md`](web-charts.md), *Sparklines and trend arrows*) at `Points` resolution, with the times of *Times first*
-  and then the values in parts, each part one read transaction under the trend gate.
-  - *Goods of one island.* The read names one island and a set of product GUIDs (at most the 500 shown rows). A point holds,
-    for each good of the set, the `Delta` of the good's first entry of the island in stored position in that tick (no value
-    where that delta has none, and the second entry of a repeated good is never used), or for an hourly point the mean
-    `DeltaSum / DeltaCount` of the island's hourly entry; a good with no value is absent from the point. A part is one
-    statement over at most 240 ticks, the goods read through `json_each` of one JSON parameter, ordered by tick and
-    position.
-  - *Buildings of a set of islands.* The read names a set of islands (the island list's region, unbounded in count). A point
-    holds, for each island that has entries, its buildings: the sum of the entries' `BuildingCount` for a tick, and for an
-    hourly point `Math.Round(Σ BuildingCountSum / EntryCount, MidpointRounding.AwayFromZero)`; an island with no entries in
-    the point is absent. The island set is one JSON parameter as the figures read has it.
-  - *Parts of island points.* A part reads at most 240 island points (a tick or hourly point of one island), so that it scans
-    no more entries than a part of the figures read: the islands are cut in chunks of 240, the last chunk taking the rest,
-    and a chunk of `c` islands reads its points in slices of `240 / c` points (integer division, at least one). 24 islands by
-    240 points are 24 parts, 240 islands by 240 points 240 parts and 241 islands by 240 points 241 parts; no point or no
-    island gives no part. A part of the goods read is a part of 240 points like the others.
-  - Like the other trend reads they return at most the maximum of points asked and the count of all points of the range.
 - **The trend gate.** Every transaction of a trend read, the times' and each part's, runs under the database's trend gate,
   taken before the in-memory database's write gate, so the trend reads of the whole server run one at a time and the
   clean-up of a deleted profile (*Deleting a profile*) waits for the part in progress and lets none start until it has
@@ -255,10 +235,6 @@ three runs unless a row says otherwise. The limit is 10 seconds a step at the bo
 | The deletion's first transaction, a year of hourly points (8,684, built from the 167 real hours of the 7-day run) and 20,190 unfolded ticks | 1,133, 1,130 and 1,134 ms |
 | The series read over 7 days of ticks (5,040 points) | 146, 82 and 82 ms |
 | The series read over a year of hourly points (8,714 points) | 163, 152 and 126 ms |
-| The batch reads of the trend column, 60 ticks at the bounds (256 islands, 512 entries) scaled to 240 points: one part of 240 island points | 90 to 150 ms |
-| The whole opening read of the island list, 256 islands by 240 points (256 parts), warm and with the page cache dropped | about 12.8 to 13.4 s warm and 17 to 19.7 s cold |
-| A refresh of the island list after one new tick (a times transaction and two parts: 256 islands by 1 point) | 100 to 120 ms |
-| The opening read of a goods table (the goods of one island by 240 points) | 0.36 to 0.7 s |
 
 The tick rows of the deletion's measurement over a year were written as rows of the tick table alone, since the first
 transaction changes only the profile of those rows and of the hourly points; no figure here extends beyond those sizes.
@@ -299,12 +275,6 @@ pages are in the page cache (the way the rows above measure, with the file just 
 read over the fixture's 24 islands takes 1 second. A part holds the in-memory database's write gate for its transaction only,
 0.6 seconds at most in these rows, against about 3.9 seconds of a fold step.
 
-The whole opening read of the island list at the bounds exceeds the 10 seconds a step of this section's limit: 256 islands by
-240 points take about 12.8 to 13.4 s warm and 17 to 19.7 s with the page cache dropped, while each part stays far within the
-limit (90 to 150 ms) and the figures of the page never wait for it, because the page shows them while the trends are read
-([`web-charts.md`](web-charts.md), *Limits and errors*). The refresh after a
-tick reads only the points after the held newest one and takes 100 to 120 ms.
-
 Size, measured on the file after a truncating checkpoint, by the pages of each table and its indexes:
 
 | What | Ticks | Hourly rows |
@@ -320,7 +290,6 @@ ticks are gone.
 
 ## Related decisions
 
-- [`decisions/0092-row-trends-read-once-per-table-in-island-point-parts.md`](../decisions/0092-row-trends-read-once-per-table-in-island-point-parts.md) — a table's trends are one read for all its rows, in parts of at most 240 island points.
 - [`decisions/0021-sqlite-history-with-retention.md`](../decisions/0021-sqlite-history-with-retention.md) — full resolution for 7 days, then hourly values kept without limit, deletion per profile.
 - [`decisions/0031-bounded-local-tick-buffer-gaps-accepted.md`](../decisions/0031-bounded-local-tick-buffer-gaps-accepted.md) — a gap stays a gap.
 - [`decisions/0083-history-folded-tick-by-tick-into-hourly-sums-and-counts.md`](../decisions/0083-history-folded-tick-by-tick-into-hourly-sums-and-counts.md) — the fold, one tick per transaction, sums and counts, the latest hour and the kept identities.
@@ -334,5 +303,5 @@ ticks are gone.
 - The tables, the file, the start and the rules of storing: [`server-data.md`](server-data.md).
 - The state a deletion drops and rebuilds: [`server-state.md`](server-state.md).
 - The button, the dialog and the host rule: [`web-pages.md`](web-pages.md); the setting `AllowedHosts`: [`server.md`](server.md).
-- The charts, their range, gaps and states, and the sparklines and trend arrows built from the batch reads: [`web-charts.md`](web-charts.md).
+- The charts: [`web-charts.md`](web-charts.md); the trend column's batch reads: [`web-trends.md`](web-trends.md).
 - Shrinking the database file and removing the residue of older versions: the user guide.

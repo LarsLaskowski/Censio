@@ -2,7 +2,7 @@
 
 - **Status:** Proposed
 - **Date:** 2026-11-18
-- **Area:** history
+- **Area:** web-trends
 - **Source:** Issue #38
 - **Supersedes:** —
 
@@ -35,7 +35,7 @@ the pages of a region was not taken: a cache with its own lifetime and invalidat
 Two new trend reads, one for the deltas of a set of goods on one island and one for the buildings of a set of islands,
 each read the newest 240 points' times in one transaction and the values in parts of at most 240 island points under the
 trend gate; a refresh reads only the points after the held newest one, and a page never waits for them before showing its
-figures. The rules and measurements are in [`history.md`](../areas/history.md), *The trend reads*.
+figures. The rules and measurements are in [`web-trends.md`](../areas/web-trends.md), *The batch reads of the trend column*.
 
 ## Consequences
 
