@@ -29,8 +29,10 @@ Feature: [spec.md](spec.md) (approved by the Lead, the window and values by the 
 | 15 | `TrendReader` runs one chart read at a time across the server for a whole read and logs a failure as `ChartReadFailed` | `TrendReader.cs` `_gate`, `ReadAsync`; `UiLog.cs:24` | confirmed |
 | 16 | Ticks arrive about 120 s apart | `docs/protocol.md:80` | confirmed |
 | 17 | A zero-length subpath with round caps is drawn as a dot | SVG 2, *Painting*, `stroke-linecap` (zero-length subpaths) | confirmed |
-| 18 | A part of 240 island points of the islands read, and the one part of the goods read, take about as long as a part of the figures read (0.14 to 0.29 s in memory at the bounds) | to verify: Dev, step 6, scratch program at the contract's bounds as `history.md` *Measurements* (three runs, warm, cold, in-memory write-gate hold); result into `history.md` | unverified |
-| 19 | A goods table of 500 rows by 240 points renders its trend cells in about 2 MB and adds a few MB of heap | to verify: Dev, step 6, scratch render as `web-charts.md` *Memory and size of a page*; result into `web-charts.md` | unverified |
+| 18 | A part of 240 island points of the islands read, and the one part of the goods read, take about as long as a part of the figures read (0.14 to 0.29 s in memory at the bounds) | to verify: Dev, step 6, scratch program at the contract's bounds (256 islands of 512 entries) as `history.md` *Measurements*, three runs each, warm and with the page cache dropped, and the in-memory write-gate hold of one part: one part of each read; the whole opening read of an island list of 256 islands by 240 points; a refresh read of one new tick; the goods opening read of 500 goods by 240 points; results into `history.md` | unverified |
+| 19 | A goods table of 500 rows by 240 points renders its trend cells in about 2 MB and adds a few MB of heap | to verify: Dev, step 6, scratch render as `web-charts.md` *Memory and size of a page*: the render batch of the trend cells; the heap held by the page's trends; the peak during one goods read (the `HistoryGoodsPoint` dictionaries of 240 points by up to 500 goods plus the sample lists); the heap while a refresh is in flight and the held read is still shown; results into `web-charts.md` | unverified |
+| 21 | A page's load loop awaits `ReadDetailsAsync`, so a notice during it only marks one more load and the next tick's figures wait for the details | `DataPageBase.cs:191-210` `LoadAsync`, `ReadOnceAsync` (`await ReadDetailsAsync`) | confirmed |
+| 22 | A range choice cancels the details' token through `ReplaceDetailsCancellation`, and `ClearDetails` raises the island page's `_generation` | `DataPageBase.OnParametersSetAsync`; `IslandDetail.razor.cs` `ClearDetails` | confirmed |
 | 20 | Records 0086 to 0090 are unreleased | `git ls-remote --tags origin`: `v0.3.0` is `7646dd5`, before #212 | confirmed |
 
 ## Tests per criterion
@@ -52,16 +54,19 @@ Feature: [spec.md](spec.md) (approved by the Lead, the window and values by the 
 | AC5 | `IslandDetailTrendCellsEmptyBeforeReadAndWhenPrerendered`, `IslandDetailFailedTrendReadShowsDashAndLine` | `tests/Censio.Server.Tests/IslandDetailTests.cs` |
 | AC5 | `RegionIslandsFailedTrendReadShowsDashAndLine` | `tests/Censio.Server.Tests/RegionIslandsTests.cs` |
 | AC5 | `TrendReaderSparklineReadFailureLogsChartWarningOnce`, `TrendReaderSparklineReadCancelledLogsNothing` | `tests/Censio.Server.Tests/TrendReaderTests.cs` |
-| AC6 | `IslandDetailStoredTickRereadsTrends`, `IslandDetailRangeChoiceReadsNoTrends`, `IslandDetailLanguageSwitchRedrawsTrendsWithoutRead` | `tests/Censio.Server.Tests/IslandDetailTests.cs` |
+| AC5 | `IslandDetailCancelledTrendReadShowsAndLogsNothing` (an address change during a held trend read) | `tests/Censio.Server.Tests/IslandDetailTests.cs` |
+| AC6 | `IslandDetailStoredTickRereadsTrends`, `IslandDetailRangeChoiceReadsNoTrends` (a page whose trend read has answered: no further trend call, the shown sparklines stay), `IslandDetailRangeChoiceDuringTrendReadKeepsIt` (the running read is not cancelled and is shown), `IslandDetailLanguageSwitchRedrawsTrendsWithoutRead` | `tests/Censio.Server.Tests/IslandDetailTests.cs` |
+| AC6 | `TrendReaderSparklineRefreshReadsOnlyAfterNewestHeldPoint`, `TrendReaderSparklineRefreshDropsPointsBeforeWindowAndKeepsNewest240`, `TrendReaderSparklineChangedKeySetReadsWhole` | `tests/Censio.Server.Tests/TrendReaderTests.cs` |
+| AC6 | `SparklineLoaderRequestDuringReadReadsOnceMoreWithNewest`, `SparklineLoaderSameAsOfReadsNothing`, `SparklineLoaderAddressChangeCancelsAndDropsHeld`, `SparklineLoaderCancelledReadKeepsNothing` | `tests/Censio.Server.Tests/SparklineLoaderTests.cs` |
 | AC6 | `RegionIslandsTickOfOtherProfileReadsNoTrends`, `RegionIslandsThemeSwitchRedrawsTrendsWithoutRead` | `tests/Censio.Server.Tests/RegionIslandsTests.cs` |
-| AC7 | `HistoryStorePlanIslandPartsHoldAtMostPartSizeIslandPoints` (rows: 1, 24, 240, 241 and 300 islands by 240 points), `HistoryStoreReadIslandsTrendPartWaitsForTrendGate`, `HistoryStoreReadIslandsTrendPartsGiveSamePointsAsOneRead` | `tests/Censio.Server.Data.Tests/HistoryStoreTests.cs` |
-| AC7 | `IslandDetailTableShowsWhileTrendReadHeld`, `IslandDetailTrendsReadAfterOverviewAndDespiteItsFailure` | `tests/Censio.Server.Tests/IslandDetailTests.cs` |
+| AC7 | `HistoryStorePlanIslandPartsHoldAtMostPartSizeIslandPoints` (rows of points, islands, parts: 240, 1, 1; 240, 24, 24; 240, 240, 240; 240, 241, 241; 240, 300, 300; 0, 24, 0; 5, 0, 0; each part at most 240 island points), `HistoryStoreReadIslandsTrendPartWaitsForTrendGate`, `HistoryStoreReadIslandsTrendPartsGiveSamePointsAsOneRead` | `tests/Censio.Server.Data.Tests/HistoryStoreTests.cs` |
+| AC7 | `IslandDetailTableShowsWhileTrendReadHeld`, `IslandDetailStoredTickUpdatesFiguresWhileTrendReadHeld`, `IslandDetailTrendsReadAfterOverviewAndDespiteItsFailure` | `tests/Censio.Server.Tests/IslandDetailTests.cs` |
+| AC7 | `RegionIslandsStoredTickUpdatesFiguresWhileTrendReadHeld` | `tests/Censio.Server.Tests/RegionIslandsTests.cs` |
 | AC8 | `SparklineBuilderPathOfMaxPointsStaysWithinMarkupLimit` | `tests/Censio.Server.Tests/SparklineBuilderTests.cs` |
 | AC8 | `TrendCellMarkupHoldsOneSvgPathOfCoordinatesOnly` | `tests/Censio.Server.Tests/TrendCellTests.cs` |
 
-The page tests read through `FakeHistoryTrends`; the store tests use the real `HistoryStore` on a file database as the
-existing trend tests do. A test of AC8 checks the markup length of the whole cell (`svg` element and arrow) at 240 points
-whose coordinates all need a decimal.
+Page tests read through `FakeHistoryTrends`, store tests the real `HistoryStore` on a file database. AC8 measures the
+whole cell at 240 points whose coordinates all need a decimal.
 
 ## Approach
 
@@ -77,8 +82,10 @@ and the end just after the tick, the rule of `TrendRange.For` (share the computa
   entry is never used). Hourly points: the island's `HourlyEntries` of the goods, `Mean(DeltaSum, DeltaCount)`. A point's
   `Deltas` holds only goods with a value.
 - `ReadIslandsTrendAsync`: the times through the same times transaction, then the parts that `PlanIslandParts` gives:
-  islands in chunks of at most 240, points in slices of `240 / chunk` points, so a part covers at most 240 island points
-  (a tick or hourly point of one island). Each part is one `ReadTrendTransactionAsync`. Per tick the buildings of an
+  islands in chunks of 240 filled first (the last chunk takes the rest), and per chunk of `c` islands the points in slices
+  of `240 / c` (integer division) points, so a part covers at most 240 island points (a tick or hourly point of one
+  island) and 241 islands by 240 points take 241 parts; no points or no islands give no part. An island without a row in
+  a part's ticks costs an index probe and no entry scan, so the plan does not leave such islands out. Each part is one `ReadTrendTransactionAsync`. Per tick the buildings of an
   island are the sum of its entries' `BuildingCount` (an integer `sum` in SQL is allowed, `history.md`); an island with no
   entries in the tick is absent. Per hourly point: fact 7's formula over the island's hourly entries. The island set is a
   JSON parameter as `SerializeIslands` writes it.
@@ -90,7 +97,14 @@ and the end just after the tick, the rule of `TrendRange.For` (share the computa
 `TrendRange.ForSparklines`, run in the reader's one-read gate (the private `ReadAsync` becomes generic over its result so the
 failure path stays one: `UiLog.ChartReadFailed`, a cancellation rethrows), convert the points into one list of
 `SparklineSample` per requested key and call `SparklineBuilder.Build`, decimals 2 for delta and 0 for buildings. The
-result holds every requested key: a `SparklineView`, or `null` for fewer than two valued points.
+result holds every requested key: a `SparklineView`, or `null` for fewer than two valued points, and per key its samples
+(one per point of the window, a no-value sample included, so every key shares the timeline).
+- **Refresh.** Given a held read whose keys equal the requested ones and that has points, the read starts just after
+  the held newest point (its time plus one tick, never before the window start), the pattern of `TrendReader.ReadStart`
+  and `TrendWindow.Extend` for the wide ranges: the held samples at or after the new window start are kept, the new ones
+  appended, the newest 240 kept, and every key's path is built again over the new window. Without a held read, with other
+  keys (a good or island added or gone) or with a held read without points, the whole window is read. A tick folded inside the held part
+  (a replayed recording older than 7 days) shows as held until the next whole read.
 
 **Geometry (`SparklineBuilder`).** `viewBox="0 0 80 20"`, width 80, height 20. x = (time − range start) / (range end −
 range start) × 80; y maps the valued points' minimum to 18 and maximum to 2 (all equal: 10). Coordinates are written with
@@ -112,17 +126,23 @@ class `censio-trend` (no wrap, a CSS rule beside `censio-number`); nothing of th
   list: `Island`, `Buildings`, `Trend`, `Produced goods`, `Goods in deficit`. The heading is `<th class="censio-trend"
   title="<tooltip>">Trend</th>`. Under the table (after the `Showing 500 of <n> goods.` line when it shows), the line
   `TrendsReadFailed` as a `<p>` after a failed read.
-- `IslandDetail.ReadDetailsAsync`: first the overview read unless it failed (today's code, without the early return of
-  fact 10 for the trends), then the trend read unless the trends failed for this island, or the held trends belong to the
-  same profile, island and as-of time. The product set is the distinct `ProductGuid` of `view.Rows`; the row that gets a
-  product's line is the first row of that product in `view.Rows` (tick order); the others show `–` (E8). A page whose view
-  has no rows (`No values …`) reads no trends.
-- `RegionIslands` overrides `ReadDetailsAsync` and `ClearDetails` the same way for the region's islands (key: profile,
-  region, as-of time).
-- `ClearDetails` keeps the held trends and their failure; they are dropped when the profile or island (region) of the
-  address changes. A range choice therefore reads no trends (AC6), and a new as-of time (a stored tick) reads them again
-  while the held ones stay shown, keyed by product or island, until the new read answers. A key missing from the held read
-  shows an empty cell.
+- **Off the load loop (fact 21).** The trends are never awaited in the page's load loop: `SparklineLoader<TKey>`, one per
+  page, runs them. `ReadDetailsAsync` calls its `Request` with the address key (profile and island, or profile and region),
+  the as-of time and the read, and returns; the island page first awaits its overview read as today (without the early
+  return of fact 10 for the trends), so the trends start after it. `Request` does nothing when the held read or the read
+  in flight is for the same address and as-of time, or when the trends of this address failed; it marks one more read when
+  a read is in flight (the newest request wins, like `LoadAsync`); otherwise it starts the read with its own cancellation,
+  linked to the page's. The read gets the held read of the same address for the refresh. Its answer is kept with its key
+  and re-renders the page through the page's `InvokeAsync(StateHasChanged)`.
+- **Keys, not generations (m2).** The held read is matched by its stored key, never by `_generation`. An address change
+  (another profile, island or region) cancels the read in flight and drops the held read and the failure; a range choice,
+  which raises `_generation` and cancels the details' token (fact 22), touches neither, so a running trend read goes on
+  and the shown sparklines stay. A cancelled read stores nothing and logs nothing; disposing the page disposes the loader.
+- The product set is the distinct `ProductGuid` of `view.Rows`; the row that gets a product's line is the first row of
+  that product in `view.Rows` (tick order); the others show `–` (E8). A view without rows (`No values …`) requests no
+  trends. `RegionIslands` gains `ReadDetailsAsync` for the region's islands and its own loader.
+- A new as-of time (a stored tick) shows the held sparklines, keyed by product or island, until the refresh answers; a key
+  missing from the held read shows an empty cell.
 
 **Image build check.** `TrendCell.razor` is a new `.razor` file, so the Dev runs the *Image build check* of
 `.squad/stack.md` (the restore-order reproduction in the sandbox) before step 7 and reports its result.
@@ -136,6 +156,11 @@ class `censio-trend` (no wrap, a CSS rule beside `censio-number`); nothing of th
   the contract's extremes reach (record 0092).
 - **MudBlazor's chart per row, or another library's sparkline** — lost: render size and a dependency (record 0093).
 - **The window of the page's chart choice, 24 hours or hourly means** — lost: the Product Manager's answer (record 0091).
+- **Reading the whole window on every refresh** — lost: about 160 parts per tick for 256 islands (record 0092).
+- **Awaiting the trends in the page's load loop** (the first plan) — lost: the next tick's figures wait for them (fact 21).
+- **One read shared by the pages of one profile, region and as-of time** — lost: a refresh is a part or two, and a cache
+  with its own lifetime and invalidation is a design of its own.
+- **Leaving out islands without a row in the window** — lost: their parts scan no entries.
 - **Building the sparklines from `TrendPoint` and the existing `BreaksBefore`** — lost: 120,000 point objects with value
   arrays per goods read; `SparklineSample` is a struct and `BreaksBefore` gets an overload on times.
 
@@ -149,7 +174,7 @@ class `censio-trend` (no wrap, a CSS rule beside `censio-number`); nothing of th
 | Censio.Server | `TrendRange.cs` | `ForSparklines`, two constants |
 | Censio.Server | `TrendReader.cs` | two reads, the generic private `ReadAsync` |
 | Censio.Server | `TrendSeriesBuilder.cs` | `BreaksBefore` overload; the existing one calls it |
-| Censio.Server | `SparklineSample.cs`, `SparklineView.cs`, `SparklineRead{TKey}.cs`, `TrendDirection.cs`, `SparklineBuilder.cs` | new |
+| Censio.Server | `SparklineSample.cs`, `SparklineView.cs`, `SparklineRead{TKey}.cs`, `SparklineLoader{TKey}.cs`, `TrendDirection.cs`, `SparklineBuilder.cs` | new |
 | Censio.Server | `TrendPalette.cs` | `Sparkline` |
 | Censio.Server | `UiTexts.cs` | six texts, English and German |
 | Censio.Server | `Components/TrendCell.razor`, `TrendCell.razor.cs` | new |
@@ -177,10 +202,14 @@ Censio.Server:
 - `public readonly record struct SparklineSample(DateTimeOffset Time, bool IsHourly, double? Value)`
 - `public enum TrendDirection` — Stable (0), Rising, Falling.
 - `public class SparklineView` — string Path, TrendDirection Direction.
-- `public class SparklineRead<TKey>` where TKey : notnull — IReadOnlyDictionary<TKey, SparklineView?> Lines, bool IsFailed.
+- `public class SparklineRead<TKey>` where TKey : notnull — IReadOnlyDictionary<TKey, SparklineView?> Lines, IReadOnlyDictionary<TKey, IReadOnlyList<SparklineSample>> Samples, bool IsFailed.
+- `public class SparklineLoader<TKey>` where TKey : notnull, IDisposable (SparklineLoader{TKey}.cs) — its members below.
+- `public void Request(object addressKey, DateTimeOffset asOf, Func<SparklineRead<TKey>?, CancellationToken, Task<SparklineRead<TKey>>> read, Func<Task> changed)` on SparklineLoader.
+- `public SparklineRead<TKey>? HeldFor(object addressKey)` on SparklineLoader (the held read only when it belongs to that address).
+- `public bool IsFailedFor(object addressKey)` on SparklineLoader.
 - `public static SparklineView? Build(IReadOnlyList<SparklineSample> samples, TrendRange range, int decimals)` on the static class SparklineBuilder, with the constants Width = 80 and Height = 20 (public const int).
-- `public Task<SparklineRead<int>> ReadGoodSparklinesAsync(Guid profileId, IslandKey island, IReadOnlyList<int> productGuids, DateTimeOffset latestTick, CancellationToken cancellationToken)` on TrendReader.
-- `public Task<SparklineRead<IslandKey>> ReadIslandSparklinesAsync(Guid profileId, IReadOnlyList<IslandKey> islands, DateTimeOffset latestTick, CancellationToken cancellationToken)` on TrendReader.
+- `public Task<SparklineRead<int>> ReadGoodSparklinesAsync(Guid profileId, IslandKey island, IReadOnlyList<int> productGuids, DateTimeOffset latestTick, SparklineRead<int>? held, CancellationToken cancellationToken)` on TrendReader.
+- `public Task<SparklineRead<IslandKey>> ReadIslandSparklinesAsync(Guid profileId, IReadOnlyList<IslandKey> islands, DateTimeOffset latestTick, SparklineRead<IslandKey>? held, CancellationToken cancellationToken)` on TrendReader.
 - `public static string Sparkline(UiTheme theme)` on TrendPalette.
 - UiTexts gains six string properties: ColumnTrend, TrendColumnTooltip, TrendRising, TrendFalling, TrendStable, TrendsReadFailed.
 - `public class TrendCell` (partial) (Components/TrendCell.razor with its code-behind) — parameters SparklineView? Line and bool IsRead, cascading parameters UiTheme Theme and UiTexts Texts.
@@ -191,14 +220,15 @@ again. / Die Trends können gerade nicht gelesen werden. Laden Sie die Seite neu
 
 The page members stay private. Checked against *Writing code* of the stack file: no nested type, no method over seven
 parameters, no keyword of another language as a name, no enum named with a Flags or Enum suffix; TrendDirection has its
-zero member; the generic file follows HistoryTrend{TPoint}.cs (SparklineRead{TKey}.cs). Existing files the skeleton
+zero member; the generic files follow HistoryTrend{TPoint}.cs (SparklineRead{TKey}.cs, SparklineLoader{TKey}.cs); the
+loader's two delegates keep Request at four parameters. Existing files the skeleton
 rewrites: IHistoryTrends.cs, HistoryStore.cs (stubs), TrendRange.cs, TrendReader.cs, TrendSeriesBuilder.cs,
 TrendPalette.cs, UiTexts.cs (both language blocks).
 
 ## Test files
 
 `tests/Censio.Server.Data.Tests/HistoryStoreTests.cs`, `tests/Censio.Server.Tests/TrendRangeTests.cs`,
-`TrendReaderTests.cs`, `SparklineBuilderTests.cs` (new), `TrendCellTests.cs` (new), `TrendPaletteTests.cs`,
+`TrendReaderTests.cs`, `SparklineBuilderTests.cs` (new), `SparklineLoaderTests.cs` (new), `TrendCellTests.cs` (new), `TrendPaletteTests.cs`,
 `IslandDetailTests.cs`, `RegionIslandsTests.cs`.
 
 Existing test code a changed signature or behavior affects, adapted by the Tester:
@@ -217,7 +247,10 @@ Files no unit test can cover: `wwwroot/css/censio.css` (one rule; outside `COVER
 ## Areas
 
 - `web-charts`: new section *Sparklines and trend arrows* (window, points, cap, arrow rule, cell layout, texts, states,
-  live updates, reads and their order, colour, no animation, accessibility, sizes of fact 19); *Scope*, *The reads*
+  live updates, reads and their order, the refresh of the new points only, colour, no animation, accessibility, sizes of
+  fact 19), and under *Limits and errors* the measured opening read of an island list at the bounds (fact 18): every open
+  island list holds `TrendReader`'s gate that long when opened and for its refresh at every tick, and the time grows with
+  the region's islands, whose number the island list does not limit ([`server-state.md`](../../docs/areas/server-state.md)); *Scope*, *The reads*
   ("Three reads feed the charts" gains the two), *Not here* drop #38; *Related decisions* 0091, 0093.
 - `web-pages`: the column lists of the island list and goods table; *Live updates* and *Reads and memory* name the trends;
   *Not here* drops sparklines; *Logging* names the warning for a trend read too.
@@ -255,8 +288,9 @@ needs no new paragraph.
   byte limits on parsed input.
 - [x] Exceptions: a failed trend read reaches the user only as the fixed text `TrendsReadFailed`; the exception goes to
   the log through `UiLog.ChartReadFailed` without arguments. None else.
-- The island list's whole read at the bounds is tens of seconds (fact 18) and holds `TrendReader`'s gate, so a chart read
-  can wait behind it; each transaction is bounded as before. Stated in `web-charts.md` and record 0092.
+- The island list's opening read at the bounds is tens of seconds (fact 18) and holds `TrendReader`'s gate, so a chart
+  read can wait behind it; a refresh reads only the new points; each transaction is bounded as before. Stated in
+  `web-charts.md` and record 0092.
 - The cell writes only numbers, the hex colour and fixed texts; `Path` is built from doubles in invariant culture.
 
 ## Decision records
@@ -269,3 +303,30 @@ needs no new paragraph.
 
 The spec's *Out of scope*. A stored island building total (record 0092, option 4) only if the measurement of fact 18
 shows the island list too slow; the Lead decides then.
+
+## Challenge
+
+- M1 (figures wait for the trends on every refresh): accepted. Fact 21 confirms it. The trends run in `SparklineLoader`,
+  started by `ReadDetailsAsync` and never awaited in the load loop, with their own cancellation and key; tests that a
+  stored tick updates the figures while a trend read is held on both pages (AC7 rows).
+- M2 (the whole window on every tick): accepted. A refresh reads only the points after the held newest one and merges
+  them as `TrendWindow.Extend` does (*Approach*, Refresh); a whole read on opening, on an address change and when the keys
+  change. Fact 18 measures the opening and the refresh read apart; record 0092 states it. Tests in `TrendReaderTests`
+  (AC6 rows).
+- m1 (a range choice cancels the running trend read): accepted. The loader's cancellation is its own, not the details'
+  token, so a range choice neither cancels nor repeats the read; tests `IslandDetailRangeChoiceReadsNoTrends` against an
+  answered read and `IslandDetailRangeChoiceDuringTrendReadKeepsIt`; a cancelled read stores and logs nothing
+  (`SparklineLoaderCancelledReadKeepsNothing`, `IslandDetailCancelledTrendReadShowsAndLogsNothing`).
+- m2 (match held trends by key, not `_generation`): accepted. The loader stores the key with the read and `HeldFor`
+  compares it; the range-choice test checks the sparklines stay.
+
+## Security review
+
+Verdict `APPROVED` with three non-blocking findings, all fixed now:
+1. Fact 18 now measures the whole opening read of 256 islands by 240 points, warm and cold, and the refresh read; the
+   `web-charts.md` *Limits and errors* sentence (*Areas*) says every open island list holds that time when opened and at
+   each refresh and that it grows with the region's unlimited islands. Leaving out islands without rows and sharing one
+   read across pages are not taken (*Options considered*); the incremental refresh cuts the per-tick cost to a part or two.
+2. `PlanIslandParts` fills chunks of 240 islands first, and its test rows assert the part count (241 islands by 240
+   points: 241 parts) besides the part size, with rows for 0 points and 0 islands.
+3. Fact 19 now samples the peak during one goods read and the heap while a refresh is in flight with the held read shown.

@@ -25,14 +25,21 @@ tick. The history stores no island total: an island's buildings are the sum over
 4. **An island building total stored at ingest** — cheap island reads; a schema change with a backfill of the stored
    history, a second value the fold and the deletion keep in step, and a security-area change of the ingest.
 
+For a new tick: **read the whole window again** — about 160 parts for a region of 256 islands every 120 s per open page;
+or **read only the points after the held newest one** (chosen), merged as the wide chart ranges do
+([0089](0089-chart-ranges-wide-ones-as-hourly-means-read-at-request.md)), a part or two per tick. Sharing one read across
+the pages of a region was not taken: a cache with its own lifetime and invalidation is a design of its own.
+
 ## Decision
 
 Two new trend reads, one for the deltas of a set of goods on one island and one for the buildings of a set of islands,
 each read the newest 240 points' times in one transaction and the values in parts of at most 240 island points under the
-trend gate. The rules and measurements are in [`history.md`](../areas/history.md), *The trend reads*.
+trend gate; a refresh reads only the points after the held newest one, and a page never waits for them before showing its
+figures. The rules and measurements are in [`history.md`](../areas/history.md), *The trend reads*.
 
 ## Consequences
 
 A transaction holds the trend gate and, in memory, the ingest no longer than a part of the overview chart's read. The
-island list's total read time grows with the region's islands (tens of seconds at the bounds, measured in `history.md`)
-and runs in the charts' read gate, so a chart read can wait behind it. Option 4 is the way out if that proves too slow.
+island list's opening read grows with the region's islands (tens of seconds at the bounds, measured in `history.md`) and
+runs in the charts' read gate, so a chart read can wait behind it; its refresh is a part or two. A tick folded inside the
+held window shows as held until the next whole read. Option 4 is the way out if that proves too slow.
