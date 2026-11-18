@@ -1977,9 +1977,10 @@ public sealed class HistoryStoreTests
     }
 
     /// <summary>
-    /// The buildings of a folded hour in an islands read are the ones of the island's figures even where adding the goods'
-    /// mean building counts lands next to a half: 3/2 + 44/3 + 7/3 is 18.5, but added one after the other as doubles, as the
-    /// figures do, 18.499999999999996, which rounds to 18.
+    /// The buildings of a folded hour in an islands read are the ones of the island's figures even where the order the goods'
+    /// mean building counts are added in decides the rounding: the first tick stores the goods in another order than their
+    /// product GUIDs, and added as doubles in GUID order, as the figures do, 3/2 + 44/3 + 7/3 is 18.499999999999996, which
+    /// rounds to 18, while in the stored order 3/2 + 7/3 + 44/3 is 18.5, which rounds to 19.
     /// </summary>
     /// <returns>A task that represents the asynchronous test</returns>
     [TestMethod]
@@ -1992,9 +1993,9 @@ public sealed class HistoryStoreTests
         var profileId = Guid.NewGuid();
 
         await StoreAsync(store,
-                         Tick(profileId, 10 * Minute, 10, Island(IslandKey, IslandName, TrendEntry(ProductGuid, 0f, 0f, 0f, 1), TrendEntry(OtherProductGuid, 0f, 0f, 0f, 15), TrendEntry(ThirdProductGuid, 0f, 0f, 0f, 3))),
-                         Tick(profileId, 20 * Minute, 20, Island(IslandKey, IslandName, TrendEntry(ProductGuid, 0f, 0f, 0f, 2), TrendEntry(OtherProductGuid, 0f, 0f, 0f, 15), TrendEntry(ThirdProductGuid, 0f, 0f, 0f, 2))),
-                         Tick(profileId, 30 * Minute, 30, Island(IslandKey, IslandName, TrendEntry(OtherProductGuid, 0f, 0f, 0f, 14), TrendEntry(ThirdProductGuid, 0f, 0f, 0f, 2))),
+                         Tick(profileId, 10 * Minute, 10, Island(IslandKey, IslandName, TrendEntry(ProductGuid, 0f, 0f, 0f, 1), TrendEntry(ThirdProductGuid, 0f, 0f, 0f, 3), TrendEntry(OtherProductGuid, 0f, 0f, 0f, 15))),
+                         Tick(profileId, 20 * Minute, 20, Island(IslandKey, IslandName, TrendEntry(ProductGuid, 0f, 0f, 0f, 2), TrendEntry(ThirdProductGuid, 0f, 0f, 0f, 2), TrendEntry(OtherProductGuid, 0f, 0f, 0f, 15))),
+                         Tick(profileId, 30 * Minute, 30, Island(IslandKey, IslandName, TrendEntry(ThirdProductGuid, 0f, 0f, 0f, 2), TrendEntry(OtherProductGuid, 0f, 0f, 0f, 14))),
                          Tick(profileId, Hour + (10 * Minute), 40, Island(IslandKey, IslandName, TrendEntry(ProductGuid, 0f, 0f, 0f, 5))));
 
         var folded = await FoldAllAsync(history, profileId);
@@ -2009,7 +2010,7 @@ public sealed class HistoryStoreTests
         var figuresHourly = figures.Points.Where(point => point.IsHourly).Select(point => point.Buildings).ToList();
 
         Assert.AreEqual(3, folded, "The three ticks of the first hour should have been folded");
-        Assert.AreSequenceEqual(new long?[] { 18 }, figuresHourly, "The figures should round the doubles' sum 18.499999999999996 to 18");
+        Assert.AreSequenceEqual(new long?[] { 18 }, figuresHourly, "The figures should add in GUID order and round the doubles' sum 18.499999999999996 to 18");
         Assert.AreSequenceEqual(figuresHourly, islandsHourly, "The islands read should give the folded hour the buildings of the island's figures");
     }
 
