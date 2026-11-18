@@ -33,16 +33,16 @@ The state is shown in the tray tooltip ([`companion.md`](companion.md)).
 | State | Meaning |
 | ----- | ------- |
 | Waiting for game | No connection: the pipe does not exist, or the connection ended at a frame boundary. The state before the first attempt |
-| Connected | The pipe is open; the game's `Version 2` has not arrived yet |
-| Receiving | A message of protocol version 2 has arrived on this connection |
+| Connected | The pipe is open; the game's `Version` (2 or 3) has not arrived yet |
+| Receiving | A message of protocol version 2 or 3 has arrived on this connection |
 | Pipe busy | The pipe exists but no instance became free within 2 seconds |
-| Protocol mismatch | A version other than 2, or a frame before the first `Version`; the connection stays open and keeps being read |
+| Protocol mismatch | A version other than 2 or 3, or a frame before the first `Version`; the connection stays open and keeps being read |
 | Error | An attempt failed, or the stream ended with a truncated frame, an oversized frame or a read failure (the kind is part of the status) |
 
-- A message result moves to `Receiving`; a skipped frame (empty, unknown type, malformed) changes nothing. Session
+- A message result moves to `Receiving`; a skipped frame (empty, unknown type, malformed) and a trade-route or item-offer frame change nothing. Session
   start, session end and island messages keep `Receiving` and cause no new attempt.
 - A protocol mismatch gives `Protocol mismatch` with the received version (none for a frame before any `Version`);
-  the mismatch errors of frames skipped meanwhile raise no new event. A `Version 2` on that connection gives
+  the mismatch errors of frames skipped meanwhile raise no new event. A `Version` of 2 or 3 on that connection gives
   `Receiving`.
 - A stream that ends at a frame boundary gives `Waiting for game`; one that ends inside a frame (a game that quits
   while sending) shows `Error` until the next attempt's result replaces it. An unexpected failure of a read ends
@@ -59,7 +59,7 @@ The state is shown in the tray tooltip ([`companion.md`](companion.md)).
   each. One counter spans all failure kinds.
 - The counter resets when the connection ended after it had been in `Receiving` without interruption for at least
   30 seconds up to its end; a protocol mismatch in between restarts that measurement. A connection that reaches
-  `Receiving` only briefly does not reset the counter, so a pipe that sends `Version 2` and breaks is not retried
+  `Receiving` only briefly does not reset the counter, so a pipe that sends a supported `Version` and breaks is not retried
   faster than the delays above.
 - A pipe that appears again is connected by the next attempt; one that appears between the check and the open is
   found by the next attempt.

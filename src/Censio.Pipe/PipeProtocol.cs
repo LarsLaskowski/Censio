@@ -38,9 +38,7 @@ public static class PipeProtocol
     /// <returns><see langword="true"/> when the version lies within the supported range</returns>
     public static bool IsSupported(int version)
     {
-#pragma warning disable RH2003, S1172 // Skeleton: removed with the implementation
-        throw new NotImplementedException();
-#pragma warning restore RH2003, S1172 // Skeleton: removed with the implementation
+        return version is >= OldestSupportedVersion and <= NewestSupportedVersion;
     }
 
     #endregion // Methods

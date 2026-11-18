@@ -5,7 +5,8 @@ byte layout and the reader's rules are in [`areas/pipe.md`](areas/pipe.md); this
 
 Sources:
 
-- The reference reader of Ubisoft (read on 2026-11-01) and a third-party capture (`Dealwatch/Tabularium117`, its own
+- The reference reader of Ubisoft (read on 2026-11-01, and again at commit
+  `4cc8ad78d63b33855b4b35dd002380fc466e4b1d` on 2026-11-18, which names protocol version 3) and a third-party capture (`Dealwatch/Tabularium117`, its own
   `docs/protocol.md`, not this file).
 - One recording of Censio's own Companion of 2026-11-07: about 90 minutes, two loads of a game, one connection, 794
   frames (1 version, 2 session starts, 2 session ends, 789 island frames). It is the source of every section below
@@ -28,7 +29,8 @@ no island frame has trailing bytes, and no float is NaN.
 
 ### Version
 
-- Payload: the protocol version. *Confirmed*: `2`, the first frame of the connection, sent once.
+- Payload: the protocol version. *Confirmed*: `2`, the first frame of the connection, sent once. Version `3`: *confirmed*
+  by the Companion's log on build `26.39954.4.58957` (2026-11-18, `received version 3`; not in a recording).
 
 ### SessionStart
 
@@ -72,6 +74,13 @@ One island per frame; the frames of one tick follow each other. *Confirmed*: 789
   productivity are 0 and the building map is empty; so is the workforce map.
 - *Confirmed*: no entry has a NaN, a duplicate map GUID or a non-ASCII name byte; the average productivity stays
   between 0 and 435.
+
+### TradeRoutes and ItemOffers
+
+- Types 4 and 5 of protocol version 3. *Assumed* (reference at commit `4cc8ad7`, not yet seen in a recording): the
+  payload starts with an int32 count (routes; traders), followed by nested data with strings (route name, folder) and
+  further counts. The reader checks the leading count only and skips the rest ([`areas/pipe.md`](areas/pipe.md),
+  *Message types*).
 
 ## Timing
 

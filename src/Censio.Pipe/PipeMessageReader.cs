@@ -53,7 +53,7 @@ public sealed class PipeMessageReader : IPipeMessageSource
             return parsed;
         }
 
-        if (version.Version == PipeProtocol.OldestSupportedVersion)
+        if (PipeProtocol.IsSupported(version.Version))
         {
             _supported = true;
             _mismatchVersion = null;
@@ -68,7 +68,7 @@ public sealed class PipeMessageReader : IPipeMessageSource
                                         {
                                             Kind = PipeErrorKind.ProtocolMismatch,
                                             ReceivedVersion = version.Version,
-                                            ExpectedVersion = PipeProtocol.OldestSupportedVersion
+                                            ExpectedVersion = PipeProtocol.NewestSupportedVersion
                                         });
     }
 
@@ -97,7 +97,7 @@ public sealed class PipeMessageReader : IPipeMessageSource
                                             {
                                                 Kind = PipeErrorKind.ProtocolMismatch,
                                                 ReceivedVersion = _mismatchVersion,
-                                                ExpectedVersion = PipeProtocol.OldestSupportedVersion,
+                                                ExpectedVersion = PipeProtocol.NewestSupportedVersion,
                                                 TypeValue = typeValue
                                             });
         }
