@@ -515,6 +515,99 @@ public sealed class RegionIslandsTests
     }
 
     /// <summary>
+    /// A change of the region or the profile in the address cancels the held trend read of the earlier address and reads the
+    /// trends of the new one, whose sparkline is drawn.
+    /// </summary>
+    /// <param name="profile">The profile of the new address</param>
+    /// <param name="session">The session of the new address</param>
+    /// <param name="expectedIsland">The island the new read asks for</param>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC5")]
+    [DataRow("11111111-1111-4111-8111-111111111111", "6627", "6627/1/0", DisplayName = "Other region")]
+    [DataRow("22222222-2222-4222-8222-222222222222", "3245", "3245/3/0", DisplayName = "Other profile")]
+    public async Task RegionIslandsAddressChangeCancelsTrendReadAndReadsNewAddress(string profile, string session, string expectedIsland)
+    {
+        // Arrange
+        var fake = new FakeHistoryTrends
+                   {
+                       IslandsTrend = CreateIslandsTrend(new Dictionary<HistoryIslandKey, long[]>
+                                                         {
+                                                             [_alpha] = [3, 2, 1],
+                                                             [new HistoryIslandKey(OtherSession, 1, 0)] = [1, 2, 3],
+                                                             [new HistoryIslandKey(Session, 3, 0)] = [1, 2, 3]
+                                                         })
+                   };
+
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken, trends: fake);
+
+        await host.StoreTicksAsync(PageTestHost.Tick(_profile,
+                                                     0,
+                                                     PageTestHost.Island(Session, 1, "Alpha", PageTestHost.Entry(1, 1f, 1f, 0.5f, 1, 100f)),
+                                                     PageTestHost.Island(OtherSession, 1, "Other", PageTestHost.Entry(1, 1f, 1f, 0.5f, 1, 100f))),
+                                   PageTestHost.Tick(_otherProfile, 0, PageTestHost.Island(Session, 3, "Gamma", PageTestHost.Entry(1, 1f, 1f, 0.5f, 1, 100f))));
+
+        fake.HoldRowTrends();
+
+        var page = RenderSession(host, UiLanguage.English);
+
+        await fake.WaitForRowTrendCallsAsync(1, PageTestHost.WaitBound, TestContext.CancellationToken);
+
+        // Act
+        page.Render(parameters => parameters.Add(component => component.Profile, profile)
+                                            .Add(component => component.Session, session));
+
+        // Assert
+        await fake.WaitForCancelledAsync(1, PageTestHost.WaitBound, TestContext.CancellationToken);
+        await fake.WaitForRowTrendCallsAsync(2, PageTestHost.WaitBound, TestContext.CancellationToken);
+
+        fake.ReleaseRowTrends();
+
+        await page.WaitForAssertionAsync(() => Assert.AreSequenceEqual(PageTestHost.Expect(ExpectedPath(1, 2, 3)), Paths(page), "The sparkline of the new address should be drawn"), PageTestHost.WaitBound);
+
+        var query = fake.IslandsQueries[1];
+
+        Assert.AreEqual(Guid.Parse(profile), query.ProfileId, "The new read should be of the new address's profile");
+        Assert.AreSequenceEqual(PageTestHost.Expect(expectedIsland), Describe(query.Islands), "The new read should ask for the islands of the new address");
+        Assert.HasCount(2, fake.IslandsQueries, "The address change should read the trends once more");
+        Assert.AreEqual(1, fake.CancelledCount, "Only the trend read of the earlier address should be cancelled");
+    }
+
+    /// <summary>
+    /// A change of the address to a region the profile lacks cancels the held trend read of the earlier address at once and
+    /// reads no trends.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC5")]
+    public async Task RegionIslandsAddressOfUnknownRegionCancelsTrendRead()
+    {
+        // Arrange
+        var fake = new FakeHistoryTrends();
+
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken, trends: fake);
+
+        await host.StoreTicksAsync(PageTestHost.Tick(_profile, 0, PageTestHost.Island(Session, 1, "Alpha", PageTestHost.Entry(1, 1f, 1f, 0.5f, 1, 100f))));
+
+        fake.HoldRowTrends();
+
+        var page = RenderSession(host, UiLanguage.English);
+
+        await fake.WaitForRowTrendCallsAsync(1, PageTestHost.WaitBound, TestContext.CancellationToken);
+
+        // Act
+        page.Render(parameters => parameters.Add(component => component.Session, "9999"));
+
+        // Assert
+        await fake.WaitForCancelledAsync(1, PageTestHost.WaitBound, TestContext.CancellationToken);
+        await Task.Delay(NegativeWaitMilliseconds, TestContext.CancellationToken);
+
+        Assert.AreEqual(1, fake.CancelledCount, "The trend read of the earlier address should be cancelled once");
+        Assert.AreEqual(1, fake.RowTrendCallCount, "An address of a region the profile lacks should read no trends");
+        Assert.IsEmpty(page.FindAll(SparklineSelector), "An address of a region the profile lacks should draw no sparkline");
+    }
+
+    /// <summary>
     /// Creates an islands trend of points two minutes apart that end at the latest tick, each with the buildings of every
     /// island at its index.
     /// </summary>

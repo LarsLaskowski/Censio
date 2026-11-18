@@ -4,8 +4,8 @@ namespace Censio.Server.Tests;
 
 /// <summary>
 /// An <see cref="IHistoryTrends" /> of trends set by the test: it records each query, counts the reads in flight and the
-/// most that ran at once, can hold every read or only the row trend reads (goods and islands) until released, and can fail
-/// every read or one kind of read.
+/// most that ran at once, can hold every read or only the row trend reads (goods and islands) until released, can let a
+/// held read ignore its cancellation, and can fail every read or one kind of read.
 /// </summary>
 public sealed class FakeHistoryTrends : IHistoryTrends
 {
@@ -129,6 +129,12 @@ public sealed class FakeHistoryTrends : IHistoryTrends
     /// follow it.
     /// </summary>
     public Exception? IslandsFailure { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value that indicates whether a held read ignores its cancellation and returns its trend once released,
+    /// like a store read that completes after its caller gave up.
+    /// </summary>
+    public bool IsIgnoringCancellation { get; set; }
 
     /// <summary>
     /// Gets the queries of the good reads, in the order they started.
@@ -360,13 +366,25 @@ public sealed class FakeHistoryTrends : IHistoryTrends
     }
 
     /// <summary>
-    /// Waits until a count of started reads reaches a number.
+    /// Waits until a number of reads have ended by cancellation, also when no render follows the cancellation.
+    /// </summary>
+    /// <param name="count">The number of cancelled reads</param>
+    /// <param name="timeout">The longest to wait</param>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>A task that completes when the reads have been cancelled</returns>
+    public Task WaitForCancelledAsync(int count, TimeSpan timeout, CancellationToken cancellationToken)
+    {
+        return WaitForCountAsync(() => CancelledCount, count, timeout, cancellationToken);
+    }
+
+    /// <summary>
+    /// Waits until a count of reads reaches a number.
     /// </summary>
     /// <param name="current">Gives the current count</param>
     /// <param name="count">The number of reads</param>
     /// <param name="timeout">The longest to wait</param>
     /// <param name="cancellationToken">The cancellation token</param>
-    /// <returns>A task that completes when the reads have started</returns>
+    /// <returns>A task that completes when the count is reached</returns>
     private static async Task WaitForCountAsync(Func<int> current, int count, TimeSpan timeout, CancellationToken cancellationToken)
     {
         var deadline = TimeProvider.System.GetUtcNow() + timeout;
@@ -375,7 +393,7 @@ public sealed class FakeHistoryTrends : IHistoryTrends
         {
             if (TimeProvider.System.GetUtcNow() > deadline)
             {
-                throw new TimeoutException($"Only {current()} of {count} reads started");
+                throw new TimeoutException($"Only {current()} of {count} reads counted");
             }
 
             await Task.Delay(10, cancellationToken).ConfigureAwait(false);
@@ -420,7 +438,7 @@ public sealed class FakeHistoryTrends : IHistoryTrends
 
         try
         {
-            await Task.WhenAll(release.Task, rowTrendRelease.Task).WaitAsync(cancellationToken).ConfigureAwait(false);
+            await Task.WhenAll(release.Task, rowTrendRelease.Task).WaitAsync(IsIgnoringCancellation ? CancellationToken.None : cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {

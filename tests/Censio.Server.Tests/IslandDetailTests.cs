@@ -1212,6 +1212,127 @@ public sealed class IslandDetailTests
     }
 
     /// <summary>
+    /// An island page that shows the no-values text instead of the goods table has no trend cells and reads no trends.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC2")]
+    public async Task IslandDetailWithoutValuesReadsNoTrends()
+    {
+        // Arrange
+        var fake = new FakeHistoryTrends
+                   {
+                       FiguresTrend = CreateFiguresTrend(3),
+                       GoodsTrend = CreateGoodsTrend(new Dictionary<int, double[]>
+                                                     {
+                                                         [1001] = [1, 2, 3]
+                                                     })
+                   };
+
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken, trends: fake);
+
+        await StoreIslandAsync(host, "Isle A", PageTestHost.Entry(1001, 1f, 1f, 3f, 1, 100f));
+        await host.StoreTicksAsync(PageTestHost.Tick(_profile, 10));
+
+        // Act
+        var page = RenderIsland(host, UiLanguage.English);
+
+        // Assert
+        await page.WaitForAssertionAsync(() => Assert.HasCount(1, page.FindAll(ChartSelector), "The overview chart should be drawn"), PageTestHost.WaitBound);
+        await Task.Delay(NegativeWaitMilliseconds, TestContext.CancellationToken);
+
+        Assert.Contains("No values for this island in the latest tick.", PageTestHost.Text(page), "The page should show the no-values text");
+        Assert.IsEmpty(TrendCells(page), "A page without values should have no trend cells");
+        Assert.AreEqual(0, fake.RowTrendCallCount, "A page without values should read no trends");
+    }
+
+    /// <summary>
+    /// An overview read that ends normally after the page moved to another island is dropped: it reads no trends of the
+    /// island left behind.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC5")]
+    public async Task IslandDetailOverviewReadEndingAfterAddressChangeReadsNoTrends()
+    {
+        // Arrange
+        var fake = new FakeHistoryTrends
+                   {
+                       FiguresTrend = CreateFiguresTrend(3),
+                       GoodsTrend = CreateGoodsTrend(new Dictionary<int, double[]>
+                                                     {
+                                                         [1001] = [1, 2, 3]
+                                                     }),
+                       IsIgnoringCancellation = true
+                   };
+
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken, trends: fake);
+
+        await host.StoreTicksAsync(PageTestHost.Tick(_profile,
+                                                     -10,
+                                                     PageTestHost.Island(Session, 1, "Isle A", PageTestHost.Entry(1001, 1f, 1f, 3f, 1, 100f)),
+                                                     PageTestHost.Island(Session, 2, "Isle B", PageTestHost.Entry(1002, 1f, 1f, 3f, 1, 100f))),
+                                   PageTestHost.Tick(_profile, 0, PageTestHost.Island(Session, 1, "Isle A", PageTestHost.Entry(1001, 1f, 1f, 3f, 1, 100f))));
+
+        fake.Hold();
+
+        var page = RenderIsland(host, UiLanguage.English);
+
+        await fake.WaitForFiguresCallsAsync(1, PageTestHost.WaitBound, TestContext.CancellationToken);
+
+        page.Render(parameters => parameters.Add(component => component.Island, "2"));
+
+        // Act
+        fake.Release();
+
+        // Assert
+        await fake.WaitForFiguresCallsAsync(2, PageTestHost.WaitBound, TestContext.CancellationToken);
+        await page.WaitForAssertionAsync(() => Assert.HasCount(1, page.FindAll(ChartSelector), "The chart of the other island should be drawn"), PageTestHost.WaitBound);
+        await Task.Delay(NegativeWaitMilliseconds, TestContext.CancellationToken);
+
+        Assert.AreEqual("Isle B", page.Find("h1").TextContent.Trim(), "The page should show the other island");
+        Assert.HasCount(2, fake.FiguresQueries, "Each island should read its overview once");
+        Assert.AreEqual(0, fake.CancelledCount, "The overview read of the island left behind should end normally");
+        Assert.AreEqual(0, fake.RowTrendCallCount, "The overview read of the island left behind should read no trends");
+    }
+
+    /// <summary>
+    /// An axis choice after the trends were read reads no trends, and the shown sparklines stay.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC6")]
+    public async Task IslandDetailAxisChoiceReadsNoTrends()
+    {
+        // Arrange
+        var fake = new FakeHistoryTrends
+                   {
+                       FiguresTrend = CreateFiguresTrend(3),
+                       GoodsTrend = CreateGoodsTrend(new Dictionary<int, double[]>
+                                                     {
+                                                         [1001] = [1, 2, 3]
+                                                     })
+                   };
+
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken, trends: fake);
+
+        await StoreIslandAsync(host, "Isle A", PageTestHost.Entry(1001, 1f, 1f, 3f, 1, 100f));
+
+        var layout = RenderIslandInFrame(host);
+
+        await layout.WaitForAssertionAsync(() => Assert.HasCount(1, layout.FindAll(SparklineSelector), "The sparkline should be drawn"), PageTestHost.WaitBound);
+
+        // Act
+        await PageTestHost.ChooseAsync(layout, "Time axis", "Game time");
+
+        // Assert
+        await Task.Delay(NegativeWaitMilliseconds, TestContext.CancellationToken);
+
+        Assert.AreEqual(1, fake.RowTrendCallCount, "An axis choice should read no trends");
+        Assert.AreSequenceEqual(PageTestHost.Expect(ExpectedPath(1, 2, 3)), Paths(layout), "The shown sparkline should stay");
+    }
+
+    /// <summary>
     /// Stores a tick with the shown island (session 3245, island 1, area 0).
     /// </summary>
     /// <param name="host">The host</param>

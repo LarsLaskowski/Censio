@@ -80,7 +80,7 @@ their file or folder and what they stand in for; their behavior is read in their
 - `RecordingLogger` (`tests/Censio.Server.Tests/RecordingLogger.cs`, linked into the Companion and Server.Data tests) and `ConcurrentRecordingLogger` (`tests/Censio.Server.Tests/ConcurrentRecordingLogger.cs`) — `ILogger`s that keep every entry, the second from any thread.
 - `ExtendedMigrationsAssembly` (`tests/Censio.Server.Data.Tests/`) — an `IMigrationsAssembly` of the real migrations plus test ones, for a test-only schema history.
 - `FakeProfileStateSource` (`tests/Censio.Server.Tests/FakeProfileStateSource.cs`) — an `IProfileStateSource` of held and stored states.
-- `FakeHistoryTrends` (`tests/Censio.Server.Tests/FakeHistoryTrends.cs`) — an `IHistoryTrends` whose reads can be held, fail and are recorded.
+- `FakeHistoryTrends` (`tests/Censio.Server.Tests/FakeHistoryTrends.cs`) — an `IHistoryTrends` whose reads can be held, fail, ignore their cancellation and are recorded.
 - `HeldTimerTimeProvider` (`tests/Censio.Server.Tests/HeldTimerTimeProvider.cs`) — a `FakeTimeProvider` whose timer callbacks run only by hand, also after disposal (a late thread-pool callback).
 - `BlockingClockTimeProvider` (`tests/Censio.Server.Tests/BlockingClockTimeProvider.cs`) — a `FakeTimeProvider` whose first clock read blocks until released.
 - `ChunkedStream` and `ChunkedClockStream` (`tests/Censio.Pipe.Tests/`) — chunked streams: read-only with faults for the frame reader, and for record-and-replay round trips.
