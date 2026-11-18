@@ -46,6 +46,16 @@ public sealed class SparklineLoaderTests
     /// </summary>
     private int _changedCount;
 
+    /// <summary>
+    /// The number of times the change report of a test's first request was called.
+    /// </summary>
+    private int _firstChangedCount;
+
+    /// <summary>
+    /// The number of times the throwing change report was called.
+    /// </summary>
+    private int _throwingChangedCount;
+
     #endregion // Fields
 
     #region Constructors
@@ -306,6 +316,102 @@ public sealed class SparklineLoaderTests
     }
 
     /// <summary>
+    /// A change report that throws, as one of a page whose circuit is gone, ends the run without escaping: the answer stays
+    /// held, the address is not marked failed, and a later request with a new as-of time reads again.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC6")]
+    public async Task SparklineLoaderThrowingChangedEndsRunAndNextRequestReads()
+    {
+        // Arrange
+        using var loader = new SparklineLoader<int>();
+
+        var firstRead = ReadOf();
+        var laterRead = ReadOf();
+
+        // Act
+        loader.Request(_address, _asOf, Read("first", Answered(firstRead)), ThrowingChanged);
+
+        var reported = await WaitUntilAsync(() => Volatile.Read(ref _throwingChangedCount) == 1);
+
+        await Task.Delay(NegativeWaitMilliseconds, TestContext.CancellationToken);
+
+        var heldAfterThrow = loader.HeldFor(_address);
+        var failedAfterThrow = loader.IsFailedFor(_address);
+
+        loader.Request(_address, _asOf.AddMinutes(2), Read("later", Answered(laterRead)), Changed);
+
+        var laterHeld = await WaitUntilAsync(() => ReferenceEquals(loader.HeldFor(_address), laterRead));
+
+        // Assert
+        Assert.IsTrue(reported, "The answer should be reported to the throwing change report");
+        Assert.AreSame(firstRead, heldAfterThrow, "The answer should stay held after the change report threw");
+        Assert.IsFalse(failedAfterThrow, "A throwing change report should not mark the address failed");
+        Assert.IsTrue(laterHeld, "A later request with a new as-of time should read again and hold its answer");
+        Assert.AreSequenceEqual(ExpectedLabels("first", "later"), _calls.Select(call => call.Label), "The later request should start one more read");
+    }
+
+    /// <summary>
+    /// A read that ignores its cancellation and answers after an address change or after the disposal stores nothing for
+    /// either address and never calls the change report of its own request.
+    /// </summary>
+    /// <param name="dispose">Whether the loader is disposed instead of asked for another address</param>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC6")]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task SparklineLoaderReadIgnoringCancellationStoresNothingAndSkipsChanged(bool dispose)
+    {
+        // Arrange
+        using var loader = new SparklineLoader<int>();
+
+        var answer = Answer();
+
+        loader.Request(_address, _asOf, ReadIgnoringToken("first", answer), FirstChanged);
+
+        var started = await WaitUntilAsync(() => _calls.Count == 1);
+
+        // Act
+        Interrupt(loader, dispose);
+        answer.SetResult(ReadOf());
+
+        await Task.Delay(NegativeWaitMilliseconds, TestContext.CancellationToken);
+
+        // Assert
+        Assert.IsTrue(started, "The request should start a read");
+        Assert.IsNull(loader.HeldFor(_address), "The late answer should not be held for its address");
+        Assert.IsNull(loader.HeldFor(_otherAddress), "The late answer should not be held for the other address");
+        Assert.AreEqual(0, Volatile.Read(ref _firstChangedCount), "The change report of the interrupted request should not be called");
+    }
+
+    /// <summary>
+    /// A second disposal does nothing, and a request after the disposal starts no read.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC6")]
+    public async Task SparklineLoaderDisposeTwiceDoesNothing()
+    {
+        // Arrange
+        var loader = new SparklineLoader<int>();
+
+        loader.Dispose();
+
+        // Act
+        loader.Dispose();
+        loader.Request(_address, _asOf, Read("after", Answered(ReadOf())), Changed);
+
+        await Task.Delay(NegativeWaitMilliseconds, TestContext.CancellationToken);
+
+        // Assert
+        Assert.IsEmpty(_calls, "A request after the disposal should start no read");
+        Assert.IsNull(loader.HeldFor(_address), "A disposed loader should hold nothing");
+        Assert.AreEqual(0, Volatile.Read(ref _changedCount), "A disposed loader should report no change");
+    }
+
+    /// <summary>
     /// Gives the labels of the reads a test expects, in their order.
     /// </summary>
     /// <param name="labels">The labels</param>
@@ -377,6 +483,46 @@ public sealed class SparklineLoaderTests
         source.SetCanceled();
 
         return source;
+    }
+
+    /// <summary>
+    /// Interrupts the read in flight: by disposing the loader, or by a request for the other address whose read never
+    /// answers.
+    /// </summary>
+    /// <param name="loader">The loader</param>
+    /// <param name="dispose">Whether to dispose the loader</param>
+    private void Interrupt(SparklineLoader<int> loader, bool dispose)
+    {
+        if (dispose)
+        {
+            loader.Dispose();
+
+            return;
+        }
+
+        loader.Request(_otherAddress, _asOf, Read("other", Answer()), Changed);
+    }
+
+    /// <summary>
+    /// Reports a change of the first request of a test.
+    /// </summary>
+    /// <returns>A completed task</returns>
+    private Task FirstChanged()
+    {
+        Interlocked.Increment(ref _firstChangedCount);
+
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Reports a change and throws, as a page whose circuit is gone does.
+    /// </summary>
+    /// <returns>Never returns</returns>
+    private Task ThrowingChanged()
+    {
+        Interlocked.Increment(ref _throwingChangedCount);
+
+        throw new InvalidOperationException("The page's circuit is gone");
     }
 
     /// <summary>

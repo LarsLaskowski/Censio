@@ -167,8 +167,11 @@ public sealed partial class SparklineBuilderTests
         // Arrange
         var samples = MaxPointSamples();
         var culture = CultureInfo.CurrentCulture;
+        var decimalComma = (CultureInfo)CultureInfo.InvariantCulture.Clone();
 
-        CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("de-DE");
+        decimalComma.NumberFormat.NumberDecimalSeparator = ",";
+        decimalComma.NumberFormat.NumberGroupSeparator = ".";
+        CultureInfo.CurrentCulture = decimalComma;
 
         // Act
         SparklineView? line;
