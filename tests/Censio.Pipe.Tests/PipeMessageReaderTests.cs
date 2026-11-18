@@ -616,7 +616,9 @@ public sealed class PipeMessageReaderTests
     /// <returns>The task</returns>
     [TestMethod]
     [TestCategory("AC6")]
-    [DataRow("long-session.jsonl", "Version=1 SessionStart=2 SessionEnd=2 AreaProductionStatistics=789 Error=0 entries=21091")]
+    [TestCategory("AC7")]
+    [DataRow("long-session.jsonl", "Version=1 SessionStart=2 SessionEnd=2 AreaProductionStatistics=789 TradeRoutes=0 ItemOffers=0 Error=0 entries=21091")]
+    [DataRow("protocol-3-session.jsonl", "Version=1 SessionStart=1 SessionEnd=1 AreaProductionStatistics=101 TradeRoutes=5 ItemOffers=4 Error=0 entries=2752")]
     public async Task PipeMessageReaderFixturesGiveReadmeFrameCounts(string fixture, string expected)
     {
         // Arrange
@@ -633,7 +635,8 @@ public sealed class PipeMessageReaderTests
     }
 
     /// <summary>
-    /// Counts the read results by message type, the errors and the production entries.
+    /// Counts the read results by message type (trade routes and item offers included), the errors and the production
+    /// entries.
     /// </summary>
     /// <param name="results">The results</param>
     /// <returns>The counts as text</returns>
@@ -648,7 +651,7 @@ public sealed class PipeMessageReaderTests
         var entries = results.Select(result => result.Message).OfType<AreaProductionStatisticsMessage>().Sum(message => message.Entries.Count);
 
         return string.Create(CultureInfo.InvariantCulture,
-                             $"Version={Count(PipeMessageType.Version)} SessionStart={Count(PipeMessageType.SessionStart)} SessionEnd={Count(PipeMessageType.SessionEnd)} AreaProductionStatistics={Count(PipeMessageType.AreaProductionStatistics)} Error={errors} entries={entries}");
+                             $"Version={Count(PipeMessageType.Version)} SessionStart={Count(PipeMessageType.SessionStart)} SessionEnd={Count(PipeMessageType.SessionEnd)} AreaProductionStatistics={Count(PipeMessageType.AreaProductionStatistics)} TradeRoutes={Count(PipeMessageType.TradeRoutes)} ItemOffers={Count(PipeMessageType.ItemOffers)} Error={errors} entries={entries}");
     }
 
     /// <summary>
