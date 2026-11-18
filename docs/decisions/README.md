@@ -155,4 +155,5 @@ once in the [area document](../areas/README.md) of the record's area, and the re
 | [0091](0091-row-trends-show-delta-and-buildings-over-a-fixed-four-hours.md) | Row trends show delta and buildings over a fixed four hours, at every point | Accepted | 2026-11-18 |
 | [0092](0092-row-trends-read-once-per-table-in-island-point-parts.md) | Row trends are read once per table, in parts of 240 island points | Accepted | 2026-11-18 |
 | [0093](0093-sparklines-drawn-as-one-svg-path-of-our-own.md) | Sparklines are drawn as one SVG path of our own | Accepted | 2026-11-18 |
+| [0094](0094-pipe-reader-accepts-protocol-versions-2-and-3-and-skips-trade-routes-and-item-offers.md) | The pipe reader accepts protocol versions 2 and 3 and skips trade routes and item offers undecoded | Proposed | 2026-11-18 |
 <!-- project:end index -->
