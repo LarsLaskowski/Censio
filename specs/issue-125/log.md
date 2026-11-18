@@ -29,3 +29,4 @@ are quoted in full.
 | 2026-11-18 17:47 | 8 Review verbatim | Orchestrator | [NON-BLOCKING, verbatim] applied docs/decisions/0094-*.md (Con: island layout rests on the reference and one real recording), commit e0f84d5; stamp PASS (verbatim) |
 | 2026-11-18 17:49 | 7 Gate stamp | Orchestrator | PASS on 08bb6643c368f326e24909a0dd5922f7961bda55 (tier security, verbatim): Format check pass; decision-check.py pass; scope-check.py pass |
 | 2026-11-18 17:50 | 9 PR approval | Orchestrator | approved by checklist; record 0094 set to Accepted, stamped (verbatim) |
+| 2026-11-18 17:50 | 10 Pull request | Orchestrator | working record posted on #125 (plan and log as permalinks to 54da512); follow-up issue #221; PR opened as draft |
