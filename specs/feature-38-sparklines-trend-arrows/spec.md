@@ -1,7 +1,7 @@
 # Spec: Sparklines and trend arrows in tables
 
 Source: Issue #38
-Status: Draft
+Status: Approved by Lead
 
 ## Problem
 
@@ -17,9 +17,10 @@ rising needs a chart, one row at a time. The issue asks for every row's trend at
 - S2: When the player opens a region's island list, the table has a column `Trend` / `Trend` after `Buildings`: per row a
   sparkline of the island's buildings at the points and figures of its overview chart, and an arrow.
 - S3: The window is a fixed `Last 4 hours`, by the start rule of the charts' ranges: from the start of the UTC hour that
-  holds the latest tick's receive time minus 4 hours, up to and including that tick (so 4 to 5 hours; at the recorded
-  spacing of about 120 s between ticks, [`protocol.md`](../../docs/protocol.md), about 120 to 150 points). It ignores
-  the range picker and the time-axis switch (always real time). The column heading's tooltip: `Last 4 hours up to the latest tick` / `Letzte 4 Stunden bis zum letzten Tick`.
+  holds the latest tick's receive time minus 4 hours, up to and including that tick (4 to 5 hours, about 120 to 150
+  ticks at the game's 120 s, [`protocol.md`](../../docs/protocol.md)), whatever the range picker and the time-axis switch
+  say (always real time). The column heading's tooltip: `Last 4 hours up to the latest tick` / `Letzte 4 Stunden bis zum
+  letzten Tick`.
 - S4: The arrow compares the newest point of the sparkline that has a value with the oldest one that has a value, each
   rounded as the table rounds that value (delta to two decimals, midpoint away from zero; buildings to a whole number):
   newer higher is `↑` named `Rising` / `Steigend`, lower is `↓` named `Falling` / `Fallend`, equal is `→` named `Stable` /
@@ -49,12 +50,12 @@ rising needs a chart, one row at a time. The issue asks for every row's trend at
 
 ## Non-functional requirements
 
-- N1: The table and its figures appear as fast as today: they never wait for the trends. One table's trends, on opening
-  and on each refresh, are one read for all its rows (all shown goods of the island; all islands of the region), not one
-  per row, of at most two read transactions in the charts' trend gate: the times and one part of at most 240 points. A
-  refresh holds the gate (and, in memory, the ingest) no longer than one region part of a chart read at the bounds
-  (about 0.3 to 0.5 s warm, [`history.md`](../../docs/areas/history.md), *Measurements*). On an island page the overview chart is read first, then the trends; a failure of one
-  does not skip the other.
+- N1: The table and its figures never wait for the trends. One table's trends, on opening and on each refresh, are one
+  read for all its rows (all shown goods of the island; all islands of the region), not one per row: in the charts'
+  trend gate, one transaction for the times and then parts, each scanning at most 240 island points (a tick or hourly
+  point of one island), as a part of the island's overview chart does. The goods table takes one part; the island list
+  one part per 240 island points (24 islands by 240 points: 24 parts). On an island page the overview chart is read
+  first, then the trends; a failure of one does not skip the other.
 - N2: A page holds at most 240 points per shown row for its trends: a window with more (a replay faster than about one
   tick per 75 s) shows its newest 240, without a cap line, and the arrow compares the oldest and newest of those; the
   heading tooltip still names 4 hours, which README and user guide state as a limit.
@@ -81,9 +82,9 @@ rising needs a chart, one row at a time. The issue asks for every row's trend at
   warning once; a cancelled read shows and logs nothing (E3, E4, N3).
 - AC6: A stored tick of the page's profile updates the trends without a reload; a tick of another profile, a range or
   axis choice reads nothing for them; a theme or language switch redraws them without a read (S5).
-- AC7: The figures render before the trend read answers; a table's trends, opened or refreshed, are one read of at most
-  two trend-gate transactions, each scanning at most 240 ticks or hourly points, after the overview chart's read on an
-  island page, neither failure skipping the other (N1).
+- AC7: The figures render before the trend read answers; a table's trends, opened or refreshed, are one read: a times
+  transaction and parts of at most 240 island points each in the trend gate, after the overview chart's read on an island
+  page, neither failure skipping the other (N1).
 - AC8: A sparkline is one SVG line of coordinates only (no name, hover point, axis or legend), and its markup at 240
   points is at most 4,000 characters (N7).
 
@@ -98,18 +99,14 @@ rising needs a chart, one row at a time. The issue asks for every row's trend at
 - Which value and window do a row's sparkline and arrow follow? Answered: by the Product Manager, delta (goods) and
   buildings (islands) over a fixed real-time window of 4 hours, not the recommended 24 ("24h ist eventuell zu viel, lass
   uns 4h nehmen"; "Delta und Gebäude").
-- At which resolution? Answered: by the Lead, every point, as the charts' `Points` resolution reads it
-  (`TrendRange.ResolutionOf`). Hourly means give 4 to 5 points over 4 hours, too few for a trend; 15-minute means would
-  need a new resolution in `HistoryStore` for no gain at about 120 to 150 ticks. The newest point is the latest tick,
-  so the sparkline ends at the value its row shows (E8).
+- At which resolution? Answered: by the Lead, every point (the charts' `Points` resolution): hourly means give 4 to 5
+  points, too few; 15-minute means need a new read resolution for no gain at 120 to 150 ticks.
 
 ## Area documents
 
-- `docs/areas/web-charts.md`: a section *Sparklines and trend arrows* (window, points, arrow, texts, states, updates,
-  reads, sizes); *Scope* and *Not here* drop #38.
-- `docs/areas/web-pages.md`: the new `Trend` column of the goods table and the island list; *Not here* drops sparklines.
-- `docs/areas/history.md`: the batch read of N1 under *The trend reads*; its *Scope* and *Not here* lines on #38 point
-  to web-charts.
+- `docs/areas/web-charts.md`: a section *Sparklines and trend arrows*; *Scope* and *Not here* drop #38.
+- `docs/areas/web-pages.md`: the `Trend` column of both tables; *Not here* drops sparklines.
+- `docs/areas/history.md`: N1's batch reads under *The trend reads*; *Scope* and *Not here* drop #38.
 - `README.md` (lines 22 and 204): the limit "no sparklines or trend arrows (#38)" gives way to the trend column, its
   window and the 240-point limit of a fast replay.
 - `docs/USER_GUIDE.md`, English and German: the pages item describes the column; *Latest data only* (line 441, "the one
@@ -121,7 +118,10 @@ rising needs a chart, one row at a time. The issue asks for every row's trend at
   all its rows, of at most two transactions in the trend gate, with the time it holds the gate at the bounds, and fix the
   order on the island page (overview chart first, `IslandDetail.razor.cs` `ReadDetailsAsync`). Today's reads are one
   good or one island each (`TrendReader.ReadGoodAsync`, `ReadFiguresAsync`), so this needs a new batch read; the
-  `history.md` line under *Area documents* is now mandatory.
+  `history.md` line under *Area documents* is now mandatory. Amended while planning: an island-list part of 240 ticks
+  would scan every entry of every island of the region (up to 256 islands of 512 entries per tick, about 30 s a part at
+  the bounds), so N1 and AC7 bound a part by 240 island points, the scan of an overview chart's part, instead of two
+  transactions.
 - M2 (render size and memory): accepted. N7 and AC8 fix the markup (one SVG line, coordinates only, not MudBlazor's
   chart) and a per-row size a unit test pins; the plan measures the batch and heap at 500 rows by 240 points.
 - m1 (README, user guide): accepted; both are under *Area documents* with their passages.
