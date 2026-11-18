@@ -124,6 +124,7 @@ internal sealed class PipeFrameAnonymiser
                           VersionMessage version => WriteVersion(version),
                           SessionStartMessage start => WriteSessionStart(start),
                           AreaProductionStatisticsMessage area => WriteIsland(frame, area),
+                          UndecodedMessage undecoded => [(byte)undecoded.MessageType, 0, 0, 0, 0],
                           _ => [(byte)PipeMessageType.SessionEnd]
                       };
 
@@ -493,7 +494,7 @@ internal sealed class PipeFrameAnonymiser
 
         if (message is VersionMessage version)
         {
-            _supported = version.Version == PipeProtocol.SupportedVersion;
+            _supported = PipeProtocol.IsSupported(version.Version);
 
             return true;
         }

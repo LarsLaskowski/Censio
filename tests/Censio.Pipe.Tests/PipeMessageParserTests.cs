@@ -266,11 +266,12 @@ public sealed class PipeMessageParserTests
     }
 
     /// <summary>
-    /// A type byte above 3 gives the unknown-type error with the value.
+    /// A type byte above 5 gives the unknown-type error with the value.
     /// </summary>
     /// <param name="type">The type byte</param>
     [TestMethod]
-    [DataRow((byte)4)]
+    [TestCategory("AC2")]
+    [DataRow((byte)6)]
     [DataRow((byte)255)]
     public void PipeMessageParserUnknownTypeReturnsUnknownType(byte type)
     {
@@ -284,6 +285,102 @@ public sealed class PipeMessageParserTests
         Assert.AreEqual(PipeReadResultKind.Error, result.Kind, "An unknown type should give an error");
         Assert.AreEqual(PipeErrorKind.UnknownType, result.Error?.Kind, "The error should be an unknown type");
         Assert.AreEqual(type, result.Error?.TypeValue, "The error should carry the type value");
+    }
+
+    /// <summary>
+    /// A trade-route or item-offer frame with a count that is not negative gives an undecoded message of its type,
+    /// whatever follows the count.
+    /// </summary>
+    /// <param name="type">The type byte</param>
+    /// <param name="count">The count, followed by as many entries in the reference layout</param>
+    [TestMethod]
+    [TestCategory("AC2")]
+    [DataRow((byte)4, 0)]
+    [DataRow((byte)4, 1)]
+    [DataRow((byte)5, 0)]
+    [DataRow((byte)5, 1)]
+    public void PipeMessageParserTradeRoutesOrItemOffersReturnsUndecodedMessage(byte type, int count)
+    {
+        // Arrange
+        var frame = new PipeFrameBuilder().Byte(type).Int32Value(count).UndecodedEntries(type, count).Build();
+
+        // Act
+        var message = ParseMessage<UndecodedMessage>(frame);
+
+        // Assert
+        Assert.AreEqual((PipeMessageType)type, message.MessageType, $"The undecoded message should carry type {type}");
+    }
+
+    /// <summary>
+    /// The consumed length of a trade-route or item-offer frame ends behind its count: the entries and trailing bytes
+    /// after it are not read.
+    /// </summary>
+    /// <param name="type">The type byte</param>
+    [TestMethod]
+    [TestCategory("AC2")]
+    [DataRow((byte)4)]
+    [DataRow((byte)5)]
+    public void PipeMessageParserTradeRoutesOrItemOffersReportsConsumedAfterCount(byte type)
+    {
+        // Arrange
+        var frame = new PipeFrameBuilder().Byte(type).Int32Value(1).UndecodedEntries(type, 1).Raw(0xAA, 0xBB).Build();
+
+        // Act
+        var result = PipeMessageParser.Parse(frame, out var consumed);
+
+        // Assert
+        Assert.IsInstanceOfType<UndecodedMessage>(result.Message, $"The type {type} frame should give an undecoded message");
+        Assert.AreEqual(5, consumed, "The consumed length should end behind the type byte and the count");
+    }
+
+    /// <summary>
+    /// A trade-route or item-offer frame with fewer than 4 payload bytes gives the malformed-message error at the count.
+    /// </summary>
+    /// <param name="type">The type byte</param>
+    /// <param name="payloadLength">The number of payload bytes</param>
+    [TestMethod]
+    [TestCategory("AC2")]
+    [DataRow((byte)4, 0)]
+    [DataRow((byte)4, 1)]
+    [DataRow((byte)4, 2)]
+    [DataRow((byte)4, 3)]
+    [DataRow((byte)5, 0)]
+    [DataRow((byte)5, 1)]
+    [DataRow((byte)5, 2)]
+    [DataRow((byte)5, 3)]
+    public void PipeMessageParserTradeRoutesOrItemOffersWithoutCountReturnsMalformed(byte type, int payloadLength)
+    {
+        // Arrange
+        var frame = new PipeFrameBuilder().Byte(type).Raw([.. Enumerable.Repeat((byte)0x01, payloadLength)]).Build();
+
+        // Act
+        var error = ParseMalformed(frame);
+
+        // Assert
+        Assert.AreEqual(1, error.Offset, $"The offset should be the position of the count ({payloadLength} payload bytes)");
+    }
+
+    /// <summary>
+    /// A trade-route or item-offer frame with a negative count gives the malformed-message error at the count.
+    /// </summary>
+    /// <param name="type">The type byte</param>
+    /// <param name="count">The negative count</param>
+    [TestMethod]
+    [TestCategory("AC2")]
+    [DataRow((byte)4, -1)]
+    [DataRow((byte)4, int.MinValue)]
+    [DataRow((byte)5, -1)]
+    [DataRow((byte)5, int.MinValue)]
+    public void PipeMessageParserTradeRoutesOrItemOffersNegativeCountReturnsMalformed(byte type, int count)
+    {
+        // Arrange
+        var frame = new PipeFrameBuilder().Byte(type).Int32Value(count).UndecodedEntries(type, 1).Build();
+
+        // Act
+        var error = ParseMalformed(frame);
+
+        // Assert
+        Assert.AreEqual(1, error.Offset, $"The offset should be the position of the count {count}");
     }
 
     /// <summary>

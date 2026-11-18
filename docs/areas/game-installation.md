@@ -57,8 +57,8 @@ Steam is not searched. A player with another copy (Steam) names the folder in th
 The build is the file version of `bin\win64\anno117.exe` as four numbers `Major.Minor.Build.Revision`, for example
 `26.29905.4.51797`, not the version the game's main menu shows (`3.0.1733841` on the same installation). A file that
 cannot be read, has no version or has all four numbers zero gives the build *unknown*; the installation is still
-used. The same file version gives the same text at every start. Not verified: that the file version changes with
-every game update.
+used. The same file version gives the same text at every start. The file version changes with a game update: the build went from `26.29905.4.51797` to `26.39954.4.58957` while the
+main-menu version went from `3.0.1733841` to `3.0.1.1743890` (Product Manager, 2026-11-18).
 
 The build is read again at each later check of the catalog, at a new pipe connection ([`game-catalog-cache.md`](game-catalog-cache.md)): only the file version of the program file of the installation found at the start, not a new search. The
 `Game:` line then shows the build read last, the next time the menu is opened; no log line is written. A build that cannot be read

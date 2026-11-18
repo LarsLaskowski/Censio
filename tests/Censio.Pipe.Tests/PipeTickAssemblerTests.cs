@@ -494,8 +494,11 @@ public sealed class PipeTickAssemblerTests
     /// <returns>The task</returns>
     [TestMethod]
     [TestCategory("AC6")]
+    [TestCategory("AC7")]
     [DataRow("long-session.jsonl",
              "items=Version,RepeatedSessionEnd,SessionStart,Tick x32,SessionEnd,SessionStart,Tick x1,EndOfStream ticks=33 GameTimeChanged=1 QuietPeriod=31 StreamEnded=1 noData=2 islands=24 renamed=1 figures=Player 1")]
+    [DataRow("protocol-3-session.jsonl",
+             "items=Version,RepeatedSessionEnd,SessionStart,Tick x5,EndOfStream ticks=5 GameTimeChanged=1 QuietPeriod=3 StreamEnded=1 noData=1 islands=25 renamed=0 figures=Player 1")]
     public async Task PipeTickAssemblerFixturesGiveReadmeTicksAndEvents(string fixture, string expected)
     {
         // Arrange

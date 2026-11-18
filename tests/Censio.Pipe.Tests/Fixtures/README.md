@@ -1,8 +1,10 @@
 # Test fixtures
 
-Anonymised recordings of the Anno 117 statistics pipe (recording format version 1, protocol version 2), read by the
-fixture-based tests of `Censio.Pipe.Tests`. The Product Manager made them from the recordings of issue #17 with the
-anonymiser of the pull request that added the fixtures:
+Anonymised recordings of the Anno 117 statistics pipe (recording format version 1, protocol versions 2 and 3), read by
+the fixture-based tests of `Censio.Pipe.Tests`. The Product Manager made `long-session.jsonl` (protocol version 2) from
+the recordings of issue #17 with the anonymiser of the pull request that added the fixtures; `protocol-3-session.jsonl`
+(protocol version 3) was made in the pull request for issue #125 from a recording a user supplied, with the anonymiser
+of that pull request:
 
 ```bash
 dotnet run --project src/Censio.Anonymiser -c Release -- <recording> <fixture>.jsonl
@@ -19,6 +21,7 @@ Product Manager.
 | Fixture | Variants it shows |
 | ------- | ----------------- |
 | `long-session.jsonl` | a long session (about 1.5 hours of receive time, 31 ticks with data); islands of three regions (three session GUIDs); an island renamed during the session; a pause of about 18 minutes between two ticks; a session end before the first session start; a session end followed by a new session start of the same figure; ticks without data at the start and at the end |
+| `protocol-3-session.jsonl` | protocol version 3; a recording started in the middle of a connection; trade routes and item offers emptied (each written as its type byte and a count of 0) |
 
 ## Facts the tests assert
 
@@ -36,6 +39,17 @@ its facts below and a `DataRow` in both tests.
 - 33 ticks: 1 closed because the game time changed (the first, without data), 31 by the quiet period, 1 by the end of
   the stream (the last, without data); 2 ticks without data.
 - 24 island keys, 1 of them renamed (it carries two names); the figure is `Player 1` in both session starts.
+
+`protocol-3-session.jsonl`:
+
+- 114 lines: the header and 113 frames, all decoded: 1 `Version` (3), 1 session start, 1 session end, 101 island
+  frames with 2,752 production entries, 5 trade-route and 4 item-offer frames (undecoded messages, each five bytes),
+  no error.
+- Replayed: `Version`, `RepeatedSessionEnd` (the session end before the session start), `SessionStart`, 5 ticks, end
+  of stream.
+- 5 ticks: 1 closed because the game time changed, 3 by the quiet period, 1 by the end of the stream; 1 tick without
+  data.
+- 25 island keys, none renamed; the figure is `Player 1`.
 
 `long-session.jsonl` is also linked into `Censio.Server.Tests` (as `Fixtures/Pipe/long-session.jsonl`). The
 `PageReaderFixture…` tests (in `PageReaderTests`) replay it through `PipeReplayStream`, `PipeTickAssembler` and

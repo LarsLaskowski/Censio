@@ -109,7 +109,8 @@ mismatch`: the version gate skips every frame of a file without it.
 
 ### Privacy
 
-A recording holds the name of the player figure, island names and the economic data as the game sent them. It stays on the
+A recording holds the name of the player figure, island names, the names and folders of trade routes (protocol
+version 3) and the economic data as the game sent them. It stays on the
 machine, is never deleted automatically and is sent only when the user replays it with `--server`, as contract messages (ticks, session events and states, without the figure name) to the server named there ([`replay-sending.md`](replay-sending.md)); nothing else sends it. Only anonymised fixtures (record 0029,
 *Anonymising* below) may be shared publicly.
 
@@ -207,6 +208,9 @@ still go to a maintainer privately; the tool is for the fixtures that are commit
 - **Randomness.** Offset and factors come from the operating system's cryptographic random source, fresh for every
   run; there is no seed, and a result cannot be reproduced.
 
+- **Trade routes and item offers.** A frame of type 4 or 5 (protocol version 3) is written as its type byte and a count
+  of 0 (five bytes); nothing of the original is copied, so route names, folders and counts do not reach the output.
+
 ### What is kept
 
 Line count and order, frame types, `Version` frames, session ends, session ID, island ID, area index, session GUID,
@@ -217,7 +221,8 @@ game times, close reasons and session events as the original's, with every recei
 ### What is refused
 
 - A frame the tool does not decode gives `frame cannot be anonymised in line <n>`: an unknown type, a malformed
-  message, and any frame but `Version` before a `Version 2` or after a `Version` of another number. Its bytes could
+  message, and a trade-route or item-offer frame without its count or with a negative one, and any frame but `Version` before a
+  `Version 2` or `3` or after a `Version` of another number. Its bytes could
   hold a name, so it is neither copied nor dropped. An empty frame holds nothing and is copied. A `Version` frame of
   any number is written anew.
 - Every line and every frame is written anew from its decoded fields by the format's own header and frame-line
@@ -228,8 +233,9 @@ game times, close reasons and session events as the original's, with every recei
 
 ### Fixtures
 
-Anonymised recordings under `tests/Censio.Pipe.Tests/Fixtures/` are read by the tests of the message reader and the
-tick assembler; their `README.md` says how each was made and which facts it shows, never an original name, file name
+Anonymised recordings under `tests/Censio.Pipe.Tests/Fixtures/` (`long-session.jsonl` of protocol version 2 and
+`protocol-3-session.jsonl` of protocol version 3, with trade routes and item offers emptied) are read by the tests of
+the message reader and the tick assembler; their `README.md` says how each was made and which facts it shows, never an original name, file name
 or time. A maintainer may keep a local deny list (names that must not appear and the path of each fixture's original,
 named by the environment variable `CENSIO_FIXTURE_DENY_LIST`); the test that uses it is inconclusive where it is
 missing, compares each fixture with its original by position and reports counts, line numbers and field names only.

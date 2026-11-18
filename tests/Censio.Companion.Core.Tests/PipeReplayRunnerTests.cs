@@ -168,14 +168,14 @@ public sealed class PipeReplayRunnerTests
     public async Task PipeReplayRunnerProtocolMismatchAfterOtherVersion()
     {
         // Arrange
-        var recording = PipeTestFrames.Recording(_start, (_start, PipeTestFrames.Version(3)), (_start.AddSeconds(1), PipeTestFrames.Island(1, 100)));
+        var recording = PipeTestFrames.Recording(_start, (_start, PipeTestFrames.Version(4)), (_start.AddSeconds(1), PipeTestFrames.Island(1, 100)));
         var runner = CreateRunner(recording);
 
         // Act
         await runner.RunAsync(TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
 
         // Assert
-        Assert.AreEqual(Status(PipeConnectionState.ProtocolMismatch, false), _events.First(), "The version 3 should show a protocol mismatch");
+        Assert.AreEqual(Status(PipeConnectionState.ProtocolMismatch, false), _events.First(), "The version 4 should show a protocol mismatch");
         Assert.AreEqual(Status(PipeConnectionState.ProtocolMismatch, true), runner.Status, "The replay should end in the protocol mismatch");
     }
 
