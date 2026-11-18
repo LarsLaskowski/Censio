@@ -52,7 +52,7 @@ public sealed class PipeMessageReaderTests
             yield return [Array.Empty<byte>(), 0, Array.Empty<byte>(), PipeReadResultKind.Error];
             yield return [VersionFrame(2), 1, new byte[] { 99, 1, 2 }, PipeReadResultKind.Error];
             yield return [VersionFrame(2), 1, new byte[] { 3, 1 }, PipeReadResultKind.Error];
-            yield return [Array.Empty<byte>(), 0, new byte[] { 0, 3, 0, 0, 0 }, PipeReadResultKind.Error];
+            yield return [Array.Empty<byte>(), 0, new byte[] { 0, 4, 0, 0, 0 }, PipeReadResultKind.Error];
             yield return [Array.Empty<byte>(), 0, new byte[] { 2 }, PipeReadResultKind.Error];
         }
     }
@@ -247,7 +247,7 @@ public sealed class PipeMessageReaderTests
     public async Task PipeMessageReaderUnknownTypeThenFrameReturnsNextMessage()
     {
         // Arrange
-        using var stream = new ChunkedStream([.. VersionFrame(2), .. new PipeFrameBuilder().Byte(4).BuildWithPrefix(), .. SessionEndFrame()]);
+        using var stream = new ChunkedStream([.. VersionFrame(2), .. new PipeFrameBuilder().Byte(6).BuildWithPrefix(), .. SessionEndFrame()]);
         var reader = new PipeMessageReader(stream);
 
         await reader.ReadAsync(TestContext.CancellationToken);
@@ -258,7 +258,7 @@ public sealed class PipeMessageReaderTests
 
         // Assert
         Assert.AreEqual(PipeErrorKind.UnknownType, unknown.Error?.Kind, "The unknown type should give its error");
-        Assert.AreEqual((byte)4, unknown.Error?.TypeValue, "The error should carry the type value");
+        Assert.AreEqual((byte)6, unknown.Error?.TypeValue, "The error should carry the type value");
         Assert.IsInstanceOfType<SessionEndMessage>(next.Message, "The next frame should be decoded");
     }
 
@@ -306,23 +306,57 @@ public sealed class PipeMessageReaderTests
     }
 
     /// <summary>
-    /// An unsupported version gives a protocol mismatch.
+    /// A supported version (2 or 3) is delivered as a version message, and the session start, island and session end
+    /// frames after it are decoded.
     /// </summary>
+    /// <param name="version">The announced version</param>
     /// <returns>The task of the test</returns>
     [TestMethod]
-    public async Task PipeMessageReaderUnsupportedVersionReturnsMismatch()
+    [TestCategory("AC1")]
+    [DataRow(2)]
+    [DataRow(3)]
+    public async Task PipeMessageReaderSupportedVersionDecodesFollowingFrames(int version)
     {
         // Arrange
-        using var stream = new ChunkedStream(VersionFrame(3));
+        using var stream = new ChunkedStream(CreateSequence(version));
+        var reader = new PipeMessageReader(stream);
+
+        // Act
+        var results = await ReadToEndAsync(reader);
+
+        // Assert
+        Assert.HasCount(5, results, $"The sequence after version {version} should give four messages and the end of the stream");
+        Assert.AreEqual(version, (results[0].Message as VersionMessage)?.Version, $"Version {version} should be delivered as a version message");
+        Assert.AreEqual("Head", (results[1].Message as SessionStartMessage)?.Headline, $"The session start after version {version} should be decoded");
+        Assert.AreEqual("Area", (results[2].Message as AreaProductionStatisticsMessage)?.AreaName, $"The island after version {version} should be decoded");
+        Assert.IsInstanceOfType<SessionEndMessage>(results[3].Message, $"The session end after version {version} should be decoded");
+        Assert.AreEqual(PipeReadResultKind.EndOfStream, results[4].Kind, "The sequence should end");
+    }
+
+    /// <summary>
+    /// A version other than 2 or 3 gives a protocol mismatch with the received version and the newest supported version
+    /// as the expected one.
+    /// </summary>
+    /// <param name="version">The announced version</param>
+    /// <returns>The task of the test</returns>
+    [TestMethod]
+    [TestCategory("AC1")]
+    [DataRow(1)]
+    [DataRow(4)]
+    [DataRow(-1)]
+    public async Task PipeMessageReaderUnsupportedVersionReturnsMismatchWithNewestVersion(int version)
+    {
+        // Arrange
+        using var stream = new ChunkedStream(VersionFrame(version));
         var reader = new PipeMessageReader(stream);
 
         // Act
         var result = await reader.ReadAsync(TestContext.CancellationToken);
 
         // Assert
-        Assert.AreEqual(PipeErrorKind.ProtocolMismatch, result.Error?.Kind, "An unsupported version should give a mismatch");
-        Assert.AreEqual(3, result.Error?.ReceivedVersion, "The error should carry the received version");
-        Assert.AreEqual(PipeProtocol.NewestSupportedVersion, result.Error?.ExpectedVersion, "The error should carry the expected version");
+        Assert.AreEqual(PipeErrorKind.ProtocolMismatch, result.Error?.Kind, $"Version {version} should give a mismatch");
+        Assert.AreEqual(version, result.Error?.ReceivedVersion, "The error should carry the received version");
+        Assert.AreEqual(3, result.Error?.ExpectedVersion, "The error should carry version 3 as the expected version");
     }
 
     /// <summary>
@@ -333,7 +367,7 @@ public sealed class PipeMessageReaderTests
     public async Task PipeMessageReaderFrameAfterUnsupportedVersionReturnsMismatch()
     {
         // Arrange
-        using var stream = new ChunkedStream([.. VersionFrame(3), .. SessionEndFrame()]);
+        using var stream = new ChunkedStream([.. VersionFrame(4), .. SessionEndFrame()]);
         var reader = new PipeMessageReader(stream);
 
         await reader.ReadAsync(TestContext.CancellationToken);
@@ -343,7 +377,7 @@ public sealed class PipeMessageReaderTests
 
         // Assert
         Assert.AreEqual(PipeErrorKind.ProtocolMismatch, result.Error?.Kind, "A frame after an unsupported version should give a mismatch");
-        Assert.AreEqual(3, result.Error?.ReceivedVersion, "The error should carry the received version");
+        Assert.AreEqual(4, result.Error?.ReceivedVersion, "The error should carry the received version");
         Assert.AreEqual(PipeProtocol.NewestSupportedVersion, result.Error?.ExpectedVersion, "The error should carry the expected version");
         Assert.AreEqual((byte)2, result.Error?.TypeValue, "The error should carry the type of the frame");
     }
@@ -356,7 +390,7 @@ public sealed class PipeMessageReaderTests
     public async Task PipeMessageReaderSupportedVersionAfterMismatchDecodesFrames()
     {
         // Arrange
-        using var stream = new ChunkedStream([.. VersionFrame(3), .. VersionFrame(2), .. SessionEndFrame()]);
+        using var stream = new ChunkedStream([.. VersionFrame(4), .. VersionFrame(2), .. SessionEndFrame()]);
         var reader = new PipeMessageReader(stream);
 
         // Act
@@ -410,23 +444,77 @@ public sealed class PipeMessageReaderTests
     }
 
     /// <summary>
-    /// An unknown type before any version gives a mismatch.
+    /// An unknown type (6) before any version gives a mismatch.
     /// </summary>
     /// <returns>The task of the test</returns>
     [TestMethod]
+    [TestCategory("AC2")]
     public async Task PipeMessageReaderUnknownTypeBeforeVersionReturnsMismatch()
     {
         // Arrange
-        using var stream = new ChunkedStream(new PipeFrameBuilder().Byte(4).BuildWithPrefix());
+        using var stream = new ChunkedStream(new PipeFrameBuilder().Byte(6).BuildWithPrefix());
         var reader = new PipeMessageReader(stream);
 
         // Act
         var result = await reader.ReadAsync(TestContext.CancellationToken);
 
         // Assert
-        Assert.AreEqual(PipeErrorKind.ProtocolMismatch, result.Error?.Kind, "An unknown type before the version should give a mismatch");
-        Assert.AreEqual((byte)4, result.Error?.TypeValue, "The error should carry the type of the frame");
+        Assert.AreEqual(PipeErrorKind.ProtocolMismatch, result.Error?.Kind, "An unknown type 6 before the version should give a mismatch");
+        Assert.AreEqual((byte)6, result.Error?.TypeValue, "The error should carry the type of the frame");
         Assert.IsNull(result.Error?.ReceivedVersion, "No version was received");
+    }
+
+    /// <summary>
+    /// A trade-route or item-offer frame before any version gives a mismatch, as every non-version frame does.
+    /// </summary>
+    /// <param name="type">The type byte of the frame</param>
+    /// <returns>The task of the test</returns>
+    [TestMethod]
+    [TestCategory("AC2")]
+    [DataRow((byte)4)]
+    [DataRow((byte)5)]
+    public async Task PipeMessageReaderTradeRoutesOrItemOffersBeforeVersionReturnsMismatch(byte type)
+    {
+        // Arrange
+        using var stream = new ChunkedStream(PipeFrameBuilder.WithPrefix(UndecodedFrame(type)));
+        var reader = new PipeMessageReader(stream);
+
+        // Act
+        var result = await reader.ReadAsync(TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(PipeErrorKind.ProtocolMismatch, result.Error?.Kind, $"A type {type} frame before the version should give a mismatch");
+        Assert.AreEqual(type, result.Error?.TypeValue, "The error should carry the type of the frame");
+        Assert.IsNull(result.Error?.ReceivedVersion, "No version was received");
+        Assert.AreEqual(3, result.Error?.ExpectedVersion, "The error should carry version 3 as the expected version");
+    }
+
+    /// <summary>
+    /// A trade-route frame after version 3 is delivered as an undecoded message of its type, carrying its whole frame,
+    /// and the frame after it is decoded.
+    /// </summary>
+    /// <returns>The task of the test</returns>
+    [TestMethod]
+    [TestCategory("AC2")]
+    public async Task PipeMessageReaderTradeRoutesAfterVersionThreeReturnsUndecodedMessage()
+    {
+        // Arrange
+        var frame = UndecodedFrame((byte)PipeMessageType.TradeRoutes);
+        using var stream = new ChunkedStream([.. VersionFrame(3), .. PipeFrameBuilder.WithPrefix(frame), .. SessionEndFrame()]);
+        var reader = new PipeMessageReader(stream);
+
+        await reader.ReadAsync(TestContext.CancellationToken);
+
+        // Act
+        var result = await reader.ReadAsync(TestContext.CancellationToken);
+        var next = await reader.ReadAsync(TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(PipeReadResultKind.Message, result.Kind, "The trade-route frame should give a message");
+        Assert.IsInstanceOfType<UndecodedMessage>(result.Message, "The trade-route frame should give an undecoded message");
+        Assert.AreEqual(PipeMessageType.TradeRoutes, result.Message.MessageType, "The undecoded message should carry the trade-route type");
+        Assert.AreSequenceEqual(frame, result.Frame?.ToArray() ?? [], "The result should carry the whole frame");
+        Assert.IsInstanceOfType<SessionEndMessage>(next.Message, "The frame after the trade routes should be decoded");
     }
 
     /// <summary>
@@ -583,10 +671,31 @@ public sealed class PipeMessageReaderTests
     }
 
     /// <summary>
-    /// Creates a sequence of a version, a session start, a statistics frame and a session end.
+    /// Creates a trade-route or item-offer frame in the reference layout with a count of 1 and its entry, without its
+    /// length prefix.
+    /// </summary>
+    /// <param name="type">The type byte, 4 or 5</param>
+    /// <returns>The frame bytes</returns>
+    private static byte[] UndecodedFrame(byte type)
+    {
+        return new PipeFrameBuilder().Byte(type).Int32Value(1).UndecodedEntries(type, 1).Build();
+    }
+
+    /// <summary>
+    /// Creates a sequence of a version 2, a session start, a statistics frame and a session end.
     /// </summary>
     /// <returns>The bytes</returns>
     private static byte[] CreateSequence()
+    {
+        return CreateSequence(2);
+    }
+
+    /// <summary>
+    /// Creates a sequence of a version, a session start, a statistics frame and a session end.
+    /// </summary>
+    /// <param name="version">The version of the first frame</param>
+    /// <returns>The bytes</returns>
+    private static byte[] CreateSequence(int version)
     {
         var statistics = new PipeFrameBuilder().Byte(3)
                                                .Byte(200)
@@ -601,7 +710,7 @@ public sealed class PipeMessageReaderTests
 
         return
         [
-            .. VersionFrame(2),
+            .. VersionFrame(version),
             .. new PipeFrameBuilder().Byte(1).StringValue("Head").BuildWithPrefix(),
             .. statistics,
             .. SessionEndFrame()

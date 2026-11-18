@@ -406,11 +406,33 @@ public sealed class PipeConnectionTests : IDisposable
     }
 
     /// <summary>
-    /// A version other than 2 raises a protocol mismatch with the received version.
+    /// A version other than 2 or 3 raises a protocol mismatch with the received version.
     /// </summary>
     /// <returns>The task</returns>
     [TestMethod]
     public async Task PipeConnectionWrongVersionRaisesProtocolMismatchWithVersion()
+    {
+        // Arrange
+        var stream = await StartConnectedAsync();
+
+        // Act
+        stream.Feed(VersionFrame(4));
+
+        await WaitForPendingReadsAsync(stream, 2);
+
+        // Assert
+        Assert.AreSequenceEqual(new[] { Status(PipeConnectionState.Connected), MismatchStatus(4) },
+                                _events.ToArray(),
+                                "Version 4 should raise a protocol mismatch carrying version 4");
+    }
+
+    /// <summary>
+    /// Version 3 raises receiving, not a protocol mismatch.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    [TestCategory("AC4")]
+    public async Task PipeConnectionVersionThreeRaisesReceiving()
     {
         // Arrange
         var stream = await StartConnectedAsync();
@@ -421,9 +443,34 @@ public sealed class PipeConnectionTests : IDisposable
         await WaitForPendingReadsAsync(stream, 2);
 
         // Assert
-        Assert.AreSequenceEqual(new[] { Status(PipeConnectionState.Connected), MismatchStatus(3) },
+        Assert.AreSequenceEqual(new[] { Status(PipeConnectionState.Connected), Status(PipeConnectionState.Receiving) },
                                 _events.ToArray(),
-                                "Version 3 should raise a protocol mismatch carrying version 3");
+                                "Version 3 should raise receiving");
+    }
+
+    /// <summary>
+    /// Trade-route and item-offer frames after version 3 raise no further event and keep the connection open.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    [TestCategory("AC4")]
+    public async Task PipeConnectionTradeRoutesAndItemOffersRaiseNoEvent()
+    {
+        // Arrange
+        var stream = await StartConnectedAsync(VersionFrame(3), IslandFrame());
+
+        // Act
+        stream.Feed(Concat(UndecodedFrame(PipeMessageType.TradeRoutes), UndecodedFrame(PipeMessageType.ItemOffers), IslandFrame()));
+
+        await WaitForPendingReadsAsync(stream, 2);
+
+        // Assert
+        Assert.AreSequenceEqual(new[] { Status(PipeConnectionState.Connected), Status(PipeConnectionState.Receiving) },
+                                _events.ToArray(),
+                                "Trade-route and item-offer frames should raise no event after receiving");
+        Assert.AreEqual(0, stream.UnreadByteCount, "Every frame should be read");
+        Assert.IsFalse(stream.IsDisposed, "The connection should stay open");
+        Assert.AreEqual(1, _connector.AttemptCount, "Trade-route and item-offer frames should cause no new attempt");
     }
 
     /// <summary>
@@ -455,7 +502,7 @@ public sealed class PipeConnectionTests : IDisposable
     public async Task PipeConnectionRepeatedMismatchRaisesNoEvent()
     {
         // Arrange
-        var stream = await StartConnectedAsync(VersionFrame(3));
+        var stream = await StartConnectedAsync(VersionFrame(4));
 
         // Act
         stream.Feed(Concat(SessionEndFrame(), SessionStartFrame(), IslandFrame()));
@@ -463,7 +510,7 @@ public sealed class PipeConnectionTests : IDisposable
         await WaitForPendingReadsAsync(stream, 2);
 
         // Assert
-        Assert.AreSequenceEqual(new[] { Status(PipeConnectionState.Connected), MismatchStatus(3) },
+        Assert.AreSequenceEqual(new[] { Status(PipeConnectionState.Connected), MismatchStatus(4) },
                                 _events.ToArray(),
                                 "Further mismatch errors should raise no new event");
     }
@@ -479,7 +526,7 @@ public sealed class PipeConnectionTests : IDisposable
         var stream = await StartConnectedAsync();
 
         // Act
-        stream.Feed(Concat(VersionFrame(3), SessionEndFrame(), SessionEndFrame()));
+        stream.Feed(Concat(VersionFrame(4), SessionEndFrame(), SessionEndFrame()));
 
         await WaitForPendingReadsAsync(stream, 2);
 
@@ -497,7 +544,7 @@ public sealed class PipeConnectionTests : IDisposable
     public async Task PipeConnectionVersionTwoAfterMismatchRaisesReceiving()
     {
         // Arrange
-        var stream = await StartConnectedAsync(VersionFrame(3));
+        var stream = await StartConnectedAsync(VersionFrame(4));
 
         // Act
         stream.Feed(VersionFrame(2));
@@ -505,7 +552,7 @@ public sealed class PipeConnectionTests : IDisposable
         await WaitForPendingReadsAsync(stream, 2);
 
         // Assert
-        Assert.AreSequenceEqual(new[] { Status(PipeConnectionState.Connected), MismatchStatus(3), Status(PipeConnectionState.Receiving) },
+        Assert.AreSequenceEqual(new[] { Status(PipeConnectionState.Connected), MismatchStatus(4), Status(PipeConnectionState.Receiving) },
                                 _events.ToArray(),
                                 "Version 2 after the mismatch should raise receiving");
     }
@@ -517,7 +564,7 @@ public sealed class PipeConnectionTests : IDisposable
     /// <returns>The task</returns>
     [TestMethod]
     [DataRow(new byte[] { 0, 0, 0, 0 }, DisplayName = "Empty frame")]
-    [DataRow(new byte[] { 1, 0, 0, 0, 4 }, DisplayName = "Unknown type")]
+    [DataRow(new byte[] { 1, 0, 0, 0, 6 }, DisplayName = "Unknown type")]
     [DataRow(new byte[] { 2, 0, 0, 0, 1, 50 }, DisplayName = "Malformed message")]
     public async Task PipeConnectionSkippedFrameKeepsState(byte[] frame)
     {
@@ -928,7 +975,7 @@ public sealed class PipeConnectionTests : IDisposable
     public void PipeConnectionNeverWritesToStream()
     {
         // Arrange
-        var stream = EnqueueStream(VersionFrame(2), SessionStartFrame(), IslandFrame(), SessionEndFrame(), VersionFrame(3), SessionEndFrame());
+        var stream = EnqueueStream(VersionFrame(2), SessionStartFrame(), IslandFrame(), SessionEndFrame(), VersionFrame(4), SessionEndFrame());
 
         stream.End();
 
@@ -1047,7 +1094,7 @@ public sealed class PipeConnectionTests : IDisposable
         AdvanceInSteps(TimeSpan.FromSeconds(3));
 
         _clock.Advance(TimeSpan.FromSeconds(20));
-        stream.Feed(VersionFrame(3));
+        stream.Feed(VersionFrame(4));
         stream.Feed(VersionFrame(2));
         _clock.Advance(TimeSpan.FromSeconds(20));
         stream.End();
@@ -1301,7 +1348,7 @@ public sealed class PipeConnectionTests : IDisposable
         await failed.Task.WaitAsync(_guard, TestContext.CancellationToken);
 
         // Act
-        stream.Feed(PipeTestFrames.Wire(PipeTestFrames.Version(3)));
+        stream.Feed(PipeTestFrames.Wire(PipeTestFrames.Version(4)));
         stream.End();
 
         await ended.Task.WaitAsync(_guard, TestContext.CancellationToken);
@@ -1312,7 +1359,7 @@ public sealed class PipeConnectionTests : IDisposable
                                 {
                                     Status(PipeConnectionState.Connected),
                                     Status(PipeConnectionState.Receiving),
-                                    MismatchStatus(3),
+                                    MismatchStatus(4),
                                     Status(PipeConnectionState.WaitingForGame)
                                 },
                                 _events.ToArray(),
@@ -1729,7 +1776,7 @@ public sealed class PipeConnectionTests : IDisposable
     {
         // Arrange
         var session = new PipeRecordingSession(OpenSink);
-        var stream = await StartMidConnectionRecordingAsync(session, PipeTestFrames.Version(3));
+        var stream = await StartMidConnectionRecordingAsync(session, PipeTestFrames.Version(4));
 
         stream.Feed(PipeTestFrames.Wire(PipeTestFrames.Island(2, 100)));
 
@@ -1804,8 +1851,8 @@ public sealed class PipeConnectionTests : IDisposable
                                         PipeTestFrames.UnknownType(),
                                         PipeTestFrames.UnknownType(),
                                         PipeTestFrames.Island(1, 100),
-                                        PipeTestFrames.Version(3),
-                                        PipeTestFrames.Version(3),
+                                        PipeTestFrames.Version(4),
+                                        PipeTestFrames.Version(4),
                                         PipeTestFrames.UnknownType()));
         stream.End();
 
@@ -1817,7 +1864,7 @@ public sealed class PipeConnectionTests : IDisposable
         (LogLevel, string)[] expected = [
                                             (LogLevel.Information, "Connection state Connected, error kind (null), Windows error code (null), received version (null)"),
                                             (LogLevel.Information, "Connection state Receiving, error kind (null), Windows error code (null), received version (null)"),
-                                            (LogLevel.Information, "Connection state ProtocolMismatch, error kind (null), Windows error code (null), received version 3"),
+                                            (LogLevel.Information, "Connection state ProtocolMismatch, error kind (null), Windows error code (null), received version 4"),
                                             (LogLevel.Information, "Connection state WaitingForGame, error kind (null), Windows error code (null), received version (null)"),
                                         ];
 
@@ -1983,6 +2030,17 @@ public sealed class PipeConnectionTests : IDisposable
                                      .Int32Value(1)
                                      .Entry(10, [new(1, 2)], [new(3, 4)])
                                      .BuildWithPrefix();
+    }
+
+    /// <summary>
+    /// Creates a trade-route or item-offer frame in the reference layout with a count of 1 and its entry, with its length
+    /// prefix.
+    /// </summary>
+    /// <param name="type">The message type, trade routes or item offers</param>
+    /// <returns>The bytes</returns>
+    private static byte[] UndecodedFrame(PipeMessageType type)
+    {
+        return new PipeFrameBuilder().Byte((byte)type).Int32Value(1).UndecodedEntries((byte)type, 1).BuildWithPrefix();
     }
 
     /// <summary>

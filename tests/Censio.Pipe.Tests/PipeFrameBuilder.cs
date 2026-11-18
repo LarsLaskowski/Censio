@@ -170,6 +170,31 @@ public sealed class PipeFrameBuilder
     }
 
     /// <summary>
+    /// Appends the entries of a trade-route (type 4) or item-offer (type 5) payload, after its count, in the layout of the
+    /// reference reader (commit <c>4cc8ad7</c>): per trade route an ID, a name and a folder, a problem count, a ship count
+    /// and a station count of 0; per trader an ID and a list of one item GUID.
+    /// </summary>
+    /// <param name="type">The type byte of the frame, 4 or 5</param>
+    /// <param name="count">The number of entries</param>
+    /// <returns>This builder</returns>
+    public PipeFrameBuilder UndecodedEntries(byte type, int count)
+    {
+        for (var index = 0; index < count; index++)
+        {
+            if (type == (byte)PipeMessageType.TradeRoutes)
+            {
+                Int32Value(100 + index).StringValue("Route").StringValue("Folder").Int32Value(0).Int32Value(2).Int32Value(0);
+            }
+            else
+            {
+                Int32Value(200 + index).Int32Value(1).Int32Value(1000 + index);
+            }
+        }
+
+        return this;
+    }
+
+    /// <summary>
     /// Gets the bytes written so far: the frame without a length prefix.
     /// </summary>
     /// <returns>The frame bytes</returns>
