@@ -6,7 +6,7 @@ The trend charts of the data pages: the two charts of a good's page and the over
 range picker and the time-axis switch with their stored choice, the range they show, the points and their gaps, hourly
 means, the game-time axis, the region total, the cap of 2,880 points, the tooltip and the axes, the colours and the
 animation, the reads that feed them with their bounds and failures, and the chart texts in
-English and German. Users of the web application rely on it; the pages around the charts are in
+English and German. The sparklines and trend arrows of the tables are in [`web-trends.md`](web-trends.md). Users of the web application rely on it; the pages around the charts are in
 [`web-pages.md`](web-pages.md), the history the charts read in [`history.md`](history.md).
 
 ## Behavior
@@ -213,8 +213,9 @@ English and German. Users of the web application rely on it; the pages around th
 ### The reads
 
 - Three reads feed the charts, each of one profile and the range and resolution of the choice: one good on one island (the island chart), one
-  good summed per point over the region's islands (the region total), and the figures of one island per point (the overview).
-  Each reads the newest 2,880 points and the count of all, never more, and keeps no tick in memory beyond the one it
+  good summed per point over the region's islands (the region total), and the figures of one island per point (the overview);
+  two more feed the trend column ([`web-trends.md`](web-trends.md)).
+  Each of the three reads the newest 2,880 points and the count of all, never more, and keeps no tick in memory beyond the one it
   folds into a point ([`history.md`](history.md), *The trend reads*). A transaction of a read scans at most 240 ticks or hourly
   points (*Hourly resolution* of that section for the wide ranges), so the ingest waits no longer than before.
 - The charts' reads run one at a time across the server, in a gate of their own and not the gate of the pages' profile reader
@@ -230,8 +231,10 @@ English and German. Users of the web application rely on it; the pages around th
 
 ### Logging
 
-A failed chart read logs one warning, `A chart could not be read from the database.`, in the category `Censio.Server.TrendReader`
-with the exception and no other argument: no name, value, address or offset. The charts log nothing else.
+A failed chart read, and a failed read of a table's trends ([`web-trends.md`](web-trends.md)), logs one warning, `A chart could not be read from the database.`, in
+the category `Censio.Server.TrendReader` with the exception and no other argument: no name, value, address or offset. The
+charts and the trend column log nothing else: a cancelled read logs nothing, and a failure of the page's own start of the
+trend read, which the reader does not see, is shown as a failed read and logs nothing.
 
 ## Limits and errors
 
@@ -283,4 +286,5 @@ with the exception and no other argument: no name, value, address or offset. The
 
 - The pages' frame, routes, number and time formats, the as-of line and the reload text: [`web-pages.md`](web-pages.md), [`web-ui.md`](web-ui.md).
 - The stored history, the trend reads' SQL-level rules, the trend gate and the measurements of the reads: [`history.md`](history.md), [`server-data.md`](server-data.md).
-- Sparklines and trend arrows (#38); a range of the user's own choosing, a range per chart and time labels on the game-time axis; other values, a region's goods list and deficits (#47, #49 to #51); the chart toolbar (zoom, download) and several goods in one chart; the phone layout (#53).
+- The sparklines and trend arrows of the goods table and the island list: [`web-trends.md`](web-trends.md).
+- A range of the user's own choosing, a range per chart and time labels on the game-time axis; other values, a region's goods list and deficits (#47, #49 to #51); the chart toolbar (zoom, download) and several goods in one chart; the phone layout (#53).

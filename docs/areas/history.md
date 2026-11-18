@@ -2,12 +2,13 @@
 
 ## Scope
 
-The time series the server keeps per profile, island and good: the read of a series and its points and gaps, the two
+The time series the server keeps per profile, island and good: the read of a series and its points and gaps, the
 trend reads of the charts with the trend gate, the retention rule (ticks at full resolution for 7 days, then hourly sums and counts without limit), the fold and its cutoff,
 the latest hour, late and resent ticks, repeated goods, the retention job with its schedule and log lines, deleting a
 profile's history with its removal steps, secure delete and the clean-up of the database file, the legacy residue and the
 measurements. Operators who run the server rely on the retention and the deletion; the charts ([`web-charts.md`](web-charts.md))
-call the trend reads, and the charts of later features (#38, #49 to #51) call these or the series read.
+and the trend column ([`web-trends.md`](web-trends.md)) call the trend reads, and the charts of later features (#49 to #51) call these or the
+series read.
 
 ## Behavior
 
@@ -55,9 +56,11 @@ call the trend reads, and the charts of later features (#38, #49 to #51) call th
 
 ### The trend reads
 
-- Two reads serve the charts of [`web-charts.md`](web-charts.md), and each returns one point per tick or hourly point of a
-  range, never more than the maximum its caller names (the server asks for 2,880). The good read names a profile, a set of
-  islands, a good and the range; the figures read names a profile, one island and the range. Each also returns the number
+- Two reads serve the charts of [`web-charts.md`](web-charts.md) (the batch reads of the trend column are in
+  [`web-trends.md`](web-trends.md)). Each returns one point per tick or hourly point of a
+  range, never more than the maximum its caller names (the server asks for 2,880). The good
+  read names a profile, a set of islands, a good and the range; the figures read names a profile, one island and the range.
+  Each also returns the number
   of all points of the range, so a caller can say that it shows the newest only. A query names a resolution:
   `Points` (the default, the points just described) or `Hours` (*Hourly resolution*). A point also carries its game
   time, its first game time and whether no island of it holds an entry (*Game times*).
@@ -75,7 +78,7 @@ call the trend reads, and the charts of later features (#38, #49 to #51) call th
   deficit the entries whose delta rounded to two decimals, midpoint away from zero, is below 0), and no value when the tick
   lacks the island or the island has no entries. For an hourly point: buildings `Math.Round(Σ BuildingCountSum / EntryCount,
   MidpointRounding.AwayFromZero)` over the island's goods, produced goods the goods with `BuildingCountSum > 0`, goods in
-  deficit the goods with at least one delta whose mean `DeltaSum / DeltaCount`, rounded as above, is below 0.
+  deficit the goods with at least one delta whose mean `DeltaSum / DeltaCount`, rounded as above, is below 0. The hourly entries are read in product GUID order.
 - The island set is one JSON parameter read through SQLite's `json_each`, never one parameter per island and never
   formatted into the statement; the rows a tick adds stay bounded by the tick's islands (256). The reads use the index of
   the tick entries by tick island, good and position ([`server-data.md`](server-data.md)); the series read keeps its
@@ -300,5 +303,5 @@ ticks are gone.
 - The tables, the file, the start and the rules of storing: [`server-data.md`](server-data.md).
 - The state a deletion drops and rebuilds: [`server-state.md`](server-state.md).
 - The button, the dialog and the host rule: [`web-pages.md`](web-pages.md); the setting `AllowedHosts`: [`server.md`](server.md).
-- The charts, their range, gaps and states: [`web-charts.md`](web-charts.md); sparklines and trend arrows (#38).
+- The charts: [`web-charts.md`](web-charts.md); the trend column's batch reads: [`web-trends.md`](web-trends.md).
 - Shrinking the database file and removing the residue of older versions: the user guide.

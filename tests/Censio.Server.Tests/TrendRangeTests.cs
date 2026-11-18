@@ -55,6 +55,39 @@ public sealed class TrendRangeTests
     }
 
     /// <summary>
+    /// The range of the sparklines starts at the start of the UTC hour that holds the latest tick's receive time minus 4
+    /// hours, whatever the offset of the receive time, and ends right after the latest tick, which the range includes; the
+    /// start and end are clamped at the ends of the time scale.
+    /// </summary>
+    /// <param name="latestText">The receive time of the latest tick</param>
+    /// <param name="expectedStartText">The start of the range</param>
+    [TestMethod]
+    [TestCategory("AC1")]
+    [DataRow("2026-06-11T10:21:36.5503617+00:00", "2026-06-11T06:00:00+00:00")]
+    [DataRow("2026-06-11T10:00:00+00:00", "2026-06-11T06:00:00+00:00")]
+    [DataRow("2026-06-11T10:59:59.9999999+00:00", "2026-06-11T06:00:00+00:00")]
+    [DataRow("2026-06-11T09:59:59.9999999+00:00", "2026-06-11T05:00:00+00:00")]
+    [DataRow("2026-06-11T02:21:36+00:00", "2026-06-10T22:00:00+00:00")]
+    [DataRow("2026-06-11T12:30:00+02:00", "2026-06-11T06:00:00+00:00")]
+    [DataRow("0001-01-01T00:00:00+00:00", "0001-01-01T00:00:00+00:00")]
+    [DataRow("0001-01-01T03:59:59+00:00", "0001-01-01T00:00:00+00:00")]
+    [DataRow("9999-12-31T23:59:59.9999999+00:00", "9999-12-31T19:00:00+00:00")]
+    public void TrendRangeForSparklinesStartsAtTheHourFourHoursBeforeTheLatestTick(string latestText, string expectedStartText)
+    {
+        // Arrange
+        var latest = DateTimeOffset.Parse(latestText, CultureInfo.InvariantCulture);
+        var expectedStart = DateTimeOffset.Parse(expectedStartText, CultureInfo.InvariantCulture);
+        var expectedEnd = latest.UtcTicks == DateTimeOffset.MaxValue.UtcTicks ? DateTimeOffset.MaxValue : latest.AddTicks(1);
+
+        // Act
+        var result = TrendRange.ForSparklines(latest);
+
+        // Assert
+        Assert.AreEqual(expectedStart.UtcDateTime, result.Start.UtcDateTime, "The sparklines should start at the UTC hour that holds the time 4 hours back from the latest tick");
+        Assert.AreEqual(expectedEnd.UtcDateTime, result.End.UtcDateTime, "The sparklines should end, exclusive, one tick of time after the latest tick, at most at the end of the time scale");
+    }
+
+    /// <summary>
     /// The range of all history starts at the beginning of the time scale and ends right after the latest tick.
     /// </summary>
     /// <param name="latestText">The receive time of the latest tick</param>

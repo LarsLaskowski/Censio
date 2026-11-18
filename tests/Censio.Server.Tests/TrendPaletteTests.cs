@@ -67,6 +67,29 @@ public sealed class TrendPaletteTests
     }
 
     /// <summary>
+    /// The colour of the sparklines reaches the contrast of 3:1 against the surface of the theme it is drawn on, and is
+    /// opaque.
+    /// </summary>
+    /// <param name="theme">The theme</param>
+    [TestMethod]
+    [TestCategory("AC3")]
+    [DataRow(UiTheme.Light)]
+    [DataRow(UiTheme.Dark)]
+    public void TrendPaletteSparklineReachesThreeToOneOnSurface(UiTheme theme)
+    {
+        // Arrange
+        var mudTheme = CensioTheme.Create();
+        var surface = theme == UiTheme.Dark ? mudTheme.PaletteDark.Surface : mudTheme.PaletteLight.Surface;
+
+        // Act
+        var line = new MudColor(TrendPalette.Sparkline(theme));
+
+        // Assert
+        Assert.AreEqual(byte.MaxValue, line.A, "The sparkline colour should be opaque, so the ratio is the rendered one");
+        Assert.IsGreaterThanOrEqualTo(LineContrast, ContrastRatio(line, surface), $"The sparkline colour {line.ToString(MudColorOutputFormats.Hex)} should reach 3:1 on the surface of the {theme} theme");
+    }
+
+    /// <summary>
     /// The lines of one chart differ in hue by 30 degrees or more, pairwise, in both themes.
     /// </summary>
     /// <param name="kind">The kind of the chart</param>

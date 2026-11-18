@@ -152,4 +152,7 @@ once in the [area document](../areas/README.md) of the record's area, and the re
 | [0088](0088-charts-show-the-day-up-to-the-latest-tick-with-gaps-after-15-minutes.md) | Charts show the day up to a profile's latest tick and break a line after 15 minutes without a point | Accepted | 2026-11-16 |
 | [0089](0089-chart-ranges-wide-ones-as-hourly-means-read-at-request.md) | Charts offer four ranges kept in the browser, and the wide ones show hourly means computed when read | Accepted | 2026-11-17 |
 | [0090](0090-game-time-axis-places-points-without-time-labels.md) | The game-time axis places the range's points at their game time, without time labels | Accepted | 2026-11-17 |
+| [0091](0091-row-trends-show-delta-and-buildings-over-a-fixed-four-hours.md) | Row trends show delta and buildings over a fixed four hours, at every point | Accepted | 2026-11-18 |
+| [0092](0092-row-trends-read-once-per-table-in-island-point-parts.md) | Row trends are read once per table, in parts of 240 island points | Accepted | 2026-11-18 |
+| [0093](0093-sparklines-drawn-as-one-svg-path-of-our-own.md) | Sparklines are drawn as one SVG path of our own | Accepted | 2026-11-18 |
 <!-- project:end index -->

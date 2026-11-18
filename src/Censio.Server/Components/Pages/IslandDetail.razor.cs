@@ -40,6 +40,16 @@ public partial class IslandDetail
     /// </summary>
     private bool _isOverviewFailed;
 
+    /// <summary>
+    /// The loader of the trend column, replaced when the profile or the island changes.
+    /// </summary>
+    private SparklineLoader<int> _sparklines = new();
+
+    /// <summary>
+    /// The profile, session, island and area the loader belongs to, or <see langword="null" /> before the first address.
+    /// </summary>
+    private (string? Profile, string? Session, string? Island, string? Area)? _sparklineAddress;
+
     #endregion // Fields
 
     #region Properties
@@ -138,6 +148,56 @@ public partial class IslandDetail
     }
 
     /// <summary>
+    /// Gives what a row's trend cell shows.
+    /// </summary>
+    /// <param name="row">The row</param>
+    /// <param name="held">The read of the trends, or <see langword="null" /> before there is one</param>
+    /// <param name="isFailed">A value that indicates whether the read of the trends failed</param>
+    /// <param name="firstRows">The first row of each good</param>
+    /// <returns>Whether the cell is read, and its line</returns>
+    private static (bool IsRead, SparklineView? Line) TrendOf(GoodRow row, SparklineRead<int>? held, bool isFailed, HashSet<GoodRow> firstRows)
+    {
+        if (isFailed)
+        {
+            return (true, null);
+        }
+
+        if (held is null)
+        {
+            return (false, null);
+        }
+
+        if (firstRows.Contains(row) == false)
+        {
+            return (true, null);
+        }
+
+        return held.Lines.TryGetValue(row.ProductGuid, out var line)
+                   ? (true, line)
+                   : (false, null);
+    }
+
+    /// <summary>
+    /// Finds the first row of each good in the order of the view.
+    /// </summary>
+    /// <param name="view">The view</param>
+    /// <returns>The rows</returns>
+    private static HashSet<GoodRow> FirstRows(ProfileView view)
+    {
+        return new HashSet<GoodRow>(view.Rows.GroupBy(row => row.ProductGuid).Select(group => group.First()), ReferenceEqualityComparer.Instance);
+    }
+
+    /// <summary>
+    /// Gives the key under which the loader holds the trends of a view.
+    /// </summary>
+    /// <param name="view">The view</param>
+    /// <returns>The key</returns>
+    private static (Guid ProfileId, IslandKey? Island) SparklineKey(ProfileView view)
+    {
+        return ValueTuple.Create(view.ProfileId, view.Island);
+    }
+
+    /// <summary>
     /// Orders the rows by shown good name, ties by product GUID.
     /// </summary>
     /// <param name="view">The view</param>
@@ -181,38 +241,53 @@ public partial class IslandDetail
     /// <inheritdoc />
     protected override async Task ReadDetailsAsync(ProfileView view, CancellationToken cancellationToken)
     {
-        if (_isOverviewFailed || view.Island is not { } island || view.AsOf is not { } asOf)
+        if (view.Island is not { } island || view.AsOf is not { } asOf)
         {
             return;
         }
 
-        var generation = _generation;
-        var read = await Trends.ReadFiguresAsync(view.ProfileId,
-                                                 island,
-                                                 new TrendRequest
-                                                 {
-                                                     LatestTick = asOf,
-                                                     Choice = ChartChoice,
-                                                     Held = _overviewRead?.View
-                                                 },
-                                                 cancellationToken).ConfigureAwait(true);
+        if (_isOverviewFailed == false)
+        {
+            var generation = _generation;
+            var read = await Trends.ReadFiguresAsync(view.ProfileId,
+                                                     island,
+                                                     new TrendRequest
+                                                     {
+                                                         LatestTick = asOf,
+                                                         Choice = ChartChoice,
+                                                         Held = _overviewRead?.View
+                                                     },
+                                                     cancellationToken).ConfigureAwait(true);
 
-        if (generation != _generation)
+            if (generation != _generation)
+            {
+                return;
+            }
+
+            if (read.IsFailed)
+            {
+                _isOverviewFailed = true;
+            }
+            else
+            {
+                _overviewRead = read;
+                _overviewNumber++;
+            }
+
+            StateHasChanged();
+        }
+
+        var products = view.Rows.Select(row => row.ProductGuid).Distinct().ToList();
+
+        if (products.Count == 0)
         {
             return;
         }
 
-        if (read.IsFailed)
-        {
-            _isOverviewFailed = true;
-        }
-        else
-        {
-            _overviewRead = read;
-            _overviewNumber++;
-        }
-
-        StateHasChanged();
+        _sparklines.Request(SparklineKey(view),
+                            asOf,
+                            (held, token) => Trends.ReadGoodSparklinesAsync(view.ProfileId, island, products, asOf, held, token),
+                            () => InvokeAsync(StateHasChanged));
     }
 
     /// <inheritdoc />
@@ -221,6 +296,30 @@ public partial class IslandDetail
         _generation++;
         _overviewRead = null;
         _isOverviewFailed = false;
+
+        var address = (Profile, Session, Island, Area);
+
+        if (address.Equals(_sparklineAddress) == false)
+        {
+            if (_sparklineAddress is not null)
+            {
+                _sparklines.Dispose();
+                _sparklines = new SparklineLoader<int>();
+            }
+
+            _sparklineAddress = address;
+        }
+    }
+
+    /// <inheritdoc />
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _sparklines.Dispose();
+        }
+
+        base.Dispose(disposing);
     }
 
     #endregion // DataPageBase

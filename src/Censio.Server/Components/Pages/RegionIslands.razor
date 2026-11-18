@@ -25,20 +25,32 @@ else if (View is { } shown && FindRegion(shown) is { } region)
             <tr>
                 <th>@Texts.ColumnIsland</th>
                 <th class="censio-number">@Texts.ColumnBuildings</th>
+                <th class="censio-trend" title="@Texts.TrendColumnTooltip">@Texts.ColumnTrend</th>
                 <th class="censio-number">@Texts.ColumnProducedGoods</th>
                 <th class="censio-number">@Texts.ColumnGoodsInDeficit</th>
             </tr>
         </thead>
         <tbody>
+            @{
+                var trends = _sparklines.HeldFor(AddressKey);
+                var isTrendsFailed = _sparklines.IsFailedFor(AddressKey);
+            }
             @foreach (var island in OrderedIslands(region))
             {
+                var (isRead, line) = TrendOf(island.Key, trends, isTrendsFailed);
+
                 <tr>
                     <td><MudLink Href="@PageAddress.IslandLink(shown.ProfileId, island.Key)">@PageNames.Island(island.Name, Language)</MudLink></td>
                     <td class="censio-number">@PageFormat.Count(island.Figures?.Buildings)</td>
+                    <td class="censio-trend"><TrendCell IsRead="isRead" Line="line" /></td>
                     <td class="censio-number">@PageFormat.Count(island.Figures?.ProducedGoods)</td>
                     <td class="censio-number">@PageFormat.Count(island.Figures?.GoodsInDeficit)</td>
                 </tr>
             }
         </tbody>
     </MudSimpleTable>
+    if (_sparklines.IsFailedFor(AddressKey))
+    {
+        <p>@Texts.TrendsReadFailed</p>
+    }
 }

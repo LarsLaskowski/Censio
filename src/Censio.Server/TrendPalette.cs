@@ -35,6 +35,16 @@ public static class TrendPalette
     }
 
     /// <summary>
+    /// Gives the colour of the sparklines in a theme.
+    /// </summary>
+    /// <param name="theme">The theme</param>
+    /// <returns>The colour</returns>
+    public static string Sparkline(UiTheme theme)
+    {
+        return Hex(PaletteOf(theme).Secondary);
+    }
+
+    /// <summary>
     /// Gives the palette of a theme.
     /// </summary>
     /// <param name="theme">The theme</param>

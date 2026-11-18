@@ -11,6 +11,10 @@
     text-align: right;
 }
 
+.censio-frame .censio-trend {
+    white-space: nowrap;
+}
+
 .censio-frame .censio-icon {
     width: 24px;
 }

@@ -1795,6 +1795,334 @@ public sealed class HistoryStoreTests
     }
 
     /// <summary>
+    /// A goods read gives per tick the delta of each asked good's first entry on the island: a second entry of a good, a
+    /// good not asked for and another island add nothing, a delta without a value and a tick without the island's entries
+    /// give no delta, and every point of the range is a point.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC1")]
+    public async Task HistoryStoreReadGoodsTrendGivesFirstEntryDeltaPerGoodAndTick()
+    {
+        // Arrange
+        var (store, history, _) = await OpenAsync();
+
+        var profileId = Guid.NewGuid();
+
+        await StoreAsync(store,
+                         Tick(profileId, 10 * Minute, 10, Island(IslandKey, IslandName, TrendEntry(ProductGuid, 0f, 0f, 0.5f, 1), TrendEntry(OtherProductGuid, 0f, 0f, -1f, 1), TrendEntry(ProductGuid, 0f, 0f, 9f, 1), TrendEntry(ThirdProductGuid, 0f, 0f, 2f, 1)), Island(OtherIslandKey, "Second island", TrendEntry(ProductGuid, 0f, 0f, 7f, 1))),
+                         Tick(profileId, 20 * Minute, 20, Island(IslandKey, IslandName, TrendEntry(ProductGuid, 0f, 0f, null, 1), TrendEntry(OtherProductGuid, 0f, 0f, 0.25f, 1))),
+                         Tick(profileId, 30 * Minute, 30, Island(OtherIslandKey, "Second island", TrendEntry(ProductGuid, 0f, 0f, 7f, 1))),
+                         Tick(profileId, 40 * Minute, 40, Island(IslandKey, IslandName)));
+
+        var query = GoodsQuery(profileId, TrendIsland(IslandKey), [ProductGuid, OtherProductGuid], _hour, _hour.AddHours(1), 240);
+
+        // Act
+        var trend = await history.ReadGoodsTrendAsync(query, TestContext.CancellationToken);
+
+        // Assert
+        var expected = new[]
+                       {
+                           $"tick {FormatTime(_hour.AddSeconds(10 * Minute))} {{1010=0.5,1011=-1}}",
+                           $"tick {FormatTime(_hour.AddSeconds(20 * Minute))} {{1011=0.25}}",
+                           $"tick {FormatTime(_hour.AddSeconds(30 * Minute))} {{}}",
+                           $"tick {FormatTime(_hour.AddSeconds(40 * Minute))} {{}}"
+                       };
+
+        Assert.AreSequenceEqual(expected, trend.Points.Select(DescribeGoodsPoint), "Each tick should give the first entry's delta of each asked good on the island and leave out a delta without a value");
+        Assert.AreEqual(4, trend.TotalCount, "The count should hold every tick of the range");
+    }
+
+    /// <summary>
+    /// A goods read gives a folded hour of the island the mean delta of each asked good over the ticks that carried a
+    /// delta of its first entry, leaves out a good no tick carried a delta for, and follows it with the later ticks.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC1")]
+    public async Task HistoryStoreReadGoodsTrendGivesHourlyMeanDeltaOfFoldedHour()
+    {
+        // Arrange
+        var (store, history, _) = await OpenAsync();
+
+        var profileId = Guid.NewGuid();
+
+        await StoreAsync(store,
+                         Tick(profileId, 10 * Minute, 10, Island(IslandKey, IslandName, TrendEntry(ProductGuid, 0f, 0f, 0.5f, 1), TrendEntry(OtherProductGuid, 0f, 0f, null, 1), TrendEntry(ProductGuid, 0f, 0f, 100f, 1), TrendEntry(ThirdProductGuid, 0f, 0f, null, 1))),
+                         Tick(profileId, 20 * Minute, 20, Island(IslandKey, IslandName, TrendEntry(ProductGuid, 0f, 0f, -1f, 1), TrendEntry(OtherProductGuid, 0f, 0f, null, 1), TrendEntry(ThirdProductGuid, 0f, 0f, null, 1))),
+                         Tick(profileId, 30 * Minute, 30, Island(IslandKey, IslandName, TrendEntry(OtherProductGuid, 0f, 0f, 1.5f, 1)), Island(OtherIslandKey, "Second island", TrendEntry(ProductGuid, 0f, 0f, 50f, 1))),
+                         Tick(profileId, Hour + (10 * Minute), 40, Island(IslandKey, IslandName, TrendEntry(ProductGuid, 0f, 0f, 2f, 1), TrendEntry(ThirdProductGuid, 0f, 0f, -0.75f, 1))));
+
+        var folded = await FoldAllAsync(history, profileId);
+        var query = GoodsQuery(profileId, TrendIsland(IslandKey), [ProductGuid, OtherProductGuid, ThirdProductGuid], _hour, _hour.AddHours(2), 240);
+
+        // Act
+        var trend = await history.ReadGoodsTrendAsync(query, TestContext.CancellationToken);
+
+        // Assert
+        var expected = new[]
+                       {
+                           $"hourly {FormatTime(_hour)} {{1010=-0.25,1011=1.5}}",
+                           $"tick {FormatTime(_hour.AddSeconds(Hour + (10 * Minute)))} {{1010=2,1012=-0.75}}"
+                       };
+
+        Assert.AreEqual(3, folded, "The three ticks of the first hour should have been folded");
+        Assert.AreSequenceEqual(expected, trend.Points.Select(DescribeGoodsPoint), "The folded hour should give each good's mean delta over the ticks that carried one, without the second entry, and the later tick its deltas");
+        Assert.AreEqual(2, trend.TotalCount, "The count should hold the hourly point and the tick");
+    }
+
+    /// <summary>
+    /// A goods read of a range with more points than its maximum, the sparklines' 240 points, gives the newest points,
+    /// oldest first, and the count of all points of the range.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC1")]
+    public async Task HistoryStoreReadGoodsTrendGivesNewestPointsUpToMax()
+    {
+        // Arrange
+        var (store, history, _) = await OpenAsync();
+
+        var profileId = Guid.NewGuid();
+        var maxPoints = HistoryStore.TrendPartSize;
+        var count = maxPoints + 10;
+
+        await StoreAsync(store, Enumerable.Range(1, count).Select(index => Tick(profileId, index * 5, index, Island(IslandKey, IslandName, TrendEntry(ProductGuid, 0f, 0f, index, 1)))).ToArray());
+
+        var query = GoodsQuery(profileId, TrendIsland(IslandKey), [ProductGuid], _hour, _hour.AddHours(1), maxPoints);
+
+        // Act
+        var trend = await history.ReadGoodsTrendAsync(query, TestContext.CancellationToken);
+
+        // Assert
+        var expected = Enumerable.Range(count - maxPoints + 1, maxPoints).Select(index => $"tick {FormatTime(_hour.AddSeconds(index * 5))} {{1010={index}}}");
+
+        Assert.AreSequenceEqual(expected, trend.Points.Select(DescribeGoodsPoint), "The newest points up to the maximum should be returned, oldest first");
+        Assert.AreEqual(count, trend.TotalCount, "The count should hold every point of the range");
+    }
+
+    /// <summary>
+    /// An islands read gives per tick the sum of the building counts of all entries of each asked island, a repeated good
+    /// included as the island's figures count it; an island without entries in a tick, absent from it or not asked for
+    /// gives no figure, and an island the latest tick lacks keeps its earlier figures.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC2")]
+    public async Task HistoryStoreReadIslandsTrendSumsBuildingsPerIslandAndTick()
+    {
+        // Arrange
+        var (store, history, _) = await OpenAsync();
+
+        var profileId = Guid.NewGuid();
+
+        await StoreAsync(store,
+                         Tick(profileId, 10 * Minute, 10, Island(IslandKey, IslandName, TrendEntry(ProductGuid, 0f, 0f, 0f, 2), TrendEntry(OtherProductGuid, 0f, 0f, 0f, 3), TrendEntry(ProductGuid, 0f, 0f, 0f, 4)), Island(OtherIslandKey, "Second island", TrendEntry(ProductGuid, 0f, 0f, 0f, 5)), Island(3, "Third island", TrendEntry(ProductGuid, 0f, 0f, 0f, 100))),
+                         Tick(profileId, 20 * Minute, 20, Island(IslandKey, IslandName), Island(OtherIslandKey, "Second island", TrendEntry(ProductGuid, 0f, 0f, 0f, 1), TrendEntry(OtherProductGuid, 0f, 0f, 0f, 0))),
+                         Tick(profileId, 30 * Minute, 30, Island(OtherIslandKey, "Second island", TrendEntry(ProductGuid, 0f, 0f, 0f, 0))));
+
+        var query = IslandsQuery(profileId, [TrendIsland(IslandKey), TrendIsland(OtherIslandKey)], _hour, _hour.AddHours(1), 240);
+
+        // Act
+        var trend = await history.ReadIslandsTrendAsync(query, TestContext.CancellationToken);
+
+        // Assert
+        var expected = new[]
+                       {
+                           $"tick {FormatTime(_hour.AddSeconds(10 * Minute))} {{1=9,2=5}}",
+                           $"tick {FormatTime(_hour.AddSeconds(20 * Minute))} {{2=1}}",
+                           $"tick {FormatTime(_hour.AddSeconds(30 * Minute))} {{2=0}}"
+                       };
+
+        Assert.AreSequenceEqual(expected, trend.Points.Select(DescribeIslandsPoint), "Each tick should give the summed building counts of every asked island with entries in it");
+        Assert.AreEqual(3, trend.TotalCount, "The count should hold every tick of the range");
+    }
+
+    /// <summary>
+    /// An islands read gives a folded hour of each island the sum of its goods' mean building counts, of the first entry of
+    /// a good, rounded away from zero, as the island's figures do, and follows it with the later ticks.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC2")]
+    public async Task HistoryStoreReadIslandsTrendGivesHourlyBuildingsOfFoldedHour()
+    {
+        // Arrange
+        var (store, history, _) = await OpenAsync();
+
+        var profileId = Guid.NewGuid();
+
+        await StoreAsync(store,
+                         Tick(profileId, 10 * Minute, 10, Island(IslandKey, IslandName, TrendEntry(ProductGuid, 0f, 0f, 0f, 1), TrendEntry(OtherProductGuid, 0f, 0f, 0f, 1), TrendEntry(ThirdProductGuid, 0f, 0f, 0f, 0)), Island(OtherIslandKey, "Second island", TrendEntry(ProductGuid, 0f, 0f, 0f, 3))),
+                         Tick(profileId, 20 * Minute, 20, Island(IslandKey, IslandName, TrendEntry(ProductGuid, 0f, 0f, 0f, 2), TrendEntry(OtherProductGuid, 0f, 0f, 0f, 1), TrendEntry(ProductGuid, 0f, 0f, 0f, 100))),
+                         Tick(profileId, 30 * Minute, 30, Island(IslandKey, IslandName), Island(OtherIslandKey, "Second island", TrendEntry(ProductGuid, 0f, 0f, 0f, 4))),
+                         Tick(profileId, Hour + (10 * Minute), 40, Island(IslandKey, IslandName, TrendEntry(ProductGuid, 0f, 0f, 0f, 5))));
+
+        var folded = await FoldAllAsync(history, profileId);
+        var query = IslandsQuery(profileId, [TrendIsland(IslandKey), TrendIsland(OtherIslandKey)], _hour, _hour.AddHours(2), 240);
+
+        // Act
+        var trend = await history.ReadIslandsTrendAsync(query, TestContext.CancellationToken);
+
+        // Assert
+        var expected = new[]
+                       {
+                           $"hourly {FormatTime(_hour)} {{1=3,2=4}}",
+                           $"tick {FormatTime(_hour.AddSeconds(Hour + (10 * Minute)))} {{1=5}}"
+                       };
+
+        Assert.AreEqual(3, folded, "The three ticks of the first hour should have been folded");
+        Assert.AreSequenceEqual(expected, trend.Points.Select(DescribeIslandsPoint), "The folded hour should round each island's sum of mean building counts up from 2.5 and 3.5, without the second entry");
+        Assert.AreEqual(2, trend.TotalCount, "The count should hold the hourly point and the tick");
+    }
+
+    /// <summary>
+    /// The buildings of a folded hour in an islands read are the ones of the island's figures even where the order the goods'
+    /// mean building counts are added in decides the rounding: the first tick stores the goods in another order than their
+    /// product GUIDs, and added as doubles in GUID order, as the figures do, 3/2 + 44/3 + 7/3 is 18.499999999999996, which
+    /// rounds to 18, while in the stored order 3/2 + 7/3 + 44/3 is 18.5, which rounds to 19.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC2")]
+    public async Task HistoryStoreReadIslandsTrendHourlyBuildingsEqualFiguresNearHalf()
+    {
+        // Arrange
+        var (store, history, _) = await OpenAsync();
+
+        var profileId = Guid.NewGuid();
+
+        await StoreAsync(store,
+                         Tick(profileId, 10 * Minute, 10, Island(IslandKey, IslandName, TrendEntry(ProductGuid, 0f, 0f, 0f, 1), TrendEntry(ThirdProductGuid, 0f, 0f, 0f, 3), TrendEntry(OtherProductGuid, 0f, 0f, 0f, 15))),
+                         Tick(profileId, 20 * Minute, 20, Island(IslandKey, IslandName, TrendEntry(ProductGuid, 0f, 0f, 0f, 2), TrendEntry(ThirdProductGuid, 0f, 0f, 0f, 2), TrendEntry(OtherProductGuid, 0f, 0f, 0f, 15))),
+                         Tick(profileId, 30 * Minute, 30, Island(IslandKey, IslandName, TrendEntry(ThirdProductGuid, 0f, 0f, 0f, 2), TrendEntry(OtherProductGuid, 0f, 0f, 0f, 14))),
+                         Tick(profileId, Hour + (10 * Minute), 40, Island(IslandKey, IslandName, TrendEntry(ProductGuid, 0f, 0f, 0f, 5))));
+
+        var folded = await FoldAllAsync(history, profileId);
+        var island = TrendIsland(IslandKey);
+
+        // Act
+        var islands = await history.ReadIslandsTrendAsync(IslandsQuery(profileId, [island], _hour, _hour.AddHours(2), 240), TestContext.CancellationToken);
+        var figures = await history.ReadFiguresTrendAsync(FiguresQuery(profileId, island, _hour, _hour.AddHours(2), 240), TestContext.CancellationToken);
+
+        // Assert
+        var islandsHourly = islands.Points.Where(point => point.IsHourly).Select(point => point.Buildings.TryGetValue(island, out var buildings) ? (long?)buildings : null).ToList();
+        var figuresHourly = figures.Points.Where(point => point.IsHourly).Select(point => point.Buildings).ToList();
+
+        Assert.AreEqual(3, folded, "The three ticks of the first hour should have been folded");
+        Assert.AreSequenceEqual(new long?[] { 18 }, figuresHourly, "The figures should add in GUID order and round the doubles' sum 18.499999999999996 to 18");
+        Assert.AreSequenceEqual(figuresHourly, islandsHourly, "The islands read should give the folded hour the buildings of the island's figures");
+    }
+
+    /// <summary>
+    /// The parts of an islands read hold at most the part size in island points, a tick or hourly point of one island
+    /// counting one: islands are cut into chunks of the part size filled first, the points of a chunk into slices, every
+    /// island point of the read lies in exactly one part, no part is empty, and no points or no islands give no part.
+    /// </summary>
+    /// <param name="pointCount">The number of points</param>
+    /// <param name="islandCount">The number of islands</param>
+    /// <param name="expectedParts">The number of parts</param>
+    [TestMethod]
+    [TestCategory("AC7")]
+    [DataRow(240, 1, 1)]
+    [DataRow(240, 24, 24)]
+    [DataRow(240, 240, 240)]
+    [DataRow(240, 241, 241)]
+    [DataRow(240, 300, 300)]
+    [DataRow(0, 24, 0)]
+    [DataRow(5, 0, 0)]
+    public void HistoryStorePlanIslandPartsHoldAtMostPartSizeIslandPoints(int pointCount, int islandCount, int expectedParts)
+    {
+        // Act
+        var parts = HistoryStore.PlanIslandParts(pointCount, islandCount, HistoryStore.TrendPartSize);
+
+        // Assert
+        Assert.HasCount(expectedParts, parts, "The read should take one part per slice of each chunk of islands");
+        Assert.IsLessThanOrEqualTo(HistoryStore.TrendPartSize, parts.Select(IslandPointsOf).DefaultIfEmpty(0).Max(), "No part should hold more island points than the part size");
+        Assert.AreEqual(0, parts.Count(part => part.PointCount < 1 || part.IslandCount < 1), "No part should be empty");
+        Assert.AreEqual(pointCount * islandCount, parts.Sum(IslandPointsOf), "The parts together should hold every island point of the read once");
+        Assert.AreEqual(pointCount * islandCount, CountCoveredIslandPoints(parts, pointCount, islandCount), "Every island point of the read should lie in a part");
+    }
+
+    /// <summary>
+    /// An islands part asked for while the trend gate is held waits for it, then reads.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public async Task HistoryStoreReadIslandsTrendPartWaitsForTrendGate()
+    {
+        // Arrange
+        var (store, history, _) = await OpenAsync();
+
+        var gate = _databases[^1].TrendGate;
+        var profileId = Guid.NewGuid();
+        var cancellationToken = TestContext.CancellationToken;
+
+        await StoreAsync(store, Tick(profileId, 10 * Minute, 10, Island(IslandKey, IslandName, TrendEntry(ProductGuid, 0f, 0f, 0f, 3))));
+
+        var query = IslandsQuery(profileId, [TrendIsland(IslandKey)], _hour, _hour.AddHours(1), 240);
+
+        await gate.WaitAsync(cancellationToken);
+
+        // Act
+        Task<HistoryTrend<HistoryIslandsPoint>> read;
+        bool completedWhileHeld;
+
+        try
+        {
+            read = history.ReadIslandsTrendAsync(query, cancellationToken);
+            completedWhileHeld = await CompletesWithinWaitAsync(read);
+        }
+        finally
+        {
+            gate.Release();
+        }
+
+        var trend = await read.WaitAsync(_stepBound, cancellationToken);
+
+        // Assert
+        Assert.IsFalse(completedWhileHeld, "The read should wait while the trend gate is held");
+        Assert.AreSequenceEqual(new[] { $"tick {FormatTime(_hour.AddSeconds(10 * Minute))} {{1=3}}" }, trend.Points.Select(DescribeIslandsPoint), "The read should give its point once the gate is free");
+    }
+
+    /// <summary>
+    /// An islands read of more island points than one part holds, over two chunks of islands (241 stored and one the
+    /// history lacks) and a folded hour with two ticks, gives every island at every point the buildings figure its own
+    /// figures read gives, and the same count.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public async Task HistoryStoreReadIslandsTrendPartsGiveSamePointsAsOneRead()
+    {
+        // Arrange
+        var (store, history, _) = await OpenAsync();
+
+        var profileId = Guid.NewGuid();
+        var storedIslands = HistoryStore.TrendPartSize + 1;
+
+        await StoreAsync(store,
+                         ManyIslandsTick(profileId, 10 * Minute, 1, storedIslands),
+                         ManyIslandsTick(profileId, 20 * Minute, 2, storedIslands),
+                         ManyIslandsTick(profileId, Hour + (10 * Minute), 3, storedIslands),
+                         ManyIslandsTick(profileId, Hour + (20 * Minute), 4, storedIslands));
+
+        var folded = await FoldAllAsync(history, profileId);
+        var query = IslandsQuery(profileId, [.. Enumerable.Range(1, storedIslands + 1).Select(TrendIsland)], _hour, _hour.AddHours(2), 240);
+        var (expected, expectedCount) = await ReadFiguresOfEachIslandAsync(history, query);
+
+        // Act
+        var trend = await history.ReadIslandsTrendAsync(query, TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(2, folded, "The two ticks of the first hour should have been folded");
+        Assert.HasCount(3, expected, "The figures reads should give the hourly point and the two ticks");
+        Assert.AreSequenceEqual(expected, trend.Points.Select(DescribeIslandsPoint), "Every island should get the buildings figure of its own figures read at every point, whatever part it was read in");
+        Assert.AreEqual(expectedCount, trend.TotalCount, "The count should be the figures reads' count");
+    }
+
+    /// <summary>
     /// Creates an entry for a trend: the generation, consumption, delta and building count, everything else zero.
     /// </summary>
     /// <param name="productGuid">The product GUID</param>
@@ -1983,6 +2311,139 @@ public sealed class HistoryStoreTests
     private static string DescribeFiguresPoint(HistoryFiguresPoint point)
     {
         return $"{(point.IsHourly ? "hourly" : "tick")} {FormatTime(point.Time)} {point.Buildings?.ToString(CultureInfo.InvariantCulture) ?? "null"} {point.ProducedGoods?.ToString(CultureInfo.InvariantCulture) ?? "null"} {point.GoodsInDeficit?.ToString(CultureInfo.InvariantCulture) ?? "null"}";
+    }
+
+    /// <summary>
+    /// Creates the goods trend query of an island.
+    /// </summary>
+    /// <param name="profileId">The profile identity</param>
+    /// <param name="island">The island</param>
+    /// <param name="productGuids">The product GUIDs of the goods</param>
+    /// <param name="rangeStart">The range start, inclusive</param>
+    /// <param name="rangeEnd">The range end, exclusive</param>
+    /// <param name="maxPoints">The maximum number of points</param>
+    /// <returns>The query</returns>
+    private static HistoryGoodsTrendQuery GoodsQuery(Guid profileId, HistoryIslandKey island, IReadOnlyList<int> productGuids, DateTimeOffset rangeStart, DateTimeOffset rangeEnd, int maxPoints)
+    {
+        return new HistoryGoodsTrendQuery
+               {
+                   ProfileId = profileId,
+                   Island = island,
+                   ProductGuids = productGuids,
+                   RangeStart = rangeStart,
+                   RangeEnd = rangeEnd,
+                   MaxPoints = maxPoints
+               };
+    }
+
+    /// <summary>
+    /// Creates the islands trend query of a set of islands.
+    /// </summary>
+    /// <param name="profileId">The profile identity</param>
+    /// <param name="islands">The islands</param>
+    /// <param name="rangeStart">The range start, inclusive</param>
+    /// <param name="rangeEnd">The range end, exclusive</param>
+    /// <param name="maxPoints">The maximum number of points</param>
+    /// <returns>The query</returns>
+    private static HistoryIslandsTrendQuery IslandsQuery(Guid profileId, IReadOnlyList<HistoryIslandKey> islands, DateTimeOffset rangeStart, DateTimeOffset rangeEnd, int maxPoints)
+    {
+        return new HistoryIslandsTrendQuery
+               {
+                   ProfileId = profileId,
+                   Islands = islands,
+                   RangeStart = rangeStart,
+                   RangeEnd = rangeEnd,
+                   MaxPoints = maxPoints
+               };
+    }
+
+    /// <summary>
+    /// Describes a point of a goods trend: kind, time and the deltas by product GUID in ascending order.
+    /// </summary>
+    /// <param name="point">The point</param>
+    /// <returns>The text</returns>
+    private static string DescribeGoodsPoint(HistoryGoodsPoint point)
+    {
+        var deltas = point.Deltas.OrderBy(pair => pair.Key).Select(pair => $"{pair.Key.ToString(CultureInfo.InvariantCulture)}={FormatValue(pair.Value)}");
+
+        return $"{(point.IsHourly ? "hourly" : "tick")} {FormatTime(point.Time)} {{{string.Join(',', deltas)}}}";
+    }
+
+    /// <summary>
+    /// Describes a point of an islands trend: kind, time and the buildings by island key number in ascending order.
+    /// </summary>
+    /// <param name="point">The point</param>
+    /// <returns>The text</returns>
+    private static string DescribeIslandsPoint(HistoryIslandsPoint point)
+    {
+        return DescribeBuildings(point.IsHourly, point.Time, point.Buildings.Select(pair => (pair.Key.SessionGuid, pair.Value)));
+    }
+
+    /// <summary>
+    /// Describes the buildings of islands at a point.
+    /// </summary>
+    /// <param name="isHourly">Whether the point is an hour</param>
+    /// <param name="time">The time</param>
+    /// <param name="buildings">The key number and buildings of each island with a figure</param>
+    /// <returns>The text</returns>
+    private static string DescribeBuildings(bool isHourly, DateTimeOffset time, IEnumerable<(int Key, long Buildings)> buildings)
+    {
+        var figures = buildings.OrderBy(island => island.Key).Select(island => $"{island.Key.ToString(CultureInfo.InvariantCulture)}={island.Buildings.ToString(CultureInfo.InvariantCulture)}");
+
+        return $"{(isHourly ? "hourly" : "tick")} {FormatTime(time)} {{{string.Join(',', figures)}}}";
+    }
+
+    /// <summary>
+    /// Counts the island points of a part of an islands read.
+    /// </summary>
+    /// <param name="slice">The part</param>
+    /// <returns>The number of island points</returns>
+    private static int IslandPointsOf(TrendIslandSlice slice)
+    {
+        return slice.PointCount * slice.IslandCount;
+    }
+
+    /// <summary>
+    /// Counts the distinct island points of a read that its parts cover.
+    /// </summary>
+    /// <param name="parts">The parts</param>
+    /// <param name="pointCount">The number of points of the read</param>
+    /// <param name="islandCount">The number of islands of the read</param>
+    /// <returns>The number of distinct island points inside the read that lie in a part</returns>
+    private static int CountCoveredIslandPoints(List<TrendIslandSlice> parts, int pointCount, int islandCount)
+    {
+        return parts.SelectMany(part => Enumerable.Range(part.PointStart, part.PointCount).SelectMany(point => Enumerable.Range(part.IslandStart, part.IslandCount).Select(island => (Point: point, Island: island))))
+                    .Where(cell => cell.Point >= 0 && cell.Point < pointCount && cell.Island >= 0 && cell.Island < islandCount)
+                    .Distinct()
+                    .Count();
+    }
+
+    /// <summary>
+    /// Creates a tick of many islands with key numbers from 1: an island is absent when its number plus the tick's number
+    /// is a multiple of 5, without entries when it is a multiple of 7, and else holds two goods with building counts that
+    /// follow both numbers.
+    /// </summary>
+    /// <param name="profileId">The profile identity</param>
+    /// <param name="seconds">The receive time in seconds after the hour <c>H</c></param>
+    /// <param name="number">The number of the tick</param>
+    /// <param name="islandCount">The number of islands</param>
+    /// <returns>The tick</returns>
+    private static ContractTick ManyIslandsTick(Guid profileId, long seconds, int number, int islandCount)
+    {
+        return Tick(profileId, seconds, seconds, [.. Enumerable.Range(1, islandCount).Where(key => (key + number) % 5 != 0).Select(key => ManyIslandsIsland(key, number))]);
+    }
+
+    /// <summary>
+    /// Creates an island of <see cref="ManyIslandsTick" />.
+    /// </summary>
+    /// <param name="key">The key number of the island</param>
+    /// <param name="number">The number of the tick</param>
+    /// <returns>The island</returns>
+    private static ContractTickIsland ManyIslandsIsland(int key, int number)
+    {
+        return (key + number) % 7 == 0
+                   ? Island(key, IslandName)
+                   : Island(key, IslandName, TrendEntry(ProductGuid, 0f, 0f, 0f, (key + number) % 4), TrendEntry(OtherProductGuid, 0f, 0f, 0f, key % 3));
     }
 
     /// <summary>
@@ -2567,6 +3028,34 @@ public sealed class HistoryStoreTests
         var series = await history.ReadSeriesAsync(Query(profileId, rangeStart, rangeEnd), TestContext.CancellationToken);
 
         return series.Select(DescribePoint).ToList();
+    }
+
+    /// <summary>
+    /// Reads the figures of each island of an islands query on its own and describes, per point, the buildings of every
+    /// island with a figure, as <see cref="DescribeIslandsPoint" /> does.
+    /// </summary>
+    /// <param name="history">The history store</param>
+    /// <param name="query">The islands query</param>
+    /// <returns>The points described and the count of the figures reads</returns>
+    private async Task<(List<string> Points, int TotalCount)> ReadFiguresOfEachIslandAsync(HistoryStore history, HistoryIslandsTrendQuery query)
+    {
+        var trends = new List<(int Key, HistoryTrend<HistoryFiguresPoint> Trend)>();
+
+        foreach (var island in query.Islands)
+        {
+            var trend = await history.ReadFiguresTrendAsync(FiguresQuery(query.ProfileId, island, query.RangeStart, query.RangeEnd, query.MaxPoints), TestContext.CancellationToken);
+
+            trends.Add((island.SessionGuid, trend));
+        }
+
+        var first = trends[0].Trend;
+        var points = first.Points.Select((point, index) => DescribeBuildings(point.IsHourly,
+                                                                             point.Time,
+                                                                             trends.Where(island => island.Trend.Points[index].Buildings is not null)
+                                                                                   .Select(island => (island.Key, island.Trend.Points[index].Buildings.GetValueOrDefault()))))
+                                 .ToList();
+
+        return (points, first.TotalCount);
     }
 
     #endregion // Methods
