@@ -23,6 +23,16 @@ public abstract class DataPageBase : ComponentBase, IDisposable
     private CancellationToken _cancellationToken;
 
     /// <summary>
+    /// The cancellation source of the details' reads, replaced when the address changes.
+    /// </summary>
+    private CancellationTokenSource? _detailsCancellation;
+
+    /// <summary>
+    /// The token of <see cref="_detailsCancellation" />, read once so that no read touches a disposed source.
+    /// </summary>
+    private CancellationToken _detailsToken;
+
+    /// <summary>
     /// A value that indicates whether the page is disposed.
     /// </summary>
     private volatile bool _isDisposed;
@@ -62,6 +72,12 @@ public abstract class DataPageBase : ComponentBase, IDisposable
     /// </summary>
     [CascadingParameter]
     public UiTexts Texts { get; set; } = UiTexts.For(UiLanguage.English);
+
+    /// <summary>
+    /// Gets or sets the chart choice of range and time axis.
+    /// </summary>
+    [CascadingParameter]
+    public ChartChoice ChartChoice { get; set; } = ChartChoice.Default;
 
     /// <summary>
     /// Gets or sets the request the page is rendered for; its abort cancels the page's reads during prerendering.
@@ -230,6 +246,7 @@ public abstract class DataPageBase : ComponentBase, IDisposable
             Show(PageMode.Loading, null);
         }
 
+        var detailsToken = _detailsToken;
         var read = await Reader.ReadAsync(profileId, island, _cancellationToken).ConfigureAwait(true);
 
         if (_isDisposed)
@@ -246,8 +263,29 @@ public abstract class DataPageBase : ComponentBase, IDisposable
 
         if (ShowRead(read) is { } ready && RendererInfo.IsInteractive)
         {
-            await ReadDetailsAsync(ready, _cancellationToken).ConfigureAwait(true);
+            try
+            {
+                await ReadDetailsAsync(ready, detailsToken).ConfigureAwait(true);
+            }
+            catch (OperationCanceledException) when (detailsToken.IsCancellationRequested && _cancellationToken.IsCancellationRequested == false)
+            {
+                // A new address cancelled the details' read: the pending read shows the new one
+            }
         }
+    }
+
+    /// <summary>
+    /// Cancels the details' read of the earlier address and gives the next one a source of its own.
+    /// </summary>
+    private void ReplaceDetailsCancellation()
+    {
+        var earlier = _detailsCancellation;
+
+        _detailsCancellation = CancellationTokenSource.CreateLinkedTokenSource(_cancellationToken);
+        _detailsToken = _detailsCancellation.Token;
+
+        earlier?.Cancel();
+        earlier?.Dispose();
     }
 
     /// <summary>
@@ -343,6 +381,7 @@ public abstract class DataPageBase : ComponentBase, IDisposable
     {
         _cancellation = CancellationTokenSource.CreateLinkedTokenSource(HttpContext?.RequestAborted ?? CancellationToken.None);
         _cancellationToken = _cancellation.Token;
+        ReplaceDetailsCancellation();
         State.Changed += OnStateChanged;
     }
 
@@ -358,6 +397,7 @@ public abstract class DataPageBase : ComponentBase, IDisposable
 
         _addressKey = key;
 
+        ReplaceDetailsCancellation();
         ClearDetails();
 
         return LoadAsync();
@@ -388,6 +428,8 @@ public abstract class DataPageBase : ComponentBase, IDisposable
         _isDisposed = true;
         State.Changed -= OnStateChanged;
         _cancellation?.Cancel();
+        _detailsCancellation?.Cancel();
+        _detailsCancellation?.Dispose();
         _cancellation?.Dispose();
     }
 

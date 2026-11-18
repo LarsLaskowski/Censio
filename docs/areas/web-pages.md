@@ -69,7 +69,8 @@ application rely on it.
 
 - The heading is the island's name; under it `<region> · <profile>`, the region a link back to its island list.
 - Above the goods table, under the as-of line, the chart `Overview` / `Übersicht` shows the island's key figures over the
-  last 24 hours up to the latest tick ([`web-charts.md`](web-charts.md)).
+  range of the chart choice (by default the last 24 hours) up to the latest tick, with the range picker and the time-axis
+  switch under its heading ([`web-charts.md`](web-charts.md)).
 - The table lists one row per entry of the island in the latest tick, with the columns (an unlabelled icon column of
   24 pixels, then) `Good`, `Production`, `Consumption`, `Delta`, `Buildings`, `Productivity` (German `Ware`,
   `Produktion`, `Verbrauch`, `Delta`, `Gebäude`, `Produktivität`).
@@ -280,4 +281,4 @@ figure and the browser's offset are never logged.
 - What the Companion sends and how it is stored: [`ingest.md`](ingest.md), [`contract.md`](contract.md).
 - The stored history, the series read and the deletion's rules: [`history.md`](history.md).
 - The charts, their range, gaps, tooltip, colours and reads: [`web-charts.md`](web-charts.md).
-- Deficits and surpluses per region, efficiency, economics, workforce, search, a range picker, sparklines and trend arrows, the phone layout and sorting by column: later features (#37, #38, #47 to #51, #53).
+- Deficits and surpluses per region, efficiency, economics, workforce, search, sparklines and trend arrows, the phone layout and sorting by column: later features (#38, #47 to #51, #53).

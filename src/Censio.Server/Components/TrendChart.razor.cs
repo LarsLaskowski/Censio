@@ -20,16 +20,6 @@ public sealed partial class TrendChart : IDisposable
     private const string TooltipTimeFormat = "yyyy'-'MM'-'dd'T'HH':'mm':'ss'.'fffffff";
 
     /// <summary>
-    /// The format of the labels of the time axis: digits and a literal colon.
-    /// </summary>
-    private const string TimeLabelFormat = "HH\\:mm";
-
-    /// <summary>
-    /// The most intervals the time axis is divided into.
-    /// </summary>
-    private const int MaxLabelIntervals = 8;
-
-    /// <summary>
     /// The height above which a hovered point leaves no room for a tooltip above it.
     /// </summary>
     private const double BelowLimit = 120;
@@ -37,11 +27,6 @@ public sealed partial class TrendChart : IDisposable
     #endregion // Constants
 
     #region Fields
-
-    /// <summary>
-    /// The distances between two labels of the time axis the chart may take, the smallest first.
-    /// </summary>
-    private static readonly TimeSpan[] _timeLabelSpacings = [TimeSpan.FromMinutes(10), TimeSpan.FromMinutes(15), TimeSpan.FromMinutes(30), TimeSpan.FromHours(1), TimeSpan.FromHours(2), TimeSpan.FromHours(3)];
 
     /// <summary>
     /// Cancels the call to the browser when the component is disposed.
@@ -54,7 +39,12 @@ public sealed partial class TrendChart : IDisposable
     private TrendRead? _lastRead;
 
     /// <summary>
-    /// A value that indicates whether the last read holds no value at all.
+    /// The axis the last read was looked at on.
+    /// </summary>
+    private ChartAxis _lastAxis;
+
+    /// <summary>
+    /// A value that indicates whether the last read holds no value to draw on the axis.
     /// </summary>
     private bool _hasNoValues;
 
@@ -74,9 +64,9 @@ public sealed partial class TrendChart : IDisposable
     private string[] _palette = [];
 
     /// <summary>
-    /// The kind, theme, language and label spacing the options were made for.
+    /// The kind, theme, language, axis, label spacing and label format the options were made for.
     /// </summary>
-    private (TrendKind Kind, UiTheme Theme, UiLanguage Language, TimeSpan Spacing)? _optionsKey;
+    private (TrendKind Kind, UiTheme Theme, UiLanguage Language, ChartAxis Axis, TimeSpan Spacing, string Format)? _optionsKey;
 
     /// <summary>
     /// The chart component, or <see langword="null"/> while none is drawn.
@@ -137,6 +127,12 @@ public sealed partial class TrendChart : IDisposable
     public DateTimeOffset? AsOf { get; set; }
 
     /// <summary>
+    /// Gets or sets the time axis the chart is drawn on.
+    /// </summary>
+    [Parameter]
+    public ChartAxis Axis { get; set; } = ChartAxis.RealTime;
+
+    /// <summary>
     /// Gets or sets the number of the read, which grows with every read.
     /// </summary>
     [Parameter]
@@ -184,23 +180,33 @@ public sealed partial class TrendChart : IDisposable
     #region Methods
 
     /// <summary>
-    /// Tells whether no point of a view holds a value.
+    /// Tells whether no point of a view that is drawn on an axis holds a value.
     /// </summary>
     /// <param name="view">The view</param>
+    /// <param name="axis">The axis</param>
     /// <returns><see langword="true"/> when no point holds a value</returns>
-    private static bool HoldsNoValue(TrendView view)
+    private static bool HoldsNoValue(TrendView view, ChartAxis axis)
     {
-        return view.Points.All(point => point.Values.All(value => value is null));
+        return view.Points.Where(point => axis == ChartAxis.RealTime || TrendSeriesBuilder.IsOnGameAxis(point)).All(point => point.Values.All(value => value is null));
     }
 
     /// <summary>
-    /// Gives the smallest distance between two labels of the time axis that divides a span into few enough intervals.
+    /// Gives the time a point is drawn at on an axis.
     /// </summary>
-    /// <param name="span">The time the chart shows</param>
-    /// <returns>The distance</returns>
-    private static TimeSpan LabelSpacing(TimeSpan span)
+    /// <param name="point">The point</param>
+    /// <param name="axis">The axis</param>
+    /// <param name="offsetMinutes">The UTC offset of the browser in minutes, or <see langword="null"/> for UTC</param>
+    /// <returns>The time, or <see langword="null"/> when the point is not drawn</returns>
+    private static DateTime? DrawnTime(TrendPoint point, ChartAxis axis, int? offsetMinutes)
     {
-        return _timeLabelSpacings.FirstOrDefault(spacing => span / spacing <= MaxLabelIntervals, _timeLabelSpacings[^1]);
+        if (axis == ChartAxis.RealTime)
+        {
+            return TrendSeriesBuilder.LocalTime(point.Time, offsetMinutes);
+        }
+
+        return TrendSeriesBuilder.IsOnGameAxis(point)
+                   ? TrendSeriesBuilder.GameAxisTime(point.GameTime!.Value)
+                   : null;
     }
 
     /// <summary>
@@ -208,8 +214,11 @@ public sealed partial class TrendChart : IDisposable
     /// </summary>
     private void UpdateOptions()
     {
-        var spacing = LabelSpacing(_drawn is { } drawn ? drawn.Last - drawn.First : TimeSpan.FromDays(1));
-        var key = (Kind, Theme, Language, spacing);
+        var axis = _drawn?.Axis ?? Axis;
+        var span = _drawn is { } drawn ? drawn.Last - drawn.First : TimeSpan.FromDays(1);
+        var spacing = TrendSeriesBuilder.LabelSpacing(span);
+        var format = TrendSeriesBuilder.TimeLabelFormat(axis, span);
+        var key = (Kind, Theme, Language, axis, spacing, format);
 
         if (_optionsKey == key)
         {
@@ -221,7 +230,7 @@ public sealed partial class TrendChart : IDisposable
         _options = new TimeSeriesChartOptions
                    {
                        ChartPalette = _palette,
-                       TimeLabelFormat = TimeLabelFormat,
+                       TimeLabelFormat = format,
                        TimeLabelSpacing = spacing,
                        TimeLabelSpacingRounding = true,
                        TooltipTimeLabelFormat = TooltipTimeFormat,
@@ -287,6 +296,11 @@ public sealed partial class TrendChart : IDisposable
             lines.Add(Texts.HourlyAverage);
         }
 
+        if (drawn.Axis == ChartAxis.GameTime && point.GameTime is { } gameTime)
+        {
+            lines.Add(string.Format(CultureInfo.InvariantCulture, Texts.GameTimeFormat, PageFormat.GameTime(gameTime)));
+        }
+
         lines.AddRange(names.Select((name, line) => $"{name}: {FormatValue(line, point.Values[line])}"));
 
         return lines;
@@ -346,7 +360,10 @@ public sealed partial class TrendChart : IDisposable
 
         foreach (var point in view.Points)
         {
-            pointsByTime.TryAdd(TrendSeriesBuilder.LocalTime(point.Time, offsetMinutes), point);
+            if (DrawnTime(point, Axis, offsetMinutes) is { } drawnTime)
+            {
+                pointsByTime.TryAdd(drawnTime, point);
+            }
         }
 
         return new DrawnTrend
@@ -354,10 +371,11 @@ public sealed partial class TrendChart : IDisposable
                    Read = read,
                    ReadNumber = readNumber,
                    OffsetMinutes = offsetMinutes,
+                   Axis = Axis,
                    PointsByTime = pointsByTime,
                    First = pointsByTime.Keys.Min(),
                    Last = pointsByTime.Keys.Max(),
-                   Series = [.. TrendSeriesBuilder.Build(view, LineNames, offsetMinutes)],
+                   Series = [.. TrendSeriesBuilder.Build(view, LineNames, offsetMinutes, Axis)],
                    SeriesTexts = Texts
                };
     }
@@ -390,17 +408,18 @@ public sealed partial class TrendChart : IDisposable
     /// <inheritdoc />
     protected override void OnParametersSet()
     {
-        if (ReferenceEquals(Read, _lastRead) == false)
+        if (ReferenceEquals(Read, _lastRead) == false || Axis != _lastAxis)
         {
             _lastRead = Read;
-            _hasNoValues = Read?.View is { } view && HoldsNoValue(view);
+            _lastAxis = Axis;
+            _hasNoValues = Read?.View is { } view && HoldsNoValue(view, Axis);
         }
 
         if (Read?.View is null || _hasNoValues)
         {
             _drawn = null;
         }
-        else if (_drawn is { } drawn && ReferenceEquals(drawn.SeriesTexts, Texts) == false)
+        else if (_drawn is { } drawn && (ReferenceEquals(drawn.SeriesTexts, Texts) == false || drawn.Axis != Axis))
         {
             _drawn = CreateDrawn(drawn.Read, drawn.ReadNumber, drawn.OffsetMinutes);
             _isRebuildPending = true;

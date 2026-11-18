@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.RegularExpressions;
 
 using AngleSharp.Dom;
@@ -7,6 +8,7 @@ using Bunit;
 using Censio.Contracts;
 using Censio.Server.Components.Layout;
 using Censio.Server.Components.Pages;
+using Censio.Server.Data;
 
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Rendering;
@@ -164,6 +166,235 @@ public sealed partial class GoodTrendTests
         Assert.Contains(range, page.FindAll("p").Select(paragraph => paragraph.TextContent.Trim()).ToList(), $"The page should show the range line '{range}'");
         Assert.AreSequenceEqual(headings.Split('|'), page.FindAll("h2").Select(heading => heading.TextContent.Trim()).ToList(), "The page should show the heading of each chart");
         Assert.AreSequenceEqual(legend.Split('|'), page.FindAll(ChartSelector)[0].ParentElement!.QuerySelectorAll(".mud-chart-legend-item").Select(item => item.TextContent.Trim()).ToList(), "The chart should name its three lines in the language shown");
+    }
+
+    /// <summary>
+    /// Choosing another range in the controls reads both charts again with that range, shows the new range line and
+    /// selection, and redraws both charts, without a reload.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC4")]
+    public async Task GoodTrendRangeChangeRereadsBothChartsWithRange()
+    {
+        // Arrange
+        var fake = new FakeHistoryTrends
+                   {
+                       GoodTrend = FakeHistoryTrends.CreateGoodTrend(_pointEnd, 2)
+                   };
+
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken, trends: fake);
+
+        await StoreProfileAsync(host);
+
+        var layout = RenderGoodInFrame(host);
+
+        await layout.WaitForAssertionAsync(() => Assert.AreSequenceEqual(_twoSmallCharts, PointCounts(layout), "Both charts should be drawn"), PageTestHost.WaitBound);
+
+        // Act
+        await PageTestHost.ChooseAsync(layout, "Period", "Last 7 days");
+
+        // Assert
+        await layout.WaitForAssertionAsync(() => Assert.HasCount(4, fake.GoodQueries, "Both charts should be read again"), PageTestHost.WaitBound);
+        await layout.WaitForAssertionAsync(() => Assert.AreSequenceEqual(_twoSmallCharts, PointCounts(layout), "Both charts should be drawn again"), PageTestHost.WaitBound);
+
+        var queries = fake.GoodQueries.Skip(2).Select(query => $"{query.RangeStart.UtcDateTime.ToString("O", CultureInfo.InvariantCulture)} {query.Resolution}").ToList();
+        var expected = new[] { "2026-11-06T12:00:00.0000000Z Hours", "2026-11-06T12:00:00.0000000Z Hours" };
+
+        Assert.AreSequenceEqual(expected, queries, "Both reads should ask for the week at hourly resolution");
+        Assert.AreEqual("Last 7 days", string.Join('|', PageTestHost.Selected(layout, "Period")), "The new range should be selected");
+        Assert.Contains("Last 7 days up to the latest tick", layout.FindAll("p").Select(paragraph => paragraph.TextContent.Trim()).ToList(), "The range line should name the new range");
+    }
+
+    /// <summary>
+    /// Choosing the game-time axis redraws both charts from the reads they hold: no chart is read again, the charts stay
+    /// drawn and their time axis carries no label.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC4")]
+    public async Task GoodTrendAxisChangeRedrawsWithoutRead()
+    {
+        // Arrange
+        var fake = new FakeHistoryTrends
+                   {
+                       GoodTrend = GameTimeTrend(3)
+                   };
+
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken, trends: fake);
+
+        await StoreProfileAsync(host);
+
+        var layout = RenderGoodInFrame(host);
+
+        await layout.WaitForAssertionAsync(() => Assert.AreSequenceEqual(_twoLargerCharts, PointCounts(layout), "Both charts should be drawn"), PageTestHost.WaitBound);
+
+        var callsBefore = fake.CallCount;
+
+        // Act
+        await PageTestHost.ChooseAsync(layout, "Time axis", "Game time");
+
+        // Assert
+        await layout.WaitForAssertionAsync(() => Assert.IsTrue(layout.FindAll(".mud-charts-xaxis > *").All(label => label.TextContent.Length == 0), "The game-time axis should carry no time label"), PageTestHost.WaitBound);
+        await Task.Delay(NegativeWaitMilliseconds, TestContext.CancellationToken);
+
+        Assert.AreEqual(callsBefore, fake.CallCount, "An axis change should read no chart");
+        Assert.AreSequenceEqual(_twoLargerCharts, PointCounts(layout), "Both charts should stay drawn");
+        Assert.AreEqual("Game time", string.Join('|', PageTestHost.Selected(layout, "Time axis")), "The new axis should be selected");
+    }
+
+    /// <summary>
+    /// A range chosen while a chart read runs cancels that read, and the charts show the read of the new range.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC4")]
+    public async Task GoodTrendRangeChangeCancelsEarlierRead()
+    {
+        // Arrange
+        var fake = new FakeHistoryTrends
+                   {
+                       GoodTrend = FakeHistoryTrends.CreateGoodTrend(_pointEnd, 2)
+                   };
+
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken, trends: fake);
+
+        await StoreProfileAsync(host);
+
+        fake.Hold();
+
+        var layout = RenderGoodInFrame(host);
+
+        await fake.WaitForCallsAsync(1, PageTestHost.WaitBound, TestContext.CancellationToken);
+
+        // Act
+        await PageTestHost.ChooseAsync(layout, "Period", "Last hour");
+        await fake.WaitForCallsAsync(2, PageTestHost.WaitBound, TestContext.CancellationToken);
+
+        var cancelledWhileHeld = fake.CancelledCount;
+
+        fake.GoodTrend = FakeHistoryTrends.CreateGoodTrend(_pointEnd, 3);
+        fake.Release();
+
+        // Assert
+        await layout.WaitForAssertionAsync(() => Assert.AreSequenceEqual(_twoLargerCharts, PointCounts(layout), "The charts should show the read of the new range"), PageTestHost.WaitBound);
+
+        Assert.AreEqual(1, cancelledWhileHeld, "The read of the earlier range should have been cancelled");
+        Assert.AreEqual("2026-11-13T11:00:00.0000000Z", fake.GoodQueries[^1].RangeStart.UtcDateTime.ToString("O", CultureInfo.InvariantCulture), "The last read should be the one of the last hour");
+    }
+
+    /// <summary>
+    /// Several quick choices end with the charts of the last one.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC4")]
+    public async Task GoodTrendQuickChoicesShowOnlyLast()
+    {
+        // Arrange
+        var fake = new FakeHistoryTrends
+                   {
+                       GoodTrend = FakeHistoryTrends.CreateGoodTrend(_pointEnd, 2)
+                   };
+
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken, trends: fake);
+
+        await StoreProfileAsync(host);
+
+        fake.Hold();
+
+        var layout = RenderGoodInFrame(host);
+
+        await fake.WaitForCallsAsync(1, PageTestHost.WaitBound, TestContext.CancellationToken);
+
+        // Act
+        await PageTestHost.ChooseAsync(layout, "Period", "Last hour");
+        await PageTestHost.ChooseAsync(layout, "Period", "Last 7 days");
+        fake.Release();
+
+        // Assert
+        await layout.WaitForAssertionAsync(() => Assert.AreSequenceEqual(_twoSmallCharts, PointCounts(layout), "Both charts should be drawn"), PageTestHost.WaitBound);
+
+        var lastTwo = fake.GoodQueries.Skip(fake.GoodQueries.Count - 2).Select(query => query.Resolution).ToList();
+
+        Assert.AreEqual("Last 7 days", string.Join('|', PageTestHost.Selected(layout, "Period")), "The last choice should be selected");
+        Assert.AreSequenceEqual(new[] { HistoryTrendResolution.Hours, HistoryTrendResolution.Hours }, lastTwo, "The charts should be read last for the last choice");
+        Assert.Contains("Last 7 days up to the latest tick", layout.FindAll("p").Select(paragraph => paragraph.TextContent.Trim()).ToList(), "The range line should name the last choice");
+    }
+
+    /// <summary>
+    /// After a failed read a choice reads the charts again.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC4")]
+    public async Task GoodTrendChoiceAfterFailedReadReadsAgain()
+    {
+        // Arrange
+        var fake = new FakeHistoryTrends
+                   {
+                       GoodTrend = FakeHistoryTrends.CreateGoodTrend(_pointEnd, 2),
+                       Failure = new InvalidOperationException("The history is gone")
+                   };
+
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken, trends: fake);
+
+        await StoreProfileAsync(host);
+
+        var layout = RenderGoodInFrame(host);
+        var failed = UiTexts.For(UiLanguage.English).ReadFailed;
+
+        await layout.WaitForAssertionAsync(() => Assert.AreEqual(2, CountOf(PageTestHost.Text(layout), failed), "Both charts should show the reload text"), PageTestHost.WaitBound);
+
+        fake.Failure = null;
+
+        // Act
+        await PageTestHost.ChooseAsync(layout, "Period", "Last hour");
+
+        // Assert
+        await layout.WaitForAssertionAsync(() => Assert.AreSequenceEqual(_twoSmallCharts, PointCounts(layout), "Both charts should be drawn after the new read"), PageTestHost.WaitBound);
+    }
+
+    /// <summary>
+    /// A new tick on the week range reads only the newest hour again, from the hour of the last point held, and keeps the
+    /// older hours.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC2")]
+    public async Task GoodTrendTickOnWeekReadsNewestHourOnly()
+    {
+        // Arrange
+        var fake = new FakeHistoryTrends
+                   {
+                       GoodTrend = HourlyTrend(10, 11, 12)
+                   };
+
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken, trends: fake);
+
+        await StoreProfileAsync(host);
+
+        var layout = RenderGoodInFrame(host);
+
+        await layout.WaitForAssertionAsync(() => Assert.AreSequenceEqual(_twoLargerCharts, PointCounts(layout), "Both charts should be drawn"), PageTestHost.WaitBound);
+        await PageTestHost.ChooseAsync(layout, "Period", "Last 7 days");
+        await layout.WaitForAssertionAsync(() => Assert.HasCount(4, fake.GoodQueries, "The week should be read whole"), PageTestHost.WaitBound);
+        await layout.WaitForAssertionAsync(() => Assert.AreSequenceEqual(_twoLargerCharts, PointCounts(layout), "Both charts should be drawn for the week"), PageTestHost.WaitBound);
+
+        fake.GoodTrend = HourlyTrend(12);
+
+        // Act
+        await host.StoreTicksAsync(PageTestHost.Tick(_profile, 120, IslandA(), IslandB()));
+
+        // Assert
+        await layout.WaitForAssertionAsync(() => Assert.HasCount(6, fake.GoodQueries, "Both charts should be read again for the new tick"), PageTestHost.WaitBound);
+        await layout.WaitForAssertionAsync(() => Assert.AreSequenceEqual(_twoLargerCharts, PointCounts(layout), "Both charts should keep their three hours"), PageTestHost.WaitBound);
+
+        var starts = fake.GoodQueries.Select(query => query.RangeStart.UtcDateTime.ToString("O", CultureInfo.InvariantCulture)).ToList();
+
+        Assert.AreEqual("2026-11-06T12:00:00.0000000Z", starts[2], "The choice should read the whole week");
+        Assert.AreEqual("2026-11-13T12:00:00.0000000Z", starts[4], "The tick should read from the hour of the last point held for the island chart");
+        Assert.AreEqual("2026-11-13T12:00:00.0000000Z", starts[5], "The tick should read from the hour of the last point held for the region chart");
     }
 
     /// <summary>
@@ -698,6 +929,65 @@ public sealed partial class GoodTrendTests
     private static List<int> PointCounts(IRenderedComponent<GoodTrend> component)
     {
         return [.. component.FindAll(ChartSelector).Select(chart => chart.QuerySelectorAll("circle").Length)];
+    }
+
+    /// <summary>
+    /// Counts the hover points of each drawn chart of the frame.
+    /// </summary>
+    /// <param name="component">The rendered frame</param>
+    /// <returns>The counts, one per chart</returns>
+    private static List<int> PointCounts(IRenderedComponent<MainLayout> component)
+    {
+        return [.. component.FindAll(ChartSelector).Select(chart => chart.QuerySelectorAll("circle").Length)];
+    }
+
+    /// <summary>
+    /// Creates a good trend of ticks two minutes apart that end at the time of the tests, each with a game time.
+    /// </summary>
+    /// <param name="count">The number of points</param>
+    /// <returns>The trend</returns>
+    private static HistoryTrend<HistoryGoodPoint> GameTimeTrend(int count)
+    {
+        var trend = FakeHistoryTrends.CreateGoodTrend(_pointEnd, count);
+
+        return new HistoryTrend<HistoryGoodPoint>
+               {
+                   Points = [
+                                .. trend.Points.Select((point, index) => new HistoryGoodPoint
+                                                                         {
+                                                                             Time = point.Time,
+                                                                             IsHourly = false,
+                                                                             Generation = point.Generation,
+                                                                             Consumption = point.Consumption,
+                                                                             Delta = point.Delta,
+                                                                             GameTime = 1_750_000_000 + (index * 120_000)
+                                                                         })
+                            ],
+                   TotalCount = count
+               };
+    }
+
+    /// <summary>
+    /// Creates a good trend of hourly points.
+    /// </summary>
+    /// <param name="hours">The hours of the day of the tests</param>
+    /// <returns>The trend</returns>
+    private static HistoryTrend<HistoryGoodPoint> HourlyTrend(params int[] hours)
+    {
+        return new HistoryTrend<HistoryGoodPoint>
+               {
+                   Points = [
+                                .. hours.Select(hour => new HistoryGoodPoint
+                                                        {
+                                                            Time = _pointEnd.AddHours(hour - 12),
+                                                            IsHourly = true,
+                                                            Generation = hour,
+                                                            Consumption = 1,
+                                                            Delta = 0
+                                                        })
+                            ],
+                   TotalCount = hours.Length
+               };
     }
 
     /// <summary>

@@ -148,6 +148,23 @@ public static class PageFormat
     }
 
     /// <summary>
+    /// Formats a game time in milliseconds as hours and minutes.
+    /// </summary>
+    /// <param name="milliseconds">The game time in milliseconds</param>
+    /// <returns>The text</returns>
+    public static string GameTime(long milliseconds)
+    {
+        var magnitude = milliseconds < 0
+                            ? (ulong)~milliseconds + 1
+                            : (ulong)milliseconds;
+        var minutes = magnitude / 60_000;
+
+        var sign = milliseconds < 0 ? "-" : string.Empty;
+
+        return string.Create(CultureInfo.InvariantCulture, $"{sign}{minutes / 60}:{minutes % 60:00}");
+    }
+
+    /// <summary>
     /// Rounds a value to two decimals, midpoints away from zero; a rounded negative zero is zero.
     /// </summary>
     /// <param name="value">The value</param>

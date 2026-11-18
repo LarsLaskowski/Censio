@@ -50,27 +50,28 @@ public sealed class TrendReader
     /// <param name="profileId">The profile identity</param>
     /// <param name="islands">The islands to sum</param>
     /// <param name="productGuid">The product GUID of the good</param>
-    /// <param name="latestTick">The receive time of the latest tick</param>
+    /// <param name="request">The request</param>
     /// <param name="cancellationToken">The cancellation token</param>
     /// <returns>The read, which is failed when the history could not be read</returns>
-    public Task<TrendRead> ReadGoodAsync(Guid profileId, IReadOnlyList<IslandKey> islands, int productGuid, DateTimeOffset latestTick, CancellationToken cancellationToken)
+    public Task<TrendRead> ReadGoodAsync(Guid profileId, IReadOnlyList<IslandKey> islands, int productGuid, TrendRequest request, CancellationToken cancellationToken)
     {
-        var range = TrendRange.Before(latestTick);
+        var range = TrendRange.For(request.Choice.Range, request.LatestTick);
         var query = new HistoryGoodTrendQuery
                     {
                         ProfileId = profileId,
                         Islands = [.. islands.Select(island => new HistoryIslandKey(island.SessionGuid, island.IslandId, island.AreaIndex))],
                         ProductGuid = productGuid,
-                        RangeStart = range.Start,
+                        RangeStart = ReadStart(request, range),
                         RangeEnd = range.End,
-                        MaxPoints = TrendRange.MaxPoints
+                        MaxPoints = TrendRange.MaxPoints,
+                        Resolution = TrendRange.ResolutionOf(request.Choice.Range)
                     };
 
         return ReadAsync(async () =>
                          {
                              var trend = await _trends.ReadGoodTrendAsync(query, cancellationToken).ConfigureAwait(false);
 
-                             return Convert(trend, point => point.Time, point => point.IsHourly, point => [point.Generation, point.Consumption, point.Delta]);
+                             return Merge(Convert(trend, point => point.Time, point => point.IsHourly, point => [point.Generation, point.Consumption, point.Delta], point => (point.GameTime, point.FirstGameTime, point.HasNoEntries)), request, range);
                          },
                          cancellationToken);
     }
@@ -80,28 +81,62 @@ public sealed class TrendReader
     /// </summary>
     /// <param name="profileId">The profile identity</param>
     /// <param name="island">The island</param>
-    /// <param name="latestTick">The receive time of the latest tick</param>
+    /// <param name="request">The request</param>
     /// <param name="cancellationToken">The cancellation token</param>
     /// <returns>The read, which is failed when the history could not be read</returns>
-    public Task<TrendRead> ReadFiguresAsync(Guid profileId, IslandKey island, DateTimeOffset latestTick, CancellationToken cancellationToken)
+    public Task<TrendRead> ReadFiguresAsync(Guid profileId, IslandKey island, TrendRequest request, CancellationToken cancellationToken)
     {
-        var range = TrendRange.Before(latestTick);
+        var range = TrendRange.For(request.Choice.Range, request.LatestTick);
         var query = new HistoryFiguresTrendQuery
                     {
                         ProfileId = profileId,
                         Island = new HistoryIslandKey(island.SessionGuid, island.IslandId, island.AreaIndex),
-                        RangeStart = range.Start,
+                        RangeStart = ReadStart(request, range),
                         RangeEnd = range.End,
-                        MaxPoints = TrendRange.MaxPoints
+                        MaxPoints = TrendRange.MaxPoints,
+                        Resolution = TrendRange.ResolutionOf(request.Choice.Range)
                     };
 
         return ReadAsync(async () =>
                          {
                              var trend = await _trends.ReadFiguresTrendAsync(query, cancellationToken).ConfigureAwait(false);
 
-                             return Convert(trend, point => point.Time, point => point.IsHourly, point => [point.Buildings, point.ProducedGoods, point.GoodsInDeficit]);
+                             return Merge(Convert(trend, point => point.Time, point => point.IsHourly, point => [point.Buildings, point.ProducedGoods, point.GoodsInDeficit], point => (point.GameTime, point.FirstGameTime, point.HasNoEntries)), request, range);
                          },
                          cancellationToken);
+    }
+
+    /// <summary>
+    /// Gives the start a read asks for: the range start, or for a wide range with a held view the hour of the held view's last point.
+    /// </summary>
+    /// <param name="request">The request</param>
+    /// <param name="range">The range</param>
+    /// <returns>The start</returns>
+    private static DateTimeOffset ReadStart(TrendRequest request, TrendRange range)
+    {
+        if (TrendRange.ResolutionOf(request.Choice.Range) != HistoryTrendResolution.Hours || request.Held is not { Points.Count: > 0 } held)
+        {
+            return range.Start;
+        }
+
+        var last = held.Points[^1].Time.UtcTicks;
+        var hour = new DateTimeOffset(last - (last % TimeSpan.TicksPerHour), TimeSpan.Zero);
+
+        return hour > range.Start ? hour : range.Start;
+    }
+
+    /// <summary>
+    /// Merges the newly read view into the held one when only the newest hours were read.
+    /// </summary>
+    /// <param name="view">The view read</param>
+    /// <param name="request">The request</param>
+    /// <param name="range">The range</param>
+    /// <returns>The view to show</returns>
+    private static TrendView Merge(TrendView view, TrendRequest request, TrendRange range)
+    {
+        return TrendRange.ResolutionOf(request.Choice.Range) == HistoryTrendResolution.Hours && request.Held is { Points.Count: > 0 } held
+                   ? TrendWindow.Extend(held, view, range)
+                   : view;
     }
 
     /// <summary>
@@ -112,8 +147,13 @@ public sealed class TrendReader
     /// <param name="time">Gives the time of a point</param>
     /// <param name="isHourly">Tells whether a point is hourly</param>
     /// <param name="values">Gives the values of a point in line order</param>
+    /// <param name="gameTimes">Gives the game time, the first game time and whether no island of a point holds an entry</param>
     /// <returns>The view</returns>
-    private static TrendView Convert<TPoint>(HistoryTrend<TPoint> trend, Func<TPoint, DateTimeOffset> time, Func<TPoint, bool> isHourly, Func<TPoint, double?[]> values)
+    private static TrendView Convert<TPoint>(HistoryTrend<TPoint> trend,
+                                             Func<TPoint, DateTimeOffset> time,
+                                             Func<TPoint, bool> isHourly,
+                                             Func<TPoint, double?[]> values,
+                                             Func<TPoint, (long? GameTime, long? FirstGameTime, bool HasNoEntries)> gameTimes)
     {
         return new TrendView
                {
@@ -122,7 +162,10 @@ public sealed class TrendReader
                                                                 {
                                                                     Time = time(point),
                                                                     IsHourly = isHourly(point),
-                                                                    Values = values(point)
+                                                                    Values = values(point),
+                                                                    GameTime = gameTimes(point).GameTime,
+                                                                    FirstGameTime = gameTimes(point).FirstGameTime,
+                                                                    HasNoEntries = gameTimes(point).HasNoEntries
                                                                 })
                             ],
                    TotalCount = trend.TotalCount

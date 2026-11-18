@@ -20,6 +20,16 @@ public static class UiPreferences
     public const string LanguageCookieName = "censio-language";
 
     /// <summary>
+    /// The name of the cookie that holds the chart range.
+    /// </summary>
+    public const string ChartRangeCookieName = "censio-chart-range";
+
+    /// <summary>
+    /// The name of the cookie that holds the chart time axis.
+    /// </summary>
+    public const string ChartAxisCookieName = "censio-chart-axis";
+
+    /// <summary>
     /// The stored value of the light theme.
     /// </summary>
     private const string LightValue = "light";
@@ -38,6 +48,36 @@ public static class UiPreferences
     /// The stored value of German.
     /// </summary>
     private const string GermanValue = "de";
+
+    /// <summary>
+    /// The stored value of the last hour.
+    /// </summary>
+    private const string HourValue = "hour";
+
+    /// <summary>
+    /// The stored value of the last day.
+    /// </summary>
+    private const string DayValue = "day";
+
+    /// <summary>
+    /// The stored value of the last week.
+    /// </summary>
+    private const string WeekValue = "week";
+
+    /// <summary>
+    /// The stored value of all history.
+    /// </summary>
+    private const string AllValue = "all";
+
+    /// <summary>
+    /// The stored value of the real-time axis.
+    /// </summary>
+    private const string RealValue = "real";
+
+    /// <summary>
+    /// The stored value of the game-time axis.
+    /// </summary>
+    private const string GameValue = "game";
 
     #endregion // Constants
 
@@ -102,6 +142,27 @@ public static class UiPreferences
     }
 
     /// <summary>
+    /// Reads the chart choice of the stored cookie values; a missing or unknown value gives the default of its part.
+    /// </summary>
+    /// <param name="storedRange">The stored range, or <c>null</c> when the cookie is absent.</param>
+    /// <param name="storedAxis">The stored axis, or <c>null</c> when the cookie is absent.</param>
+    /// <returns>The choice</returns>
+    public static ChartChoice ReadChartChoice(string? storedRange, string? storedAxis)
+    {
+        return new ChartChoice
+               {
+                   Range = storedRange switch
+                           {
+                               HourValue => ChartRange.LastHour,
+                               WeekValue => ChartRange.LastWeek,
+                               AllValue => ChartRange.All,
+                               _ => ChartRange.LastDay
+                           },
+                   Axis = string.Equals(storedAxis, GameValue, StringComparison.Ordinal) ? ChartAxis.GameTime : ChartAxis.RealTime
+               };
+    }
+
+    /// <summary>
     /// Gets the value stored for a theme.
     /// </summary>
     /// <param name="theme">The theme.</param>
@@ -119,6 +180,32 @@ public static class UiPreferences
     public static string StoredValue(UiLanguage language)
     {
         return language == UiLanguage.German ? GermanValue : EnglishValue;
+    }
+
+    /// <summary>
+    /// Gives the stored value of a range.
+    /// </summary>
+    /// <param name="range">The range</param>
+    /// <returns>The value</returns>
+    public static string StoredValue(ChartRange range)
+    {
+        return range switch
+               {
+                   ChartRange.LastHour => HourValue,
+                   ChartRange.LastWeek => WeekValue,
+                   ChartRange.All => AllValue,
+                   _ => DayValue
+               };
+    }
+
+    /// <summary>
+    /// Gives the stored value of a time axis.
+    /// </summary>
+    /// <param name="axis">The axis</param>
+    /// <returns>The value</returns>
+    public static string StoredValue(ChartAxis axis)
+    {
+        return axis == ChartAxis.GameTime ? GameValue : RealValue;
     }
 
     #endregion // Methods

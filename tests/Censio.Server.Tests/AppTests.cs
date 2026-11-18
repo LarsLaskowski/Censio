@@ -92,5 +92,46 @@ public sealed class AppTests
         Assert.AreEqual(expected, app.FindComponent<Routes>().Instance.DeletionAllowed, $"The router should be told whether the host '{requestHost}' may delete");
     }
 
+    /// <summary>
+    /// The document passes the chart choice of the request's cookies to the router; an absent or unknown cookie value gives
+    /// the default of its part.
+    /// </summary>
+    /// <param name="storedRange">The cookie of the range, or <see langword="null" /> for none</param>
+    /// <param name="storedAxis">The cookie of the axis, or <see langword="null" /> for none</param>
+    /// <param name="expectedRange">The range the router should be told</param>
+    /// <param name="expectedAxis">The axis the router should be told</param>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC5")]
+    [DataRow("week", "game", ChartRange.LastWeek, ChartAxis.GameTime)]
+    [DataRow("hour", "real", ChartRange.LastHour, ChartAxis.RealTime)]
+    [DataRow("all", null, ChartRange.All, ChartAxis.RealTime)]
+    [DataRow(null, "game", ChartRange.LastDay, ChartAxis.GameTime)]
+    [DataRow("Week", "GAME", ChartRange.LastDay, ChartAxis.RealTime)]
+    [DataRow("%3Cb%3E", "x", ChartRange.LastDay, ChartAxis.RealTime)]
+    [DataRow(null, null, ChartRange.LastDay, ChartAxis.RealTime)]
+    public async Task AppPassesStoredChartChoiceOfRequest(string? storedRange, string? storedAxis, ChartRange expectedRange, ChartAxis expectedAxis)
+    {
+        // Arrange
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken);
+
+        var httpContext = new DefaultHttpContext();
+        var cookies = new[] { (UiPreferences.ChartRangeCookieName, storedRange), (UiPreferences.ChartAxisCookieName, storedAxis) }.Where(cookie => cookie.Item2 is not null).Select(cookie => $"{cookie.Item1}={cookie.Item2}");
+
+        httpContext.Request.Headers.Cookie = string.Join("; ", cookies);
+
+        // Act
+        var app = host.Context.Render<App>(parameters => parameters.AddCascadingValue<HttpContext>(httpContext));
+
+        // Assert
+        var expected = new ChartChoice
+                       {
+                           Range = expectedRange,
+                           Axis = expectedAxis
+                       };
+
+        Assert.AreEqual(expected, app.FindComponent<Routes>().Instance.ChartChoice, "The router should be told the stored choice, or the default of each part that is absent or unknown");
+    }
+
     #endregion // Methods
 }

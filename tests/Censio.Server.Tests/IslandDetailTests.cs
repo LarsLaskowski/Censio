@@ -604,6 +604,92 @@ public sealed class IslandDetailTests
     }
 
     /// <summary>
+    /// Choosing another range in the controls under the overview heading reads the overview again with that range and
+    /// shows the new range line.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC4")]
+    public async Task IslandDetailRangeChangeRereadsOverview()
+    {
+        // Arrange
+        var fake = new FakeHistoryTrends
+                   {
+                       FiguresTrend = CreateFiguresTrend(3)
+                   };
+
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken, trends: fake);
+
+        await StoreIslandAsync(host, "Isle A", PageTestHost.Entry(1001, 1f, 1f, 0f, 1, 100f));
+
+        var layout = RenderIslandInFrame(host);
+
+        await layout.WaitForAssertionAsync(() => Assert.HasCount(1, layout.FindAll(ChartSelector), "The overview chart should be drawn"), PageTestHost.WaitBound);
+
+        // Act
+        await PageTestHost.ChooseAsync(layout, "Period", "Last hour");
+
+        // Assert
+        await layout.WaitForAssertionAsync(() => Assert.HasCount(2, fake.FiguresQueries, "The overview should be read again"), PageTestHost.WaitBound);
+        await layout.WaitForAssertionAsync(() => Assert.HasCount(1, layout.FindAll(ChartSelector), "The overview chart should be drawn again"), PageTestHost.WaitBound);
+
+        Assert.AreEqual("2026-11-13T11:00:00.0000000Z", fake.FiguresQueries[1].RangeStart.UtcDateTime.ToString("O", CultureInfo.InvariantCulture), "The read should start an hour before the latest tick");
+        Assert.AreEqual(HistoryTrendResolution.Points, fake.FiguresQueries[1].Resolution, "The hour should be read tick by tick");
+        Assert.Contains("Last hour up to the latest tick", layout.FindAll("p").Select(paragraph => paragraph.TextContent.Trim()).ToList(), "The range line should name the new range");
+    }
+
+    /// <summary>
+    /// Choosing the game-time axis redraws the overview from the read it holds: nothing is read again and the time axis
+    /// carries no label.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC4")]
+    public async Task IslandDetailAxisChangeRedrawsWithoutRead()
+    {
+        // Arrange
+        var trend = CreateFiguresTrend(3);
+        var fake = new FakeHistoryTrends
+                   {
+                       FiguresTrend = new HistoryTrend<HistoryFiguresPoint>
+                                      {
+                                          Points = [
+                                                       .. trend.Points.Select((point, index) => new HistoryFiguresPoint
+                                                                                                {
+                                                                                                    Time = point.Time,
+                                                                                                    IsHourly = false,
+                                                                                                    Buildings = point.Buildings,
+                                                                                                    ProducedGoods = point.ProducedGoods,
+                                                                                                    GoodsInDeficit = point.GoodsInDeficit,
+                                                                                                    GameTime = 1_750_000_000 + (index * 120_000)
+                                                                                                })
+                                                   ],
+                                          TotalCount = 3
+                                      }
+                   };
+
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken, trends: fake);
+
+        await StoreIslandAsync(host, "Isle A", PageTestHost.Entry(1001, 1f, 1f, 0f, 1, 100f));
+
+        var layout = RenderIslandInFrame(host);
+
+        await layout.WaitForAssertionAsync(() => Assert.HasCount(1, layout.FindAll(ChartSelector), "The overview chart should be drawn"), PageTestHost.WaitBound);
+
+        var callsBefore = fake.CallCount;
+
+        // Act
+        await PageTestHost.ChooseAsync(layout, "Time axis", "Game time");
+
+        // Assert
+        await layout.WaitForAssertionAsync(() => Assert.IsTrue(layout.FindAll(".mud-charts-xaxis > *").All(label => label.TextContent.Length == 0), "The game-time axis should carry no time label"), PageTestHost.WaitBound);
+        await Task.Delay(NegativeWaitMilliseconds, TestContext.CancellationToken);
+
+        Assert.AreEqual(callsBefore, fake.CallCount, "An axis change should read nothing");
+        Assert.HasCount(1, layout.FindAll(ChartSelector), "The overview chart should stay drawn");
+    }
+
+    /// <summary>
     /// Stores a tick with the shown island (session 3245, island 1, area 0).
     /// </summary>
     /// <param name="host">The host</param>
@@ -670,6 +756,18 @@ public sealed class IslandDetailTests
                                                                  .Add(page => page.Session, session)
                                                                  .Add(page => page.Island, island)
                                                                  .Add(page => page.Area, area));
+    }
+
+    /// <summary>
+    /// Renders the detail of the shown island as the body of the frame, which starts in the light theme and English.
+    /// </summary>
+    /// <param name="host">The host</param>
+    /// <returns>The rendered frame</returns>
+    private static IRenderedComponent<MainLayout> RenderIslandInFrame(PageTestHost host)
+    {
+        return host.Context.Render<MainLayout>(parameters => parameters.AddCascadingValue(UiTheme.Light)
+                                                                       .AddCascadingValue(UiLanguage.English)
+                                                                       .Add(frame => frame.Body, RenderIslandBody));
     }
 
     /// <summary>

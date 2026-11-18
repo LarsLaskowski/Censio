@@ -27,5 +27,11 @@ public partial class Routes
     [Parameter]
     public bool DeletionAllowed { get; set; }
 
+    /// <summary>
+    /// Gets or sets the chart choice the page starts with.
+    /// </summary>
+    [Parameter]
+    public ChartChoice ChartChoice { get; set; } = ChartChoice.Default;
+
     #endregion // Properties
 }

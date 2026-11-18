@@ -1489,6 +1489,312 @@ public sealed class HistoryStoreTests
     }
 
     /// <summary>
+    /// An hourly read gives one point per UTC hour that holds a tick, folded or not, with each value the mean over the
+    /// hour's ticks that carried it, the folded point's ticks included; for several islands the sum of the islands'
+    /// means. A tick without an island or without a value adds nothing to the mean, and an hour without a tick is no point.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC2")]
+    public async Task HistoryStoreReadGoodTrendByHoursMeansTicksAndFoldedPoints()
+    {
+        // Arrange
+        var (store, history, _) = await OpenAsync();
+
+        var profileId = Guid.NewGuid();
+
+        await StoreAsync(store,
+                         Tick(profileId, 10 * Minute, 10, Island(IslandKey, IslandName, TrendEntry(ProductGuid, 1.5f, 1f, 0.5f, 1))),
+                         Tick(profileId, 20 * Minute, 20, Island(IslandKey, IslandName, TrendEntry(ProductGuid, 2.5f, 3f, null, 1))),
+                         Tick(profileId, Hour + (10 * Minute), 100, Island(IslandKey, IslandName, TrendEntry(ProductGuid, 2f, 1f, null, 1)), Island(OtherIslandKey, "Second island", TrendEntry(ProductGuid, 10f, 3f, 0.5f, 1))),
+                         Tick(profileId, Hour + (20 * Minute), 200, Island(IslandKey, IslandName, TrendEntry(ProductGuid, 4f, 3f, 1f, 1))),
+                         Tick(profileId, (3 * Hour) + (5 * Minute), 300, Island(IslandKey, IslandName, TrendEntry(ProductGuid, 7f, 1f, 0f, 1))));
+
+        var folded = await FoldAllAsync(history, profileId);
+
+        await StoreAsync(store, Tick(profileId, 40 * Minute, 30, Island(IslandKey, IslandName, TrendEntry(ProductGuid, 5f, 2f, -1f, 1))));
+
+        var query = GoodQuery(profileId, [TrendIsland(IslandKey), TrendIsland(OtherIslandKey)], _hour, _hour.AddHours(4), 100, HistoryTrendResolution.Hours);
+
+        // Act
+        var trend = await history.ReadGoodTrendAsync(query, TestContext.CancellationToken);
+
+        // Assert
+        var expected = new[]
+                       {
+                           $"hourly {FormatTime(_hour)} 3 2 -0.25",
+                           $"hourly {FormatTime(_hour.AddHours(1))} 13 5 1.5",
+                           $"hourly {FormatTime(_hour.AddHours(3))} 7 1 0"
+                       };
+
+        Assert.AreEqual(2, folded, "The two ticks of the first hour should have been folded before the late tick arrived");
+        Assert.AreSequenceEqual(expected, trend.Points.Select(DescribeGoodPoint), "Each hour should give the mean of its ticks and of the folded point per island, summed over the islands, and an hour without a tick no point");
+        Assert.AreEqual(3, trend.TotalCount, "The count should be the hours that hold a tick");
+    }
+
+    /// <summary>
+    /// The hourly point read from the ticks of an hour equals the hourly point the fold makes of the same ticks, in
+    /// its values and its game times, and the hourly read after the fold gives it again.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC2")]
+    public async Task HistoryStoreReadGoodTrendByHoursEqualsFoldedHour()
+    {
+        // Arrange
+        var (store, history, _) = await OpenAsync();
+
+        var profileId = Guid.NewGuid();
+
+        await StoreAsync(store,
+                         Tick(profileId, 10 * Minute, 1_000, Island(IslandKey, IslandName, TrendEntry(ProductGuid, 1.25f, 1f, 0.5f, 1)), Island(OtherIslandKey, "Second island", TrendEntry(ProductGuid, 4f, 2f, null, 1))),
+                         Tick(profileId, 20 * Minute, 2_000, Island(IslandKey, IslandName, TrendEntry(ProductGuid, 2.5f, 3f, -1.5f, 1))),
+                         Tick(profileId, 30 * Minute, 3_000, Island(IslandKey, IslandName, TrendEntry(ProductGuid, 3.75f, 2f, null, 1)), Island(OtherIslandKey, "Second island", TrendEntry(ProductGuid, 8f, 4f, 0.25f, 1))),
+                         LatestTick(profileId));
+
+        var points = GoodQuery(profileId, [TrendIsland(IslandKey), TrendIsland(OtherIslandKey)], _hour, _hour.AddHours(1), 100);
+        var hours = GoodQuery(profileId, [TrendIsland(IslandKey), TrendIsland(OtherIslandKey)], _hour, _hour.AddHours(1), 100, HistoryTrendResolution.Hours);
+
+        // Act
+        var before = await history.ReadGoodTrendAsync(hours, TestContext.CancellationToken);
+        var folded = await FoldAllAsync(history, profileId);
+        var afterPoints = await history.ReadGoodTrendAsync(points, TestContext.CancellationToken);
+        var afterHours = await history.ReadGoodTrendAsync(hours, TestContext.CancellationToken);
+
+        // Assert
+        var expected = before.Points.Select(DescribeGoodWithGameTimes).ToList();
+
+        Assert.AreEqual(3, folded, "The three ticks of the hour should have been folded");
+        Assert.HasCount(1, expected, "The hourly read should give one point for the hour");
+        Assert.AreSequenceEqual(expected, afterPoints.Points.Select(DescribeGoodWithGameTimes), "The hourly point of the fold should read as the hourly read of the ticks");
+        Assert.AreSequenceEqual(expected, afterHours.Points.Select(DescribeGoodWithGameTimes), "The hourly read should give the same point after the fold");
+    }
+
+    /// <summary>
+    /// The hourly figures of an island follow the fold: only the first entry of a good counts, the buildings are the sum of
+    /// the goods' mean building counts rounded away from zero, and an hour whose ticks lack the island has no value.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC2")]
+    public async Task HistoryStoreReadFiguresTrendByHoursUsesFirstEntryPerGood()
+    {
+        // Arrange
+        var (store, history, _) = await OpenAsync();
+
+        var profileId = Guid.NewGuid();
+
+        await StoreAsync(store,
+                         Tick(profileId, 10 * Minute, 10, Island(IslandKey, IslandName, TrendEntry(ProductGuid, 0f, 0f, -1f, 2), TrendEntry(OtherProductGuid, 0f, 0f, 0.5f, 1), TrendEntry(ProductGuid, 0f, 0f, -5f, 100))),
+                         Tick(profileId, 20 * Minute, 20, Island(IslandKey, IslandName, TrendEntry(ProductGuid, 0f, 0f, -1f, 4), TrendEntry(OtherProductGuid, 0f, 0f, 0.5f, 2), TrendEntry(ProductGuid, 0f, 0f, -5f, 100))),
+                         Tick(profileId, 30 * Minute, 30, Island(IslandKey, IslandName)),
+                         Tick(profileId, Hour + (10 * Minute), 40, Island(OtherIslandKey, "Second island", TrendEntry(ProductGuid, 0f, 0f, 0f, 1))));
+
+        var query = FiguresQuery(profileId, TrendIsland(IslandKey), _hour, _hour.AddHours(2), 100, HistoryTrendResolution.Hours);
+
+        // Act
+        var trend = await history.ReadFiguresTrendAsync(query, TestContext.CancellationToken);
+
+        // Assert
+        var expected = new[]
+                       {
+                           $"hourly {FormatTime(_hour)} 5 2 1",
+                           $"hourly {FormatTime(_hour.AddHours(1))} null null null"
+                       };
+
+        Assert.AreSequenceEqual(expected, trend.Points.Select(DescribeFiguresPoint), "The hour should count the first entry of each good, round the buildings' sum of means up from 4.5 and give an hour without the island no value");
+        Assert.AreEqual(2, trend.TotalCount, "The count should be the hours that hold a tick");
+    }
+
+    /// <summary>
+    /// An hour with more ticks than one part holds is read in several parts and still gives one point with the mean and
+    /// the game times of all its ticks, followed by the next hour.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC2")]
+    public async Task HistoryStoreReadTrendByHoursSplitsLongHourAcrossParts()
+    {
+        // Arrange
+        var (store, history, _) = await OpenAsync();
+
+        var profileId = Guid.NewGuid();
+        var count = HistoryStore.TrendPartSize + 20;
+
+        await StoreAsync(store, Enumerable.Range(1, count).Select(index => GoodTick(profileId, index * 10, index)).ToArray());
+        await StoreAsync(store, GoodTick(profileId, Hour + Minute, 1_000), GoodTick(profileId, Hour + (2 * Minute), 2_000), GoodTick(profileId, Hour + (3 * Minute), 3_000));
+
+        var query = GoodQuery(profileId, [TrendIsland(IslandKey)], _hour, _hour.AddHours(2), 100, HistoryTrendResolution.Hours);
+
+        // Act
+        var trend = await history.ReadGoodTrendAsync(query, TestContext.CancellationToken);
+
+        // Assert
+        var expected = new[]
+                       {
+                           $"hourly {FormatTime(_hour)} 130.5 1 0",
+                           $"hourly {FormatTime(_hour.AddHours(1))} 2000 1 0"
+                       };
+
+        Assert.AreSequenceEqual(expected, trend.Points.Select(DescribeGoodPoint), "The ticks of the long hour should all count once in its mean, whatever part they were read in");
+        Assert.AreSequenceEqual(new[] { $"hourly 10 {count * 10} False", $"hourly {Hour + Minute} {Hour + (3 * Minute)} False" }, trend.Points.Select(DescribeGoodGameTimes), "The hours should carry the smallest and largest game time of all their ticks");
+        Assert.AreEqual(2, trend.TotalCount, "The count should be the hours that hold a tick");
+    }
+
+    /// <summary>
+    /// The parts of an hourly read hold at most the part size in rows, an hourly point and a tick counting one each: every
+    /// tick and every hourly point is read once, the hours stay oldest first, and no part or slice is empty.
+    /// </summary>
+    /// <param name="partSize">The part size</param>
+    [TestMethod]
+    [TestCategory("AC2")]
+    [DataRow(1)]
+    [DataRow(7)]
+    [DataRow(10)]
+    [DataRow(HistoryStore.TrendPartSize)]
+    public void HistoryStorePlanHourPartsHoldsAtMostPartSizeRows(int partSize)
+    {
+        // Arrange
+        var hours = PlannedHours();
+
+        // Act
+        var parts = HistoryStore.PlanHourParts(hours, partSize);
+
+        // Assert
+        var slices = parts.SelectMany(part => part).ToList();
+
+        Assert.IsGreaterThanOrEqualTo(1, parts.Count, "The hours should give at least one part");
+        Assert.IsGreaterThanOrEqualTo(1, parts.Min(part => part.Count), "No part should be empty");
+        Assert.IsGreaterThanOrEqualTo(1, slices.Min(RowsOf), "No slice should be empty");
+        Assert.IsLessThanOrEqualTo(partSize, parts.Max(part => part.Sum(RowsOf)), "No part should hold more rows than the part size");
+        Assert.AreSequenceEqual(hours.Select(hour => $"{hour.HourTicks} {hour.Ticks} {(hour.WithHourly ? 1 : 0)}"), slices.GroupBy(slice => slice.HourTicks).Select(group => $"{group.Key} {group.Sum(slice => slice.Ticks)} {group.Count(slice => slice.WithHourly)}"), "Every tick and every hourly point should be read exactly once, the hours in their order");
+        Assert.AreSequenceEqual(slices.Select(slice => slice.HourTicks).Order(), slices.Select(slice => slice.HourTicks), "The slices of an hour should follow each other, oldest hour first");
+    }
+
+    /// <summary>
+    /// A point of a trend read carries its game times and tells whether no island of it holds an entry: the tick its
+    /// game time, a folded hour its smallest and largest, whatever the ticks held.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC3")]
+    public async Task HistoryStoreReadTrendGivesGameTimesAndNoEntriesFlag()
+    {
+        // Arrange
+        var (store, history, _) = await OpenAsync();
+
+        var profileId = Guid.NewGuid();
+
+        await StoreAsync(store,
+                         NoEntryTick(profileId, 10 * Minute, 19_000),
+                         Tick(profileId, 20 * Minute, 1_750_000_000, Island(IslandKey, IslandName, TrendEntry(ProductGuid, 1f, 1f, 0f, 1))),
+                         Tick(profileId, 30 * Minute, 1_750_060_000, Island(IslandKey, IslandName, TrendEntry(ProductGuid, 3f, 1f, 0f, 1))),
+                         NoEntryTick(profileId, Hour + (10 * Minute), 19_001),
+                         Tick(profileId, (3 * Hour) + (5 * Minute), 1_750_120_000, Island(IslandKey, IslandName, TrendEntry(ProductGuid, 4f, 1f, 0f, 1))),
+                         Tick(profileId, (3 * Hour) + (15 * Minute), 1_750_130_000, Island(IslandKey, IslandName, TrendEntry(ProductGuid, 5f, 1f, 0f, 1))),
+                         NoEntryTick(profileId, (3 * Hour) + (20 * Minute), 19_002));
+        _clock.SetUtcNow(_hour.AddDays(30));
+        await FoldAllAsync(history, profileId);
+
+        var query = GoodQuery(profileId, [TrendIsland(IslandKey)], _hour, _hour.AddHours(4), 100);
+
+        // Act
+        var trend = await history.ReadGoodTrendAsync(query, TestContext.CancellationToken);
+
+        // Assert
+        var expected = new[]
+                       {
+                           "hourly 19000 1750060000 False",
+                           "hourly 19001 19001 True",
+                           "tick 1750120000 False",
+                           "tick 1750130000 False",
+                           "tick 19002 True"
+                       };
+
+        Assert.AreSequenceEqual(expected, trend.Points.Select(DescribeGoodGameTimes), "Each point should carry its game times and the flag of having no entry in any island");
+    }
+
+    /// <summary>
+    /// An hourly read of a good gives an hour the largest and smallest game time over its ticks that hold an entry, the
+    /// folded point and the unfolded ticks alike, and flags an hour without any entry.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC3")]
+    public async Task HistoryStoreReadTrendByHoursGivesGameTimesOfTicksWithEntries()
+    {
+        // Arrange
+        var (store, history, _) = await OpenAsync();
+
+        var profileId = Guid.NewGuid();
+
+        await StoreAsync(store,
+                         Tick(profileId, 10 * Minute, 1_000, Island(IslandKey, IslandName, TrendEntry(ProductGuid, 1f, 1f, 0f, 1))),
+                         Tick(profileId, 20 * Minute, 2_000, Island(IslandKey, IslandName, TrendEntry(ProductGuid, 2f, 1f, 0f, 1))),
+                         Tick(profileId, (3 * Hour) + (5 * Minute), 9_000, Island(IslandKey, IslandName, TrendEntry(ProductGuid, 9f, 1f, 0f, 1))));
+        await FoldAllAsync(history, profileId);
+        await StoreAsync(store,
+                         Tick(profileId, 40 * Minute, 3_000, Island(IslandKey, IslandName, TrendEntry(ProductGuid, 3f, 1f, 0f, 1))),
+                         NoEntryTick(profileId, 50 * Minute, 500),
+                         NoEntryTick(profileId, Hour + (10 * Minute), 19_000),
+                         NoEntryTick(profileId, Hour + (20 * Minute), 19_500),
+                         Tick(profileId, (2 * Hour) + (10 * Minute), 7_000, Island(IslandKey, IslandName, TrendEntry(ProductGuid, 4f, 1f, 0f, 1))),
+                         Tick(profileId, (2 * Hour) + (20 * Minute), 6_000, Island(IslandKey, IslandName, TrendEntry(ProductGuid, 5f, 1f, 0f, 1))));
+
+        var query = GoodQuery(profileId, [TrendIsland(IslandKey)], _hour, _hour.AddHours(4), 100, HistoryTrendResolution.Hours);
+
+        // Act
+        var trend = await history.ReadGoodTrendAsync(query, TestContext.CancellationToken);
+
+        // Assert
+        var expected = new[]
+                       {
+                           "hourly 1000 3000 False",
+                           "hourly 6000 7000 False",
+                           "hourly 9000 9000 False"
+                       };
+
+        Assert.AreSequenceEqual(expected, trend.Points.Where(point => point.HasNoEntries == false).Select(DescribeGoodGameTimes), "An hour should carry the smallest and largest game time of its ticks with an entry, the folded point included and a tick without entries left out");
+
+        var expectedFlags = new[] { false, true, false, false };
+
+        Assert.AreSequenceEqual(expectedFlags, trend.Points.Select(point => point.HasNoEntries), "Only the hour whose ticks hold no entry should be flagged");
+    }
+
+    /// <summary>
+    /// An hourly read of the figures of an island gives an hour the game times of its ticks that hold an entry on any
+    /// island, and flags an hour whose ticks hold no entry on any island.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC3")]
+    public async Task HistoryStoreReadFiguresTrendByHoursGivesGameTimesAndNoEntriesFlag()
+    {
+        // Arrange
+        var (store, history, _) = await OpenAsync();
+
+        var profileId = Guid.NewGuid();
+
+        await StoreAsync(store,
+                         Tick(profileId, 10 * Minute, 1_000, Island(IslandKey, IslandName, TrendEntry(ProductGuid, 0f, 0f, 0f, 1))),
+                         Tick(profileId, 20 * Minute, 3_000, Island(IslandKey, IslandName), Island(OtherIslandKey, "Second island", TrendEntry(ProductGuid, 0f, 0f, 0f, 1))),
+                         NoEntryTick(profileId, 30 * Minute, 19_000),
+                         NoEntryTick(profileId, Hour + (10 * Minute), 19_001));
+
+        var query = FiguresQuery(profileId, TrendIsland(IslandKey), _hour, _hour.AddHours(2), 100, HistoryTrendResolution.Hours);
+
+        // Act
+        var trend = await history.ReadFiguresTrendAsync(query, TestContext.CancellationToken);
+
+        // Assert
+        var expected = new[] { "hourly 1000 3000 False" };
+        var expectedFlags = new[] { false, true };
+
+        Assert.AreSequenceEqual(expected, trend.Points.Where(point => point.HasNoEntries == false).Select(DescribeFiguresGameTimes), "The hour should carry the game times of its ticks with an entry on any island");
+        Assert.AreSequenceEqual(expectedFlags, trend.Points.Select(point => point.HasNoEntries), "Only the hour whose ticks hold no entry on any island should be flagged");
+    }
+
+    /// <summary>
     /// Creates an entry for a trend: the generation, consumption, delta and building count, everything else zero.
     /// </summary>
     /// <param name="productGuid">The product GUID</param>
@@ -1532,8 +1838,9 @@ public sealed class HistoryStoreTests
     /// <param name="rangeStart">The range start, inclusive</param>
     /// <param name="rangeEnd">The range end, exclusive</param>
     /// <param name="maxPoints">The maximum number of points</param>
+    /// <param name="resolution">The resolution of the points</param>
     /// <returns>The query</returns>
-    private static HistoryGoodTrendQuery GoodQuery(Guid profileId, IReadOnlyList<HistoryIslandKey> islands, DateTimeOffset rangeStart, DateTimeOffset rangeEnd, int maxPoints)
+    private static HistoryGoodTrendQuery GoodQuery(Guid profileId, IReadOnlyList<HistoryIslandKey> islands, DateTimeOffset rangeStart, DateTimeOffset rangeEnd, int maxPoints, HistoryTrendResolution resolution = HistoryTrendResolution.Points)
     {
         return new HistoryGoodTrendQuery
                {
@@ -1542,7 +1849,8 @@ public sealed class HistoryStoreTests
                    ProductGuid = ProductGuid,
                    RangeStart = rangeStart,
                    RangeEnd = rangeEnd,
-                   MaxPoints = maxPoints
+                   MaxPoints = maxPoints,
+                   Resolution = resolution
                };
     }
 
@@ -1554,8 +1862,9 @@ public sealed class HistoryStoreTests
     /// <param name="rangeStart">The range start, inclusive</param>
     /// <param name="rangeEnd">The range end, exclusive</param>
     /// <param name="maxPoints">The maximum number of points</param>
+    /// <param name="resolution">The resolution of the points</param>
     /// <returns>The query</returns>
-    private static HistoryFiguresTrendQuery FiguresQuery(Guid profileId, HistoryIslandKey island, DateTimeOffset rangeStart, DateTimeOffset rangeEnd, int maxPoints)
+    private static HistoryFiguresTrendQuery FiguresQuery(Guid profileId, HistoryIslandKey island, DateTimeOffset rangeStart, DateTimeOffset rangeEnd, int maxPoints, HistoryTrendResolution resolution = HistoryTrendResolution.Points)
     {
         return new HistoryFiguresTrendQuery
                {
@@ -1563,8 +1872,97 @@ public sealed class HistoryStoreTests
                    Island = island,
                    RangeStart = rangeStart,
                    RangeEnd = rangeEnd,
-                   MaxPoints = maxPoints
+                   MaxPoints = maxPoints,
+                   Resolution = resolution
                };
+    }
+
+    /// <summary>
+    /// Creates a tick whose island holds no entry, as the game sends after a load.
+    /// </summary>
+    /// <param name="profileId">The profile identity</param>
+    /// <param name="seconds">The receive time in seconds after the hour <c>H</c></param>
+    /// <param name="gameTime">The game time</param>
+    /// <returns>The tick</returns>
+    private static ContractTick NoEntryTick(Guid profileId, long seconds, long gameTime)
+    {
+        return Tick(profileId, seconds, gameTime, Island(IslandKey, IslandName));
+    }
+
+    /// <summary>
+    /// Describes a point of a good's trend with its game times: kind, then the smallest and largest game time of an
+    /// hourly point or the game time of a tick, and the flag of having no entries.
+    /// </summary>
+    /// <param name="point">The point</param>
+    /// <returns>The text</returns>
+    private static string DescribeGoodGameTimes(HistoryGoodPoint point)
+    {
+        return DescribeGameTimes(point.IsHourly, point.FirstGameTime, point.GameTime, point.HasNoEntries);
+    }
+
+    /// <summary>
+    /// Describes a point of the figures with its game times, as <see cref="DescribeGoodGameTimes" /> does.
+    /// </summary>
+    /// <param name="point">The point</param>
+    /// <returns>The text</returns>
+    private static string DescribeFiguresGameTimes(HistoryFiguresPoint point)
+    {
+        return DescribeGameTimes(point.IsHourly, point.FirstGameTime, point.GameTime, point.HasNoEntries);
+    }
+
+    /// <summary>
+    /// Describes the game times of a point.
+    /// </summary>
+    /// <param name="isHourly">Whether the point is an hour</param>
+    /// <param name="firstGameTime">The first game time</param>
+    /// <param name="gameTime">The game time</param>
+    /// <param name="hasNoEntries">Whether the point has no entries</param>
+    /// <returns>The text</returns>
+    private static string DescribeGameTimes(bool isHourly, long? firstGameTime, long? gameTime, bool hasNoEntries)
+    {
+        var game = gameTime?.ToString(CultureInfo.InvariantCulture) ?? "null";
+        var first = firstGameTime?.ToString(CultureInfo.InvariantCulture) ?? "null";
+
+        return isHourly
+                   ? $"hourly {first} {game} {hasNoEntries}"
+                   : $"tick {game} {hasNoEntries}";
+    }
+
+    /// <summary>
+    /// Describes a point of a good's trend with its values and game times.
+    /// </summary>
+    /// <param name="point">The point</param>
+    /// <returns>The text</returns>
+    private static string DescribeGoodWithGameTimes(HistoryGoodPoint point)
+    {
+        return $"{DescribeGoodPoint(point)} {DescribeGoodGameTimes(point)}";
+    }
+
+    /// <summary>
+    /// Counts the rows of a slice of an hourly read: its ticks and its hourly point.
+    /// </summary>
+    /// <param name="slice">The slice</param>
+    /// <returns>The number of rows</returns>
+    private static int RowsOf(TrendHourSlice slice)
+    {
+        return slice.Ticks + (slice.WithHourly ? 1 : 0);
+    }
+
+    /// <summary>
+    /// Creates the hours of a plan: with ticks and an hourly point, with many ticks, with an hourly point only, with
+    /// more rows than a small part holds, and with one tick.
+    /// </summary>
+    /// <returns>The hours, oldest first</returns>
+    private static List<(long HourTicks, int Ticks, bool WithHourly)> PlannedHours()
+    {
+        return [
+                   (_hour.UtcTicks, 3, true),
+                   (_hour.AddHours(1).UtcTicks, 25, false),
+                   (_hour.AddHours(2).UtcTicks, 0, true),
+                   (_hour.AddHours(3).UtcTicks, 10, true),
+                   (_hour.AddHours(4).UtcTicks, 1, false),
+                   (_hour.AddHours(5).UtcTicks, 600, true)
+               ];
     }
 
     /// <summary>

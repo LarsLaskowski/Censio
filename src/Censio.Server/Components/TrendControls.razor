@@ -1,0 +1,13 @@
+<div class="censio-chart-controls">
+    <MudToggleGroup T="ChartRange" Value="Choice.Range" ValueChanged="ChooseRangeAsync" SelectionMode="SelectionMode.SingleSelection" Outlined="true" aria-label="@Texts.ChartRangeLabel" role="group">
+        <MudToggleItem Value="ChartRange.LastHour" Text="@Texts.RangeLastHour" />
+        <MudToggleItem Value="ChartRange.LastDay" Text="@Texts.RangeLastDay" />
+        <MudToggleItem Value="ChartRange.LastWeek" Text="@Texts.RangeLastWeek" />
+        <MudToggleItem Value="ChartRange.All" Text="@Texts.RangeAll" />
+    </MudToggleGroup>
+    <MudToggleGroup T="ChartAxis" Value="Choice.Axis" ValueChanged="ChooseAxisAsync" SelectionMode="SelectionMode.SingleSelection" Outlined="true" aria-label="@Texts.ChartAxisLabel" role="group">
+        <MudToggleItem Value="ChartAxis.RealTime" Text="@Texts.AxisRealTime" />
+        <MudToggleItem Value="ChartAxis.GameTime" Text="@Texts.AxisGameTime" />
+    </MudToggleGroup>
+</div>
+<p>@RangeLine</p>

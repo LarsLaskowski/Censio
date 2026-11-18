@@ -137,7 +137,7 @@ public partial class GoodTrend
     #region DataPageBase
 
     /// <inheritdoc />
-    protected override object AddressKey => ValueTuple.Create(Profile, Session, Island, Area, Good);
+    protected override object AddressKey => ValueTuple.Create(Profile, Session, Island, Area, Good, ChartChoice.Range);
 
     /// <inheritdoc />
     protected override PageMode ResolveTarget(out Guid profileId, out IslandKey? island)
@@ -177,14 +177,32 @@ public partial class GoodTrend
         }
 
         var generation = _generation;
-        var islandRead = await Trends.ReadGoodAsync(view.ProfileId, [island], productGuid, asOf, cancellationToken).ConfigureAwait(true);
+        var islandRead = await Trends.ReadGoodAsync(view.ProfileId,
+                                                    [island],
+                                                    productGuid,
+                                                    new TrendRequest
+                                                    {
+                                                        LatestTick = asOf,
+                                                        Choice = ChartChoice,
+                                                        Held = _islandRead?.View
+                                                    },
+                                                    cancellationToken).ConfigureAwait(true);
 
         if (Accept(islandRead, generation, read => (_islandRead, _islandNumber) = (read, ++_readCount)) == false)
         {
             return;
         }
 
-        var regionRead = await Trends.ReadGoodAsync(view.ProfileId, [.. region.Islands.Select(regionIsland => regionIsland.Key)], productGuid, asOf, cancellationToken).ConfigureAwait(true);
+        var regionRead = await Trends.ReadGoodAsync(view.ProfileId,
+                                                    [.. region.Islands.Select(regionIsland => regionIsland.Key)],
+                                                    productGuid,
+                                                    new TrendRequest
+                                                    {
+                                                        LatestTick = asOf,
+                                                        Choice = ChartChoice,
+                                                        Held = _regionRead?.View
+                                                    },
+                                                    cancellationToken).ConfigureAwait(true);
 
         Accept(regionRead, generation, read => (_regionRead, _regionNumber) = (read, ++_readCount));
     }

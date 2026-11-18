@@ -150,4 +150,6 @@ once in the [area document](../areas/README.md) of the record's area, and the re
 | [0086](0086-charts-drawn-with-mudblazors-own-time-series-chart.md) | Charts are drawn with MudBlazor's own time-series chart, not Blazor-ApexCharts | Accepted | 2026-11-16 |
 | [0087](0087-chart-reads-aggregate-per-point-bounded-in-parts-with-a-product-index.md) | Chart reads aggregate per point, read the newest 2,880 points in parts, and use an index of tick entries by good | Accepted | 2026-11-16 |
 | [0088](0088-charts-show-the-day-up-to-the-latest-tick-with-gaps-after-15-minutes.md) | Charts show the day up to a profile's latest tick and break a line after 15 minutes without a point | Accepted | 2026-11-16 |
+| [0089](0089-chart-ranges-wide-ones-as-hourly-means-read-at-request.md) | Charts offer four ranges kept in the browser, and the wide ones show hourly means computed when read | Accepted | 2026-11-17 |
+| [0090](0090-game-time-axis-places-points-without-time-labels.md) | The game-time axis places the range's points at their game time, without time labels | Accepted | 2026-11-17 |
 <!-- project:end index -->

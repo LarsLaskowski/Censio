@@ -3,8 +3,8 @@
 ## Scope
 
 The frame of the server's web pages: the app bar, the navigation, the profile switch, the light and the
-dark theme with their palette, typography and contrast levels, the language choice and its default, the two cookies
-that keep the choices, the treatment of unknown stored values, the frame's texts in English and German, and that every
+dark theme with their palette, typography and contrast levels, the language choice and its default, the cookies
+that keep the choices (theme, language, chart range and time axis), the treatment of unknown stored values, the frame's texts in English and German, and that every
 resource comes from the server itself. Desktop browsers only. Users of the web application rely on it; the pages'
 data is in [`web-pages.md`](web-pages.md).
 
@@ -59,11 +59,13 @@ data is in [`web-pages.md`](web-pages.md).
   | ------ | ------ | ------- |
   | `censio-theme` | `light`, `dark` | the theme |
   | `censio-language` | `en`, `de` | the language |
+  | `censio-chart-range` | `hour`, `day`, `week`, `all` | the range of the charts ([`web-charts.md`](web-charts.md), *Range*) |
+  | `censio-chart-axis` | `real`, `game` | the time axis of the charts |
 
 - A cookie lives 365 days (`Max-Age=31536000`), has `Path=/` and `SameSite=Lax`. It is neither `HttpOnly` (a script
   writes it) nor `Secure` (the server speaks plain HTTP, [record 0006](../decisions/0006-server-plain-http-and-open-health.md)); it carries no identity. Only the
   constants above are ever written.
-- The server reads both cookies and `Accept-Language` on the request for a page and keeps nothing: no value is stored,
+- The server reads the cookies and `Accept-Language` on the request for a page and keeps nothing: no value is stored,
   logged or echoed in the page.
 - The values are compared whole and in ordinal letter case, after ASP.NET Core has percent-decoded the cookie
   (`%64ark` reads as `dark`). Any other value (another letter case, another code, markup, control characters, an
@@ -173,8 +175,8 @@ those of the charts in [`web-charts.md`](web-charts.md).
 - A stored value the server does not know, a damaged or overlong value and a value with markup or control characters
   are treated as no choice; the value is neither shown on the page nor logged.
 - When the browser does not store a choice made on an open page (the connection to the page was lost or the script
-  failed), the page keeps the new theme or language and the server writes one `Debug` line,
-  `The browser did not store the theme choice.` or `... language choice.`; the line names the kind of the choice,
+  failed), the page keeps the new theme, language, range or axis and the server writes one `Debug` line,
+  `The browser did not store the theme choice.`, `... language choice.`, `... chart range choice.` or `... time axis choice.`; the line names the kind of the choice,
   never its value or the exception text. Nothing is shown to the user.
 - The server serves the files of the packages and of the project as static assets in every environment (it loads the
   static web assets manifest itself), so a run from the build output finds MudBlazor's files.
@@ -183,7 +185,7 @@ those of the charts in [`web-charts.md`](web-charts.md).
 
 - [`decisions/0025-mudblazor-and-blazor-apexcharts-light-theme.md`](../decisions/0025-mudblazor-and-blazor-apexcharts-light-theme.md) — MudBlazor is the component library, with a light and a dark theme (its chart part is amended by record 0086).
 - [`decisions/0086-charts-drawn-with-mudblazors-own-time-series-chart.md`](../decisions/0086-charts-drawn-with-mudblazors-own-time-series-chart.md) — the charts are MudBlazor's own, not Blazor-ApexCharts.
-- [`decisions/0071-web-ui-choices-kept-in-browser-cookies-written-by-a-script.md`](../decisions/0071-web-ui-choices-kept-in-browser-cookies-written-by-a-script.md) — the choices live in two cookies written by a script and read at render time.
+- [`decisions/0071-web-ui-choices-kept-in-browser-cookies-written-by-a-script.md`](../decisions/0071-web-ui-choices-kept-in-browser-cookies-written-by-a-script.md) — the choices live in cookies, one per choice, written by a script and read at render time; the chart range and axis are two more ([record 0089](../decisions/0089-chart-ranges-wide-ones-as-hourly-means-read-at-request.md)).
 - [`decisions/0072-web-ui-texts-from-an-own-table-without-culture-data.md`](../decisions/0072-web-ui-texts-from-an-own-table-without-culture-data.md) — the texts come from an own table, without culture data.
 - [`decisions/0081-pages-resolve-resources-against-a-fixed-document-base.md`](../decisions/0081-pages-resolve-resources-against-a-fixed-document-base.md) — pages resolve their resources against the fixed document base `/`.
 

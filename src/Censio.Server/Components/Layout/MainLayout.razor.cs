@@ -20,6 +20,11 @@ public sealed partial class MainLayout : IDisposable
     /// </summary>
     private const int MaxListedProfiles = 100;
 
+    /// <summary>
+    /// The browser function that stores a preference cookie.
+    /// </summary>
+    private const string StorePreferenceFunction = "censio.storePreference";
+
     #endregion // Constants
 
     #region Fields
@@ -43,6 +48,16 @@ public sealed partial class MainLayout : IDisposable
     /// The texts of the language shown.
     /// </summary>
     private UiTexts _texts = UiTexts.For(UiLanguage.English);
+
+    /// <summary>
+    /// The chart choice shown.
+    /// </summary>
+    private ChartChoice _choice = ChartChoice.Default;
+
+    /// <summary>
+    /// The callback the pages hand a new chart choice to, built once so the cascade stays the same value.
+    /// </summary>
+    private EventCallback<ChartChoice> _chooseChart;
 
     /// <summary>
     /// A value that indicates whether the navigation is open.
@@ -89,6 +104,12 @@ public sealed partial class MainLayout : IDisposable
     /// </summary>
     [CascadingParameter]
     public UiLanguage InitialLanguage { get; set; }
+
+    /// <summary>
+    /// Gets or sets the chart choice the page starts with.
+    /// </summary>
+    [CascadingParameter]
+    public ChartChoice InitialChartChoice { get; set; } = ChartChoice.Default;
 
     /// <summary>
     /// Gets or sets the JavaScript runtime.
@@ -208,7 +229,7 @@ public sealed partial class MainLayout : IDisposable
     {
         _theme = _theme == UiTheme.Dark ? UiTheme.Light : UiTheme.Dark;
 
-        await StoreAsync("theme", "censio.storePreference", UiPreferences.ThemeCookieName, UiPreferences.StoredValue(_theme)).ConfigureAwait(true);
+        await StoreAsync("theme", StorePreferenceFunction, UiPreferences.ThemeCookieName, UiPreferences.StoredValue(_theme)).ConfigureAwait(true);
     }
 
     /// <summary>
@@ -223,8 +244,21 @@ public sealed partial class MainLayout : IDisposable
 
         RefreshProfiles(true);
 
-        await StoreAsync("language", "censio.storePreference", UiPreferences.LanguageCookieName, UiPreferences.StoredValue(language)).ConfigureAwait(true);
+        await StoreAsync("language", StorePreferenceFunction, UiPreferences.LanguageCookieName, UiPreferences.StoredValue(language)).ConfigureAwait(true);
         await StoreAsync("language", "censio.setDocumentLanguage", UiPreferences.StoredValue(language)).ConfigureAwait(true);
+    }
+
+    /// <summary>
+    /// Takes a new chart choice, shows it and asks the browser to store its range and its axis.
+    /// </summary>
+    /// <param name="choice">The choice made</param>
+    /// <returns>A task that completes when the browser answered</returns>
+    private async Task ChooseChartAsync(ChartChoice choice)
+    {
+        _choice = choice;
+
+        await StoreAsync("chart range", StorePreferenceFunction, UiPreferences.ChartRangeCookieName, UiPreferences.StoredValue(choice.Range)).ConfigureAwait(true);
+        await StoreAsync("time axis", StorePreferenceFunction, UiPreferences.ChartAxisCookieName, UiPreferences.StoredValue(choice.Axis)).ConfigureAwait(true);
     }
 
     /// <summary>
@@ -256,6 +290,8 @@ public sealed partial class MainLayout : IDisposable
         _theme = InitialTheme;
         _language = InitialLanguage;
         _texts = UiTexts.For(_language);
+        _choice = InitialChartChoice;
+        _chooseChart = EventCallback.Factory.Create<ChartChoice>(this, ChooseChartAsync);
 
         RefreshProfiles(true);
         RefreshRegionsLink();

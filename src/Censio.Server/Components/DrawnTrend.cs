@@ -25,17 +25,22 @@ internal sealed class DrawnTrend
     public required int? OffsetMinutes { get; init; }
 
     /// <summary>
-    /// Gets the points by the clock time they are drawn at.
+    /// Gets the time axis the chart is drawn on.
+    /// </summary>
+    public required ChartAxis Axis { get; init; }
+
+    /// <summary>
+    /// Gets the points by the time they are drawn at.
     /// </summary>
     public required Dictionary<DateTime, TrendPoint> PointsByTime { get; init; }
 
     /// <summary>
-    /// Gets the earliest clock time drawn.
+    /// Gets the earliest time drawn.
     /// </summary>
     public required DateTime First { get; init; }
 
     /// <summary>
-    /// Gets the latest clock time drawn.
+    /// Gets the latest time drawn.
     /// </summary>
     public required DateTime Last { get; init; }
 

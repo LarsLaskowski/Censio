@@ -152,7 +152,7 @@ public partial class IslandDetail
     #region DataPageBase
 
     /// <inheritdoc />
-    protected override object AddressKey => ValueTuple.Create(Profile, Session, Island, Area);
+    protected override object AddressKey => ValueTuple.Create(Profile, Session, Island, Area, ChartChoice.Range);
 
     /// <inheritdoc />
     protected override PageMode ResolveTarget(out Guid profileId, out IslandKey? island)
@@ -187,7 +187,15 @@ public partial class IslandDetail
         }
 
         var generation = _generation;
-        var read = await Trends.ReadFiguresAsync(view.ProfileId, island, asOf, cancellationToken).ConfigureAwait(true);
+        var read = await Trends.ReadFiguresAsync(view.ProfileId,
+                                                 island,
+                                                 new TrendRequest
+                                                 {
+                                                     LatestTick = asOf,
+                                                     Choice = ChartChoice,
+                                                     Held = _overviewRead?.View
+                                                 },
+                                                 cancellationToken).ConfigureAwait(true);
 
         if (generation != _generation)
         {

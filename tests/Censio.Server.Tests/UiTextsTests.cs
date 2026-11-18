@@ -132,7 +132,6 @@ public sealed class UiTextsTests
     /// <param name="german">The German text</param>
     [TestMethod]
     [TestCategory("AC7")]
-    [DataRow(nameof(UiTexts.ChartRange), "Last 24 hours up to the latest tick", "Letzte 24 Stunden bis zum letzten Tick")]
     [DataRow(nameof(UiTexts.ChartThisIsland), "This island", "Diese Insel")]
     [DataRow(nameof(UiTexts.ChartRegionTotal), "All islands of the region", "Alle Inseln der Region")]
     [DataRow(nameof(UiTexts.ChartOverview), "Overview", "Übersicht")]
@@ -148,6 +147,36 @@ public sealed class UiTextsTests
         // Assert
         Assert.AreEqual(english, shownInEnglish, $"The chart text {textName} should read as the spec gives it in English");
         Assert.AreEqual(german, shownInGerman, $"The chart text {textName} should read as the spec gives it in German");
+    }
+
+    /// <summary>
+    /// Every text of the chart controls exists in English and German, each exactly the one of spec AC6.
+    /// </summary>
+    /// <param name="textName">The name of the text property</param>
+    /// <param name="english">The English text</param>
+    /// <param name="german">The German text</param>
+    [TestMethod]
+    [TestCategory("AC6")]
+    [DataRow(nameof(UiTexts.ChartRangeFormat), "{0} up to the latest tick", "{0} bis zum letzten Tick")]
+    [DataRow(nameof(UiTexts.RangeLastHour), "Last hour", "Letzte Stunde")]
+    [DataRow(nameof(UiTexts.RangeLastDay), "Last 24 hours", "Letzte 24 Stunden")]
+    [DataRow(nameof(UiTexts.RangeLastWeek), "Last 7 days", "Letzte 7 Tage")]
+    [DataRow(nameof(UiTexts.RangeAll), "All", "Gesamt")]
+    [DataRow(nameof(UiTexts.RangeAllHistory), "All history", "Gesamter Verlauf")]
+    [DataRow(nameof(UiTexts.AxisRealTime), "Real time", "Echtzeit")]
+    [DataRow(nameof(UiTexts.AxisGameTime), "Game time", "Spielzeit")]
+    [DataRow(nameof(UiTexts.ChartRangeLabel), "Period", "Zeitraum")]
+    [DataRow(nameof(UiTexts.ChartAxisLabel), "Time axis", "Zeitachse")]
+    [DataRow(nameof(UiTexts.GameTimeFormat), "Game time {0}", "Spielzeit {0}")]
+    public void UiTextsChartControlTextsInBothLanguages(string textName, string english, string german)
+    {
+        // Act
+        var shownInEnglish = ReadText(UiTexts.For(UiLanguage.English), textName);
+        var shownInGerman = ReadText(UiTexts.For(UiLanguage.German), textName);
+
+        // Assert
+        Assert.AreEqual(english, shownInEnglish, $"The chart control text {textName} should read as the spec gives it in English");
+        Assert.AreEqual(german, shownInGerman, $"The chart control text {textName} should read as the spec gives it in German");
     }
 
     /// <summary>

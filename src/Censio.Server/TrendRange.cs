@@ -1,3 +1,5 @@
+using Censio.Server.Data;
+
 namespace Censio.Server;
 
 /// <summary>
@@ -31,20 +33,46 @@ public sealed class TrendRange
     #region Methods
 
     /// <summary>
-    /// Gives the range of the day up to the latest tick.
+    /// Gives the range of a choice up to the latest tick.
     /// </summary>
+    /// <param name="range">The range of the choice</param>
     /// <param name="latestTick">The receive time of the latest tick</param>
     /// <returns>The range</returns>
-    public static TrendRange Before(DateTimeOffset latestTick)
+    public static TrendRange For(ChartRange range, DateTimeOffset latestTick)
     {
-        var back = latestTick.UtcTicks - TimeSpan.TicksPerDay;
-        var start = back - (back % TimeSpan.TicksPerHour);
+        var latest = latestTick.UtcTicks;
+        var start = 0L;
+
+        if (range != ChartRange.All)
+        {
+            var back = Math.Max(0L,
+                                latest - (range switch
+                                          {
+                                              ChartRange.LastHour => TimeSpan.TicksPerHour,
+                                              ChartRange.LastDay => TimeSpan.TicksPerDay,
+                                              _ => 7 * TimeSpan.TicksPerDay
+                                          }));
+
+            start = back - (back % TimeSpan.TicksPerHour);
+        }
 
         return new TrendRange
                {
                    Start = new DateTimeOffset(start, TimeSpan.Zero),
-                   End = new DateTimeOffset(latestTick.UtcTicks + 1, TimeSpan.Zero)
+                   End = new DateTimeOffset(Math.Min(latest + 1, DateTimeOffset.MaxValue.UtcTicks), TimeSpan.Zero)
                };
+    }
+
+    /// <summary>
+    /// Gives the resolution a range is read at.
+    /// </summary>
+    /// <param name="range">The range of the choice</param>
+    /// <returns>The resolution</returns>
+    public static HistoryTrendResolution ResolutionOf(ChartRange range)
+    {
+        return range is ChartRange.LastWeek or ChartRange.All
+                   ? HistoryTrendResolution.Hours
+                   : HistoryTrendResolution.Points;
     }
 
     #endregion // Methods
