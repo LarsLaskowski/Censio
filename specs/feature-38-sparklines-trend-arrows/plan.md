@@ -330,3 +330,49 @@ Verdict `APPROVED` with three non-blocking findings, all fixed now:
 2. `PlanIslandParts` fills chunks of 240 islands first, and its test rows assert the part count (241 islands by 240
    points: 241 parts) besides the part size, with rows for 0 points and 0 islands.
 3. Fact 19 now samples the peak during one goods read and the heap while a refresh is in flight with the held read shown.
+
+## Security notes
+
+**Security confirmation of the revised plan for feature #38: approved, one new non-blocking finding**
+
+I re-read `/home/user/Censio/specs/feature-38-sparklines-trend-arrows/plan.md` (as revised), the *Decision* and *Consequences* of `/home/user/Censio/docs/decisions/0092-row-trends-read-once-per-table-in-island-point-parts.md`, and the loader and refresh rows of `tasks.md`. I ran nothing this round: the new design adds no statement and no measured claim beyond facts 18 and 19, which stay with the Dev in step 6.
+
+**My three earlier findings are resolved**
+1. Fact 18 now measures the whole opening read of 256 islands × 240 points, warm and cold, and the refresh read. The `web-charts.md` *Limits and errors* sentence (plan *Areas*) says every open island list holds the gate when opened and at each refresh, and that the time grows with the region's islands, which nothing limits. Not leaving out islands without rows, and not sharing one read across pages, are argued under *Options considered*. That is acceptable: such islands cost an index probe and scan no entries, which matches the island-part plan I measured last round.
+2. `PlanIslandParts` now fills chunks of 240 first, and the test rows assert the part count (241 islands × 240 points gives 241 parts), with rows for 0 points and 0 islands.
+3. Fact 19 now samples the peak of one goods read and the heap while a refresh is in flight and the held read is still shown.
+
+**The new incremental read**
+- **Part bound:** unchanged. A refresh goes through the same times transaction and island-point parts under the trend gate. One new tick for 256 islands is 2 parts (a chunk of 240 and one of 16). It grows with islands / 240 for larger regions and never exceeds 240 island points per part.
+- **Window:** the refresh starts just after the held newest point, never before the window start. It keeps at most 240 points, so the held data stays within the window and the cap.
+- **Inputs:** the refresh's inputs are server-side only (the held read of the same address with equal keys, the server's as-of time). No client value reaches the range or the query.
+- **Contents of the held read:** only numbers keyed by product GUID or island key, never a name. So a held read kept in a circuit after a profile is deleted holds no private names, and the page shows `Not found.` for it.
+- **Correctness, outside my area:** with "held newest time plus one tick", a tick whose receive time equals the held newest one but was stored later would be missed until the next whole read. The same goes for a late, older tick. This is a correctness question for the Devil's Advocate or the Reviewer, not a security one.
+
+**The loader's bounds, cancellation, failure and logging**
+- **Bounds:** at most one read in flight and one pending request per page ("the newest request wins"). Running off the load loop therefore adds no queue in `TrendReader._gate` beyond what the first plan had.
+- **Cancellation:** the loader has its own source, linked to the page's. An address change cancels it and drops the held read and the failure. Disposing the page disposes the loader. The cancellation reaches `_gate.WaitAsync` and every part's `TrendGate.WaitAsync` (`HistoryStore.cs:1441`), so a page that leaves while waiting holds nothing.
+- **Key match:** the held read is matched by its stored key (`HeldFor`), so an answer for an earlier address is never shown under the next one. `SparklineLoaderAddressChangeCancelsAndDropsHeld` pins this.
+- **Failure and logging:**
+  - A failure is logged once, in `TrendReader` through `UiLog.ChartReadFailed` with no arguments.
+  - `Request` does nothing for a failed address, so a failure cannot turn into a log line on every tick.
+  - A cancelled read stores and logs nothing (`SparklineLoaderCancelledReadKeepsNothing`, `IslandDetailCancelledTrendReadShowsAndLogsNothing`).
+  - No new log call or argument is added.
+
+**Finding**
+
+[NON-BLOCKING] The plan does not say what happens to an exception in the loader's background read, or which thread changes the loader's state.
+- Evidence: plan *Approach*, *Pages*, "Off the load loop" ("starts the read with its own cancellation … re-renders the page through the page's `InvokeAsync(StateHasChanged)`"). The signature is `Request(object addressKey, DateTimeOffset asOf, Func<…, Task<SparklineRead<TKey>>> read, Func<Task> changed)`.
+- The read is started and not awaited by the page. `TrendReader` turns a history failure into `IsFailed`, but two exceptions can arise outside it:
+  - in the page's `read` delegate (building the key lists);
+  - in `changed`, after the circuit is gone (`ObjectDisposedException`).
+- Either one would be lost unobserved, or, if the run ends up `async void`, would end the circuit. Nothing would be logged, and E4's text would not show.
+- `TrendReader` uses `ConfigureAwait(false)`, so the loader's continuation may run off the renderer's dispatcher while a render reads `HeldFor`.
+- Smallest fix: one sentence under "Off the load loop":
+
+  > The loader's run is a `Task` it keeps, never `async void`: a cancellation ends it silently, any other exception outside
+  > the reader marks the address failed without a second log line, `changed` is skipped once the loader is disposed, and
+  > the held read, the failure and the pending request change only inside the page's `InvokeAsync`.
+
+  Add one `SparklineLoaderTests` row for a throwing `read` delegate (marked failed, nothing escapes).
+- Recommendation: fix now, it is one sentence and one test row.
