@@ -93,6 +93,7 @@ public sealed class AnonymiserCommandTests
             yield return ["malformed island", RecordingOf(_version2, island[..^1]), 3L];
             yield return ["island before Version", RecordingOf(island, _version2), 2L];
             yield return ["session end before Version", RecordingOf(_sessionEnd, _version2), 2L];
+            yield return ["trade routes before Version", RecordingOf([4, 0, 0, 0, 0], _version2), 2L];
             yield return ["island after Version 4", RecordingOf(_version2, [0, 4, 0, 0, 0], island), 4L];
         }
     }

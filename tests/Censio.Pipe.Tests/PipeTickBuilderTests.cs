@@ -619,6 +619,81 @@ public sealed class PipeTickBuilderTests
     }
 
     /// <summary>
+    /// An undecoded message produces no item and leaves the open tick open.
+    /// </summary>
+    /// <param name="messageType">The type of the undecoded message</param>
+    [TestMethod]
+    [TestCategory("AC3")]
+    [DataRow(PipeMessageType.TradeRoutes)]
+    [DataRow(PipeMessageType.ItemOffers)]
+    public void PipeTickBuilderUndecodedMessageKeepsOpenTick(PipeMessageType messageType)
+    {
+        // Arrange
+        var builder = new PipeTickBuilder();
+
+        builder.Add(Frame(_ostia, "Ostia", 100), At(0));
+
+        // Act
+        var results = builder.Add(PipeReadResult.FromMessage(new UndecodedMessage(messageType)), At(1));
+
+        // Assert
+        Assert.IsEmpty(results, $"An undecoded {messageType} message should produce no item");
+        Assert.AreEqual(At(0) + PipeTickLimits.QuietPeriod, builder.QuietDeadline, "The tick of the island should stay open");
+    }
+
+    /// <summary>
+    /// An undecoded message just before the quiet deadline does not restart the quiet period.
+    /// </summary>
+    /// <param name="messageType">The type of the undecoded message</param>
+    [TestMethod]
+    [TestCategory("AC3")]
+    [DataRow(PipeMessageType.TradeRoutes)]
+    [DataRow(PipeMessageType.ItemOffers)]
+    public void PipeTickBuilderUndecodedMessageDoesNotRestartQuietPeriod(PipeMessageType messageType)
+    {
+        // Arrange
+        var builder = new PipeTickBuilder();
+        var beforeDeadline = At(2) + PipeTickLimits.QuietPeriod - TimeSpan.FromMilliseconds(1);
+
+        builder.Add(Frame(_ostia, "Ostia", 100), At(0));
+        builder.Add(Frame(new PipeIslandKey(1, 2, 0), "Neapolis", 100), At(2));
+
+        // Act
+        var results = builder.Add(PipeReadResult.FromMessage(new UndecodedMessage(messageType)), beforeDeadline);
+
+        // Assert
+        Assert.IsEmpty(results, $"An undecoded {messageType} message before the deadline should produce no item");
+        Assert.AreEqual(At(2) + PipeTickLimits.QuietPeriod, builder.QuietDeadline, "The deadline should still follow the last island");
+    }
+
+    /// <summary>
+    /// An undecoded message between a session event and a session end does not change whether that end is repeated.
+    /// </summary>
+    /// <param name="before">The session event before the undecoded message</param>
+    /// <param name="expected">The result kind of the following session end</param>
+    [TestMethod]
+    [TestCategory("AC3")]
+    [DataRow(PipeMessageType.SessionStart, PipeTickResultKind.SessionEnd)]
+    [DataRow(PipeMessageType.SessionEnd, PipeTickResultKind.RepeatedSessionEnd)]
+    public void PipeTickBuilderUndecodedMessageKeepsRepeatedSessionEnd(PipeMessageType before, PipeTickResultKind expected)
+    {
+        // Arrange
+        var builder = new PipeTickBuilder();
+
+        builder.Add(Frame(_ostia, "Ostia", 100), At(0));
+        builder.Add(PipeReadResult.FromMessage(CreateSessionEvent(before)), At(1));
+        builder.Add(PipeReadResult.FromMessage(new UndecodedMessage(PipeMessageType.TradeRoutes)), At(2));
+        builder.Add(PipeReadResult.FromMessage(new UndecodedMessage(PipeMessageType.ItemOffers)), At(3));
+
+        // Act
+        var results = builder.Add(PipeReadResult.FromMessage(new SessionEndMessage()), At(4));
+
+        // Assert
+        Assert.HasCount(1, results, "The session end should deliver one item");
+        Assert.AreEqual(expected, results[0].Kind, $"The session end after a {before} and undecoded messages should keep its kind");
+    }
+
+    /// <summary>
     /// The end of the stream closes the open tick as stream ended and is delivered after it.
     /// </summary>
     [TestMethod]

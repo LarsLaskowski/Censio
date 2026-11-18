@@ -997,6 +997,32 @@ public sealed class PipeRecordingAnonymiserTests
     }
 
     /// <summary>
+    /// A trade-route or item-offer frame without its count or with a negative count is refused with its line.
+    /// </summary>
+    /// <param name="frame">The malformed frame</param>
+    /// <returns>The task</returns>
+    [TestMethod]
+    [TestCategory("AC5")]
+    [DataRow(new byte[] { 4 })]
+    [DataRow(new byte[] { 4, 1, 0, 0 })]
+    [DataRow(new byte[] { 5, 1, 0, 0 })]
+    [DataRow(new byte[] { 4, 0xFF, 0xFF, 0xFF, 0xFF })]
+    [DataRow(new byte[] { 5, 0, 0, 0, 0x80 })]
+    public async Task PipeRecordingAnonymiserMalformedTradeRoutesIsRefused(byte[] frame)
+    {
+        // Arrange
+        var recording = RecordingOf(_version3, frame, _sessionEnd);
+
+        // Act
+        var (result, output) = await AnonymiseAsync(recording, new ScriptedPipeAnonymiserRandom(Up));
+
+        // Assert
+        Assert.AreEqual(PipeAnonymiseResultKind.FrameNotAnonymisable, result.Kind, $"A malformed type {frame[0]} frame should be refused");
+        Assert.AreEqual(3L, result.LineNumber, "The refusal should name the line of the malformed frame");
+        Assert.IsEmpty(output, "A refused recording should write nothing");
+    }
+
+    /// <summary>
     /// Two runs with the system random source draw different offsets and factors.
     /// </summary>
     /// <returns>The task</returns>
