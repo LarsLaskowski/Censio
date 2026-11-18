@@ -23,8 +23,9 @@ history and the other trend reads in [`history.md`](history.md).
   shows `–`, because the history keeps the first entry of a good ([`history.md`](history.md), *The series read*).
 - **The window** is fixed: the points from the start of the UTC hour that holds the latest tick's receive time minus 4
   hours, up to and including the latest tick, so 4 to 5 hours (about 120 to 150 ticks at the game's 120 seconds,
-  [`protocol.md`](protocol.md)), always in real time, whatever the range picker and the time-axis switch say. Every point of
-  it is drawn (`Points` resolution), never hourly means. A window with more than 240 points, which only a replay faster than
+  [`protocol.md`](../protocol.md)), always in real time, whatever the range picker and the time-axis switch say. Every point of
+  it is drawn (`Points` resolution): each tick, and an hour the retention has folded (older than 7 days, so only for a
+  profile not played for a week) as its one hourly point ([`history.md`](history.md)). A window with more than 240 points, which only a replay faster than
   about one tick per 75 seconds makes, shows its newest 240 without a cap line; the arrow then compares the oldest and the
   newest of those, and the heading's tooltip still says 4 hours.
 - **The line** is one SVG path of coordinates in a box of 80 by 20 units, a stroke of 1.5 with round caps, the window's
@@ -73,8 +74,8 @@ history and the other trend reads in [`history.md`](history.md).
 
 ### The batch reads of the trend column
 
-**The batch reads of the trend column.** Two more reads give a table's sparklines in one read for all its rows, each of
-  one profile, a range and the newest `MaxPoints` points (the server asks for 240, over the fixed four hours of
+Two reads beside the charts' reads of [`history.md`](history.md) give a table's sparklines in one read for all its rows,
+each of one profile, a range and the newest `MaxPoints` points (the server asks for 240, over the fixed four hours of
   *Sparklines and trend arrows*) at `Points` resolution, with the times of [`history.md`](history.md), *The trend reads* (*Times first*)
   and then the values in parts, each part one read transaction under the trend gate.
   - *Goods of one island.* The read names one island and a set of product GUIDs (at most the 500 shown rows). A point holds,
@@ -85,7 +86,8 @@ history and the other trend reads in [`history.md`](history.md).
     position.
   - *Buildings of a set of islands.* The read names a set of islands (the island list's region, unbounded in count). A point
     holds, for each island that has entries, its buildings: the sum of the entries' `BuildingCount` for a tick, and for an
-    hourly point `Math.Round(Σ BuildingCountSum / EntryCount, MidpointRounding.AwayFromZero)`; an island with no entries in
+    hourly point `Math.Round(Σ BuildingCountSum / EntryCount, MidpointRounding.AwayFromZero)`, the quotients of the island's
+    hourly entries added in C# in the order of the entries, as the figures read does, never summed in SQL; an island with no entries in
     the point is absent. The island set is one JSON parameter as the figures read has it.
   - *Parts of island points.* A part reads at most 240 island points (a tick or hourly point of one island), so that it scans
     no more entries than a part of the figures read: the islands are cut in chunks of 240, the last chunk taking the rest,
@@ -140,4 +142,4 @@ tick reads only the points after the held newest one and takes 100 to 120 ms.
 - The charts, their range, gaps, tooltip, colours, animation, the chart reads and the logging rule: [`web-charts.md`](web-charts.md).
 - The stored history, the series and chart trend reads, the trend gate and the other measurements: [`history.md`](history.md), [`server-data.md`](server-data.md).
 - The tables' frame, columns and live updates, and the pages' reads and memory: [`web-pages.md`](web-pages.md).
-- Trends in the region overview, on the good's page and for other values, another or user-chosen window, hourly means, a tooltip per point and sorting by trend.
+- Trends in the region overview, on the good's page and for other values, another or user-chosen window, hourly means as a resolution of the window, a tooltip per point and sorting by trend.

@@ -209,14 +209,14 @@ public sealed class HistoryStore : IHistoryTrends
                                                + "GROUP BY t.\"Number\", ti.\"Id\";";
 
     /// <summary>
-    /// The statement that selects the sum of the mean building counts of each island of a set for some hourly points.
+    /// The statement that selects the building count sums and entry counts of the entries of each island of a set for some hourly points, in the order of the entries.
     /// </summary>
-    private const string HourlyIslandsTrendSql = "SELECT p.\"Number\", " + HourlyIslandKeySql + ", sum(e.\"BuildingCountSum\" / CAST(e.\"EntryCount\" AS REAL)) "
+    private const string HourlyIslandsTrendSql = "SELECT p.\"Number\", " + HourlyIslandKeySql + ", e.\"BuildingCountSum\", e.\"EntryCount\" "
                                                  + FromHourlyPointsSql
                                                  + "JOIN \"HourlyIslands\" hi ON hi.\"PointNumber\" = p.\"Number\" "
                                                  + "JOIN \"HourlyEntries\" e ON e.\"HourlyIslandId\" = hi.\"Id\" "
                                                  + "WHERE p.\"ProfileId\" = $profile AND p.\"Number\" IN (SELECT \"value\" FROM json_each($numbers)) AND " + HourlyIslandKeySql + IslandsInSql
-                                                 + "GROUP BY p.\"Number\", hi.\"Id\";";
+                                                 + "ORDER BY p.\"Number\", hi.\"Id\", e.\"Id\";";
 
     /// <summary>
     /// The expression that tells whether an island of a tick holds an entry.
@@ -1560,7 +1560,9 @@ public sealed class HistoryStore : IHistoryTrends
                     sums[at] = found;
                 }
 
-                found[keys[reader.GetInt64(1)]] = reader.GetDouble(2);
+                var key = keys[reader.GetInt64(1)];
+
+                found[key] = found.GetValueOrDefault(key) + (isHourly ? reader.GetInt64(2) / (double)reader.GetInt32(3) : reader.GetDouble(2));
             }
         }
 

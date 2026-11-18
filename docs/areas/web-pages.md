@@ -64,7 +64,7 @@ application rely on it.
   `Gebäude`, `Trend`, `Produzierte Waren`, `Waren im Defizit`). The islands are ordered by shown name (ordinal, letter case
   ignored), ties by session GUID, island ID and area index. The name is a link to the island's detail. The `Trend` cell of
   an island is its sparkline of buildings over the last 4 hours with an arrow, also for an island the latest tick lacks; the
-  figures show before the trends are read and never wait for them ([`web-charts.md`](web-charts.md), *Sparklines and trend
+  figures show before the trends are read and never wait for them ([`web-trends.md`](web-trends.md), *Sparklines and trend
   arrows*).
 - An island with an empty name is shown as `Unnamed island` / `Unbenannte Insel` (`UiTexts`).
 
@@ -293,4 +293,4 @@ value ([`server-state.md`](server-state.md), *Logging*); a failed read of a char
 - What the Companion sends and how it is stored: [`ingest.md`](ingest.md), [`contract.md`](contract.md).
 - The stored history, the series read and the deletion's rules: [`history.md`](history.md).
 - The charts, their range, gaps, tooltip, colours and reads: [`web-charts.md`](web-charts.md).
-- Deficits and surpluses per region, efficiency, economics, workforce, search, the phone layout and sorting by column: later features (#47 to #51, #53). The trend column's sparklines and arrows: [`web-charts.md`](web-charts.md).
+- Deficits and surpluses per region, efficiency, economics, workforce, search, the phone layout and sorting by column: later features (#47 to #51, #53). The trend column's sparklines and arrows: [`web-trends.md`](web-trends.md).
