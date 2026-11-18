@@ -297,5 +297,21 @@ public sealed class FakeHistoryTrends : IHistoryTrends
         return FiguresTrend;
     }
 
+    /// <inheritdoc />
+    public Task<HistoryTrend<HistoryGoodsPoint>> ReadGoodsTrendAsync(HistoryGoodsTrendQuery query, CancellationToken cancellationToken)
+    {
+#pragma warning disable RH2003 // Skeleton: removed with the implementation
+        throw new NotImplementedException();
+#pragma warning restore RH2003
+    }
+
+    /// <inheritdoc />
+    public Task<HistoryTrend<HistoryIslandsPoint>> ReadIslandsTrendAsync(HistoryIslandsTrendQuery query, CancellationToken cancellationToken)
+    {
+#pragma warning disable RH2003 // Skeleton: removed with the implementation
+        throw new NotImplementedException();
+#pragma warning restore RH2003
+    }
+
     #endregion // IHistoryTrends
 }

@@ -405,6 +405,20 @@ public sealed class HistoryStore : IHistoryTrends
     }
 
     /// <summary>
+    /// Cuts the points and islands of an islands trend read into parts of at most the part size island points.
+    /// </summary>
+    /// <param name="pointCount">The number of points.</param>
+    /// <param name="islandCount">The number of islands.</param>
+    /// <param name="partSize">The maximum number of island points per part.</param>
+    /// <returns>The parts, each a block of points and islands.</returns>
+    internal static List<TrendIslandSlice> PlanIslandParts(int pointCount, int islandCount, int partSize)
+    {
+#pragma warning disable RH2003 // Skeleton: removed with the implementation
+        throw new NotImplementedException();
+#pragma warning restore RH2003
+    }
+
+    /// <summary>
     /// Cuts the hours of a range, oldest first, into parts of at most the part size rows.
     /// </summary>
     /// <param name="hours">The hours with their tick counts and whether an hourly point exists.</param>
@@ -1539,6 +1553,22 @@ public sealed class HistoryStore : IHistoryTrends
                               query.MaxPoints,
                               (connection, part) => ReadFiguresPartAsync(connection, query, part, cancellationToken),
                               cancellationToken);
+    }
+
+    /// <inheritdoc/>
+    public Task<HistoryTrend<HistoryGoodsPoint>> ReadGoodsTrendAsync(HistoryGoodsTrendQuery query, CancellationToken cancellationToken)
+    {
+#pragma warning disable RH2003 // Skeleton: removed with the implementation
+        throw new NotImplementedException();
+#pragma warning restore RH2003
+    }
+
+    /// <inheritdoc/>
+    public Task<HistoryTrend<HistoryIslandsPoint>> ReadIslandsTrendAsync(HistoryIslandsTrendQuery query, CancellationToken cancellationToken)
+    {
+#pragma warning disable RH2003 // Skeleton: removed with the implementation
+        throw new NotImplementedException();
+#pragma warning restore RH2003
     }
 
     #endregion // IHistoryTrends

@@ -23,5 +23,21 @@ public interface IHistoryTrends
     /// <returns>The trend of the figures</returns>
     Task<HistoryTrend<HistoryFiguresPoint>> ReadFiguresTrendAsync(HistoryFiguresTrendQuery query, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Reads the delta points of several goods of one island.
+    /// </summary>
+    /// <param name="query">The query</param>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>The trend of the goods</returns>
+    Task<HistoryTrend<HistoryGoodsPoint>> ReadGoodsTrendAsync(HistoryGoodsTrendQuery query, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Reads the building count points of several islands.
+    /// </summary>
+    /// <param name="query">The query</param>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>The trend of the islands</returns>
+    Task<HistoryTrend<HistoryIslandsPoint>> ReadIslandsTrendAsync(HistoryIslandsTrendQuery query, CancellationToken cancellationToken);
+
     #endregion // Methods
 }
