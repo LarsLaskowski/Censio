@@ -17,6 +17,26 @@ public sealed class HistoryStore : IHistoryTrends
     public const int TrendPartSize = 240;
 
     /// <summary>
+    /// The start of the statements over the ticks.
+    /// </summary>
+    private const string FromTicksSql = "FROM \"Ticks\" t ";
+
+    /// <summary>
+    /// The start of the statements over the hourly points.
+    /// </summary>
+    private const string FromHourlyPointsSql = "FROM \"HourlyPoints\" p ";
+
+    /// <summary>
+    /// The condition tail that restricts an island key to the set of the islands parameter.
+    /// </summary>
+    private const string IslandsInSql = " IN (SELECT \"value\" FROM json_each($islands)) ";
+
+    /// <summary>
+    /// The name of the parameter of the islands of the statements.
+    /// </summary>
+    private const string IslandsParameter = "$islands";
+
+    /// <summary>
     /// The statement that selects the latest receive time of a profile.
     /// </summary>
     private const string LatestReceiveSql = "SELECT max(\"ReceiveTicks\") FROM \"Ticks\" WHERE \"ProfileId\" = $profile;";
@@ -48,7 +68,7 @@ public sealed class HistoryStore : IHistoryTrends
                                            + "e.\"GenerationSum\", e.\"GenerationCount\", e.\"ConsumptionSum\", e.\"ConsumptionCount\", e.\"DeltaSum\", e.\"DeltaCount\", e.\"PerfectGenerationSum\", e.\"PerfectGenerationCount\", "
                                            + "e.\"PerfectConsumptionSum\", e.\"PerfectConsumptionCount\", e.\"IncomeSum\", e.\"IncomeCount\", e.\"SummedProductivitySum\", e.\"SummedProductivityCount\", e.\"AverageProductivitySum\", e.\"AverageProductivityCount\", "
                                            + "e.\"BuildingCountSum\", e.\"MaintenanceSum\", e.\"ProfitSum\" "
-                                           + "FROM \"HourlyPoints\" p "
+                                           + FromHourlyPointsSql
                                            + "LEFT JOIN \"HourlyIslands\" i ON i.\"PointNumber\" = p.\"Number\" AND i.\"SessionGuid\" = $session AND i.\"IslandId\" = $island AND i.\"AreaIndex\" = $area "
                                            + "LEFT JOIN \"HourlyEntries\" e ON e.\"HourlyIslandId\" = i.\"Id\" AND e.\"ProductGuid\" = $product "
                                            + "WHERE p.\"ProfileId\" = $profile AND p.\"HourTicks\" >= $start AND p.\"HourTicks\" < $end ORDER BY p.\"HourTicks\";";
@@ -59,7 +79,7 @@ public sealed class HistoryStore : IHistoryTrends
     private const string TickSeriesSql = "SELECT t.\"Number\", t.\"ReceiveTicks\", t.\"GameTime\", i.\"Name\", e.\"Id\", "
                                          + "e.\"Generation\", e.\"Consumption\", e.\"Delta\", e.\"PerfectGeneration\", e.\"PerfectConsumption\", e.\"Income\", e.\"SummedProductivity\", e.\"AverageProductivity\", "
                                          + "e.\"BuildingCount\", e.\"Maintenance\", e.\"Profit\" "
-                                         + "FROM \"Ticks\" t "
+                                         + FromTicksSql
                                          + "LEFT JOIN \"TickIslands\" i ON i.\"TickNumber\" = t.\"Number\" AND i.\"SessionGuid\" = $session AND i.\"IslandId\" = $island AND i.\"AreaIndex\" = $area "
                                          + "LEFT JOIN \"TickEntries\" e ON e.\"Id\" = (SELECT x.\"Id\" FROM \"TickEntries\" x WHERE x.\"TickIslandId\" = i.\"Id\" AND x.\"ProductGuid\" = $product ORDER BY x.\"Position\" LIMIT 1) "
                                          + "WHERE t.\"ProfileId\" = $profile AND t.\"ReceiveTicks\" >= $start AND t.\"ReceiveTicks\" < $end ORDER BY t.\"ReceiveTicks\", t.\"Number\";";
@@ -160,6 +180,45 @@ public sealed class HistoryStore : IHistoryTrends
     private const string HourlyFiguresHourSql = "SELECT p.\"Number\", e.\"EntryCount\", e.\"BuildingCountSum\", e.\"DeltaSum\", e.\"DeltaCount\", e.\"ProductGuid\" " + HourlyFiguresFromSql + ";";
 
     /// <summary>
+    /// The statement that selects the entries of some goods of an island for some ticks, in the order of the entries.
+    /// </summary>
+    private const string TickGoodsTrendSql = "SELECT t.\"Number\", e.\"ProductGuid\", e.\"Delta\" "
+                                             + FromTicksSql
+                                             + "JOIN \"TickIslands\" ti ON ti.\"TickNumber\" = t.\"Number\" AND ti.\"SessionGuid\" = $session AND ti.\"IslandId\" = $island AND ti.\"AreaIndex\" = $area "
+                                             + "JOIN \"TickEntries\" e ON e.\"TickIslandId\" = ti.\"Id\" AND e.\"ProductGuid\" IN (SELECT \"value\" FROM json_each($products)) "
+                                             + "WHERE t.\"ProfileId\" = $profile AND t.\"Number\" IN (SELECT \"value\" FROM json_each($numbers)) "
+                                             + "ORDER BY t.\"Number\", e.\"Position\";";
+
+    /// <summary>
+    /// The statement that selects the entries of some goods of an island for some hourly points.
+    /// </summary>
+    private const string HourlyGoodsTrendSql = "SELECT p.\"Number\", e.\"ProductGuid\", e.\"DeltaSum\", e.\"DeltaCount\" "
+                                               + FromHourlyPointsSql
+                                               + "JOIN \"HourlyIslands\" hi ON hi.\"PointNumber\" = p.\"Number\" AND hi.\"SessionGuid\" = $session AND hi.\"IslandId\" = $island AND hi.\"AreaIndex\" = $area "
+                                               + "JOIN \"HourlyEntries\" e ON e.\"HourlyIslandId\" = hi.\"Id\" AND e.\"ProductGuid\" IN (SELECT \"value\" FROM json_each($products)) "
+                                               + "WHERE p.\"ProfileId\" = $profile AND p.\"Number\" IN (SELECT \"value\" FROM json_each($numbers));";
+
+    /// <summary>
+    /// The statement that selects the sum of the building counts of each island of a set for some ticks.
+    /// </summary>
+    private const string TickIslandsTrendSql = "SELECT t.\"Number\", " + TickIslandKeySql + ", sum(e.\"BuildingCount\") "
+                                               + FromTicksSql
+                                               + "JOIN \"TickIslands\" ti ON ti.\"TickNumber\" = t.\"Number\" "
+                                               + "JOIN \"TickEntries\" e ON e.\"TickIslandId\" = ti.\"Id\" "
+                                               + "WHERE t.\"ProfileId\" = $profile AND t.\"Number\" IN (SELECT \"value\" FROM json_each($numbers)) AND " + TickIslandKeySql + IslandsInSql
+                                               + "GROUP BY t.\"Number\", ti.\"Id\";";
+
+    /// <summary>
+    /// The statement that selects the sum of the mean building counts of each island of a set for some hourly points.
+    /// </summary>
+    private const string HourlyIslandsTrendSql = "SELECT p.\"Number\", " + HourlyIslandKeySql + ", sum(e.\"BuildingCountSum\" / CAST(e.\"EntryCount\" AS REAL)) "
+                                                 + FromHourlyPointsSql
+                                                 + "JOIN \"HourlyIslands\" hi ON hi.\"PointNumber\" = p.\"Number\" "
+                                                 + "JOIN \"HourlyEntries\" e ON e.\"HourlyIslandId\" = hi.\"Id\" "
+                                                 + "WHERE p.\"ProfileId\" = $profile AND p.\"Number\" IN (SELECT \"value\" FROM json_each($numbers)) AND " + HourlyIslandKeySql + IslandsInSql
+                                                 + "GROUP BY p.\"Number\", hi.\"Id\";";
+
+    /// <summary>
     /// The expression that tells whether an island of a tick holds an entry.
     /// </summary>
     private const string TickHasEntrySql = "EXISTS (SELECT 1 FROM \"TickIslands\" xi JOIN \"TickEntries\" xe ON xe.\"TickIslandId\" = xi.\"Id\" WHERE xi.\"TickNumber\" = t.\"Number\")";
@@ -210,25 +269,25 @@ public sealed class HistoryStore : IHistoryTrends
     /// <summary>
     /// The statement that selects the entry of a good on each island of a set for some ticks, without the columns.
     /// </summary>
-    private const string TickGoodFromSql = "FROM \"Ticks\" t "
+    private const string TickGoodFromSql = FromTicksSql
                                            + "JOIN \"TickIslands\" ti ON ti.\"TickNumber\" = t.\"Number\" "
                                            + "JOIN \"TickEntries\" e ON e.\"Id\" = (SELECT x.\"Id\" FROM \"TickEntries\" x WHERE x.\"TickIslandId\" = ti.\"Id\" AND x.\"ProductGuid\" = $product ORDER BY x.\"Position\" LIMIT 1) "
-                                           + "WHERE t.\"ProfileId\" = $profile AND t.\"Number\" IN (SELECT \"value\" FROM json_each($numbers)) AND " + TickIslandKeySql + " IN (SELECT \"value\" FROM json_each($islands)) "
+                                           + "WHERE t.\"ProfileId\" = $profile AND t.\"Number\" IN (SELECT \"value\" FROM json_each($numbers)) AND " + TickIslandKeySql + IslandsInSql
                                            + "ORDER BY t.\"Number\", ti.\"SessionGuid\", ti.\"IslandId\", ti.\"AreaIndex\"";
 
     /// <summary>
     /// The statement that selects the entry of a good on each island of a set for some hourly points, without the columns.
     /// </summary>
-    private const string HourlyGoodFromSql = "FROM \"HourlyPoints\" p "
+    private const string HourlyGoodFromSql = FromHourlyPointsSql
                                              + "JOIN \"HourlyIslands\" hi ON hi.\"PointNumber\" = p.\"Number\" "
                                              + "JOIN \"HourlyEntries\" e ON e.\"HourlyIslandId\" = hi.\"Id\" AND e.\"ProductGuid\" = $product "
-                                             + "WHERE p.\"ProfileId\" = $profile AND p.\"Number\" IN (SELECT \"value\" FROM json_each($numbers)) AND " + HourlyIslandKeySql + " IN (SELECT \"value\" FROM json_each($islands)) "
+                                             + "WHERE p.\"ProfileId\" = $profile AND p.\"Number\" IN (SELECT \"value\" FROM json_each($numbers)) AND " + HourlyIslandKeySql + IslandsInSql
                                              + "ORDER BY p.\"Number\", hi.\"SessionGuid\", hi.\"IslandId\", hi.\"AreaIndex\"";
 
     /// <summary>
     /// The statement that selects the entries of an island for some ticks, without the columns.
     /// </summary>
-    private const string TickFiguresFromSql = "FROM \"Ticks\" t "
+    private const string TickFiguresFromSql = FromTicksSql
                                               + "JOIN \"TickIslands\" ti ON ti.\"TickNumber\" = t.\"Number\" AND ti.\"SessionGuid\" = $session AND ti.\"IslandId\" = $island AND ti.\"AreaIndex\" = $area "
                                               + "JOIN \"TickEntries\" e ON e.\"TickIslandId\" = ti.\"Id\" "
                                               + "WHERE t.\"ProfileId\" = $profile AND t.\"Number\" IN (SELECT \"value\" FROM json_each($numbers))";
@@ -236,7 +295,7 @@ public sealed class HistoryStore : IHistoryTrends
     /// <summary>
     /// The statement that selects the entries of an island for some hourly points, without the columns.
     /// </summary>
-    private const string HourlyFiguresFromSql = "FROM \"HourlyPoints\" p "
+    private const string HourlyFiguresFromSql = FromHourlyPointsSql
                                                 + "JOIN \"HourlyIslands\" hi ON hi.\"PointNumber\" = p.\"Number\" AND hi.\"SessionGuid\" = $session AND hi.\"IslandId\" = $island AND hi.\"AreaIndex\" = $area "
                                                 + "JOIN \"HourlyEntries\" e ON e.\"HourlyIslandId\" = hi.\"Id\" "
                                                 + "WHERE p.\"ProfileId\" = $profile AND p.\"Number\" IN (SELECT \"value\" FROM json_each($numbers))";
@@ -413,9 +472,25 @@ public sealed class HistoryStore : IHistoryTrends
     /// <returns>The parts, each a block of points and islands.</returns>
     internal static List<TrendIslandSlice> PlanIslandParts(int pointCount, int islandCount, int partSize)
     {
-#pragma warning disable RH2003 // Skeleton: removed with the implementation
-        throw new NotImplementedException();
-#pragma warning restore RH2003
+        var parts = new List<TrendIslandSlice>();
+
+        if (pointCount < 1 || islandCount < 1 || partSize < 1)
+        {
+            return parts;
+        }
+
+        for (var islandStart = 0; islandStart < islandCount; islandStart += partSize)
+        {
+            var islands = Math.Min(partSize, islandCount - islandStart);
+            var points = Math.Max(1, partSize / islands);
+
+            for (var pointStart = 0; pointStart < pointCount; pointStart += points)
+            {
+                parts.Add(new TrendIslandSlice(pointStart, Math.Min(points, pointCount - pointStart), islandStart, islands));
+            }
+        }
+
+        return parts;
     }
 
     /// <summary>
@@ -812,7 +887,7 @@ public sealed class HistoryStore : IHistoryTrends
         var ticks = new Dictionary<long, (double? Generation, double? Consumption, double? Delta)>();
         var hourly = new Dictionary<long, (double? Generation, double? Consumption, double? Delta)>();
 
-        using (var command = StoreAccess.CreateCommand(connection, TickGoodTrendSql, (ProfileParameter, query.ProfileId), (ProductParameter, query.ProductGuid), (NumbersParameter, SerializeNumbers(part, false)), ("$islands", islands)))
+        using (var command = StoreAccess.CreateCommand(connection, TickGoodTrendSql, (ProfileParameter, query.ProfileId), (ProductParameter, query.ProductGuid), (NumbersParameter, SerializeNumbers(part, false)), (IslandsParameter, islands)))
             using (var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
             {
                 while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
@@ -823,7 +898,7 @@ public sealed class HistoryStore : IHistoryTrends
                 }
             }
 
-        using (var command = StoreAccess.CreateCommand(connection, HourlyGoodTrendSql, (ProfileParameter, query.ProfileId), (ProductParameter, query.ProductGuid), (NumbersParameter, SerializeNumbers(part, true)), ("$islands", islands)))
+        using (var command = StoreAccess.CreateCommand(connection, HourlyGoodTrendSql, (ProfileParameter, query.ProfileId), (ProductParameter, query.ProductGuid), (NumbersParameter, SerializeNumbers(part, true)), (IslandsParameter, islands)))
             using (var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
             {
                 while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
@@ -1199,7 +1274,7 @@ public sealed class HistoryStore : IHistoryTrends
                 continue;
             }
 
-            using var command = StoreAccess.CreateCommand(connection, sql, (ProfileParameter, query.ProfileId), (ProductParameter, query.ProductGuid), (NumbersParameter, JsonSerializer.Serialize(owners.Keys.ToArray())), ("$islands", islands));
+            using var command = StoreAccess.CreateCommand(connection, sql, (ProfileParameter, query.ProfileId), (ProductParameter, query.ProductGuid), (NumbersParameter, JsonSerializer.Serialize(owners.Keys.ToArray())), (IslandsParameter, islands));
             using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
 
             while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
@@ -1352,6 +1427,144 @@ public sealed class HistoryStore : IHistoryTrends
                    FirstGameTime = totals.FirstGameTime,
                    HasNoEntries = totals.HasEntries == false
                };
+    }
+
+    /// <summary>
+    /// Reads the deltas of some goods of an island for the points of a part.
+    /// </summary>
+    /// <param name="connection">The opened connection inside a read transaction</param>
+    /// <param name="query">The query</param>
+    /// <param name="part">The points of the part</param>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>The points, in the order of the part, each with the deltas of the goods that have one</returns>
+    private static async Task<List<HistoryGoodsPoint>> ReadGoodsPartAsync(SqliteConnection connection, HistoryGoodsTrendQuery query, List<TrendTime> part, CancellationToken cancellationToken)
+    {
+        var products = JsonSerializer.Serialize(query.ProductGuids);
+        var ticks = new Dictionary<long, Dictionary<int, double>>();
+        var seen = new HashSet<(long Number, int ProductGuid)>();
+        var hourly = new Dictionary<long, Dictionary<int, double>>();
+
+        using (var command = CreateGoodsCommand(connection, TickGoodsTrendSql, query, products, SerializeNumbers(part, false)))
+            using (var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
+            {
+                while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                {
+                    var number = reader.GetInt64(0);
+                    var productGuid = reader.GetInt32(1);
+
+                    if (seen.Add((number, productGuid)) && ReadFloat(reader, 2) is { } delta)
+                    {
+                        GetOrAddDeltas(ticks, number)[productGuid] = delta;
+                    }
+                }
+            }
+
+        using (var command = CreateGoodsCommand(connection, HourlyGoodsTrendSql, query, products, SerializeNumbers(part, true)))
+            using (var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
+            {
+                while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                {
+                    if (Mean(reader, 2) is { } delta)
+                    {
+                        GetOrAddDeltas(hourly, reader.GetInt64(0))[reader.GetInt32(1)] = delta;
+                    }
+                }
+            }
+
+        return [
+                   .. part.Select(time => new HistoryGoodsPoint
+                                          {
+                                              Time = new DateTimeOffset(time.Ticks, TimeSpan.Zero),
+                                              IsHourly = time.IsHourly,
+                                              Deltas = (time.IsHourly ? hourly : ticks).GetValueOrDefault(time.Number) ?? []
+                                          })
+               ];
+    }
+
+    /// <summary>
+    /// Gets the deltas of a point, adding an empty set for a point that has none yet.
+    /// </summary>
+    /// <param name="deltas">The deltas by row number</param>
+    /// <param name="number">The row number</param>
+    /// <returns>The deltas of the point</returns>
+    private static Dictionary<int, double> GetOrAddDeltas(Dictionary<long, Dictionary<int, double>> deltas, long number)
+    {
+        if (deltas.TryGetValue(number, out var found) == false)
+        {
+            found = [];
+            deltas[number] = found;
+        }
+
+        return found;
+    }
+
+    /// <summary>
+    /// Creates the command of a goods statement.
+    /// </summary>
+    /// <param name="connection">The connection</param>
+    /// <param name="sql">The constant statement</param>
+    /// <param name="query">The query</param>
+    /// <param name="products">The JSON array of the product GUIDs</param>
+    /// <param name="numbers">The JSON array of the row numbers</param>
+    /// <returns>The command</returns>
+    private static SqliteCommand CreateGoodsCommand(SqliteConnection connection, string sql, HistoryGoodsTrendQuery query, string products, string numbers)
+    {
+        return StoreAccess.CreateCommand(connection,
+                                         sql,
+                                         (ProfileParameter, query.ProfileId),
+                                         ("$session", query.Island.SessionGuid),
+                                         ("$island", (int)query.Island.IslandId),
+                                         ("$area", (int)query.Island.AreaIndex),
+                                         ("$products", products),
+                                         (NumbersParameter, numbers));
+    }
+
+    /// <summary>
+    /// Reads the buildings of the islands of a part for the points of the part.
+    /// </summary>
+    /// <param name="connection">The opened connection inside a read transaction</param>
+    /// <param name="profileId">The profile identity</param>
+    /// <param name="points">The points of the part</param>
+    /// <param name="islands">The islands of the part</param>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>The buildings of each island with entries, by kind and row number of the point</returns>
+    private static async Task<Dictionary<(bool IsHourly, long Number), Dictionary<HistoryIslandKey, long>>> ReadIslandsPartAsync(SqliteConnection connection,
+                                                                                                                                 Guid profileId,
+                                                                                                                                 List<TrendTime> points,
+                                                                                                                                 List<HistoryIslandKey> islands,
+                                                                                                                                 CancellationToken cancellationToken)
+    {
+        var keys = islands.ToDictionary(island => ((long)island.SessionGuid * 65536) + (island.IslandId * 256L) + island.AreaIndex);
+        var serialized = SerializeIslands(islands);
+        var sums = new Dictionary<(bool IsHourly, long Number), Dictionary<HistoryIslandKey, double>>();
+
+        foreach (var (isHourly, sql) in new[] { (false, TickIslandsTrendSql), (true, HourlyIslandsTrendSql) })
+        {
+            var numbers = SerializeNumbers(points, isHourly);
+
+            if (numbers == "[]")
+            {
+                continue;
+            }
+
+            using var command = StoreAccess.CreateCommand(connection, sql, (ProfileParameter, profileId), (NumbersParameter, numbers), (IslandsParameter, serialized));
+            using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+
+            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            {
+                var at = (isHourly, reader.GetInt64(0));
+
+                if (sums.TryGetValue(at, out var found) == false)
+                {
+                    found = [];
+                    sums[at] = found;
+                }
+
+                found[keys[reader.GetInt64(1)]] = reader.GetDouble(2);
+            }
+        }
+
+        return sums.ToDictionary(pair => pair.Key, pair => pair.Value.ToDictionary(island => island.Key, island => (long)Math.Round(island.Value, MidpointRounding.AwayFromZero)));
     }
 
     /// <summary>
@@ -1509,6 +1722,50 @@ public sealed class HistoryStore : IHistoryTrends
                };
     }
 
+    /// <summary>
+    /// Reads the buildings of a set of islands over the newest points of a range, in parts of at most the part size island points.
+    /// </summary>
+    /// <param name="query">The query</param>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>The newest points in time order and the number of all points of the range</returns>
+    private async Task<HistoryTrend<HistoryIslandsPoint>> ReadIslandsAsync(HistoryIslandsTrendQuery query, CancellationToken cancellationToken)
+    {
+        var (times, total) = await ReadTrendTransactionAsync(connection => ReadTimesAsync(connection, query.ProfileId, query.RangeStart, query.RangeEnd, Math.Max(0, query.MaxPoints), cancellationToken), cancellationToken).ConfigureAwait(false);
+
+        var buildings = times.Select(_ => new Dictionary<HistoryIslandKey, long>()).ToList();
+
+        foreach (var slice in PlanIslandParts(times.Count, query.Islands.Count, TrendPartSize))
+        {
+            var points = times.GetRange(slice.PointStart, slice.PointCount);
+            var islands = query.Islands.Skip(slice.IslandStart).Take(slice.IslandCount).ToList();
+            var found = await ReadTrendTransactionAsync(connection => ReadIslandsPartAsync(connection, query.ProfileId, points, islands, cancellationToken), cancellationToken).ConfigureAwait(false);
+
+            for (var index = 0; index < points.Count; index++)
+            {
+                if (found.TryGetValue((points[index].IsHourly, points[index].Number), out var island))
+                {
+                    foreach (var (key, count) in island)
+                    {
+                        buildings[slice.PointStart + index][key] = count;
+                    }
+                }
+            }
+        }
+
+        return new HistoryTrend<HistoryIslandsPoint>
+               {
+                   Points = [
+                                .. times.Select((time, index) => new HistoryIslandsPoint
+                                                                 {
+                                                                     Time = new DateTimeOffset(time.Ticks, TimeSpan.Zero),
+                                                                     IsHourly = time.IsHourly,
+                                                                     Buildings = buildings[index]
+                                                                 })
+                            ],
+                   TotalCount = total
+               };
+    }
+
     #endregion // Methods
 
     #region IHistoryTrends
@@ -1558,17 +1815,18 @@ public sealed class HistoryStore : IHistoryTrends
     /// <inheritdoc/>
     public Task<HistoryTrend<HistoryGoodsPoint>> ReadGoodsTrendAsync(HistoryGoodsTrendQuery query, CancellationToken cancellationToken)
     {
-#pragma warning disable RH2003 // Skeleton: removed with the implementation
-        throw new NotImplementedException();
-#pragma warning restore RH2003
+        return ReadTrendAsync(query.ProfileId,
+                              query.RangeStart,
+                              query.RangeEnd,
+                              query.MaxPoints,
+                              (connection, part) => ReadGoodsPartAsync(connection, query, part, cancellationToken),
+                              cancellationToken);
     }
 
     /// <inheritdoc/>
     public Task<HistoryTrend<HistoryIslandsPoint>> ReadIslandsTrendAsync(HistoryIslandsTrendQuery query, CancellationToken cancellationToken)
     {
-#pragma warning disable RH2003 // Skeleton: removed with the implementation
-        throw new NotImplementedException();
-#pragma warning restore RH2003
+        return ReadIslandsAsync(query, cancellationToken);
     }
 
     #endregion // IHistoryTrends
