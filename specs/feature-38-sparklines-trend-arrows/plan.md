@@ -133,7 +133,7 @@ class `censio-trend` (no wrap, a CSS rule beside `censio-number`); nothing of th
   a read is in flight (the newest request wins, like `LoadAsync`); otherwise it starts the read with its own cancellation,
   linked to the page's. The read gets the held read of the same address for the refresh. Its answer is kept with its key
   and re-renders the page through `changed`, which the page passes as `() => InvokeAsync(StateHasChanged)`.
-- **Run and errors (Security note).** The run is a `Task` the loader keeps, never `async void`. Its state changes, and
+- **Run and errors (Security note).** The run is a discarded `Task.Run` task, never `async void`, catching every exception. Its state changes, and
   `HeldFor` and `IsFailedFor` read it, only under the loader's lock (a continuation may run off the dispatcher);
   `changed`, called outside the lock, is the one marshalling point. A cancellation ends the run silently; another
   exception outside the reader (a throwing `read`) marks the address failed and calls `changed`, logging nothing; one of
