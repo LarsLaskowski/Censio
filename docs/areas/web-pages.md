@@ -60,9 +60,12 @@ application rely on it.
 
 - The heading is the region's name; under it the profile's shown name and a link `All regions` / `Alle Regionen` to the
   overview of the profile.
-- The table has the columns `Island`, `Buildings`, `Produced goods`, `Goods in deficit` (German `Insel`, `Gebäude`,
-  `Produzierte Waren`, `Waren im Defizit`). The islands are ordered by shown name (ordinal, letter case ignored), ties by
-  session GUID, island ID and area index. The name is a link to the island's detail.
+- The table has the columns `Island`, `Buildings`, `Trend`, `Produced goods`, `Goods in deficit` (German `Insel`,
+  `Gebäude`, `Trend`, `Produzierte Waren`, `Waren im Defizit`). The islands are ordered by shown name (ordinal, letter case
+  ignored), ties by session GUID, island ID and area index. The name is a link to the island's detail. The `Trend` cell of
+  an island is its sparkline of buildings over the last 4 hours with an arrow, also for an island the latest tick lacks; the
+  figures show before the trends are read and never wait for them ([`web-charts.md`](web-charts.md), *Sparklines and trend
+  arrows*).
 - An island with an empty name is shown as `Unnamed island` / `Unbenannte Insel` (`UiTexts`).
 
 ### Island detail
@@ -72,11 +75,15 @@ application rely on it.
   range of the chart choice (by default the last 24 hours) up to the latest tick, with the range picker and the time-axis
   switch under its heading ([`web-charts.md`](web-charts.md)).
 - The table lists one row per entry of the island in the latest tick, with the columns (an unlabelled icon column of
-  24 pixels, then) `Good`, `Production`, `Consumption`, `Delta`, `Buildings`, `Productivity` (German `Ware`,
-  `Produktion`, `Verbrauch`, `Delta`, `Gebäude`, `Produktivität`).
+  24 pixels, then) `Good`, `Production`, `Consumption`, `Delta`, `Trend`, `Buildings`, `Productivity` (German `Ware`,
+  `Produktion`, `Verbrauch`, `Delta`, `Trend`, `Gebäude`, `Produktivität`). The `Trend` cell of a row is the sparkline of the
+  good's delta on the island over the last 4 hours with an arrow, in the row of the good's first entry only; the figures show
+  before the trends are read and never wait for them ([`web-charts.md`](web-charts.md), *Sparklines and trend arrows*).
 - At most 500 rows are shown: the first 500 entries of the island in the tick's order, shown ordered by shown good
   name (ordinal, letter case ignored), ties by product GUID. For an island with more entries the line
-  `Showing 500 of <n> goods.` / `500 von <n> Waren angezeigt.` follows the table.
+  `Showing 500 of <n> goods.` / `500 von <n> Waren angezeigt.` follows the table; after a failed read of the trends the line
+  `The trends cannot be read right now. Reload the page to try again.` / `Die Trends können gerade nicht gelesen werden.
+  Laden Sie die Seite neu, um es erneut zu versuchen.` follows it.
 - A good is named by the catalog entry in the shown language, else in the other language, else `Good <GUID>` /
   `Ware <GUID>` (`UiTexts`, in both languages). The name is a link to the good's page, which charts the good on this
   island and over its region ([`web-charts.md`](web-charts.md)).
@@ -147,6 +154,9 @@ text and is not retried until the page is loaded again: a notice of the server s
   the states between (it never queues one read per tick).
 - A change of the Companion's connection or status changes the banner of open pages; it reads nothing.
 - A language switch, a theme switch and a banner change re-render from the figures a page holds, without a read.
+- The trends of the island list and of the goods table are read beside the page's load, never inside it: a notice that
+  arrives while they are read still updates the figures at once, and the trends of the new tick follow when their read
+  answers ([`web-charts.md`](web-charts.md), *Sparklines and trend arrows*). A range or axis choice reads no trends.
 - A notice reaches a page through its own work item and never blocks the follower that delivers it.
 
 ### Profile switch
@@ -209,9 +219,9 @@ text and is not retried until the page is loaded again: a notice of the server s
 
 The pages log nothing of their own, a deletion included: the retention job logs it without a name
 ([`history.md`](history.md), *Log lines*). A failed read of a profile is logged by the server state without a name or a
-value ([`server-state.md`](server-state.md), *Logging*); a failed read of a chart logs the warning `A chart could not be read
-from the database.` with the exception and nothing else ([`web-charts.md`](web-charts.md), *Logging*); an address, a name, a
-figure and the browser's offset are never logged.
+value ([`server-state.md`](server-state.md), *Logging*); a failed read of a chart or of the trends of a table logs the warning
+`A chart could not be read from the database.` with the exception and nothing else ([`web-charts.md`](web-charts.md),
+*Logging*); an address, a name, a figure and the browser's offset are never logged.
 
 ## Limits and errors
 
@@ -245,7 +255,9 @@ figure and the browser's offset are never logged.
   most 500 of them). It holds no reference to a profile state once the view is built, held states included. The memory of
   a page is proportional to the island count of its profile, which is unbounded ([`server-state.md`](server-state.md),
   *Memory*), and a worst island of 92,097 entries shows 500 rows. The reads of the charts are bounded and gated apart
-  from this reader ([`web-charts.md`](web-charts.md), *The reads*); a page keeps the points of its charts besides the view.
+  from this reader ([`web-charts.md`](web-charts.md), *The reads*); a page keeps the points of its charts besides the view,
+  and the island list and the goods table keep their trends: at most 240 samples for each shown row, which are at most 500
+  goods or the region's islands ([`web-charts.md`](web-charts.md), *Memory and size of a page*).
 - The bytes of an icon stay in memory after the icon read is released, until the response is written: up to 17,825,792
   bytes for each request in flight ([`contract.md`](contract.md), *Bounds*). The number of requests in flight is not
   limited, like the uploads of an accepted risk of [`ingest.md`](ingest.md) (*Accepted risks*).
@@ -281,4 +293,4 @@ figure and the browser's offset are never logged.
 - What the Companion sends and how it is stored: [`ingest.md`](ingest.md), [`contract.md`](contract.md).
 - The stored history, the series read and the deletion's rules: [`history.md`](history.md).
 - The charts, their range, gaps, tooltip, colours and reads: [`web-charts.md`](web-charts.md).
-- Deficits and surpluses per region, efficiency, economics, workforce, search, sparklines and trend arrows, the phone layout and sorting by column: later features (#38, #47 to #51, #53).
+- Deficits and surpluses per region, efficiency, economics, workforce, search, the phone layout and sorting by column: later features (#47 to #51, #53). The trend column's sparklines and arrows: [`web-charts.md`](web-charts.md).

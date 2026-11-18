@@ -5,7 +5,8 @@
 The trend charts of the data pages: the two charts of a good's page and the overview chart of an island's page, the
 range picker and the time-axis switch with their stored choice, the range they show, the points and their gaps, hourly
 means, the game-time axis, the region total, the cap of 2,880 points, the tooltip and the axes, the colours and the
-animation, the reads that feed them with their bounds and failures, and the chart texts in
+animation, the reads that feed them with their bounds and failures, the sparklines and trend arrows of the goods table
+and the island list with their window, reads and texts, and the chart texts in
 English and German. Users of the web application rely on it; the pages around the charts are in
 [`web-pages.md`](web-pages.md), the history the charts read in [`history.md`](history.md).
 
@@ -213,8 +214,9 @@ English and German. Users of the web application rely on it; the pages around th
 ### The reads
 
 - Three reads feed the charts, each of one profile and the range and resolution of the choice: one good on one island (the island chart), one
-  good summed per point over the region's islands (the region total), and the figures of one island per point (the overview).
-  Each reads the newest 2,880 points and the count of all, never more, and keeps no tick in memory beyond the one it
+  good summed per point over the region's islands (the region total), and the figures of one island per point (the overview);
+  two more feed the trend column (*Sparklines and trend arrows*).
+  Each of the three reads the newest 2,880 points and the count of all, never more, and keeps no tick in memory beyond the one it
   folds into a point ([`history.md`](history.md), *The trend reads*). A transaction of a read scans at most 240 ticks or hourly
   points (*Hourly resolution* of that section for the wide ranges), so the ingest waits no longer than before.
 - The charts' reads run one at a time across the server, in a gate of their own and not the gate of the pages' profile reader
@@ -228,10 +230,73 @@ English and German. Users of the web application rely on it; the pages around th
 - A chart read never holds the clean-up of a deleted profile back: the clean-up waits for the chart read's part in progress,
   and no part starts while it truncates the write-ahead log ([`history.md`](history.md), *Deleting a profile*).
 
+### Sparklines and trend arrows
+
+- **Where.** The goods table of an island's page has a column `Trend` / `Trend` after `Delta`, and the island list of a region
+  has one after `Buildings` ([`web-pages.md`](web-pages.md)). The column heading's tooltip is `Last 4 hours up to the latest
+  tick` / `Letzte 4 Stunden bis zum letzten Tick`. A cell shows a sparkline and, after a space, an arrow. An island page
+  without a goods table (`No values for this island in the latest tick.`) has no trend cells and reads no trends.
+- **What a row shows.** A goods row shows the good's delta on the island at each point of the window, the values and points
+  of the good page's island chart (*Points, gaps and hourly means*); an island row shows the island's buildings figure at
+  each point, also for an island the latest tick lacks. Only the shown rows of the goods table (at most 500) get trends. A
+  good the island carries twice in the latest tick has two rows: the row of its first entry gets the trend and the other
+  shows `–`, because the history keeps the first entry of a good ([`history.md`](history.md), *The series read*).
+- **The window** is fixed: the points from the start of the UTC hour that holds the latest tick's receive time minus 4
+  hours, up to and including the latest tick, so 4 to 5 hours (about 120 to 150 ticks at the game's 120 seconds,
+  [`protocol.md`](protocol.md)), always in real time, whatever the range picker and the time-axis switch say. Every point of
+  it is drawn (`Points` resolution), never hourly means. A window with more than 240 points, which only a replay faster than
+  about one tick per 75 seconds makes, shows its newest 240 without a cap line; the arrow then compares the oldest and the
+  newest of those, and the heading's tooltip still says 4 hours.
+- **The line** is one SVG path of coordinates in a box of 80 by 20 units, a stroke of 1.5 with round caps, the window's
+  start at the left and the latest tick's end at the right. The smallest value of the row's points sits at the bottom, the
+  largest at the top, and equal values in the middle. It breaks by the rule of *Points, gaps and hourly means*: where a point
+  has no value, and after more than 15 minutes between the end of a point and the next one; it is never drawn as zero. A
+  point alone between two breaks is drawn as a dot. A cell with fewer than two points that have a value shows `–` and no
+  line or arrow. The path has no more than one decimal a coordinate, and its markup at 240 points is at most 4,000
+  characters, checked by a unit test; the cell holds no name, hover point, axis, label or legend.
+- **The arrow** compares the newest point that has a value with the oldest one that has a value, each rounded as the table
+  rounds the value (the delta to two decimals, midpoint away from zero; buildings to a whole number): a higher newest value
+  is `↑` named `Rising` / `Steigend`, a lower one `↓` named `Falling` / `Fallend`, an equal one `→` named `Stable` /
+  `Gleichbleibend`. So a delta that drifts from -0.004 to 0.004 is `Stable`. The name is the arrow's accessible name
+  (`role="img"`, `aria-label`) and its tooltip; the arrow has the text colour.
+- **Colour, animation and accessibility.** The line has the palette's secondary colour of the theme shown, which reaches 3:1
+  against the surface in both themes (*Colours*, a unit test). A sparkline has no animation: the reveal of *Animation* applies
+  to the charts' lines only, and a sparkline is neither in a `censio-chart` element nor a `mud-chart-line`. The SVG is hidden
+  from the accessibility tree (`aria-hidden="true"`), so the arrow's name is the row's only trend text.
+- **States.** A cell is empty before its trends are read and on the prerender, which reads none ([`web-pages.md`](web-pages.md),
+  *Reads and memory*). After a failed read every cell shows `–`, the line `The trends cannot be read right now. Reload the
+  page to try again.` / `Die Trends können gerade nicht gelesen werden. Laden Sie die Seite neu, um es erneut zu versuchen.`
+  shows under the table (after the line `Showing 500 of <n> goods.` where that shows), the warning of *Logging* is logged once,
+  and the trends of that address are not read again until the page is reloaded or its address changes. A cancelled read
+  shows and logs nothing. A good or island the held read lacks (new since it was read) has an empty cell until the next read.
+- **Live updates.** A stored tick of the page's profile reads the trends again without a reload and the sparklines and
+  arrows follow; until it answers the cells show the held ones, by good or island. A tick of another profile, a range choice
+  and an axis choice read none, and a range choice neither cancels a running trend read nor repeats it. A theme or language
+  switch redraws the sparklines and arrows from the read the page holds, without a read.
+- **Reads and their order.** A table's trends are one read for all its rows (the shown goods of the island; the islands of the
+  region), not one a row: a times transaction and parts of at most 240 island points under the trend gate
+  ([`history.md`](history.md), *The batch reads of the trend column*), asked for the newest 240 points of the window. The
+  trends never run inside the page's load loop ([`web-pages.md`](web-pages.md), *Live updates*): the page starts them and goes
+  on, so the table's figures render before they answer and a stored tick updates the figures while a trend read is
+  running. On an island page the overview chart is read first and then the trends, and a failure of one does not skip the
+  other. A page keeps at most one trend read running and one request waiting, the newest; an address change (another profile,
+  island or region) cancels the running read, which frees the trend gate at its next part, and drops what the page held.
+  A read the page leaves is cancelled with it.
+- **The refresh.** The first read of an address reads the whole window. A later read for the same keys (the same goods or
+  islands) starts just after the newest point the page holds, never before the window start, appends the new points to the
+  held ones, drops those before the new window start and keeps the newest 240, so a tick costs a part or two. A read for other
+  keys (a good or an island added or gone) or without held points reads the whole window again. A tick that
+  is stored with the receive time of the held newest point or earlier, and a tick folded into an hourly point inside the held
+  part, show only at the next whole read ([record 0092](../decisions/0092-row-trends-read-once-per-table-in-island-point-parts.md)).
+- **No names.** The cell writes only numbers, the hex colour and fixed texts; a good's or island's
+  name never reaches it, and a failed read logs nothing beyond the warning of *Logging*.
+
 ### Logging
 
-A failed chart read logs one warning, `A chart could not be read from the database.`, in the category `Censio.Server.TrendReader`
-with the exception and no other argument: no name, value, address or offset. The charts log nothing else.
+A failed chart read or a failed read of a table's trends logs one warning, `A chart could not be read from the database.`, in
+the category `Censio.Server.TrendReader` with the exception and no other argument: no name, value, address or offset. The
+charts and the trend column log nothing else: a cancelled read logs nothing, and a failure of the page's own start of the
+trend read, which the reader does not see, is shown as a failed read and logs nothing.
 
 ## Limits and errors
 
@@ -262,17 +327,34 @@ with the exception and no other argument: no name, value, address or offset. The
   of 240 ticks at the bounds held the write gate for 0.27 to 0.30 s (region) and 0.16 to 0.20 s (figures) in three runs on the
   in-memory database, against about 3.9 s of a fold step, so the ingest acknowledges within the Companion's 30 seconds
   ([`replay-sending.md`](replay-sending.md), *Failures*).
+- **The island list's opening read.** The whole opening read of an island list at the contract's bounds (256 islands by 240
+  points, 256 parts, scaled from 60 ticks, [`history.md`](history.md), *Measurements*) takes about 12.8 to 13.4 s warm and
+  17 to 19.7 s with the page cache dropped, which exceeds the 10 seconds a step of that section, while each part takes 90 to
+  150 ms and the page shows its figures meanwhile (its cells stay empty). Every open island list holds `TrendReader`'s gate
+  for that long when it is opened, and again at each refresh, which reads the points after the held newest one and takes
+  100 to 120 ms; a chart read of another page waits behind it. The time
+  grows with the region's islands, whose number the island list does not limit ([`server-state.md`](server-state.md)). The
+  goods table's opening read of one island takes 0.36 to 0.7 s.
 - **Memory and size of a page.** Measured with a scratch program that renders the page's two charts through the server's own
   chart component and a Blazor renderer, with 2,880 points a line and the browser's offset answered at once: the managed heap
   holds about 53.3 MB for the two charts after a collection (0.9 MB of it the points of the two reads, the rest the render
   tree, the series and the chart's components). The render batch that draws a chart is 3,353,385 bytes (about 3.2 MiB), one
   for each of the two charts; with 100 points a chart's batch is 120,576 bytes. The memory
   of open pages is proportional to their number, which is not limited, as for the pages of [`web-pages.md`](web-pages.md).
+- **Memory and size of the trend column.** Measured with a scratch program that renders a goods table of 500 rows by 240
+  points through the cell component and a Blazor renderer: the render batch of the 500 trend cells is 1.40 MiB, the heap of
+  the renderer and its tree 3.56 MB, and the read a page holds (the samples and lines of 500 goods) 6.91 MB. One whole goods
+  read holds 3.39 MB of points (`HistoryGoodsPoint` dictionaries of 240 points by up to 500 goods) and allocates about 26 MB
+  in all; while a refresh is in flight and the held read is still shown, the trends take about 13.9 MB of the page's heap,
+  and the page about 17.5 MB.
 - A failed read, a lost connection and a browser that never answers the offset are the cases of *States of a chart* and
   *Tooltip, axes and times*; none shows an exception text.
 
 ## Related decisions
 
+- [`decisions/0091-row-trends-show-delta-and-buildings-over-a-fixed-four-hours.md`](../decisions/0091-row-trends-show-delta-and-buildings-over-a-fixed-four-hours.md) — a row's trend is the delta of a good or the buildings of an island over a fixed four hours.
+- [`decisions/0092-row-trends-read-once-per-table-in-island-point-parts.md`](../decisions/0092-row-trends-read-once-per-table-in-island-point-parts.md) — a table's trends are one read in parts of at most 240 island points, refreshed by the new points.
+- [`decisions/0093-sparklines-drawn-as-one-svg-path-of-our-own.md`](../decisions/0093-sparklines-drawn-as-one-svg-path-of-our-own.md) — a sparkline is one SVG path of our own, not MudBlazor's chart.
 - [`decisions/0086-charts-drawn-with-mudblazors-own-time-series-chart.md`](../decisions/0086-charts-drawn-with-mudblazors-own-time-series-chart.md) — the charts are MudBlazor's own time-series chart, with a reveal of our own style rule for the animation.
 - [`decisions/0087-chart-reads-aggregate-per-point-bounded-in-parts-with-a-product-index.md`](../decisions/0087-chart-reads-aggregate-per-point-bounded-in-parts-with-a-product-index.md) — the reads aggregate per point, read the newest 2,880 points in parts and use an index of tick entries by good.
 - [`decisions/0088-charts-show-the-day-up-to-the-latest-tick-with-gaps-after-15-minutes.md`](../decisions/0088-charts-show-the-day-up-to-the-latest-tick-with-gaps-after-15-minutes.md) — the default range is the day up to the latest tick, and a line breaks after 15 minutes without a point.
@@ -283,4 +365,4 @@ with the exception and no other argument: no name, value, address or offset. The
 
 - The pages' frame, routes, number and time formats, the as-of line and the reload text: [`web-pages.md`](web-pages.md), [`web-ui.md`](web-ui.md).
 - The stored history, the trend reads' SQL-level rules, the trend gate and the measurements of the reads: [`history.md`](history.md), [`server-data.md`](server-data.md).
-- Sparklines and trend arrows (#38); a range of the user's own choosing, a range per chart and time labels on the game-time axis; other values, a region's goods list and deficits (#47, #49 to #51); the chart toolbar (zoom, download) and several goods in one chart; the phone layout (#53).
+- A range of the user's own choosing, a range per chart and time labels on the game-time axis; other values, a region's goods list and deficits (#47, #49 to #51); the chart toolbar (zoom, download) and several goods in one chart; the phone layout (#53).

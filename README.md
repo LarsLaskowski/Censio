@@ -19,7 +19,7 @@ What `v0.3.0` cannot do:
 
 - Names and icons in the Companion only in the diagnostics window (regions and goods): the Companion loads them from its cache or reads them from your installation at every start, and reads them again when the game was updated (it checks when the game connects), and shows a bare number (GUID) where it cannot name one, and no icon where the game's files give none (the log line `Catalog icons: …` counts them); buildings and workforce have no column yet.
 - Nothing is sent from the Companion to the server except a recording you replay with `--server` (*Sending a recording to a server*); live sending is not there yet (#40), so the pages fill only from a replay.
-- The charts show at most the newest 2,880 points and only a good's production, consumption and delta and an island's buildings, produced goods and goods in deficit: there is no period of your own choosing (dates, zoom), the game-time axis has no time labels, and there are no sparklines or trend arrows (#38).
+- The charts show at most the newest 2,880 points and only a good's production, consumption and delta and an island's buildings, produced goods and goods in deficit: there is no period of your own choosing (dates, zoom), the game-time axis has no time labels, and the trend column of the goods table and the island list shows a fixed last 4 hours (the newest 240 points at most, so a replay faster than about one tick per 75 seconds shows less) and no other window.
 - The Companion has no settings for a server address or a token; a replay takes them as the switches `--server` and `--token-file`.
 
 ## Getting Censio
@@ -201,7 +201,7 @@ Das kann `v0.3.0` nicht:
 
 - Namen und Symbole im Companion nur im Diagnosefenster (Regionen und Waren): Der Companion lädt sie bei jedem Start aus seinem Cache oder liest sie aus Ihrer Installation und liest sie erneut, wenn das Spiel aktualisiert wurde (er prüft das, wenn das Spiel sich verbindet), und zeigt eine blanke Zahl (GUID), wo er keinen Namen findet, und kein Symbol, wo die Spieldateien keines liefern (die Logzeile `Catalog icons: …` zählt sie); Gebäude und Arbeitskräfte haben noch keine Spalte.
 - Der Companion sendet nichts an den Server, außer einer Aufzeichnung, die Sie mit `--server` abspielen (*Eine Aufzeichnung an einen Server senden*); das Senden im laufenden Betrieb gibt es noch nicht (#40), die Seiten füllen sich also nur durch ein Abspielen.
-- Die Diagramme zeigen höchstens die neuesten 2.880 Punkte und nur Produktion, Verbrauch und Delta einer Ware sowie Gebäude, produzierte Waren und Waren im Defizit einer Insel: Es gibt keinen frei gewählten Zeitraum (Datum, Zoom), die Spielzeitachse hat keine Zeitbeschriftungen, und es gibt keine Sparklines oder Trendpfeile (#38).
+- Die Diagramme zeigen höchstens die neuesten 2.880 Punkte und nur Produktion, Verbrauch und Delta einer Ware sowie Gebäude, produzierte Waren und Waren im Defizit einer Insel: Es gibt keinen frei gewählten Zeitraum (Datum, Zoom), die Spielzeitachse hat keine Zeitbeschriftungen, die Trendspalte der Warentabelle und der Inselliste zeigt ein festes Fenster der letzten 4 Stunden (höchstens die neuesten 240 Punkte, daher zeigt ein Abspielen, das schneller als etwa ein Tick je 75 Sekunden ist, weniger) und kein anderes.
 - Der Companion hat keine Einstellungen für eine Serveradresse oder ein Token; ein Abspielen nimmt sie als Schalter `--server` und `--token-file`.
 
 ## Censio beziehen

@@ -7,6 +7,20 @@ namespace Censio.Server.Components.Pages;
 /// </summary>
 public partial class RegionIslands
 {
+    #region Fields
+
+    /// <summary>
+    /// The loader of the trend column, replaced when the address changes.
+    /// </summary>
+    private SparklineLoader<IslandKey> _sparklines = new();
+
+    /// <summary>
+    /// A value that indicates whether the loader belongs to an address already.
+    /// </summary>
+    private bool _isSparklinesUsed;
+
+    #endregion // Fields
+
     #region Properties
 
     /// <summary>
@@ -22,6 +36,12 @@ public partial class RegionIslands
     public string? Session { get; set; }
 
     /// <summary>
+    /// Gets or sets the chart reader.
+    /// </summary>
+    [Inject]
+    private TrendReader Trends { get; set; } = null!;
+
+    /// <summary>
     /// Gets the heading of the page: the region's name once it is shown.
     /// </summary>
     private string Heading => Mode == PageMode.Ready && View is { } view && FindRegion(view) is { } region
@@ -31,6 +51,25 @@ public partial class RegionIslands
     #endregion // Properties
 
     #region Methods
+
+    /// <summary>
+    /// Gives what an island's trend cell shows.
+    /// </summary>
+    /// <param name="key">The key of the island</param>
+    /// <param name="held">The read of the trends, or <see langword="null" /> before there is one</param>
+    /// <param name="isFailed">A value that indicates whether the read of the trends failed</param>
+    /// <returns>Whether the cell is read, and its line</returns>
+    private static (bool IsRead, SparklineView? Line) TrendOf(IslandKey key, SparklineRead<IslandKey>? held, bool isFailed)
+    {
+        if (isFailed)
+        {
+            return (true, null);
+        }
+
+        return held is not null && held.Lines.TryGetValue(key, out var line)
+                   ? (true, line)
+                   : (false, null);
+    }
 
     /// <summary>
     /// Finds the region that holds the session of the address.
@@ -78,6 +117,50 @@ public partial class RegionIslands
     protected override bool IsKnown(ProfileView view)
     {
         return FindRegion(view) is not null;
+    }
+
+    /// <inheritdoc />
+    protected override Task ReadDetailsAsync(ProfileView view, CancellationToken cancellationToken)
+    {
+        if (view.AsOf is not { } asOf || FindRegion(view) is not { } region)
+        {
+            return Task.CompletedTask;
+        }
+
+        var islands = region.Islands.Select(island => island.Key).ToList();
+
+        if (islands.Count > 0)
+        {
+            _sparklines.Request(AddressKey,
+                                asOf,
+                                (held, token) => Trends.ReadIslandSparklinesAsync(view.ProfileId, islands, asOf, held, token),
+                                () => InvokeAsync(StateHasChanged));
+        }
+
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    protected override void ClearDetails()
+    {
+        if (_isSparklinesUsed)
+        {
+            _sparklines.Dispose();
+            _sparklines = new SparklineLoader<IslandKey>();
+        }
+
+        _isSparklinesUsed = true;
+    }
+
+    /// <inheritdoc />
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _sparklines.Dispose();
+        }
+
+        base.Dispose(disposing);
     }
 
     #endregion // DataPageBase
