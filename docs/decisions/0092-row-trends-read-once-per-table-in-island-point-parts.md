@@ -1,6 +1,6 @@
 # 0092: Row trends are read once per table, in parts of 240 island points
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-18
 - **Area:** web-trends
 - **Source:** Issue #38

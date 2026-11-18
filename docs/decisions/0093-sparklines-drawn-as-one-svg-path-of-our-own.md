@@ -1,6 +1,6 @@
 # 0093: Sparklines are drawn as one SVG path of our own
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-18
 - **Area:** web-trends
 - **Source:** Issue #38

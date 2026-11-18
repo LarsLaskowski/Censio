@@ -1,6 +1,6 @@
 # 0091: Row trends show delta and buildings over a fixed four hours, at every point
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-18
 - **Area:** web-trends
 - **Source:** Issue #38
