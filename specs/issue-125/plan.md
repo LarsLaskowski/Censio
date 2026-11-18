@@ -26,8 +26,8 @@ version 3 recording could be anonymised.
 | 3 | The reference at commit `4cc8ad78d63b33855b4b35dd002380fc466e4b1d` names `PROTOCOL_VERSION = 3` and types `TradeRoutes` (4) and `ItemOffers` (5) | `src/pipe.h` of that commit, fetched from raw.githubusercontent.com on 2026-11-18 | confirmed |
 | 4 | The reference decodes Version, SessionStart, SessionEnd and AreaProductionStatistics field for field as `PipeMessageParser` does | `src/pipe.cpp` of that commit (`ProductionEntryData::read`, the type-3 branch of `RunPipe`) read against `PipeMessageParser.cs:115-140` and `docs/areas/pipe.md`, *Message types* | confirmed |
 | 5 | Type 4 and type 5 payloads start with an int32 entry count (routes; traders), then nested data with strings (route name, folder) and further counts | `src/pipe.cpp`, branches `TradeRoutes` / `ItemOffers`, `TradeRouteEntryData::read`, `ItemOfferEntryData::read` | confirmed |
-| 6 | The game's version 3 island frames keep that layout | to verify: the new reader decodes all 101 island frames of the private recording outside the repository (`/root/.claude/uploads/6058ab20-ce3d-56be-a324-941adf5987d8/32f95262-recording-v3.jsonl`) without an error; Tester and Dev, after step 6 (AC7) | unverified |
-| 6a | The game's type 4/5 frames start with a non-negative int32 count and stay far within 1 MiB | The user's version 3 recording of 2026-11-18, build `26.39954.4.58957`, mid-connection, 114 lines, summarised by the orchestrator without reading contents: `Version` `[0,3,0,0,0]`, 1 session start, 1 session end, 101 island frames (29 to 4,946 bytes), 5 type 4 frames (8,186 bytes, count 57), 4 type 5 frames (229 bytes, count 7) | confirmed |
+| 6 | The game's version 3 island frames keep that layout | to verify: the new reader decodes all 101 island frames of the user's private version 3 recording (outside the repository; the orchestrator gives its path to the Tester) without an error; Tester and Dev, after step 6 (AC7) | unverified |
+| 6a | The game's type 4/5 frames start with a non-negative int32 count and stay far within 1 MiB | The user's version 3 recording, build `26.39954.4.58957`, mid-connection, 114 lines, summarised by the orchestrator without reading contents: `Version` `[0,3,0,0,0]`, 1 session start, 1 session end, 101 island frames (29 to 4,946 bytes), 5 type 4 frames (8,186 bytes, count 57), 4 type 5 frames (229 bytes, count 7) | confirmed |
 | 6b | The released anonymiser refuses that recording (`frame cannot be anonymised in line 3`, the session end after `Version 3`) | the user's run; `PipeFrameAnonymiser.cs:496` | confirmed |
 | 7 | The reference's buffer is still 1 MiB for every frame | `src/pipe.cpp`, `maxMessageSize{ 1024 * 1024 }` | confirmed |
 | 8 | A message type the tick builder does not match produces no item, closes no tick and does not restart the quiet period | `src/Censio.Pipe/PipeTickBuilder.cs:142-173` (`AddMessage` switch without default); `QuietDeadline` follows islands only | confirmed |
@@ -56,10 +56,19 @@ version 3 recording could be anonymised.
 - AC7: The user's real version 3 recording (private, outside the repository, never committed, copied or quoted in a
   comment) is read by the new reader with every one of its 113 frames a message (101 islands, 5 + 4 undecoded) and no
   error, and `Censio.Anonymiser` accepts it. Its anonymised output is committed as the fixture
-  `tests/Censio.Pipe.Tests/Fixtures/protocol-3-session.jsonl` only when the anonymisation guarantees hold: every
-  island and figure name invented, every type 4/5 frame exactly `[type, 0, 0, 0, 0]`, and the local deny-list check
-  finds no original name (figure, islands, trade routes and folders); otherwise no fixture, and the Tester reports
-  why.
+  `tests/Censio.Pipe.Tests/Fixtures/protocol-3-session.jsonl` only when the local deny-list check finds no original
+  figure or island name, and every type 4/5 frame of the output is exactly `[type, 0, 0, 0, 0]`; otherwise no
+  fixture, and the Tester reports why. The check runs in the scratchpad, never on the build output or under `tests/`:
+  (a) a throwaway script extracts, through `PipeMessageParser`, only the figure and island names of the original as
+  `deny` lines plus `original protocol-3-session.jsonl <path>` into a scratchpad deny list and prints only the entry
+  count (no trade route or folder name is extracted); (b) the anonymiser writes into an otherwise empty scratchpad
+  folder; (c) an uncommitted harness calls `FixtureDenyList.LoadAsync` on that deny list, then `CheckAsync` on that
+  folder, and reports `report.ToString()`; (d) a mechanical check reports as counts that original and output have
+  equal line counts and equal frame types per line, and that every type 4/5 frame of the output is exactly
+  `[type, 0, 0, 0, 0]` (expected 5 and 4); (e) the output is copied to `tests/Censio.Pipe.Tests/Fixtures/` only after
+  (c) reports 0 findings and (d) holds. Every report gives kinds, counts, line numbers and field names only; no
+  command prints a decoded name, frame, base64 line or deny-list line of the original (no `head`, `cat` or `jq` on
+  it). The Tester deletes the scratchpad deny list and harness after the check.
 
 ## Tests per criterion
 
@@ -71,7 +80,7 @@ version 3 recording could be anonymised.
 | AC4 | `PipeConnectionVersionThreeRaisesReceiving`, `PipeConnectionTradeRoutesAndItemOffersRaiseNoEvent` | `tests/Censio.Companion.Core.Tests/PipeConnectionTests.cs` |
 | AC5 | `PipeRecordingAnonymiserVersionThreeRecordingIsAnonymised`, `PipeRecordingAnonymiserTradeRoutesOrItemOffersAreWrittenEmpty` (DataRow 4, 5; a count above 0, a reference-layout entry with a route name, then trailing bytes; asserts the written frame equals exactly `[type, 0, 0, 0, 0]`), `PipeRecordingAnonymiserMalformedTradeRoutesIsRefused`; `AnonymiserCommandUndecodableFramePrintsLine` with the new row `trade routes before Version` and the row `island after Version 4` (adapted from `Version 3`), the method carrying `AC5` | `tests/Censio.Pipe.Tests/PipeRecordingAnonymiserTests.cs`, `tests/Censio.Anonymiser.Tests/AnonymiserCommandTests.cs` |
 | AC6 | check: the Reviewer reads the *Build* section against `log.md` and the issue | — |
-| AC7 | manual: the Tester after step 6, on the branch build, over the private recording outside the repository (`/root/.claude/uploads/6058ab20-ce3d-56be-a324-941adf5987d8/32f95262-recording-v3.jsonl`): a replay through `PipeMessageReader` counting results by kind (expected as AC7), then `Censio.Anonymiser` into the scratchpad, then `FixtureDenyListTests` with `CENSIO_FIXTURE_DENY_LIST` naming a scratchpad deny list of the original's names; the Tester reports counts only, no name. With the fixture: `PipeMessageReaderFixturesGiveReadmeFrameCounts` and `PipeTickAssemblerFixturesGiveReadmeTicksAndEvents` gain its `DataRow`; the Reviewer reads the fixture for names | `tests/Censio.Pipe.Tests/PipeMessageReaderTests.cs`, `tests/Censio.Pipe.Tests/PipeTickAssemblerTests.cs` |
+| AC7 | manual: the Tester after step 6, on the branch build, over the private recording outside the repository, whose path the orchestrator gives: a replay through `PipeMessageReader` counting results by kind (expected as AC7), then steps (a) to (e) of AC7 in the scratchpad; the Tester reports counts only, no name. With the fixture: `PipeMessageReaderFixturesGiveReadmeFrameCounts` and `PipeTickAssemblerFixturesGiveReadmeTicksAndEvents` gain its `DataRow`; the Reviewer reads the fixture for names | `tests/Censio.Pipe.Tests/PipeMessageReaderTests.cs`, `tests/Censio.Pipe.Tests/PipeTickAssemblerTests.cs` |
 
 Synthetic type 4 and 5 frames follow the reference layout of fact 5, built with `PipeFrameBuilder`'s `Byte`,
 `Int32Value` and `StringValue`, not copied from the real recording (fact 6a), whose only use is AC7.
@@ -202,7 +211,7 @@ All by the Dev, once the code is green:
   supplied; a row for `protocol-3-session.jsonl` (variants: protocol version 3, a recording started mid-connection,
   trade routes and item offers emptied) and its facts as counts, no name or time; `docs/areas/pipe.md`, *Residual
   risks* ("one anonymised fixture exists") and `docs/areas/pipe-recording.md`, *Fixtures*, by the Dev.
-- `docs/protocol.md` (the Dev): *Sources* adds the user's version 3 recording of 2026-11-18 (about 113 frames,
+- `docs/protocol.md` (the Dev): *Sources* adds a version 3 recording supplied by a user (about 113 frames, started
   mid-connection), with derived facts only: the frame counts and size ranges of fact 6a, and whether the island
   frames decoded as version 2 (AC7's result).
 - `docs/ARCHITECTURE.md`, `README.md`, `.squad/project.md`: none (sweep for "version 2", "protocol", "0 to 3" and the
