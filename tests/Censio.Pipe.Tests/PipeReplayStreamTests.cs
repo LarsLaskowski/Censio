@@ -400,7 +400,7 @@ public sealed class PipeReplayStreamTests
         // Arrange
         byte[][] frames = [
                               IslandFrame(1, 100),
-                              VersionFrame(3),
+                              VersionFrame(4),
                               IslandFrame(1, 100),
                               VersionFrame(2),
                               IslandFrame(1, 100)

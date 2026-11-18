@@ -2,11 +2,11 @@
 
 ## Scope
 
-The statistics pipe as the Companion reads it: the frame layout, the message types of protocol version 2, the
+The statistics pipe as the Companion reads it: the frame layout, the message types of protocol versions 2 and 3, the
 1 MiB limit, the error kinds, which errors skip a frame and which end the stream, the version gate, and the
 grouping of the messages into ticks and session events with the tick limits. The pipe is untrusted input: the format
-is known from Ubisoft's example reader (`UbisoftMainzAnno/anno117_pipe_example`, read on 2026-11-01, "for
-documentation purposes only") and one recording of ours; [`../protocol.md`](../protocol.md) states what the recording
+is known from Ubisoft's example reader (`UbisoftMainzAnno/anno117_pipe_example`, read on 2026-11-01 and again at
+commit `4cc8ad7` on 2026-11-18, "for documentation purposes only") and one recording of ours; [`../protocol.md`](../protocol.md) states what the recording
 confirms. A game update may change the format without notice. The reader works on any readable byte
 stream and does not depend on Windows or on the named pipe (implemented in `Censio.Pipe`). Ticks are assembled on an
 injected clock, so the same rules serve a live connection ([`pipe-connection.md`](pipe-connection.md)) and a replay
@@ -41,6 +41,12 @@ injected clock, so the same rules serve a live connection ([`pipe-connection.md`
 | 1 | SessionStart | string (player figure's name) |
 | 2 | SessionEnd | empty |
 | 3 | AreaProductionStatistics | session ID, island ID, area index (one unsigned byte each, 0 to 255); session GUID (int32); area name (string); timestamp (int64); entry count (int32); that many entries |
+| 4 | TradeRoutes | int32 count; the rest is not decoded (protocol version 3) |
+| 5 | ItemOffers | int32 count; the rest is not decoded (protocol version 3) |
+
+- A frame of type 4 or 5 is delivered as an undecoded message of its type once its leading count is read and is not
+  negative; whatever follows the count, strings of route names and folders included, is never read, held or logged.
+  The message changes no state. The types are accepted under version 2 too: the parser has no version.
 
 - An entry is: product GUID (int32); generation, consumption, delta, perfect generation, perfect consumption
   (float32); building count, maintenance (int32); income (float32); profit (int32); summed and average
@@ -52,13 +58,14 @@ injected clock, so the same rules serve a live connection ([`pipe-connection.md`
 ### Version gate
 
 - A reader starts with the version unknown and tracks it per stream. Only a `Version` frame is decoded while the
-  version is unknown or not `2`.
+  version is unknown or not a supported one (`2` or `3`).
 - A frame of any other type before the first `Version`, an unknown type byte included, gives a protocol-mismatch
   error without a received version. An empty frame before any `Version` gives the empty-frame error, not a
   protocol-mismatch error, because it has no type byte to gate.
-- After a `Version` other than `2`, the version frame gives a protocol-mismatch error with the received and the
-  expected version, and every following frame of another type is skipped undecoded and gives that error again, until
-  a `Version 2` arrives.
+- After a `Version` other than `2` or `3`, the version frame gives a protocol-mismatch error with the received and the
+  expected version (`3`, the newest supported), and every following frame of another type is skipped undecoded and
+  gives that error again, until a supported `Version` arrives. A `Version` of `2` or `3` is delivered as a version
+  message, and a switch between them on one stream is no mismatch.
 
 ### Ticks and sessions
 
@@ -85,8 +92,9 @@ A tick is delivered when it closes, once, and is never reopened. It closes when:
 5. the stream ends, also with a truncated-frame, oversized-frame or read-failed error (*stream ended*); the tick is
    delivered before the error and the end.
 
-- A version message or a skipped-frame error does not close the tick and does not restart the quiet period: only an
-  island frame does.
+- A version message, an undecoded message (type 4 or 5) or a skipped-frame error does not close the tick and does not
+  restart the quiet period: only an island frame does. An undecoded message produces no item and does not change
+  whether a following session end is a repeated one.
 - The receive time of a tick is the time its last island frame was received; the receive time of a frame is the
   moment its read completed.
 - A frame that is dropped for a tick limit does not restart the quiet period and its key does not count as present.
@@ -137,9 +145,9 @@ A tick is delivered when it closes, once, and is never reopened. It closes when:
 | Error kind | Cause | Effect |
 | ---------- | ----- | ------ |
 | Empty frame | Length `0` | Frame skipped |
-| Unknown type | Type byte other than 0 to 3 | Frame skipped |
-| Malformed message | Payload too short for its type, string length beyond the frame, negative count, count the rest of the frame cannot hold, map over 1,024 pairs, duplicate-amount sum outside the int32 range | Frame skipped; no message with a `0` in place of a missing value |
-| Protocol mismatch | Version other than `2`, or a non-version frame while the version is unknown or not `2` | Frame skipped |
+| Unknown type | Type byte other than 0 to 5 | Frame skipped |
+| Malformed message | Payload too short for its type, string length beyond the frame, negative count, count the rest of the frame cannot hold, map over 1,024 pairs, duplicate-amount sum outside the int32 range, type 4 or 5 without its count (fewer than 4 payload bytes) or with a negative one | Frame skipped; no message with a `0` in place of a missing value |
+| Protocol mismatch | Version other than `2` or `3`, or a non-version frame while the version is unknown or not supported | Frame skipped |
 | Truncated frame | Stream ends inside the length prefix or a payload | Stream ends |
 | Oversized frame | Length over 1 MiB, or negative | Stream ends |
 | Read failed | I/O error of the stream | Stream ends |
@@ -163,14 +171,14 @@ The reference reads leniently; this reader is strict and fails closed (record 00
 - **Short field.** The reference reads `0` for a field past the end of the frame. Here the frame is rejected as
   malformed.
 - **Wrong version.** The reference logs an unexpected version and decodes on. Here decoding stops until a
-  `Version 2` arrives.
+  supported `Version` arrives.
 - **Map cap.** The reference has no cap. Integer keys hash to themselves, so colliding keys would cost seconds of CPU
   per frame; the cap of 1,024 pairs per map bounds it. A future game with larger maps would see its frames rejected
   until the cap is raised.
 
 ### Residual risks
 
-Until more fixtures from real recordings test the reader (one anonymised fixture exists, [`pipe-recording.md`](pipe-recording.md), *Fixtures*):
+Until more fixtures from real recordings test the reader (two anonymised fixtures exist, one of protocol version 2 and one of protocol version 3, [`pipe-recording.md`](pipe-recording.md), *Fixtures*):
 
 - The format is known from the reference source as read on 2026-11-01 and one recording of 2026-11-07
   ([`../protocol.md`](../protocol.md)); a single recording cannot show a single reader or the units of the rates.
@@ -179,7 +187,13 @@ Until more fixtures from real recordings test the reader (one anonymised fixture
   `docs/protocol.md`, a file of that repository, not ours), not on our own; our recording has no non-ASCII byte.
 - Whether the game ever sends duplicate map keys is unknown; none was seen in one recording.
 - A game update that changes the format without a new protocol version is misread as long as every field still
-  fits; one that bumps the version is refused with a protocol-mismatch error.
+  fits; one that bumps the version beyond 3 is refused with a protocol-mismatch error.
+- The island layout under version 3 rests on the reference at commit `4cc8ad7` (which decodes versions, session events
+  and islands as before) and one real recording of the game after the update, whose 101 island frames decode without
+  an error ([`../protocol.md`](../protocol.md)); a field added at the end of an island frame
+  is ignored, one inserted earlier is misread or rejected as malformed.
+- The reference reads a missing count of a type 4 or 5 frame as 0 and a negative one as no entries; this reader
+  rejects both, so a game that ever sends such a frame has it skipped.
 - One recording confirms the timing (frames about one second apart, ticks about two minutes), the shared timestamp,
   the zero-entry tick after a load and the number of islands per tick (at most 24, with at most 1,934 entries and
   pairs); the double session end was not seen ([`../protocol.md`](../protocol.md)). Other games and updates may differ.

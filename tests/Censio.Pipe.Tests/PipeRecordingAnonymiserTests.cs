@@ -142,6 +142,11 @@ public sealed class PipeRecordingAnonymiserTests
     private static readonly byte[] _version2 = [0, 2, 0, 0, 0];
 
     /// <summary>
+    /// A version 3 frame.
+    /// </summary>
+    private static readonly byte[] _version3 = [0, 3, 0, 0, 0];
+
+    /// <summary>
     /// A session-end frame.
     /// </summary>
     private static readonly byte[] _sessionEnd = [2];
@@ -937,6 +942,84 @@ public sealed class PipeRecordingAnonymiserTests
         // Assert
         Assert.AreEqual(PipeAnonymiseResultKind.FrameNotAnonymisable, result.Kind, "A session end before the version should be refused");
         Assert.AreEqual(2L, result.LineNumber, "The refusal should name the line of the session end");
+    }
+
+    /// <summary>
+    /// A recording of version 3 is anonymised as one of version 2: the version is kept, the names are replaced.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    [TestCategory("AC5")]
+    public async Task PipeRecordingAnonymiserVersionThreeRecordingIsAnonymised()
+    {
+        // Arrange
+        var recording = RecordingOf(_version3, SessionStart("Alice"), StandardIsland(1, "Ostia", 100), _sessionEnd);
+
+        // Act
+        var (result, output) = await AnonymiseAsync(recording, new ScriptedPipeAnonymiserRandom(Up));
+
+        // Assert
+        var frames = OutputFrames(output);
+        string[] expectedNames = ["-", "Player 1", "Island 1", "-"];
+
+        Assert.AreEqual(PipeAnonymiseResultKind.Anonymised, result.Kind, "A version 3 recording should be anonymised");
+        Assert.AreEqual(4L, result.FrameCount, "Every frame should be counted");
+        Assert.AreSequenceEqual(_version3, frames[0].Frame, "The version 3 frame should be written unchanged");
+        Assert.AreSequenceEqual(expectedNames, frames.Select(line => NameOf(line.Frame)).ToArray(), "The names after version 3 should be replaced");
+        Assert.AreSequenceEqual(_sessionEnd, frames[3].Frame, "The session end should be written");
+    }
+
+    /// <summary>
+    /// A trade-route or item-offer frame with a count above 0, entries with names and trailing bytes is written as its
+    /// type byte and a count of 0, nothing of its content copied.
+    /// </summary>
+    /// <param name="type">The type byte</param>
+    /// <returns>The task</returns>
+    [TestMethod]
+    [TestCategory("AC5")]
+    [DataRow((byte)4)]
+    [DataRow((byte)5)]
+    public async Task PipeRecordingAnonymiserTradeRoutesOrItemOffersAreWrittenEmpty(byte type)
+    {
+        // Arrange
+        var frame = new PipeFrameBuilder().Byte(type).Int32Value(2).UndecodedEntries(type, 2).Raw(0xAA, 0xBB).Build();
+        var recording = RecordingOf(_version3, frame, _sessionEnd);
+
+        // Act
+        var (result, output) = await AnonymiseAsync(recording, new ScriptedPipeAnonymiserRandom(Up));
+
+        // Assert
+        var frames = OutputFrames(output);
+
+        Assert.AreEqual(PipeAnonymiseResultKind.Anonymised, result.Kind, $"A recording with a type {type} frame should be anonymised");
+        Assert.HasCount(4, OutputLines(output), "The output should have the input's line count");
+        Assert.AreSequenceEqual(new byte[] { type, 0, 0, 0, 0 }, frames[1].Frame, $"The type {type} frame should be its type byte and a count of 0");
+    }
+
+    /// <summary>
+    /// A trade-route or item-offer frame without its count or with a negative count is refused with its line.
+    /// </summary>
+    /// <param name="frame">The malformed frame</param>
+    /// <returns>The task</returns>
+    [TestMethod]
+    [TestCategory("AC5")]
+    [DataRow(new byte[] { 4 })]
+    [DataRow(new byte[] { 4, 1, 0, 0 })]
+    [DataRow(new byte[] { 5, 1, 0, 0 })]
+    [DataRow(new byte[] { 4, 0xFF, 0xFF, 0xFF, 0xFF })]
+    [DataRow(new byte[] { 5, 0, 0, 0, 0x80 })]
+    public async Task PipeRecordingAnonymiserMalformedTradeRoutesIsRefused(byte[] frame)
+    {
+        // Arrange
+        var recording = RecordingOf(_version3, frame, _sessionEnd);
+
+        // Act
+        var (result, output) = await AnonymiseAsync(recording, new ScriptedPipeAnonymiserRandom(Up));
+
+        // Assert
+        Assert.AreEqual(PipeAnonymiseResultKind.FrameNotAnonymisable, result.Kind, $"A malformed type {frame[0]} frame should be refused");
+        Assert.AreEqual(3L, result.LineNumber, "The refusal should name the line of the malformed frame");
+        Assert.IsEmpty(output, "A refused recording should write nothing");
     }
 
     /// <summary>

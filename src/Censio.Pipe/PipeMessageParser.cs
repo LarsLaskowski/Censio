@@ -54,7 +54,7 @@ public static class PipeMessageParser
 
         var typeValue = frame[0];
 
-        if (typeValue > (byte)PipeMessageType.AreaProductionStatistics)
+        if (typeValue > (byte)PipeMessageType.ItemOffers)
         {
             return PipeReadResult.FromError(new PipeError
                                             {
@@ -69,6 +69,7 @@ public static class PipeMessageParser
                                    PipeMessageType.Version => ParseVersion(frame, ref position),
                                    PipeMessageType.SessionStart => ParseSessionStart(frame, ref position),
                                    PipeMessageType.SessionEnd => new SessionEndMessage(),
+                                   PipeMessageType.TradeRoutes or PipeMessageType.ItemOffers => ParseUndecoded((PipeMessageType)typeValue, frame, ref position),
                                    _ => ParseStatistics(frame, ref position)
                                };
 
@@ -104,6 +105,27 @@ public static class PipeMessageParser
     private static SessionStartMessage? ParseSessionStart(ReadOnlySpan<byte> frame, ref int position)
     {
         return TryReadString(frame, ref position, out var headline) ? new SessionStartMessage(headline) : null;
+    }
+
+    /// <summary>
+    /// Parses the leading count of a trade-route or item-offer payload and leaves the rest undecoded.
+    /// </summary>
+    /// <param name="messageType">The message type of the frame</param>
+    /// <param name="frame">The frame</param>
+    /// <param name="position">The read position; on failure the offset of the count</param>
+    /// <returns>The message, or <c>null</c> when the count is missing or negative</returns>
+    private static UndecodedMessage? ParseUndecoded(PipeMessageType messageType, ReadOnlySpan<byte> frame, ref int position)
+    {
+        var countPosition = position;
+
+        if (TryReadInt(frame, ref position, out var count) == false || count < 0)
+        {
+            position = countPosition;
+
+            return null;
+        }
+
+        return new UndecodedMessage(messageType);
     }
 
     /// <summary>
