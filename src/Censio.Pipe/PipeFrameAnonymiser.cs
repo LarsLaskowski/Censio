@@ -493,7 +493,7 @@ internal sealed class PipeFrameAnonymiser
 
         if (message is VersionMessage version)
         {
-            _supported = version.Version == PipeProtocol.SupportedVersion;
+            _supported = version.Version == PipeProtocol.OldestSupportedVersion;
 
             return true;
         }

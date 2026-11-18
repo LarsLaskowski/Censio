@@ -322,7 +322,7 @@ public sealed class PipeMessageReaderTests
         // Assert
         Assert.AreEqual(PipeErrorKind.ProtocolMismatch, result.Error?.Kind, "An unsupported version should give a mismatch");
         Assert.AreEqual(3, result.Error?.ReceivedVersion, "The error should carry the received version");
-        Assert.AreEqual(PipeProtocol.SupportedVersion, result.Error?.ExpectedVersion, "The error should carry the expected version");
+        Assert.AreEqual(PipeProtocol.NewestSupportedVersion, result.Error?.ExpectedVersion, "The error should carry the expected version");
     }
 
     /// <summary>
@@ -344,7 +344,7 @@ public sealed class PipeMessageReaderTests
         // Assert
         Assert.AreEqual(PipeErrorKind.ProtocolMismatch, result.Error?.Kind, "A frame after an unsupported version should give a mismatch");
         Assert.AreEqual(3, result.Error?.ReceivedVersion, "The error should carry the received version");
-        Assert.AreEqual(PipeProtocol.SupportedVersion, result.Error?.ExpectedVersion, "The error should carry the expected version");
+        Assert.AreEqual(PipeProtocol.NewestSupportedVersion, result.Error?.ExpectedVersion, "The error should carry the expected version");
         Assert.AreEqual((byte)2, result.Error?.TypeValue, "The error should carry the type of the frame");
     }
 
@@ -387,7 +387,7 @@ public sealed class PipeMessageReaderTests
         // Assert
         Assert.AreEqual(PipeErrorKind.ProtocolMismatch, result.Error?.Kind, "A frame before the version should give a mismatch");
         Assert.IsNull(result.Error?.ReceivedVersion, "No version was received");
-        Assert.AreEqual(PipeProtocol.SupportedVersion, result.Error?.ExpectedVersion, "The error should carry the expected version");
+        Assert.AreEqual(PipeProtocol.NewestSupportedVersion, result.Error?.ExpectedVersion, "The error should carry the expected version");
         Assert.AreEqual((byte)2, result.Error?.TypeValue, "The error should carry the type of the frame");
     }
 
