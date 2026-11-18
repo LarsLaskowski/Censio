@@ -28,7 +28,7 @@ names), and nothing in Censio uses either new type yet.
 
 1. **Accept 2 and 3, skip types 4 and 5 undecoded** (chosen) — the Companion works again with the island data it
    already understands; the new types change no state and their content is never decoded, held or logged. Con: the
-   island layout under version 3 rests on the reference alone.
+   island layout under version 3 rests on the reference and one real recording.
 2. **Accept only 3** — matches the reference's single constant, but a game that has not updated (or a replay of an
    older recording) would show `Protocol mismatch`; nothing in version 3 changes the frames of version 2.
 3. **Decode trade routes and item offers now** — the reference gives the layout, but no feature uses them, the strings
