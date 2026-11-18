@@ -91,6 +91,12 @@ public sealed class UiTextsTests
     [DataRow(nameof(UiTexts.CompanionNotConnected), "The Companion is not connected.", "Der Companion ist nicht verbunden.")]
     [DataRow(nameof(UiTexts.GameNotRunning), "The game is not running.", "Das Spiel läuft nicht.")]
     [DataRow(nameof(UiTexts.StatisticsUnreadable), "The Companion cannot read the game's statistics.", "Der Companion kann die Statistik des Spiels nicht lesen.")]
+    [DataRow(nameof(UiTexts.ColumnTrend), "Trend", "Trend")]
+    [DataRow(nameof(UiTexts.TrendColumnTooltip), "Last 4 hours up to the latest tick", "Letzte 4 Stunden bis zum letzten Tick")]
+    [DataRow(nameof(UiTexts.TrendRising), "Rising", "Steigend")]
+    [DataRow(nameof(UiTexts.TrendFalling), "Falling", "Fallend")]
+    [DataRow(nameof(UiTexts.TrendStable), "Stable", "Gleichbleibend")]
+    [DataRow(nameof(UiTexts.TrendsReadFailed), "The trends cannot be read right now. Reload the page to try again.", "Die Trends können gerade nicht gelesen werden. Laden Sie die Seite neu, um es erneut zu versuchen.")]
     public void UiTextsEveryPageTextHasBothLanguages(string textName, string english, string german)
     {
         // Act

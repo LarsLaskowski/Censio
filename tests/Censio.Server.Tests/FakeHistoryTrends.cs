@@ -336,6 +336,18 @@ public sealed class FakeHistoryTrends : IHistoryTrends
     }
 
     /// <summary>
+    /// Waits until a number of figures reads have started.
+    /// </summary>
+    /// <param name="count">The number of figures reads</param>
+    /// <param name="timeout">The longest to wait</param>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>A task that completes when the reads have started</returns>
+    public Task WaitForFiguresCallsAsync(int count, TimeSpan timeout, CancellationToken cancellationToken)
+    {
+        return WaitForCountAsync(() => FiguresQueries.Count, count, timeout, cancellationToken);
+    }
+
+    /// <summary>
     /// Waits until a number of row trend reads (goods and islands) have started.
     /// </summary>
     /// <param name="count">The number of row trend reads</param>
