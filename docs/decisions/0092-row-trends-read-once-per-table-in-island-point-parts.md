@@ -40,6 +40,6 @@ figures. The rules and measurements are in [`history.md`](../areas/history.md), 
 ## Consequences
 
 A transaction holds the trend gate and, in memory, the ingest no longer than a part of the overview chart's read. The
-island list's opening read grows with the region's islands (tens of seconds at the bounds, measured in `history.md`) and
-runs in the charts' read gate, so a chart read can wait behind it; its refresh is a part or two. A tick folded inside the
+island list's opening read grows with the region's islands (about 13 s warm and up to 20 s cold at the bounds, each
+part 150 ms at most, measured in `history.md`) and runs in the charts' read gate, so a chart read can wait behind it; its refresh is a part or two. A tick folded inside the
 held window shows as held until the next whole read. Option 4 is the way out if that proves too slow.
