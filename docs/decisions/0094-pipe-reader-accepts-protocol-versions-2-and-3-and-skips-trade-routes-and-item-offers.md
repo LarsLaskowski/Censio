@@ -1,6 +1,6 @@
 # 0094: The pipe reader accepts protocol versions 2 and 3 and skips trade routes and item offers undecoded
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-18
 - **Area:** pipe
 - **Source:** Issue #125
