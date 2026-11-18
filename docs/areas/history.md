@@ -78,7 +78,7 @@ series read.
   deficit the entries whose delta rounded to two decimals, midpoint away from zero, is below 0), and no value when the tick
   lacks the island or the island has no entries. For an hourly point: buildings `Math.Round(Σ BuildingCountSum / EntryCount,
   MidpointRounding.AwayFromZero)` over the island's goods, produced goods the goods with `BuildingCountSum > 0`, goods in
-  deficit the goods with at least one delta whose mean `DeltaSum / DeltaCount`, rounded as above, is below 0.
+  deficit the goods with at least one delta whose mean `DeltaSum / DeltaCount`, rounded as above, is below 0. The hourly entries are read in product GUID order.
 - The island set is one JSON parameter read through SQLite's `json_each`, never one parameter per island and never
   formatted into the statement; the rows a tick adds stay bounded by the tick's islands (256). The reads use the index of
   the tick entries by tick island, good and position ([`server-data.md`](server-data.md)); the series read keeps its

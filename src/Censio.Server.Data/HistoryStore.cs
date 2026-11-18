@@ -172,7 +172,7 @@ public sealed class HistoryStore : IHistoryTrends
     /// <summary>
     /// The statement that selects the entries of an island for some hourly points.
     /// </summary>
-    private const string HourlyFiguresTrendSql = "SELECT p.\"Number\", e.\"EntryCount\", e.\"BuildingCountSum\", e.\"DeltaSum\", e.\"DeltaCount\" " + HourlyFiguresFromSql + ";";
+    private const string HourlyFiguresTrendSql = "SELECT p.\"Number\", e.\"EntryCount\", e.\"BuildingCountSum\", e.\"DeltaSum\", e.\"DeltaCount\" " + HourlyFiguresFromSql + " ORDER BY p.\"Number\", e.\"ProductGuid\";";
 
     /// <summary>
     /// The statement that selects the entries of an island for some hourly points with their good.
@@ -209,14 +209,14 @@ public sealed class HistoryStore : IHistoryTrends
                                                + "GROUP BY t.\"Number\", ti.\"Id\";";
 
     /// <summary>
-    /// The statement that selects the building count sums and entry counts of the entries of each island of a set for some hourly points, in the order of the entries.
+    /// The statement that selects the building count sums and entry counts of the entries of each island of a set for some hourly points, in product GUID order.
     /// </summary>
     private const string HourlyIslandsTrendSql = "SELECT p.\"Number\", " + HourlyIslandKeySql + ", e.\"BuildingCountSum\", e.\"EntryCount\" "
                                                  + FromHourlyPointsSql
                                                  + "JOIN \"HourlyIslands\" hi ON hi.\"PointNumber\" = p.\"Number\" "
                                                  + "JOIN \"HourlyEntries\" e ON e.\"HourlyIslandId\" = hi.\"Id\" "
                                                  + "WHERE p.\"ProfileId\" = $profile AND p.\"Number\" IN (SELECT \"value\" FROM json_each($numbers)) AND " + HourlyIslandKeySql + IslandsInSql
-                                                 + "ORDER BY p.\"Number\", hi.\"Id\", e.\"Id\";";
+                                                 + "ORDER BY p.\"Number\", hi.\"Id\", e.\"ProductGuid\";";
 
     /// <summary>
     /// The expression that tells whether an island of a tick holds an entry.

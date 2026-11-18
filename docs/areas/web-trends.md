@@ -87,7 +87,7 @@ each of one profile, a range and the newest `MaxPoints` points (the server asks 
   - *Buildings of a set of islands.* The read names a set of islands (the island list's region, unbounded in count). A point
     holds, for each island that has entries, its buildings: the sum of the entries' `BuildingCount` for a tick, and for an
     hourly point `Math.Round(Σ BuildingCountSum / EntryCount, MidpointRounding.AwayFromZero)`, the quotients of the island's
-    hourly entries added in C# in the order of the entries, as the figures read does, never summed in SQL; an island with no entries in
+    hourly entries added in C# in product GUID order, as the figures read does, never summed in SQL; an island with no entries in
     the point is absent. The island set is one JSON parameter as the figures read has it.
   - *Parts of island points.* A part reads at most 240 island points (a tick or hourly point of one island), so that it scans
     no more entries than a part of the figures read: the islands are cut in chunks of 240, the last chunk taking the rest,
