@@ -19,8 +19,9 @@ Ubisoft's reference reader (`UbisoftMainzAnno/anno117_pipe_example`, commit `4cc
 (trade routes: a count, then per route an ID, name and folder strings, problem and ship counts and its stations with
 their goods) and 5 (item offers: a count, then per trader an ID and a list of item GUIDs). It reads versions, session
 events and island frames field for field as our reader decodes them for version 2, and keeps its 1 MiB buffer.
-No recording of version 3 exists yet; the Product Manager chose to build from the reference with synthetic frames and
-to send a raw recording later (issue #125, step 2). Trade routes carry text the player types (route and folder
+The Product Manager chose to build from the reference with synthetic frames (issue #125, step 2); a raw version 3
+recording the user then supplied (kept private) confirms that frames of types 4 and 5 start with a count and stay far
+within 1 MiB, and is read against the new reader in the same pull request. Trade routes carry text the player types (route and folder
 names), and nothing in Censio uses either new type yet.
 
 ## Options considered
@@ -47,10 +48,9 @@ anonymiser writes it as its type with a count of 0. The rules are in [pipe](../a
 
 ## Consequences
 
-- Unverified until a real version 3 recording is read (the Product Manager's, after merge): that the island frames of
-  version 3 keep the version 2 layout (a field added at the end is ignored; one inserted earlier is misread or
-  rejected as malformed), that frames of types 4 and 5 start with a non-negative 32-bit count, and that they stay
-  within 1 MiB (a larger one ends the stream, and the connection reconnects and shows `Error` each time).
+- One real recording backs the version 3 island layout (a field added at the end is ignored; one inserted earlier is
+  misread or rejected as malformed). The reference reads a missing count as 0 and a negative one as no entries; this
+  reader rejects both, so a game that ever sends such a frame has it skipped.
 - A malformed trade-route or item-offer frame is a skipped frame without effect, but the anonymiser refuses a
   recording that holds one.
 - Fixtures made from version 3 recordings hold no trade routes or item offers; the feature that decodes them extends
