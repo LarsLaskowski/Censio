@@ -1,1 +1,13 @@
-@* Skeleton: the markup comes with the implementation *@
+@if (IsRead)
+{
+    if (Line is { } line)
+    {
+        <svg class="censio-sparkline" width="80" height="20" viewBox="0 0 80 20" aria-hidden="true" focusable="false"><path d="@line.Path" fill="none" stroke="@Stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg>
+        @(" ")
+        <span role="img" aria-label="@ArrowName(line.Direction)" title="@ArrowName(line.Direction)">@Arrow(line.Direction)</span>
+    }
+    else
+    {
+        @("–")
+    }
+}

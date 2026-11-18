@@ -50,27 +50,15 @@ public sealed class TrendRange
     /// <returns>The range</returns>
     public static TrendRange For(ChartRange range, DateTimeOffset latestTick)
     {
-        var latest = latestTick.UtcTicks;
-        var start = 0L;
-
-        if (range != ChartRange.All)
-        {
-            var back = Math.Max(0L,
-                                latest - (range switch
-                                          {
-                                              ChartRange.LastHour => TimeSpan.TicksPerHour,
-                                              ChartRange.LastDay => TimeSpan.TicksPerDay,
-                                              _ => 7 * TimeSpan.TicksPerDay
-                                          }));
-
-            start = back - (back % TimeSpan.TicksPerHour);
-        }
-
-        return new TrendRange
-               {
-                   Start = new DateTimeOffset(start, TimeSpan.Zero),
-                   End = new DateTimeOffset(Math.Min(latest + 1, DateTimeOffset.MaxValue.UtcTicks), TimeSpan.Zero)
-               };
+        return range == ChartRange.All
+                   ? Create(latestTick.UtcTicks, null)
+                   : Create(latestTick.UtcTicks,
+                            range switch
+                            {
+                                ChartRange.LastHour => TimeSpan.TicksPerHour,
+                                ChartRange.LastDay => TimeSpan.TicksPerDay,
+                                _ => 7 * TimeSpan.TicksPerDay
+                            });
     }
 
     /// <summary>
@@ -80,9 +68,7 @@ public sealed class TrendRange
     /// <returns>The range</returns>
     public static TrendRange ForSparklines(DateTimeOffset latestTick)
     {
-#pragma warning disable RH2003 // Skeleton: removed with the implementation
-        throw new NotImplementedException();
-#pragma warning restore RH2003
+        return Create(latestTick.UtcTicks, SparklineHours * TimeSpan.TicksPerHour);
     }
 
     /// <summary>
@@ -95,6 +81,30 @@ public sealed class TrendRange
         return range is ChartRange.LastWeek or ChartRange.All
                    ? HistoryTrendResolution.Hours
                    : HistoryTrendResolution.Points;
+    }
+
+    /// <summary>
+    /// Creates the range that ends right after a tick and starts at the hour that holds the time a span before it.
+    /// </summary>
+    /// <param name="latest">The receive time of the latest tick in ticks</param>
+    /// <param name="span">The ticks to go back, or <see langword="null"/> for the beginning of the time scale</param>
+    /// <returns>The range</returns>
+    private static TrendRange Create(long latest, long? span)
+    {
+        var start = 0L;
+
+        if (span is { } back)
+        {
+            var from = Math.Max(0L, latest - back);
+
+            start = from - (from % TimeSpan.TicksPerHour);
+        }
+
+        return new TrendRange
+               {
+                   Start = new DateTimeOffset(start, TimeSpan.Zero),
+                   End = new DateTimeOffset(Math.Min(latest + 1, DateTimeOffset.MaxValue.UtcTicks), TimeSpan.Zero)
+               };
     }
 
     #endregion // Methods

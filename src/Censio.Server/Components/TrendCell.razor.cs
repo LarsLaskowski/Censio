@@ -33,5 +33,44 @@ public sealed partial class TrendCell
     [CascadingParameter]
     public UiTexts Texts { get; set; } = UiTexts.For(UiLanguage.English);
 
+    /// <summary>
+    /// Gets the colour of the line in the theme shown.
+    /// </summary>
+    private string Stroke => TrendPalette.Sparkline(Theme);
+
     #endregion // Properties
+
+    #region Methods
+
+    /// <summary>
+    /// Gives the sign of a direction.
+    /// </summary>
+    /// <param name="direction">The direction</param>
+    /// <returns>The arrow</returns>
+    private static string Arrow(TrendDirection direction)
+    {
+        return direction switch
+               {
+                   TrendDirection.Rising => "↑",
+                   TrendDirection.Falling => "↓",
+                   _ => "→"
+               };
+    }
+
+    /// <summary>
+    /// Gives the name of a direction in the language shown.
+    /// </summary>
+    /// <param name="direction">The direction</param>
+    /// <returns>The name</returns>
+    private string ArrowName(TrendDirection direction)
+    {
+        return direction switch
+               {
+                   TrendDirection.Rising => Texts.TrendRising,
+                   TrendDirection.Falling => Texts.TrendFalling,
+                   _ => Texts.TrendStable
+               };
+    }
+
+    #endregion // Methods
 }

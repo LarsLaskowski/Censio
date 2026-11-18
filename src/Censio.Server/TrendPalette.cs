@@ -41,9 +41,7 @@ public static class TrendPalette
     /// <returns>The colour</returns>
     public static string Sparkline(UiTheme theme)
     {
-#pragma warning disable RH2003 // Skeleton: removed with the implementation
-        throw new NotImplementedException();
-#pragma warning restore RH2003
+        return Hex(PaletteOf(theme).Secondary);
     }
 
     /// <summary>

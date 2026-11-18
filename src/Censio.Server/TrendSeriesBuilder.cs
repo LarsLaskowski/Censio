@@ -167,7 +167,7 @@ public static class TrendSeriesBuilder
     /// <returns><see langword="true"/> when the line breaks before the later point</returns>
     public static bool BreaksBefore(TrendPoint earlier, TrendPoint later)
     {
-        return later.Time - EndOf(earlier) > GapAfter;
+        return BreaksBefore(earlier.Time, earlier.IsHourly, later.Time);
     }
 
     /// <summary>
@@ -179,9 +179,7 @@ public static class TrendSeriesBuilder
     /// <returns><see langword="true"/> when the line breaks before the later point</returns>
     public static bool BreaksBefore(DateTimeOffset earlierTime, bool isEarlierHourly, DateTimeOffset laterTime)
     {
-#pragma warning disable RH2003 // Skeleton: removed with the implementation
-        throw new NotImplementedException();
-#pragma warning restore RH2003
+        return laterTime - (isEarlierHourly ? earlierTime.AddHours(1) : earlierTime) > GapAfter;
     }
 
     /// <summary>
