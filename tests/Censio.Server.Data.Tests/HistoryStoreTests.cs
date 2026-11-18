@@ -1977,6 +1977,43 @@ public sealed class HistoryStoreTests
     }
 
     /// <summary>
+    /// The buildings of a folded hour in an islands read are the ones of the island's figures even where adding the goods'
+    /// mean building counts lands next to a half: 3/2 + 44/3 + 7/3 is 18.5, but added one after the other as doubles, as the
+    /// figures do, 18.499999999999996, which rounds to 18.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC2")]
+    public async Task HistoryStoreReadIslandsTrendHourlyBuildingsEqualFiguresNearHalf()
+    {
+        // Arrange
+        var (store, history, _) = await OpenAsync();
+
+        var profileId = Guid.NewGuid();
+
+        await StoreAsync(store,
+                         Tick(profileId, 10 * Minute, 10, Island(IslandKey, IslandName, TrendEntry(ProductGuid, 0f, 0f, 0f, 1), TrendEntry(OtherProductGuid, 0f, 0f, 0f, 15), TrendEntry(ThirdProductGuid, 0f, 0f, 0f, 3))),
+                         Tick(profileId, 20 * Minute, 20, Island(IslandKey, IslandName, TrendEntry(ProductGuid, 0f, 0f, 0f, 2), TrendEntry(OtherProductGuid, 0f, 0f, 0f, 15), TrendEntry(ThirdProductGuid, 0f, 0f, 0f, 2))),
+                         Tick(profileId, 30 * Minute, 30, Island(IslandKey, IslandName, TrendEntry(OtherProductGuid, 0f, 0f, 0f, 14), TrendEntry(ThirdProductGuid, 0f, 0f, 0f, 2))),
+                         Tick(profileId, Hour + (10 * Minute), 40, Island(IslandKey, IslandName, TrendEntry(ProductGuid, 0f, 0f, 0f, 5))));
+
+        var folded = await FoldAllAsync(history, profileId);
+        var island = TrendIsland(IslandKey);
+
+        // Act
+        var islands = await history.ReadIslandsTrendAsync(IslandsQuery(profileId, [island], _hour, _hour.AddHours(2), 240), TestContext.CancellationToken);
+        var figures = await history.ReadFiguresTrendAsync(FiguresQuery(profileId, island, _hour, _hour.AddHours(2), 240), TestContext.CancellationToken);
+
+        // Assert
+        var islandsHourly = islands.Points.Where(point => point.IsHourly).Select(point => point.Buildings.TryGetValue(island, out var buildings) ? (long?)buildings : null).ToList();
+        var figuresHourly = figures.Points.Where(point => point.IsHourly).Select(point => point.Buildings).ToList();
+
+        Assert.AreEqual(3, folded, "The three ticks of the first hour should have been folded");
+        Assert.AreSequenceEqual(new long?[] { 18 }, figuresHourly, "The figures should round the doubles' sum 18.499999999999996 to 18");
+        Assert.AreSequenceEqual(figuresHourly, islandsHourly, "The islands read should give the folded hour the buildings of the island's figures");
+    }
+
+    /// <summary>
     /// The parts of an islands read hold at most the part size in island points, a tick or hourly point of one island
     /// counting one: islands are cut into chunks of the part size filled first, the points of a chunk into slices, every
     /// island point of the read lies in exactly one part, no part is empty, and no points or no islands give no part.
