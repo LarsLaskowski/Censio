@@ -7,3 +7,4 @@ are quoted in full.
 | ---- | ---- | ------ | ------ |
 | 2026-11-19 19:47 | 1 Intake | Orchestrator | Issue 221 read: feature (decode pipe protocol 3 types 4 and 5); branch claude/youthful-lovelace-063mr0 off main 18e8ec3 |
 | 2026-11-19 19:51 | 2a Spec | Lead | RESULT: ESCALATE — usage of decoded data (Q1: pipe layer only / plus diagnostics window / plus server live state) and real v3 recording sample (Q2); spec.md Draft written (opus/medium · 84,395 tokens · 20 tool uses · 217 s · 40 in · 17,719 out · 1,064,260 cache read · 82,292 cache write · 489,426 weighted) |
+| 2026-11-19 19:55 | 2a Spec | Product Manager | Q1 answered: option 1, pipe layer only (decode with caps, anonymiser, real fixture; display becomes a follow-up feature). Q2 answered: the Product Manager supplies the real version 3 recording outside the repository before the plan is written. |
