@@ -23,7 +23,8 @@ names are text the player types, so they must never reach a committed fixture or
 - S2: Given the same connection, when an item-offers frame arrives, then the reader delivers an item-offers message:
   per trader, in frame order, its ID and the GUIDs of the items it offers, in frame order.
 - S3: Given an open tick, when a trade-routes or item-offers message arrives, then the tick, the quiet period, the
-  session events and the connection state are as they are today: the messages produce no tick item.
+  session events and the connection state are as they are today: the messages produce no tick item, and the
+  Companion sends, shows and logs nothing of them.
 - S4: Given a raw version 3 recording with trade routes and item offers, when a contributor runs
   `Censio.Anonymiser <recording> <output>`, then every route and item-offer frame is written with its decoded
   structure: route names become `Route <n>`, folder names `Folder <n>`, the integer amounts change, and IDs, GUIDs,
@@ -31,8 +32,6 @@ names are text the player types, so they must never reach a committed fixture or
   before the feature.
 - S5: Given the real version 3 recording, when it has been anonymised, then a committed fixture holds its trade routes
   and item offers decoded, and the reader's tests read it.
-- S6: *(pending the Product Manager's answer to the first open question: how the Companion or the server uses the
-  decoded data.)*
 
 ## Errors and edge cases
 
@@ -97,21 +96,25 @@ names are text the player types, so they must never reach a committed fixture or
 - AC11: A fixture anonymised from the real version 3 recording holds its trade-route and item-offer frames decoded,
   the reader delivers every one of them without an error, and a replay of it gives the ticks and session events of
   the original (S5, N4).
-- AC12: *(pending the answer to the first open question: the criteria of S6.)*
 
 ## Out of scope
 
 - A history of trade routes or item offers over time.
-- Interpreting the owner value or the problem counts beyond delivering them as numbers (unless S6 asks for it).
+- Using the decoded data in the Companion or the server: no contract message, server state, page or diagnostics
+  column shows it (the Product Manager's answer to Q1); showing it is a follow-up feature issue.
+- Interpreting the owner value or the problem counts beyond delivering them as numbers.
 - Changing what a raw recording holds: it keeps the raw frames, as for figure and island names (record 0036).
 
 ## Open questions
 
 - Q1: How do the Companion or the server use the decoded data (the issue's "decide how the Companion or server uses
-  the data")? Escalated to the Product Manager; the options are in the Lead's result of step 2.
+  the data")? Answered: the Product Manager chose the pipe layer only — types 4 and 5 are decoded with caps, the anonymiser
+  is extended and a real fixture is made; the Companion changes no state with them and nothing downstream uses them.
+  Showing the data is a follow-up feature issue.
 - Q2: Which real sample is the reader built from? The version 3 recording of #125 is kept private and is not in the
   session; the plan needs it supplied outside the repository (`.squad/routing.md`, *Escalation to the Product
-  Manager*) for AC11 and to confirm the nested counts.
+  Manager*) for AC11 and to confirm the nested counts. Answered: the Product Manager supplies the
+  real version 3 recording outside the repository before the plan is written; the plan does not start without it.
 - Q3: Does the game ever send a missing or negative count? Answered: none was seen at the top level — the version 3
   recording's 5 trade-route frames (count 57) and 4 item-offer frames (count 7) all start with a positive count
   ([`../../docs/protocol.md`](../../docs/protocol.md), *TradeRoutes and ItemOffers*); its nested counts are unknown
@@ -132,4 +135,9 @@ names are text the player types, so they must never reach a committed fixture or
   *Anonymising*; the new fixture in *Fixtures*.
 - `docs/protocol.md`: what the real recording confirms of types 4 and 5 (counts, sizes, no missing or negative
   count), derived facts only.
-- The area documents S6 touches, once the Product Manager has answered Q1.
+- `docs/areas/pipe.md`, *Ticks and sessions*: the rule that a type 4 or 5 message changes no tick, quiet period or
+  session state, now worded for the decoded messages instead of "an undecoded message".
+- `tests/Censio.Pipe.Tests/Fixtures/README.md` (no area document, but where a fixture is described): how the new
+  fixture was made and which facts of types 4 and 5 it shows.
+- No Companion, contract, server or web area document changes (`companion.md`, `companion-diagnostics.md`,
+  `contract.md`, `server-state.md`, `web-pages.md`): nothing downstream uses the data (Q1).
