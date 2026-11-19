@@ -58,7 +58,7 @@ One island per frame; the frames of one tick follow each other. *Confirmed*: 789
 | Island ID, area index | Parts of the island key (see *Island identity*) | none | confirmed |
 | Session GUID | Identifies a session of the game; part of the island key | none | confirmed |
 | Area name | Name of the island; it can change (see *Rename*) | text | confirmed |
-| Timestamp | Game time of the tick (see *Timestamp*) | milliseconds of game time | assumed (no source states the unit; consistent with the recording, see *Timestamp*) |
+| Timestamp | Game time of the tick (see *Timestamp*) | milliseconds of game time | confirmed (20:00 minutes of game time over 20:00 minutes of real time at 1x speed, see *Timestamp*) |
 | Entry count | Number of product entries of the island | count | confirmed: at most 69 |
 | Product GUID | The product of an entry; 125 distinct in the recording, none twice in an island | none | confirmed |
 | Generation, consumption | Produced and consumed amount | per minute | assumed (reference names; the unit is not visible) |
@@ -102,8 +102,8 @@ One island per frame; the frames of one tick follow each other. *Confirmed*: 789
 - *Confirmed*: shared by all islands of a tick, never by two consecutive ticks, always a multiple of 100.
 - *Confirmed*: it rises by 71,700 to 280,700 per tick (and by about 1.75 × 10⁹ from the zero-entry tick of the first
   load, 19,000, to the next one); the second zero-entry tick continues the game time.
-- *Assumed* (no source states the unit; consistent with the recording): milliseconds of game time, running with the game speed, so a paused game
-  sends no ticks.
+- *Confirmed* (no source states the unit; measured with the real game at 1x speed: the game time rose by 20:00 minutes over 20:00 minutes of real time, and no unit 60 or 1,000 times off fits): milliseconds of game time, running with the game speed, so a paused game
+  sends no ticks. It is not the play time the game shows for a savegame, which ran about 3.7 times faster over the same period.
 
 ## Island identity
 
