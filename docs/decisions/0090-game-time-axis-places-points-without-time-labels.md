@@ -9,8 +9,8 @@
 ## Context
 
 The game time stops while the game is paused and the game sends no ticks then ([`protocol.md`](../protocol.md),
-*Timestamp*, assumed), so on a real-time axis every pause is a gap. Issue #37 asks for a switch to game time. The game
-time is a number of milliseconds (assumed) with no confirmed origin; the tick after the first load of a game start
+*Timestamp*, confirmed at 1x speed), so on a real-time axis every pause is a gap. Issue #37 asks for a switch to game time. The game
+time is a number of milliseconds (confirmed at 1x speed) with no confirmed origin; the tick after the first load of a game start
 carries 19,000 against about 1.75 × 10⁹ for the next one, and an hourly point keeps the smallest and largest game time of
 its folded ticks, that tick's included. MudBlazor's time-series chart writes its axis labels only through a `DateTime`
 format ([0086](0086-charts-drawn-with-mudblazors-own-time-series-chart.md)), which wraps at 24 hours and, with the day,
