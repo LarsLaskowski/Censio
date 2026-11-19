@@ -9,8 +9,8 @@ Since protocol version 3 (game build `26.39954.4.58957`) the game sends two mess
 type 4, the player's trade routes, and type 5, the item offers of traders. The reader checks only their leading count
 and delivers them as undecoded messages that change nothing ([record 0094](../../docs/decisions/0094-pipe-reader-accepts-protocol-versions-2-and-3-and-skips-trade-routes-and-item-offers.md),
 [pipe](../../docs/areas/pipe.md), *Message types*); the anonymiser writes each as its type byte and a count of 0
-([pipe-recording](../../docs/areas/pipe-recording.md), *Anonymising*). So nothing in Censio can show a route with
-problems or lost ships, and no fixture holds real trade-route content to test a reader against. Route and folder
+([pipe-recording](../../docs/areas/pipe-recording.md), *Anonymising*). No fixture holds real trade-route content to test a
+reader against. Route and folder
 names are text the player types, so they must never reach a committed fixture or a log.
 
 ## Scenarios
@@ -48,16 +48,22 @@ names are text the player types, so they must never reach a committed fixture or
 - E5: Flag bits the reference does not name (bits 3 to 7 of a station's flags, 1 to 7 of a good's) are ignored; the
   named bits are delivered.
 - E6: A route ID, trader ID, station ID or item GUID that occurs twice is delivered twice, in its place; nothing is
-  merged or dropped.
+  merged or dropped. The reference differs: it keeps only the last offer of a repeated trader and groups routes by
+  folder without their ID.
 - E7: Route and folder names follow the string rules of [pipe](../../docs/areas/pipe.md), *Frame layout* (UTF-8 with
   U+FFFD, not trimmed, empty allowed). An empty folder is delivered as an empty text.
 - E8: Bytes after the last field of a trade-routes or item-offers frame are ignored; the message is delivered.
-- E9: A station's island key is delivered as read, whether or not an island frame with that key was seen.
 - E10: Types 4 and 5 are decoded under protocol version 2 as well, as today: the parser has no version.
 - E11: The anonymiser refuses a malformed trade-routes or item-offers frame with `frame cannot be anonymised in line
-  <n>`, as it does today for a missing or negative leading count.
+  <n>`, as it does today for a missing or negative leading count, and a trade-routes frame whose rewritten form (with
+  its invented names) would exceed 1 MiB.
 - E12: An invented name is never equal to an original name of the file of any kind (figure, island, route, folder),
   ignoring case; one original name keeps one invented name per kind, and an empty name stays empty.
+- E13: The anonymiser writes the flags of a station and a good from their named bits only: unnamed bits are written as
+  0, so they cannot carry data (as the NaN payload rule of [pipe-recording](../../docs/areas/pipe-recording.md),
+  *Amounts*).
+- E14: A lost-ship count at most the ship count stays at most the ship count after anonymising; a goods amount below
+  0 (possibly a special value) is kept unchanged.
 
 ## Non-functional requirements
 
@@ -66,15 +72,18 @@ names are text the player types, so they must never reach a committed fixture or
 - N2: Time: decoding a frame of up to 1 MiB of any shape takes time proportional to its size; no count can make the
   reader do work that the frame's bytes do not pay for.
 - N3: Privacy: route and folder names and every other decoded field of types 4 and 5 are never logged and never part of
-  an error; an error keeps its kind, type value and offset only. No original route or folder name and no original
-  amount of these frames reaches the anonymiser's output.
+  an error; an error keeps its kind, type value and offset only. No original route or folder name and no non-zero
+  original amount of these frames reaches the anonymiser's output, except a negative goods amount (E14).
 - N4: Compatibility: the recording format and its version are unchanged (recordings hold raw frames, record 0036);
   existing recordings and both fixtures replay as before; frames of types 0 to 3 decode as before.
+- N5: Real layout: the layout is confirmed against the raw real recording, not only against the anonymiser's own
+  output, which is written from the reader's decoding and so cannot show a misread layout. The check reads the
+  recording from outside the repository, reports counts only, and is inconclusive where the recording is missing.
 
 ## Acceptance criteria
 
 - AC1: A trade-routes frame built from the reference layout is delivered with every field of S1 in frame order, a
-  repeated ID kept in its place, names under the string rules and trailing bytes ignored (S1, E6, E7, E8, E9, E10).
+  repeated ID kept in its place, names under the string rules and trailing bytes ignored (S1, E6, E7, E8, E10).
 - AC2: An item-offers frame built from the reference layout is delivered with every trader and item of S2 in frame
   order, repeats kept (S2, E6, E8).
 - AC3: A count of 0 at each of the five levels gives an empty list, and the existing fixture's emptied frames decode
@@ -88,14 +97,19 @@ names are text the player types, so they must never reach a committed fixture or
   and do not change whether a following session end is a repeated one (S3).
 - AC8: The anonymiser writes route names as `Route <n>` and folder names as `Folder <n>` under the numbering rules of
   island and figure names, never equal to any original name of the file ignoring case (S4, E12, N3).
-- AC9: The anonymiser keeps IDs, GUIDs, island keys, flags, list lengths and order of types 4 and 5, changes problem
-  counts, ship counts, lost-ship counts and goods amounts by the integer rule of maintenance, and each written frame
-  parses back to that structure, else it is refused (S4, N3).
-- AC10: The anonymiser refuses a malformed trade-routes or item-offers frame with `frame cannot be anonymised in line
-  <n>` (E11).
+- AC9: The anonymiser keeps IDs, GUIDs, island keys, station owners, the named flag bits, list lengths and order of
+  types 4 and 5, writes unnamed flag bits as 0, changes problem counts, ship counts, lost-ship counts and goods amounts
+  of 0 or more by the integer rule of maintenance with lost ships kept at most ships where the original holds that,
+  keeps a negative goods amount, and each written frame parses back to that structure (owners included), else it is
+  refused (S4, E13, E14, N3).
+- AC10: The anonymiser refuses a malformed trade-routes or item-offers frame, and a trade-routes frame whose rewritten
+  form would exceed 1 MiB, with `frame cannot be anonymised in line <n>` (E11).
 - AC11: A fixture anonymised from the real version 3 recording holds its trade-route and item-offer frames decoded,
   the reader delivers every one of them without an error, and a replay of it gives the ticks and session events of
   the original (S5, N4).
+- AC12: Every type 4 and type 5 frame of the raw real recording (supplied by the Product Manager, outside the
+  repository) decodes without an error and ends exactly at the frame's end (no trailing byte), and no route or folder
+  name holds U+FFFD; a frame that fails this is escalated by the plan instead of being accepted under E8 (N5).
 
 ## Out of scope
 
@@ -118,8 +132,8 @@ names are text the player types, so they must never reach a committed fixture or
 - Q3: Does the game ever send a missing or negative count? Answered: none was seen at the top level — the version 3
   recording's 5 trade-route frames (count 57) and 4 item-offer frames (count 7) all start with a positive count
   ([`../../docs/protocol.md`](../../docs/protocol.md), *TradeRoutes and ItemOffers*); its nested counts are unknown
-  until the plan decodes it. The reference itself cannot survive a negative nested count (E2), so the reader keeps
-  rejecting both (record 0033).
+  until AC12's run. The reference cannot survive a negative nested count (E2); the reader keeps rejecting both
+  (record 0033).
 - Q4: Must a recording anonymise route names "before any recording keeps them"? Answered: no — a Companion recording
   holds the raw frames and stays private, as it does for figure and island names (records 0029, 0036); names are
   replaced by the anonymiser before a recording becomes a fixture (record 0042).
@@ -130,14 +144,35 @@ names are text the player types, so they must never reach a committed fixture or
 
 - `docs/areas/pipe.md`: the layout of types 4 and 5 in *Message types*; their caps and malformed cases in *Limits and
   errors*; the missing and negative counts, short fields and nested negative counts in *Deliberate differences from
-  the reference*; the residual risks updated.
+  the reference*, together with the reference's last-offer-wins for a repeated trader and its grouping of routes by
+  folder without their ID (E6); the residual risks updated.
 - `docs/areas/pipe-recording.md`: route and folder names, integer amounts and the kept fields of types 4 and 5 in
   *Anonymising*; the new fixture in *Fixtures*.
 - `docs/protocol.md`: what the real recording confirms of types 4 and 5 (counts, sizes, no missing or negative
-  count), derived facts only.
+  count, frames ending at their last field, names without U+FFFD, lost ships against ships, negative goods amounts),
+  derived facts only.
 - `docs/areas/pipe.md`, *Ticks and sessions*: the rule that a type 4 or 5 message changes no tick, quiet period or
   session state, now worded for the decoded messages instead of "an undecoded message".
 - `tests/Censio.Pipe.Tests/Fixtures/README.md` (no area document, but where a fixture is described): how the new
   fixture was made and which facts of types 4 and 5 it shows.
 - No Companion, contract, server or web area document changes (`companion.md`, `companion-diagnostics.md`,
   `contract.md`, `server-state.md`, `web-pages.md`): nothing downstream uses the data (Q1).
+
+## Challenge
+
+- 1 (major, AC11 cannot catch a wrong layout): accepted. The fixture is written from the reader's own decoding and kept
+  only when it parses back, so it cannot show a misread layout. Added N5 and AC12: a check on the raw real recording
+  that every type 4 and 5 frame decodes to its exact end and no name holds U+FFFD, escalated by the plan otherwise;
+  its result goes into `docs/protocol.md` as a derived fact.
+- 2 (minor, rewritten frame over 1 MiB): accepted. E11 and AC10 now refuse a trade-routes frame whose rewritten form
+  would exceed 1 MiB.
+- 3 (minor, owner and flag bits): accepted. AC9 keeps the station owner and compares it in the read-back; E13 and AC9
+  write flags from the named bits only, unnamed bits as 0.
+- 4 (minor, N3 against keeping 0): accepted. N3 now says no non-zero original amount (with the exception of E14).
+- 5 (minor, further differences from the reference): accepted. E6 names them, and *Area documents* lists them for
+  *Deliberate differences from the reference* in `docs/areas/pipe.md`.
+- 6 (minor, perturbed relations and special amounts): accepted. E14 and AC9 keep lost ships at most ships where the
+  original holds that, and keep a negative goods amount unchanged. The plan checks both against the real recording
+  (AC12's run) and adjusts the rule when the recording shows another relation.
+- Noted (record 0094 is unreleased): confirmed, since no tag contains its commit `30e8960`. The plan edits it in
+  place instead of superseding it.
