@@ -105,7 +105,7 @@ English and German. The sparklines and trend arrows of the tables are in [`web-t
 
 - On `Game time` each point sits at its game time, the Unix epoch plus its milliseconds as a `DateTime` (game times from
   -62,135,596,800,000 to 253,402,300,799,999 ms have a place, others none). The game time is read as milliseconds of game
-  time ([`protocol.md`](../protocol.md), *Timestamp*, assumed); the tooltip's game time and the 15-minute rule depend on that unit.
+  time ([`protocol.md`](../protocol.md), *Timestamp*, confirmed at 1x speed); the tooltip's game time and the 15-minute rule depend on that unit.
 - **Which points.** A tick or hour in which no island holds an entry (the tick the game sends after a load, `No data yet`
   of [`pipe.md`](pipe.md), whose game time can be far below the others) and a point whose game time has no place are left
   out, so they never stretch the axis; on `Real time` such a tick stays a point without values. Every other point without a
