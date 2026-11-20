@@ -20,7 +20,7 @@ public sealed class ContractReaderTests
     /// <summary>
     /// The fixed text of a message that breaks a value rule.
     /// </summary>
-    private const string InvalidText = "Contract message breaks a rule of contract version 1";
+    private const string InvalidText = "Contract message breaks a rule of contract version 2";
 
     /// <summary>
     /// The fixed text of a message above a size bound.
@@ -85,52 +85,52 @@ public sealed class ContractReaderTests
     /// <summary>
     /// A valid tick in single-quote notation.
     /// </summary>
-    private const string TickNotation = $"{{'type':'tick','contractVersion':1,'id':'{Id}','profileId':'{Profile}','receiveTime':'{Time}','gameTime':42,'islands':[{IslandNotation}]}}";
+    private const string TickNotation = $"{{'type':'tick','contractVersion':2,'id':'{Id}','profileId':'{Profile}','receiveTime':'{Time}','gameTime':42,'islands':[{IslandNotation}]}}";
 
     /// <summary>
     /// A valid hello in single-quote notation.
     /// </summary>
-    private const string HelloNotation = $"{{'type':'hello','contractVersion':1,'token':'secret-token','companionVersion':'0.3.0','profileId':'{Profile}','profileName':'Alice'}}";
+    private const string HelloNotation = $"{{'type':'hello','contractVersion':2,'token':'secret-token','companionVersion':'0.3.0','profileId':'{Profile}','profileName':'Alice'}}";
 
     /// <summary>
     /// A valid accepted hello reply in single-quote notation.
     /// </summary>
-    private const string HelloAcceptedNotation = "{'type':'helloAccepted','contractVersion':1,'serverVersion':'0.3.0','catalogIdentity':null}";
+    private const string HelloAcceptedNotation = "{'type':'helloAccepted','contractVersion':2,'serverVersion':'0.3.0','catalogIdentity':null}";
 
     /// <summary>
     /// A valid refused hello reply in single-quote notation.
     /// </summary>
-    private const string HelloRefusedNotation = "{'type':'helloRefused','contractVersion':1,'reason':'tokenRefused','receivedVersion':1,'supportedVersions':[1]}";
+    private const string HelloRefusedNotation = "{'type':'helloRefused','contractVersion':2,'reason':'tokenRefused','receivedVersion':2,'supportedVersions':[2]}";
 
     /// <summary>
     /// A valid catalog upload in single-quote notation.
     /// </summary>
-    private const string CatalogUploadNotation = $"{{'type':'catalogUpload','contractVersion':1,'id':'{Id}','document':'{CatalogBase64}'}}";
+    private const string CatalogUploadNotation = $"{{'type':'catalogUpload','contractVersion':2,'id':'{Id}','document':'{CatalogBase64}'}}";
 
     /// <summary>
     /// A valid icon image in single-quote notation.
     /// </summary>
-    private const string IconImageNotation = $"{{'type':'iconImage','contractVersion':1,'id':'{Id}','reference':'{PngReference}','png':'{PngBase64}'}}";
+    private const string IconImageNotation = $"{{'type':'iconImage','contractVersion':2,'id':'{Id}','reference':'{PngReference}','png':'{PngBase64}'}}";
 
     /// <summary>
     /// A valid session start in single-quote notation.
     /// </summary>
-    private const string SessionStartNotation = $"{{'type':'sessionStart','contractVersion':1,'id':'{Id}','profileId':'{Profile}','receiveTime':'{Time}'}}";
+    private const string SessionStartNotation = $"{{'type':'sessionStart','contractVersion':2,'id':'{Id}','profileId':'{Profile}','receiveTime':'{Time}'}}";
 
     /// <summary>
     /// A valid session end in single-quote notation.
     /// </summary>
-    private const string SessionEndNotation = $"{{'type':'sessionEnd','contractVersion':1,'id':'{Id}','profileId':'{Profile}','receiveTime':'{Time}'}}";
+    private const string SessionEndNotation = $"{{'type':'sessionEnd','contractVersion':2,'id':'{Id}','profileId':'{Profile}','receiveTime':'{Time}'}}";
 
     /// <summary>
     /// A valid status in single-quote notation.
     /// </summary>
-    private const string StatusNotation = "{'type':'status','contractVersion':1,'pipeState':'receiving'}";
+    private const string StatusNotation = "{'type':'status','contractVersion':2,'pipeState':'receiving'}";
 
     /// <summary>
     /// A valid acknowledgement in single-quote notation.
     /// </summary>
-    private const string AcknowledgementNotation = $"{{'type':'acknowledgement','contractVersion':1,'id':'{Id}','refusal':null,'refusedVersion':null,'missingIcons':['{Icon}']}}";
+    private const string AcknowledgementNotation = $"{{'type':'acknowledgement','contractVersion':2,'id':'{Id}','refusal':null,'refusedVersion':null,'missingIcons':['{Icon}']}}";
 
     #endregion // Constants
 
@@ -143,31 +143,31 @@ public sealed class ContractReaderTests
                                                                                {
                                                                                    ["257 islands in a tick"] = () => Utf8(TickWithIslands(IslandsNotation(257), false)),
                                                                                    ["257 islands with type last and islands first"] = () => Utf8(TickWithIslands(IslandsNotation(257), true)),
-                                                                                   ["257 islands in a status message"] = () => Utf8($"{{'type':'status','contractVersion':1,'pipeState':'receiving','islands':[{IslandsNotation(257)}]}}"),
-                                                                                   ["257 islands in a version 2 tick"] = () => Utf8(TickWithIslands(IslandsNotation(257), false).Replace("'contractVersion':1", "'contractVersion':2", StringComparison.Ordinal)),
+                                                                                   ["257 islands in a status message"] = () => Utf8($"{{'type':'status','contractVersion':2,'pipeState':'receiving','islands':[{IslandsNotation(257)}]}}"),
+                                                                                   ["257 islands in a version 3 tick"] = () => Utf8(TickWithIslands(IslandsNotation(257), false).Replace("'contractVersion':2", "'contractVersion':3", StringComparison.Ordinal)),
                                                                                    ["524,289 entries and pairs in a tick"] = () => Utf8(TickWithIslands(IslandWithEntries(EntriesAndPairs(ContractReader.MaxEntriesAndPairs + 1)), false)),
                                                                                    ["1,025 workforce pairs"] = () => Utf8(TickWithIslands(IslandWithEntries(EntryWithPairs(ContractReader.MaxPairsPerMap + 1, 0)), false)),
                                                                                    ["1,025 building pairs"] = () => Utf8(TickWithIslands(IslandWithEntries(EntryWithPairs(0, ContractReader.MaxPairsPerMap + 1)), false)),
-                                                                                   ["17 supported versions"] = () => Utf8($"{{'type':'helloRefused','contractVersion':1,'reason':'unsupportedVersion','receivedVersion':2,'supportedVersions':[{Numbers(17)}]}}"),
-                                                                                   ["17 supported versions in a version 2 refusal"] = () => Utf8($"{{'type':'helloRefused','contractVersion':2,'reason':'unsupportedVersion','receivedVersion':1,'supportedVersions':[{Numbers(17)}]}}"),
-                                                                                   ["16,385 missing icons"] = () => Utf8($"{{'type':'acknowledgement','contractVersion':1,'id':'{Id}','refusal':null,'refusedVersion':null,'missingIcons':[{MissingIcons(ContractReader.MaxMissingIcons + 1)}]}}"),
+                                                                                   ["17 supported versions"] = () => Utf8($"{{'type':'helloRefused','contractVersion':2,'reason':'unsupportedVersion','receivedVersion':2,'supportedVersions':[{Numbers(17)}]}}"),
+                                                                                   ["17 supported versions in a version 3 refusal"] = () => Utf8($"{{'type':'helloRefused','contractVersion':3,'reason':'unsupportedVersion','receivedVersion':1,'supportedVersions':[{Numbers(17)}]}}"),
+                                                                                   ["16,385 missing icons"] = () => Utf8($"{{'type':'acknowledgement','contractVersion':2,'id':'{Id}','refusal':null,'refusedVersion':null,'missingIcons':[{MissingIcons(ContractReader.MaxMissingIcons + 1)}]}}"),
                                                                                    ["16,385 missing icons in a tick"] = () => Utf8(Substitute(TickNotation, "'gameTime':42", $"'gameTime':42,'missingIcons':[{MissingIcons(ContractReader.MaxMissingIcons + 1)}]")),
                                                                                    ["token of 1,025 bytes"] = () => Utf8(Substitute(HelloNotation, "'secret-token'", $"'{new string('a', 1025)}'")),
                                                                                    ["token of 1,026 bytes in two-byte characters"] = () => Utf8(Substitute(HelloNotation, "'secret-token'", $"'{new string('ä', 513)}'")),
-                                                                                   ["token of 1,025 bytes in a version 2 hello"] = () => Utf8(Substitute(HelloNotation, "'contractVersion':1,'token':'secret-token'", $"'contractVersion':2,'token':'{new string('a', 1025)}'")),
+                                                                                   ["token of 1,025 bytes in a version 3 hello"] = () => Utf8(Substitute(HelloNotation, "'contractVersion':2,'token':'secret-token'", $"'contractVersion':3,'token':'{new string('a', 1025)}'")),
                                                                                    ["profile name of 1,025 bytes"] = () => Utf8(Substitute(HelloNotation, "'Alice'", $"'{new string('a', 1025)}'")),
                                                                                    ["companion version of 1,025 bytes"] = () => Utf8(Substitute(HelloNotation, "'0.3.0'", $"'{new string('a', 1025)}'")),
                                                                                    ["server version of 1,025 bytes"] = () => Utf8(Substitute(HelloAcceptedNotation, "'0.3.0'", $"'{new string('a', 1025)}'")),
                                                                                    ["reference of 1,025 bytes"] = () => Utf8(Substitute(IconImageNotation, $"'{PngReference}'", $"'{new string('a', 1025)}'")),
                                                                                    ["island name of 766 bytes"] = () => Utf8(Substitute(TickNotation, "'Isle'", $"'{new string('a', 766)}'")),
                                                                                    ["island name of 256 replacement characters"] = () => Utf8(Substitute(TickNotation, "'Isle'", $"'{new string((char)0xFFFD, 256)}'")),
-                                                                                   ["island name of 766 bytes in a status message"] = () => Utf8($"{{'type':'status','contractVersion':1,'pipeState':'receiving','islands':[{{'name':'{new string('a', 766)}'}}]}}"),
+                                                                                   ["island name of 766 bytes in a status message"] = () => Utf8($"{{'type':'status','contractVersion':2,'pipeState':'receiving','islands':[{{'name':'{new string('a', 766)}'}}]}}"),
                                                                                    ["property name of 1,025 bytes"] = () => Utf8(Substitute(StatusNotation, "'pipeState'", $"'{new string('a', 1025)}':1,'pipeState'")),
-                                                                                   ["property name of 1,025 bytes in a version 2 message"] = () => Utf8(Substitute(StatusNotation, "'contractVersion':1", $"'contractVersion':2,'{new string('a', 1025)}':1")),
+                                                                                   ["property name of 1,025 bytes in a version 3 message"] = () => Utf8(Substitute(StatusNotation, "'contractVersion':2", $"'contractVersion':3,'{new string('a', 1025)}':1")),
                                                                                    ["string of 1,025 bytes in an unknown property"] = () => Utf8(Substitute(StatusNotation, "'pipeState'", $"'future':'{new string('a', 1025)}','pipeState'")),
                                                                                    ["png of 1,025 characters inside an island"] = () => Utf8(Substitute(TickNotation, "'name':'Isle'", $"'name':'Isle','png':'{new string('A', 1028)}'")),
                                                                                    ["png above the binary bound"] = () => Utf8(IconJson(new byte[ContractReader.MaxBinaryBytes + 1])),
-                                                                                   ["document above the binary bound"] = () => Utf8($"{{'type':'catalogUpload','contractVersion':1,'id':'{Id}','document':'{Convert.ToBase64String(new byte[ContractReader.MaxBinaryBytes + 1])}'}}")
+                                                                                   ["document above the binary bound"] = () => Utf8($"{{'type':'catalogUpload','contractVersion':2,'id':'{Id}','document':'{Convert.ToBase64String(new byte[ContractReader.MaxBinaryBytes + 1])}'}}")
                                                                                };
 
     /// <summary>
@@ -178,8 +178,8 @@ public sealed class ContractReaderTests
                                                                                   ["256 islands"] = () => Utf8(TickWithIslands(IslandsNotation(256), false)),
                                                                                   ["524,288 entries and pairs"] = () => Utf8(TickWithIslands(IslandWithEntries(EntriesAndPairs(ContractReader.MaxEntriesAndPairs)), false)),
                                                                                   ["1,024 pairs in each map"] = () => Utf8(TickWithIslands(IslandWithEntries(EntryWithPairs(ContractReader.MaxPairsPerMap, ContractReader.MaxPairsPerMap)), false)),
-                                                                                  ["16 supported versions"] = () => Utf8($"{{'type':'helloRefused','contractVersion':1,'reason':'unsupportedVersion','receivedVersion':17,'supportedVersions':[{Numbers(16)}]}}"),
-                                                                                  ["16,384 missing icons"] = () => Utf8($"{{'type':'acknowledgement','contractVersion':1,'id':'{Id}','refusal':null,'refusedVersion':null,'missingIcons':[{MissingIcons(ContractReader.MaxMissingIcons)}]}}"),
+                                                                                  ["16 supported versions"] = () => Utf8($"{{'type':'helloRefused','contractVersion':2,'reason':'unsupportedVersion','receivedVersion':17,'supportedVersions':[{Numbers(16)}]}}"),
+                                                                                  ["16,384 missing icons"] = () => Utf8($"{{'type':'acknowledgement','contractVersion':2,'id':'{Id}','refusal':null,'refusedVersion':null,'missingIcons':[{MissingIcons(ContractReader.MaxMissingIcons)}]}}"),
                                                                                   ["token of 1,024 bytes"] = () => Utf8(Substitute(HelloNotation, "'secret-token'", $"'{new string('a', 1024)}'")),
                                                                                   ["profile name of 1,024 bytes in three-byte characters"] = () => Utf8(Substitute(HelloNotation, "'Alice'", $"'{new string('木', 341)}a'")),
                                                                                   ["island name of 765 bytes"] = () => Utf8(Substitute(TickNotation, "'Isle'", $"'{new string('a', 765)}'")),
@@ -224,7 +224,7 @@ public sealed class ContractReaderTests
                                                                                       ["tick without game time"] = () => Substitute(TickNotation, "'gameTime':42,", string.Empty),
                                                                                       ["tick id null"] = () => Substitute(TickNotation, $"'{Id}'", "null"),
                                                                                       ["tick island name too long"] = () => Substitute(TickNotation, "'Isle'", $"'{new string('a', 766)}'"),
-                                                                                      ["tick version 2"] = () => Substitute(TickNotation, "'contractVersion':1", "'contractVersion':2"),
+                                                                                      ["tick version 3"] = () => Substitute(TickNotation, "'contractVersion':2", "'contractVersion':3"),
                                                                                       ["tick id all zero"] = () => Substitute(TickNotation, Id, ZeroId),
                                                                                       ["tick id no UUID"] = () => Substitute(TickNotation, Id, "tick-a"),
                                                                                       ["tick id uppercase"] = () => Substitute(TickNotation, Id, Profile.ToUpperInvariant()),
@@ -263,7 +263,7 @@ public sealed class ContractReaderTests
     /// <summary>
     /// Gets the version cases: the contract version and the body after it in single-quote notation.
     /// </summary>
-    private static IEnumerable<object[]> OtherVersionRows => new[] { 0, 2, -1, int.MaxValue, int.MinValue }.SelectMany(version => OtherVersionBodies().Select(body => new object[] { version, body }));
+    private static IEnumerable<object[]> OtherVersionRows => new[] { 0, 1, 3, -1, int.MaxValue, int.MinValue }.SelectMany(version => OtherVersionBodies().Select(body => new object[] { version, body }));
 
     /// <summary>
     /// Gets the malformed inputs: the name of the case and the bytes.
@@ -294,19 +294,19 @@ public sealed class ContractReaderTests
     {
         get
         {
-            const string markerHello = "{'type':'hello','contractVersion':1,'token':'MARKERTOKEN','companionVersion':'0.3.0','profileId':'" + Profile + "','profileName':'MARKERPROFILE'}";
-            const string markerTick = "{'type':'tick','contractVersion':1,'id':'" + Id + "','profileId':'" + Profile + "','receiveTime':'" + Time + "','gameTime':42,'islands':[{'sessionGuid':1,'islandId':1,'areaIndex':0,'sessionId':2,'name':'MARKERISLAND','entries':[]}]}";
+            const string markerHello = "{'type':'hello','contractVersion':2,'token':'MARKERTOKEN','companionVersion':'0.3.0','profileId':'" + Profile + "','profileName':'MARKERPROFILE'}";
+            const string markerTick = "{'type':'tick','contractVersion':2,'id':'" + Id + "','profileId':'" + Profile + "','receiveTime':'" + Time + "','gameTime':42,'islands':[{'sessionGuid':1,'islandId':1,'areaIndex':0,'sessionId':2,'name':'MARKERISLAND','entries':[]}]}";
 
             yield return new object[] { "malformed hello", Json(markerHello.Replace("'profileName'", "'MARKERTOKEN':1,'profileName'", StringComparison.Ordinal)), ContractErrorKind.Malformed };
             yield return new object[] { "invalid hello", Json(markerHello.Replace(Profile, ZeroId, StringComparison.Ordinal)), ContractErrorKind.Invalid };
             yield return new object[] { "too large hello", Json(markerHello.Replace("'0.3.0'", $"'{new string('a', 1025)}'", StringComparison.Ordinal)), ContractErrorKind.TooLarge };
-            yield return new object[] { "version 2 hello", Json(markerHello.Replace("'contractVersion':1", "'contractVersion':2", StringComparison.Ordinal)), ContractErrorKind.UnsupportedVersion };
+            yield return new object[] { "version 3 hello", Json(markerHello.Replace("'contractVersion':2", "'contractVersion':3", StringComparison.Ordinal)), ContractErrorKind.UnsupportedVersion };
             yield return new object[] { "malformed tick", Json(markerTick.Replace("'gameTime':42", "'gameTime':'MARKERISLAND'", StringComparison.Ordinal)), ContractErrorKind.Malformed };
             yield return new object[] { "invalid tick", Json(markerTick.Replace(Id, ZeroId, StringComparison.Ordinal)), ContractErrorKind.Invalid };
             yield return new object[] { "too large tick", Json(markerTick.Replace("'MARKERISLAND'", $"'MARKERISLAND{new string('a', 760)}'", StringComparison.Ordinal)), ContractErrorKind.TooLarge };
-            yield return new object[] { "catalog refused", Json($"{{'type':'catalogUpload','contractVersion':1,'id':'{Id}','document':'{Base64("{\"schemaVersion\":1,\"gameVersion\":\"MARKERCATALOG\",\"entries\":[]}")}'}}"), ContractErrorKind.CatalogRefused };
-            yield return new object[] { "malformed catalog upload", Json($"{{'type':'catalogUpload','contractVersion':1,'id':'{Id}','document':'{Base64("{\"schemaVersion\":1,\"gameVersion\":\"MARKERCATALOG\",\"entries\":[]}")}','MARKERCATALOG':1}}"), ContractErrorKind.Malformed };
-            yield return new object[] { "invalid icon image", Json($"{{'type':'iconImage','contractVersion':1,'id':'{Id}','reference':'{Icon}','png':'{Base64("MARKERIMAGEDATA!!")}'}}"), ContractErrorKind.Invalid };
+            yield return new object[] { "catalog refused", Json($"{{'type':'catalogUpload','contractVersion':2,'id':'{Id}','document':'{Base64("{\"schemaVersion\":1,\"gameVersion\":\"MARKERCATALOG\",\"entries\":[]}")}'}}"), ContractErrorKind.CatalogRefused };
+            yield return new object[] { "malformed catalog upload", Json($"{{'type':'catalogUpload','contractVersion':2,'id':'{Id}','document':'{Base64("{\"schemaVersion\":1,\"gameVersion\":\"MARKERCATALOG\",\"entries\":[]}")}','MARKERCATALOG':1}}"), ContractErrorKind.Malformed };
+            yield return new object[] { "invalid icon image", Json($"{{'type':'iconImage','contractVersion':2,'id':'{Id}','reference':'{Icon}','png':'{Base64("MARKERIMAGEDATA!!")}'}}"), ContractErrorKind.Invalid };
         }
     }
 
@@ -358,7 +358,7 @@ public sealed class ContractReaderTests
             yield return new object[] { "tick without game time", ContractErrorKind.Malformed };
             yield return new object[] { "tick id null", ContractErrorKind.Malformed };
             yield return new object[] { "tick island name too long", ContractErrorKind.TooLarge };
-            yield return new object[] { "tick version 2", ContractErrorKind.UnsupportedVersion };
+            yield return new object[] { "tick version 3", ContractErrorKind.UnsupportedVersion };
             yield return new object[] { "tick id all zero", ContractErrorKind.Invalid };
             yield return new object[] { "tick id no UUID", ContractErrorKind.Invalid };
             yield return new object[] { "tick id uppercase", ContractErrorKind.Invalid };
@@ -448,12 +448,12 @@ public sealed class ContractReaderTests
     /// <param name="notation">The message in single-quote notation</param>
     [TestMethod]
     [TestCategory("AC4")]
-    [DataRow($"{{'type':'sessionStart','contractVersion':1,'id':'{Id}','profileId':'{Profile}','receiveTime':'{Time}','figureName':'Marcus'}}")]
-    [DataRow($"{{'type':'sessionStart','contractVersion':1,'id':'{Id}','profileId':'{Profile}','receiveTime':'{Time}','headline':'Marcus'}}")]
-    [DataRow($"{{'type':'sessionStart','contractVersion':1,'id':'{Id}','profileId':'{Profile}','receiveTime':'{Time}','text':'Marcus'}}")]
-    [DataRow($"{{'type':'sessionEnd','contractVersion':1,'id':'{Id}','profileId':'{Profile}','receiveTime':'{Time}','figureName':'Marcus'}}")]
-    [DataRow($"{{'type':'tick','contractVersion':1,'id':'{Id}','profileId':'{Profile}','receiveTime':'{Time}','gameTime':42,'islands':[],'figureName':'Marcus'}}")]
-    [DataRow($"{{'type':'hello','contractVersion':1,'token':null,'companionVersion':'0.3.0','profileId':'{Profile}','profileName':'Alice','figureName':'Marcus'}}")]
+    [DataRow($"{{'type':'sessionStart','contractVersion':2,'id':'{Id}','profileId':'{Profile}','receiveTime':'{Time}','figureName':'Marcus'}}")]
+    [DataRow($"{{'type':'sessionStart','contractVersion':2,'id':'{Id}','profileId':'{Profile}','receiveTime':'{Time}','headline':'Marcus'}}")]
+    [DataRow($"{{'type':'sessionStart','contractVersion':2,'id':'{Id}','profileId':'{Profile}','receiveTime':'{Time}','text':'Marcus'}}")]
+    [DataRow($"{{'type':'sessionEnd','contractVersion':2,'id':'{Id}','profileId':'{Profile}','receiveTime':'{Time}','figureName':'Marcus'}}")]
+    [DataRow($"{{'type':'tick','contractVersion':2,'id':'{Id}','profileId':'{Profile}','receiveTime':'{Time}','gameTime':42,'islands':[],'figureName':'Marcus'}}")]
+    [DataRow($"{{'type':'hello','contractVersion':2,'token':null,'companionVersion':'0.3.0','profileId':'{Profile}','profileName':'Alice','figureName':'Marcus'}}")]
     public void ContractReaderSessionStartWithTextIsMalformed(string notation)
     {
         // Arrange
@@ -467,7 +467,7 @@ public sealed class ContractReaderTests
     }
 
     /// <summary>
-    /// A message of a contract version other than 1 is refused as unsupported with the version found, whatever it holds.
+    /// A message of a contract version other than 2 is refused as unsupported with the version found, whatever it holds.
     /// </summary>
     /// <param name="version">The contract version</param>
     /// <param name="body">The rest of the message after the version, in single-quote notation</param>
@@ -495,7 +495,7 @@ public sealed class ContractReaderTests
     public void ContractReaderEscapedVersionNameIsFound()
     {
         // Arrange
-        var text = Json("""{'type':'status','contract\u0056ersion':2,'pipeState':'receiving'}""");
+        var text = Json("""{'type':'status','contract\u0056ersion':3,'pipeState':'receiving'}""");
         var json = Encoding.UTF8.GetBytes(text);
 
         // Act
@@ -503,7 +503,7 @@ public sealed class ContractReaderTests
 
         // Assert
         Assert.Contains("\\u0056", text, "The input should still hold the backslash of the escape");
-        AssertUnsupportedVersion(result, 2, "escaped version name");
+        AssertUnsupportedVersion(result, 3, "escaped version name");
     }
 
     /// <summary>
@@ -513,8 +513,8 @@ public sealed class ContractReaderTests
     /// <param name="version">The version of the hello</param>
     [TestMethod]
     [TestCategory("AC5")]
-    [DataRow($"{{'type':'hello','contractVersion':2,'token':'secret-token','companionVersion':'0.4.0','profileId':'{Profile}','profileName':'Alice'}}", 2)]
-    [DataRow($"{{'type':'hello','contractVersion':2,'token':'secret-token','companionVersion':'0.4.0','profileId':'{Profile}','profileName':'Alice','futureProperty':[1]}}", 2)]
+    [DataRow($"{{'type':'hello','contractVersion':3,'token':'secret-token','companionVersion':'0.4.0','profileId':'{Profile}','profileName':'Alice'}}", 3)]
+    [DataRow($"{{'type':'hello','contractVersion':3,'token':'secret-token','companionVersion':'0.4.0','profileId':'{Profile}','profileName':'Alice','futureProperty':[1]}}", 3)]
     [DataRow("{'type':'hello','contractVersion':3}", 3)]
     [DataRow("{'contractVersion':0,'type':'hello','profileId':7}", 0)]
     public void ContractReaderHelloOfOtherVersionIsRefusedWithItsVersion(string notation, int version)
@@ -538,9 +538,9 @@ public sealed class ContractReaderTests
     /// <param name="supported">The expected supported versions</param>
     [TestMethod]
     [TestCategory("AC5")]
-    [DataRow("{'type':'helloRefused','contractVersion':2,'reason':'unsupportedVersion','receivedVersion':1,'supportedVersions':[2]}", ContractHelloRefusal.UnsupportedVersion, 1, new[] { 2 })]
-    [DataRow("{'supportedVersions':[2],'receivedVersion':1,'reason':'unsupportedVersion','contractVersion':2,'type':'helloRefused'}", ContractHelloRefusal.UnsupportedVersion, 1, new[] { 2 })]
-    [DataRow("{'type':'helloRefused','contractVersion':2,'reason':'tokenRefused','receivedVersion':2,'supportedVersions':[2]}", ContractHelloRefusal.TokenRefused, 2, new[] { 2 })]
+    [DataRow("{'type':'helloRefused','contractVersion':3,'reason':'unsupportedVersion','receivedVersion':1,'supportedVersions':[2]}", ContractHelloRefusal.UnsupportedVersion, 1, new[] { 2 })]
+    [DataRow("{'supportedVersions':[2],'receivedVersion':1,'reason':'unsupportedVersion','contractVersion':3,'type':'helloRefused'}", ContractHelloRefusal.UnsupportedVersion, 1, new[] { 2 })]
+    [DataRow("{'type':'helloRefused','contractVersion':3,'reason':'tokenRefused','receivedVersion':2,'supportedVersions':[2]}", ContractHelloRefusal.TokenRefused, 2, new[] { 2 })]
     [DataRow("{'type':'helloRefused','contractVersion':3,'reason':'companionConnected','receivedVersion':3,'supportedVersions':[2,3]}", ContractHelloRefusal.CompanionConnected, 3, new[] { 2, 3 })]
     [DataRow("{'type':'helloRefused','contractVersion':1,'reason':'tokenRefused','receivedVersion':1,'supportedVersions':[1]}", ContractHelloRefusal.TokenRefused, 1, new[] { 1 })]
     [DataRow("{'type':'helloRefused','contractVersion':1,'reason':'companionConnected','receivedVersion':1,'supportedVersions':[1]}", ContractHelloRefusal.CompanionConnected, 1, new[] { 1 })]
@@ -567,11 +567,11 @@ public sealed class ContractReaderTests
     /// <param name="notation">The reply in single-quote notation</param>
     [TestMethod]
     [TestCategory("AC5")]
-    [DataRow("{'type':'helloRefused','contractVersion':2,'reason':'unsupportedVersion','receivedVersion':1,'supportedVersions':[2],'retryAfter':5}")]
-    [DataRow("{'type':'helloRefused','contractVersion':2,'reason':'rateLimited','receivedVersion':1,'supportedVersions':[2]}")]
-    [DataRow("{'type':'helloRefused','contractVersion':2,'reason':'unsupportedVersion','receivedVersion':1}")]
-    [DataRow("{'type':'helloRefused','contractVersion':2,'reason':'unsupportedVersion','receivedVersion':'1','supportedVersions':[2]}")]
-    [DataRow("{'type':'helloRefused','contractVersion':2,'reason':'unsupportedVersion','receivedVersion':1,'supportedVersions':'2'}")]
+    [DataRow("{'type':'helloRefused','contractVersion':3,'reason':'unsupportedVersion','receivedVersion':1,'supportedVersions':[2],'retryAfter':5}")]
+    [DataRow("{'type':'helloRefused','contractVersion':3,'reason':'rateLimited','receivedVersion':1,'supportedVersions':[2]}")]
+    [DataRow("{'type':'helloRefused','contractVersion':3,'reason':'unsupportedVersion','receivedVersion':1}")]
+    [DataRow("{'type':'helloRefused','contractVersion':3,'reason':'unsupportedVersion','receivedVersion':'1','supportedVersions':[2]}")]
+    [DataRow("{'type':'helloRefused','contractVersion':3,'reason':'unsupportedVersion','receivedVersion':1,'supportedVersions':'2'}")]
     public void ContractReaderOtherVersionRefusalOfUnknownFormIsUnsupportedVersion(string notation)
     {
         // Arrange
@@ -581,7 +581,7 @@ public sealed class ContractReaderTests
         var result = ContractReader.Read(json);
 
         // Assert
-        AssertUnsupportedVersion(result, 2, notation);
+        AssertUnsupportedVersion(result, 3, notation);
     }
 
     /// <summary>
@@ -652,7 +652,7 @@ public sealed class ContractReaderTests
     }
 
     /// <summary>
-    /// A message that breaks a value rule of version 1 is invalid.
+    /// A message that breaks a value rule of version 2 is invalid.
     /// </summary>
     /// <param name="label">The name of the case</param>
     /// <param name="text">The JSON text</param>
@@ -726,7 +726,7 @@ public sealed class ContractReaderTests
     [TestCategory("AC7")]
     [DataRow(StatusNotation)]
     [DataRow("not json")]
-    [DataRow("{'type':'status','contractVersion':2,'pipeState':'receiving'}")]
+    [DataRow("{'type':'status','contractVersion':3,'pipeState':'receiving'}")]
     [DataRow("{'type':'status',")]
     public void ContractReaderInputAboveByteBoundIsTooLarge(string notation)
     {
@@ -864,7 +864,7 @@ public sealed class ContractReaderTests
     public void ContractReaderCatalogUploadWithRefusedDocumentIsCatalogRefused(string label, CatalogDocumentErrorKind catalogKind, string text)
     {
         // Arrange
-        var json = Utf8($"{{'type':'catalogUpload','contractVersion':1,'id':'{Id}','document':'{Convert.ToBase64String(_refusedCatalogs[label]())}'}}");
+        var json = Utf8($"{{'type':'catalogUpload','contractVersion':2,'id':'{Id}','document':'{Convert.ToBase64String(_refusedCatalogs[label]())}'}}");
 
         // Act
         var result = ContractReader.Read(json);
@@ -935,7 +935,7 @@ public sealed class ContractReaderTests
     {
         // Arrange
         var document = Json($"{{'schemaVersion':1,'gameVersion':'1.2.3.4','entries':[{{'guid':5,'kind':'region','names':{{'en':'Wood','de':'Holz'}},'regionGuid':7,'regionTypes':['Coast','Land'],'icon':'{Icon}'}}]}}");
-        var json = Utf8($"{{'type':'catalogUpload','contractVersion':1,'id':'{Id}','document':'{Base64(document)}'}}");
+        var json = Utf8($"{{'type':'catalogUpload','contractVersion':2,'id':'{Id}','document':'{Base64(document)}'}}");
 
         // Act
         var result = ContractReader.Read(json);
@@ -967,7 +967,7 @@ public sealed class ContractReaderTests
     /// <returns>The JSON text of the upload</returns>
     private static string CatalogUploadJson(string label)
     {
-        return Json($"{{'type':'catalogUpload','contractVersion':1,'id':'{Id}','document':'{Convert.ToBase64String(_refusedCatalogs[label]())}'}}");
+        return Json($"{{'type':'catalogUpload','contractVersion':2,'id':'{Id}','document':'{Convert.ToBase64String(_refusedCatalogs[label]())}'}}");
     }
 
     /// <summary>
@@ -1060,7 +1060,7 @@ public sealed class ContractReaderTests
     /// <returns>The icon image</returns>
     private static string IconJson(byte[] png)
     {
-        return $"{{'type':'iconImage','contractVersion':1,'id':'{Id}','reference':'{Convert.ToHexStringLower(SHA256.HashData(png))}','png':'{Convert.ToBase64String(png)}'}}";
+        return $"{{'type':'iconImage','contractVersion':2,'id':'{Id}','reference':'{Convert.ToHexStringLower(SHA256.HashData(png))}','png':'{Convert.ToBase64String(png)}'}}";
     }
 
     /// <summary>
@@ -1092,8 +1092,8 @@ public sealed class ContractReaderTests
     private static string TickWithIslands(string islands, bool typeLast)
     {
         return typeLast
-                   ? $"{{'islands':[{islands}],'id':'{Id}','profileId':'{Profile}','receiveTime':'{Time}','gameTime':42,'contractVersion':1,'type':'tick'}}"
-                   : $"{{'type':'tick','contractVersion':1,'id':'{Id}','profileId':'{Profile}','receiveTime':'{Time}','gameTime':42,'islands':[{islands}]}}";
+                   ? $"{{'islands':[{islands}],'id':'{Id}','profileId':'{Profile}','receiveTime':'{Time}','gameTime':42,'contractVersion':2,'type':'tick'}}"
+                   : $"{{'type':'tick','contractVersion':2,'id':'{Id}','profileId':'{Profile}','receiveTime':'{Time}','gameTime':42,'islands':[{islands}]}}";
     }
 
     /// <summary>
@@ -1181,7 +1181,7 @@ public sealed class ContractReaderTests
     /// <param name="context">What the case was, for the messages</param>
     private static void AssertUnsupportedVersion(ContractReadResult result, int version, string context)
     {
-        AssertRefusal(result, ContractErrorKind.UnsupportedVersion, $"Contract version {version} is not supported; supported: 1", context);
+        AssertRefusal(result, ContractErrorKind.UnsupportedVersion, $"Contract version {version} is not supported; supported: 2", context);
         Assert.AreEqual(version, result.Error!.Version, "The refusal should carry the version found: " + context);
     }
 
@@ -1234,21 +1234,21 @@ public sealed class ContractReaderTests
         yield return ("single quotes", Encoding.UTF8.GetBytes(StatusNotation));
         yield return ("comment", Utf8(Substitute(StatusNotation, "'pipeState'", "/* c */'pipeState'")));
         yield return ("depth 65", Utf8(Substitute(StatusNotation, "'pipeState'", $"'future':{new string('[', 64)}{new string(']', 64)},'pipeState'")));
-        yield return ("truncated version 2", Utf8("{'type':'status','contractVersion':2,'pipeState':'receiving'"));
-        yield return ("depth 65 in version 2", Utf8($"{{'type':'status','contractVersion':2,'future':{new string('[', 64)}{new string(']', 64)}}}"));
-        yield return ("invalid UTF-8 in a string", [.. Utf8("{'type':'status','contractVersion':1,'pipeState':'rec"), 0xC3, 0x28, .. Utf8("'}")]);
+        yield return ("truncated version 3", Utf8("{'type':'status','contractVersion':3,'pipeState':'receiving'"));
+        yield return ("depth 65 in version 3", Utf8($"{{'type':'status','contractVersion':3,'future':{new string('[', 64)}{new string(']', 64)}}}"));
+        yield return ("invalid UTF-8 in a string", [.. Utf8("{'type':'status','contractVersion':2,'pipeState':'rec"), 0xC3, 0x28, .. Utf8("'}")]);
         yield return ("invalid UTF-8 in an island name", [.. Utf8(TickNotation[..TickNotation.IndexOf("Isle", StringComparison.Ordinal)]), 0xED, 0xA0, 0x80, .. Utf8(TickNotation[TickNotation.IndexOf("Isle", StringComparison.Ordinal)..])]);
         yield return ("version missing", Utf8("{'type':'status','pipeState':'receiving'}"));
-        yield return ("version twice", Utf8("{'type':'status','contractVersion':1,'contractVersion':1,'pipeState':'receiving'}"));
-        yield return ("version as text", Utf8(Substitute(StatusNotation, "'contractVersion':1", "'contractVersion':'1'")));
-        yield return ("version with a fraction", Utf8(Substitute(StatusNotation, "'contractVersion':1", "'contractVersion':1.0")));
-        yield return ("version with an exponent", Utf8(Substitute(StatusNotation, "'contractVersion':1", "'contractVersion':1e0")));
-        yield return ("version above 32 bits", Utf8(Substitute(StatusNotation, "'contractVersion':1", "'contractVersion':4294967297")));
-        yield return ("version null", Utf8(Substitute(StatusNotation, "'contractVersion':1", "'contractVersion':null")));
-        yield return ("version only inside an island", Utf8(Substitute(TickNotation, "'contractVersion':1,", string.Empty).Replace("\"sessionGuid\"", "\"contractVersion\":1,\"sessionGuid\"", StringComparison.Ordinal)));
+        yield return ("version twice", Utf8("{'type':'status','contractVersion':2,'contractVersion':2,'pipeState':'receiving'}"));
+        yield return ("version as text", Utf8(Substitute(StatusNotation, "'contractVersion':2", "'contractVersion':'2'")));
+        yield return ("version with a fraction", Utf8(Substitute(StatusNotation, "'contractVersion':2", "'contractVersion':2.0")));
+        yield return ("version with an exponent", Utf8(Substitute(StatusNotation, "'contractVersion':2", "'contractVersion':2e0")));
+        yield return ("version above 32 bits", Utf8(Substitute(StatusNotation, "'contractVersion':2", "'contractVersion':4294967298")));
+        yield return ("version null", Utf8(Substitute(StatusNotation, "'contractVersion':2", "'contractVersion':null")));
+        yield return ("version only inside an island", Utf8(Substitute(TickNotation, "'contractVersion':2,", string.Empty).Replace("\"sessionGuid\"", "\"contractVersion\":2,\"sessionGuid\"", StringComparison.Ordinal)));
         yield return ("version in another case", Utf8(Substitute(StatusNotation, "'contractVersion'", "'ContractVersion'")));
-        yield return ("type missing", Utf8("{'contractVersion':1,'pipeState':'receiving'}"));
-        yield return ("type twice", Utf8("{'type':'status','type':'status','contractVersion':1,'pipeState':'receiving'}"));
+        yield return ("type missing", Utf8("{'contractVersion':2,'pipeState':'receiving'}"));
+        yield return ("type twice", Utf8("{'type':'status','type':'status','contractVersion':2,'pipeState':'receiving'}"));
         yield return ("type a number", Utf8(Substitute(StatusNotation, "'type':'status'", "'type':9")));
         yield return ("type null", Utf8(Substitute(StatusNotation, "'type':'status'", "'type':null")));
         yield return ("unknown type", Utf8(Substitute(StatusNotation, "'type':'status'", "'type':'futureType'")));
@@ -1263,7 +1263,7 @@ public sealed class ContractReaderTests
         yield return ("missing nullable float", Utf8(Substitute(TickNotation, "'income':null,", string.Empty)));
         yield return ("missing catalog identity", Utf8(Substitute(HelloAcceptedNotation, ",'catalogIdentity':null", string.Empty)));
         yield return ("missing refused version", Utf8(Substitute(AcknowledgementNotation, "'refusedVersion':null,", string.Empty)));
-        yield return ("version 1 refusal with a future property", Utf8(Substitute(HelloRefusedNotation, "'supportedVersions':[1]", "'supportedVersions':[1],'retryAfter':5")));
+        yield return ("version 2 refusal with a future property", Utf8(Substitute(HelloRefusedNotation, "'supportedVersions':[2]", "'supportedVersions':[2],'retryAfter':5")));
         yield return ("game time as text", Utf8(Substitute(TickNotation, "'gameTime':42", "'gameTime':'42'")));
         yield return ("game time above 64 bits", Utf8(Substitute(TickNotation, "'gameTime':42", "'gameTime':9223372036854775808")));
         yield return ("game time with a fraction", Utf8(Substitute(TickNotation, "'gameTime':42", "'gameTime':42.5")));
@@ -1291,7 +1291,7 @@ public sealed class ContractReaderTests
         yield return ("islands [null]", Utf8(Substitute(TickNotation, $"[{IslandNotation}]", "[null]")));
         yield return ("entries [null]", Utf8(Substitute(TickNotation, $"[{EntryNotation}]", "[null]")));
         yield return ("missingIcons [null]", Utf8(Substitute(AcknowledgementNotation, $"['{Icon}']", "[null]")));
-        yield return ("supportedVersions [null]", Utf8(Substitute(HelloRefusedNotation, "[1]", "[null]")));
+        yield return ("supportedVersions [null]", Utf8(Substitute(HelloRefusedNotation, "[2]", "[null]")));
         yield return ("island name null", Utf8(Substitute(TickNotation, "'Isle'", "null")));
         yield return ("profile name null", Utf8(Substitute(HelloNotation, "'Alice'", "null")));
         yield return ("identity null", Utf8(Substitute(TickNotation, $"'id':'{Id}'", "'id':null")));
@@ -1312,13 +1312,13 @@ public sealed class ContractReaderTests
         yield return ("missing icons a string", Utf8(Substitute(AcknowledgementNotation, $"['{Icon}']", $"'{Icon}'")));
         yield return ("Base64 png a number", Utf8(Substitute(IconImageNotation, $"'{PngBase64}'", "7")));
         yield return ("Base64 document with a space", Utf8(Substitute(CatalogUploadNotation, "eyJzY2hl", "eyJz Y2hl")));
-        yield return ("Base64 document without padding", Utf8($"{{'type':'catalogUpload','contractVersion':1,'id':'{Id}','document':'{Base64("not json").TrimEnd('=')}'}}"));
+        yield return ("Base64 document without padding", Utf8($"{{'type':'catalogUpload','contractVersion':2,'id':'{Id}','document':'{Base64("not json").TrimEnd('=')}'}}"));
         yield return ("root name of 800 bytes is no island name", Utf8(Substitute(TickNotation, "'gameTime':42", $"'gameTime':42,'name':'{new string('a', 800)}'")));
         yield return ("root png of 1,100 Base64 characters in a status message", Utf8(Substitute(StatusNotation, "'pipeState'", $"'png':'{new string('A', 1100)}','pipeState'")));
     }
 
     /// <summary>
-    /// Returns the inputs that break a value rule of version 1.
+    /// Returns the inputs that break a value rule of version 2.
     /// </summary>
     /// <returns>The name of each case and its JSON text</returns>
     private static IEnumerable<(string Label, string Json)> InvalidInputs()
@@ -1337,11 +1337,11 @@ public sealed class ContractReaderTests
         yield return ("catalog identity of 65 digits", Substitute(HelloAcceptedNotation, "null", $"'{Icon}0'"));
         yield return ("catalog identity empty", Substitute(HelloAcceptedNotation, "null", "''"));
         yield return ("catalog identity not hex", Substitute(HelloAcceptedNotation, "null", $"'{Icon[..63]}g'"));
-        yield return ("supported versions empty", Substitute(HelloRefusedNotation, "[1]", "[]"));
-        yield return ("supported versions descending", Substitute(HelloRefusedNotation, "[1]", "[2,1]"));
-        yield return ("supported versions repeated", Substitute(HelloRefusedNotation, "[1]", "[1,1]"));
-        yield return ("supported version zero", Substitute(HelloRefusedNotation, "[1]", "[0]"));
-        yield return ("supported version negative", Substitute(HelloRefusedNotation, "[1]", "[-1,1]"));
+        yield return ("supported versions empty", Substitute(HelloRefusedNotation, "[2]", "[]"));
+        yield return ("supported versions descending", Substitute(HelloRefusedNotation, "[2]", "[3,2]"));
+        yield return ("supported versions repeated", Substitute(HelloRefusedNotation, "[2]", "[2,2]"));
+        yield return ("supported version zero", Substitute(HelloRefusedNotation, "[2]", "[0]"));
+        yield return ("supported version negative", Substitute(HelloRefusedNotation, "[2]", "[-1,2]"));
         yield return ("catalog upload identity all zero", Substitute(CatalogUploadNotation, Id, ZeroId));
         yield return ("icon identity all zero", Substitute(IconImageNotation, Id, ZeroId));
         yield return ("icon reference not the PNG hash", Substitute(IconImageNotation, PngReference, Icon));
