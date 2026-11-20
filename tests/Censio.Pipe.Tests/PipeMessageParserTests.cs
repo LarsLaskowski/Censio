@@ -572,7 +572,10 @@ public sealed class PipeMessageParserTests
     [TestMethod]
     [TestCategory("AC4")]
     [DataRow(33, 30)]
+    [DataRow(36, 34)]
     [DataRow(82, 80)]
+    [DataRow(84, 84)]
+    [DataRow(85, 85)]
     [DataRow(86, 86)]
     [DataRow(89, 87)]
     [DataRow(93, 91)]
@@ -588,6 +591,31 @@ public sealed class PipeMessageParserTests
 
         // Assert
         Assert.AreEqual(expectedOffset, error.Offset, $"The offset should be the position of the field that does not fit (cut at {length})");
+    }
+
+    /// <summary>
+    /// A short field of a later route (its ID, major or minor problem count) or of a later offer (its trader ID), in a
+    /// frame whose count the bytes left can still hold, gives the malformed-message error at that field.
+    /// </summary>
+    /// <param name="type">The type byte</param>
+    /// <param name="length">The length the frame of two elements is cut to</param>
+    /// <param name="expectedOffset">The offset of the field that does not fit</param>
+    [TestMethod]
+    [TestCategory("AC4")]
+    [DataRow((byte)4, 111, 109)]
+    [DataRow((byte)4, 128, 126)]
+    [DataRow((byte)4, 132, 130)]
+    [DataRow((byte)5, 23, 21)]
+    public void PipeMessageParserTradeRoutesOrItemOffersShortFieldOfLaterElementReturnsMalformed(byte type, int length, int expectedOffset)
+    {
+        // Arrange
+        var frame = TwoElementFrame(type)[..length];
+
+        // Act
+        var error = ParseMalformed(frame);
+
+        // Assert
+        Assert.AreEqual(expectedOffset, error.Offset, $"The offset should be the position of the field of the second element that does not fit (type {type}, cut at {length})");
     }
 
     /// <summary>
@@ -1139,6 +1167,21 @@ public sealed class PipeMessageParserTests
                             Offers = [CreateOffer(7)]
                         }
                };
+    }
+
+    /// <summary>
+    /// Writes a frame of two elements: for type 4 the reference route twice (the second starting at 109: ID at 109, major
+    /// problems at 126, minor problems at 130), for type 5 the reference offers (the second starting at 21).
+    /// </summary>
+    /// <param name="type">The type byte, 4 or 5</param>
+    /// <returns>The frame bytes</returns>
+    private static byte[] TwoElementFrame(byte type)
+    {
+        var route = ReferenceRoutes()[0];
+
+        return type == (byte)PipeMessageType.TradeRoutes
+                   ? new PipeFrameBuilder().Byte(4).TradeRoutes([route, route]).Build()
+                   : FrameOf(ReferenceMessage(type));
     }
 
     /// <summary>

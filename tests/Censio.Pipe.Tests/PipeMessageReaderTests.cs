@@ -654,6 +654,32 @@ public sealed class PipeMessageReaderTests
     }
 
     /// <summary>
+    /// The trade-route and item-offer frames of the protocol 3 fixture, emptied by the anonymiser that made it, decode as
+    /// messages without routes or traders.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    [TestCategory("AC3")]
+    public async Task PipeMessageReaderProtocolThreeFixtureGivesEmptyTradeRoutesAndItemOffers()
+    {
+        // Arrange
+        using var replay = new PipeReplayStream(File.OpenRead(Path.Combine(FixtureDenyList.FixturesFolder, "protocol-3-session.jsonl")), PipeReplaySpeed.Maximum, new PipeReplayClock(DateTimeOffset.UnixEpoch), TimeProvider.System);
+        var reader = new PipeMessageReader(replay);
+
+        // Act
+        var results = await ReadFixtureToEndAsync(reader);
+
+        // Assert
+        var messages = results.Select(result => result.Message).ToList();
+        var routeCounts = string.Join(' ', messages.OfType<TradeRoutesMessage>().Select(message => message.Routes.Count));
+        var offerCounts = string.Join(' ', messages.OfType<ItemOffersMessage>().Select(message => message.Offers.Count));
+
+        Assert.AreEqual("0 0 0 0 0", routeCounts, "The five trade-route frames should decode as messages without routes");
+        Assert.AreEqual("0 0 0 0", offerCounts, "The four item-offer frames should decode as messages without traders");
+        Assert.IsNull(replay.Problem, "The fixture should be a valid recording");
+    }
+
+    /// <summary>
     /// Counts the read results by message type (trade routes and item offers included), the errors and the production
     /// entries.
     /// </summary>
