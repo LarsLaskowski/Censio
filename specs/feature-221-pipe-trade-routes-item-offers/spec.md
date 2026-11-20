@@ -1,7 +1,7 @@
 # Spec: Decode trade routes and item offers of pipe protocol 3
 
 Source: Issue #221
-Status: Draft
+Status: Approved by Lead
 
 ## Problem
 
@@ -68,7 +68,8 @@ names are text the player types, so they must never reach a committed fixture or
 ## Non-functional requirements
 
 - N1: Memory: a read still holds at most one frame (1 MiB) plus its decoded message. Each count has a cap with a wide
-  margin over the version 3 recording (57 routes, 7 traders per frame); the caps' values are set in the plan.
+  margin over the real version 3 recordings (at most 57 routes, 4 stations per route, 5 goods per station, 7 traders,
+  6 items per trader); the caps' values are set in the plan.
 - N2: Time: decoding a frame of up to 1 MiB of any shape takes time proportional to its size; no count can make the
   reader do work that the frame's bytes do not pay for.
 - N3: Privacy: route and folder names and every other decoded field of types 4 and 5 are never logged and never part of
@@ -125,15 +126,14 @@ names are text the player types, so they must never reach a committed fixture or
   the data")? Answered: the Product Manager chose the pipe layer only — types 4 and 5 are decoded with caps, the anonymiser
   is extended and a real fixture is made; the Companion changes no state with them and nothing downstream uses them.
   Showing the data is a follow-up feature issue.
-- Q2: Which real sample is the reader built from? The version 3 recording of #125 is kept private and is not in the
-  session; the plan needs it supplied outside the repository (`.squad/routing.md`, *Escalation to the Product
-  Manager*) for AC11 and to confirm the nested counts. Answered: the Product Manager supplies the
-  real version 3 recording outside the repository before the plan is written; the plan does not start without it.
+- Q2: Which real sample is the reader built from? Answered: a real version 3 recording the Product Manager supplies
+  outside the repository before the plan is written (for AC11, AC12 and the nested counts).
 - Q3: Does the game ever send a missing or negative count? Answered: none was seen at the top level — the version 3
   recording's 5 trade-route frames (count 57) and 4 item-offer frames (count 7) all start with a positive count
-  ([`../../docs/protocol.md`](../../docs/protocol.md), *TradeRoutes and ItemOffers*); its nested counts are unknown
-  until AC12's run. The reference cannot survive a negative nested count (E2); the reader keeps rejecting both
-  (record 0033).
+  ([`../../docs/protocol.md`](../../docs/protocol.md), *TradeRoutes and ItemOffers*). The second recording the
+  Product Manager supplied for this plan (11 trade-route and 12 item-offer frames) has no missing or negative count
+  at any level, and every route, station and trader there has at least one station, good or item. The reference
+  cannot survive a negative nested count (E2); the reader keeps rejecting both (record 0033).
 - Q4: Must a recording anonymise route names "before any recording keeps them"? Answered: no — a Companion recording
   holds the raw frames and stays private, as it does for figure and island names (records 0029, 0036); names are
   replaced by the anonymiser before a recording becomes a fixture (record 0042).
