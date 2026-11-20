@@ -183,6 +183,57 @@ public sealed class ContractMessageConverterTests
     }
 
     /// <summary>
+    /// The trade routes convert to a contract message that keeps the routes in their order, each with its ID, name, folder
+    /// and four counts as the game sent them, and its stations in route order by their island key; the receive time is
+    /// taken in UTC, the profile is the caller's, and the message reads back unchanged after a write.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC1")]
+    public void ContractMessageConverterToTradeRoutesKeepsRoutesInOrder()
+    {
+        // Arrange
+        var message = CreateTradeRoutes();
+        var receiveTime = _time.ToOffset(TimeSpan.FromHours(2));
+
+        // Act
+        var converted = ContractMessageConverter.ToTradeRoutes(message, _profile, receiveTime);
+
+        // Assert
+        Assert.AreNotEqual(Guid.Empty, converted.Id, "The trade routes should get an identity");
+        Assert.AreEqual(_profile, converted.ProfileId, "The trade routes should carry the profile they were converted for");
+        Assert.AreEqual(_time.UtcTicks, converted.ReceiveTime.UtcTicks, "The trade routes should carry the receive time they were given");
+        Assert.AreEqual(TimeSpan.Zero, converted.ReceiveTime.Offset, "The receive time should be taken in UTC");
+        Assert.AreEqual(DescribePipeRoutes(message), DescribeContractRoutes(converted), "The routes and their stations should keep their order and values");
+
+        var read = RoundTrip<ContractTradeRoutes>(converted, "trade routes");
+
+        Assert.AreEqual(converted.Id, read.Id, "The identity should read back");
+        Assert.AreEqual(DescribePipeRoutes(message), DescribeContractRoutes(read), "The routes read back should keep their order and values");
+    }
+
+    /// <summary>
+    /// Trade routes without routes convert to a message without routes, and equal trade routes converted twice get
+    /// different identities.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC1")]
+    public void ContractMessageConverterToTradeRoutesTakenSeparatelyGetDifferentIdentities()
+    {
+        // Arrange
+        var message = new TradeRoutesMessage
+                      {
+                          Routes = []
+                      };
+
+        // Act
+        var converted = new[] { ContractMessageConverter.ToTradeRoutes(message, _profile, _time), ContractMessageConverter.ToTradeRoutes(message, _profile, _time) };
+
+        // Assert
+        Assert.IsEmpty(converted[0].Routes, "Trade routes without routes should convert without routes");
+        Assert.AreNotEqual(converted[0].Id, converted[1].Id, "Trade routes converted separately should get their own identities");
+    }
+
+    /// <summary>
     /// Writes a message and reads it back, asserting neither step refuses it.
     /// </summary>
     /// <typeparam name="T">The expected message type</typeparam>
@@ -366,6 +417,99 @@ public sealed class ContractMessageConverterTests
         var islands = tick.Islands.Select(island => $"{island.SessionGuid}/{island.IslandId}/{island.AreaIndex}/{island.SessionId}/{island.Name.Length}:{island.Name}[{string.Join(" ", island.Entries.Select(entry => $"{entry.ProductGuid}:{Bits(entry.Generation)},{Bits(entry.Consumption)},{Bits(entry.Delta)},{Bits(entry.PerfectGeneration)},{Bits(entry.PerfectConsumption)},{entry.BuildingCount},{entry.Maintenance},{Bits(entry.Income)},{entry.Profit},{Bits(entry.SummedProductivity)},{Bits(entry.AverageProductivity)},w{DescribeMap(entry.WorkforceAmounts)},b{DescribeMap(entry.BuildingAmounts)}"))}]");
 
         return $"{tick.ReceiveTime.UtcTicks}|{tick.ReceiveTime.Offset}|{tick.GameTime}|{string.Join(";", islands)}";
+    }
+
+    /// <summary>
+    /// Creates trade routes of every value: a repeated route ID and name, an empty name and folder, counts at the ends of
+    /// the int32 range and lost ships above ships, stations of distinct and repeated keys with goods, flags and owners, and
+    /// a route without stations.
+    /// </summary>
+    /// <returns>The trade routes</returns>
+    private static TradeRoutesMessage CreateTradeRoutes()
+    {
+        return new TradeRoutesMessage
+               {
+                   Routes = [
+                                CreateRoute(7, "Via Appia", "North", [3, 1, 2, 1], CreateStation(180023, 2, 0), CreateStation(-180045, 255, 255), CreateStation(180023, 2, 0)),
+                                CreateRoute(3, string.Empty, string.Empty, [int.MaxValue, int.MinValue, 1, 4]),
+                                CreateRoute(7, "Via Appia", "South", [0, -1, 2, 0], CreateStation(180023, 1, 0))
+                            ]
+               };
+    }
+
+    /// <summary>
+    /// Creates a pipe trade route.
+    /// </summary>
+    /// <param name="id">The route ID</param>
+    /// <param name="name">The name</param>
+    /// <param name="folder">The folder</param>
+    /// <param name="counts">The major problems, minor problems, ships and lost ships</param>
+    /// <param name="stations">The stations in route order</param>
+    /// <returns>The route</returns>
+    private static TradeRoute CreateRoute(int id, string name, string folder, int[] counts, params TradeRouteStation[] stations)
+    {
+        return new TradeRoute
+               {
+                   Id = id,
+                   Name = name,
+                   Folder = folder,
+                   MajorProblems = counts[0],
+                   MinorProblems = counts[1],
+                   Ships = counts[2],
+                   LostShips = counts[3],
+                   Stations = stations
+               };
+    }
+
+    /// <summary>
+    /// Creates a pipe station with goods, a session ID, an owner and flags that do not cross the contract.
+    /// </summary>
+    /// <param name="sessionGuid">The session GUID</param>
+    /// <param name="islandId">The island ID</param>
+    /// <param name="areaIndex">The area index</param>
+    /// <returns>The station</returns>
+    private static TradeRouteStation CreateStation(int sessionGuid, byte islandId, byte areaIndex)
+    {
+        return new TradeRouteStation
+               {
+                   Id = 9,
+                   SessionId = 4,
+                   IslandId = islandId,
+                   AreaIndex = areaIndex,
+                   SessionGuid = sessionGuid,
+                   Owner = 41,
+                   ThrowOverboard = true,
+                   WaitUntilFull = true,
+                   WaitUntilEmpty = false,
+                   Goods = [
+                               new TradeRouteGood
+                               {
+                                   ProductGuid = 1010017,
+                                   Amount = 50,
+                                   Loading = true
+                               }
+                           ]
+               };
+    }
+
+    /// <summary>
+    /// Describes the routes of pipe trade routes with the values that cross the contract, in their order.
+    /// </summary>
+    /// <param name="message">The pipe trade routes</param>
+    /// <returns>The description</returns>
+    private static string DescribePipeRoutes(TradeRoutesMessage message)
+    {
+        return string.Join(";", message.Routes.Select(route => $"{route.Id}/{route.Name.Length}:{route.Name}/{route.Folder.Length}:{route.Folder}/{route.MajorProblems},{route.MinorProblems},{route.Ships},{route.LostShips}[{string.Join(" ", route.Stations.Select(station => $"{station.SessionGuid}/{station.IslandId}/{station.AreaIndex}"))}]"));
+    }
+
+    /// <summary>
+    /// Describes the routes of contract trade routes in the form of <see cref="DescribePipeRoutes" />.
+    /// </summary>
+    /// <param name="message">The contract trade routes</param>
+    /// <returns>The description</returns>
+    private static string DescribeContractRoutes(ContractTradeRoutes message)
+    {
+        return string.Join(";", message.Routes.Select(route => $"{route.Id}/{route.Name.Length}:{route.Name}/{route.Folder.Length}:{route.Folder}/{route.MajorProblems},{route.MinorProblems},{route.Ships},{route.LostShips}[{string.Join(" ", route.Stations.Select(station => $"{station.SessionGuid}/{station.IslandId}/{station.AreaIndex}"))}]"));
     }
 
     /// <summary>

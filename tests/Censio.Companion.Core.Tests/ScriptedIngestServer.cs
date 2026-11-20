@@ -116,6 +116,7 @@ public sealed class ScriptedIngestServer : IAsyncDisposable
                    ContractTick tick => tick.Id,
                    ContractSessionStart start => start.Id,
                    ContractSessionEnd end => end.Id,
+                   ContractTradeRoutes routes => routes.Id,
                    _ => Guid.Empty
                };
     }

@@ -46,6 +46,16 @@ public sealed class PipeReplayRunnerTests
     private static readonly string[] _sessionEventsOnce = ["SessionStart", "SessionEnd"];
 
     /// <summary>
+    /// The messages of the replay with trade routes sent in order, statuses left out.
+    /// </summary>
+    private static readonly string[] _replayWithTradeRoutes = ["Hello", "TradeRoutes", "Tick 1", "Tick 1"];
+
+    /// <summary>
+    /// The names of the routes of the trade-routes frame, in their order.
+    /// </summary>
+    private static readonly string[] _tradeRouteNames = ["Via Appia", "Via Ostiensis"];
+
+    /// <summary>
     /// The statuses the runner raised, in order.
     /// </summary>
     private readonly ConcurrentQueue<PipeReplayStatus> _events = [];
@@ -814,6 +824,42 @@ public sealed class PipeReplayRunnerTests
     }
 
     /// <summary>
+    /// A trade-routes frame of protocol 3 is sent at once as trade routes with the recorded read stamp of its frame and
+    /// its routes in their order, while the open tick goes on; the finished status counts only the ticks as sent.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    [TestCategory("AC1")]
+    [TestCategory("AC7")]
+    public async Task PipeReplayRunnerReplayWithServerSendsTradeRoutesWithReadStamp()
+    {
+        // Arrange
+        var recording = PipeTestFrames.Recording(_start,
+                                                 (_start, PipeTestFrames.Version(3)),
+                                                 (_start.AddSeconds(1), PipeTestFrames.Island(1, 100)),
+                                                 (_start.AddSeconds(7), TradeRoutesFrame()),
+                                                 (_start.AddSeconds(9), PipeTestFrames.Island(1, 200)));
+        await using var server = ScriptedIngestServer.Create();
+        await using var sender = CreateSender(new DuplexReplayConnector(server.ClientSocket), null);
+        var runner = CreateSendingRunner(() => new MemoryStream(recording), sender);
+        var serving = server.AcknowledgeAllAsync(false, TestContext.CancellationToken);
+
+        // Act
+        await runner.RunAsync(TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+
+        var messages = await serving.WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreSequenceEqual(_replayWithTradeRoutes, messages.Where(message => message is not ContractStatus).Select(Describe), "The trade routes should be sent at once, before the open tick closes");
+
+        var routes = Assert.ContainsSingle(messages.OfType<ContractTradeRoutes>(), "One trade-routes message should be sent");
+
+        Assert.AreEqual(_start.AddSeconds(7), routes.ReceiveTime, "The trade routes should carry their frame's recorded stamp");
+        Assert.AreSequenceEqual(_tradeRouteNames, routes.Routes.Select(route => route.Name), "The routes should be sent in their order");
+        Assert.AreEqual("Censio Companion: Replay finished: 2 ticks sent, 0 refused", TrayMenu.FormatReplayToolTip(runner.Status), "The finished status should count only the ticks as sent");
+    }
+
+    /// <summary>
     /// An invalid line after sent ticks ends the replay with today's problem after the ticks before it were sent, and the
     /// connection is closed.
     /// </summary>
@@ -925,6 +971,53 @@ public sealed class PipeReplayRunnerTests
                {
                    ContractTick tick => string.Create(CultureInfo.InvariantCulture, $"Tick {tick.Islands.Count}"),
                    _ => message.Type.ToString()
+               };
+    }
+
+    /// <summary>
+    /// Creates a trade-routes frame without its length prefix: a route with one station of the island of
+    /// <see cref="PipeTestFrames.Island(int, long)" /> and a route without stations.
+    /// </summary>
+    /// <returns>The frame</returns>
+    private static byte[] TradeRoutesFrame()
+    {
+        var station = new TradeRouteStation
+                      {
+                          Id = 1,
+                          SessionId = 7,
+                          IslandId = 1,
+                          AreaIndex = 0,
+                          SessionGuid = 1,
+                          Owner = 41,
+                          ThrowOverboard = false,
+                          WaitUntilFull = false,
+                          WaitUntilEmpty = false,
+                          Goods = []
+                      };
+
+        return new PipeFrameBuilder().Byte((byte)PipeMessageType.TradeRoutes)
+                                     .TradeRoutes([CreateRoute(_tradeRouteNames[0], [station]), CreateRoute(_tradeRouteNames[1], [])])
+                                     .Build();
+    }
+
+    /// <summary>
+    /// Creates a trade route without problems or lost ships.
+    /// </summary>
+    /// <param name="name">The name</param>
+    /// <param name="stations">The stations in route order</param>
+    /// <returns>The route</returns>
+    private static TradeRoute CreateRoute(string name, TradeRouteStation[] stations)
+    {
+        return new TradeRoute
+               {
+                   Id = 1,
+                   Name = name,
+                   Folder = "North",
+                   MajorProblems = 0,
+                   MinorProblems = 0,
+                   Ships = 1,
+                   LostShips = 0,
+                   Stations = stations
                };
     }
 
@@ -1048,8 +1141,8 @@ public sealed class PipeReplayRunnerTests
         await server.SendAsync(new ContractHelloRefused
                                {
                                    Reason = ContractHelloRefusal.TokenRefused,
-                                   ReceivedVersion = 1,
-                                   SupportedVersions = [1]
+                                   ReceivedVersion = 2,
+                                   SupportedVersions = [2]
                                },
                                TestContext.CancellationToken);
     }

@@ -805,7 +805,7 @@ public sealed class TrayMenuTests
     [DataRow(ReplaySendProblemKind.ServerUnreachable, "server unreachable")]
     [DataRow(ReplaySendProblemKind.TokenRefused, "token refused")]
     [DataRow(ReplaySendProblemKind.CompanionConnected, "another Companion is connected")]
-    [DataRow(ReplaySendProblemKind.VersionNotSupported, "server does not support contract version 1")]
+    [DataRow(ReplaySendProblemKind.VersionNotSupported, "server does not support contract version 2")]
     [DataRow(ReplaySendProblemKind.NoAnswer, "server does not answer")]
     [DataRow(ReplaySendProblemKind.ConnectionLost, "server connection lost")]
     [DataRow(ReplaySendProblemKind.InvalidReply, "invalid server reply")]
