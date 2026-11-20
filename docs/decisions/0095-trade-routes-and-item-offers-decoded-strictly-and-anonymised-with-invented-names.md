@@ -1,6 +1,6 @@
 # 0095: Trade routes and item offers are decoded strictly with caps and anonymised with invented names
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-20
 - **Area:** pipe
 - **Source:** Issue #221
