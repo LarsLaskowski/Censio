@@ -55,8 +55,8 @@ names are text the player types, so they must never reach a committed fixture or
 - E8: Bytes after the last field of a trade-routes or item-offers frame are ignored; the message is delivered.
 - E10: Types 4 and 5 are decoded under protocol version 2 as well, as today: the parser has no version.
 - E11: The anonymiser refuses a malformed trade-routes or item-offers frame with `frame cannot be anonymised in line
-  <n>`, as it does today for a missing or negative leading count, and a trade-routes frame whose rewritten form (with
-  its invented names) would exceed 1 MiB.
+  <n>`, as it does today for a missing or negative leading count, and any frame whose rewritten form (with its
+  invented names) would exceed 1 MiB: a trade-routes frame, or an island frame whose name grows.
 - E12: An invented name is never equal to an original name of the file of any kind (figure, island, route, folder),
   ignoring case; one original name keeps one invented name per kind, and an empty name stays empty.
 - E13: The anonymiser writes the flags of a station and a good from their named bits only: unnamed bits are written as
@@ -103,7 +103,7 @@ names are text the player types, so they must never reach a committed fixture or
   of 0 or more by the integer rule of maintenance with lost ships kept at most ships where the original holds that,
   keeps a negative goods amount, and each written frame parses back to that structure (owners included), else it is
   refused (S4, E13, E14, N3).
-- AC10: The anonymiser refuses a malformed trade-routes or item-offers frame, and a trade-routes frame whose rewritten
+- AC10: The anonymiser refuses a malformed trade-routes or item-offers frame, and a frame of any type whose rewritten
   form would exceed 1 MiB, with `frame cannot be anonymised in line <n>` (E11).
 - AC11: A fixture anonymised from the real version 3 recording holds its trade-route and item-offer frames decoded,
   the reader delivers every one of them without an error, and a replay of it gives the ticks and session events of
@@ -176,3 +176,9 @@ names are text the player types, so they must never reach a committed fixture or
   (AC12's run) and adjusts the rule when the recording shows another relation.
 - Noted (record 0094 is unreleased): confirmed, since no tag contains its commit `30e8960`. The plan edits it in
   place instead of superseding it.
+
+## Amendments
+
+| Criterion | Change | Reason | Step | Decided by |
+| --------- | ------ | ------ | ---- | ---------- |
+| AC10 | The 1 MiB refusal covers a rewritten frame of any type, not only trade routes (E11 likewise) | An island frame grows with its invented name (`Island <n>`) and can pass 1 MiB as well; the plan already refuses every type | 6 (G2) | Lead |

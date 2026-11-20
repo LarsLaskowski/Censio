@@ -43,7 +43,7 @@ See [spec.md](spec.md), *Problem*. Today `PipeMessageParser.ParseUndecoded` (`sr
 | AC7 | `PipeTickBuilderTradeRoutesOrItemOffersKeepOpenTick`, `PipeTickBuilderTradeRoutesOrItemOffersDoNotRestartQuietPeriod`, `PipeTickBuilderTradeRoutesOrItemOffersKeepRepeatedSessionEnd`; `PipeConnectionTradeRoutesAndItemOffersRaiseNoEvent` (frames rebuilt in the reference layout, so they decode) | `tests/Censio.Pipe.Tests/PipeTickBuilderTests.cs`, `tests/Censio.Companion.Core.Tests/PipeConnectionTests.cs` |
 | AC8 | `PipeRecordingAnonymiserRouteAndFolderNamesAreInvented`, `PipeRecordingAnonymiserInventedRouteNameSkipsOriginalOfAnotherKind`, `PipeRecordingAnonymiserEmptyRouteAndFolderNamesStayEmpty`; `FixtureDenyListFixturesHaveInventedNames` (extended to routes and folders) | `tests/Censio.Pipe.Tests/PipeRecordingAnonymiserTests.cs`, `tests/Censio.Pipe.Tests/FixtureDenyListTests.cs` |
 | AC9 | `PipeRecordingAnonymiserTradeRoutesKeepStructure`, `PipeRecordingAnonymiserTradeRouteAmountsChange`, `PipeRecordingAnonymiserLostShipsStayAtMostShips`, `PipeRecordingAnonymiserNegativeGoodsAmountIsKept`, `PipeRecordingAnonymiserUnnamedFlagBitsAreWrittenAsZero`, `PipeRecordingAnonymiserItemOffersKeepStructure` | `tests/Censio.Pipe.Tests/PipeRecordingAnonymiserTests.cs` |
-| AC10 | `PipeRecordingAnonymiserMalformedTradeRoutesOrItemOffersAreRefused`, `PipeRecordingAnonymiserTradeRoutesOverOneMebibyteAfterRewritingAreRefused` | `tests/Censio.Pipe.Tests/PipeRecordingAnonymiserTests.cs` |
+| AC10 | `PipeRecordingAnonymiserMalformedTradeRoutesOrItemOffersAreRefused`, `PipeRecordingAnonymiserTradeRoutesOverOneMebibyteAfterRewritingAreRefused`, `PipeRecordingAnonymiserIslandOverOneMebibyteAfterRewritingIsRefused` | `tests/Censio.Pipe.Tests/PipeRecordingAnonymiserTests.cs` |
 | AC11 | `PipeMessageReaderFixturesGiveReadmeFrameCounts` and `PipeTickAssemblerFixturesGiveReadmeTicksAndEvents` (a `DataRow` for `protocol-3-trade-routes.jsonl` each); manual: the Tester, in step 5, runs `FixtureDenyListFixturesAgainstLocalDenyList` with a scratch deny list naming the supplied recording as the fixture's original and every original name as denied | `tests/Censio.Pipe.Tests/PipeMessageReaderTests.cs`, `tests/Censio.Pipe.Tests/PipeTickAssemblerTests.cs`, `tests/Censio.Pipe.Tests/FixtureDenyListTests.cs` |
 | AC12 | `FixtureDenyListOriginalTradeFrameWithTrailingBytesIsReported`, `FixtureDenyListOriginalTradeFrameWithReplacementCharacterIsReported`; manual: the Tester, in step 5, runs `FixtureDenyListOriginalTradeFramesDecodeToTheirEnd` against the supplied recording (inconclusive without `CENSIO_FIXTURE_DENY_LIST`), counts only | `tests/Censio.Pipe.Tests/FixtureDenyListTests.cs` |
 
@@ -90,8 +90,10 @@ See [spec.md](spec.md), *Problem*. Today `PipeMessageParser.ParseUndecoded` (`sr
   perturbed ships, or the perturbed ships minus 1 when that would equal the original non-zero lost-ship count. That
   value is never the original, and at least 0 when the original ship count is positive.
 - `IsReadBack` gains private structure checks for both messages: same route, station, goods, offer and item counts,
-  and equal IDs, island keys, owners, named flags, goods GUIDs and loading, trader IDs and item GUIDs. Then
-  `Anonymise` refuses any written frame longer than `PipeProtocol.MaxFrameLength`, for every type (E11).
+  and equal IDs, island keys, owners, named flags, goods GUIDs and loading, trader IDs and item GUIDs. The 1 MiB
+  refusal (E11, every type) sits in `PipeRecordingAnonymiser.RewriteAsync`: a frame `Anonymise` returns that is longer
+  than `PipeProtocol.MaxFrameLength` gives `FrameNotAnonymisable` with its line and is not written; `Anonymise` keeps
+  its signature and gets no state for it (G2 decision, replacing `LastFrameTooLong`).
 - Every frame draws its amounts afresh, as island frames do (record 0042). A recording that repeats one trade-route
   frame (all 11 of the sample are byte-identical, fact 11) therefore lets a reader infer a small original value from
   the spread of its copies (2 to 4 move by exactly 1; 1 always becomes 2). This is accepted and documented as a
@@ -190,6 +192,12 @@ Files no unit test can cover: none whole. In `src/Censio.Pipe/PipeMessageParser.
 `ParseGood` and of the item read in `ParseItemOffer`, and the `null` check on `ParseGood` in `ParseStation`, are
 unreachable: `TryReadCount` admits a count only when the frame holds that many elements of the fixed size
 (`MinGoodSize`, `ItemSize`). They stay as fail-closed defense (record 0033), as in `TryReadMap` (G1, Lead decision).
+In `src/Censio.Pipe/PipeFrameAnonymiser.cs` the false branches of the read-back (`IsReadBack`, the three
+`KeepsStructure` overloads: the written frame is built from the decoded original), the `TryGetRoute`/`TryGetFolder`
+refusal (pass 1 collects every name) and the clause `route.LostShips != 0` of `LimitLostShips` (`Perturb` keeps 0)
+are unreachable today. They stay (G2, Lead decision): the read-back is AC9's "else it is refused" control, the name
+refusal matches `WriteIsland` and `WriteSessionStart`, and the clause keeps lost ships from becoming -1 should the
+integer rule ever move 0.
 
 ## Areas
 
@@ -206,7 +214,9 @@ unreachable: `TryReadCount` admits a count only when the frame holds that many e
   - *Anonymising*, *What changes*: the trade-routes bullet becomes route and folder names, amounts and the lost-ship
     rule, and the flags.
   - *What is kept*: IDs, keys, owners, GUIDs, counts and order.
-  - *What is refused*: malformed types 4 and 5 at any level, and a written frame over 1 MiB.
+  - *What is refused*: malformed types 4 and 5 at any level, and a written frame of any type over 1 MiB (a
+    trade-routes frame, or an island frame whose invented name is longer than the original); the error table's
+    `frame cannot be anonymised in line <n>` row names that cause too.
   - *Fixtures*: the third fixture.
   - *Privacy* (line 112) stays true. *Anonymising* states the residual risk of repeated frames: amounts are drawn
     afresh per frame, so the copies of a repeated island or trade-route frame let a small original value be inferred.
