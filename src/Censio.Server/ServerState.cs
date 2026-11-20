@@ -234,7 +234,7 @@ public sealed partial class ServerState : IProfileStateSource
                                                Profile = profile,
                                                LatestTick = current.State.LatestTick,
                                                Islands = current.State.Islands,
-                                               LatestTradeRoutes = null
+                                               LatestTradeRoutes = current.State.LatestTradeRoutes
                                            },
                                    ReceiveTicks = current.ReceiveTicks,
                                    Sequence = current.Sequence
@@ -306,19 +306,78 @@ public sealed partial class ServerState : IProfileStateSource
         }
     }
 
-    // Skeleton: removed with the implementation
-#pragma warning disable RH2003, S2325
     /// <summary>
-    /// Stores the trade routes of a profile.
+    /// Stores the trade routes of a profile: a newer set replaces the held one, an older or resent one changes nothing.
     /// </summary>
     /// <param name="routes">The trade routes</param>
     /// <param name="cancellationToken">The cancellation token</param>
     /// <returns>The result of the store</returns>
     public async Task<ServerStoreResult> StoreTradeRoutesAsync(ContractTradeRoutes routes, CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        await _writeGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+
+        try
+        {
+            var result = await _store.StoreTradeRoutesAsync(routes, cancellationToken).ConfigureAwait(false);
+
+            if (result.Outcome != ServerStoreOutcome.Stored)
+            {
+                return result;
+            }
+
+            var snapshot = GetSnapshot();
+            var profiles = snapshot.Profiles;
+            var isNew = FindProfile(profiles, routes.ProfileId) < 0;
+            var held = snapshot.Held;
+
+            if (isNew)
+            {
+                profiles = PutProfile(profiles,
+                                      new StoredProfile
+                                      {
+                                          Id = routes.ProfileId,
+                                          Name = null
+                                      });
+            }
+
+            if (held.TryGetValue(routes.ProfileId, out var current))
+            {
+                held = Replace(held,
+                               routes.ProfileId,
+                               new HeldProfileState
+                               {
+                                   State = new StoredProfileState
+                                           {
+                                               Profile = current.State.Profile,
+                                               LatestTick = current.State.LatestTick,
+                                               Islands = current.State.Islands,
+                                               LatestTradeRoutes = routes
+                                           },
+                                   ReceiveTicks = current.ReceiveTicks,
+                                   Sequence = current.Sequence
+                               });
+            }
+
+            Swap(new ServerStateSnapshot
+                 {
+                     Profiles = profiles,
+                     Held = held,
+                     Catalog = snapshot.Catalog
+                 });
+            Notify(ServerStateChangeKind.TradeRoutes, routes.ProfileId);
+
+            if (isNew)
+            {
+                Notify(ServerStateChangeKind.Profile, routes.ProfileId);
+            }
+
+            return result;
+        }
+        finally
+        {
+            _writeGate.Release();
+        }
     }
-#pragma warning restore RH2003, S2325
 
     /// <summary>
     /// Stores a catalog.
@@ -873,7 +932,7 @@ public sealed partial class ServerState : IProfileStateSource
                                                Profile = current.State.Profile,
                                                LatestTick = tick,
                                                Islands = MergeIslands(current.State.Islands, tick),
-                                               LatestTradeRoutes = null
+                                               LatestTradeRoutes = current.State.LatestTradeRoutes
                                            },
                                    ReceiveTicks = receiveTicks,
                                    Sequence = ++_sequence
@@ -893,7 +952,7 @@ public sealed partial class ServerState : IProfileStateSource
                                                  Profile = current.State.Profile,
                                                  LatestTick = current.State.LatestTick,
                                                  Islands = listed,
-                                                 LatestTradeRoutes = null
+                                                 LatestTradeRoutes = current.State.LatestTradeRoutes
                                              },
                                      ReceiveTicks = current.ReceiveTicks,
                                      Sequence = current.Sequence
@@ -911,8 +970,9 @@ public sealed partial class ServerState : IProfileStateSource
         }
 
         var islands = await TryListIslandsAsync(tick.ProfileId).ConfigureAwait(false);
+        var (isRead, tradeRoutes) = await TryReadTradeRoutesAsync(tick.ProfileId).ConfigureAwait(false);
 
-        if (islands is null)
+        if (islands is null || isRead == false)
         {
             _markedProfiles.Add(tick.ProfileId);
 
@@ -928,7 +988,7 @@ public sealed partial class ServerState : IProfileStateSource
                                      Profile = profiles[FindProfile(profiles, tick.ProfileId)],
                                      LatestTick = tick,
                                      Islands = islands,
-                                     LatestTradeRoutes = null
+                                     LatestTradeRoutes = tradeRoutes
                                  },
                          ReceiveTicks = receiveTicks,
                          Sequence = ++_sequence
@@ -990,6 +1050,26 @@ public sealed partial class ServerState : IProfileStateSource
             LogStateReadFailed(_logger, exception);
 
             return null;
+        }
+    }
+
+    /// <summary>
+    /// Reads the trade routes of a profile that enters the held states; a failure is logged. The read ignores a
+    /// cancellation because the tick is stored already and the state must follow it.
+    /// </summary>
+    /// <param name="profileId">The profile identity</param>
+    /// <returns>Whether the read succeeded, and the trade routes, or <see langword="null"/> when none are stored</returns>
+    private async Task<(bool IsRead, ContractTradeRoutes? TradeRoutes)> TryReadTradeRoutesAsync(Guid profileId)
+    {
+        try
+        {
+            return (true, await _store.ReadTradeRoutesAsync(profileId, CancellationToken.None).ConfigureAwait(false));
+        }
+        catch (SqliteException exception)
+        {
+            LogStateReadFailed(_logger, exception);
+
+            return (false, null);
         }
     }
 

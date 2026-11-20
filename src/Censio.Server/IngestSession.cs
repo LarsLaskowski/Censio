@@ -237,6 +237,7 @@ public sealed partial class IngestSession : IDisposable
         return message switch
                {
                    ContractTick tick => tick.Id,
+                   ContractTradeRoutes tradeRoutes => tradeRoutes.Id,
                    ContractSessionStart start => start.Id,
                    ContractSessionEnd end => end.Id,
                    ContractIconImage icon => icon.Id,
@@ -566,6 +567,12 @@ public sealed partial class IngestSession : IDisposable
             case ContractTick tick:
                 {
                     result = await _state.StoreTickAsync(tick, _stoppingToken).ConfigureAwait(false);
+                }
+                break;
+
+            case ContractTradeRoutes tradeRoutes:
+                {
+                    result = await _state.StoreTradeRoutesAsync(tradeRoutes, _stoppingToken).ConfigureAwait(false);
                 }
                 break;
 
