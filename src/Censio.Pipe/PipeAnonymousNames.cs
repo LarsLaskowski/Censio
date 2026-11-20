@@ -98,6 +98,54 @@ internal sealed class PipeAnonymousNames
         return TryGet(original, _inventedFigures, out invented);
     }
 
+#pragma warning disable S2325, RH2003 // Skeleton: removed with the implementation
+    /// <summary>
+    /// Adds the name of a trade route.
+    /// </summary>
+    /// <param name="name">The original name</param>
+    public void AddRoute(string name)
+    {
+        throw new NotImplementedException();
+    }
+#pragma warning restore S2325, RH2003
+
+#pragma warning disable S2325, RH2003 // Skeleton: removed with the implementation
+    /// <summary>
+    /// Adds the name of a route folder.
+    /// </summary>
+    /// <param name="name">The original name</param>
+    public void AddFolder(string name)
+    {
+        throw new NotImplementedException();
+    }
+#pragma warning restore S2325, RH2003
+
+#pragma warning disable S2325, RH2003 // Skeleton: removed with the implementation
+    /// <summary>
+    /// Looks up the invented name of a trade route.
+    /// </summary>
+    /// <param name="original">The original name</param>
+    /// <param name="invented">The invented name</param>
+    /// <returns><see langword="true" /> when the name was added</returns>
+    public bool TryGetRoute(string original, out string invented)
+    {
+        throw new NotImplementedException();
+    }
+#pragma warning restore S2325, RH2003
+
+#pragma warning disable S2325, RH2003 // Skeleton: removed with the implementation
+    /// <summary>
+    /// Looks up the invented name of a route folder.
+    /// </summary>
+    /// <param name="original">The original name</param>
+    /// <param name="invented">The invented name</param>
+    /// <returns><see langword="true" /> when the name was added</returns>
+    public bool TryGetFolder(string original, out string invented)
+    {
+        throw new NotImplementedException();
+    }
+#pragma warning restore S2325, RH2003
+
     /// <summary>
     /// Looks up an invented name; an empty name stays empty.
     /// </summary>
