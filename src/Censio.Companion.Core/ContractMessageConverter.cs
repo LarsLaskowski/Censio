@@ -84,8 +84,6 @@ public static class ContractMessageConverter
                };
     }
 
-    // Skeleton: removed with the implementation
-#pragma warning disable RH2003, S1172
     /// <summary>
     /// Converts the trade routes of the pipe into a contract message with a new identity.
     /// </summary>
@@ -95,9 +93,35 @@ public static class ContractMessageConverter
     /// <returns>The contract trade routes</returns>
     public static ContractTradeRoutes ToTradeRoutes(TradeRoutesMessage message, Guid profileId, DateTimeOffset receiveTime)
     {
-        throw new NotImplementedException();
+        ArgumentNullException.ThrowIfNull(message);
+
+        return new ContractTradeRoutes
+               {
+                   Id = Guid.NewGuid(),
+                   ProfileId = profileId,
+                   ReceiveTime = receiveTime.ToUniversalTime(),
+                   Routes = [
+                                .. message.Routes.Select(route => new ContractTradeRoute
+                                                                  {
+                                                                      Id = route.Id,
+                                                                      Name = route.Name,
+                                                                      Folder = route.Folder,
+                                                                      MajorProblems = route.MajorProblems,
+                                                                      MinorProblems = route.MinorProblems,
+                                                                      Ships = route.Ships,
+                                                                      LostShips = route.LostShips,
+                                                                      Stations = [
+                                                                                     .. route.Stations.Select(station => new ContractTradeRouteStation
+                                                                                                                         {
+                                                                                                                             SessionGuid = station.SessionGuid,
+                                                                                                                             IslandId = station.IslandId,
+                                                                                                                             AreaIndex = station.AreaIndex
+                                                                                                                         })
+                                                                                 ]
+                                                                  })
+                            ]
+               };
     }
-#pragma warning restore RH2003, S1172
 
     /// <summary>
     /// Converts a pipe island into a contract island.

@@ -318,8 +318,6 @@ public sealed class ReplaySender : IAsyncDisposable
         return await SendMessageAsync(message, message.Id, false, cancellationToken).ConfigureAwait(false);
     }
 
-    // Skeleton: removed with the implementation
-#pragma warning disable RH2003, S1172, S2325, CS1998
     /// <summary>
     /// Sends the trade routes and waits for the acknowledgement.
     /// </summary>
@@ -329,9 +327,10 @@ public sealed class ReplaySender : IAsyncDisposable
     /// <returns>The problem, or <c>null</c> if there is none</returns>
     public async Task<ReplaySendProblemKind?> SendTradeRoutesAsync(TradeRoutesMessage message, DateTimeOffset receiveTime, CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        var routes = ContractMessageConverter.ToTradeRoutes(message, ProfileId, receiveTime);
+
+        return await SendMessageAsync(routes, routes.Id, false, cancellationToken).ConfigureAwait(false);
     }
-#pragma warning restore RH2003, S1172, S2325, CS1998
 
     /// <summary>
     /// Closes the connection.
