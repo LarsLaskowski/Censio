@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Net;
 using System.Net.WebSockets;
 using System.Runtime.CompilerServices;
+using System.Text.Json.Nodes;
 
 using Censio.Companion.Core;
 using Censio.Contracts;
@@ -49,6 +50,21 @@ public sealed class IngestEndpointTests
     /// The X-Forwarded-For header.
     /// </summary>
     private const string ForwardedForHeader = "X-Forwarded-For";
+
+    /// <summary>
+    /// The file name of the long-session fixture.
+    /// </summary>
+    private const string LongSessionFixture = "long-session.jsonl";
+
+    /// <summary>
+    /// The file name of the protocol 3 fixture with decoded trade routes.
+    /// </summary>
+    private const string TradeRoutesFixture = "protocol-3-trade-routes.jsonl";
+
+    /// <summary>
+    /// The pipe message type of a trade-routes frame (its first byte).
+    /// </summary>
+    private const byte TradeRoutesFrameType = 4;
 
     #endregion // Constants
 
@@ -709,6 +725,61 @@ public sealed class IngestEndpointTests
     }
 
     /// <summary>
+    /// A replay of the trade-routes fixture sent with the stored token leaves the 57 routes of the file's last trade-routes
+    /// frame as the profile's latest trade routes, in order with every value (the repeated name as two routes), under that
+    /// frame's recorded stamp.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC1")]
+    public async Task IngestEndpointReplaySentTradeRoutesFixtureStoresLastRoutes()
+    {
+        // Arrange
+        var dataDirectory = CreateTemporaryDirectory();
+        using var factory = new CensioServerFactory("Production", CreateDataDirectorySettings(dataDirectory));
+        var state = factory.Services.GetRequiredService<ServerState>();
+        await using var sender = CreateReplaySender(factory, dataDirectory);
+        var expected = await ReadLastFixtureTradeRoutesAsync(TradeRoutesFixture, sender.ProfileId);
+
+        // Act
+        await CreateFixtureRunner(sender, TradeRoutesFixture).RunAsync(TestContext.CancellationToken).WaitAsync(_replayBound, TestContext.CancellationToken);
+
+        var read = await state.ReadProfileStateAsync(sender.ProfileId, TestContext.CancellationToken);
+
+        // Assert
+        var stored = read.State?.LatestTradeRoutes;
+
+        Assert.HasCount(57, expected?.Routes ?? [], "The fixture's last trade-routes frame should hold 57 routes, or the comparison below would prove less");
+        Assert.HasCount(56, expected!.Routes.Select(route => route.Name).Distinct(StringComparer.Ordinal).ToList(), "One route name of the frame should be repeated, or the comparison below would prove less");
+        Assert.AreSequenceEqual(DescribeRoutes(expected), DescribeRoutes(stored), "The profile's latest trade routes should be the last frame's routes, in order with every value");
+        Assert.AreEqual(ReadLastTradeRoutesStamp(TradeRoutesFixture), stored?.ReceiveTime, "The latest trade routes should carry the last frame's recorded stamp");
+    }
+
+    /// <summary>
+    /// A replay of the trade-routes fixture counts only its ticks with islands as sent, none refused: the acknowledged
+    /// trade-routes messages count in neither number.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public async Task IngestEndpointReplaySentTradeRoutesFixtureCountsOnlyTicks()
+    {
+        // Arrange
+        var dataDirectory = CreateTemporaryDirectory();
+        using var factory = new CensioServerFactory("Production", CreateDataDirectorySettings(dataDirectory));
+        var expected = await CountFixtureTicksWithIslandsAsync(TradeRoutesFixture);
+        await using var sender = CreateReplaySender(factory, dataDirectory);
+        var runner = CreateFixtureRunner(sender, TradeRoutesFixture);
+
+        // Act
+        await runner.RunAsync(TestContext.CancellationToken).WaitAsync(_replayBound, TestContext.CancellationToken);
+
+        // Assert
+        Assert.IsGreaterThan(0, expected, "The fixture should have ticks with islands, or the test would prove less");
+        Assert.AreEqual($"Censio Companion: Replay finished: {expected} ticks sent, 0 refused", TrayMenu.FormatReplayToolTip(runner.Status), "Only the ticks should be counted as sent, and the acknowledged trade routes not as refused");
+    }
+
+    /// <summary>
     /// Returns the WebSocket address of the endpoint on the test server.
     /// </summary>
     /// <param name="factory">The server factory</param>
@@ -736,13 +807,14 @@ public sealed class IngestEndpointTests
     }
 
     /// <summary>
-    /// Creates a runner that replays the fixture at maximum speed into a sender.
+    /// Creates a runner that replays a fixture at maximum speed into a sender.
     /// </summary>
     /// <param name="sender">The sender</param>
+    /// <param name="fileName">The file name of the fixture</param>
     /// <returns>The runner</returns>
-    private static PipeReplayRunner CreateFixtureRunner(ReplaySender sender)
+    private static PipeReplayRunner CreateFixtureRunner(ReplaySender sender, string fileName = LongSessionFixture)
     {
-        return new PipeReplayRunner(() => File.OpenRead(FixturePath()), PipeReplaySpeed.Maximum, TimeProvider.System, NullLogger.Instance, sender);
+        return new PipeReplayRunner(() => File.OpenRead(FixturePath(fileName)), PipeReplaySpeed.Maximum, TimeProvider.System, NullLogger.Instance, sender);
     }
 
     /// <summary>
@@ -757,12 +829,43 @@ public sealed class IngestEndpointTests
     }
 
     /// <summary>
-    /// Returns the path of the pipe fixture.
+    /// Returns the path of a linked pipe fixture.
     /// </summary>
+    /// <param name="fileName">The file name of the fixture</param>
     /// <returns>The path</returns>
-    private static string FixturePath()
+    private static string FixturePath(string fileName = LongSessionFixture)
     {
-        return Path.Combine(AppContext.BaseDirectory, "Fixtures", "Pipe", "long-session.jsonl");
+        return Path.Combine(AppContext.BaseDirectory, "Fixtures", "Pipe", fileName);
+    }
+
+    /// <summary>
+    /// Reads the recorded stamp of the last trade-routes frame of a fixture from its lines.
+    /// </summary>
+    /// <param name="fileName">The file name of the fixture</param>
+    /// <returns>The stamp</returns>
+    private static DateTimeOffset ReadLastTradeRoutesStamp(string fileName)
+    {
+        var last = File.ReadLines(FixturePath(fileName))
+                       .Skip(1)
+                       .Select(line => JsonNode.Parse(line)!)
+                       .Last(line => Convert.FromBase64String(line["frame"]!.GetValue<string>())[0] == TradeRoutesFrameType);
+
+        return last["time"]!.GetValue<DateTimeOffset>();
+    }
+
+    /// <summary>
+    /// Describes the routes of a set of trade routes as text, one line per route in order with its stations in order.
+    /// </summary>
+    /// <param name="routes">The set, or <see langword="null" /></param>
+    /// <returns>The lines</returns>
+    private static List<string> DescribeRoutes(ContractTradeRoutes? routes)
+    {
+        if (routes is null)
+        {
+            return ["<no trade routes>"];
+        }
+
+        return [.. routes.Routes.Select(route => $"{route.Id} {route.Name} {route.Folder} {route.MajorProblems} {route.MinorProblems} {route.Ships} {route.LostShips} [{string.Join(" ", route.Stations.Select(station => $"{station.SessionGuid}/{station.IslandId}/{station.AreaIndex}"))}]")];
     }
 
     /// <summary>
@@ -1082,14 +1185,15 @@ public sealed class IngestEndpointTests
     }
 
     /// <summary>
-    /// Replays the fixture through the message reader and the tick assembler and counts its ticks with at least one island.
+    /// Replays a fixture through the message reader and the tick assembler and counts its ticks with at least one island.
     /// </summary>
+    /// <param name="fileName">The file name of the fixture</param>
     /// <returns>The number of ticks with islands</returns>
-    private async Task<int> CountFixtureTicksWithIslandsAsync()
+    private async Task<int> CountFixtureTicksWithIslandsAsync(string fileName = LongSessionFixture)
     {
         var clock = new PipeReplayClock(DateTimeOffset.UnixEpoch);
 
-        using var replay = new PipeReplayStream(File.OpenRead(FixturePath()), PipeReplaySpeed.Maximum, clock, TimeProvider.System);
+        using var replay = new PipeReplayStream(File.OpenRead(FixturePath(fileName)), PipeReplaySpeed.Maximum, clock, TimeProvider.System);
         using var assembler = new PipeTickAssembler(new PipeMessageReader(replay), clock);
 
         var count = 0;
@@ -1102,6 +1206,34 @@ public sealed class IngestEndpointTests
         }
 
         return count;
+    }
+
+    /// <summary>
+    /// Replays a fixture through the message reader and the tick assembler and gives its last trade-routes message as the
+    /// Companion converts it.
+    /// </summary>
+    /// <param name="fileName">The file name of the fixture</param>
+    /// <param name="profileId">The profile identity</param>
+    /// <returns>The converted message, or <see langword="null" /> when the fixture has none</returns>
+    private async Task<ContractTradeRoutes?> ReadLastFixtureTradeRoutesAsync(string fileName, Guid profileId)
+    {
+        var clock = new PipeReplayClock(DateTimeOffset.UnixEpoch);
+
+        using var replay = new PipeReplayStream(File.OpenRead(FixturePath(fileName)), PipeReplaySpeed.Maximum, clock, TimeProvider.System);
+        using var assembler = new PipeTickAssembler(new PipeMessageReader(replay), clock);
+
+        TradeRoutesMessage? last = null;
+        var result = await assembler.ReadAsync(TestContext.CancellationToken);
+
+        while (result.Kind != PipeTickResultKind.EndOfStream)
+        {
+            last = result.TradeRoutes ?? last;
+            result = await assembler.ReadAsync(TestContext.CancellationToken);
+        }
+
+        return last is null
+                   ? null
+                   : ContractMessageConverter.ToTradeRoutes(last, profileId, DateTimeOffset.UnixEpoch);
     }
 
     /// <summary>

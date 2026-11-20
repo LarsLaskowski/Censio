@@ -153,6 +153,16 @@ public sealed class ServerStateTests
     /// </summary>
     private const string IslandAfterDeletion = "Island after the deletion 6d0a";
 
+    /// <summary>
+    /// A trade route name.
+    /// </summary>
+    private const string RouteName = "Route name 5e1b";
+
+    /// <summary>
+    /// A trade route folder.
+    /// </summary>
+    private const string FolderName = "Folder name 3a7c";
+
     #endregion // Constants
 
     #region Fields
@@ -1864,6 +1874,228 @@ public sealed class ServerStateTests
     }
 
     /// <summary>
+    /// A newer trade-routes message of a held profile is stored, replaces the held set whole and tells the followers that
+    /// the profile's trade routes changed; the held tick and islands stay.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC4")]
+    public async Task ServerStateStoreTradeRoutesAsyncNewerReplacesHeldSetAndTellsFollowers()
+    {
+        // Arrange
+        var (_, state) = await OpenRestoredAsync(null);
+
+        var profileId = Guid.NewGuid();
+        var tick = CreateTick(profileId, 5, CreateIsland(1, IslandName, CreateEntry(1)));
+        var newer = CreateTradeRoutes(profileId, 20, CreateRoute(9, "Route of the newer message", string.Empty, [0, 1, 2, 3], CreateStation(2, 2, 0), CreateStation(1, 1, 0)));
+
+        await StoreTicksAsync(state, tick);
+        await StoreTradeRoutesAsync(state, CreateEveryValueTradeRoutes(profileId, 10));
+
+        var (notices, told) = Follow(state, 1);
+
+        // Act
+        var result = await state.StoreTradeRoutesAsync(newer, TestContext.CancellationToken);
+
+        // Assert
+        await told.WaitAsync(_waitBound, TestContext.CancellationToken);
+
+        var held = GetHeld(state, profileId);
+
+        Assert.AreEqual(ServerStoreOutcome.Stored, result.Outcome, "The newer set should be stored");
+        Assert.AreSequenceEqual(DescribeTradeRoutes(newer), DescribeTradeRoutes(held?.LatestTradeRoutes), "The newer set should replace the held one whole");
+        Assert.AreSequenceEqual(DescribeTick(tick), DescribeTick(held?.LatestTick), "The held tick should stay");
+        Assert.AreSequenceEqual(new[] { DescribeNotice(ServerStateChangeKind.TradeRoutes, profileId) }, notices.ToList(), "The followers should be told that the profile's trade routes changed");
+    }
+
+    /// <summary>
+    /// A trade-routes message older than the held set (by receive time) is answered as already stored, replaces nothing
+    /// in the held state or the store, and tells no follower.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC4")]
+    public async Task ServerStateStoreTradeRoutesAsyncOlderKeepsNewer()
+    {
+        // Arrange
+        var (store, state) = await OpenRestoredAsync(null);
+
+        var profileId = Guid.NewGuid();
+        var newer = CreateEveryValueTradeRoutes(profileId, 20);
+
+        await StoreTicksAsync(state, CreateTick(profileId, 5, CreateIsland(1, IslandName, CreateEntry(1))));
+        await StoreTradeRoutesAsync(state, newer);
+
+        var (notices, told) = Follow(state, 1);
+
+        // Act
+        var result = await state.StoreTradeRoutesAsync(CreateTradeRoutes(profileId, 10, CreateRoute(1, "Route of the older message", FolderName, [1, 1, 1, 1])), TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(ServerStoreOutcome.AlreadyStored, result.Outcome, "The older set should be answered as already stored");
+        Assert.AreSequenceEqual(DescribeTradeRoutes(newer), DescribeTradeRoutes(GetHeld(state, profileId)?.LatestTradeRoutes), "The held set should stay the newer one");
+        Assert.AreSequenceEqual(DescribeTradeRoutes(newer), DescribeTradeRoutes(await store.ReadTradeRoutesAsync(profileId, TestContext.CancellationToken)), "The stored set should stay the newer one");
+        await AssertOnlyLaterTickToldAsync(state, notices, told);
+    }
+
+    /// <summary>
+    /// A hello's name for a held profile with trade routes keeps the held set.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC4")]
+    public async Task ServerStateStoreProfileAsyncHelloKeepsHeldTradeRoutes()
+    {
+        // Arrange
+        var (_, state) = await OpenRestoredAsync(null);
+
+        var profileId = Guid.NewGuid();
+        var routes = CreateEveryValueTradeRoutes(profileId, 10);
+
+        await StoreTicksAsync(state, CreateTick(profileId, 5, CreateIsland(1, IslandName, CreateEntry(1))));
+        await StoreTradeRoutesAsync(state, routes);
+
+        // Act
+        await state.StoreProfileAsync(profileId, ProfileName, TestContext.CancellationToken);
+
+        // Assert
+        var held = GetHeld(state, profileId);
+
+        Assert.AreEqual(ProfileName, held?.Profile.Name, "The hello should name the held profile, or the check below would prove less");
+        Assert.AreSequenceEqual(DescribeTradeRoutes(routes), DescribeTradeRoutes(held?.LatestTradeRoutes), "The hello should keep the held trade routes");
+    }
+
+    /// <summary>
+    /// A newer tick of a held profile with trade routes, and an older one that names an island again (so the island list is
+    /// read again), both keep the held set.
+    /// </summary>
+    /// <param name="tickSeconds">The receive time of the tick, after (10) or before (1) the held tick at 5 s</param>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC4")]
+    [DataRow(10)]
+    [DataRow(1)]
+    public async Task ServerStateStoreTickAsyncNewerOrOlderTickKeepsHeldTradeRoutes(int tickSeconds)
+    {
+        // Arrange
+        var (_, state) = await OpenRestoredAsync(null);
+
+        var profileId = Guid.NewGuid();
+        var routes = CreateEveryValueTradeRoutes(profileId, 3);
+
+        await StoreTicksAsync(state, CreateTick(profileId, 5, CreateIsland(1, IslandName, CreateEntry(1))));
+        await StoreTradeRoutesAsync(state, routes);
+
+        // Act
+        await state.StoreTickAsync(CreateTick(profileId, tickSeconds, CreateIsland(1, IslandName, CreateEntry(2)), CreateIsland(2, "Island of the later stored tick", CreateEntry(3))), TestContext.CancellationToken);
+
+        // Assert
+        var held = GetHeld(state, profileId);
+
+        Assert.AreEqual(2, held?.Islands.Count, $"The held islands should list the tick's second island, so the state was rebuilt: tick at {tickSeconds} s");
+        Assert.AreSequenceEqual(DescribeTradeRoutes(routes), DescribeTradeRoutes(held?.LatestTradeRoutes), $"The tick should keep the held trade routes: tick at {tickSeconds} s");
+    }
+
+    /// <summary>
+    /// A state restored from the reopened file holds each held profile's latest trade routes as before the stop.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC6")]
+    public async Task ServerStateRestoreAsyncKeepsLatestTradeRoutes()
+    {
+        // Arrange
+        var databaseFile = CreateDatabaseFile();
+        var (_, before) = await OpenRestoredAsync(databaseFile);
+
+        var profileId = Guid.NewGuid();
+        var latest = CreateTradeRoutes(profileId, 20, CreateRoute(3, RouteName, FolderName, [4, 3, 2, 1], CreateStation(1, 1, 0)));
+
+        await StoreTicksAsync(before, CreateTick(profileId, 5, CreateIsland(1, IslandName, CreateEntry(1))));
+        await StoreTradeRoutesAsync(before, CreateEveryValueTradeRoutes(profileId, 10));
+        await StoreTradeRoutesAsync(before, latest);
+
+        var expected = DescribeTradeRoutes(GetHeld(before, profileId)?.LatestTradeRoutes);
+
+        CloseDatabases();
+
+        var (_, after) = await OpenAsync(databaseFile);
+
+        // Act
+        await after.RestoreAsync(TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreSequenceEqual(DescribeTradeRoutes(latest), expected, "The latest set should be held before the stop, or the comparison below would prove less");
+        Assert.AreSequenceEqual(expected, DescribeTradeRoutes(GetHeld(after, profileId)?.LatestTradeRoutes), "The restored state should hold the latest trade routes as before the stop");
+    }
+
+    /// <summary>
+    /// A profile that enters the held profiles by a tick holds its stored trade routes beside its island list.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC6")]
+    public async Task ServerStateStoreTickAsyncEnteringProfileReadsTradeRoutes()
+    {
+        // Arrange
+        var (store, state) = await OpenRestoredAsync(null);
+
+        Guid[] profiles = [Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()];
+        var routes = CreateEveryValueTradeRoutes(profiles[0], 15);
+
+        await StoreTicksAsync(state,
+                              CreateTick(profiles[0], 10, CreateIsland(1, IslandName, CreateEntry(1))),
+                              CreateTick(profiles[1], 20, CreateIsland(1, IslandName, CreateEntry(2))),
+                              CreateTick(profiles[2], 30, CreateIsland(1, IslandName, CreateEntry(3))));
+
+        // Written to the store alone, so only the entering read can bring the set into the held state
+        await store.StoreTradeRoutesAsync(routes, TestContext.CancellationToken);
+
+        var heldBefore = state.HeldProfiles.ToList();
+
+        // Act
+        await state.StoreTickAsync(CreateTick(profiles[0], 40, CreateIsland(1, IslandName, CreateEntry(4))), TestContext.CancellationToken);
+
+        // Assert
+        Assert.DoesNotContain(profiles[0], heldBefore, "The profile should not be held before its tick, or the test would prove less");
+        Assert.AreSequenceEqual(DescribeTradeRoutes(routes), DescribeTradeRoutes(GetHeld(state, profiles[0])?.LatestTradeRoutes), "The entering profile should hold its stored trade routes");
+    }
+
+    /// <summary>
+    /// A trade-routes message of a deleted profile creates it again without a name, as a tick does, and tells the
+    /// followers of the new profile and of its trade routes.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC6")]
+    public async Task ServerStateStoreTradeRoutesAsyncAfterDeletionCreatesUnnamedProfile()
+    {
+        // Arrange
+        var (store, state) = await OpenRestoredAsync(null);
+
+        var profileId = Guid.NewGuid();
+        var later = CreateEveryValueTradeRoutes(profileId, 20);
+
+        await state.StoreProfileAsync(profileId, ProfileName, TestContext.CancellationToken);
+        await StoreTicksAsync(state, CreateTick(profileId, 1, CreateIsland(1, IslandName, CreateEntry(1))));
+        await state.DeleteProfileAsync(profileId, TestContext.CancellationToken);
+
+        var (notices, told) = Follow(state, 2);
+
+        // Act
+        var result = await state.StoreTradeRoutesAsync(later, TestContext.CancellationToken);
+
+        // Assert
+        await told.WaitAsync(_waitBound, TestContext.CancellationToken);
+
+        Assert.AreEqual(ServerStoreOutcome.Stored, result.Outcome, "The set of the deleted profile should be stored");
+        Assert.AreSequenceEqual(new[] { DescribeProfile(profileId, null) }, DescribeProfiles(state.Profiles), "The profile should be listed again, without a name");
+        Assert.AreSequenceEqual(DescribeProfiles(await store.ListProfilesAsync(TestContext.CancellationToken)), DescribeProfiles(state.Profiles), "The profiles should be listed as the store lists them");
+        Assert.AreSequenceEqual(DescribeTradeRoutes(later), DescribeTradeRoutes(await store.ReadTradeRoutesAsync(profileId, TestContext.CancellationToken)), "The set should be stored for the profile created again");
+        Assert.AreSequenceEqual(new[] { DescribeNotice(ServerStateChangeKind.Profile, profileId), DescribeNotice(ServerStateChangeKind.TradeRoutes, profileId) }.Order(StringComparer.Ordinal).ToList(), notices.Order(StringComparer.Ordinal).ToList(), "The followers should be told of the new profile and of its trade routes");
+    }
+
+    /// <summary>
     /// Gives the receive time some seconds after the base receive time.
     /// </summary>
     /// <param name="seconds">The seconds</param>
@@ -2110,6 +2342,114 @@ public sealed class ServerStateTests
                    Reference = reference,
                    Png = Encoding.UTF8.GetBytes("png " + reference)
                };
+    }
+
+    /// <summary>
+    /// Creates a set of trade routes of a new identity.
+    /// </summary>
+    /// <param name="profileId">The profile identity</param>
+    /// <param name="receiveSeconds">The receive time in seconds after the base receive time</param>
+    /// <param name="routes">The routes</param>
+    /// <returns>The set</returns>
+    private static ContractTradeRoutes CreateTradeRoutes(Guid profileId, long receiveSeconds, params ContractTradeRoute[] routes)
+    {
+        return new ContractTradeRoutes
+               {
+                   Id = Guid.NewGuid(),
+                   ProfileId = profileId,
+                   ReceiveTime = ReceiveTime(receiveSeconds),
+                   Routes = routes
+               };
+    }
+
+    /// <summary>
+    /// Creates a set of trade routes of every value: a repeated route ID and name, an empty name and folder, counts at the
+    /// ends of the int32 range, lost ships above ships, repeated station keys and a route without stations.
+    /// </summary>
+    /// <param name="profileId">The profile identity</param>
+    /// <param name="receiveSeconds">The receive time in seconds after the base receive time</param>
+    /// <returns>The set</returns>
+    private static ContractTradeRoutes CreateEveryValueTradeRoutes(Guid profileId, long receiveSeconds)
+    {
+        return CreateTradeRoutes(profileId,
+                                 receiveSeconds,
+                                 CreateRoute(7, RouteName, FolderName, [3, 1, 2, 5], CreateStation(180023, 2, 0), CreateStation(-5, 255, 255), CreateStation(180023, 2, 0)),
+                                 CreateRoute(7, RouteName + " é€中", string.Empty, [int.MinValue, -1, int.MaxValue, 0]),
+                                 CreateRoute(-2, string.Empty, FolderName, [0, 0, 1, 0], CreateStation(1, 1, 0)));
+    }
+
+    /// <summary>
+    /// Creates a trade route.
+    /// </summary>
+    /// <param name="id">The route ID</param>
+    /// <param name="name">The route name</param>
+    /// <param name="folder">The folder</param>
+    /// <param name="counts">The major problems, minor problems, ships and lost ships</param>
+    /// <param name="stations">The stations</param>
+    /// <returns>The route</returns>
+    private static ContractTradeRoute CreateRoute(int id, string name, string folder, int[] counts, params ContractTradeRouteStation[] stations)
+    {
+        return new ContractTradeRoute
+               {
+                   Id = id,
+                   Name = name,
+                   Folder = folder,
+                   MajorProblems = counts[0],
+                   MinorProblems = counts[1],
+                   Ships = counts[2],
+                   LostShips = counts[3],
+                   Stations = stations
+               };
+    }
+
+    /// <summary>
+    /// Creates a station.
+    /// </summary>
+    /// <param name="sessionGuid">The session GUID</param>
+    /// <param name="islandId">The island ID</param>
+    /// <param name="areaIndex">The area index</param>
+    /// <returns>The station</returns>
+    private static ContractTradeRouteStation CreateStation(int sessionGuid, byte islandId, byte areaIndex)
+    {
+        return new ContractTradeRouteStation
+               {
+                   SessionGuid = sessionGuid,
+                   IslandId = islandId,
+                   AreaIndex = areaIndex
+               };
+    }
+
+    /// <summary>
+    /// Describes a set of trade routes as text: identity, profile and receive time, then one line per route in order with
+    /// its stations in order.
+    /// </summary>
+    /// <param name="routes">The set, or <see langword="null" /></param>
+    /// <returns>The lines</returns>
+    private static List<string> DescribeTradeRoutes(ContractTradeRoutes? routes)
+    {
+        if (routes is null)
+        {
+            return ["<no trade routes>"];
+        }
+
+        return
+        [
+            $"{routes.Id} {routes.ProfileId} {routes.ReceiveTime.UtcTicks} {routes.ReceiveTime.Offset}",
+            .. routes.Routes.Select(route => $"{route.Id} {route.Name.Length}:{route.Name} {route.Folder.Length}:{route.Folder} {route.MajorProblems} {route.MinorProblems} {route.Ships} {route.LostShips} [{string.Join(" ", route.Stations.Select(station => $"{station.SessionGuid}/{station.IslandId}/{station.AreaIndex}"))}]")
+        ];
+    }
+
+    /// <summary>
+    /// Gives the held state of a profile.
+    /// </summary>
+    /// <param name="state">The server state</param>
+    /// <param name="profileId">The profile identity</param>
+    /// <returns>The held state, or <see langword="null" /> when the profile is not held</returns>
+    private static StoredProfileState? GetHeld(ServerState state, Guid profileId)
+    {
+        return state.TryGetHeld(profileId, out var held)
+                   ? held
+                   : null;
     }
 
     /// <summary>
@@ -2420,6 +2760,25 @@ public sealed class ServerStateTests
             if (result.Outcome != ServerStoreOutcome.Stored)
             {
                 throw new InvalidOperationException($"The test tick was not stored: {result.Outcome}", result.Failure);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Stores sets of trade routes in order and fails on a set not stored.
+    /// </summary>
+    /// <param name="state">The server state</param>
+    /// <param name="sets">The sets</param>
+    /// <returns>A task that represents the asynchronous operation</returns>
+    private async Task StoreTradeRoutesAsync(ServerState state, params ContractTradeRoutes[] sets)
+    {
+        foreach (var routes in sets)
+        {
+            var result = await state.StoreTradeRoutesAsync(routes, TestContext.CancellationToken);
+
+            if (result.Outcome != ServerStoreOutcome.Stored)
+            {
+                throw new InvalidOperationException($"The test trade routes were not stored: {result.Outcome}", result.Failure);
             }
         }
     }
