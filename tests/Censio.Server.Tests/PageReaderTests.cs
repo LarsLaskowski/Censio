@@ -389,6 +389,7 @@ public sealed class PageReaderTests : IDisposable
     {
         return new StoredProfileState
                {
+                   LatestTradeRoutes = null,
                    Profile = new StoredProfile
                              {
                                  Id = profileId,

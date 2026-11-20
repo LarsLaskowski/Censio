@@ -218,7 +218,8 @@ public sealed class ServerStore
                                     {
                                         Profile = profile,
                                         LatestTick = latestTick,
-                                        Islands = islands
+                                        Islands = islands,
+                                        LatestTradeRoutes = null
                                     };
                          },
                          cancellationToken);
@@ -250,6 +251,31 @@ public sealed class ServerStore
                                               },
                                               cancellationToken);
     }
+
+    // Skeleton: removed with the implementation
+#pragma warning disable RH2003, S2325
+    /// <summary>
+    /// Stores the trade routes of a profile, replacing the earlier ones.
+    /// </summary>
+    /// <param name="routes">The trade routes</param>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>The store result</returns>
+    public Task<ServerStoreResult> StoreTradeRoutesAsync(ContractTradeRoutes routes, CancellationToken cancellationToken)
+    {
+        throw new NotImplementedException();
+    }
+
+    /// <summary>
+    /// Reads the latest trade routes of a profile.
+    /// </summary>
+    /// <param name="profileId">The profile identity</param>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>The trade routes, or <see langword="null"/> when none are stored</returns>
+    public Task<ContractTradeRoutes?> ReadTradeRoutesAsync(Guid profileId, CancellationToken cancellationToken)
+    {
+        throw new NotImplementedException();
+    }
+#pragma warning restore RH2003, S2325
 
     /// <summary>
     /// Stores the catalog, replacing an earlier one.

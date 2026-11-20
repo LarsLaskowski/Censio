@@ -233,7 +233,8 @@ public sealed partial class ServerState : IProfileStateSource
                                            {
                                                Profile = profile,
                                                LatestTick = current.State.LatestTick,
-                                               Islands = current.State.Islands
+                                               Islands = current.State.Islands,
+                                               LatestTradeRoutes = null
                                            },
                                    ReceiveTicks = current.ReceiveTicks,
                                    Sequence = current.Sequence
@@ -857,7 +858,8 @@ public sealed partial class ServerState : IProfileStateSource
                                            {
                                                Profile = current.State.Profile,
                                                LatestTick = tick,
-                                               Islands = MergeIslands(current.State.Islands, tick)
+                                               Islands = MergeIslands(current.State.Islands, tick),
+                                               LatestTradeRoutes = null
                                            },
                                    ReceiveTicks = receiveTicks,
                                    Sequence = ++_sequence
@@ -876,7 +878,8 @@ public sealed partial class ServerState : IProfileStateSource
                                              {
                                                  Profile = current.State.Profile,
                                                  LatestTick = current.State.LatestTick,
-                                                 Islands = listed
+                                                 Islands = listed,
+                                                 LatestTradeRoutes = null
                                              },
                                      ReceiveTicks = current.ReceiveTicks,
                                      Sequence = current.Sequence
@@ -910,7 +913,8 @@ public sealed partial class ServerState : IProfileStateSource
                                  {
                                      Profile = profiles[FindProfile(profiles, tick.ProfileId)],
                                      LatestTick = tick,
-                                     Islands = islands
+                                     Islands = islands,
+                                     LatestTradeRoutes = null
                                  },
                          ReceiveTicks = receiveTicks,
                          Sequence = ++_sequence

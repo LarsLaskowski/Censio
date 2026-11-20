@@ -355,7 +355,8 @@ public sealed class ProfileViewBuilderTests
                                  Name = "Profile 7f3c"
                              },
                    LatestTick = tick,
-                   Islands = listed
+                   Islands = listed,
+                   LatestTradeRoutes = null
                };
     }
 

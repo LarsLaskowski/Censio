@@ -1208,6 +1208,7 @@ public sealed class RegionsTests
 
         return new StoredProfileState
                {
+                   LatestTradeRoutes = null,
                    Profile = new StoredProfile
                              {
                                  Id = profileId,
