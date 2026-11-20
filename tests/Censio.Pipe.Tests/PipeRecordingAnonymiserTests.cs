@@ -1272,20 +1272,43 @@ public sealed class PipeRecordingAnonymiserTests
     }
 
     /// <summary>
-    /// A trade-route or item-offer frame without its count or with a negative count is refused with its line.
+    /// A malformed trade-route or item-offer frame is refused with its line: a count missing, negative or beyond the
+    /// frame at the route, station, goods, offer and item level, and a short route field.
     /// </summary>
-    /// <param name="frame">The malformed frame</param>
+    /// <param name="type">The type byte of the reference frame</param>
+    /// <param name="offset">The offset of the count written anew</param>
+    /// <param name="value">The count written at the offset</param>
+    /// <param name="length">The length the frame is cut to</param>
     /// <returns>The task</returns>
     [TestMethod]
-    [TestCategory("AC5")]
-    [DataRow(new byte[] { 4 })]
-    [DataRow(new byte[] { 4, 1, 0, 0 })]
-    [DataRow(new byte[] { 5, 1, 0, 0 })]
-    [DataRow(new byte[] { 4, 0xFF, 0xFF, 0xFF, 0xFF })]
-    [DataRow(new byte[] { 5, 0, 0, 0, 0x80 })]
-    public async Task PipeRecordingAnonymiserMalformedTradeRoutesIsRefused(byte[] frame)
+    [TestCategory("AC10")]
+    [DataRow((byte)4, 1, 1, 1)]
+    [DataRow((byte)4, 1, 1, 4)]
+    [DataRow((byte)4, 1, -1, 71)]
+    [DataRow((byte)4, 1, int.MinValue, 71)]
+    [DataRow((byte)4, 1, 2, 71)]
+    [DataRow((byte)4, 1, 1, 36)]
+    [DataRow((byte)4, 38, 1, 40)]
+    [DataRow((byte)4, 38, -1, 71)]
+    [DataRow((byte)4, 38, 2, 71)]
+    [DataRow((byte)4, 58, 1, 60)]
+    [DataRow((byte)4, 58, -1, 71)]
+    [DataRow((byte)4, 58, 2, 71)]
+    [DataRow((byte)5, 1, 1, 4)]
+    [DataRow((byte)5, 1, -1, 17)]
+    [DataRow((byte)5, 1, 2, 17)]
+    [DataRow((byte)5, 9, 1, 11)]
+    [DataRow((byte)5, 9, -1, 17)]
+    [DataRow((byte)5, 9, 2, 17)]
+    public async Task PipeRecordingAnonymiserMalformedTradeRoutesOrItemOffersAreRefused(byte type, int offset, int value, int length)
     {
         // Arrange
+        var reference = ReferenceTradeFrame(type);
+
+        Assert.HasCount(type == 4 ? 71 : 17, reference, "The reference frame should have the layout the offsets assume");
+        Assert.AreEqual(PipeReadResultKind.Message, PipeMessageParser.Parse(reference).Kind, "The reference frame should be well formed");
+
+        var frame = WithInt(reference, offset, value)[..length];
         var recording = RecordingOf(_version3, frame, _sessionEnd);
 
         // Act
@@ -1984,6 +2007,37 @@ public sealed class PipeRecordingAnonymiserTests
     private static byte[] TradeRoutesFrame(params TradeRoute[] routes)
     {
         return new PipeFrameBuilder().Byte(4).TradeRoutes(routes).Build();
+    }
+
+    /// <summary>
+    /// Creates a well-formed frame of one element per level. Type 4: one route (station count at 38) of one station (goods
+    /// count at 58) of one good, 71 bytes. Type 5: one offer (item count at 9) of one item, 17 bytes. The top count is at 1.
+    /// </summary>
+    /// <param name="type">The type byte, 4 or 5</param>
+    /// <returns>The frame</returns>
+    private static byte[] ReferenceTradeFrame(byte type)
+    {
+        var station = StationOf(11, 200, 1, (false, false, false), GoodOf(1010, 5, true));
+
+        return type == (byte)PipeMessageType.TradeRoutes
+                   ? TradeRoutesFrame(TradeRouteOf(7, "Route", "Folder", _noCounts, station))
+                   : new PipeFrameBuilder().Byte(5).ItemOffers([OfferOf(8, 1000)]).Build();
+    }
+
+    /// <summary>
+    /// Overwrites a little-endian 32-bit integer of a frame.
+    /// </summary>
+    /// <param name="frame">The frame</param>
+    /// <param name="offset">The offset of the integer</param>
+    /// <param name="value">The new value</param>
+    /// <returns>A copy of the frame with the new value</returns>
+    private static byte[] WithInt(byte[] frame, int offset, int value)
+    {
+        var copy = frame.ToArray();
+
+        BinaryPrimitives.WriteInt32LittleEndian(copy.AsSpan(offset), value);
+
+        return copy;
     }
 
     /// <summary>
