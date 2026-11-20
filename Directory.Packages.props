@@ -6,14 +6,14 @@
   </PropertyGroup>
   <ItemGroup>
     <!-- Code analysis (every project); reihitsu.cli in .config/dotnet-tools.json stays at the analyzer's version -->
-    <PackageVersion Include="Reihitsu.Analyzer" Version="1.2.0" />
-    <PackageVersion Include="SonarAnalyzer.CSharp" Version="10.36.0.15337" />
+    <PackageVersion Include="Reihitsu.Analyzer" Version="1.4.0" />
+    <PackageVersion Include="SonarAnalyzer.CSharp" Version="10.37.0.15768" />
     <PackageVersion Include="MSTest.Analyzers" Version="4.5.3" />
     <!-- Tests (every project whose name ends in .Tests) -->
     <PackageVersion Include="MSTest.TestFramework" Version="4.5.3" />
     <PackageVersion Include="MSTest.TestAdapter" Version="4.5.3" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.12.0" />
-    <PackageVersion Include="coverlet.collector" Version="10.1.0" />
+    <PackageVersion Include="coverlet.collector" Version="10.1.1" />
     <!-- Test projects that need them -->
     <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="11.0.0" />
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="11.0.0" />
@@ -22,6 +22,6 @@
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="11.0.0" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="11.0.0" />
     <!-- Web UI (Censio.Server) -->
-    <PackageVersion Include="MudBlazor" Version="9.13.0" />
+    <PackageVersion Include="MudBlazor" Version="9.14.0" />
   </ItemGroup>
 </Project>
