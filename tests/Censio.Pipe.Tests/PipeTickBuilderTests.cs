@@ -619,14 +619,11 @@ public sealed class PipeTickBuilderTests
     }
 
     /// <summary>
-    /// A trade-routes or item-offers message produces no item and leaves the open tick open.
+    /// An item-offers message produces no item and leaves the open tick open.
     /// </summary>
-    /// <param name="messageType">The type of the message, trade routes or item offers</param>
     [TestMethod]
     [TestCategory("AC7")]
-    [DataRow(PipeMessageType.TradeRoutes)]
-    [DataRow(PipeMessageType.ItemOffers)]
-    public void PipeTickBuilderTradeRoutesOrItemOffersKeepOpenTick(PipeMessageType messageType)
+    public void PipeTickBuilderItemOffersKeepOpenTick()
     {
         // Arrange
         var builder = new PipeTickBuilder();
@@ -634,22 +631,50 @@ public sealed class PipeTickBuilderTests
         builder.Add(Frame(_ostia, "Ostia", 100), At(0));
 
         // Act
-        var results = builder.Add(PipeReadResult.FromMessage(CreateTradeRoutesOrItemOffers(messageType)), At(1));
+        var results = builder.Add(PipeReadResult.FromMessage(CreateTradeRoutesOrItemOffers(PipeMessageType.ItemOffers)), At(1));
 
         // Assert
-        Assert.IsEmpty(results, $"A {messageType} message should produce no item");
+        Assert.IsEmpty(results, "An item-offers message should produce no item");
         Assert.AreEqual(At(0) + PipeTickLimits.QuietPeriod, builder.QuietDeadline, "The tick of the island should stay open");
     }
 
     /// <summary>
-    /// A trade-routes or item-offers message just before the quiet deadline does not restart the quiet period.
+    /// A trade-routes message delivers one trade-routes item that carries the message itself, and leaves the open tick
+    /// open with its deadline (spec AC1).
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC1")]
+    public void PipeTickBuilderTradeRoutesDeliversItemAndKeepsOpenTick()
+    {
+        // Arrange
+        var builder = new PipeTickBuilder();
+        var message = CreateTradeRoutesOrItemOffers(PipeMessageType.TradeRoutes);
+
+        builder.Add(Frame(_ostia, "Ostia", 100), At(0));
+
+        // Act
+        var results = builder.Add(PipeReadResult.FromMessage(message), At(1));
+
+        // Assert
+        Assert.HasCount(1, results, "A trade-routes message should deliver one item");
+        Assert.AreEqual(PipeTickResultKind.TradeRoutes, results[0].Kind, "The item should be a trade-routes item");
+        Assert.AreSame(message, results[0].TradeRoutes, "The item should carry the trade-routes message unchanged");
+        Assert.IsNull(results[0].Tick, "The trade-routes item should close no tick");
+        Assert.AreEqual(At(0) + PipeTickLimits.QuietPeriod, builder.QuietDeadline, "The tick of the island should stay open");
+    }
+
+    /// <summary>
+    /// A trade-routes or item-offers message just before the quiet deadline does not restart the quiet period; trade routes
+    /// deliver their one item, item offers none.
     /// </summary>
     /// <param name="messageType">The type of the message, trade routes or item offers</param>
+    /// <param name="items">The number of items the message delivers</param>
     [TestMethod]
+    [TestCategory("AC1")]
     [TestCategory("AC7")]
-    [DataRow(PipeMessageType.TradeRoutes)]
-    [DataRow(PipeMessageType.ItemOffers)]
-    public void PipeTickBuilderTradeRoutesOrItemOffersDoNotRestartQuietPeriod(PipeMessageType messageType)
+    [DataRow(PipeMessageType.TradeRoutes, 1)]
+    [DataRow(PipeMessageType.ItemOffers, 0)]
+    public void PipeTickBuilderTradeRoutesOrItemOffersDoNotRestartQuietPeriod(PipeMessageType messageType, int items)
     {
         // Arrange
         var builder = new PipeTickBuilder();
@@ -662,7 +687,7 @@ public sealed class PipeTickBuilderTests
         var results = builder.Add(PipeReadResult.FromMessage(CreateTradeRoutesOrItemOffers(messageType)), beforeDeadline);
 
         // Assert
-        Assert.IsEmpty(results, $"A {messageType} message before the deadline should produce no item");
+        Assert.HasCount(items, results, $"A {messageType} message before the deadline should deliver only its own items");
         Assert.AreEqual(At(2) + PipeTickLimits.QuietPeriod, builder.QuietDeadline, "The deadline should still follow the last island");
     }
 

@@ -805,7 +805,7 @@ public sealed class TrayMenuTests
     [DataRow(ReplaySendProblemKind.ServerUnreachable, "server unreachable")]
     [DataRow(ReplaySendProblemKind.TokenRefused, "token refused")]
     [DataRow(ReplaySendProblemKind.CompanionConnected, "another Companion is connected")]
-    [DataRow(ReplaySendProblemKind.VersionNotSupported, "server does not support contract version 1")]
+    [DataRow(ReplaySendProblemKind.VersionNotSupported, "server does not support contract version 2")]
     [DataRow(ReplaySendProblemKind.NoAnswer, "server does not answer")]
     [DataRow(ReplaySendProblemKind.ConnectionLost, "server connection lost")]
     [DataRow(ReplaySendProblemKind.InvalidReply, "invalid server reply")]
@@ -825,6 +825,30 @@ public sealed class TrayMenuTests
         // Assert
         Assert.AreEqual("Censio Companion: Replay error: " + reason, toolTip, $"The tooltip should name the reason of {kind}");
         Assert.AreEqual(reason, TrayMenu.FormatReplaySendReason(kind), $"The reason of {kind} should be its text");
+    }
+
+    /// <summary>
+    /// A replay a server refused for its version names contract version 2, the only version this build sends, in the
+    /// tooltip and in the reason.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC8")]
+    public void TrayMenuVersionNotSupportedNamesVersionTwo()
+    {
+        // Arrange
+        var status = new PipeReplayStatus
+                     {
+                         State = PipeConnectionState.Receiving,
+                         IsFinished = true,
+                         SendProblem = ReplaySendProblemKind.VersionNotSupported
+                     };
+
+        // Act
+        var toolTip = TrayMenu.FormatReplayToolTip(status);
+
+        // Assert
+        Assert.AreEqual("Censio Companion: Replay error: server does not support contract version 2", toolTip, "The tooltip should name contract version 2");
+        Assert.AreEqual("server does not support contract version 2", TrayMenu.FormatReplaySendReason(ReplaySendProblemKind.VersionNotSupported), "The reason should name contract version 2");
     }
 
     /// <summary>

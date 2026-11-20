@@ -3,7 +3,7 @@
 ## Scope
 
 The server's data pages: the region overview, the island list of a region, the island detail with its goods table, the
-key figures, names and their fallbacks, the number and time formats, the row and profile limits, the live updates, the
+trade routes of a profile, the key figures, names and their fallbacks, the number and time formats, the row and profile limits, the live updates, the
 as-of line and the banner, the addresses and their failures, the bounded reads of profiles, the icon route, deleting a
 profile's history with the host rule that guards it, and what is logged. The good's page and the charts have their own
 document, [`web-charts.md`](web-charts.md); this one holds their route, address and logging rules. Users of the web
@@ -13,7 +13,7 @@ application rely on it.
 
 ### Pages and routes
 
-- Five routes show data, all inside the frame of [`web-ui.md`](web-ui.md), none needs a login ([record 0006](../decisions/0006-server-plain-http-and-open-health.md); only the deletion of a profile's history has a rule of its own, *Deleting a profile's history*):
+- Seven routes show data, all inside the frame of [`web-ui.md`](web-ui.md), none needs a login ([record 0006](../decisions/0006-server-plain-http-and-open-health.md); only the deletion of a profile's history has a rule of its own, *Deleting a profile's history*):
 
   | Route | Page |
   | ----- | ---- |
@@ -22,6 +22,8 @@ application rely on it.
   | `/profiles/{profile}/sessions/{session}` | the island list of the region that holds the session |
   | `/profiles/{profile}/islands/{session}/{island}/{area}` | the goods of one island |
   | `/profiles/{profile}/islands/{session}/{island}/{area}/goods/{good}` | the trend charts of one good on one island ([`web-charts.md`](web-charts.md)) |
+  | `/trade-routes` | the trade routes of the profile whose latest tick is newest; it follows that profile live |
+  | `/profiles/{profile}/trade-routes` | the trade routes of the named profile |
 
 - The profile in an address is a picked profile: it stays until another is picked, and every link a page offers carries
   the profile the page shows, so a reload and a copied address show the same profile ([record 0077](../decisions/0077-page-address-carries-the-shown-profile.md)).
@@ -29,7 +31,8 @@ application rely on it.
   address, whichever of its sessions that is.
 - The browser's tab title of every page is `Censio – <heading>`. The heading is the page's `h1`: `Regions` / `Regionen`
   on the overview, the region's name on the island list, the island's name on the detail, the good's shown name on the
-  good's page, and `Regions` / `Regionen` while the page shows no data, a loading text or an error text.
+  good's page, `Trade routes` / `Handelsrouten` on the trade-routes page, and `Regions` / `Regionen` while one of the other pages shows
+  no data, a loading text or an error text.
 - Every name is shown as text, never as markup.
 
 ### Regions
@@ -92,6 +95,37 @@ application rely on it.
 - An island the latest tick has no values for (it lacks the island, or the tick is empty) keeps its heading and shows
   `No values for this island in the latest tick.` / `Keine Werte für diese Insel im letzten Tick.` instead of the table.
 
+### Trade routes
+
+- The page `Trade routes` / `Handelsrouten` lists the routes of the profile's latest trade-routes message, the only set
+  the server keeps ([`server-state.md`](server-state.md), [record 0097](../decisions/0097-latest-trade-routes-per-profile-stored-as-rows-on-a-page-of-their-own.md)).
+  It has no history, chart or detail page and no `Delete history` button.
+- Top to bottom: the heading `Trade routes` / `Handelsrouten` (tab title `Censio – Trade routes` / `Censio – Handelsrouten`);
+  in the ready state the profile's shown name as on the region overview; the Companion banner and, when the profile has
+  received trade routes (an empty set included), the as-of line; then the status text of the page ([*Texts of a page that shows no figures*](#texts-of-a-page-that-shows-no-figures)),
+  or `No trade routes received yet.` / `Noch keine Handelsrouten empfangen.` for a profile that never received trade
+  routes (a protocol 2 game, or a profile of a release before trade routes), or `No trade routes in the latest data.` /
+  `Keine Handelsrouten in den letzten Daten.` when the latest message holds no route, or a summary line and the table.
+- The summary line reads `<n> trade routes, <p> with problems or lost ships.` / `<n> Handelsrouten, <p> mit Problemen oder
+  verlorenen Schiffen.` (`1 trade route, …` / `1 Handelsroute, …` for one route), `<n>` the routes and `<p>` those whose major
+  problems, minor problems or lost ships are above 0; both numbers are grouped as *Number formats* says.
+- The table has the columns `Route`, `Folder`, `Ships`, `Lost ships`, `Major problems`, `Minor problems`, `Stations` (German
+  `Route`, `Ordner`, `Schiffe`, `Verlorene Schiffe`, `Große Probleme`, `Kleine Probleme`, `Stationen`), a dense table with a hover
+  row. The four counts are right-aligned whole numbers, shown as received (also lost ships above ships and a negative
+  count); lost ships, major problems and minor problems above 0 take the palette's `Error` colour, the number itself
+  carrying the meaning without the colour (ships take none). The routes are ordered by major problems, minor problems and
+  lost ships, each descending, then by shown name (ordinal, letter case ignored), folder (ordinal) and ID, so the routes with
+  problems come first. Two routes of one name or ID are two rows; nothing is merged.
+- A route with an empty name is `Unnamed route` / `Unbenannte Route`, an empty folder is `–`. The stations cell lists the
+  route's stations in the order read, each by the name the profile's island list holds (the name of the latest tick for an
+  island the list lacks, an empty name as `Unnamed island` / `Unbenannte Insel`), separated by ` → `; a station whose island
+  neither names is `Island <session GUID>/<island ID>/<area index>` / `Insel …`; a route without stations shows `–`.
+  A station that appears twice in a route is listed twice.
+- Every name is rendered as text of its own, never as markup, also a route or folder name that looks like markup.
+- **As-of exception.** The time of the as-of line on this page is the receive time of the trade-routes message shown, not
+  of the profile's latest tick (*As-of line and banner*); a profile without trade routes shows no line, only the banner.
+- `/trade-routes` while no profile has a tick shows the `No data yet.` text; the page of a named profile that exists needs no tick.
+
 ### Number formats
 
 - Production and consumption: two decimals with grouped thousands, `1,234.50` in English and `1.234,50` in German.
@@ -108,7 +142,8 @@ application rely on it.
 
 ### As-of line and banner
 
-- Every data page shows `As of <time>` / `Stand: <time>` for the receive time of the shown profile's latest tick, as
+- Every data page shows `As of <time>` / `Stand: <time>` for the receive time of the shown profile's latest tick (the trade-routes
+  page: of its latest trade-routes message, *Trade routes*), as
   `yyyy-MM-dd HH:mm` in both languages, at the UTC offset the browser gives for that instant, without a suffix.
   Until the browser's first answer the line is an empty paragraph (one no-break space, so the table below does not
   move): no time, no `As of` / `Stand:`, no ` UTC`. When the browser's answer is unusable (a failed call, an answer
@@ -147,7 +182,10 @@ text and is not retried until the page is loaded again: a notice of the server s
 
 - A page follows the server state ([`server-state.md`](server-state.md), *Followers and notices*) and shows a stored
   tick of its profile, a stored catalog or icon and a hello that renames the profile without a reload. A tick of another
-  profile leaves a page unchanged.
+  profile leaves a page unchanged. A stored trade-routes message is told as a notice of its own (`TradeRoutes`): only the
+  trade-routes page of its profile reads again and shows the new set without a reload (an older message replaces nothing,
+  so nothing is told); every other page ignores the notice, so the messages that arrive about every two minutes cause no
+  read of their trends.
 - The region overview without a picked profile shows the profile with the newest latest tick and follows it: when a tick
   makes another profile the newest, it shows that one.
 - A notice during a read causes one more read afterwards, so a page that falls behind ends at the newest state and skips
@@ -232,7 +270,7 @@ value ([`server-state.md`](server-state.md), *Logging*); a failed read of a char
   island and the area a byte of at most ten digits, all digits ASCII, nothing else. Any other segment, of any length
   and with any characters, is not found.
 - The good of the good's page is a session-style integer: at most ten ASCII digits with an optional leading minus.
-- `Not found.` is shown for an address that matches one of the five routes but names a profile, region, island or good
+- `Not found.` is shown for an address that matches one of the seven routes but names a profile, region, island or good
   that is malformed, or a profile, region or island that is unknown (a well-formed good the island never carried is not
   unknown, [`web-charts.md`](web-charts.md)). The address is neither echoed nor logged. A path that matches none of the routes keeps the
   empty `404` of [`server.md`](server.md), because the router has no content for it.
@@ -258,6 +296,27 @@ value ([`server-state.md`](server-state.md), *Logging*); a failed read of a char
   from this reader ([`web-charts.md`](web-charts.md), *The reads*); a page keeps the points of its charts besides the view,
   and the island list and the goods table keep their trends: at most 240 samples for each shown row, which are at most 500
   goods or the region's islands ([`web-trends.md`](web-trends.md), *Limits and errors*).
+- Only the trade-routes page keeps the profile's routes: its view holds one stop per station of the set (at most 52,428,
+  [`contract.md`](contract.md), *Bounds*) with the island name of the name map as that map holds it, not a copy; the reader
+  and the view builder build routes only when the page asks (a flag), so the view of every other page keeps none. The page
+  renders each station's name and each separator as a text of its own, so its render tree grows with the stations. Measured
+  at the bounds (1,024 routes, 52,428 stations over 256 islands, route, folder and island names of 765 ASCII characters),
+  .NET 11, Release, retained managed memory by `GC.GetTotalMemory(true)` after forced collections, a throwaway test outside
+  the repository:
+
+  | Case | Retained |
+  | ---- | -------- |
+  | The derived view of the page, built from the held state (the same view without routes: 0.02 MiB, the names shared with the state) | 2.27 MiB |
+  | One open tab after its first render (view and render tree), in a process that had rendered no such page | 30.0 MiB |
+  | The same tab right after a live update that rendered it again (the previous tree stays until the next render) | 56.1 MiB |
+  | Six open tabs after live updates, the figure the second and third update left unchanged, in each of three runs | 184.2 MiB, 30.7 MiB a tab |
+  | The same six tabs closed | 154 MiB over the heap before they opened |
+
+  The page was rendered by a minimal `Renderer` that discards each batch, over the real services (bUnit's renderer keeps the
+  markup too). Closed tabs give their memory back slowly: the runtime's array pool keeps the arrays of the render trees. The
+  plan's estimate was 5 MB for the view and 9 MB a tab; a tab needs 3 to 6 times that. Not measured: the batches a circuit
+  keeps until the browser acknowledges them. Like a page's island list (record 0074), the number of open tabs is not bounded
+  by the server; the risk is accepted in [record 0097](../decisions/0097-latest-trade-routes-per-profile-stored-as-rows-on-a-page-of-their-own.md).
 - The bytes of an icon stay in memory after the icon read is released, until the response is written: up to 17,825,792
   bytes for each request in flight ([`contract.md`](contract.md), *Bounds*). The number of requests in flight is not
   limited, like the uploads of an accepted risk of [`ingest.md`](ingest.md) (*Accepted risks*).
@@ -283,6 +342,7 @@ value ([`server-state.md`](server-state.md), *Logging*); a failed read of a char
 - [`decisions/0076-icons-served-by-content-hash-after-a-png-header-check.md`](../decisions/0076-icons-served-by-content-hash-after-a-png-header-check.md) — icons are served by their content hash after a PNG header check.
 - [`decisions/0077-page-address-carries-the-shown-profile.md`](../decisions/0077-page-address-carries-the-shown-profile.md) — the page address carries the shown profile.
 - [`decisions/0078-times-shown-at-the-browsers-utc-offset.md`](../decisions/0078-times-shown-at-the-browsers-utc-offset.md) — times are shown at the browser's UTC offset for the instant.
+- [`decisions/0097-latest-trade-routes-per-profile-stored-as-rows-on-a-page-of-their-own.md`](../decisions/0097-latest-trade-routes-per-profile-stored-as-rows-on-a-page-of-their-own.md) — the latest trade routes of a profile on a page of their own, ignored by the other pages.
 - [`decisions/0085-deletion-only-from-pages-opened-by-a-trusted-host.md`](../decisions/0085-deletion-only-from-pages-opened-by-a-trusted-host.md) — the deletion of a profile's history only from a page opened by a trusted host.
 - [`decisions/0086-charts-drawn-with-mudblazors-own-time-series-chart.md`](../decisions/0086-charts-drawn-with-mudblazors-own-time-series-chart.md) — the charts of the good's page and the island overview are MudBlazor's own time-series chart.
 

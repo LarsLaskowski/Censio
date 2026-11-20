@@ -12,7 +12,7 @@ public static class ContractReader
     /// <summary>
     /// The only contract version this build reads and writes.
     /// </summary>
-    public const int CurrentVersion = 1;
+    public const int CurrentVersion = 2;
 
     /// <summary>
     /// The largest message in bytes.
@@ -58,6 +58,26 @@ public static class ContractReader
     /// The most missing icons in an acknowledgement.
     /// </summary>
     public const int MaxMissingIcons = 16384;
+
+    /// <summary>
+    /// The most trade routes in a trade-routes message.
+    /// </summary>
+    public const int MaxTradeRoutes = 1024;
+
+    /// <summary>
+    /// The most stations of one trade route.
+    /// </summary>
+    public const int MaxStationsPerRoute = 256;
+
+    /// <summary>
+    /// The most stations in a trade-routes message.
+    /// </summary>
+    public const int MaxStations = 52428;
+
+    /// <summary>
+    /// The largest route or folder name in UTF-8 bytes.
+    /// </summary>
+    public const int MaxRouteNameBytes = 765;
 
     #endregion // Constants
 
@@ -160,6 +180,7 @@ public static class ContractReader
                      ContractSessionEnd sessionEnd => sessionEnd.Id,
                      ContractCatalogUpload catalogUpload => catalogUpload.Id,
                      ContractIconImage iconImage => iconImage.Id,
+                     ContractTradeRoutes tradeRoutes => tradeRoutes.Id,
                      _ => Guid.Empty
                  };
 
@@ -188,6 +209,7 @@ public static class ContractReader
                        ContractMessageType.SessionEnd => JsonSerializer.Deserialize(utf8Json, ContractJsonContext.Default.ContractSessionEnd),
                        ContractMessageType.Status => JsonSerializer.Deserialize(utf8Json, ContractJsonContext.Default.ContractStatus),
                        ContractMessageType.Acknowledgement => JsonSerializer.Deserialize(utf8Json, ContractJsonContext.Default.ContractAcknowledgement),
+                       ContractMessageType.TradeRoutes => JsonSerializer.Deserialize(utf8Json, ContractJsonContext.Default.ContractTradeRoutes),
                        _ => null
                    };
         }

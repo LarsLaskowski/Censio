@@ -36,4 +36,5 @@ namespace Censio.Contracts;
 [JsonSerializable(typeof(ContractSessionEnd))]
 [JsonSerializable(typeof(ContractStatus))]
 [JsonSerializable(typeof(ContractAcknowledgement))]
+[JsonSerializable(typeof(ContractTradeRoutes))]
 internal sealed partial class ContractJsonContext : JsonSerializerContext;

@@ -432,6 +432,7 @@ public sealed class PipeReplayRunner
                {
                    PipeTickResultKind.SessionStart => await sender.SendSessionStartAsync(stamp, cancellationToken).ConfigureAwait(false),
                    PipeTickResultKind.SessionEnd => await sender.SendSessionEndAsync(stamp, cancellationToken).ConfigureAwait(false),
+                   PipeTickResultKind.TradeRoutes when item.TradeRoutes is { } routes => await sender.SendTradeRoutesAsync(routes, stamp, cancellationToken).ConfigureAwait(false),
                    _ => null
                };
     }

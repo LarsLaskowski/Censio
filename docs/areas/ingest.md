@@ -29,13 +29,13 @@ arrives in parts, and at most 32,768 bytes. The server decides in this order:
 
 1. A first message that is not a readable contract message, a binary frame, a message over 32,768 bytes or one not
    complete in time closes the connection without a reply (*Closes*).
-2. A first message of a contract version other than `1`, whatever its type and token, is answered `helloRefused`
-   `unsupportedVersion` with `receivedVersion` the version found and `supportedVersions` `[1]`, then the connection is
+2. A first message of a contract version other than `2`, whatever its type and token, is answered `helloRefused`
+   `unsupportedVersion` with `receivedVersion` the version found and `supportedVersions` `[2]`, then the connection is
    closed. This check comes before the token and the second-Companion rule, so Companion and server of different
    versions always name the versions (record 0058). Log line `Companion refused: unsupported contract version <n>.`
-3. A first message of version `1` that is no hello is closed without a reply.
+3. A first message of version `2` that is no hello is closed without a reply.
 4. A hello whose `token` is wrong or `null` while the token is required is answered `helloRefused` `tokenRefused`
-   with `receivedVersion` `1` and `supportedVersions` `[1]`, then closed. Log line `Companion refused: token refused.`
+   with `receivedVersion` `2` and `supportedVersions` `[2]`, then closed. Log line `Companion refused: token refused.`
 5. A valid hello while another Companion is connected is answered `helloRefused` `companionConnected` with the same
    two values, then closed; the connected Companion is not affected. Log line
    `Companion refused: another Companion is connected.`
@@ -80,11 +80,11 @@ arrives in parts, and at most 32,768 bytes. The server decides in this order:
 - The switch `Censio:Ingest:RequireToken` (`CENSIO__INGEST__REQUIRETOKEN`) is `true` by default. Only `false` (any case)
   switches the token off: the server logs the warning
   `The ingest token is switched off: anyone who reaches the server can send data.`, neither reads nor creates
-  `ingest-token`, and accepts a version-1 hello whatever its `token` holds. Anyone who reaches the endpoint can then send data
+  `ingest-token`, and accepts a version-2 hello whatever its `token` holds. Anyone who reaches the endpoint can then send data
   (record 0019). With `Censio:Ingest:TokenFile` set, `false` stops the start instead (*Start failures*).
 - With the token required, no data directory and the setting unset, the server starts, logs the warning
   `No ingest token without a data directory (Censio:DataDirectory); every Companion is refused.` and refuses every
-  version-1 hello as in step 4 of *The hello*.
+  version-2 hello as in step 4 of *The hello*.
 
 ### One Companion and silent connections
 
@@ -149,18 +149,18 @@ first:
 - A `status` message is accepted and gets no reply; its pipe state is kept as the Companion's game state until the
   Companion disconnects ([`server-state.md`](server-state.md), *Companion connection*), and the pages that follow the
   state are told when it changes (record 0075).
-- A tick, icon image or catalog upload the reader accepts is stored, and only then answered, in order, with an
+- A tick, trade-routes message, icon image or catalog upload the reader accepts is stored, and only then answered, in order, with an
   `acknowledgement` naming its `id`, `refusal` `null`, `refusedVersion` `null`: an acknowledgement says that the message
   is stored (record 0068). A message already stored (a resend after a lost acknowledgement) is acknowledged the same way
-  and changes nothing: a tick is a resend when its `id` is stored, an icon image when its `reference` is stored, a
-  catalog upload when the SHA-256 of its document equals the stored catalog's. For a catalog upload `missingIcons`
+  and changes nothing: a tick is a resend when its `id` is stored, a trade-routes message when its profile's set has its `id` or a later receive time,
+  an icon image when its `reference` is stored, a catalog upload when the SHA-256 of its document equals the stored catalog's. For a catalog upload `missingIcons`
   lists exactly the distinct icon references of its document, sorted, that have no stored icon, a resend included; for
   the other types the list is empty. A later catalog upload replaces the earlier one, whatever its age.
 - A session start or session end the reader accepts is answered the same way and stores nothing.
 - A message whose storing fails (disk full, file removed) is not acknowledged: the connection is closed with 1011 and an
   empty reason, the error line of *Log lines* is logged and the message counts as refused. The Companion reconnects and
   resends it.
-- A message of one of these five types that the reader refuses as *invalid* or with a catalog kind, whose `id` is a
+- A message of one of these six types that the reader refuses as *invalid* or with a catalog kind, whose `id` is a
   valid UUID, is answered with an `acknowledgement` naming that `id` and the refusal kind (`invalid`,
   `catalogMalformed`, `catalogUnsupportedVersion`, `catalogInvalid`, `catalogTooLarge`), `refusedVersion` the
   catalog's schema version for `catalogUnsupportedVersion` and `null` otherwise, `missingIcons` empty. The connection

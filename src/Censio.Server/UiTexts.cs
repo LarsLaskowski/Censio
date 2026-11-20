@@ -15,6 +15,20 @@ public sealed class UiTexts
                                                    NavigationButton = "Open or close the navigation",
                                                    HomeEntry = "Home",
                                                    RegionsEntry = "Regions",
+                                                   TradeRoutesEntry = "Trade routes",
+                                                   ColumnRoute = "Route",
+                                                   ColumnFolder = "Folder",
+                                                   ColumnShips = "Ships",
+                                                   ColumnLostShips = "Lost ships",
+                                                   ColumnMajorProblems = "Major problems",
+                                                   ColumnMinorProblems = "Minor problems",
+                                                   ColumnStations = "Stations",
+                                                   UnnamedRoute = "Unnamed route",
+                                                   StationFallbackFormat = "Island {0}/{1}/{2}",
+                                                   NoTradeRoutes = "No trade routes received yet.",
+                                                   EmptyTradeRoutes = "No trade routes in the latest data.",
+                                                   TradeRoutesSummaryFormat = "{0} trade routes, {1} with problems or lost ships.",
+                                                   TradeRoutesSummaryOneFormat = "{0} trade route, {1} with problems or lost ships.",
                                                    ProfileSwitch = "Profile",
                                                    SwitchToDarkTheme = "Switch to the dark theme",
                                                    SwitchToLightTheme = "Switch to the light theme",
@@ -53,7 +67,7 @@ public sealed class UiTexts
                                                    StatisticsUnreadable = "The Companion cannot read the game's statistics.",
                                                    DeleteHistory = "Delete history",
                                                    DeleteHistoryTitle = "Delete history?",
-                                                   DeleteHistoryTextFormat = "All data of the profile {0} is removed from the server: its regions, islands, goods and history. This cannot be undone.",
+                                                   DeleteHistoryTextFormat = "All data of the profile {0} is removed from the server: its regions, islands, goods, trade routes and history. This cannot be undone.",
                                                    DeleteHistoryConfirm = "Delete",
                                                    DeleteHistoryCancel = "Cancel",
                                                    DeleteHistoryFailed = "The history could not be deleted.",
@@ -85,6 +99,20 @@ public sealed class UiTexts
                                                   NavigationButton = "Navigation öffnen oder schließen",
                                                   HomeEntry = "Startseite",
                                                   RegionsEntry = "Regionen",
+                                                  TradeRoutesEntry = "Handelsrouten",
+                                                  ColumnRoute = "Route",
+                                                  ColumnFolder = "Ordner",
+                                                  ColumnShips = "Schiffe",
+                                                  ColumnLostShips = "Verlorene Schiffe",
+                                                  ColumnMajorProblems = "Große Probleme",
+                                                  ColumnMinorProblems = "Kleine Probleme",
+                                                  ColumnStations = "Stationen",
+                                                  UnnamedRoute = "Unbenannte Route",
+                                                  StationFallbackFormat = "Insel {0}/{1}/{2}",
+                                                  NoTradeRoutes = "Noch keine Handelsrouten empfangen.",
+                                                  EmptyTradeRoutes = "Keine Handelsrouten in den letzten Daten.",
+                                                  TradeRoutesSummaryFormat = "{0} Handelsrouten, {1} mit Problemen oder verlorenen Schiffen.",
+                                                  TradeRoutesSummaryOneFormat = "{0} Handelsroute, {1} mit Problemen oder verlorenen Schiffen.",
                                                   ProfileSwitch = "Profil",
                                                   SwitchToDarkTheme = "Zum dunklen Design wechseln",
                                                   SwitchToLightTheme = "Zum hellen Design wechseln",
@@ -123,7 +151,7 @@ public sealed class UiTexts
                                                   StatisticsUnreadable = "Der Companion kann die Statistik des Spiels nicht lesen.",
                                                   DeleteHistory = "Verlauf löschen",
                                                   DeleteHistoryTitle = "Verlauf löschen?",
-                                                  DeleteHistoryTextFormat = "Alle Daten des Profils {0} werden vom Server entfernt: seine Regionen, Inseln, Waren und sein Verlauf. Das lässt sich nicht rückgängig machen.",
+                                                  DeleteHistoryTextFormat = "Alle Daten des Profils {0} werden vom Server entfernt: seine Regionen, Inseln, Waren, Handelsrouten und sein Verlauf. Das lässt sich nicht rückgängig machen.",
                                                   DeleteHistoryConfirm = "Löschen",
                                                   DeleteHistoryCancel = "Abbrechen",
                                                   DeleteHistoryFailed = "Der Verlauf konnte nicht gelöscht werden.",
@@ -180,6 +208,76 @@ public sealed class UiTexts
     /// Gets the text of the navigation entry of the region overview, also its heading.
     /// </summary>
     public required string RegionsEntry { get; init; }
+
+    /// <summary>
+    /// Gets the text of the navigation entry of the trade routes, also their heading.
+    /// </summary>
+    public required string TradeRoutesEntry { get; init; }
+
+    /// <summary>
+    /// Gets the heading of the route column.
+    /// </summary>
+    public required string ColumnRoute { get; init; }
+
+    /// <summary>
+    /// Gets the heading of the folder column.
+    /// </summary>
+    public required string ColumnFolder { get; init; }
+
+    /// <summary>
+    /// Gets the heading of the ships column.
+    /// </summary>
+    public required string ColumnShips { get; init; }
+
+    /// <summary>
+    /// Gets the heading of the lost-ships column.
+    /// </summary>
+    public required string ColumnLostShips { get; init; }
+
+    /// <summary>
+    /// Gets the heading of the major-problems column.
+    /// </summary>
+    public required string ColumnMajorProblems { get; init; }
+
+    /// <summary>
+    /// Gets the heading of the minor-problems column.
+    /// </summary>
+    public required string ColumnMinorProblems { get; init; }
+
+    /// <summary>
+    /// Gets the heading of the stations column.
+    /// </summary>
+    public required string ColumnStations { get; init; }
+
+    /// <summary>
+    /// Gets the shown name of a route without a name.
+    /// </summary>
+    public required string UnnamedRoute { get; init; }
+
+    /// <summary>
+    /// Gets the format of the shown name of a station no island list entry names.
+    /// </summary>
+    public required string StationFallbackFormat { get; init; }
+
+    /// <summary>
+    /// Gets the text when no trade routes were received yet.
+    /// </summary>
+    public required string NoTradeRoutes { get; init; }
+
+    /// <summary>
+    /// Gets the text when the latest trade routes hold no route.
+    /// </summary>
+    public required string EmptyTradeRoutes { get; init; }
+
+    /// <summary>
+    /// Gets the format of the summary of the trade routes.
+    /// </summary>
+    public required string TradeRoutesSummaryFormat { get; init; }
+
+    /// <summary>
+    /// Gets the format of the summary of one trade route.
+    /// </summary>
+    public required string TradeRoutesSummaryOneFormat { get; init; }
 
     /// <summary>
     /// Gets the text of the profile switch.

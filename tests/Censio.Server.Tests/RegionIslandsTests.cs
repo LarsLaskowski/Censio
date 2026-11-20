@@ -758,6 +758,7 @@ public sealed class RegionIslandsTests
     {
         return new StoredProfileState
                {
+                   LatestTradeRoutes = null,
                    Profile = new StoredProfile
                              {
                                  Id = _profile,

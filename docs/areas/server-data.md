@@ -84,6 +84,11 @@ The schema has these tables; the server's store is the only code that reads or w
   tick island, product GUID and position: the second index serves the trend reads of the charts, which find a good's
   entry on each island of a tick without scanning the island's entries ([`history.md`](history.md), *The trend reads*;
   record 0087). Its bytes and cost are measured in [`history.md`](history.md) (*Measurements*).
+- **Trade route sets, trade routes and trade route stations:** a profile's latest trade-routes message ([`contract.md`](contract.md)),
+  at most one set per profile. The set row holds the profile (its key), the identity and the receive time (UTC ticks) of the
+  message; a route row the profile, its position, the route's ID, name, folder and four counts; a station row its route,
+  its position and the island key (session GUID, island ID, area index). Positions keep the order of the message, so a set
+  reads back as it was sent; route IDs and names may repeat. Route and folder names are private like island names.
 - **Catalog:** one row, the catalog identity (the SHA-256 of the document's bytes, as the hello reply names it) and the
   document's bytes.
 - **Icons:** the PNG bytes by reference key.
@@ -108,21 +113,27 @@ bit for bit, negative zero included, and a missing value never reads back as zer
 - **Profile.** Storing a profile identity and name creates the profile or, for a known identity, keeps it and takes the
   new name. A tick of an identity the store does not hold yet is stored and creates that profile without a name; its next
   hello gives it the name. Listing returns every profile with identity and name.
+- **Trade routes.** Storing a message first looks at the profile's stored set: one with the message's identity, or with a later
+  receive time, is reported as already stored and nothing is written (an equal receive time with another identity
+  replaces). Otherwise, in the one transaction, the profile is created without a name when unknown (as a tick does, so a
+  message that arrives during a deletion's steps creates the profile again), its old set is deleted and the new one is
+  written in order. Reading a profile's trade routes gives the set in position order, or nothing when none is stored.
+  Nothing keeps an earlier set: the table holds the latest only.
 - **Tick.** A tick whose identity is stored, as a tick or as a folded tick ([`history.md`](history.md)), is reported as
   already stored and changes nothing. Otherwise the tick, its
   islands, entries and pairs are written, and each island's row in the island table is updated when the tick's
   (receive time, storing order) is not older than the one stored. A tick reads back with every value of the message equal,
   the islands and entries in their stored positions and the maps ascending by GUID. An island a tick did not carry has no
   values in that tick: a gap, never zeros.
-- **Profile state.** The store reads a profile's row, its latest tick and its island list in one deferred read
-  transaction, so the three agree, and gives nothing for an unknown profile. It lists the profiles with ticks, the one
+- **Profile state.** The store reads a profile's row, its latest tick, its island list and its latest trade routes in one
+  deferred read transaction, so the four agree, and gives nothing for an unknown profile. It lists the profiles with ticks, the one
   whose latest tick is the newest first, by the order of *Latest tick*, at most as many as asked for. The server's state
   is built from these two reads ([`server-state.md`](server-state.md)).
 - **Latest tick.** The latest tick of a profile is the one with the latest receive time and, among equal receive times, the
   one stored last; a tick stored later with an earlier receive time is not the latest, and another profile's ticks never
   count. The islands of a profile are listed by their key, each with the name of the tick with the latest receive time
   that carried it.
-- **Deleting a profile.** One write transaction removes the profile's row and islands and gives its ticks and hourly
+- **Deleting a profile.** One write transaction removes the profile's row, islands and trade routes (set, routes and stations) and gives its ticks and hourly
   points a fresh tombstone as their profile, so no read by profile returns them and a read of a tick by its identity
   gives none; an unknown profile changes nothing, and the catalog, the icons and the other profiles are untouched. Steps
   of their own then remove the rows ([`history.md`](history.md)).
@@ -179,6 +190,7 @@ the bounds; the retention job folds ticks 7 days old or older into hourly points
 - [`decisions/0066-database-file-setting-and-in-memory-without-data-directory.md`](../decisions/0066-database-file-setting-and-in-memory-without-data-directory.md) — the file setting, and an in-memory database with a warning without a data directory.
 - [`decisions/0067-ticks-stored-as-rows-with-float-bit-patterns.md`](../decisions/0067-ticks-stored-as-rows-with-float-bit-patterns.md) — ticks as rows written by prepared commands, floats as 32-bit patterns.
 - [`decisions/0084-profile-deleted-in-steps-and-cleared-from-the-file.md`](../decisions/0084-profile-deleted-in-steps-and-cleared-from-the-file.md) — secure delete on the server's connection, a deleted profile's rows behind a tombstone.
+- [`decisions/0097-latest-trade-routes-per-profile-stored-as-rows-on-a-page-of-their-own.md`](../decisions/0097-latest-trade-routes-per-profile-stored-as-rows-on-a-page-of-their-own.md) — the latest trade routes per profile as rows, replaced whole.
 
 ## Not here
 

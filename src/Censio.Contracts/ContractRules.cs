@@ -66,10 +66,15 @@ internal sealed class ContractRules
     /// Checks a message of the reader for a <c>null</c> element in a list the deserialization lets through.
     /// </summary>
     /// <param name="message">The message</param>
-    /// <returns><c>true</c> when the message holds a <c>null</c> island or entry</returns>
+    /// <returns><c>true</c> when the message holds a <c>null</c> island, entry, route or station</returns>
     internal static bool ContainsNull(ContractMessage message)
     {
-        return message is ContractTick tick && tick.Islands.Any(island => island is null || island.Entries.Any(entry => entry is null));
+        return message switch
+               {
+                   ContractTick tick => tick.Islands.Any(island => island is null || island.Entries.Any(entry => entry is null)),
+                   ContractTradeRoutes tradeRoutes => tradeRoutes.Routes.Any(route => route is null || route.Stations.Any(station => station is null)),
+                   _ => false
+               };
     }
 
     /// <summary>
@@ -140,6 +145,12 @@ internal sealed class ContractRules
             case ContractTick tick:
                 {
                     CheckTick(tick);
+                }
+                break;
+
+            case ContractTradeRoutes tradeRoutes:
+                {
+                    CheckTradeRoutes(tradeRoutes);
                 }
                 break;
 
@@ -370,6 +381,46 @@ internal sealed class ContractRules
         {
             Require(IsHex(ordered[index]) && (index == 0 || string.CompareOrdinal(ordered[index - 1], ordered[index]) < 0));
         }
+    }
+
+    /// <summary>
+    /// Checks a trade-routes message: its identities and time, the bounds of its routes and stations and the names of its routes.
+    /// </summary>
+    /// <param name="tradeRoutes">The trade-routes message</param>
+    private void CheckTradeRoutes(ContractTradeRoutes tradeRoutes)
+    {
+        CheckIdentity(tradeRoutes.Id);
+        CheckIdentity(tradeRoutes.ProfileId);
+        CheckTime(tradeRoutes.ReceiveTime);
+
+        if (tradeRoutes.Routes is null)
+        {
+            _invalid = true;
+
+            return;
+        }
+
+        _tooLarge |= tradeRoutes.Routes.Count > ContractReader.MaxTradeRoutes;
+
+        long stations = 0;
+
+        foreach (var route in tradeRoutes.Routes)
+        {
+            if (route is null || route.Stations is null)
+            {
+                _invalid = true;
+
+                continue;
+            }
+
+            CheckText(route.Name, ContractReader.MaxRouteNameBytes, false);
+            CheckText(route.Folder, ContractReader.MaxRouteNameBytes, false);
+            _tooLarge |= route.Stations.Count > ContractReader.MaxStationsPerRoute;
+            stations += route.Stations.Count;
+            _invalid |= route.Stations.Any(station => station is null);
+        }
+
+        _tooLarge |= stations > ContractReader.MaxStations;
     }
 
     /// <summary>

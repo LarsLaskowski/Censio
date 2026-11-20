@@ -61,11 +61,12 @@ what the server does with them in [`ingest.md`](ingest.md).
   skip them, and a certificate the system does not trust is `server unreachable`. Over `ws://` the token and the data
   cross the network unencrypted ([`SECURITY.md`](../../SECURITY.md), record 0006).
 - The WebSocket upgrade must complete within 30 seconds.
-- It needs a server with the contract version 1 ingest; the image `0.2.0` has none and answers an HTTP page.
+- It needs a server with the contract version 2 ingest; the image `0.2.0` has none and answers an HTTP page, and a server
+  of release 0.3.0 reads version 1 and refuses the hello (*Limits and errors*).
 
 ### Hello and profile
 
-- The Companion sends one hello per run with the contract version 1, the Companion's version, the token of the file
+- The Companion sends one hello per run with the contract version 2, the Companion's version, the token of the file
   (none without `--token-file`), a new profile identity and the profile name `Replay <yyyy-MM-dd HH:mm:ss>`, the local
   time at which the run began, in the invariant culture. A second run creates a second profile; the first stays
   ([`server-state.md`](server-state.md)). No figure name is sent (record 0041).
@@ -78,6 +79,11 @@ what the server does with them in [`ingest.md`](ingest.md).
   identity, the recorded receive time and the islands as read (record 0036). A tick without islands has no message (the
   contract needs one to 256 islands) and is counted neither as sent nor as refused; a tick the contract writer refuses
   is counted as refused without being sent.
+- Every trade-routes item of the replay (a recording of pipe protocol 3 holds them, [`pipe.md`](pipe.md)), as a `tradeRoutes` message
+  with a new message identity, the profile identity, the recorded read stamp of its frame as receive time and its routes with
+  their stations' island keys in the order read ([`contract.md`](contract.md)); one without routes is sent too. It goes out
+  where it stands in the recording, between the ticks. Item offers are not sent; a trade-routes message the contract writer
+  refuses is counted as refused without being sent.
 - A `sessionStart` and a `sessionEnd` of the replay in their order, each with the recorded read stamp of its frame as
   receive time; a repeated session end ([`pipe.md`](pipe.md)) carries no new information and is not sent.
 - A `status` message with the replayed pipe state after `helloAccepted` and at each change of that state; it gets no
@@ -87,10 +93,11 @@ what the server does with them in [`ingest.md`](ingest.md).
 
 ### One message in flight
 
-- A tick, session start or session end is sent only after the previous one was acknowledged, so at most one message and
+- A tick, trade-routes message, session start or session end is sent only after the previous one was acknowledged, so at most one message and
   one reply are held and a slow server slows the replay; the receive times stay the recorded ones.
-- An acknowledgement without a refusal counts a sent tick (a session event is not counted); an acknowledgement with a
-  refusal, or a message the writer refused, counts as refused and the replay goes on.
+- An acknowledgement without a refusal counts a sent tick (a session event and a trade-routes message are not counted); an
+  acknowledgement with a refusal, of whatever message, or a message the writer refused, counts as refused and the replay
+  goes on. So `<n>` of the status text counts ticks only and `<r>` also a refused trade-routes message.
 - The Companion waits at most 30 seconds for each acknowledgement, and writing a message is bounded by the same 30
   seconds.
 
@@ -139,7 +146,7 @@ below are done by the Companion at once.
 | server unreachable | No WebSocket at the address: unknown host, closed port, an HTTP answer instead of an upgrade, a redirect, a TLS failure, no upgrade within 30 seconds |
 | token refused | The server answered `helloRefused` `tokenRefused` |
 | another Companion is connected | `helloRefused` `companionConnected` |
-| server does not support contract version 1 | `helloRefused` `unsupportedVersion` |
+| server does not support contract version 2 | `helloRefused` `unsupportedVersion`, a server of release 0.3.0 that reads version 1 among them |
 | server does not answer | No `helloAccepted` or `helloRefused` within 30 seconds of the hello, a message the server does not take within 30 seconds, or no acknowledgement within 30 seconds of a message |
 | server connection lost | The connection ends after the hello (a close frame, a failed send or receive, a server that stops) |
 | invalid server reply | A frame that is not a readable contract message, is binary, is larger than 65,536 bytes, is of a type the server does not send at that point, or acknowledges another message than the awaited one, also one that arrives while nothing is awaited |
@@ -209,6 +216,7 @@ shell's encoding is confirmed. Not tried: `docker cp` for the token file, a toke
 - [`decisions/0080-replay-token-read-from-a-file-named-on-the-command-line.md`](../decisions/0080-replay-token-read-from-a-file-named-on-the-command-line.md) — the token is read from a file, byte order marks accepted.
 - [`decisions/0036-pipe-recording-raw-frames-and-replay-on-a-recorded-clock.md`](../decisions/0036-pipe-recording-raw-frames-and-replay-on-a-recorded-clock.md) — the replay's receive times are the recorded ones.
 - [`decisions/0019-websocket-transport-with-shared-token.md`](../decisions/0019-websocket-transport-with-shared-token.md) — the WebSocket with a shared token the sender presents.
+- [`decisions/0096-contract-version-2-adds-trade-routes-read-exactly.md`](../decisions/0096-contract-version-2-adds-trade-routes-read-exactly.md) — version 2 adds the trade-routes message a replay sends.
 
 ## Not here
 

@@ -116,7 +116,7 @@ public sealed class UiTextsTests
     [TestCategory("AC9")]
     [DataRow(nameof(UiTexts.DeleteHistory), "Delete history", "Verlauf löschen")]
     [DataRow(nameof(UiTexts.DeleteHistoryTitle), "Delete history?", "Verlauf löschen?")]
-    [DataRow(nameof(UiTexts.DeleteHistoryTextFormat), "All data of the profile {0} is removed from the server: its regions, islands, goods and history. This cannot be undone.", "Alle Daten des Profils {0} werden vom Server entfernt: seine Regionen, Inseln, Waren und sein Verlauf. Das lässt sich nicht rückgängig machen.")]
+    [DataRow(nameof(UiTexts.DeleteHistoryTextFormat), "All data of the profile {0} is removed from the server: its regions, islands, goods, trade routes and history. This cannot be undone.", "Alle Daten des Profils {0} werden vom Server entfernt: seine Regionen, Inseln, Waren, Handelsrouten und sein Verlauf. Das lässt sich nicht rückgängig machen.")]
     [DataRow(nameof(UiTexts.DeleteHistoryConfirm), "Delete", "Löschen")]
     [DataRow(nameof(UiTexts.DeleteHistoryCancel), "Cancel", "Abbrechen")]
     [DataRow(nameof(UiTexts.DeleteHistoryFailed), "The history could not be deleted.", "Der Verlauf konnte nicht gelöscht werden.")]
@@ -128,6 +128,38 @@ public sealed class UiTextsTests
 
         // Assert
         Assert.AreEqual($"{english}|{german}", texts, $"The text {textName} should exist in English and German as spec AC9 and E9 give it");
+    }
+
+    /// <summary>
+    /// Every fixed text of the trade-routes page and its navigation entry exists in English and German, each exactly the
+    /// one of the spec and the plan's layout.
+    /// </summary>
+    /// <param name="textName">The name of the text property</param>
+    /// <param name="english">The English text</param>
+    /// <param name="german">The German text</param>
+    [TestMethod]
+    [TestCategory("AC5")]
+    [TestCategory("AC3")]
+    [DataRow(nameof(UiTexts.TradeRoutesEntry), "Trade routes", "Handelsrouten")]
+    [DataRow(nameof(UiTexts.ColumnRoute), "Route", "Route")]
+    [DataRow(nameof(UiTexts.ColumnFolder), "Folder", "Ordner")]
+    [DataRow(nameof(UiTexts.ColumnShips), "Ships", "Schiffe")]
+    [DataRow(nameof(UiTexts.ColumnLostShips), "Lost ships", "Verlorene Schiffe")]
+    [DataRow(nameof(UiTexts.ColumnMajorProblems), "Major problems", "Große Probleme")]
+    [DataRow(nameof(UiTexts.ColumnMinorProblems), "Minor problems", "Kleine Probleme")]
+    [DataRow(nameof(UiTexts.ColumnStations), "Stations", "Stationen")]
+    [DataRow(nameof(UiTexts.UnnamedRoute), "Unnamed route", "Unbenannte Route")]
+    [DataRow(nameof(UiTexts.NoTradeRoutes), "No trade routes received yet.", "Noch keine Handelsrouten empfangen.")]
+    [DataRow(nameof(UiTexts.EmptyTradeRoutes), "No trade routes in the latest data.", "Keine Handelsrouten in den letzten Daten.")]
+    public void UiTextsTradeRoutesTextsMatchSpec(string textName, string english, string german)
+    {
+        // Act
+        var shownInEnglish = ReadText(UiTexts.For(UiLanguage.English), textName);
+        var shownInGerman = ReadText(UiTexts.For(UiLanguage.German), textName);
+
+        // Assert
+        Assert.AreEqual(english, shownInEnglish, $"The trade-routes text {textName} should read as the spec gives it in English");
+        Assert.AreEqual(german, shownInGerman, $"The trade-routes text {textName} should read as the spec gives it in German");
     }
 
     /// <summary>

@@ -88,27 +88,27 @@ public static class PageAddress
     /// <returns>The address</returns>
     public static string RegionsEntryLink(string? relativePath)
     {
-        var path = relativePath ?? string.Empty;
-        var end = path.IndexOfAny(['?', '#']);
+        return TryParseProfileOfAddress(relativePath, out var profileId) ? RegionsLink(profileId) : "/regions";
+    }
 
-        if (end >= 0)
-        {
-            path = path[..end];
-        }
+    /// <summary>
+    /// Gives the address of a profile's trade routes.
+    /// </summary>
+    /// <param name="profileId">The profile identity</param>
+    /// <returns>The address</returns>
+    public static string TradeRoutesLink(Guid profileId)
+    {
+        return string.Create(CultureInfo.InvariantCulture, $"/profiles/{profileId}/trade-routes");
+    }
 
-        if (path.StartsWith(ProfilesPrefix, StringComparison.Ordinal))
-        {
-            var rest = path[ProfilesPrefix.Length..];
-            var slash = rest.IndexOf('/', StringComparison.Ordinal);
-            var identity = slash < 0 ? rest : rest[..slash];
-
-            if (TryParseProfile(identity, out var profileId))
-            {
-                return RegionsLink(profileId);
-            }
-        }
-
-        return "/regions";
+    /// <summary>
+    /// Gives the address the trade-routes navigation entry leads to: the trade routes of the profile the address shows, or the ones of the newest profile.
+    /// </summary>
+    /// <param name="relativePath">The base-relative address, query and fragment included</param>
+    /// <returns>The address</returns>
+    public static string TradeRoutesEntryLink(string? relativePath)
+    {
+        return TryParseProfileOfAddress(relativePath, out var profileId) ? TradeRoutesLink(profileId) : "/trade-routes";
     }
 
     /// <summary>
@@ -164,6 +164,35 @@ public static class PageAddress
     private static bool IsDigits(string text)
     {
         return text.Length > 0 && text.All(character => character is >= '0' and <= '9');
+    }
+
+    /// <summary>
+    /// Finds the profile an address shows.
+    /// </summary>
+    /// <param name="relativePath">The base-relative address, query and fragment included</param>
+    /// <param name="profileId">The identity of the profile</param>
+    /// <returns><see langword="true"/> when the address starts with the pages of a profile</returns>
+    private static bool TryParseProfileOfAddress(string? relativePath, out Guid profileId)
+    {
+        var path = relativePath ?? string.Empty;
+        var end = path.IndexOfAny(['?', '#']);
+
+        if (end >= 0)
+        {
+            path = path[..end];
+        }
+
+        profileId = Guid.Empty;
+
+        if (path.StartsWith(ProfilesPrefix, StringComparison.Ordinal) == false)
+        {
+            return false;
+        }
+
+        var rest = path[ProfilesPrefix.Length..];
+        var slash = rest.IndexOf('/', StringComparison.Ordinal);
+
+        return TryParseProfile(slash < 0 ? rest : rest[..slash], out profileId);
     }
 
     #endregion // Methods

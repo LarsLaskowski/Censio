@@ -78,7 +78,7 @@ injected clock, so the same rules serve a live connection ([`pipe-connection.md`
 
 The game sends one island per frame and no end-of-tick marker. A tick is the set of island frames that share one
 game time (the frame's timestamp); the assembler groups the frames into ticks and delivers them, with session
-events, errors and version messages, as typed items.
+events, errors, version messages and trade routes, as typed items.
 
 #### Island key
 
@@ -100,8 +100,9 @@ A tick is delivered when it closes, once, and is never reopened. It closes when:
    delivered before the error and the end.
 
 - A version message, a trade-routes or item-offers message (type 4 or 5) or a skipped-frame error does not close the
-  tick and does not restart the quiet period: only an island frame does. A trade-routes or item-offers message
-  produces no item and does not change whether a following session end is a repeated one.
+  tick and does not restart the quiet period: only an island frame does. A trade-routes message is delivered at once as a
+  trade-routes item that holds the decoded message, so it comes before the tick that is still open when it arrives; an
+  item-offers message produces no item. Neither changes whether a following session end is a repeated one.
 - The receive time of a tick is the time its last island frame was received; the receive time of a frame is the
   moment its read completed.
 - A frame that is dropped for a tick limit does not restart the quiet period and its key does not count as present.

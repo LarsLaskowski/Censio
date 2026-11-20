@@ -73,6 +73,16 @@ public sealed class ReplaySenderTests
     private static readonly LogLevel[] _connectedAndEndLevels = [LogLevel.Information, LogLevel.Information];
 
     /// <summary>
+    /// The names of the routes of the trade routes, in their order.
+    /// </summary>
+    private static readonly string[] _routeNames = ["Via Appia", "Via Ostiensis"];
+
+    /// <summary>
+    /// The island IDs of the two stations of the first route, in route order.
+    /// </summary>
+    private static readonly byte[] _stationIslands = [0, 1];
+
+    /// <summary>
     /// The real-time limit that keeps a broken implementation from hanging a test.
     /// </summary>
     private static readonly TimeSpan _guard = TimeSpan.FromSeconds(10);
@@ -238,6 +248,34 @@ public sealed class ReplaySenderTests
 
         // Assert
         Assert.AreEqual(expected, problem, $"The refusal {reason} should give its problem");
+    }
+
+    /// <summary>
+    /// A refused hello reply of contract version 1, as a server of the earlier release sends it, is version not supported
+    /// and logs the text that names version 2.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC8")]
+    public async Task ReplaySenderRefusedHelloOfVersionOneReportsVersionNotSupported()
+    {
+        // Arrange
+        await using var server = ScriptedIngestServer.Create();
+        var logger = new RecordingLogger();
+        await using var sender = CreateSender(new DuplexReplayConnector(server.ClientSocket), CreateTimeProvider(), logger, null);
+        var reply = """{"type":"helloRefused","contractVersion":1,"reason":"unsupportedVersion","receivedVersion":2,"supportedVersions":[1]}""";
+
+        // Act
+        var connecting = sender.ConnectServerAsync(TestContext.CancellationToken);
+
+        await server.ReceiveAsync(TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+        await server.SendRawAsync(Encoding.UTF8.GetBytes(reply), WebSocketMessageType.Text, TestContext.CancellationToken);
+
+        var problem = await connecting.WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(ReplaySendProblemKind.VersionNotSupported, problem, "The refused hello reply of version 1 should be version not supported");
+        Assert.Contains("Replay refused by the server: server does not support contract version 2", logger.Entries.Select(entry => entry.Message), "The refusal should log the text that names version 2");
     }
 
     /// <summary>
@@ -486,6 +524,120 @@ public sealed class ReplaySenderTests
     }
 
     /// <summary>
+    /// Sent trade routes are counted in no tick count: accepted ones are not counted at all, ones the server refuses and ones
+    /// the contract writer refuses before sending count as refused, and the replay goes on.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public async Task ReplaySenderTradeRoutesCountsOnlyRefused()
+    {
+        // Arrange
+        await using var server = ScriptedIngestServer.Create();
+        await using var sender = CreateSender(new DuplexReplayConnector(server.ClientSocket), CreateTimeProvider(), new RecordingLogger(), null);
+
+        await ConnectAcceptedAsync(sender, server);
+
+        // Act
+        var accepted = await SendAcknowledgedAsync(sender.SendTradeRoutesAsync(CreateTradeRoutes(1), _start, TestContext.CancellationToken), server, null);
+        var refused = await SendAcknowledgedAsync(sender.SendTradeRoutesAsync(CreateTradeRoutes(1), _start, TestContext.CancellationToken), server, ContractAcknowledgementRefusal.Invalid);
+        var unwritten = await sender.SendTradeRoutesAsync(CreateTradeRoutes(ContractReader.MaxStationsPerRoute + 1), _start, TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+        var sending = sender.SendTickAsync(CreateTick(1), TestContext.CancellationToken);
+        var next = await server.ReceiveAsync(TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+
+        await server.AcknowledgeAsync(next, null, TestContext.CancellationToken);
+
+        var tick = await sending.WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        Assert.IsNull(accepted, "Accepted trade routes should give no problem");
+        Assert.IsNull(refused, "Trade routes the server refuses should not stop the replay");
+        Assert.IsNull(unwritten, "Trade routes the writer refuses should not stop the replay");
+        Assert.IsNull(tick, "The tick after them should be sent");
+        Assert.IsInstanceOfType<ContractTick>(next, "The trade routes the writer refuses should not have been sent");
+        Assert.AreEqual(new ReplaySendCounts
+                        {
+                            Ticks = 1,
+                            Refused = 2
+                        },
+                        sender.Counts,
+                        "Only the tick should count as sent and both refused trade routes as refused");
+    }
+
+    /// <summary>
+    /// Sent trade routes carry the profile of the hello, the receive time in UTC and the routes in their order.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC1")]
+    public async Task ReplaySenderTradeRoutesSendsProfileReceiveTimeAndRoutes()
+    {
+        // Arrange
+        await using var server = ScriptedIngestServer.Create();
+        await using var sender = CreateSender(new DuplexReplayConnector(server.ClientSocket), CreateTimeProvider(), new RecordingLogger(), null);
+        var receiveTime = _start.ToOffset(TimeSpan.FromHours(2));
+
+        await ConnectAcceptedAsync(sender, server);
+
+        // Act
+        var sending = sender.SendTradeRoutesAsync(CreateTradeRoutes(2), receiveTime, TestContext.CancellationToken);
+        var message = await server.ReceiveAsync(TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+
+        await server.AcknowledgeAsync(message, null, TestContext.CancellationToken);
+
+        var problem = await sending.WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        Assert.IsNull(problem, "The acknowledged trade routes should give no problem");
+
+        var routes = Assert.IsInstanceOfType<ContractTradeRoutes>(message, "The trade routes should be sent as a trade-routes message");
+
+        Assert.AreEqual(sender.ProfileId, routes.ProfileId, "The trade routes should carry the profile of the hello");
+        Assert.AreEqual(_start.UtcTicks, routes.ReceiveTime.UtcTicks, "The trade routes should carry the receive time they were given");
+        Assert.AreEqual(TimeSpan.Zero, routes.ReceiveTime.Offset, "The receive time should be sent in UTC");
+        Assert.AreSequenceEqual(_routeNames, routes.Routes.Select(route => route.Name), "The routes should be sent in their order");
+        Assert.AreSequenceEqual(_stationIslands, routes.Routes[0].Stations.Select(station => station.IslandId), "The stations should be sent in route order");
+    }
+
+    /// <summary>
+    /// The end of a replay that sent trade routes names only the ticks as sent and the refused trade routes as refused, in the
+    /// log line and in the finished status.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public async Task ReplaySenderTradeRoutesEndTextsCountTicksAndRefused()
+    {
+        // Arrange
+        await using var server = ScriptedIngestServer.Create();
+        var logger = new RecordingLogger();
+        await using var sender = CreateSender(new DuplexReplayConnector(server.ClientSocket), CreateTimeProvider(), logger, null);
+
+        await ConnectAcceptedAsync(sender, server);
+        await SendAcknowledgedAsync(sender.SendTradeRoutesAsync(CreateTradeRoutes(1), _start, TestContext.CancellationToken), server, null);
+        await SendAcknowledgedAsync(sender.SendTickAsync(CreateTick(1), TestContext.CancellationToken), server, null);
+        await SendAcknowledgedAsync(sender.SendTradeRoutesAsync(CreateTradeRoutes(1), _start, TestContext.CancellationToken), server, ContractAcknowledgementRefusal.Invalid);
+
+        // Act
+        var serverEnd = server.ReceiveAsync(TestContext.CancellationToken);
+        var problem = await sender.CloseAsync(TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+
+        await serverEnd.WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        Assert.IsNull(problem, "The close should give no problem");
+        Assert.AreSequenceEqual(_connectedAndEndLines, logger.Entries.Select(entry => entry.Message), "The end line should count the tick as sent and the refused trade routes as refused");
+        Assert.AreEqual("Censio Companion: Replay finished: 1 tick sent, 1 refused",
+                        TrayMenu.FormatReplayToolTip(new PipeReplayStatus
+                                                     {
+                                                         State = PipeConnectionState.Receiving,
+                                                         IsFinished = true,
+                                                         Sent = sender.Counts
+                                                     }),
+                        "The finished status should count the tick as sent and the refused trade routes as refused");
+    }
+
+    /// <summary>
     /// A send waits for its acknowledgement before it returns, so the next message is sent only after it.
     /// </summary>
     /// <returns>A task that completes when the test is done</returns>
@@ -648,7 +800,7 @@ public sealed class ReplaySenderTests
     [DataRow("unreachable", "Replay sending failed: server unreachable")]
     [DataRow("tokenRefused", "Replay refused by the server: token refused")]
     [DataRow("companionConnected", "Replay refused by the server: another Companion is connected")]
-    [DataRow("unsupportedVersion", "Replay refused by the server: server does not support contract version 1")]
+    [DataRow("unsupportedVersion", "Replay refused by the server: server does not support contract version 2")]
     [DataRow("noAnswer", "Replay sending failed: server does not answer")]
     [DataRow("connectionLost", "Replay sending failed: server connection lost")]
     [DataRow("invalidReply", "Replay sending failed: invalid server reply")]
@@ -1153,7 +1305,7 @@ public sealed class ReplaySenderTests
         return new ContractHelloRefused
                {
                    Reason = reason,
-                   ReceivedVersion = 1,
+                   ReceivedVersion = 2,
                    SupportedVersions = [2]
                };
     }
@@ -1171,6 +1323,63 @@ public sealed class ReplaySenderTests
                    ReceiveTime = _start,
                    Islands = [.. Enumerable.Range(0, islands).Select(CreateIsland)],
                    CloseReason = PipeTickCloseReason.GameTimeChanged
+               };
+    }
+
+    /// <summary>
+    /// Creates trade routes of two routes: the first with stations of island IDs counting up from 0, the second without
+    /// stations.
+    /// </summary>
+    /// <param name="stations">The number of stations of the first route</param>
+    /// <returns>The trade routes</returns>
+    private static TradeRoutesMessage CreateTradeRoutes(int stations)
+    {
+        return new TradeRoutesMessage
+               {
+                   Routes = [CreateRoute(_routeNames[0], [.. Enumerable.Range(0, stations).Select(CreateStation)]), CreateRoute(_routeNames[1], [])]
+               };
+    }
+
+    /// <summary>
+    /// Creates a trade route without problems or lost ships.
+    /// </summary>
+    /// <param name="name">The name</param>
+    /// <param name="stations">The stations in route order</param>
+    /// <returns>The route</returns>
+    private static TradeRoute CreateRoute(string name, TradeRouteStation[] stations)
+    {
+        return new TradeRoute
+               {
+                   Id = 1,
+                   Name = name,
+                   Folder = "North",
+                   MajorProblems = 0,
+                   MinorProblems = 0,
+                   Ships = 2,
+                   LostShips = 0,
+                   Stations = stations
+               };
+    }
+
+    /// <summary>
+    /// Creates a station without goods.
+    /// </summary>
+    /// <param name="index">The index of the station, which gives its island ID</param>
+    /// <returns>The station</returns>
+    private static TradeRouteStation CreateStation(int index)
+    {
+        return new TradeRouteStation
+               {
+                   Id = index,
+                   SessionId = 1,
+                   IslandId = (byte)(index % 256),
+                   AreaIndex = 0,
+                   SessionGuid = 180023,
+                   Owner = 41,
+                   ThrowOverboard = false,
+                   WaitUntilFull = false,
+                   WaitUntilEmpty = false,
+                   Goods = []
                };
     }
 

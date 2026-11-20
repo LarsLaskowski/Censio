@@ -43,5 +43,10 @@ public enum PipeTickResultKind
     /// <summary>
     /// The end of the stream.
     /// </summary>
-    EndOfStream
+    EndOfStream,
+
+    /// <summary>
+    /// The trade routes of the game.
+    /// </summary>
+    TradeRoutes
 }

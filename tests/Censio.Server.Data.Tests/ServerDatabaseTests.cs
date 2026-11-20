@@ -2,6 +2,9 @@ using System.Runtime.Versioning;
 using System.Text;
 
 using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.Logging;
 
 namespace Censio.Server.Data.Tests;
@@ -49,6 +52,32 @@ public sealed class ServerDatabaseTests : IDisposable
     /// </summary>
     private const string InsertLockRowSql = "INSERT INTO \"__EFMigrationsLock\" (\"Id\", \"Timestamp\") VALUES (1, '2026-11-13 12:00:00+00:00');";
 
+    /// <summary>
+    /// The identifier of the initial migration, the only one of v0.3.0.
+    /// </summary>
+    private const string InitialSchemaMigrationId = "20261113143019_InitialSchema";
+
+    /// <summary>
+    /// The statements that store a profile with one tick of one island, one entry and one map pair in the tables of the
+    /// v0.3.0 schema, as that release wrote them.
+    /// </summary>
+    private const string InsertInitialSchemaTickSql = "INSERT INTO \"Profiles\" (\"Id\", \"Name\") VALUES ('" + KeptProfileId + "', '" + KeptProfileName + "');"
+                                                      + "INSERT INTO \"Ticks\" (\"Number\", \"Id\", \"ProfileId\", \"ReceiveTicks\", \"GameTime\") VALUES (1, '0B4F7E2A-1C3D-4E5F-8A9B-0C1D2E3F4A5B', '" + KeptProfileId + "', 639000000000000000, 3600000);"
+                                                      + "INSERT INTO \"TickIslands\" (\"Id\", \"TickNumber\", \"Position\", \"SessionGuid\", \"IslandId\", \"AreaIndex\", \"SessionId\", \"Name\") VALUES (1, 1, 0, 180023, 2, 0, 1, 'Kept island');"
+                                                      + "INSERT INTO \"TickEntries\" (\"Id\", \"TickIslandId\", \"Position\", \"ProductGuid\", \"Generation\", \"Consumption\", \"Delta\", \"PerfectGeneration\", \"PerfectConsumption\", \"Income\", \"SummedProductivity\", \"AverageProductivity\", \"BuildingCount\", \"Maintenance\", \"Profit\") VALUES (1, 1, 0, 1010017, 1069547520, NULL, -1077936128, 0, 1, 2, 3, 4, 17, -250, 2147483647);"
+                                                      + "INSERT INTO \"TickMapPairs\" (\"Id\", \"EntryId\", \"Kind\", \"Guid\", \"Amount\") VALUES (1, 1, 0, 1010052, 40);"
+                                                      + "INSERT INTO \"Islands\" (\"Id\", \"ProfileId\", \"SessionGuid\", \"IslandId\", \"AreaIndex\", \"Name\", \"NameReceiveTicks\", \"NameTickNumber\") VALUES (1, '" + KeptProfileId + "', 180023, 2, 0, 'Kept island', 639000000000000000, 1);";
+
+    /// <summary>
+    /// The query that reads every row of the profile and tick tables of the v0.3.0 schema as one line each.
+    /// </summary>
+    private const string ReadTickRowsSql = "SELECT 'profile ' || \"Id\" || ' ' || ifnull(\"Name\", '') FROM \"Profiles\""
+                                           + " UNION ALL SELECT 'tick ' || \"Number\" || ' ' || \"Id\" || ' ' || \"ProfileId\" || ' ' || \"ReceiveTicks\" || ' ' || \"GameTime\" FROM \"Ticks\""
+                                           + " UNION ALL SELECT 'tick island ' || \"Id\" || ' ' || \"TickNumber\" || ' ' || \"Position\" || ' ' || \"SessionGuid\" || ' ' || \"IslandId\" || ' ' || \"AreaIndex\" || ' ' || \"SessionId\" || ' ' || \"Name\" FROM \"TickIslands\""
+                                           + " UNION ALL SELECT 'entry ' || \"Id\" || ' ' || \"TickIslandId\" || ' ' || \"Position\" || ' ' || \"ProductGuid\" || ' ' || ifnull(\"Generation\", '-') || ' ' || ifnull(\"Consumption\", '-') || ' ' || ifnull(\"Delta\", '-') || ' ' || ifnull(\"PerfectGeneration\", '-') || ' ' || ifnull(\"PerfectConsumption\", '-') || ' ' || ifnull(\"Income\", '-') || ' ' || ifnull(\"SummedProductivity\", '-') || ' ' || ifnull(\"AverageProductivity\", '-') || ' ' || \"BuildingCount\" || ' ' || \"Maintenance\" || ' ' || \"Profit\" FROM \"TickEntries\""
+                                           + " UNION ALL SELECT 'map pair ' || \"Id\" || ' ' || \"EntryId\" || ' ' || \"Kind\" || ' ' || \"Guid\" || ' ' || \"Amount\" FROM \"TickMapPairs\""
+                                           + " UNION ALL SELECT 'island ' || \"Id\" || ' ' || \"ProfileId\" || ' ' || \"SessionGuid\" || ' ' || \"IslandId\" || ' ' || \"AreaIndex\" || ' ' || \"Name\" || ' ' || \"NameReceiveTicks\" || ' ' || \"NameTickNumber\" FROM \"Islands\";";
+
     #endregion // Constants
 
     #region Fields
@@ -61,7 +90,7 @@ public sealed class ServerDatabaseTests : IDisposable
     /// <summary>
     /// The tables of the current schema, sorted ordinally.
     /// </summary>
-    private static readonly string[] _currentTables = ["Catalog", "DeletedProfiles", "FoldedTicks", "HourlyEntries", "HourlyIslands", "HourlyMapPairs", "HourlyPoints", "Icons", "Islands", "Profiles", "TickEntries", "TickIslands", "TickMapPairs", "Ticks"];
+    private static readonly string[] _currentTables = ["Catalog", "DeletedProfiles", "FoldedTicks", "HourlyEntries", "HourlyIslands", "HourlyMapPairs", "HourlyPoints", "Icons", "Islands", "Profiles", "TickEntries", "TickIslands", "TickMapPairs", "Ticks", "TradeRouteSets", "TradeRouteStations", "TradeRoutes"];
 
     /// <summary>
     /// The temporary directories of the running test, deleted afterwards.
@@ -609,6 +638,36 @@ public sealed class ServerDatabaseTests : IDisposable
     }
 
     /// <summary>
+    /// A database of the v0.3.0 schema (the initial schema only) holding a profile with a tick opens updated, gains the
+    /// trade-route tables and records every migration of the build, and its profile, tick, islands, entries and map pairs
+    /// stay row for row as they were.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC8")]
+    public async Task ServerDatabaseOpenInitialSchemaWithTicksAddsTradeRoutesAndKeepsTicks()
+    {
+        // Arrange
+        var databaseFile = Path.Combine(CreateTemporaryDirectory(), DatabaseFileName);
+
+        await CreateInitialSchemaAsync(databaseFile);
+        Execute(databaseFile, command => command.CommandText = InsertInitialSchemaTickSql);
+        SqliteConnection.ClearAllPools();
+
+        var rowsBefore = ReadTickRows(databaseFile);
+
+        // Act
+        var result = await OpenAsync(databaseFile);
+
+        // Assert
+        Assert.AreEqual(ServerDatabaseOpenKind.Updated, result.Kind, "A database of the v0.3.0 schema should be reported as updated");
+        Assert.AreSequenceEqual(ExtendedMigrationsAssembly.RealMigrationIds.ToList(), ReadHistory(databaseFile), "Every migration of the build should be recorded as applied");
+        Assert.AreSequenceEqual(_currentTables, ReadUserTables(databaseFile), "The file should hold the tables of the current schema, the trade-route tables included");
+        Assert.HasCount(6, rowsBefore, "The v0.3.0 rows should have been written, or the comparison below would prove nothing");
+        Assert.AreSequenceEqual(rowsBefore, ReadTickRows(databaseFile), "The profile and its tick rows should stay as they were");
+    }
+
+    /// <summary>
     /// Ends the test as inconclusive in a process that ignores file permissions.
     /// </summary>
     private static void SkipWhenPrivileged()
@@ -745,6 +804,16 @@ public sealed class ServerDatabaseTests : IDisposable
     }
 
     /// <summary>
+    /// Reads every row of the profile and tick tables, each as one line of its values.
+    /// </summary>
+    /// <param name="databaseFile">The file</param>
+    /// <returns>The lines, by table and then by key</returns>
+    private static List<string> ReadTickRows(string databaseFile)
+    {
+        return ReadColumn(databaseFile, command => command.CommandText = ReadTickRowsSql);
+    }
+
+    /// <summary>
     /// Creates a temporary directory for the test, deleted afterwards.
     /// </summary>
     /// <returns>The full path of the directory</returns>
@@ -784,6 +853,26 @@ public sealed class ServerDatabaseTests : IDisposable
         Execute(databaseFile, command => command.CommandText = "INSERT INTO \"Profiles\" (\"Id\", \"Name\") VALUES ('" + KeptProfileId + "', '" + KeptProfileName + "');");
 
         return databaseFile;
+    }
+
+    /// <summary>
+    /// Creates a database file of the v0.3.0 schema: the initial migration applied and no later one.
+    /// </summary>
+    /// <param name="databaseFile">The database file</param>
+    /// <returns>A task that represents the asynchronous operation</returns>
+    private async Task CreateInitialSchemaAsync(string databaseFile)
+    {
+        var connectionString = new SqliteConnectionStringBuilder
+                               {
+                                   DataSource = databaseFile,
+                                   Pooling = false
+                               };
+        var options = new DbContextOptionsBuilder<CensioDbContext>().UseSqlite(connectionString.ToString())
+                                                                    .Options;
+
+        await using var context = new CensioDbContext(options);
+
+        await context.GetService<IMigrator>().MigrateAsync(InitialSchemaMigrationId, TestContext.CancellationToken);
     }
 
     /// <summary>

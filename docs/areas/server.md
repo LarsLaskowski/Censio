@@ -39,7 +39,7 @@ the Docker health probe rely on it.
   TLS is the job of a reverse proxy in front of it (`SECURITY.md`).
 - A request for an unknown path answers `404` with an empty body. In `Production` an unhandled error answers
   `500` with an empty body; the server has no exception page, status-code page or error handler of its own.
-- `/`, `/health`, the data pages (`/regions` and the routes under `/profiles/`), `/icons/{reference}` and the Blazor hub
+- `/`, `/health`, the data pages (`/regions`, `/trade-routes` and the routes under `/profiles/`), `/icons/{reference}` and the Blazor hub
   need no login: anyone who reaches the port reads every stored profile ([`web-pages.md`](web-pages.md),
   `SECURITY.md`). Antiforgery protection is on.
 - `/ingest` is a WebSocket route for the Companion that needs no web login either: it authenticates a connection by the

@@ -85,6 +85,45 @@ public static class ContractMessageConverter
     }
 
     /// <summary>
+    /// Converts the trade routes of the pipe into a contract message with a new identity.
+    /// </summary>
+    /// <param name="message">The trade-routes message</param>
+    /// <param name="profileId">The profile identity</param>
+    /// <param name="receiveTime">The time the message was received</param>
+    /// <returns>The contract trade routes</returns>
+    public static ContractTradeRoutes ToTradeRoutes(TradeRoutesMessage message, Guid profileId, DateTimeOffset receiveTime)
+    {
+        ArgumentNullException.ThrowIfNull(message);
+
+        return new ContractTradeRoutes
+               {
+                   Id = Guid.NewGuid(),
+                   ProfileId = profileId,
+                   ReceiveTime = receiveTime.ToUniversalTime(),
+                   Routes = [
+                                .. message.Routes.Select(route => new ContractTradeRoute
+                                                                  {
+                                                                      Id = route.Id,
+                                                                      Name = route.Name,
+                                                                      Folder = route.Folder,
+                                                                      MajorProblems = route.MajorProblems,
+                                                                      MinorProblems = route.MinorProblems,
+                                                                      Ships = route.Ships,
+                                                                      LostShips = route.LostShips,
+                                                                      Stations = [
+                                                                                     .. route.Stations.Select(station => new ContractTradeRouteStation
+                                                                                                                         {
+                                                                                                                             SessionGuid = station.SessionGuid,
+                                                                                                                             IslandId = station.IslandId,
+                                                                                                                             AreaIndex = station.AreaIndex
+                                                                                                                         })
+                                                                                 ]
+                                                                  })
+                            ]
+               };
+    }
+
+    /// <summary>
     /// Converts a pipe island into a contract island.
     /// </summary>
     /// <param name="island">The pipe island</param>

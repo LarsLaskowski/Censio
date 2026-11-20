@@ -20,7 +20,7 @@ public sealed class ContractReaderTests
     /// <summary>
     /// The fixed text of a message that breaks a value rule.
     /// </summary>
-    private const string InvalidText = "Contract message breaks a rule of contract version 1";
+    private const string InvalidText = "Contract message breaks a rule of contract version 2";
 
     /// <summary>
     /// The fixed text of a message above a size bound.
@@ -85,52 +85,72 @@ public sealed class ContractReaderTests
     /// <summary>
     /// A valid tick in single-quote notation.
     /// </summary>
-    private const string TickNotation = $"{{'type':'tick','contractVersion':1,'id':'{Id}','profileId':'{Profile}','receiveTime':'{Time}','gameTime':42,'islands':[{IslandNotation}]}}";
+    private const string TickNotation = $"{{'type':'tick','contractVersion':2,'id':'{Id}','profileId':'{Profile}','receiveTime':'{Time}','gameTime':42,'islands':[{IslandNotation}]}}";
 
     /// <summary>
     /// A valid hello in single-quote notation.
     /// </summary>
-    private const string HelloNotation = $"{{'type':'hello','contractVersion':1,'token':'secret-token','companionVersion':'0.3.0','profileId':'{Profile}','profileName':'Alice'}}";
+    private const string HelloNotation = $"{{'type':'hello','contractVersion':2,'token':'secret-token','companionVersion':'0.3.0','profileId':'{Profile}','profileName':'Alice'}}";
 
     /// <summary>
     /// A valid accepted hello reply in single-quote notation.
     /// </summary>
-    private const string HelloAcceptedNotation = "{'type':'helloAccepted','contractVersion':1,'serverVersion':'0.3.0','catalogIdentity':null}";
+    private const string HelloAcceptedNotation = "{'type':'helloAccepted','contractVersion':2,'serverVersion':'0.3.0','catalogIdentity':null}";
 
     /// <summary>
     /// A valid refused hello reply in single-quote notation.
     /// </summary>
-    private const string HelloRefusedNotation = "{'type':'helloRefused','contractVersion':1,'reason':'tokenRefused','receivedVersion':1,'supportedVersions':[1]}";
+    private const string HelloRefusedNotation = "{'type':'helloRefused','contractVersion':2,'reason':'tokenRefused','receivedVersion':2,'supportedVersions':[2]}";
 
     /// <summary>
     /// A valid catalog upload in single-quote notation.
     /// </summary>
-    private const string CatalogUploadNotation = $"{{'type':'catalogUpload','contractVersion':1,'id':'{Id}','document':'{CatalogBase64}'}}";
+    private const string CatalogUploadNotation = $"{{'type':'catalogUpload','contractVersion':2,'id':'{Id}','document':'{CatalogBase64}'}}";
 
     /// <summary>
     /// A valid icon image in single-quote notation.
     /// </summary>
-    private const string IconImageNotation = $"{{'type':'iconImage','contractVersion':1,'id':'{Id}','reference':'{PngReference}','png':'{PngBase64}'}}";
+    private const string IconImageNotation = $"{{'type':'iconImage','contractVersion':2,'id':'{Id}','reference':'{PngReference}','png':'{PngBase64}'}}";
 
     /// <summary>
     /// A valid session start in single-quote notation.
     /// </summary>
-    private const string SessionStartNotation = $"{{'type':'sessionStart','contractVersion':1,'id':'{Id}','profileId':'{Profile}','receiveTime':'{Time}'}}";
+    private const string SessionStartNotation = $"{{'type':'sessionStart','contractVersion':2,'id':'{Id}','profileId':'{Profile}','receiveTime':'{Time}'}}";
 
     /// <summary>
     /// A valid session end in single-quote notation.
     /// </summary>
-    private const string SessionEndNotation = $"{{'type':'sessionEnd','contractVersion':1,'id':'{Id}','profileId':'{Profile}','receiveTime':'{Time}'}}";
+    private const string SessionEndNotation = $"{{'type':'sessionEnd','contractVersion':2,'id':'{Id}','profileId':'{Profile}','receiveTime':'{Time}'}}";
 
     /// <summary>
     /// A valid status in single-quote notation.
     /// </summary>
-    private const string StatusNotation = "{'type':'status','contractVersion':1,'pipeState':'receiving'}";
+    private const string StatusNotation = "{'type':'status','contractVersion':2,'pipeState':'receiving'}";
 
     /// <summary>
     /// A valid acknowledgement in single-quote notation.
     /// </summary>
-    private const string AcknowledgementNotation = $"{{'type':'acknowledgement','contractVersion':1,'id':'{Id}','refusal':null,'refusedVersion':null,'missingIcons':['{Icon}']}}";
+    private const string AcknowledgementNotation = $"{{'type':'acknowledgement','contractVersion':2,'id':'{Id}','refusal':null,'refusedVersion':null,'missingIcons':['{Icon}']}}";
+
+    /// <summary>
+    /// A valid trade-route station in single-quote notation.
+    /// </summary>
+    private const string StationNotation = "{'sessionGuid':180023,'islandId':1,'areaIndex':0}";
+
+    /// <summary>
+    /// The two stations of <see cref="RouteNotation" /> in single-quote notation.
+    /// </summary>
+    private const string StationsNotation = $"[{StationNotation},{{'sessionGuid':-5,'islandId':255,'areaIndex':255}}]";
+
+    /// <summary>
+    /// A valid trade route of two stations in single-quote notation.
+    /// </summary>
+    private const string RouteNotation = $"{{'id':7,'name':'Via Appia','folder':'North','majorProblems':1,'minorProblems':2,'ships':3,'lostShips':4,'stations':{StationsNotation}}}";
+
+    /// <summary>
+    /// A valid trade-routes message of one route in single-quote notation.
+    /// </summary>
+    private const string TradeRoutesNotation = $"{{'type':'tradeRoutes','contractVersion':2,'id':'{Id}','profileId':'{Profile}','receiveTime':'{Time}','routes':[{RouteNotation}]}}";
 
     #endregion // Constants
 
@@ -143,31 +163,31 @@ public sealed class ContractReaderTests
                                                                                {
                                                                                    ["257 islands in a tick"] = () => Utf8(TickWithIslands(IslandsNotation(257), false)),
                                                                                    ["257 islands with type last and islands first"] = () => Utf8(TickWithIslands(IslandsNotation(257), true)),
-                                                                                   ["257 islands in a status message"] = () => Utf8($"{{'type':'status','contractVersion':1,'pipeState':'receiving','islands':[{IslandsNotation(257)}]}}"),
-                                                                                   ["257 islands in a version 2 tick"] = () => Utf8(TickWithIslands(IslandsNotation(257), false).Replace("'contractVersion':1", "'contractVersion':2", StringComparison.Ordinal)),
+                                                                                   ["257 islands in a status message"] = () => Utf8($"{{'type':'status','contractVersion':2,'pipeState':'receiving','islands':[{IslandsNotation(257)}]}}"),
+                                                                                   ["257 islands in a version 3 tick"] = () => Utf8(TickWithIslands(IslandsNotation(257), false).Replace("'contractVersion':2", "'contractVersion':3", StringComparison.Ordinal)),
                                                                                    ["524,289 entries and pairs in a tick"] = () => Utf8(TickWithIslands(IslandWithEntries(EntriesAndPairs(ContractReader.MaxEntriesAndPairs + 1)), false)),
                                                                                    ["1,025 workforce pairs"] = () => Utf8(TickWithIslands(IslandWithEntries(EntryWithPairs(ContractReader.MaxPairsPerMap + 1, 0)), false)),
                                                                                    ["1,025 building pairs"] = () => Utf8(TickWithIslands(IslandWithEntries(EntryWithPairs(0, ContractReader.MaxPairsPerMap + 1)), false)),
-                                                                                   ["17 supported versions"] = () => Utf8($"{{'type':'helloRefused','contractVersion':1,'reason':'unsupportedVersion','receivedVersion':2,'supportedVersions':[{Numbers(17)}]}}"),
-                                                                                   ["17 supported versions in a version 2 refusal"] = () => Utf8($"{{'type':'helloRefused','contractVersion':2,'reason':'unsupportedVersion','receivedVersion':1,'supportedVersions':[{Numbers(17)}]}}"),
-                                                                                   ["16,385 missing icons"] = () => Utf8($"{{'type':'acknowledgement','contractVersion':1,'id':'{Id}','refusal':null,'refusedVersion':null,'missingIcons':[{MissingIcons(ContractReader.MaxMissingIcons + 1)}]}}"),
+                                                                                   ["17 supported versions"] = () => Utf8($"{{'type':'helloRefused','contractVersion':2,'reason':'unsupportedVersion','receivedVersion':2,'supportedVersions':[{Numbers(17)}]}}"),
+                                                                                   ["17 supported versions in a version 3 refusal"] = () => Utf8($"{{'type':'helloRefused','contractVersion':3,'reason':'unsupportedVersion','receivedVersion':1,'supportedVersions':[{Numbers(17)}]}}"),
+                                                                                   ["16,385 missing icons"] = () => Utf8($"{{'type':'acknowledgement','contractVersion':2,'id':'{Id}','refusal':null,'refusedVersion':null,'missingIcons':[{MissingIcons(ContractReader.MaxMissingIcons + 1)}]}}"),
                                                                                    ["16,385 missing icons in a tick"] = () => Utf8(Substitute(TickNotation, "'gameTime':42", $"'gameTime':42,'missingIcons':[{MissingIcons(ContractReader.MaxMissingIcons + 1)}]")),
                                                                                    ["token of 1,025 bytes"] = () => Utf8(Substitute(HelloNotation, "'secret-token'", $"'{new string('a', 1025)}'")),
                                                                                    ["token of 1,026 bytes in two-byte characters"] = () => Utf8(Substitute(HelloNotation, "'secret-token'", $"'{new string('ä', 513)}'")),
-                                                                                   ["token of 1,025 bytes in a version 2 hello"] = () => Utf8(Substitute(HelloNotation, "'contractVersion':1,'token':'secret-token'", $"'contractVersion':2,'token':'{new string('a', 1025)}'")),
+                                                                                   ["token of 1,025 bytes in a version 3 hello"] = () => Utf8(Substitute(HelloNotation, "'contractVersion':2,'token':'secret-token'", $"'contractVersion':3,'token':'{new string('a', 1025)}'")),
                                                                                    ["profile name of 1,025 bytes"] = () => Utf8(Substitute(HelloNotation, "'Alice'", $"'{new string('a', 1025)}'")),
                                                                                    ["companion version of 1,025 bytes"] = () => Utf8(Substitute(HelloNotation, "'0.3.0'", $"'{new string('a', 1025)}'")),
                                                                                    ["server version of 1,025 bytes"] = () => Utf8(Substitute(HelloAcceptedNotation, "'0.3.0'", $"'{new string('a', 1025)}'")),
                                                                                    ["reference of 1,025 bytes"] = () => Utf8(Substitute(IconImageNotation, $"'{PngReference}'", $"'{new string('a', 1025)}'")),
                                                                                    ["island name of 766 bytes"] = () => Utf8(Substitute(TickNotation, "'Isle'", $"'{new string('a', 766)}'")),
                                                                                    ["island name of 256 replacement characters"] = () => Utf8(Substitute(TickNotation, "'Isle'", $"'{new string((char)0xFFFD, 256)}'")),
-                                                                                   ["island name of 766 bytes in a status message"] = () => Utf8($"{{'type':'status','contractVersion':1,'pipeState':'receiving','islands':[{{'name':'{new string('a', 766)}'}}]}}"),
+                                                                                   ["island name of 766 bytes in a status message"] = () => Utf8($"{{'type':'status','contractVersion':2,'pipeState':'receiving','islands':[{{'name':'{new string('a', 766)}'}}]}}"),
                                                                                    ["property name of 1,025 bytes"] = () => Utf8(Substitute(StatusNotation, "'pipeState'", $"'{new string('a', 1025)}':1,'pipeState'")),
-                                                                                   ["property name of 1,025 bytes in a version 2 message"] = () => Utf8(Substitute(StatusNotation, "'contractVersion':1", $"'contractVersion':2,'{new string('a', 1025)}':1")),
+                                                                                   ["property name of 1,025 bytes in a version 3 message"] = () => Utf8(Substitute(StatusNotation, "'contractVersion':2", $"'contractVersion':3,'{new string('a', 1025)}':1")),
                                                                                    ["string of 1,025 bytes in an unknown property"] = () => Utf8(Substitute(StatusNotation, "'pipeState'", $"'future':'{new string('a', 1025)}','pipeState'")),
                                                                                    ["png of 1,025 characters inside an island"] = () => Utf8(Substitute(TickNotation, "'name':'Isle'", $"'name':'Isle','png':'{new string('A', 1028)}'")),
                                                                                    ["png above the binary bound"] = () => Utf8(IconJson(new byte[ContractReader.MaxBinaryBytes + 1])),
-                                                                                   ["document above the binary bound"] = () => Utf8($"{{'type':'catalogUpload','contractVersion':1,'id':'{Id}','document':'{Convert.ToBase64String(new byte[ContractReader.MaxBinaryBytes + 1])}'}}")
+                                                                                   ["document above the binary bound"] = () => Utf8($"{{'type':'catalogUpload','contractVersion':2,'id':'{Id}','document':'{Convert.ToBase64String(new byte[ContractReader.MaxBinaryBytes + 1])}'}}")
                                                                                };
 
     /// <summary>
@@ -178,8 +198,8 @@ public sealed class ContractReaderTests
                                                                                   ["256 islands"] = () => Utf8(TickWithIslands(IslandsNotation(256), false)),
                                                                                   ["524,288 entries and pairs"] = () => Utf8(TickWithIslands(IslandWithEntries(EntriesAndPairs(ContractReader.MaxEntriesAndPairs)), false)),
                                                                                   ["1,024 pairs in each map"] = () => Utf8(TickWithIslands(IslandWithEntries(EntryWithPairs(ContractReader.MaxPairsPerMap, ContractReader.MaxPairsPerMap)), false)),
-                                                                                  ["16 supported versions"] = () => Utf8($"{{'type':'helloRefused','contractVersion':1,'reason':'unsupportedVersion','receivedVersion':17,'supportedVersions':[{Numbers(16)}]}}"),
-                                                                                  ["16,384 missing icons"] = () => Utf8($"{{'type':'acknowledgement','contractVersion':1,'id':'{Id}','refusal':null,'refusedVersion':null,'missingIcons':[{MissingIcons(ContractReader.MaxMissingIcons)}]}}"),
+                                                                                  ["16 supported versions"] = () => Utf8($"{{'type':'helloRefused','contractVersion':2,'reason':'unsupportedVersion','receivedVersion':17,'supportedVersions':[{Numbers(16)}]}}"),
+                                                                                  ["16,384 missing icons"] = () => Utf8($"{{'type':'acknowledgement','contractVersion':2,'id':'{Id}','refusal':null,'refusedVersion':null,'missingIcons':[{MissingIcons(ContractReader.MaxMissingIcons)}]}}"),
                                                                                   ["token of 1,024 bytes"] = () => Utf8(Substitute(HelloNotation, "'secret-token'", $"'{new string('a', 1024)}'")),
                                                                                   ["profile name of 1,024 bytes in three-byte characters"] = () => Utf8(Substitute(HelloNotation, "'Alice'", $"'{new string('木', 341)}a'")),
                                                                                   ["island name of 765 bytes"] = () => Utf8(Substitute(TickNotation, "'Isle'", $"'{new string('a', 765)}'")),
@@ -224,7 +244,7 @@ public sealed class ContractReaderTests
                                                                                       ["tick without game time"] = () => Substitute(TickNotation, "'gameTime':42,", string.Empty),
                                                                                       ["tick id null"] = () => Substitute(TickNotation, $"'{Id}'", "null"),
                                                                                       ["tick island name too long"] = () => Substitute(TickNotation, "'Isle'", $"'{new string('a', 766)}'"),
-                                                                                      ["tick version 2"] = () => Substitute(TickNotation, "'contractVersion':1", "'contractVersion':2"),
+                                                                                      ["tick version 3"] = () => Substitute(TickNotation, "'contractVersion':2", "'contractVersion':3"),
                                                                                       ["tick id all zero"] = () => Substitute(TickNotation, Id, ZeroId),
                                                                                       ["tick id no UUID"] = () => Substitute(TickNotation, Id, "tick-a"),
                                                                                       ["tick id uppercase"] = () => Substitute(TickNotation, Id, Profile.ToUpperInvariant()),
@@ -232,6 +252,54 @@ public sealed class ContractReaderTests
                                                                                       ["acknowledgement with valid id"] = () => Substitute(AcknowledgementNotation, $"['{Icon}']", "['XYZ']"),
                                                                                       ["hello profile all zero"] = () => Substitute(HelloNotation, Profile, ZeroId)
                                                                                   };
+
+    /// <summary>
+    /// The trade-routes messages at a bound or with a value the rules allow, built on demand: the name of the case, the
+    /// number of routes and stations it holds and the builder of its JSON text.
+    /// </summary>
+    private static readonly Dictionary<string, (int Routes, int Stations, Func<string> Create)> _tradeRoutesAccepted = new()
+                                                                                                                       {
+                                                                                                                           ["no routes"] = (0, 0, () => TradeRoutesJson(string.Empty, false)),
+                                                                                                                           ["1,024 routes"] = (ContractReader.MaxTradeRoutes, ContractReader.MaxTradeRoutes, () => TradeRoutesJson(Routes(Enumerable.Repeat(1, ContractReader.MaxTradeRoutes)), false)),
+                                                                                                                           ["256 stations in one route"] = (1, ContractReader.MaxStationsPerRoute, () => TradeRoutesJson(Routes([ContractReader.MaxStationsPerRoute]), false)),
+                                                                                                                           ["256 stations in each of two routes"] = (2, 512, () => TradeRoutesJson(Routes([ContractReader.MaxStationsPerRoute, ContractReader.MaxStationsPerRoute]), false)),
+                                                                                                                           ["52,428 stations in a message"] = (205, ContractReader.MaxStations, () => TradeRoutesJson(Routes(StationCounts(ContractReader.MaxStations)), false)),
+                                                                                                                           ["route name of 765 bytes"] = (1, 2, () => Substitute(TradeRoutesNotation, "'Via Appia'", $"'{new string('a', 765)}'")),
+                                                                                                                           ["route name of 255 three-byte characters"] = (1, 2, () => Substitute(TradeRoutesNotation, "'Via Appia'", $"'{new string('木', 255)}'")),
+                                                                                                                           ["route name of 255 replacement characters"] = (1, 2, () => Substitute(TradeRoutesNotation, "'Via Appia'", $"'{new string((char)0xFFFD, 255)}'")),
+                                                                                                                           ["route name of 255 escaped replacement characters"] = (1, 2, () => Substitute(TradeRoutesNotation, "'Via Appia'", $"'{EscapedReplacementCharacters(255)}'")),
+                                                                                                                           ["folder of 765 bytes"] = (1, 2, () => Substitute(TradeRoutesNotation, "'North'", $"'{new string('a', 765)}'")),
+                                                                                                                           ["folder of 255 replacement characters"] = (1, 2, () => Substitute(TradeRoutesNotation, "'North'", $"'{new string((char)0xFFFD, 255)}'")),
+                                                                                                                           ["folder of 255 escaped replacement characters"] = (1, 2, () => Substitute(TradeRoutesNotation, "'North'", $"'{EscapedReplacementCharacters(255)}'")),
+                                                                                                                           ["empty route name and folder"] = (1, 2, () => Substitute(Substitute(TradeRoutesNotation, "'Via Appia'", "''"), "'North'", "''")),
+                                                                                                                           ["repeated route id and name"] = (2, 4, () => TradeRoutesJson($"{RouteNotation},{RouteNotation}", false)),
+                                                                                                                           ["counts at the ends of 32 bits and lost ships above ships"] = (1, 2, () => Substitute(TradeRoutesNotation, "'majorProblems':1,'minorProblems':2,'ships':3,'lostShips':4", "'majorProblems':-2147483648,'minorProblems':2147483647,'ships':-1,'lostShips':5")),
+                                                                                                                           ["route id at the ends of 32 bits"] = (2, 4, () => TradeRoutesJson($"{RouteNotation.Replace("'id':7", "'id':-2147483648", StringComparison.Ordinal)},{RouteNotation.Replace("'id':7", "'id':2147483647", StringComparison.Ordinal)}", false)),
+                                                                                                                           ["route without stations"] = (1, 0, () => Substitute(TradeRoutesNotation, StationsNotation, "[]")),
+                                                                                                                           ["routes first and type last"] = (1, 2, () => TradeRoutesJson(RouteNotation, true)),
+                                                                                                                           ["largest message at every bound"] = (ContractReader.MaxTradeRoutes, ContractReader.MaxStations, LargestTradeRoutesJson)
+                                                                                                                       };
+
+    /// <summary>
+    /// The trade-routes messages above a bound, built on demand: the name of the case and its builder.
+    /// </summary>
+    private static readonly Dictionary<string, Func<byte[]>> _tradeRoutesTooLarge = new()
+                                                                                    {
+                                                                                        ["1,025 routes"] = () => Encoding.UTF8.GetBytes(TradeRoutesJson(Routes(Enumerable.Repeat(0, ContractReader.MaxTradeRoutes + 1)), false)),
+                                                                                        ["1,025 routes with type last"] = () => Encoding.UTF8.GetBytes(TradeRoutesJson(Routes(Enumerable.Repeat(0, ContractReader.MaxTradeRoutes + 1)), true)),
+                                                                                        ["1,025 routes in a version 1 message"] = () => Encoding.UTF8.GetBytes(TradeRoutesJson(Routes(Enumerable.Repeat(0, ContractReader.MaxTradeRoutes + 1)), false).Replace("\"contractVersion\":2", "\"contractVersion\":1", StringComparison.Ordinal)),
+                                                                                        ["1,025 routes in a status message"] = () => Utf8($"{{'type':'status','contractVersion':2,'pipeState':'receiving','routes':[{Routes(Enumerable.Repeat(0, ContractReader.MaxTradeRoutes + 1))}]}}"),
+                                                                                        ["257 stations in one route"] = () => Encoding.UTF8.GetBytes(TradeRoutesJson(Routes([ContractReader.MaxStationsPerRoute + 1]), false)),
+                                                                                        ["257 stations in the second route"] = () => Encoding.UTF8.GetBytes(TradeRoutesJson(Routes([1, ContractReader.MaxStationsPerRoute + 1]), false)),
+                                                                                        ["257 stations in a status message"] = () => Utf8($"{{'type':'status','contractVersion':2,'pipeState':'receiving','routes':[{{'stations':[{string.Join(",", Enumerable.Repeat(StationNotation, ContractReader.MaxStationsPerRoute + 1))}]}}]}}"),
+                                                                                        ["52,429 stations in a message"] = () => Encoding.UTF8.GetBytes(TradeRoutesJson(Routes(StationCounts(ContractReader.MaxStations + 1)), false)),
+                                                                                        ["route name of 766 bytes"] = () => Encoding.UTF8.GetBytes(Substitute(TradeRoutesNotation, "'Via Appia'", $"'{new string('a', 766)}'")),
+                                                                                        ["route name of 256 replacement characters"] = () => Encoding.UTF8.GetBytes(Substitute(TradeRoutesNotation, "'Via Appia'", $"'{new string((char)0xFFFD, 256)}'")),
+                                                                                        ["route name of 256 escaped replacement characters"] = () => Encoding.UTF8.GetBytes(Substitute(TradeRoutesNotation, "'Via Appia'", $"'{EscapedReplacementCharacters(256)}'")),
+                                                                                        ["folder of 766 bytes"] = () => Encoding.UTF8.GetBytes(Substitute(TradeRoutesNotation, "'North'", $"'{new string('a', 766)}'")),
+                                                                                        ["folder of 256 three-byte characters"] = () => Encoding.UTF8.GetBytes(Substitute(TradeRoutesNotation, "'North'", $"'{new string('木', 256)}'")),
+                                                                                        ["route name of 766 bytes in a status message"] = () => Utf8($"{{'type':'status','contractVersion':2,'pipeState':'receiving','routes':[{{'name':'{new string('a', 766)}'}}]}}")
+                                                                                    };
 
     #endregion // Fields
 
@@ -256,14 +324,22 @@ public sealed class ContractReaderTests
             yield return new object[] { SessionEndNotation, ContractMessageType.SessionEnd };
             yield return new object[] { StatusNotation, ContractMessageType.Status };
             yield return new object[] { AcknowledgementNotation, ContractMessageType.Acknowledgement };
+            yield return new object[] { TradeRoutesNotation, ContractMessageType.TradeRoutes };
+            yield return new object[] { Substitute(TradeRoutesNotation, $"[{RouteNotation}]", "[]"), ContractMessageType.TradeRoutes };
             yield return new object[] { Substitute(AcknowledgementNotation, $"'refusal':null,'refusedVersion':null,'missingIcons':['{Icon}']", "'refusal':'catalogUnsupportedVersion','refusedVersion':2,'missingIcons':[]"), ContractMessageType.Acknowledgement };
         }
     }
 
     /// <summary>
+    /// Gets a valid message of every type but the refused hello reply, its version set to 1: the message type and the message
+    /// as JSON text.
+    /// </summary>
+    private static IEnumerable<object[]> VersionOneRows => new[] { (ContractMessageType.Hello, HelloNotation), (ContractMessageType.HelloAccepted, HelloAcceptedNotation), (ContractMessageType.CatalogUpload, CatalogUploadNotation), (ContractMessageType.IconImage, IconImageNotation), (ContractMessageType.Tick, TickNotation), (ContractMessageType.SessionStart, SessionStartNotation), (ContractMessageType.SessionEnd, SessionEndNotation), (ContractMessageType.Status, StatusNotation), (ContractMessageType.Acknowledgement, AcknowledgementNotation), (ContractMessageType.TradeRoutes, TradeRoutesNotation) }.Select(row => new object[] { row.Item1, Substitute(row.Item2, "'contractVersion':2", "'contractVersion':1") });
+
+    /// <summary>
     /// Gets the version cases: the contract version and the body after it in single-quote notation.
     /// </summary>
-    private static IEnumerable<object[]> OtherVersionRows => new[] { 0, 2, -1, int.MaxValue, int.MinValue }.SelectMany(version => OtherVersionBodies().Select(body => new object[] { version, body }));
+    private static IEnumerable<object[]> OtherVersionRows => new[] { 0, 1, 3, -1, int.MaxValue, int.MinValue }.SelectMany(version => OtherVersionBodies().Select(body => new object[] { version, body }));
 
     /// <summary>
     /// Gets the malformed inputs: the name of the case and the bytes.
@@ -294,19 +370,19 @@ public sealed class ContractReaderTests
     {
         get
         {
-            const string markerHello = "{'type':'hello','contractVersion':1,'token':'MARKERTOKEN','companionVersion':'0.3.0','profileId':'" + Profile + "','profileName':'MARKERPROFILE'}";
-            const string markerTick = "{'type':'tick','contractVersion':1,'id':'" + Id + "','profileId':'" + Profile + "','receiveTime':'" + Time + "','gameTime':42,'islands':[{'sessionGuid':1,'islandId':1,'areaIndex':0,'sessionId':2,'name':'MARKERISLAND','entries':[]}]}";
+            const string markerHello = "{'type':'hello','contractVersion':2,'token':'MARKERTOKEN','companionVersion':'0.3.0','profileId':'" + Profile + "','profileName':'MARKERPROFILE'}";
+            const string markerTick = "{'type':'tick','contractVersion':2,'id':'" + Id + "','profileId':'" + Profile + "','receiveTime':'" + Time + "','gameTime':42,'islands':[{'sessionGuid':1,'islandId':1,'areaIndex':0,'sessionId':2,'name':'MARKERISLAND','entries':[]}]}";
 
             yield return new object[] { "malformed hello", Json(markerHello.Replace("'profileName'", "'MARKERTOKEN':1,'profileName'", StringComparison.Ordinal)), ContractErrorKind.Malformed };
             yield return new object[] { "invalid hello", Json(markerHello.Replace(Profile, ZeroId, StringComparison.Ordinal)), ContractErrorKind.Invalid };
             yield return new object[] { "too large hello", Json(markerHello.Replace("'0.3.0'", $"'{new string('a', 1025)}'", StringComparison.Ordinal)), ContractErrorKind.TooLarge };
-            yield return new object[] { "version 2 hello", Json(markerHello.Replace("'contractVersion':1", "'contractVersion':2", StringComparison.Ordinal)), ContractErrorKind.UnsupportedVersion };
+            yield return new object[] { "version 3 hello", Json(markerHello.Replace("'contractVersion':2", "'contractVersion':3", StringComparison.Ordinal)), ContractErrorKind.UnsupportedVersion };
             yield return new object[] { "malformed tick", Json(markerTick.Replace("'gameTime':42", "'gameTime':'MARKERISLAND'", StringComparison.Ordinal)), ContractErrorKind.Malformed };
             yield return new object[] { "invalid tick", Json(markerTick.Replace(Id, ZeroId, StringComparison.Ordinal)), ContractErrorKind.Invalid };
             yield return new object[] { "too large tick", Json(markerTick.Replace("'MARKERISLAND'", $"'MARKERISLAND{new string('a', 760)}'", StringComparison.Ordinal)), ContractErrorKind.TooLarge };
-            yield return new object[] { "catalog refused", Json($"{{'type':'catalogUpload','contractVersion':1,'id':'{Id}','document':'{Base64("{\"schemaVersion\":1,\"gameVersion\":\"MARKERCATALOG\",\"entries\":[]}")}'}}"), ContractErrorKind.CatalogRefused };
-            yield return new object[] { "malformed catalog upload", Json($"{{'type':'catalogUpload','contractVersion':1,'id':'{Id}','document':'{Base64("{\"schemaVersion\":1,\"gameVersion\":\"MARKERCATALOG\",\"entries\":[]}")}','MARKERCATALOG':1}}"), ContractErrorKind.Malformed };
-            yield return new object[] { "invalid icon image", Json($"{{'type':'iconImage','contractVersion':1,'id':'{Id}','reference':'{Icon}','png':'{Base64("MARKERIMAGEDATA!!")}'}}"), ContractErrorKind.Invalid };
+            yield return new object[] { "catalog refused", Json($"{{'type':'catalogUpload','contractVersion':2,'id':'{Id}','document':'{Base64("{\"schemaVersion\":1,\"gameVersion\":\"MARKERCATALOG\",\"entries\":[]}")}'}}"), ContractErrorKind.CatalogRefused };
+            yield return new object[] { "malformed catalog upload", Json($"{{'type':'catalogUpload','contractVersion':2,'id':'{Id}','document':'{Base64("{\"schemaVersion\":1,\"gameVersion\":\"MARKERCATALOG\",\"entries\":[]}")}','MARKERCATALOG':1}}"), ContractErrorKind.Malformed };
+            yield return new object[] { "invalid icon image", Json($"{{'type':'iconImage','contractVersion':2,'id':'{Id}','reference':'{Icon}','png':'{Base64("MARKERIMAGEDATA!!")}'}}"), ContractErrorKind.Invalid };
         }
     }
 
@@ -358,13 +434,50 @@ public sealed class ContractReaderTests
             yield return new object[] { "tick without game time", ContractErrorKind.Malformed };
             yield return new object[] { "tick id null", ContractErrorKind.Malformed };
             yield return new object[] { "tick island name too long", ContractErrorKind.TooLarge };
-            yield return new object[] { "tick version 2", ContractErrorKind.UnsupportedVersion };
+            yield return new object[] { "tick version 3", ContractErrorKind.UnsupportedVersion };
             yield return new object[] { "tick id all zero", ContractErrorKind.Invalid };
             yield return new object[] { "tick id no UUID", ContractErrorKind.Invalid };
             yield return new object[] { "tick id uppercase", ContractErrorKind.Invalid };
             yield return new object[] { "catalog upload id all zero", ContractErrorKind.Invalid };
             yield return new object[] { "acknowledgement with valid id", ContractErrorKind.Invalid };
             yield return new object[] { "hello profile all zero", ContractErrorKind.Invalid };
+        }
+    }
+
+    /// <summary>
+    /// Gets the trade-routes messages at a bound or with a value the rules allow: the name of the case (a key of
+    /// <see cref="_tradeRoutesAccepted" />), the number of routes and the number of stations it holds.
+    /// </summary>
+    private static IEnumerable<object[]> TradeRoutesAcceptedRows => _tradeRoutesAccepted.Select(pair => new object[] { pair.Key, pair.Value.Routes, pair.Value.Stations });
+
+    /// <summary>
+    /// Gets the names of the trade-routes messages above a bound.
+    /// </summary>
+    private static IEnumerable<object[]> TradeRoutesTooLargeRows => _tradeRoutesTooLarge.Keys.Select(label => new object[] { label });
+
+    /// <summary>
+    /// Gets the trade-routes messages that break their form or a value rule: the name of the case, the bytes, the kind and
+    /// text they are refused with and the refused <c>id</c> as text, or <see langword="null" /> when none is returned.
+    /// </summary>
+    private static IEnumerable<object?[]> TradeRoutesBrokenRows => TradeRoutesBrokenInputs().Select(row => new object?[] { row.Label, row.Json, row.Kind, row.Kind == ContractErrorKind.Invalid ? InvalidText : MalformedText, row.RefusedId });
+
+    /// <summary>
+    /// Gets trade-routes messages that hold marker texts in a route name and a folder: the name of the case, the JSON text
+    /// and the kind it is refused with.
+    /// </summary>
+    private static IEnumerable<object[]> TradeRoutesMarkerRows
+    {
+        get
+        {
+            var marked = Substitute(Substitute(TradeRoutesNotation, "'Via Appia'", "'MARKERROUTE'"), "'North'", "'MARKERFOLDER'");
+
+            yield return new object[] { "malformed by a property named like the route", Substitute(marked, "'folder'", "'MARKERROUTE':1,'folder'"), ContractErrorKind.Malformed };
+            yield return new object[] { "malformed by a count of the folder's text", Substitute(marked, "'ships':3", "'ships':'MARKERFOLDER'"), ContractErrorKind.Malformed };
+            yield return new object[] { "invalid by its id", Substitute(marked, Id, ZeroId), ContractErrorKind.Invalid };
+            yield return new object[] { "invalid by its profile", Substitute(marked, Profile, ZeroId), ContractErrorKind.Invalid };
+            yield return new object[] { "too large by its route name", Substitute(marked, "'MARKERROUTE'", $"'MARKERROUTE{new string('a', 760)}'"), ContractErrorKind.TooLarge };
+            yield return new object[] { "too large by its folder", Substitute(marked, "'MARKERFOLDER'", $"'MARKERFOLDER{new string('a', 760)}'"), ContractErrorKind.TooLarge };
+            yield return new object[] { "version 1", Substitute(marked, "'contractVersion':2", "'contractVersion':1"), ContractErrorKind.UnsupportedVersion };
         }
     }
 
@@ -448,12 +561,12 @@ public sealed class ContractReaderTests
     /// <param name="notation">The message in single-quote notation</param>
     [TestMethod]
     [TestCategory("AC4")]
-    [DataRow($"{{'type':'sessionStart','contractVersion':1,'id':'{Id}','profileId':'{Profile}','receiveTime':'{Time}','figureName':'Marcus'}}")]
-    [DataRow($"{{'type':'sessionStart','contractVersion':1,'id':'{Id}','profileId':'{Profile}','receiveTime':'{Time}','headline':'Marcus'}}")]
-    [DataRow($"{{'type':'sessionStart','contractVersion':1,'id':'{Id}','profileId':'{Profile}','receiveTime':'{Time}','text':'Marcus'}}")]
-    [DataRow($"{{'type':'sessionEnd','contractVersion':1,'id':'{Id}','profileId':'{Profile}','receiveTime':'{Time}','figureName':'Marcus'}}")]
-    [DataRow($"{{'type':'tick','contractVersion':1,'id':'{Id}','profileId':'{Profile}','receiveTime':'{Time}','gameTime':42,'islands':[],'figureName':'Marcus'}}")]
-    [DataRow($"{{'type':'hello','contractVersion':1,'token':null,'companionVersion':'0.3.0','profileId':'{Profile}','profileName':'Alice','figureName':'Marcus'}}")]
+    [DataRow($"{{'type':'sessionStart','contractVersion':2,'id':'{Id}','profileId':'{Profile}','receiveTime':'{Time}','figureName':'Marcus'}}")]
+    [DataRow($"{{'type':'sessionStart','contractVersion':2,'id':'{Id}','profileId':'{Profile}','receiveTime':'{Time}','headline':'Marcus'}}")]
+    [DataRow($"{{'type':'sessionStart','contractVersion':2,'id':'{Id}','profileId':'{Profile}','receiveTime':'{Time}','text':'Marcus'}}")]
+    [DataRow($"{{'type':'sessionEnd','contractVersion':2,'id':'{Id}','profileId':'{Profile}','receiveTime':'{Time}','figureName':'Marcus'}}")]
+    [DataRow($"{{'type':'tick','contractVersion':2,'id':'{Id}','profileId':'{Profile}','receiveTime':'{Time}','gameTime':42,'islands':[],'figureName':'Marcus'}}")]
+    [DataRow($"{{'type':'hello','contractVersion':2,'token':null,'companionVersion':'0.3.0','profileId':'{Profile}','profileName':'Alice','figureName':'Marcus'}}")]
     public void ContractReaderSessionStartWithTextIsMalformed(string notation)
     {
         // Arrange
@@ -467,7 +580,7 @@ public sealed class ContractReaderTests
     }
 
     /// <summary>
-    /// A message of a contract version other than 1 is refused as unsupported with the version found, whatever it holds.
+    /// A message of a contract version other than 2 is refused as unsupported with the version found, whatever it holds.
     /// </summary>
     /// <param name="version">The contract version</param>
     /// <param name="body">The rest of the message after the version, in single-quote notation</param>
@@ -495,7 +608,7 @@ public sealed class ContractReaderTests
     public void ContractReaderEscapedVersionNameIsFound()
     {
         // Arrange
-        var text = Json("""{'type':'status','contract\u0056ersion':2,'pipeState':'receiving'}""");
+        var text = Json("""{'type':'status','contract\u0056ersion':3,'pipeState':'receiving'}""");
         var json = Encoding.UTF8.GetBytes(text);
 
         // Act
@@ -503,7 +616,7 @@ public sealed class ContractReaderTests
 
         // Assert
         Assert.Contains("\\u0056", text, "The input should still hold the backslash of the escape");
-        AssertUnsupportedVersion(result, 2, "escaped version name");
+        AssertUnsupportedVersion(result, 3, "escaped version name");
     }
 
     /// <summary>
@@ -513,8 +626,8 @@ public sealed class ContractReaderTests
     /// <param name="version">The version of the hello</param>
     [TestMethod]
     [TestCategory("AC5")]
-    [DataRow($"{{'type':'hello','contractVersion':2,'token':'secret-token','companionVersion':'0.4.0','profileId':'{Profile}','profileName':'Alice'}}", 2)]
-    [DataRow($"{{'type':'hello','contractVersion':2,'token':'secret-token','companionVersion':'0.4.0','profileId':'{Profile}','profileName':'Alice','futureProperty':[1]}}", 2)]
+    [DataRow($"{{'type':'hello','contractVersion':3,'token':'secret-token','companionVersion':'0.4.0','profileId':'{Profile}','profileName':'Alice'}}", 3)]
+    [DataRow($"{{'type':'hello','contractVersion':3,'token':'secret-token','companionVersion':'0.4.0','profileId':'{Profile}','profileName':'Alice','futureProperty':[1]}}", 3)]
     [DataRow("{'type':'hello','contractVersion':3}", 3)]
     [DataRow("{'contractVersion':0,'type':'hello','profileId':7}", 0)]
     public void ContractReaderHelloOfOtherVersionIsRefusedWithItsVersion(string notation, int version)
@@ -530,6 +643,52 @@ public sealed class ContractReaderTests
     }
 
     /// <summary>
+    /// A message of contract version 1 that is valid in version 1 is refused as unsupported, its text naming version 1 as
+    /// found and version 2 as supported.
+    /// </summary>
+    /// <param name="type">The message type</param>
+    /// <param name="text">The message as JSON text</param>
+    [TestMethod]
+    [TestCategory("AC8")]
+    [DynamicData(nameof(VersionOneRows))]
+    public void ContractReaderVersionOneRefusedNamingBothVersions(ContractMessageType type, string text)
+    {
+        // Arrange
+        var json = Encoding.UTF8.GetBytes(text);
+
+        // Act
+        var result = ContractReader.Read(json);
+
+        // Assert
+        Assert.Contains("\"contractVersion\":1,", text, $"The {type} should be of version 1");
+        AssertRefusal(result, ContractErrorKind.UnsupportedVersion, "Contract version 1 is not supported; supported: 2", type.ToString());
+        Assert.AreEqual(1, result.Error!.Version, $"The refusal of the {type} should carry version 1");
+    }
+
+    /// <summary>
+    /// The refused hello reply of a server of contract version 1 to a hello of version 2 is read with both versions: 2 as
+    /// received, 1 as supported.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC8")]
+    public void ContractReaderVersionOneServerRefusalReadsBothVersions()
+    {
+        // Arrange
+        var json = Utf8("{'type':'helloRefused','contractVersion':1,'reason':'unsupportedVersion','receivedVersion':2,'supportedVersions':[1]}");
+
+        // Act
+        var result = ContractReader.Read(json);
+
+        // Assert
+        var refused = AssertRead<ContractHelloRefused>(result, "refusal of a version 1 server");
+
+        Assert.AreEqual(ContractHelloRefusal.UnsupportedVersion, refused.Reason, "The refusal should be for the version");
+        Assert.AreEqual(2, refused.ReceivedVersion, "The refusal should name version 2 as received");
+        Assert.HasCount(1, refused.SupportedVersions, "The refusal should name one supported version");
+        Assert.AreEqual(1, refused.SupportedVersions[0], "The refusal should name version 1 as supported");
+    }
+
+    /// <summary>
     /// A refused hello reply of the frozen form is read in any version with its kind, received and supported versions.
     /// </summary>
     /// <param name="notation">The reply in single-quote notation</param>
@@ -538,9 +697,9 @@ public sealed class ContractReaderTests
     /// <param name="supported">The expected supported versions</param>
     [TestMethod]
     [TestCategory("AC5")]
-    [DataRow("{'type':'helloRefused','contractVersion':2,'reason':'unsupportedVersion','receivedVersion':1,'supportedVersions':[2]}", ContractHelloRefusal.UnsupportedVersion, 1, new[] { 2 })]
-    [DataRow("{'supportedVersions':[2],'receivedVersion':1,'reason':'unsupportedVersion','contractVersion':2,'type':'helloRefused'}", ContractHelloRefusal.UnsupportedVersion, 1, new[] { 2 })]
-    [DataRow("{'type':'helloRefused','contractVersion':2,'reason':'tokenRefused','receivedVersion':2,'supportedVersions':[2]}", ContractHelloRefusal.TokenRefused, 2, new[] { 2 })]
+    [DataRow("{'type':'helloRefused','contractVersion':3,'reason':'unsupportedVersion','receivedVersion':1,'supportedVersions':[2]}", ContractHelloRefusal.UnsupportedVersion, 1, new[] { 2 })]
+    [DataRow("{'supportedVersions':[2],'receivedVersion':1,'reason':'unsupportedVersion','contractVersion':3,'type':'helloRefused'}", ContractHelloRefusal.UnsupportedVersion, 1, new[] { 2 })]
+    [DataRow("{'type':'helloRefused','contractVersion':3,'reason':'tokenRefused','receivedVersion':2,'supportedVersions':[2]}", ContractHelloRefusal.TokenRefused, 2, new[] { 2 })]
     [DataRow("{'type':'helloRefused','contractVersion':3,'reason':'companionConnected','receivedVersion':3,'supportedVersions':[2,3]}", ContractHelloRefusal.CompanionConnected, 3, new[] { 2, 3 })]
     [DataRow("{'type':'helloRefused','contractVersion':1,'reason':'tokenRefused','receivedVersion':1,'supportedVersions':[1]}", ContractHelloRefusal.TokenRefused, 1, new[] { 1 })]
     [DataRow("{'type':'helloRefused','contractVersion':1,'reason':'companionConnected','receivedVersion':1,'supportedVersions':[1]}", ContractHelloRefusal.CompanionConnected, 1, new[] { 1 })]
@@ -567,11 +726,11 @@ public sealed class ContractReaderTests
     /// <param name="notation">The reply in single-quote notation</param>
     [TestMethod]
     [TestCategory("AC5")]
-    [DataRow("{'type':'helloRefused','contractVersion':2,'reason':'unsupportedVersion','receivedVersion':1,'supportedVersions':[2],'retryAfter':5}")]
-    [DataRow("{'type':'helloRefused','contractVersion':2,'reason':'rateLimited','receivedVersion':1,'supportedVersions':[2]}")]
-    [DataRow("{'type':'helloRefused','contractVersion':2,'reason':'unsupportedVersion','receivedVersion':1}")]
-    [DataRow("{'type':'helloRefused','contractVersion':2,'reason':'unsupportedVersion','receivedVersion':'1','supportedVersions':[2]}")]
-    [DataRow("{'type':'helloRefused','contractVersion':2,'reason':'unsupportedVersion','receivedVersion':1,'supportedVersions':'2'}")]
+    [DataRow("{'type':'helloRefused','contractVersion':3,'reason':'unsupportedVersion','receivedVersion':1,'supportedVersions':[2],'retryAfter':5}")]
+    [DataRow("{'type':'helloRefused','contractVersion':3,'reason':'rateLimited','receivedVersion':1,'supportedVersions':[2]}")]
+    [DataRow("{'type':'helloRefused','contractVersion':3,'reason':'unsupportedVersion','receivedVersion':1}")]
+    [DataRow("{'type':'helloRefused','contractVersion':3,'reason':'unsupportedVersion','receivedVersion':'1','supportedVersions':[2]}")]
+    [DataRow("{'type':'helloRefused','contractVersion':3,'reason':'unsupportedVersion','receivedVersion':1,'supportedVersions':'2'}")]
     public void ContractReaderOtherVersionRefusalOfUnknownFormIsUnsupportedVersion(string notation)
     {
         // Arrange
@@ -581,7 +740,7 @@ public sealed class ContractReaderTests
         var result = ContractReader.Read(json);
 
         // Assert
-        AssertUnsupportedVersion(result, 2, notation);
+        AssertUnsupportedVersion(result, 3, notation);
     }
 
     /// <summary>
@@ -652,7 +811,7 @@ public sealed class ContractReaderTests
     }
 
     /// <summary>
-    /// A message that breaks a value rule of version 1 is invalid.
+    /// A message that breaks a value rule of version 2 is invalid.
     /// </summary>
     /// <param name="label">The name of the case</param>
     /// <param name="text">The JSON text</param>
@@ -726,7 +885,7 @@ public sealed class ContractReaderTests
     [TestCategory("AC7")]
     [DataRow(StatusNotation)]
     [DataRow("not json")]
-    [DataRow("{'type':'status','contractVersion':2,'pipeState':'receiving'}")]
+    [DataRow("{'type':'status','contractVersion':3,'pipeState':'receiving'}")]
     [DataRow("{'type':'status',")]
     public void ContractReaderInputAboveByteBoundIsTooLarge(string notation)
     {
@@ -864,7 +1023,7 @@ public sealed class ContractReaderTests
     public void ContractReaderCatalogUploadWithRefusedDocumentIsCatalogRefused(string label, CatalogDocumentErrorKind catalogKind, string text)
     {
         // Arrange
-        var json = Utf8($"{{'type':'catalogUpload','contractVersion':1,'id':'{Id}','document':'{Convert.ToBase64String(_refusedCatalogs[label]())}'}}");
+        var json = Utf8($"{{'type':'catalogUpload','contractVersion':2,'id':'{Id}','document':'{Convert.ToBase64String(_refusedCatalogs[label]())}'}}");
 
         // Act
         var result = ContractReader.Read(json);
@@ -935,7 +1094,7 @@ public sealed class ContractReaderTests
     {
         // Arrange
         var document = Json($"{{'schemaVersion':1,'gameVersion':'1.2.3.4','entries':[{{'guid':5,'kind':'region','names':{{'en':'Wood','de':'Holz'}},'regionGuid':7,'regionTypes':['Coast','Land'],'icon':'{Icon}'}}]}}");
-        var json = Utf8($"{{'type':'catalogUpload','contractVersion':1,'id':'{Id}','document':'{Base64(document)}'}}");
+        var json = Utf8($"{{'type':'catalogUpload','contractVersion':2,'id':'{Id}','document':'{Base64(document)}'}}");
 
         // Act
         var result = ContractReader.Read(json);
@@ -961,13 +1120,194 @@ public sealed class ContractReaderTests
     }
 
     /// <summary>
+    /// A trade-routes message in the wire form reads back every value: the identities, the receive time to seven digits,
+    /// and each route's id, name, folder, four counts and stations with their island keys in route order.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public void ContractReaderTradeRoutesWireFormReadsEveryValue()
+    {
+        // Arrange
+        var json = Utf8(TradeRoutesNotation);
+
+        // Act
+        var result = ContractReader.Read(json);
+
+        // Assert
+        var message = AssertRead<ContractTradeRoutes>(result, "wire trade routes");
+
+        Assert.AreEqual(Guid.Parse(Id, CultureInfo.InvariantCulture), message.Id, "The identity should be read");
+        Assert.AreEqual(Guid.Parse(Profile, CultureInfo.InvariantCulture), message.ProfileId, "The profile should be read");
+        Assert.AreEqual(new DateTimeOffset(2026, 11, 12, 10, 20, 30, TimeSpan.Zero).AddTicks(1234567), message.ReceiveTime, "The receive time should be read to seven digits");
+        Assert.AreEqual(TimeSpan.Zero, message.ReceiveTime.Offset, "The receive time should be UTC");
+        Assert.HasCount(1, message.Routes, "The route should be read");
+
+        var route = message.Routes[0];
+
+        Assert.AreEqual(7, route.Id, "The route id should be read");
+        Assert.AreEqual("Via Appia", route.Name, "The route name should be read");
+        Assert.AreEqual("North", route.Folder, "The folder should be read");
+        Assert.AreEqual(1, route.MajorProblems, "The major problems should be read");
+        Assert.AreEqual(2, route.MinorProblems, "The minor problems should be read");
+        Assert.AreEqual(3, route.Ships, "The ships should be read");
+        Assert.AreEqual(4, route.LostShips, "The lost ships should be read");
+        Assert.AreEqual("180023/1/0 -5/255/255", string.Join(" ", route.Stations.Select(station => $"{station.SessionGuid}/{station.IslandId}/{station.AreaIndex}")), "The stations should be read with their keys in route order");
+    }
+
+    /// <summary>
+    /// A trade-routes message is read at every bound of N1 (1,024 routes, 256 stations a route, also in two routes, 52,428
+    /// stations a message, names of 765 UTF-8 bytes also of 255 escaped replacement characters, all at once), with no routes
+    /// and with what its value rules allow: repeated route ids and names, any 32-bit count, empty names and a route without
+    /// stations.
+    /// </summary>
+    /// <param name="label">The name of the case</param>
+    /// <param name="routes">The number of routes the message holds</param>
+    /// <param name="stations">The number of stations the message holds</param>
+    [TestMethod]
+    [TestCategory("AC7")]
+    [TestCategory("AC10")]
+    [DynamicData(nameof(TradeRoutesAcceptedRows))]
+    public void ContractReaderTradeRoutesAtEveryBoundAccepted(string label, int routes, int stations)
+    {
+        // Arrange
+        var json = Encoding.UTF8.GetBytes(_tradeRoutesAccepted[label].Create());
+
+        // Act
+        var result = ContractReader.Read(json);
+
+        // Assert
+        var message = AssertRead<ContractTradeRoutes>(result, label);
+
+        Assert.IsLessThan(ContractReader.MaxMessageBytes, json.Length, $"The message should stay below the byte bound: {label}");
+        Assert.HasCount(routes, message.Routes, $"Every route should be read: {label}");
+        Assert.AreEqual(stations, message.Routes.Sum(route => route.Stations.Count), $"Every station should be read: {label}");
+    }
+
+    /// <summary>
+    /// A name of 255 escaped replacement characters (765 bytes, 1,530 raw) is read whole as the route name and as the folder.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public void ContractReaderTradeRoutesEscapedReplacementCharacterNamesAreRead()
+    {
+        // Arrange
+        var text = Substitute(Substitute(TradeRoutesNotation, "'Via Appia'", $"'{EscapedReplacementCharacters(255)}'"), "'North'", $"'{EscapedReplacementCharacters(255)}'");
+        var json = Encoding.UTF8.GetBytes(text);
+
+        // Act
+        var result = ContractReader.Read(json);
+
+        // Assert
+        var route = AssertRead<ContractTradeRoutes>(result, "escaped replacement characters").Routes[0];
+
+        Assert.Contains("\\ufffd", text, "The input should still hold the backslash of the escape");
+        Assert.AreEqual(new string((char)0xFFFD, 255), route.Name, "The route name should read back whole");
+        Assert.AreEqual(new string((char)0xFFFD, 255), route.Folder, "The folder should read back whole");
+    }
+
+    /// <summary>
+    /// A trade-routes message over a bound of N1 is too large: more than 1,024 routes, 256 stations in a route, 52,428
+    /// stations in a message, a route name or folder above 765 bytes after unescaping, wherever <c>type</c> stands, in a
+    /// message of another version and in a message of another type; it returns no <c>id</c>.
+    /// </summary>
+    /// <param name="label">The name of the case</param>
+    [TestMethod]
+    [TestCategory("AC7")]
+    [DynamicData(nameof(TradeRoutesTooLargeRows))]
+    public void ContractReaderTradeRoutesOverBoundRefusedTooLarge(string label)
+    {
+        // Arrange
+        var json = _tradeRoutesTooLarge[label]();
+
+        // Act
+        var result = ContractReader.Read(json);
+
+        // Assert
+        Assert.IsLessThan(ContractReader.MaxMessageBytes, json.Length, $"The message should stay below the byte bound: {label}");
+        AssertRefusal(result, ContractErrorKind.TooLarge, TooLargeText, label);
+        Assert.IsNull(result.RefusedId, $"A message too large should return no id: {label}");
+    }
+
+    /// <summary>
+    /// A trade-routes message that breaks its form is malformed, one that breaks a value rule invalid; an invalid one with a
+    /// usable <c>id</c> returns it, so the server can acknowledge the refusal, every other one returns none.
+    /// </summary>
+    /// <param name="label">The name of the case</param>
+    /// <param name="json">The bytes of the message</param>
+    /// <param name="kind">The kind it is refused with</param>
+    /// <param name="text">The text it is refused with</param>
+    /// <param name="refusedId">The refused <c>id</c> as text, or <see langword="null" /> when none is returned</param>
+    [TestMethod]
+    [TestCategory("AC7")]
+    [DynamicData(nameof(TradeRoutesBrokenRows))]
+    public void ContractReaderTradeRoutesBrokenFormOrRuleRefused(string label, byte[] json, ContractErrorKind kind, string text, string? refusedId)
+    {
+        // Arrange
+        // Act
+        var result = ContractReader.Read(json);
+
+        // Assert
+        AssertRefusal(result, kind, text, label);
+        Assert.AreEqual(refusedId, result.RefusedId?.ToString(), $"The refusal should return the id of its row: {label}");
+    }
+
+    /// <summary>
+    /// A lone surrogate written as an escape in a route name or a folder is malformed.
+    /// </summary>
+    /// <param name="find">The text to replace in the valid message</param>
+    /// <param name="replace">The replacement, holding the escape</param>
+    [TestMethod]
+    [TestCategory("AC7")]
+    [DataRow("'Via Appia'", """'Via\ud800'""")]
+    [DataRow("'North'", """'\udc00North'""")]
+    public void ContractReaderTradeRoutesEscapedLoneSurrogateIsMalformed(string find, string replace)
+    {
+        // Arrange
+        var text = Substitute(TradeRoutesNotation, find, replace);
+        var json = Encoding.UTF8.GetBytes(text);
+
+        // Act
+        var result = ContractReader.Read(json);
+
+        // Assert
+        Assert.Contains("\\ud", text, "The input should still hold the backslash of the escape");
+        AssertRefusal(result, ContractErrorKind.Malformed, MalformedText, text);
+    }
+
+    /// <summary>
+    /// No refusal text of a trade-routes message holds a route name, a folder or the profile identity, in any kind (spec N2).
+    /// </summary>
+    /// <param name="label">The name of the case</param>
+    /// <param name="text">The JSON text</param>
+    /// <param name="kind">The kind it is refused with</param>
+    [TestMethod]
+    [TestCategory("AC7")]
+    [DynamicData(nameof(TradeRoutesMarkerRows))]
+    public void ContractReaderTradeRoutesRefusalTextHoldsNoName(string label, string text, ContractErrorKind kind)
+    {
+        // Arrange
+        var json = Encoding.UTF8.GetBytes(text);
+
+        // Act
+        var result = ContractReader.Read(json);
+
+        // Assert
+        Assert.Contains("MARKERROUTE", text, $"The input should hold the route name marker: {label}");
+        Assert.IsNotNull(result.Error, $"The message should be refused: {label}");
+        Assert.AreEqual(kind, result.Error.Kind, $"The message should be refused with the kind of its row: {label}");
+        Assert.DoesNotContain("MARKERROUTE", result.Error.Text, $"The text should hold no route name: {label}");
+        Assert.DoesNotContain("MARKERFOLDER", result.Error.Text, $"The text should hold no folder: {label}");
+        Assert.DoesNotContain(Profile, result.Error.Text, $"The text should hold no profile identity: {label}");
+    }
+
+    /// <summary>
     /// Builds a catalog upload with the valid <c>id</c> <see cref="Id" /> around a catalog document the catalog reader refuses.
     /// </summary>
     /// <param name="label">The name of the refused catalog document</param>
     /// <returns>The JSON text of the upload</returns>
     private static string CatalogUploadJson(string label)
     {
-        return Json($"{{'type':'catalogUpload','contractVersion':1,'id':'{Id}','document':'{Convert.ToBase64String(_refusedCatalogs[label]())}'}}");
+        return Json($"{{'type':'catalogUpload','contractVersion':2,'id':'{Id}','document':'{Convert.ToBase64String(_refusedCatalogs[label]())}'}}");
     }
 
     /// <summary>
@@ -1060,7 +1400,7 @@ public sealed class ContractReaderTests
     /// <returns>The icon image</returns>
     private static string IconJson(byte[] png)
     {
-        return $"{{'type':'iconImage','contractVersion':1,'id':'{Id}','reference':'{Convert.ToHexStringLower(SHA256.HashData(png))}','png':'{Convert.ToBase64String(png)}'}}";
+        return $"{{'type':'iconImage','contractVersion':2,'id':'{Id}','reference':'{Convert.ToHexStringLower(SHA256.HashData(png))}','png':'{Convert.ToBase64String(png)}'}}";
     }
 
     /// <summary>
@@ -1092,8 +1432,8 @@ public sealed class ContractReaderTests
     private static string TickWithIslands(string islands, bool typeLast)
     {
         return typeLast
-                   ? $"{{'islands':[{islands}],'id':'{Id}','profileId':'{Profile}','receiveTime':'{Time}','gameTime':42,'contractVersion':1,'type':'tick'}}"
-                   : $"{{'type':'tick','contractVersion':1,'id':'{Id}','profileId':'{Profile}','receiveTime':'{Time}','gameTime':42,'islands':[{islands}]}}";
+                   ? $"{{'islands':[{islands}],'id':'{Id}','profileId':'{Profile}','receiveTime':'{Time}','gameTime':42,'contractVersion':2,'type':'tick'}}"
+                   : $"{{'type':'tick','contractVersion':2,'id':'{Id}','profileId':'{Profile}','receiveTime':'{Time}','gameTime':42,'islands':[{islands}]}}";
     }
 
     /// <summary>
@@ -1159,6 +1499,136 @@ public sealed class ContractReaderTests
     }
 
     /// <summary>
+    /// Builds a trade-routes message of routes with the valid identities, as JSON text.
+    /// </summary>
+    /// <param name="routes">The routes in single-quote notation, separated by commas</param>
+    /// <param name="typeLast">Whether the routes come first and the type last</param>
+    /// <returns>The JSON text of the message</returns>
+    private static string TradeRoutesJson(string routes, bool typeLast)
+    {
+        return Json(typeLast
+                        ? $"{{'routes':[{routes}],'id':'{Id}','profileId':'{Profile}','receiveTime':'{Time}','contractVersion':2,'type':'tradeRoutes'}}"
+                        : $"{{'type':'tradeRoutes','contractVersion':2,'id':'{Id}','profileId':'{Profile}','receiveTime':'{Time}','routes':[{routes}]}}");
+    }
+
+    /// <summary>
+    /// Builds one route of a number of stations, in single-quote notation.
+    /// </summary>
+    /// <param name="stations">The number of stations</param>
+    /// <param name="name">The route name in single-quote notation</param>
+    /// <param name="folder">The folder in single-quote notation</param>
+    /// <returns>The route</returns>
+    private static string Route(int stations, string name, string folder)
+    {
+        return $"{{'id':7,'name':'{name}','folder':'{folder}','majorProblems':1,'minorProblems':2,'ships':3,'lostShips':4,'stations':[{string.Join(",", Enumerable.Repeat(StationNotation, stations))}]}}";
+    }
+
+    /// <summary>
+    /// Builds routes of the given numbers of stations, in single-quote notation.
+    /// </summary>
+    /// <param name="stationCounts">The number of stations of each route</param>
+    /// <returns>The routes, separated by commas</returns>
+    private static string Routes(IEnumerable<int> stationCounts)
+    {
+        return string.Join(",", stationCounts.Select(count => Route(count, "Route", "Folder")));
+    }
+
+    /// <summary>
+    /// Splits a number of stations into routes of 256 stations and one last route for the rest.
+    /// </summary>
+    /// <param name="total">The number of stations</param>
+    /// <returns>The number of stations of each route</returns>
+    private static IEnumerable<int> StationCounts(int total)
+    {
+        return Enumerable.Repeat(ContractReader.MaxStationsPerRoute, total / ContractReader.MaxStationsPerRoute).Append(total % ContractReader.MaxStationsPerRoute);
+    }
+
+    /// <summary>
+    /// Returns a number of replacement characters written as JSON escapes.
+    /// </summary>
+    /// <param name="count">The number of characters</param>
+    /// <returns>The escapes</returns>
+    private static string EscapedReplacementCharacters(int count)
+    {
+        return string.Concat(Enumerable.Repeat("""\ufffd""", count));
+    }
+
+    /// <summary>
+    /// Builds the largest trade-routes message the bounds of N1 allow: 1,024 routes, 52,428 stations in routes of 256, and
+    /// every route name and folder of 255 escaped replacement characters.
+    /// </summary>
+    /// <returns>The JSON text of the message</returns>
+    private static string LargestTradeRoutesJson()
+    {
+        var name = EscapedReplacementCharacters(255);
+        var counts = StationCounts(ContractReader.MaxStations).ToList();
+        var routes = counts.Concat(Enumerable.Repeat(0, ContractReader.MaxTradeRoutes - counts.Count)).Select(count => Route(count, name, name));
+
+        return TradeRoutesJson(string.Join(",", routes), false);
+    }
+
+    /// <summary>
+    /// Returns the trade-routes messages that break their form or a value rule.
+    /// </summary>
+    /// <returns>The name of each case, its bytes, the kind it is refused with and the refused <c>id</c> as text</returns>
+    private static IEnumerable<(string Label, byte[] Json, ContractErrorKind Kind, string? RefusedId)> TradeRoutesBrokenInputs()
+    {
+        static (string Label, byte[] Json, ContractErrorKind Kind, string? RefusedId) Malformed(string label, string find, string replace)
+        {
+            return (label, Encoding.UTF8.GetBytes(Substitute(TradeRoutesNotation, find, replace)), ContractErrorKind.Malformed, null);
+        }
+
+        static (string Label, byte[] Json, ContractErrorKind Kind, string? RefusedId) Invalid(string label, string find, string replace, string? refusedId)
+        {
+            return (label, Encoding.UTF8.GetBytes(Substitute(TradeRoutesNotation, find, replace)), ContractErrorKind.Invalid, refusedId);
+        }
+
+        var nameAt = TradeRoutesNotation.IndexOf("Via Appia", StringComparison.Ordinal);
+
+        yield return Malformed("routes null", $"[{RouteNotation}]", "null");
+        yield return Malformed("routes [null]", $"[{RouteNotation}]", "[null]");
+        yield return Malformed("routes an object", $"[{RouteNotation}]", "{}");
+        yield return Malformed("routes missing", $",'routes':[{RouteNotation}]", string.Empty);
+        yield return Malformed("stations null", $"'stations':{StationsNotation}", "'stations':null");
+        yield return Malformed("stations [null]", $"'stations':{StationsNotation}", "'stations':[null]");
+        yield return Malformed("station an array", $"'stations':{StationsNotation}", "'stations':[[180023,1,0]]");
+        yield return Malformed("stations missing", $",'stations':{StationsNotation}", string.Empty);
+        yield return Malformed("folder missing", "'folder':'North',", string.Empty);
+        yield return Malformed("lost ships missing", ",'lostShips':4", string.Empty);
+        yield return Malformed("route name null", "'Via Appia'", "null");
+        yield return Malformed("folder null", "'North'", "null");
+        yield return Malformed("route name a number", "'Via Appia'", "7");
+        yield return Malformed("unknown property in a route", "'folder':'North'", "'folder':'North','goods':[]");
+        yield return Malformed("unknown property in a station", "'areaIndex':0", "'areaIndex':0,'owner':41");
+        yield return Malformed("repeated property in a route", "'ships':3", "'ships':3,'ships':3");
+        yield return Malformed("route property in another case", "'lostShips'", "'LostShips'");
+        yield return Malformed("type in another case", "'type':'tradeRoutes'", "'type':'TradeRoutes'");
+        yield return Malformed("count as text", "'ships':3", "'ships':'3'");
+        yield return Malformed("count with a fraction", "'ships':3", "'ships':3.5");
+        yield return Malformed("count above 32 bits", "'majorProblems':1", "'majorProblems':2147483648");
+        yield return Malformed("count below 32 bits", "'minorProblems':2", "'minorProblems':-2147483649");
+        yield return Malformed("count null", "'lostShips':4", "'lostShips':null");
+        yield return Malformed("route id above 32 bits", "'id':7", "'id':2147483648");
+        yield return Malformed("route id as text", "'id':7", "'id':'7'");
+        yield return Malformed("island ID of 256", "'islandId':1", "'islandId':256");
+        yield return Malformed("area index of -1", "'areaIndex':0", "'areaIndex':-1");
+        yield return Malformed("session GUID above 32 bits", "'sessionGuid':180023", "'sessionGuid':2147483648");
+        yield return Malformed("identity null", $"'id':'{Id}'", "'id':null");
+        yield return Malformed("receive time a number", $"'{Time}'", "638000000000000000");
+        yield return Malformed("root name of 800 bytes is no route name", "'routes'", $"'name':'{new string('a', 800)}','routes'");
+        yield return Malformed("station folder of 800 bytes is no route folder", "'areaIndex':0", $"'areaIndex':0,'folder':'{new string('a', 800)}'");
+        yield return ("invalid UTF-8 in a route name", [.. Utf8(TradeRoutesNotation[..nameAt]), 0xED, 0xA0, 0x80, .. Utf8(TradeRoutesNotation[nameAt..])], ContractErrorKind.Malformed, null);
+        yield return Invalid("identity all zero", Id, ZeroId, null);
+        yield return Invalid("identity no UUID", Id, "routes-a", null);
+        yield return Invalid("identity uppercase", Id, Profile.ToUpperInvariant(), null);
+        yield return Invalid("profile all zero", Profile, ZeroId, Id);
+        yield return Invalid("profile uppercase", Profile, Profile.ToUpperInvariant(), Id);
+        yield return Invalid("receive time without fraction", Time, "2026-11-12T10:20:30Z", Id);
+        yield return Invalid("receive time with an offset", Time, "2026-11-12T10:20:30.1234567+01:00", Id);
+        yield return Invalid("receive time without zone", Time, "2026-11-12T10:20:30.1234567", Id);
+    }
+
+    /// <summary>
     /// Asserts that a result is a refusal of a kind and fixed text, without a message.
     /// </summary>
     /// <param name="result">The result</param>
@@ -1181,7 +1651,7 @@ public sealed class ContractReaderTests
     /// <param name="context">What the case was, for the messages</param>
     private static void AssertUnsupportedVersion(ContractReadResult result, int version, string context)
     {
-        AssertRefusal(result, ContractErrorKind.UnsupportedVersion, $"Contract version {version} is not supported; supported: 1", context);
+        AssertRefusal(result, ContractErrorKind.UnsupportedVersion, $"Contract version {version} is not supported; supported: 2", context);
         Assert.AreEqual(version, result.Error!.Version, "The refusal should carry the version found: " + context);
     }
 
@@ -1234,21 +1704,21 @@ public sealed class ContractReaderTests
         yield return ("single quotes", Encoding.UTF8.GetBytes(StatusNotation));
         yield return ("comment", Utf8(Substitute(StatusNotation, "'pipeState'", "/* c */'pipeState'")));
         yield return ("depth 65", Utf8(Substitute(StatusNotation, "'pipeState'", $"'future':{new string('[', 64)}{new string(']', 64)},'pipeState'")));
-        yield return ("truncated version 2", Utf8("{'type':'status','contractVersion':2,'pipeState':'receiving'"));
-        yield return ("depth 65 in version 2", Utf8($"{{'type':'status','contractVersion':2,'future':{new string('[', 64)}{new string(']', 64)}}}"));
-        yield return ("invalid UTF-8 in a string", [.. Utf8("{'type':'status','contractVersion':1,'pipeState':'rec"), 0xC3, 0x28, .. Utf8("'}")]);
+        yield return ("truncated version 3", Utf8("{'type':'status','contractVersion':3,'pipeState':'receiving'"));
+        yield return ("depth 65 in version 3", Utf8($"{{'type':'status','contractVersion':3,'future':{new string('[', 64)}{new string(']', 64)}}}"));
+        yield return ("invalid UTF-8 in a string", [.. Utf8("{'type':'status','contractVersion':2,'pipeState':'rec"), 0xC3, 0x28, .. Utf8("'}")]);
         yield return ("invalid UTF-8 in an island name", [.. Utf8(TickNotation[..TickNotation.IndexOf("Isle", StringComparison.Ordinal)]), 0xED, 0xA0, 0x80, .. Utf8(TickNotation[TickNotation.IndexOf("Isle", StringComparison.Ordinal)..])]);
         yield return ("version missing", Utf8("{'type':'status','pipeState':'receiving'}"));
-        yield return ("version twice", Utf8("{'type':'status','contractVersion':1,'contractVersion':1,'pipeState':'receiving'}"));
-        yield return ("version as text", Utf8(Substitute(StatusNotation, "'contractVersion':1", "'contractVersion':'1'")));
-        yield return ("version with a fraction", Utf8(Substitute(StatusNotation, "'contractVersion':1", "'contractVersion':1.0")));
-        yield return ("version with an exponent", Utf8(Substitute(StatusNotation, "'contractVersion':1", "'contractVersion':1e0")));
-        yield return ("version above 32 bits", Utf8(Substitute(StatusNotation, "'contractVersion':1", "'contractVersion':4294967297")));
-        yield return ("version null", Utf8(Substitute(StatusNotation, "'contractVersion':1", "'contractVersion':null")));
-        yield return ("version only inside an island", Utf8(Substitute(TickNotation, "'contractVersion':1,", string.Empty).Replace("\"sessionGuid\"", "\"contractVersion\":1,\"sessionGuid\"", StringComparison.Ordinal)));
+        yield return ("version twice", Utf8("{'type':'status','contractVersion':2,'contractVersion':2,'pipeState':'receiving'}"));
+        yield return ("version as text", Utf8(Substitute(StatusNotation, "'contractVersion':2", "'contractVersion':'2'")));
+        yield return ("version with a fraction", Utf8(Substitute(StatusNotation, "'contractVersion':2", "'contractVersion':2.0")));
+        yield return ("version with an exponent", Utf8(Substitute(StatusNotation, "'contractVersion':2", "'contractVersion':2e0")));
+        yield return ("version above 32 bits", Utf8(Substitute(StatusNotation, "'contractVersion':2", "'contractVersion':4294967298")));
+        yield return ("version null", Utf8(Substitute(StatusNotation, "'contractVersion':2", "'contractVersion':null")));
+        yield return ("version only inside an island", Utf8(Substitute(TickNotation, "'contractVersion':2,", string.Empty).Replace("\"sessionGuid\"", "\"contractVersion\":2,\"sessionGuid\"", StringComparison.Ordinal)));
         yield return ("version in another case", Utf8(Substitute(StatusNotation, "'contractVersion'", "'ContractVersion'")));
-        yield return ("type missing", Utf8("{'contractVersion':1,'pipeState':'receiving'}"));
-        yield return ("type twice", Utf8("{'type':'status','type':'status','contractVersion':1,'pipeState':'receiving'}"));
+        yield return ("type missing", Utf8("{'contractVersion':2,'pipeState':'receiving'}"));
+        yield return ("type twice", Utf8("{'type':'status','type':'status','contractVersion':2,'pipeState':'receiving'}"));
         yield return ("type a number", Utf8(Substitute(StatusNotation, "'type':'status'", "'type':9")));
         yield return ("type null", Utf8(Substitute(StatusNotation, "'type':'status'", "'type':null")));
         yield return ("unknown type", Utf8(Substitute(StatusNotation, "'type':'status'", "'type':'futureType'")));
@@ -1263,7 +1733,7 @@ public sealed class ContractReaderTests
         yield return ("missing nullable float", Utf8(Substitute(TickNotation, "'income':null,", string.Empty)));
         yield return ("missing catalog identity", Utf8(Substitute(HelloAcceptedNotation, ",'catalogIdentity':null", string.Empty)));
         yield return ("missing refused version", Utf8(Substitute(AcknowledgementNotation, "'refusedVersion':null,", string.Empty)));
-        yield return ("version 1 refusal with a future property", Utf8(Substitute(HelloRefusedNotation, "'supportedVersions':[1]", "'supportedVersions':[1],'retryAfter':5")));
+        yield return ("version 2 refusal with a future property", Utf8(Substitute(HelloRefusedNotation, "'supportedVersions':[2]", "'supportedVersions':[2],'retryAfter':5")));
         yield return ("game time as text", Utf8(Substitute(TickNotation, "'gameTime':42", "'gameTime':'42'")));
         yield return ("game time above 64 bits", Utf8(Substitute(TickNotation, "'gameTime':42", "'gameTime':9223372036854775808")));
         yield return ("game time with a fraction", Utf8(Substitute(TickNotation, "'gameTime':42", "'gameTime':42.5")));
@@ -1291,7 +1761,7 @@ public sealed class ContractReaderTests
         yield return ("islands [null]", Utf8(Substitute(TickNotation, $"[{IslandNotation}]", "[null]")));
         yield return ("entries [null]", Utf8(Substitute(TickNotation, $"[{EntryNotation}]", "[null]")));
         yield return ("missingIcons [null]", Utf8(Substitute(AcknowledgementNotation, $"['{Icon}']", "[null]")));
-        yield return ("supportedVersions [null]", Utf8(Substitute(HelloRefusedNotation, "[1]", "[null]")));
+        yield return ("supportedVersions [null]", Utf8(Substitute(HelloRefusedNotation, "[2]", "[null]")));
         yield return ("island name null", Utf8(Substitute(TickNotation, "'Isle'", "null")));
         yield return ("profile name null", Utf8(Substitute(HelloNotation, "'Alice'", "null")));
         yield return ("identity null", Utf8(Substitute(TickNotation, $"'id':'{Id}'", "'id':null")));
@@ -1312,13 +1782,13 @@ public sealed class ContractReaderTests
         yield return ("missing icons a string", Utf8(Substitute(AcknowledgementNotation, $"['{Icon}']", $"'{Icon}'")));
         yield return ("Base64 png a number", Utf8(Substitute(IconImageNotation, $"'{PngBase64}'", "7")));
         yield return ("Base64 document with a space", Utf8(Substitute(CatalogUploadNotation, "eyJzY2hl", "eyJz Y2hl")));
-        yield return ("Base64 document without padding", Utf8($"{{'type':'catalogUpload','contractVersion':1,'id':'{Id}','document':'{Base64("not json").TrimEnd('=')}'}}"));
+        yield return ("Base64 document without padding", Utf8($"{{'type':'catalogUpload','contractVersion':2,'id':'{Id}','document':'{Base64("not json").TrimEnd('=')}'}}"));
         yield return ("root name of 800 bytes is no island name", Utf8(Substitute(TickNotation, "'gameTime':42", $"'gameTime':42,'name':'{new string('a', 800)}'")));
         yield return ("root png of 1,100 Base64 characters in a status message", Utf8(Substitute(StatusNotation, "'pipeState'", $"'png':'{new string('A', 1100)}','pipeState'")));
     }
 
     /// <summary>
-    /// Returns the inputs that break a value rule of version 1.
+    /// Returns the inputs that break a value rule of version 2.
     /// </summary>
     /// <returns>The name of each case and its JSON text</returns>
     private static IEnumerable<(string Label, string Json)> InvalidInputs()
@@ -1337,11 +1807,11 @@ public sealed class ContractReaderTests
         yield return ("catalog identity of 65 digits", Substitute(HelloAcceptedNotation, "null", $"'{Icon}0'"));
         yield return ("catalog identity empty", Substitute(HelloAcceptedNotation, "null", "''"));
         yield return ("catalog identity not hex", Substitute(HelloAcceptedNotation, "null", $"'{Icon[..63]}g'"));
-        yield return ("supported versions empty", Substitute(HelloRefusedNotation, "[1]", "[]"));
-        yield return ("supported versions descending", Substitute(HelloRefusedNotation, "[1]", "[2,1]"));
-        yield return ("supported versions repeated", Substitute(HelloRefusedNotation, "[1]", "[1,1]"));
-        yield return ("supported version zero", Substitute(HelloRefusedNotation, "[1]", "[0]"));
-        yield return ("supported version negative", Substitute(HelloRefusedNotation, "[1]", "[-1,1]"));
+        yield return ("supported versions empty", Substitute(HelloRefusedNotation, "[2]", "[]"));
+        yield return ("supported versions descending", Substitute(HelloRefusedNotation, "[2]", "[3,2]"));
+        yield return ("supported versions repeated", Substitute(HelloRefusedNotation, "[2]", "[2,2]"));
+        yield return ("supported version zero", Substitute(HelloRefusedNotation, "[2]", "[0]"));
+        yield return ("supported version negative", Substitute(HelloRefusedNotation, "[2]", "[-1,2]"));
         yield return ("catalog upload identity all zero", Substitute(CatalogUploadNotation, Id, ZeroId));
         yield return ("icon identity all zero", Substitute(IconImageNotation, Id, ZeroId));
         yield return ("icon reference not the PNG hash", Substitute(IconImageNotation, PngReference, Icon));

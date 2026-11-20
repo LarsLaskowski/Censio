@@ -55,7 +55,12 @@ public enum ContractMessageType
     /// <summary>
     /// The server's answer to a message.
     /// </summary>
-    Acknowledgement
+    Acknowledgement,
+
+    /// <summary>
+    /// The trade routes of the game.
+    /// </summary>
+    TradeRoutes
 
     #endregion // Values
 }

@@ -14,6 +14,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="..\Censio.Pipe.Tests\Fixtures\long-session.jsonl" Link="Fixtures\Pipe\long-session.jsonl" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\Censio.Pipe.Tests\Fixtures\protocol-3-trade-routes.jsonl" Link="Fixtures\Pipe\protocol-3-trade-routes.jsonl" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Censio.Server\Censio.Server.csproj" />

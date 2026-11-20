@@ -17,7 +17,7 @@ public sealed class ContractError
     /// <summary>
     /// The fixed text of a message that breaks a value rule.
     /// </summary>
-    internal const string InvalidText = "Contract message breaks a rule of contract version 1";
+    internal const string InvalidText = "Contract message breaks a rule of contract version 2";
 
     /// <summary>
     /// The fixed text of a message that exceeds a size bound.

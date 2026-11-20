@@ -16,6 +16,11 @@ public static class PageNames
     /// </summary>
     private const int IdentityCharacters = 8;
 
+    /// <summary>
+    /// The mark of an empty folder.
+    /// </summary>
+    private const string EmptyMark = "–";
+
     #endregion // Constants
 
     #region Methods
@@ -118,6 +123,77 @@ public static class PageNames
         return equal > 1
                    ? string.Create(CultureInfo.InvariantCulture, $"{name} ({region.RegionGuid})")
                    : name;
+    }
+
+    /// <summary>
+    /// Gives the shown name of a trade route.
+    /// </summary>
+    /// <param name="name">The name of the route</param>
+    /// <param name="language">The language</param>
+    /// <returns>The shown name</returns>
+    public static string TradeRoute(string name, UiLanguage language)
+    {
+        return string.IsNullOrEmpty(name) ? UiTexts.For(language).UnnamedRoute : name;
+    }
+
+    /// <summary>
+    /// Gives the shown name of a trade route's folder.
+    /// </summary>
+    /// <param name="folder">The folder of the route</param>
+    /// <returns>The shown name</returns>
+    public static string Folder(string folder)
+    {
+        return string.IsNullOrEmpty(folder) ? EmptyMark : folder;
+    }
+
+    /// <summary>
+    /// Gives the shown name of a stop of a trade route.
+    /// </summary>
+    /// <param name="stop">The stop</param>
+    /// <param name="language">The language</param>
+    /// <returns>The shown name</returns>
+    public static string Station(TradeRouteStop stop, UiLanguage language)
+    {
+        ArgumentNullException.ThrowIfNull(stop);
+
+        return stop.Name is null
+                   ? string.Format(CultureInfo.InvariantCulture, UiTexts.For(language).StationFallbackFormat, stop.Island.SessionGuid, stop.Island.IslandId, stop.Island.AreaIndex)
+                   : Island(stop.Name, language);
+    }
+
+    /// <summary>
+    /// Orders the trade routes for a page: the major problems, minor problems and lost ships descending, then the shown
+    /// name ignoring case, the folder and the ID.
+    /// </summary>
+    /// <param name="routes">The routes</param>
+    /// <param name="language">The language</param>
+    /// <returns>The ordered routes</returns>
+    public static IReadOnlyList<TradeRouteView> OrderTradeRoutes(IReadOnlyList<TradeRouteView> routes, UiLanguage language)
+    {
+        return [
+                   .. routes.OrderByDescending(route => route.MajorProblems)
+                            .ThenByDescending(route => route.MinorProblems)
+                            .ThenByDescending(route => route.LostShips)
+                            .ThenBy(route => TradeRoute(route.Name, language), StringComparer.OrdinalIgnoreCase)
+                            .ThenBy(route => route.Folder, StringComparer.Ordinal)
+                            .ThenBy(route => route.Id)
+               ];
+    }
+
+    /// <summary>
+    /// Gives the summary line of the trade routes.
+    /// </summary>
+    /// <param name="routes">The routes</param>
+    /// <param name="language">The language</param>
+    /// <returns>The summary</returns>
+    public static string TradeRoutesSummary(IReadOnlyList<TradeRouteView> routes, UiLanguage language)
+    {
+        var texts = UiTexts.For(language);
+
+        return string.Format(CultureInfo.InvariantCulture,
+                             routes.Count == 1 ? texts.TradeRoutesSummaryOneFormat : texts.TradeRoutesSummaryFormat,
+                             PageFormat.Number(routes.Count, language),
+                             PageFormat.Number(routes.Count(route => route.HasProblem), language));
     }
 
     /// <summary>

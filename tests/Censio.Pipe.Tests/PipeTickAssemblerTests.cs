@@ -487,21 +487,22 @@ public sealed class PipeTickAssemblerTests
 
     /// <summary>
     /// Each fixture, replayed through the message reader and the tick assembler, gives the ticks with their close
-    /// reasons, the session events and the rename its README states.
+    /// reasons, the session events, the trade-routes items with their route counts and the rename its README states.
     /// </summary>
     /// <param name="fixture">The fixture file name</param>
     /// <param name="expected">The facts the README states</param>
     /// <returns>The task</returns>
     [TestMethod]
+    [TestCategory("AC1")]
     [TestCategory("AC6")]
     [TestCategory("AC7")]
     [TestCategory("AC11")]
     [DataRow("long-session.jsonl",
-             "items=Version,RepeatedSessionEnd,SessionStart,Tick x32,SessionEnd,SessionStart,Tick x1,EndOfStream ticks=33 GameTimeChanged=1 QuietPeriod=31 StreamEnded=1 noData=2 islands=24 renamed=1 figures=Player 1")]
+             "items=Version,RepeatedSessionEnd,SessionStart,Tick x32,SessionEnd,SessionStart,Tick x1,EndOfStream ticks=33 GameTimeChanged=1 QuietPeriod=31 StreamEnded=1 noData=2 islands=24 renamed=1 figures=Player 1 routes=")]
     [DataRow("protocol-3-session.jsonl",
-             "items=Version,RepeatedSessionEnd,SessionStart,Tick x5,EndOfStream ticks=5 GameTimeChanged=1 QuietPeriod=3 StreamEnded=1 noData=1 islands=25 renamed=0 figures=Player 1")]
+             "items=Version,RepeatedSessionEnd,TradeRoutes,SessionStart,Tick x1,TradeRoutes,Tick x1,TradeRoutes,Tick x1,TradeRoutes,Tick x1,TradeRoutes,Tick x1,EndOfStream ticks=5 GameTimeChanged=1 QuietPeriod=3 StreamEnded=1 noData=1 islands=25 renamed=0 figures=Player 1 routes=0 0 0 0 0")]
     [DataRow("protocol-3-trade-routes.jsonl",
-             "items=Version,SessionStart,Tick x12,EndOfStream ticks=12 GameTimeChanged=1 QuietPeriod=10 StreamEnded=1 noData=1 islands=25 renamed=0 figures=Player 1")]
+             "items=Version,SessionStart,Tick x1,TradeRoutes,Tick x1,TradeRoutes,Tick x1,TradeRoutes,Tick x1,TradeRoutes,Tick x1,TradeRoutes,Tick x1,TradeRoutes,Tick x1,TradeRoutes,Tick x1,TradeRoutes,Tick x1,TradeRoutes,Tick x1,TradeRoutes,Tick x1,TradeRoutes,Tick x1,EndOfStream ticks=12 GameTimeChanged=1 QuietPeriod=10 StreamEnded=1 noData=1 islands=25 renamed=0 figures=Player 1 routes=57 57 57 57 57 57 57 57 57 57 57")]
     public async Task PipeTickAssemblerFixturesGiveReadmeTicksAndEvents(string fixture, string expected)
     {
         // Arrange
@@ -519,7 +520,8 @@ public sealed class PipeTickAssemblerTests
 
     /// <summary>
     /// Describes the results of a fixture: the item sequence with consecutive ticks counted, the close reasons, the ticks
-    /// without data, the island keys, the keys that carry more than one name, and the figures' names.
+    /// without data, the island keys, the keys that carry more than one name, the figures' names and the route count of
+    /// each trade-routes item.
     /// </summary>
     /// <param name="results">The results</param>
     /// <returns>The description</returns>
@@ -555,9 +557,10 @@ public sealed class PipeTickAssemblerTests
         var islands = ticks.SelectMany(tick => tick.Islands).GroupBy(island => island.Key).ToList();
         var renamed = islands.Count(group => group.Select(island => island.Name).Distinct(StringComparer.Ordinal).Count() > 1);
         var figures = string.Join(",", results.Where(result => result.Kind == PipeTickResultKind.SessionStart).Select(result => result.Headline).Distinct(StringComparer.Ordinal));
+        var routes = string.Join(" ", results.Where(result => result.Kind == PipeTickResultKind.TradeRoutes).Select(result => result.TradeRoutes?.Routes.Count ?? -1));
 
         return string.Create(CultureInfo.InvariantCulture,
-                             $"items={string.Join(",", items)} ticks={ticks.Count} GameTimeChanged={Closed(PipeTickCloseReason.GameTimeChanged)} QuietPeriod={Closed(PipeTickCloseReason.QuietPeriod)} StreamEnded={Closed(PipeTickCloseReason.StreamEnded)} noData={ticks.Count(tick => tick.IsNoDataYet)} islands={islands.Count} renamed={renamed} figures={figures}");
+                             $"items={string.Join(",", items)} ticks={ticks.Count} GameTimeChanged={Closed(PipeTickCloseReason.GameTimeChanged)} QuietPeriod={Closed(PipeTickCloseReason.QuietPeriod)} StreamEnded={Closed(PipeTickCloseReason.StreamEnded)} noData={ticks.Count(tick => tick.IsNoDataYet)} islands={islands.Count} renamed={renamed} figures={figures} routes={routes}");
     }
 
     /// <summary>

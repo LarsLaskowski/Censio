@@ -85,6 +85,11 @@ public sealed partial class MainLayout : IDisposable
     private string _regionsLink = "/regions";
 
     /// <summary>
+    /// The address the trade-routes navigation entry leads to.
+    /// </summary>
+    private string _tradeRoutesLink = "/trade-routes";
+
+    /// <summary>
     /// A value that indicates whether the layout is disposed.
     /// </summary>
     private volatile bool _isDisposed;
@@ -182,11 +187,14 @@ public sealed partial class MainLayout : IDisposable
     }
 
     /// <summary>
-    /// Points the Regions navigation entry at the address now shown.
+    /// Points the Regions and trade-routes navigation entries at the address now shown.
     /// </summary>
     private void RefreshRegionsLink()
     {
-        _regionsLink = PageAddress.RegionsEntryLink(Navigation.ToBaseRelativePath(Navigation.Uri));
+        var path = Navigation.ToBaseRelativePath(Navigation.Uri);
+
+        _regionsLink = PageAddress.RegionsEntryLink(path);
+        _tradeRoutesLink = PageAddress.TradeRoutesEntryLink(path);
     }
 
     /// <summary>

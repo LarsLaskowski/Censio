@@ -20,6 +20,11 @@ public sealed class StoredProfileState
     public required ContractTick? LatestTick { get; init; }
 
     /// <summary>
+    /// Gets the latest trade routes, or <see langword="null"/> when none are stored.
+    /// </summary>
+    public required ContractTradeRoutes? LatestTradeRoutes { get; init; }
+
+    /// <summary>
     /// Gets the islands of the profile.
     /// </summary>
     public required IReadOnlyList<StoredIsland> Islands { get; init; }
