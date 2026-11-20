@@ -89,7 +89,57 @@ public static class ProfileViewBuilder
                    Regions = regions,
                    Island = island,
                    Rows = [.. entries.Take(ProfileView.MaxRows).Select(entry => CreateRow(entry, catalog, missingIcons))],
-                   RowCount = entries.Count
+                   RowCount = entries.Count,
+                   TradeRoutes = tradeRoutes ? CreateTradeRoutes(state.LatestTradeRoutes, names) : null
+               };
+    }
+
+    /// <summary>
+    /// Creates the view of the trade routes, each stop named by the island name map.
+    /// </summary>
+    /// <param name="routes">The trade routes, or <see langword="null"/> when none are stored</param>
+    /// <param name="names">The names of the islands</param>
+    /// <returns>The view, or <see langword="null"/> when no trade routes are stored</returns>
+    private static TradeRoutesView? CreateTradeRoutes(ContractTradeRoutes? routes, Dictionary<IslandKey, string> names)
+    {
+        if (routes is null)
+        {
+            return null;
+        }
+
+        return new TradeRoutesView
+               {
+                   AsOf = routes.ReceiveTime,
+                   Routes = [
+                                .. routes.Routes.Select(route => new TradeRouteView
+                                                                 {
+                                                                     Id = route.Id,
+                                                                     Name = route.Name,
+                                                                     Folder = route.Folder,
+                                                                     MajorProblems = route.MajorProblems,
+                                                                     MinorProblems = route.MinorProblems,
+                                                                     Ships = route.Ships,
+                                                                     LostShips = route.LostShips,
+                                                                     Stations = [.. route.Stations.Select(station => CreateStop(station, names))]
+                                                                 })
+                            ]
+               };
+    }
+
+    /// <summary>
+    /// Creates a stop of a trade route.
+    /// </summary>
+    /// <param name="station">The station</param>
+    /// <param name="names">The names of the islands</param>
+    /// <returns>The stop</returns>
+    private static TradeRouteStop CreateStop(ContractTradeRouteStation station, Dictionary<IslandKey, string> names)
+    {
+        var key = new IslandKey(station.SessionGuid, station.IslandId, station.AreaIndex);
+
+        return new TradeRouteStop
+               {
+                   Island = key,
+                   Name = names.GetValueOrDefault(key)
                };
     }
 

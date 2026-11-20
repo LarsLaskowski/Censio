@@ -16,6 +16,11 @@ public static class PageNames
     /// </summary>
     private const int IdentityCharacters = 8;
 
+    /// <summary>
+    /// The mark of an empty folder.
+    /// </summary>
+    private const string EmptyMark = "–";
+
     #endregion // Constants
 
     #region Methods
@@ -120,8 +125,6 @@ public static class PageNames
                    : name;
     }
 
-    // Skeleton: removed with the implementation
-#pragma warning disable RH2003
     /// <summary>
     /// Gives the shown name of a trade route.
     /// </summary>
@@ -130,7 +133,7 @@ public static class PageNames
     /// <returns>The shown name</returns>
     public static string TradeRoute(string name, UiLanguage language)
     {
-        throw new NotImplementedException();
+        return string.IsNullOrEmpty(name) ? UiTexts.For(language).UnnamedRoute : name;
     }
 
     /// <summary>
@@ -140,7 +143,7 @@ public static class PageNames
     /// <returns>The shown name</returns>
     public static string Folder(string folder)
     {
-        throw new NotImplementedException();
+        return string.IsNullOrEmpty(folder) ? EmptyMark : folder;
     }
 
     /// <summary>
@@ -151,18 +154,30 @@ public static class PageNames
     /// <returns>The shown name</returns>
     public static string Station(TradeRouteStop stop, UiLanguage language)
     {
-        throw new NotImplementedException();
+        ArgumentNullException.ThrowIfNull(stop);
+
+        return stop.Name is null
+                   ? string.Format(CultureInfo.InvariantCulture, UiTexts.For(language).StationFallbackFormat, stop.Island.SessionGuid, stop.Island.IslandId, stop.Island.AreaIndex)
+                   : Island(stop.Name, language);
     }
 
     /// <summary>
-    /// Orders the trade routes for a page.
+    /// Orders the trade routes for a page: the major problems, minor problems and lost ships descending, then the shown
+    /// name ignoring case, the folder and the ID.
     /// </summary>
     /// <param name="routes">The routes</param>
     /// <param name="language">The language</param>
     /// <returns>The ordered routes</returns>
     public static IReadOnlyList<TradeRouteView> OrderTradeRoutes(IReadOnlyList<TradeRouteView> routes, UiLanguage language)
     {
-        throw new NotImplementedException();
+        return [
+                   .. routes.OrderByDescending(route => route.MajorProblems)
+                            .ThenByDescending(route => route.MinorProblems)
+                            .ThenByDescending(route => route.LostShips)
+                            .ThenBy(route => TradeRoute(route.Name, language), StringComparer.OrdinalIgnoreCase)
+                            .ThenBy(route => route.Folder, StringComparer.Ordinal)
+                            .ThenBy(route => route.Id)
+               ];
     }
 
     /// <summary>
@@ -173,9 +188,13 @@ public static class PageNames
     /// <returns>The summary</returns>
     public static string TradeRoutesSummary(IReadOnlyList<TradeRouteView> routes, UiLanguage language)
     {
-        throw new NotImplementedException();
+        var texts = UiTexts.For(language);
+
+        return string.Format(CultureInfo.InvariantCulture,
+                             routes.Count == 1 ? texts.TradeRoutesSummaryOneFormat : texts.TradeRoutesSummaryFormat,
+                             PageFormat.Number(routes.Count, language),
+                             PageFormat.Number(routes.Count(route => route.HasProblem), language));
     }
-#pragma warning restore RH2003
 
     /// <summary>
     /// Takes the names of a catalog entry, the other language's for a language the entry lacks, or the fallbacks.

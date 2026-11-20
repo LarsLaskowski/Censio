@@ -356,7 +356,7 @@ public abstract class DataPageBase : ComponentBase, IDisposable
     /// <param name="arguments">The notice</param>
     private void OnStateChanged(object? sender, ServerStateChangedEventArgs arguments)
     {
-        if (_isDisposed || arguments.Kind == ServerStateChangeKind.Companion)
+        if (_isDisposed || arguments.Kind == ServerStateChangeKind.Companion || (arguments.Kind == ServerStateChangeKind.TradeRoutes && ReadsTradeRoutes == false))
         {
             return;
         }

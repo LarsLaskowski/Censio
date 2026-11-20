@@ -22,6 +22,33 @@ public partial class TradeRoutes
 
     #endregion // Properties
 
+    #region Methods
+
+    /// <summary>
+    /// Shows a count, in the error colour when it is above 0.
+    /// </summary>
+    /// <param name="value">The count</param>
+    /// <returns>The markup of the count</returns>
+    private static RenderFragment Count(int value)
+    {
+        return builder =>
+               {
+                   if (value > 0)
+                   {
+                       builder.OpenElement(0, "span");
+                       builder.AddAttribute(1, "class", "mud-error-text");
+                       builder.AddContent(2, PageFormat.Count(value));
+                       builder.CloseElement();
+                   }
+                   else
+                   {
+                       builder.AddContent(3, PageFormat.Count(value));
+                   }
+               };
+    }
+
+    #endregion // Methods
+
     #region DataPageBase
 
     /// <inheritdoc />
@@ -33,20 +60,41 @@ public partial class TradeRoutes
     /// <inheritdoc />
     protected override bool ReadsTradeRoutes => true;
 
-    // Skeleton: removed with the implementation
-#pragma warning disable RH2003
+    /// <inheritdoc />
+    protected override bool HasData(ProfileView view)
+    {
+        return true;
+    }
+
     /// <inheritdoc />
     protected override PageMode ResolveTarget(out Guid profileId, out IslandKey? island)
     {
-        throw new NotImplementedException();
+        island = null;
+
+        if (Profile is not null)
+        {
+            return PageAddress.TryParseProfile(Profile, out profileId)
+                       ? PageMode.Loading
+                       : PageMode.NotFound;
+        }
+
+        if (State.NewestProfile is { } newest)
+        {
+            profileId = newest;
+
+            return PageMode.Loading;
+        }
+
+        profileId = Guid.Empty;
+
+        return PageMode.NoData;
     }
 
     /// <inheritdoc />
     protected override bool IsKnown(ProfileView view)
     {
-        throw new NotImplementedException();
+        return true;
     }
-#pragma warning restore RH2003
 
     #endregion // DataPageBase
 }

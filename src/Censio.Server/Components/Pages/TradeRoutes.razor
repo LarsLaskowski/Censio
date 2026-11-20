@@ -5,3 +5,71 @@
 <PageTitle>@($"Censio – {Heading}")</PageTitle>
 
 <h1 class="mud-typography mud-typography-h4">@Heading</h1>
+
+@if (Mode == PageMode.Ready && View is { } view)
+{
+    <p>@ProfileLabel(view)</p>
+}
+@if (Mode != PageMode.NotFound)
+{
+    <DataStatus AsOf="View?.TradeRoutes?.AsOf" />
+}
+@if (StatusText is { } status)
+{
+    <p>@status</p>
+}
+else if (View?.TradeRoutes is not { } routes)
+{
+    <p>@Texts.NoTradeRoutes</p>
+}
+else if (routes.Routes.Count == 0)
+{
+    <p>@Texts.EmptyTradeRoutes</p>
+}
+else
+{
+    <p>@PageNames.TradeRoutesSummary(routes.Routes, Language)</p>
+    <MudSimpleTable Dense="true" Hover="true">
+        <thead>
+            <tr>
+                <th>@Texts.ColumnRoute</th>
+                <th>@Texts.ColumnFolder</th>
+                <th class="censio-number">@Texts.ColumnShips</th>
+                <th class="censio-number">@Texts.ColumnLostShips</th>
+                <th class="censio-number">@Texts.ColumnMajorProblems</th>
+                <th class="censio-number">@Texts.ColumnMinorProblems</th>
+                <th>@Texts.ColumnStations</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var route in PageNames.OrderTradeRoutes(routes.Routes, Language))
+            {
+                <tr>
+                    <td>@PageNames.TradeRoute(route.Name, Language)</td>
+                    <td>@PageNames.Folder(route.Folder)</td>
+                    <td class="censio-number">@PageFormat.Count(route.Ships)</td>
+                    <td class="censio-number">@Count(route.LostShips)</td>
+                    <td class="censio-number">@Count(route.MajorProblems)</td>
+                    <td class="censio-number">@Count(route.MinorProblems)</td>
+                    <td>
+                        @if (route.Stations.Count == 0)
+                        {
+                            @("–")
+                        }
+                        else
+                        {
+                            @for (var index = 0; index < route.Stations.Count; index++)
+                            {
+                                @if (index > 0)
+                                {
+                                    @(" → ")
+                                }
+                                @PageNames.Station(route.Stations[index], Language)
+                            }
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </MudSimpleTable>
+}

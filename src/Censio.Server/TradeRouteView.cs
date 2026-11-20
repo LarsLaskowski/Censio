@@ -47,13 +47,10 @@ public sealed class TradeRouteView
     /// </summary>
     public required IReadOnlyList<TradeRouteStop> Stations { get; init; }
 
-    // Skeleton: removed with the implementation
-#pragma warning disable RH2003, S2325, CA1065
     /// <summary>
     /// Gets a value indicating whether a problem count or the lost ships are above 0.
     /// </summary>
-    public bool HasProblem => throw new NotImplementedException();
-#pragma warning restore RH2003, S2325, CA1065
+    public bool HasProblem => MajorProblems > 0 || MinorProblems > 0 || LostShips > 0;
 
     #endregion // Properties
 }
