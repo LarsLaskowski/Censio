@@ -15,7 +15,7 @@ public sealed class ContractWriterTests
     /// <summary>
     /// The fixed text of a message that breaks a value rule.
     /// </summary>
-    private const string InvalidText = "Contract message breaks a rule of contract version 1";
+    private const string InvalidText = "Contract message breaks a rule of contract version 2";
 
     /// <summary>
     /// The fixed text of a message above a size bound.
@@ -231,7 +231,7 @@ public sealed class ContractWriterTests
                                                                                        ["hello without token"] = () => Hello(null, "0.3.0", _profileA, "Alice"),
                                                                                        ["hello accepted"] = () => Accepted("0.3.0", Icon),
                                                                                        ["hello accepted without catalog"] = () => Accepted("0.3.0", null),
-                                                                                       ["hello refused"] = () => Refused(ContractHelloRefusal.UnsupportedVersion, 2, 1),
+                                                                                       ["hello refused"] = () => Refused(ContractHelloRefusal.UnsupportedVersion, 1, 2),
                                                                                        ["catalog upload"] = () => new ContractCatalogUpload
                                                                                                                   {
                                                                                                                       Id = _id,
@@ -256,7 +256,8 @@ public sealed class ContractWriterTests
                                                                                                               PipeState = ContractPipeState.PipeBusy
                                                                                                           },
                                                                                        ["acknowledgement accepted"] = () => Acknowledgement(_id, null, null, Icon, IconTwo),
-                                                                                       ["acknowledgement refused"] = () => Acknowledgement(_id, ContractAcknowledgementRefusal.CatalogUnsupportedVersion, 2)
+                                                                                       ["acknowledgement refused"] = () => Acknowledgement(_id, ContractAcknowledgementRefusal.CatalogUnsupportedVersion, 2),
+                                                                                       ["trade routes"] = () => TradeRoutes(Route(7, "Via Appia", "North", [1, 2, 3, 4], Station(180023, 1, 0), Station(-5, 255, 255)))
                                                                                    };
 
     /// <summary>
@@ -292,6 +293,40 @@ public sealed class ContractWriterTests
                                                                                     ["document of the catalog's byte bound"] = () => PaddedCatalog(CatalogDocumentReader.MaxDocumentBytes),
                                                                                     ["document of every count at the catalog's bound"] = CountsCatalog
                                                                                 };
+
+    /// <summary>
+    /// The trade-routes messages within the bounds of N1, built on demand: the name of the case and its builder.
+    /// </summary>
+    private static readonly Dictionary<string, Func<ContractTradeRoutes>> _tradeRoutes = new()
+                                                                                         {
+                                                                                             ["routes with stations"] = () => TradeRoutes(Route(7, "Via Appia", "North", [1, 2, 3, 4], Station(180023, 1, 0), Station(-5, 255, 255)), Route(8, "Ostia", "South", [0, 0, 1, 0], Station(1, 2, 3))),
+                                                                                             ["no routes"] = () => TradeRoutes(),
+                                                                                             ["repeated route id and name"] = () => TradeRoutes(Route(7, "Via", "North", [0, 0, 1, 0], Station(1, 1, 0)), Route(7, "Via", "North", [0, 0, 1, 0], Station(1, 1, 0))),
+                                                                                             ["counts at the ends of 32 bits and lost ships above ships"] = () => TradeRoutes(Route(int.MinValue, "Via", "North", [int.MinValue, int.MaxValue, -1, 5], Station(int.MaxValue, 0, 0)), Route(int.MaxValue, "Via", "North", [-7, 0, 0, int.MinValue], Station(int.MinValue, 255, 255))),
+                                                                                             ["route without stations"] = () => TradeRoutes(Route(7, "Via", "North", [1, 2, 3, 4])),
+                                                                                             ["empty name and folder"] = () => TradeRoutes(Route(7, string.Empty, string.Empty, [1, 2, 3, 4], Station(1, 1, 0))),
+                                                                                             ["names of characters JSON escapes"] = () => TradeRoutes(Route(7, $"Quote \" back\\slash tab\t line\n <b>&' Größe 木 {char.ConvertFromUtf32(0x1F332)}{(char)0x2028}", "<script>&amp;", [1, 2, 3, 4], Station(1, 1, 0))),
+                                                                                             ["names of 255 replacement characters"] = () => TradeRoutes(Route(7, new string((char)0xFFFD, 255), new string((char)0xFFFD, 255), [1, 2, 3, 4], Station(1, 1, 0))),
+                                                                                             ["names of 765 bytes"] = () => TradeRoutes(Route(7, new string('a', 765), new string('木', 255), [1, 2, 3, 4], Station(1, 1, 0))),
+                                                                                             ["1,024 routes"] = () => TradeRoutes([.. Enumerable.Range(0, ContractReader.MaxTradeRoutes).Select(index => Route(index, "Route", "Folder", [0, 0, 1, 0], Station(index, 1, 0)))]),
+                                                                                             ["256 stations in each of two routes"] = () => TradeRoutes(RouteOfStations(ContractReader.MaxStationsPerRoute, "A"), RouteOfStations(ContractReader.MaxStationsPerRoute, "B")),
+                                                                                             ["largest message at every bound"] = LargestTradeRoutes
+                                                                                         };
+
+    /// <summary>
+    /// The trade-routes messages above a bound of N1, built on demand: the name of the case and its builder.
+    /// </summary>
+    private static readonly Dictionary<string, Func<ContractTradeRoutes>> _tradeRoutesTooLarge = new()
+                                                                                                 {
+                                                                                                     ["1,025 routes"] = () => TradeRoutes([.. Enumerable.Range(0, ContractReader.MaxTradeRoutes + 1).Select(index => Route(index, "Route", "Folder", [0, 0, 1, 0]))]),
+                                                                                                     ["257 stations in one route"] = () => TradeRoutes(RouteOfStations(ContractReader.MaxStationsPerRoute + 1, "A")),
+                                                                                                     ["257 stations in the second route"] = () => TradeRoutes(RouteOfStations(1, "A"), RouteOfStations(ContractReader.MaxStationsPerRoute + 1, "B")),
+                                                                                                     ["52,429 stations in a message"] = () => TradeRoutes([.. StationCounts(ContractReader.MaxStations + 1).Select(count => RouteOfStations(count, "R"))]),
+                                                                                                     ["route name of 766 bytes"] = () => TradeRoutes(Route(7, new string('a', 766), "North", [1, 2, 3, 4])),
+                                                                                                     ["route name of 256 replacement characters"] = () => TradeRoutes(Route(7, new string((char)0xFFFD, 256), "North", [1, 2, 3, 4])),
+                                                                                                     ["folder of 766 bytes"] = () => TradeRoutes(Route(7, "Via", new string('a', 766), [1, 2, 3, 4])),
+                                                                                                     ["folder of 256 three-byte characters"] = () => TradeRoutes(Route(7, "Via", new string('木', 256), [1, 2, 3, 4]))
+                                                                                                 };
 
     #endregion // Fields
 
@@ -338,9 +373,9 @@ public sealed class ContractWriterTests
     {
         get
         {
-            yield return new object[] { ContractHelloRefusal.UnsupportedVersion, 2, new[] { 1 } };
+            yield return new object[] { ContractHelloRefusal.UnsupportedVersion, 1, new[] { 2 } };
             yield return new object[] { ContractHelloRefusal.UnsupportedVersion, int.MinValue, new[] { 1, 2, 3 } };
-            yield return new object[] { ContractHelloRefusal.TokenRefused, 1, new[] { 1 } };
+            yield return new object[] { ContractHelloRefusal.TokenRefused, 2, new[] { 2 } };
             yield return new object[] { ContractHelloRefusal.CompanionConnected, 1, Enumerable.Range(1, 16).ToArray() };
         }
     }
@@ -356,8 +391,8 @@ public sealed class ContractWriterTests
             yield return new object?[] { Acknowledgement(_id, null, null, Icon, IconTwo), null };
             yield return new object?[] { Acknowledgement(_id, null, null, MissingIcons(ContractReader.MaxMissingIcons)), null };
             yield return new object?[] { Acknowledgement(_id, ContractAcknowledgementRefusal.Malformed, null), "Contract message is malformed" };
-            yield return new object?[] { Acknowledgement(_id, ContractAcknowledgementRefusal.UnsupportedVersion, 2), "Contract version 2 is not supported; supported: 1" };
-            yield return new object?[] { Acknowledgement(_id, ContractAcknowledgementRefusal.UnsupportedVersion, -7), "Contract version -7 is not supported; supported: 1" };
+            yield return new object?[] { Acknowledgement(_id, ContractAcknowledgementRefusal.UnsupportedVersion, 1), "Contract version 1 is not supported; supported: 2" };
+            yield return new object?[] { Acknowledgement(_id, ContractAcknowledgementRefusal.UnsupportedVersion, -7), "Contract version -7 is not supported; supported: 2" };
             yield return new object?[] { Acknowledgement(_id, ContractAcknowledgementRefusal.Invalid, null), InvalidText };
             yield return new object?[] { Acknowledgement(_id, ContractAcknowledgementRefusal.TooLarge, null), TooLargeText };
             yield return new object?[] { Acknowledgement(_id, ContractAcknowledgementRefusal.CatalogMalformed, null), "Catalog document is malformed" };
@@ -374,13 +409,23 @@ public sealed class ContractWriterTests
     {
         get
         {
-            yield return new object[] { Refused(ContractHelloRefusal.UnsupportedVersion, 2, 1), "{\"type\":\"helloRefused\",\"contractVersion\":1,\"reason\":\"unsupportedVersion\",\"receivedVersion\":2,\"supportedVersions\":[1]}" };
-            yield return new object[] { Refused(ContractHelloRefusal.TokenRefused, 1, 1), "{\"type\":\"helloRefused\",\"contractVersion\":1,\"reason\":\"tokenRefused\",\"receivedVersion\":1,\"supportedVersions\":[1]}" };
-            yield return new object[] { Refused(ContractHelloRefusal.CompanionConnected, 1, 1), "{\"type\":\"helloRefused\",\"contractVersion\":1,\"reason\":\"companionConnected\",\"receivedVersion\":1,\"supportedVersions\":[1]}" };
-            yield return new object[] { Hello(null, "0.3.0", _profileA, "Alice"), $"{{\"type\":\"hello\",\"contractVersion\":1,\"token\":null,\"companionVersion\":\"0.3.0\",\"profileId\":\"{ProfileAText}\",\"profileName\":\"Alice\"}}" };
-            yield return new object[] { Hello("secret", "0.3.0", _profileA, "Alice"), $"{{\"type\":\"hello\",\"contractVersion\":1,\"token\":\"secret\",\"companionVersion\":\"0.3.0\",\"profileId\":\"{ProfileAText}\",\"profileName\":\"Alice\"}}" };
+            yield return new object[] { Refused(ContractHelloRefusal.UnsupportedVersion, 1, 2), "{\"type\":\"helloRefused\",\"contractVersion\":2,\"reason\":\"unsupportedVersion\",\"receivedVersion\":1,\"supportedVersions\":[2]}" };
+            yield return new object[] { Refused(ContractHelloRefusal.TokenRefused, 2, 2), "{\"type\":\"helloRefused\",\"contractVersion\":2,\"reason\":\"tokenRefused\",\"receivedVersion\":2,\"supportedVersions\":[2]}" };
+            yield return new object[] { Refused(ContractHelloRefusal.CompanionConnected, 2, 2), "{\"type\":\"helloRefused\",\"contractVersion\":2,\"reason\":\"companionConnected\",\"receivedVersion\":2,\"supportedVersions\":[2]}" };
+            yield return new object[] { Hello(null, "0.3.0", _profileA, "Alice"), $"{{\"type\":\"hello\",\"contractVersion\":2,\"token\":null,\"companionVersion\":\"0.3.0\",\"profileId\":\"{ProfileAText}\",\"profileName\":\"Alice\"}}" };
+            yield return new object[] { Hello("secret", "0.3.0", _profileA, "Alice"), $"{{\"type\":\"hello\",\"contractVersion\":2,\"token\":\"secret\",\"companionVersion\":\"0.3.0\",\"profileId\":\"{ProfileAText}\",\"profileName\":\"Alice\"}}" };
         }
     }
+
+    /// <summary>
+    /// Gets the names of the trade-routes messages within the bounds.
+    /// </summary>
+    private static IEnumerable<object[]> TradeRoutesRows => _tradeRoutes.Keys.Select(label => new object[] { label });
+
+    /// <summary>
+    /// Gets the names of the trade-routes messages above a bound.
+    /// </summary>
+    private static IEnumerable<object[]> TradeRoutesTooLargeRows => _tradeRoutesTooLarge.Keys.Select(label => new object[] { label });
 
     #endregion // Properties
 
@@ -706,7 +751,7 @@ public sealed class ContractWriterTests
     }
 
     /// <summary>
-    /// A message that breaks a rule of version 1 is refused as invalid, one above a bound as too large; nothing is written.
+    /// A message that breaks a rule of version 2 is refused as invalid, one above a bound as too large; nothing is written.
     /// </summary>
     /// <param name="label">The name of the case</param>
     /// <param name="kind">The kind it is refused with</param>
@@ -908,6 +953,51 @@ public sealed class ContractWriterTests
         Assert.AreEqual(_idTwo, second.Id, "The second end should keep its own identity");
         Assert.AreEqual(_time, first.ReceiveTime, "The first end should keep its receive time");
         Assert.AreEqual(_time.AddTicks(3), second.ReceiveTime, "The second end should keep its own receive time");
+    }
+
+    /// <summary>
+    /// A trade-routes message within the bounds of N1 is written below the byte bound and read back equal in every value:
+    /// no routes, repeated ids and names, any 32-bit count, a route without stations, empty and escaped names, names at
+    /// their bound and the largest message every bound allows at once.
+    /// </summary>
+    /// <param name="label">The name of the case</param>
+    [TestMethod]
+    [TestCategory("AC7")]
+    [TestCategory("AC10")]
+    [DynamicData(nameof(TradeRoutesRows))]
+    public void ContractWriterTradeRoutesWrittenReadsBackUnchanged(string label)
+    {
+        // Arrange
+        var message = _tradeRoutes[label]();
+
+        // Act
+        var written = ContractWriter.Write(message);
+
+        // Assert
+        Assert.IsLessThan(ContractReader.MaxMessageBytes, written.Utf8Json.Length, $"The message should be written below the byte bound: {label}");
+        AssertReadsBackEqual(message, written, label);
+    }
+
+    /// <summary>
+    /// A trade-routes message above a bound of N1 is refused as too large and nothing is written.
+    /// </summary>
+    /// <param name="label">The name of the case</param>
+    [TestMethod]
+    [TestCategory("AC7")]
+    [DynamicData(nameof(TradeRoutesTooLargeRows))]
+    public void ContractWriterTradeRoutesOverBoundRefused(string label)
+    {
+        // Arrange
+        var message = _tradeRoutesTooLarge[label]();
+
+        // Act
+        var written = ContractWriter.Write(message);
+
+        // Assert
+        Assert.IsNotNull(written.Error, $"The message should be refused: {label}");
+        Assert.AreEqual(ContractErrorKind.TooLarge, written.Error.Kind, $"The message should be refused as too large: {label}");
+        Assert.AreEqual(TooLargeText, written.Error.Text, $"The refusal should have the fixed text: {label}");
+        Assert.IsTrue(written.Utf8Json.IsEmpty, $"A refused message should write nothing: {label}");
     }
 
     /// <summary>
@@ -1327,6 +1417,100 @@ public sealed class ContractWriterTests
     }
 
     /// <summary>
+    /// Builds a trade-routes message of routes with the identities <see cref="_id" /> and <see cref="_profileA" />.
+    /// </summary>
+    /// <param name="routes">The routes</param>
+    /// <returns>The message</returns>
+    private static ContractTradeRoutes TradeRoutes(params ContractTradeRoute[] routes)
+    {
+        return new ContractTradeRoutes
+               {
+                   Id = _id,
+                   ProfileId = _profileA,
+                   ReceiveTime = _time,
+                   Routes = routes
+               };
+    }
+
+    /// <summary>
+    /// Builds a trade route.
+    /// </summary>
+    /// <param name="id">The route id</param>
+    /// <param name="name">The route name</param>
+    /// <param name="folder">The folder</param>
+    /// <param name="counts">The major problems, minor problems, ships and lost ships</param>
+    /// <param name="stations">The stations in route order</param>
+    /// <returns>The route</returns>
+    private static ContractTradeRoute Route(int id, string name, string folder, int[] counts, params ContractTradeRouteStation[] stations)
+    {
+        return new ContractTradeRoute
+               {
+                   Id = id,
+                   Name = name,
+                   Folder = folder,
+                   MajorProblems = counts[0],
+                   MinorProblems = counts[1],
+                   Ships = counts[2],
+                   LostShips = counts[3],
+                   Stations = stations
+               };
+    }
+
+    /// <summary>
+    /// Builds a trade route of a number of stations with distinct keys.
+    /// </summary>
+    /// <param name="stations">The number of stations</param>
+    /// <param name="name">The route name and folder</param>
+    /// <returns>The route</returns>
+    private static ContractTradeRoute RouteOfStations(int stations, string name)
+    {
+        return Route(7, name, name, [0, 0, 1, 0], [.. Enumerable.Range(0, stations).Select(index => Station(180023 + index, (byte)(index % 256), (byte)(index / 256 % 256)))]);
+    }
+
+    /// <summary>
+    /// Builds a station of a trade route.
+    /// </summary>
+    /// <param name="sessionGuid">The session GUID</param>
+    /// <param name="islandId">The island ID</param>
+    /// <param name="areaIndex">The area index</param>
+    /// <returns>The station</returns>
+    private static ContractTradeRouteStation Station(int sessionGuid, byte islandId, byte areaIndex)
+    {
+        return new ContractTradeRouteStation
+               {
+                   SessionGuid = sessionGuid,
+                   IslandId = islandId,
+                   AreaIndex = areaIndex
+               };
+    }
+
+    /// <summary>
+    /// Splits a number of stations into routes of 256 stations and one last route for the rest.
+    /// </summary>
+    /// <param name="total">The number of stations</param>
+    /// <returns>The number of stations of each route</returns>
+    private static IEnumerable<int> StationCounts(int total)
+    {
+        return Enumerable.Repeat(ContractReader.MaxStationsPerRoute, total / ContractReader.MaxStationsPerRoute).Append(total % ContractReader.MaxStationsPerRoute);
+    }
+
+    /// <summary>
+    /// Builds the largest trade-routes message the bounds of N1 allow: 1,024 routes, 52,428 stations in routes of 256, every
+    /// route name and folder of 255 replacement characters (765 bytes, written as escapes) and every count at its widest.
+    /// </summary>
+    /// <returns>The message</returns>
+    private static ContractTradeRoutes LargestTradeRoutes()
+    {
+        var name = new string((char)0xFFFD, 255);
+        var counts = StationCounts(ContractReader.MaxStations).ToList();
+        var stationCounts = counts.Concat(Enumerable.Repeat(0, ContractReader.MaxTradeRoutes - counts.Count));
+        var station = Station(int.MinValue, 255, 255);
+        var routes = stationCounts.Select((count, index) => Route(int.MinValue + index, name, name, [int.MinValue, int.MinValue, int.MinValue, int.MinValue], [.. Enumerable.Repeat(station, count)]));
+
+        return TradeRoutes([.. routes]);
+    }
+
+    /// <summary>
     /// Asserts that a write succeeded and that its bytes read back to a message equal to the one written, and returns it.
     /// </summary>
     /// <param name="expected">The message written</param>
@@ -1366,6 +1550,7 @@ public sealed class ContractWriterTests
                    ContractSessionEnd end => $"end|{end.Id}|{end.ProfileId}|{Time(end.ReceiveTime)}",
                    ContractStatus status => $"status|{status.PipeState}",
                    ContractAcknowledgement acknowledgement => $"ack|{acknowledgement.Id}|{acknowledgement.Refusal?.ToString() ?? "-"}|{acknowledgement.RefusedVersion?.ToString(CultureInfo.InvariantCulture) ?? "-"}|{string.Join(",", acknowledgement.MissingIcons)}",
+                   ContractTradeRoutes tradeRoutes => $"routes|{tradeRoutes.Id}|{tradeRoutes.ProfileId}|{Time(tradeRoutes.ReceiveTime)}|{string.Join(";", tradeRoutes.Routes.Select(DescribeRoute))}",
                    _ => message.GetType().Name
                };
     }
@@ -1378,6 +1563,16 @@ public sealed class ContractWriterTests
     private static string DescribeIsland(ContractTickIsland island)
     {
         return $"{island.SessionGuid}/{island.IslandId}/{island.AreaIndex}/{island.SessionId}/{Text(island.Name)}[{string.Join(" ", island.Entries.Select(DescribeEntry))}]";
+    }
+
+    /// <summary>
+    /// Describes every value of a trade route exactly, its stations in route order.
+    /// </summary>
+    /// <param name="route">The route</param>
+    /// <returns>The description</returns>
+    private static string DescribeRoute(ContractTradeRoute route)
+    {
+        return $"{route.Id}/{Text(route.Name)}/{Text(route.Folder)}/{route.MajorProblems}/{route.MinorProblems}/{route.Ships}/{route.LostShips}[{string.Join(" ", route.Stations.Select(station => $"{station.SessionGuid}/{station.IslandId}/{station.AreaIndex}"))}]";
     }
 
     /// <summary>
