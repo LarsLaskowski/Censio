@@ -62,7 +62,7 @@ public sealed class RegionsTests
     /// <summary>
     /// The English dialog text of a deletion of <see cref="FirstProfileName" />.
     /// </summary>
-    private const string FirstProfileDialogText = "All data of the profile Profile one is removed from the server: its regions, islands, goods and history. This cannot be undone.";
+    private const string FirstProfileDialogText = "All data of the profile Profile one is removed from the server: its regions, islands, goods, trade routes and history. This cannot be undone.";
 
     /// <summary>
     /// The English text of a failed deletion (spec E9).
@@ -177,10 +177,11 @@ public sealed class RegionsTests
     /// <returns>A task that represents the asynchronous test</returns>
     [TestMethod]
     [TestCategory("AC9")]
+    [TestCategory("AC6")]
     [DataRow(UiLanguage.English, FirstProfileName, "Delete history?", FirstProfileDialogText, "Cancel", "Delete")]
-    [DataRow(UiLanguage.German, FirstProfileName, "Verlauf löschen?", "Alle Daten des Profils Profile one werden vom Server entfernt: seine Regionen, Inseln, Waren und sein Verlauf. Das lässt sich nicht rückgängig machen.", "Abbrechen", "Löschen")]
-    [DataRow(UiLanguage.English, null, "Delete history?", "All data of the profile Unnamed profile is removed from the server: its regions, islands, goods and history. This cannot be undone.", "Cancel", "Delete")]
-    [DataRow(UiLanguage.German, null, "Verlauf löschen?", "Alle Daten des Profils Unbenanntes Profil werden vom Server entfernt: seine Regionen, Inseln, Waren und sein Verlauf. Das lässt sich nicht rückgängig machen.", "Abbrechen", "Löschen")]
+    [DataRow(UiLanguage.German, FirstProfileName, "Verlauf löschen?", "Alle Daten des Profils Profile one werden vom Server entfernt: seine Regionen, Inseln, Waren, Handelsrouten und sein Verlauf. Das lässt sich nicht rückgängig machen.", "Abbrechen", "Löschen")]
+    [DataRow(UiLanguage.English, null, "Delete history?", "All data of the profile Unnamed profile is removed from the server: its regions, islands, goods, trade routes and history. This cannot be undone.", "Cancel", "Delete")]
+    [DataRow(UiLanguage.German, null, "Verlauf löschen?", "Alle Daten des Profils Unbenanntes Profil werden vom Server entfernt: seine Regionen, Inseln, Waren, Handelsrouten und sein Verlauf. Das lässt sich nicht rückgängig machen.", "Abbrechen", "Löschen")]
     public async Task RegionsDeleteDialogShowsSpecTexts(UiLanguage language, string? name, string title, string text, string cancel, string confirm)
     {
         // Arrange
@@ -959,6 +960,43 @@ public sealed class RegionsTests
     }
 
     /// <summary>
+    /// A trade-routes notice of the shown profile causes no read of the overview; a later catalog notice reads again.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC4")]
+    public async Task RegionsIgnoresTradeRoutesNotice()
+    {
+        // Arrange
+        using var source = new FakeProfileStateSource(false);
+
+        source.Store(_firstProfile, StoredRead(CreateState(_firstProfile)));
+
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken, source);
+
+        await host.StoreProfileAsync(_firstProfile, FirstProfileName);
+
+        var page = RenderPicked(host, _firstProfile);
+
+        await page.WaitForStateAsync(() => page.FindAll("tbody tr").Count == 1, PageTestHost.WaitBound);
+
+        var told = ObserveNotice(host.State, ServerStateChangeKind.TradeRoutes);
+
+        // Act
+        var stored = await host.State.StoreTradeRoutesAsync(OneRouteMessage(_firstProfile), TestContext.CancellationToken);
+
+        // Assert
+        await told.WaitAsync(PageTestHost.WaitBound, TestContext.CancellationToken);
+
+        source.Store(_firstProfile, StoredRead(CreateSecondSessionState(_firstProfile)));
+        await host.StoreCatalogAsync(PageTestHost.RegionEntry(FirstSession, 900001, "Latium", "Latium"));
+
+        await page.WaitForAssertionAsync(() => Assert.AreSequenceEqual(PageTestHost.Expect(RegionLink(_firstProfile, SecondSession)), PageTestHost.RowLinks(page), "The catalog notice should read the profile again"), PageTestHost.WaitBound);
+        Assert.AreEqual(ServerStoreOutcome.Stored, stored.Outcome, "The trade routes should be stored, or the test would prove less");
+        Assert.AreSequenceEqual(new[] { _firstProfile, _firstProfile }, source.Reads.ToList(), "Only the first read and the catalog's should read, never the trade-routes notice");
+    }
+
+    /// <summary>
     /// A hello that renames the shown profile updates the profile line of the open page without a reload.
     /// </summary>
     /// <returns>A task that represents the asynchronous test</returns>
@@ -1224,6 +1262,82 @@ public sealed class RegionsTests
                                      Name = "Isle A"
                                  }
                              ]
+               };
+    }
+
+    /// <summary>
+    /// Creates a state of a profile whose latest tick holds one island in the second session.
+    /// </summary>
+    /// <param name="profileId">The profile identity</param>
+    /// <returns>The state</returns>
+    private static StoredProfileState CreateSecondSessionState(Guid profileId)
+    {
+        return new StoredProfileState
+               {
+                   LatestTradeRoutes = null,
+                   Profile = new StoredProfile
+                             {
+                                 Id = profileId,
+                                 Name = FirstProfileName
+                             },
+                   LatestTick = SecondSessionTick(profileId, 10),
+                   Islands = []
+               };
+    }
+
+    /// <summary>
+    /// Gives a task that completes once the state has told a notice of a kind.
+    /// </summary>
+    /// <param name="state">The server state</param>
+    /// <param name="kind">The kind</param>
+    /// <returns>The task</returns>
+    private static Task ObserveNotice(ServerState state, ServerStateChangeKind kind)
+    {
+        var told = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        state.Changed += (_, change) =>
+                         {
+                             if (change.Kind == kind)
+                             {
+                                 told.TrySetResult();
+                             }
+                         };
+
+        return told.Task;
+    }
+
+    /// <summary>
+    /// Creates a set of trade routes of a profile with one route of one station in the first session.
+    /// </summary>
+    /// <param name="profileId">The profile identity</param>
+    /// <returns>The set</returns>
+    private static ContractTradeRoutes OneRouteMessage(Guid profileId)
+    {
+        return new ContractTradeRoutes
+               {
+                   Id = Guid.NewGuid(),
+                   ProfileId = profileId,
+                   ReceiveTime = new DateTimeOffset(2026, 11, 13, 12, 0, 5, TimeSpan.Zero),
+                   Routes = [
+                                new ContractTradeRoute
+                                {
+                                    Id = 1,
+                                    Name = "Route 1",
+                                    Folder = "Folder 1",
+                                    MajorProblems = 1,
+                                    MinorProblems = 0,
+                                    Ships = 1,
+                                    LostShips = 0,
+                                    Stations = [
+                                                   new ContractTradeRouteStation
+                                                   {
+                                                       SessionGuid = FirstSession,
+                                                       IslandId = 1,
+                                                       AreaIndex = 0
+                                                   }
+                                               ]
+                                }
+                            ]
                };
     }
 

@@ -272,6 +272,52 @@ public sealed class ProfileViewBuilderTests
     }
 
     /// <summary>
+    /// With trade routes asked for, the view carries the latest trade routes row for row as received, under their receive
+    /// time: a repeated route ID, lost ships above ships, a negative count and a route without stations kept, each stop
+    /// named by the island list, else by the latest tick, else without a name, the island list's own string kept.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC10")]
+    public void ProfileViewBuilderTradeRoutesKeepRepeatsNegativesAndEmptyStations()
+    {
+        // Arrange
+        var listedName = string.Concat("Isle ", "A");
+        var routesTime = _receiveTime.AddMinutes(-3);
+        var state = CreateState(CreateTick(TickIsland(10, 1, "Tick name", Entry(1, 1, 1f)), TickIsland(20, 1, "Isle T", Entry(1, 1, 1f))));
+        var withRoutes = new StoredProfileState
+                         {
+                             Profile = state.Profile,
+                             LatestTick = state.LatestTick,
+                             Islands = [ListedIsland(10, 1, listedName)],
+                             LatestTradeRoutes = new ContractTradeRoutes
+                                                 {
+                                                     Id = Guid.NewGuid(),
+                                                     ProfileId = _profileId,
+                                                     ReceiveTime = routesTime,
+                                                     Routes = [
+                                                                  TradeRoute(7, "Ostia", -3, 4, Station(10, 1), Station(20, 1), Station(99, 2)),
+                                                                  TradeRoute(7, "Ostia", 0, 0),
+                                                                  TradeRoute(8, string.Empty, int.MinValue, int.MaxValue, Station(10, 1))
+                                                              ]
+                                                 }
+                         };
+
+        // Act
+        var view = ProfileViewBuilder.Build(withRoutes, null, null, null, true);
+
+        // Assert
+        string[] expected = [
+                                "7 Ostia folder F major -3 minor 0 ships 1 lost 4 stops 10/1/0 Isle A, 20/1/0 Isle T, 99/2/0 <no name>",
+                                "7 Ostia folder F major 0 minor 0 ships 1 lost 0 stops ",
+                                "8  folder F major -2147483648 minor 0 ships 1 lost 2147483647 stops 10/1/0 Isle A"
+                            ];
+
+        Assert.AreEqual(routesTime, view.TradeRoutes?.AsOf, "The view's trade routes should carry their receive time");
+        Assert.AreSequenceEqual(expected, DescribeTradeRoutes(view), "Every route should be kept as received, in order");
+        Assert.AreSame(listedName, view.TradeRoutes?.Routes[0].Stations[0].Name, "A stop should take the island list's string, not a copy");
+    }
+
+    /// <summary>
     /// Collects every unreachable object, so that a weak reference to one is cleared.
     /// </summary>
 #pragma warning disable S1215 // The test checks that the view leaves the state collectable, which only a collection shows
@@ -504,6 +550,58 @@ public sealed class ProfileViewBuilderTests
     private static string DescribeName(ShownName name)
     {
         return $"{name.English} | {name.German}";
+    }
+
+    /// <summary>
+    /// Creates a trade route in folder <c>F</c> with one ship and no minor problems.
+    /// </summary>
+    /// <param name="id">The route ID</param>
+    /// <param name="name">The name</param>
+    /// <param name="majorProblems">The major problems</param>
+    /// <param name="lostShips">The lost ships</param>
+    /// <param name="stations">The stations</param>
+    /// <returns>The route</returns>
+    private static ContractTradeRoute TradeRoute(int id, string name, int majorProblems, int lostShips, params ContractTradeRouteStation[] stations)
+    {
+        return new ContractTradeRoute
+               {
+                   Id = id,
+                   Name = name,
+                   Folder = "F",
+                   MajorProblems = majorProblems,
+                   MinorProblems = 0,
+                   Ships = 1,
+                   LostShips = lostShips,
+                   Stations = stations
+               };
+    }
+
+    /// <summary>
+    /// Creates a station of a trade route in area 0.
+    /// </summary>
+    /// <param name="sessionGuid">The session GUID</param>
+    /// <param name="islandId">The island ID</param>
+    /// <returns>The station</returns>
+    private static ContractTradeRouteStation Station(int sessionGuid, byte islandId)
+    {
+        return new ContractTradeRouteStation
+               {
+                   SessionGuid = sessionGuid,
+                   IslandId = islandId,
+                   AreaIndex = 0
+               };
+    }
+
+    /// <summary>
+    /// Describes the trade routes of a view in their order: ID, name, folder, counts and stops with their names.
+    /// </summary>
+    /// <param name="view">The view</param>
+    /// <returns>The lines, or one line naming their absence</returns>
+    private static List<string> DescribeTradeRoutes(ProfileView view)
+    {
+        return view.TradeRoutes is { } tradeRoutes
+                   ? [.. tradeRoutes.Routes.Select(route => $"{route.Id} {route.Name} folder {route.Folder} major {route.MajorProblems} minor {route.MinorProblems} ships {route.Ships} lost {route.LostShips} stops {string.Join(", ", route.Stations.Select(stop => $"{DescribeKey(stop.Island)} {stop.Name ?? "<no name>"}"))}")]
+                   : ["<no trade routes>"];
     }
 
     /// <summary>

@@ -316,6 +316,39 @@ public sealed class ProgramTests
     }
 
     /// <summary>
+    /// Both trade-routes routes of the real host answer without a login with the page inside the frame: the newest
+    /// profile's address the no-data text while no profile has a tick, a profile's address the not-found text for an
+    /// unknown or malformed profile.
+    /// </summary>
+    /// <param name="path">The address of the page</param>
+    /// <param name="expected">The text the page should show</param>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC3")]
+    [DataRow("/trade-routes", "No data yet. The pages fill once the Companion sends data.")]
+    [DataRow("/profiles/3f2504e0-4f89-41d3-9a0c-0305e82c3301/trade-routes", "Not found.")]
+    [DataRow("/profiles/q7malformedq7/trade-routes", "Not found.")]
+    public async Task ProgramGetTradeRoutesPagesAnswerWithoutLogin(string path, string expected)
+    {
+        // Arrange
+        using var factory = new CensioServerFactory("Production");
+        using var client = factory.CreateClient();
+
+        // Act
+        using var response = await client.GetAsync(path, TestContext.CancellationToken);
+        var body = await response.Content.ReadAsStringAsync(TestContext.CancellationToken);
+
+        // Assert
+        var document = ParseHtml(body);
+        var main = document.QuerySelector(".mud-main-content");
+
+        Assert.AreEqual(HttpStatusCode.OK, response.StatusCode, $"{path} should answer 200 without a login");
+        Assert.AreEqual(1, CountLabel(document, "Open or close the navigation"), "The page should be shown inside the frame");
+        Assert.AreEqual("Trade routes", main?.QuerySelector("h1")?.TextContent.Trim(), "The page should be headed Trade routes");
+        Assert.Contains(expected, main?.TextContent ?? string.Empty, "The page should show the text of the spec inside the frame");
+    }
+
+    /// <summary>
     /// A data page of the real host forbids other sites to frame it, so a page of a trusted host cannot be framed by
     /// another site to make its deletion button pressed there.
     /// </summary>

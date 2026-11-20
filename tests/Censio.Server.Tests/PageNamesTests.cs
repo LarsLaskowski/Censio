@@ -229,6 +229,154 @@ public sealed class PageNamesTests
     }
 
     /// <summary>
+    /// Trade routes are ordered by major problems, minor problems and lost ships, each descending (a negative count below
+    /// 0), then by shown name ordinally ignoring case (the unnamed-route text of the language for an empty name), folder
+    /// and ID.
+    /// </summary>
+    /// <param name="language">The language</param>
+    /// <param name="expected">The expected IDs in order</param>
+    [TestMethod]
+    [TestCategory("AC2")]
+    [DataRow(UiLanguage.English, "2,5,4,3,11,1,7,8,6,10,9,12")]
+    [DataRow(UiLanguage.German, "2,5,4,3,11,1,7,8,6,9,10,12")]
+    public void PageNamesOrderTradeRoutesByProblemsThenNameFolderAndId(UiLanguage language, string expected)
+    {
+        // Arrange
+        TradeRouteView[] routes = [
+                                      CreateTradeRoute(1, "alpha", "F", "0/0/0"),
+                                      CreateTradeRoute(12, "aaa", "F", "-1/0/0"),
+                                      CreateTradeRoute(3, "zeta", "F", "1/5/0"),
+                                      CreateTradeRoute(6, "Beta", "F", "0/0/0"),
+                                      CreateTradeRoute(8, "beta", "E", "0/0/0"),
+                                      CreateTradeRoute(10, "Uncle", "F", "0/0/0"),
+                                      CreateTradeRoute(4, "zeta", "F", "1/5/3"),
+                                      CreateTradeRoute(9, string.Empty, "F", "0/0/0"),
+                                      CreateTradeRoute(2, "zeta", "F", "2/0/0"),
+                                      CreateTradeRoute(7, "beta", "E", "0/0/0"),
+                                      CreateTradeRoute(11, "zeta", "F", "0/0/1"),
+                                      CreateTradeRoute(5, "zeta", "F", "1/7/0")
+                                  ];
+
+        // Act
+        var ordered = PageNames.OrderTradeRoutes(routes, language);
+
+        // Assert
+        Assert.AreEqual(expected, string.Join(',', ordered.Select(route => route.Id)), "The routes should be ordered by their counts descending, then by shown name ignoring case, folder and ID");
+    }
+
+    /// <summary>
+    /// The summary line counts the routes and those with a major or minor problem or a lost ship above 0, in the one-route
+    /// form for one route and with the thousands separator of the language.
+    /// </summary>
+    /// <param name="language">The language</param>
+    /// <param name="counts">The major problems, minor problems and lost ships of each route, separated by commas</param>
+    /// <param name="repeat">The number of times the routes are repeated</param>
+    /// <param name="expected">The summary line of the spec</param>
+    [TestMethod]
+    [TestCategory("AC2")]
+    [DataRow(UiLanguage.English, "0/0/0,1/0/0,0/1/0,0/0/1,-1/0/0,0/-2/-3", 1, "6 trade routes, 3 with problems or lost ships.")]
+    [DataRow(UiLanguage.German, "0/0/0,1/0/0,0/1/0,0/0/1,-1/0/0,0/-2/-3", 1, "6 Handelsrouten, 3 mit Problemen oder verlorenen Schiffen.")]
+    [DataRow(UiLanguage.English, "0/0/0", 1, "1 trade route, 0 with problems or lost ships.")]
+    [DataRow(UiLanguage.German, "0/0/0", 1, "1 Handelsroute, 0 mit Problemen oder verlorenen Schiffen.")]
+    [DataRow(UiLanguage.English, "2/0/0", 1, "1 trade route, 1 with problems or lost ships.")]
+    [DataRow(UiLanguage.German, "0/0/4", 1, "1 Handelsroute, 1 mit Problemen oder verlorenen Schiffen.")]
+    [DataRow(UiLanguage.English, "0/0/1", 1000, "1,000 trade routes, 1,000 with problems or lost ships.")]
+    [DataRow(UiLanguage.German, "0/0/1", 1000, "1.000 Handelsrouten, 1.000 mit Problemen oder verlorenen Schiffen.")]
+    public void PageNamesTradeRoutesSummaryCountsRoutesWithProblems(UiLanguage language, string counts, int repeat, string expected)
+    {
+        // Arrange
+        var routes = CreateTradeRoutes(counts, repeat);
+
+        // Act
+        var summary = PageNames.TradeRoutesSummary(routes, language);
+
+        // Assert
+        Assert.AreEqual(expected, summary, "The summary line should be the one of the spec");
+    }
+
+    /// <summary>
+    /// An empty route name shows the unnamed-route text, an empty folder a dash, a station no island list names
+    /// <c>Island &lt;session GUID&gt;/&lt;island ID&gt;/&lt;area index&gt;</c> and an island with an empty name the
+    /// unnamed-island text, in the shown language; other names stay as they are.
+    /// </summary>
+    /// <param name="language">The language</param>
+    /// <param name="expected">The expected shown names</param>
+    [TestMethod]
+    [TestCategory("AC5")]
+    [DataRow(UiLanguage.English, "Unnamed route|Ostia|–|F1|Island 3245/1/2|Unnamed island|Isle A")]
+    [DataRow(UiLanguage.German, "Unbenannte Route|Ostia|–|F1|Insel 3245/1/2|Unbenannte Insel|Isle A")]
+    public void PageNamesTradeRouteStationAndFolderFallbacks(UiLanguage language, string expected)
+    {
+        // Arrange
+        var island = new IslandKey(3245, 1, 2);
+
+        // Act
+        string[] names = [
+                             PageNames.TradeRoute(string.Empty, language),
+                             PageNames.TradeRoute("Ostia", language),
+                             PageNames.Folder(string.Empty),
+                             PageNames.Folder("F1"),
+                             PageNames.Station(CreateStop(island, null), language),
+                             PageNames.Station(CreateStop(island, string.Empty), language),
+                             PageNames.Station(CreateStop(island, "Isle A"), language)
+                         ];
+
+        // Assert
+        Assert.AreEqual(expected, string.Join('|', names), "Each shown name should be the name or the spec's fallback");
+    }
+
+    /// <summary>
+    /// Creates a trade route with one ship and no stations.
+    /// </summary>
+    /// <param name="id">The route ID</param>
+    /// <param name="name">The name</param>
+    /// <param name="folder">The folder</param>
+    /// <param name="counts">The major problems, minor problems and lost ships, separated by slashes</param>
+    /// <returns>The route</returns>
+    private static TradeRouteView CreateTradeRoute(int id, string name, string folder, string counts)
+    {
+        var values = counts.Split('/').Select(value => int.Parse(value, CultureInfo.InvariantCulture)).ToList();
+
+        return new TradeRouteView
+               {
+                   Id = id,
+                   Name = name,
+                   Folder = folder,
+                   MajorProblems = values[0],
+                   MinorProblems = values[1],
+                   Ships = 1,
+                   LostShips = values[2],
+                   Stations = []
+               };
+    }
+
+    /// <summary>
+    /// Creates trade routes from their counts, repeated a number of times.
+    /// </summary>
+    /// <param name="counts">The major problems, minor problems and lost ships of each route, separated by commas</param>
+    /// <param name="repeat">The number of times the routes are repeated</param>
+    /// <returns>The routes</returns>
+    private static List<TradeRouteView> CreateTradeRoutes(string counts, int repeat)
+    {
+        return [.. Enumerable.Repeat(counts.Split(','), repeat).SelectMany(route => route).Select((route, index) => CreateTradeRoute(index, "Route", "Folder", route))];
+    }
+
+    /// <summary>
+    /// Creates a stop of a trade route.
+    /// </summary>
+    /// <param name="island">The island</param>
+    /// <param name="name">The island name, or <see langword="null" /> for none</param>
+    /// <returns>The stop</returns>
+    private static TradeRouteStop CreateStop(IslandKey island, string? name)
+    {
+        return new TradeRouteStop
+               {
+                   Island = island,
+                   Name = name
+               };
+    }
+
+    /// <summary>
     /// Reads a catalog document of entries into the lookup of the pages.
     /// </summary>
     /// <param name="entries">The entries as JSON</param>

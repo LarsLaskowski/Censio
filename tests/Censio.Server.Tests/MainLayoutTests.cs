@@ -70,6 +70,16 @@ public sealed class MainLayoutTests
     /// </summary>
     private const string DrawerSelector = ".mud-drawer";
 
+    /// <summary>
+    /// The identity of <see cref="_firstProfile" /> in the form the addresses carry.
+    /// </summary>
+    private const string FirstProfileText = "11111111-1111-4111-8111-111111111111";
+
+    /// <summary>
+    /// The address of the trade routes of <see cref="_firstProfile" />.
+    /// </summary>
+    private const string FirstTradeRoutesLink = "/profiles/" + FirstProfileText + "/trade-routes";
+
     #endregion // Constants
 
     #region Fields
@@ -525,6 +535,41 @@ public sealed class MainLayoutTests
 
         // Assert
         await layout.WaitForAssertionAsync(() => Assert.AreEqual("/regions", RegionsEntryLink(layout), "The Regions entry should lead to /regions on an address without a profile"), PageTestHost.WaitBound);
+    }
+
+    /// <summary>
+    /// The navigation lists the trade-routes entry after the Regions entry in the language shown, leading to the trade
+    /// routes of the profile the address carries, or to <c>/trade-routes</c> elsewhere, and marked on its own address.
+    /// </summary>
+    /// <param name="language">The language shown</param>
+    /// <param name="address">The address of the page</param>
+    /// <param name="entries">The texts of the navigation entries in order</param>
+    /// <param name="expectedLink">The address the trade-routes entry should lead to</param>
+    /// <param name="marked">Whether the trade-routes entry should be marked</param>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC3")]
+    [DataRow(UiLanguage.English, "/profiles/" + FirstProfileText + "/islands/3245/1/0", "Home|Regions|Trade routes", FirstTradeRoutesLink, false)]
+    [DataRow(UiLanguage.German, "/", "Startseite|Regionen|Handelsrouten", "/trade-routes", false)]
+    [DataRow(UiLanguage.English, FirstTradeRoutesLink, "Home|Regions|Trade routes", FirstTradeRoutesLink, true)]
+    [DataRow(UiLanguage.German, "/trade-routes", "Startseite|Regionen|Handelsrouten", "/trade-routes", true)]
+    public async Task MainLayoutListsTradeRoutesEntryAfterRegions(UiLanguage language, string address, string entries, string expectedLink, bool marked)
+    {
+        // Arrange
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken);
+
+        host.Context.Services.GetRequiredService<BunitNavigationManager>().NavigateTo(address);
+
+        // Act
+        var layout = RenderLayout(host.Context, UiTheme.Light, language);
+
+        // Assert
+        var links = layout.FindAll(".mud-nav-link");
+        var entry = links[^1];
+
+        Assert.AreEqual(entries, string.Join('|', links.Select(link => link.TextContent.Trim())), "The navigation should list the trade-routes entry after the Regions entry");
+        Assert.AreEqual(expectedLink, entry.GetAttribute("href"), "The trade-routes entry should lead to the trade routes of the shown profile, or of the newest");
+        Assert.AreEqual(marked, entry.ClassList.Contains("active"), "The trade-routes entry should be marked on its own address only");
     }
 
     /// <summary>

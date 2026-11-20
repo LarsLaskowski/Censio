@@ -267,5 +267,47 @@ public sealed class PageAddressTests
         Assert.AreEqual("/regions", link, $"The Regions entry on '{relativePath}' should lead to /regions");
     }
 
+    /// <summary>
+    /// The address of a profile's trade routes carries the profile.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC3")]
+    public void PageAddressTradeRoutesLinkCarriesProfile()
+    {
+        // Act
+        var link = PageAddress.TradeRoutesLink(new Guid(ProfileText));
+
+        // Assert
+        Assert.AreEqual($"/profiles/{ProfileText}/trade-routes", link, "The trade routes' address should carry the profile");
+    }
+
+    /// <summary>
+    /// The trade-routes entry links to the trade routes of the profile an address carries, query and fragment ignored, and
+    /// to <c>/trade-routes</c> on an address without a well-formed profile.
+    /// </summary>
+    /// <param name="relativePath">The base-relative address</param>
+    /// <param name="expected">The address the entry should lead to</param>
+    [TestMethod]
+    [TestCategory("AC3")]
+    [DataRow("profiles/" + ProfileText + "/regions", "/profiles/" + ProfileText + "/trade-routes")]
+    [DataRow("profiles/" + ProfileText + "/trade-routes", "/profiles/" + ProfileText + "/trade-routes")]
+    [DataRow("profiles/" + ProfileText + "/islands/3245/1/0", "/profiles/" + ProfileText + "/trade-routes")]
+    [DataRow("profiles/" + ProfileText + "/trade-routes?x=1#top", "/profiles/" + ProfileText + "/trade-routes")]
+    [DataRow("profiles/" + ProfileText, "/profiles/" + ProfileText + "/trade-routes")]
+    [DataRow("", "/trade-routes")]
+    [DataRow("trade-routes", "/trade-routes")]
+    [DataRow("regions", "/trade-routes")]
+    [DataRow("profiles/x/trade-routes", "/trade-routes")]
+    [DataRow("profiles/", "/trade-routes")]
+    [DataRow(null, "/trade-routes")]
+    public void PageAddressTradeRoutesEntryLinkFollowsProfileAddress(string? relativePath, string expected)
+    {
+        // Act
+        var link = PageAddress.TradeRoutesEntryLink(relativePath);
+
+        // Assert
+        Assert.AreEqual(expected, link, $"The trade-routes entry on '{relativePath}' should lead to {expected}");
+    }
+
     #endregion // Methods
 }
