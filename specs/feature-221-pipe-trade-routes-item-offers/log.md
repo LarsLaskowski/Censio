@@ -41,3 +41,4 @@ are quoted in full.
 | 2026-11-20 10:25 | 9 PR approval | Lead | RESULT: APPROVED — G1/G2 accepted uncovered fail-closed branches, LastFrameTooLong replacement, AC10/E11 amendment and records 0094/0095 approved; no linked issues (opus/medium · 39,277 tokens · 8 tool uses · 50 s · 16 in · 3,324 out · 201,354 cache read · 37,882 cache write · 148,112 weighted) |
 | 2026-11-20 10:27 | 7 Gate stamp | Orchestrator | PASS on c07d152bbdd3bfbbf4d929ea8f078ebc8af7c906 (tier security, verbatim): Format check pass; decision-check.py pass; scope-check.py pass |
 | 2026-11-20 10:27 | 9 PR approval | Orchestrator | Records 0095 set to Accepted (file and index); decision-check passes; stamped with --verbatim (c07d152) |
+| 2026-11-20 10:28 | 10 Pull request | Orchestrator | Matrix filled in (manual AC11/AC12 recorded), follow-up issue 225 created, working record posted to issue 221, specs removed, draft PR opened |
