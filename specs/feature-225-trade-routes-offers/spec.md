@@ -1,7 +1,7 @@
 # Spec: Show trade routes and item offers of pipe protocol 3
 
 Source: Issue #225
-Status: Draft
+Status: Approved by Lead
 
 ## Problem
 
@@ -37,7 +37,7 @@ Scope as the Product Manager chose (*Open questions*, Q1): trade routes now, ite
   `Delete history` button.
 - S2: Given routes with major problems, minor problems or lost ships, when the page opens, then a line above the table
   reads `<n> trade routes, <p> with problems or lost ships.` / `<n> Handelsrouten, <p> mit Problemen oder verlorenen
-  Schiffen.` and those routes come first, each count above 0 in the error colour.
+  Schiffen.` (`1 trade route, …` / `1 Handelsroute, …` for one) and those routes come first, each count above 0 in the error colour.
 - S3: Given the page is open, when a newer trade-routes message of the shown profile arrives, then the table shows it
   without a reload.
 - S4: Given any page, when the user picks the navigation entry, then it leads to the trade routes of the shown profile,
@@ -105,7 +105,8 @@ Scope as the Product Manager chose (*Open questions*, Q1): trade routes now, ite
   nothing (S3, E5).
 - AC5: The page shows `No trade routes received yet.` / `Noch keine Handelsrouten empfangen.` for a profile without
   trade routes, `No trade routes in the latest data.` / `Keine Handelsrouten in den letzten Daten.` for an empty latest
-  message, and the texts of E1, E2 and E7 (S6, E1, E2, E7).
+  message, and the texts of E1, E2 and E7; `/trade-routes` while no profile has a tick shows the `No data yet. …` text of
+  [web-pages](../../docs/areas/web-pages.md) (S6, E1, E2, E7).
 - AC6: After a restart the server shows each profile's latest trade routes as before the stop; a deletion removes
   them, shows the dialog text of E9 and leaves no route or folder name of the profile in the database files after the
   clean-up (real schema); a trade-routes message during the removal recreates the profile (S5, E9, N2, N3).
