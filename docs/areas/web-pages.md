@@ -101,8 +101,8 @@ application rely on it.
   the server keeps ([`server-state.md`](server-state.md), [record 0097](../decisions/0097-latest-trade-routes-per-profile-stored-as-rows-on-a-page-of-their-own.md)).
   It has no history, chart or detail page and no `Delete history` button.
 - Top to bottom: the heading `Trade routes` / `Handelsrouten` (tab title `Censio – Trade routes` / `Censio – Handelsrouten`);
-  in the ready state the profile's shown name as on the region overview; the Companion banner and, when there are
-  routes, the as-of line; then the status text of the page ([*Texts of a page that shows no figures*](#texts-of-a-page-that-shows-no-figures)),
+  in the ready state the profile's shown name as on the region overview; the Companion banner and, when the profile has
+  received trade routes (an empty set included), the as-of line; then the status text of the page ([*Texts of a page that shows no figures*](#texts-of-a-page-that-shows-no-figures)),
   or `No trade routes received yet.` / `Noch keine Handelsrouten empfangen.` for a profile that never received trade
   routes (a protocol 2 game, or a profile of a release before trade routes), or `No trade routes in the latest data.` /
   `Keine Handelsrouten in den letzten Daten.` when the latest message holds no route, or a summary line and the table.
