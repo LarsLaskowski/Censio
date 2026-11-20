@@ -186,7 +186,10 @@ Existing call sites the change breaks, all adapted by the Tester:
 
 The Anonymiser tests link `PipeFrameBuilder` too but do not call `UndecodedEntries` (fact 12).
 
-Files no unit test can cover: none.
+Files no unit test can cover: none whole. In `src/Censio.Pipe/PipeMessageParser.cs` the failure branches of
+`ParseGood` and of the item read in `ParseItemOffer`, and the `null` check on `ParseGood` in `ParseStation`, are
+unreachable: `TryReadCount` admits a count only when the frame holds that many elements of the fixed size
+(`MinGoodSize`, `ItemSize`). They stay as fail-closed defense (record 0033), as in `TryReadMap` (G1, Lead decision).
 
 ## Areas
 
