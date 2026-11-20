@@ -23,7 +23,7 @@ See [spec.md](spec.md), *Problem*. Today `PipeMessageParser.ParseUndecoded` (`sr
 | 9 | Its nested counts: 57 routes per frame, at most 4 stations per route (none without), at most 5 goods per station (none without), 7 traders, at most 6 items per trader (none without); no missing or negative count; frames 8,186 and 229 bytes | same decode | confirmed |
 | 10 | Its values: problem counts all 0, ships at most 2, lost ships all 0 (so never above ships), goods amounts 1 to 50 (none 0 or negative), one owner value, station flags only 0 or bit 2, goods flags only 0 or bit 0 (no unnamed bit), no repeated route ID, trader ID or item GUID within a list; 56 distinct route names over 57 routes, 9 folders | same decode | confirmed |
 | 11 | All 11 trade-route frames are byte-identical; the 12 item-offer frames are 9 distinct ones | same decode | confirmed |
-| 12 | `UndecodedMessage` is used only by the parser, the anonymiser and `PipeMessageParserTests`, `PipeMessageReaderTests`, `PipeTickBuilderTests` | `grep -rn UndecodedMessage src tests` | confirmed |
+| 12 | `UndecodedMessage` and `PipeFrameBuilder.UndecodedEntries` are used only by the parser, the anonymiser, `PipeMessageParserTests`, `PipeMessageReaderTests`, `PipeTickBuilderTests`, `PipeRecordingAnonymiserTests` and, through the linked builder, `PipeConnectionTests` (`UndecodedFrame`, `tests/Censio.Companion.Core.Tests/PipeConnectionTests.cs:2041-2044`, used by `PipeConnectionTradeRoutesAndItemOffersRaiseNoEvent`, `:457-473`) | grep of `src` and `tests` for both names | confirmed |
 | 13 | `PipeTickBuilder.AddMessage` (`PipeTickBuilder.cs:142-174`) switches on island, session and version messages only; any other message adds no item | source | confirmed |
 | 14 | No write-side length check exists: `Anonymise` returns the written bytes after `IsReadBack` only (`PipeFrameAnonymiser.cs:114-131`, `:367-378`) | source | confirmed |
 | 15 | `PipeAnonymousNames` keeps one `_originals` set over every kind, so the collision skip already spans kinds once routes and folders are added to it | `PipeAnonymousNames.cs` | confirmed |
@@ -40,7 +40,7 @@ See [spec.md](spec.md), *Problem*. Today `PipeMessageParser.ParseUndecoded` (`sr
 | AC4 | `PipeMessageParserTradeRoutesOrItemOffersMissingCountReturnsMalformed`, `PipeMessageParserTradeRoutesOrItemOffersNegativeCountReturnsMalformed`, `PipeMessageParserTradeRoutesShortFieldReturnsMalformed`, `PipeMessageParserTradeRoutesStringPastFrameReturnsMalformed` | `tests/Censio.Pipe.Tests/PipeMessageParserTests.cs` |
 | AC5 | `PipeMessageParserTradeRoutesOrItemOffersCountAboveCapReturnsMalformed`, `PipeMessageParserTradeRoutesOrItemOffersCountAtCapReturnsMessage`, `PipeMessageParserTradeRoutesOrItemOffersCountBeyondFrameReturnsMalformed` | `tests/Censio.Pipe.Tests/PipeMessageParserTests.cs` |
 | AC6 | `PipeMessageParserTradeRoutesUnnamedFlagBitsAreIgnored` | `tests/Censio.Pipe.Tests/PipeMessageParserTests.cs` |
-| AC7 | `PipeTickBuilderTradeRoutesOrItemOffersKeepOpenTick`, `PipeTickBuilderTradeRoutesOrItemOffersDoNotRestartQuietPeriod`, `PipeTickBuilderTradeRoutesOrItemOffersKeepRepeatedSessionEnd` | `tests/Censio.Pipe.Tests/PipeTickBuilderTests.cs` |
+| AC7 | `PipeTickBuilderTradeRoutesOrItemOffersKeepOpenTick`, `PipeTickBuilderTradeRoutesOrItemOffersDoNotRestartQuietPeriod`, `PipeTickBuilderTradeRoutesOrItemOffersKeepRepeatedSessionEnd`; `PipeConnectionTradeRoutesAndItemOffersRaiseNoEvent` (frames rebuilt in the reference layout, so they decode) | `tests/Censio.Pipe.Tests/PipeTickBuilderTests.cs`, `tests/Censio.Companion.Core.Tests/PipeConnectionTests.cs` |
 | AC8 | `PipeRecordingAnonymiserRouteAndFolderNamesAreInvented`, `PipeRecordingAnonymiserInventedRouteNameSkipsOriginalOfAnotherKind`, `PipeRecordingAnonymiserEmptyRouteAndFolderNamesStayEmpty`; `FixtureDenyListFixturesHaveInventedNames` (extended to routes and folders) | `tests/Censio.Pipe.Tests/PipeRecordingAnonymiserTests.cs`, `tests/Censio.Pipe.Tests/FixtureDenyListTests.cs` |
 | AC9 | `PipeRecordingAnonymiserTradeRoutesKeepStructure`, `PipeRecordingAnonymiserTradeRouteAmountsChange`, `PipeRecordingAnonymiserLostShipsStayAtMostShips`, `PipeRecordingAnonymiserNegativeGoodsAmountIsKept`, `PipeRecordingAnonymiserUnnamedFlagBitsAreWrittenAsZero`, `PipeRecordingAnonymiserItemOffersKeepStructure` | `tests/Censio.Pipe.Tests/PipeRecordingAnonymiserTests.cs` |
 | AC10 | `PipeRecordingAnonymiserMalformedTradeRoutesOrItemOffersAreRefused`, `PipeRecordingAnonymiserTradeRoutesOverOneMebibyteAfterRewritingAreRefused` | `tests/Censio.Pipe.Tests/PipeRecordingAnonymiserTests.cs` |
@@ -66,9 +66,9 @@ See [spec.md](spec.md), *Problem*. Today `PipeMessageParser.ParseUndecoded` (`sr
   per station, 1,024 offers per frame, 1,024 items per offer. Margins over the recording (fact 9): 18x, 64x, 51x, 146x,
   170x. Memory needs no cap: the bytes-left check bounds every list by the frame; the largest decoded message of a
   1 MiB frame is at most about 116,000 goods objects, a few MiB, held only for the read.
-  The seam the tests observe the bytes-left bound through: a count of `int.MaxValue` in a frame of a few bytes must
-  give the malformed error, where an unchecked `new List<T>(int.MaxValue)` would throw `OutOfMemoryException` instead
-  (as the existing island tests do).
+  The seam the tests observe the bounds through: a count above its cap in a frame that holds that many complete
+  elements, and a count at most its cap that the rest of the frame cannot hold, each give the malformed error at the
+  count's own offset (`PipeError.Offset`); without the check the parse fails later, at a deeper offset.
 - A malformed error carries type value and offset only (`PipeError`, unchanged): nothing of a name.
 - `PipeTickBuilder` needs no change (fact 13); its three tests are adapted to the new messages.
 
@@ -82,15 +82,20 @@ See [spec.md](spec.md), *Problem*. Today `PipeMessageParser.ParseUndecoded` (`sr
   bytes: IDs, island key bytes, session GUID, owner, list counts and order as decoded; flags from the named booleans
   only (unnamed bits 0); item GUIDs as decoded; names through `TryGetRoute`/`TryGetFolder` (an uncollected name gives
   `null`, as for islands).
-- Integer amounts, drawn in frame order with the existing `PerturbInteger` (two draws each): per route major
-  problems, minor problems, ships, lost ships; then per good, in station order, its amount when it is 0 or more. A
-  negative goods amount is written unchanged and takes no draw. Lost ships: when the original lost-ship count is at
+- Integer amounts, drawn strictly in frame order with the existing `PerturbInteger` (two draws per value, a zero
+  included, `PipeFrameAnonymiser.cs:670-675`): route 1's major problems, minor problems, ships and lost ships, then
+  route 1's goods amounts station by station, then route 2, and so on. Only a negative goods amount is written
+  unchanged and takes no draw. Lost ships: when the original lost-ship count is at
   most the original ship count and the perturbed lost ships exceed the perturbed ships, lost ships become the
   perturbed ships, or the perturbed ships minus 1 when that would equal the original non-zero lost-ship count. That
-  value is at least 0 and never the original.
+  value is never the original, and at least 0 when the original ship count is positive.
 - `IsReadBack` gains private structure checks for both messages: same route, station, goods, offer and item counts,
   and equal IDs, island keys, owners, named flags, goods GUIDs and loading, trader IDs and item GUIDs. Then
   `Anonymise` refuses any written frame longer than `PipeProtocol.MaxFrameLength`, for every type (E11).
+- Every frame draws its amounts afresh, as island frames do (record 0042). A recording that repeats one trade-route
+  frame (all 11 of the sample are byte-identical, fact 11) therefore lets a reader infer a small original value from
+  the spread of its copies (2 to 4 move by exactly 1; 1 always becomes 2). This is accepted and documented as a
+  residual risk, not prevented (plan challenge, objection 4).
 
 **Group G3 — fixture and documentation.**
 
@@ -164,7 +169,8 @@ The parser's Parse and the anonymiser's TryCollect and Anonymise keep their sign
 ## Test files
 
 `tests/Censio.Pipe.Tests/PipeMessageParserTests.cs`, `PipeMessageReaderTests.cs`, `PipeTickBuilderTests.cs`,
-`PipeRecordingAnonymiserTests.cs`, `PipeTickAssemblerTests.cs`, `FixtureDenyListTests.cs` (all existing), the helper
+`PipeRecordingAnonymiserTests.cs`, `PipeTickAssemblerTests.cs`, `FixtureDenyListTests.cs`, and
+`tests/Censio.Companion.Core.Tests/PipeConnectionTests.cs` (all existing), the helper
 `FixtureDenyList.cs`, and the new fixture `Fixtures/protocol-3-trade-routes.jsonl`.
 
 Existing call sites the change breaks, all adapted by the Tester:
@@ -174,8 +180,11 @@ Existing call sites the change breaks, all adapted by the Tester:
   `PipeRecordingAnonymiserTests.cs:985` (`…AreWrittenEmpty`, replaced by the AC9 tests), and the refusal test after
   it (kept as AC10).
 - `new UndecodedMessage(…)` in `PipeTickBuilderTests.cs:629-686`.
+- `UndecodedFrame` in `tests/Censio.Companion.Core.Tests/PipeConnectionTests.cs:2041-2044` (the linked builder),
+  rebuilt from the new reference-layout builders, so `PipeConnectionTradeRoutesAndItemOffersRaiseNoEvent` sends
+  frames that decode and not malformed ones (fact 12).
 
-`PipeFrameBuilder` is linked into the Companion and Anonymiser tests, which do not call `UndecodedEntries` (fact 12).
+The Anonymiser tests link `PipeFrameBuilder` too but do not call `UndecodedEntries` (fact 12).
 
 Files no unit test can cover: none.
 
@@ -196,7 +205,8 @@ Files no unit test can cover: none.
   - *What is kept*: IDs, keys, owners, GUIDs, counts and order.
   - *What is refused*: malformed types 4 and 5 at any level, and a written frame over 1 MiB.
   - *Fixtures*: the third fixture.
-  - *Privacy* (line 112) stays true.
+  - *Privacy* (line 112) stays true. *Anonymising* states the residual risk of repeated frames: amounts are drawn
+    afresh per frame, so the copies of a repeated island or trade-route frame let a small original value be inferred.
 
 ## Documentation updates
 
@@ -246,58 +256,28 @@ item.
   server page, which needs a contract message and the server's live state. Spec it against the decoded fixture of
   #221.
 
-## Security notes
+## Challenge
 
-Security plan review: feature 221 (trade routes and item offers), tier security, of `specs/feature-221-pipe-trade-routes-item-offers/spec.md` and `plan.md` at branch head `8c43ffd`.
+- 1 (major, `PipeConnectionTests` breaks or tests only the malformed path): accepted. I confirmed the call site at
+  `PipeConnectionTests.cs:2041-2044`, used by `:457-473`. Fact 12 is corrected. *Test files*, the AC7 row and tasks
+  row 3 now include `PipeConnectionTests.cs`, whose `UndecodedFrame` the Tester rebuilds in the reference layout.
+- 2 (minor, the `int.MaxValue` seam shows only the cap): accepted. The seam is now the error offset of a count at most
+  its cap that the bytes left cannot hold, and of a count above its cap in a frame that holds that many elements
+  (Security note 1).
+- 3 (minor, draw order): accepted. *Approach* G2 now fixes the order strictly by frame position, with two draws per
+  value (a zero included) and none only for a negative goods amount.
+- 4 (minor, repeated frames reveal small values): accepted as a documented residual risk, not prevented. Island frames
+  already re-draw per tick under record 0042, whose goal is no exact value in public, not the secrecy of an amount.
+  The values concerned are ship counts and load amounts. A per-run mapping keyed by route, station and good position
+  would need state across frames and keys that shift when the player adds a route. The risk goes into
+  `docs/areas/pipe-recording.md` (*Anonymising*) and record 0095's *Consequences*.
+- 5 (minor, stale 0094 link in the spec): accepted. `spec.md` now links the renamed record.
 
-I found no blocking findings. The tier is right: the change alters a parser of untrusted input and the anonymiser's privacy rules, and both are security controls. *Security areas touched* lists both areas the plan touches. The Companion and the server do not use the new messages: a grep of `src` outside `Censio.Pipe` finds no `TradeRoutes`, `ItemOffers` or `Undecoded`.
+## Security review
 
-**What I checked**
+Security approved with no blocking finding. Its two notes were decided as follows:
 
-- **Count checks in the parser:** I read `src/Censio.Pipe/PipeMessageParser.cs` and went through every input shape the parser takes for types 4 and 5. Every rejection path is covered by an E-case or an AC:
-  - Counts that are missing, negative, zero, above the cap, or above what the remaining bytes can hold, at all five levels (E1–E3).
-  - Short key, flags and loading-byte fields (E4).
-  - A string length byte that points past the frame end, and invalid UTF-8, which becomes U+FFFD as in `TryReadString` (E7).
-  - Unnamed flag bits (E5) and trailing bytes (E8).
-- **Minimum sizes:** route 26, station 20, good 9, offer 8, item 4. All match the layout in fact 3, where a minimum string is its length byte only. The bytes-left divisor in `TryReadCount` is therefore never too small.
-- **Memory (N1) and time (N2):** both hold.
-  - Every loop pass either uses up at least the minimum size in bytes or fails.
-  - A failed parse leaves at most three partly filled lists, all limited by the caps.
-  - A successful parse allocates only what it filled. So memory stays proportional to the frame (about 116,000 goods at most for 1 MiB), and the caps alone already limit it.
-- **Privacy:**
-  - The anonymiser writes from the decoded fields and never copies frame bytes. So unnamed flag bits are written as 0, and trailing bytes cannot get through: `IsReadBack` also requires that the frame was read exactly to its end.
-  - The collision set `_originals` in `PipeAnonymousNames.cs` is case-insensitive and shared by all name kinds, so E12 holds across all four kinds.
-  - `Perturb` never keeps a non-zero value. The lost-ship rule never writes the original non-zero count: `S'` differs from `L` by its condition, and `S'-1` differs from `L` when `S' == L`.
-  - The 1 MiB limit on written frames now applies to every frame type. This also closes the existing gap where invented island names could make a frame longer.
-- **Logging and errors (N3):** `PipeError` carries only the kind, type value and offset. `CompanionLog.ConnectionStateChanged` logs only the error kind. The `FixtureDenyList` findings (`tests/Censio.Pipe.Tests/FixtureDenyList.cs`) name a place and a field, never a value. The anonymiser's refusal message does not change.
-- **Library behavior the plan relies on:** I measured it once with `dotnet run probe.cs` (SDK 11.0.100, scratch file `/tmp/claude-0/-home-user-Censio/85a27a5b-a848-5bd1-8736-052ae677ba91/scratchpad/listprobe/probe.cs`). Output:
-  ```
-  System.OutOfMemoryException: Array dimensions exceeded supported range.   (List<object>(int.MaxValue))
-  System.OutOfMemoryException: Array dimensions exceeded supported range.   (List<int>(int.MaxValue))
-  255                                                                         (UTF-8 decode of 255 x 0xFF)
-  ```
-  This confirms the plan's out-of-memory claim and the security claim that 255 invalid bytes decode to 255 U+FFFD.
-
-**Findings**
-
-1. **[NON-BLOCKING] The tests named for the count limit do not show it.** Plan, *Approach* G1, the paragraph "The seam the tests observe the bytes-left bound through: a count of `int.MaxValue` …"; AC5.
-   - With caps of at most 1,024, a count of `int.MaxValue` is rejected by the cap check before the bytes-left check runs. That test passes even if the bytes-left check is missing.
-   - A count at or below the cap that the frame cannot hold (`CountBeyondFrameReturnsMalformed`) is malformed either way: without the check, parsing just fails later. So the result alone does not show the check.
-   - The error offset does show it. `TryReadCount` resets the position to the count's offset; without the check, the error points at a deeper field.
-   - The same applies to `CountAboveCapReturnsMalformed`. It only shows the cap check if the frame actually holds cap+1 complete elements, otherwise it passes by running out of bytes.
-
-   Smallest fix (recommended: fix now in the plan), replace that paragraph with:
-   ```
-     The seam the tests observe the bounds through: a count above its cap in a frame that holds that many complete
-     elements, and a count at most its cap that the rest of the frame cannot hold, each give the malformed error at the
-     count's own offset (`PipeError.Offset`); without the check the parse fails later, at a deeper offset.
-   ```
-
-2. **[NON-BLOCKING] The lost-ship rule claims a value is "at least 0", which is not always true.** Plan, *Approach* G2, "That value is at least 0 and never the original."
-   - Ship counts are signed int32 values from the wire. With a negative original ship count (for example S = -3, L = -5), the written value `S'` is negative.
-   - The privacy part, never the original, still holds, so this only matters if a test asserts "at least 0".
-
-   Smallest fix (recommended: fix now), replace the sentence with:
-   ```
-     That value is never the original, and at least 0 when the original ship count is positive.
-   ```
+- Note 1 (the count-limit tests do not show the bounds): fixed as recommended. *Approach* G1 names the error offset as
+  the seam, and AC5's tests assert `PipeError.Offset`.
+- Note 2 (the lost-ship value is "at least 0" only for a positive ship count): fixed as recommended. *Approach* G2 now
+  says the value is never the original, and at least 0 when the original ship count is positive.

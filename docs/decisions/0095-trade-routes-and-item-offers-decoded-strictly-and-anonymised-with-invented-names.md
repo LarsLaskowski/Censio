@@ -58,3 +58,7 @@ frame by parsing it back, and refuses any written frame over 1 MiB ([pipe-record
 - Fixtures made by this anonymiser hold trade routes and item offers; the older version 3 fixture keeps its emptied
   frames, which decode as empty messages.
 - A cap a future game exceeds rejects that frame until the cap is raised.
+- Amounts are drawn afresh per frame, as for island frames. The copies of a repeated trade-route frame therefore let a
+  reader infer a small original value (2 to 4 move by exactly 1, and 1 always becomes 2). This is accepted, like the
+  factor an entry reveals under record 0042: the goal is no exact value in public, not the secrecy of an amount. A
+  per-run mapping would need state keyed by positions that shift when a route is added.

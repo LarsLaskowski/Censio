@@ -7,7 +7,7 @@ Status: Approved by Lead
 
 Since protocol version 3 (game build `26.39954.4.58957`) the game sends two message types the Companion cannot read:
 type 4, the player's trade routes, and type 5, the item offers of traders. The reader checks only their leading count
-and delivers them as undecoded messages that change nothing ([record 0094](../../docs/decisions/0094-pipe-reader-accepts-protocol-versions-2-and-3-and-skips-trade-routes-and-item-offers.md),
+and delivers them as undecoded messages that change nothing ([record 0094](../../docs/decisions/0094-pipe-reader-accepts-protocol-versions-2-and-3.md),
 [pipe](../../docs/areas/pipe.md), *Message types*); the anonymiser writes each as its type byte and a count of 0
 ([pipe-recording](../../docs/areas/pipe-recording.md), *Anonymising*). No fixture holds real trade-route content to test a
 reader against. Route and folder
