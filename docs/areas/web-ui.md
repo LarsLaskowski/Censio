@@ -18,10 +18,11 @@ data is in [`web-pages.md`](web-pages.md).
   the pages is the deletion dialog of [`web-pages.md`](web-pages.md).
 - The app bar shows, from left to right, the navigation button, the name `Censio`, the profile switch, the language
   switch and the theme switch.
-- The navigation is open when a page opens and lists the start page (`Home` / `Startseite`, link `/`) and the region
-  overview (`Regions` / `Regionen`). The Regions entry leads to the region overview of the profile whose page is shown
-  (`/profiles/{profile}/regions`, followed as the address changes) and to `/regions` on every other address; it is marked
-  on every address that starts with its link. The navigation button
+- The navigation is open when a page opens and lists the start page (`Home` / `Startseite`, link `/`), the region
+  overview (`Regions` / `Regionen`) and the trade routes (`Trade routes` / `Handelsrouten`), in this order. The Regions entry
+  leads to the region overview of the profile whose page is shown (`/profiles/{profile}/regions`, followed as the address
+  changes) and to `/regions` on every other address; the Trade routes entry likewise to `/profiles/{profile}/trade-routes`
+  and to `/trade-routes`. Each is marked on every address that starts with its link. The navigation button
   closes and opens it; while it is closed the content takes the freed width.
 - The profile switch is a menu in the app bar with the text `Profile` / `Profil`. It is disabled while no profile
   exists. Otherwise it lists at most 100 profiles by shown name, each a link to that profile's region overview, then the
@@ -135,6 +136,7 @@ Both palettes meet WCAG 2.1 level AA, checked by a unit test for every pair:
 | Navigation button (accessible name) | `Open or close the navigation` | `Navigation öffnen oder schließen` |
 | Navigation entry of `/` | `Home` | `Startseite` |
 | Navigation entry of the region overview | `Regions` | `Regionen` |
+| Navigation entry of the trade routes | `Trade routes` | `Handelsrouten` |
 | Island without a name | `Unnamed island` | `Unbenannte Insel` |
 | Profile without a name | `Unnamed profile` | `Unbenanntes Profil` |
 | Good the catalog does not name | `Good <GUID>` | `Ware <GUID>` |
@@ -146,7 +148,7 @@ Both palettes meet WCAG 2.1 level AA, checked by a unit test for every pair:
 | Language options | `English`, `Deutsch` | `English`, `Deutsch` |
 | Button that opens the deletion dialog | `Delete history` | `Verlauf löschen` |
 | Deletion dialog, title | `Delete history?` | `Verlauf löschen?` |
-| Deletion dialog, text (`<name>` the profile's shown name) | `All data of the profile <name> is removed from the server: its regions, islands, goods and history. This cannot be undone.` | `Alle Daten des Profils <name> werden vom Server entfernt: seine Regionen, Inseln, Waren und sein Verlauf. Das lässt sich nicht rückgängig machen.` |
+| Deletion dialog, text (`<name>` the profile's shown name) | `All data of the profile <name> is removed from the server: its regions, islands, goods, trade routes and history. This cannot be undone.` | `Alle Daten des Profils <name> werden vom Server entfernt: seine Regionen, Inseln, Waren, Handelsrouten und sein Verlauf. Das lässt sich nicht rückgängig machen.` |
 | Deletion dialog, buttons | `Cancel`, `Delete` | `Abbrechen`, `Löschen` |
 | Deletion dialog, text after a failure | `The history could not be deleted.` | `Der Verlauf konnte nicht gelöscht werden.` |
 | Text beside the disabled button | `Deleting needs this page opened by IP address or as localhost, or by a host name the setting AllowedHosts lists.` | `Löschen setzt voraus, dass diese Seite über die IP-Adresse oder localhost geöffnet wurde, oder über einen Hostnamen, den die Einstellung AllowedHosts nennt.` |

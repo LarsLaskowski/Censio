@@ -161,17 +161,17 @@ series read.
 
 ### Deleting a profile
 
-- Deleting a profile's history removes the profile completely: its row, its islands, its ticks and its hourly points.
+- Deleting a profile's history removes the profile completely: its row, its islands, its trade routes, its ticks and its hourly points.
   The catalog, the icons and the other profiles stay. A profile that is not stored changes nothing.
-- One write transaction removes the profile's row and its islands, creates a fresh random identity (a tombstone) and sets
+- One write transaction removes the profile's row, its islands and its trade routes, creates a fresh random identity (a tombstone) and sets
   it as the profile of the profile's ticks and hourly points, one row per tick or hour. From then on no read by profile
   and no read of a tick by its identity returns them, and the server's state drops the profile
   ([`server-state.md`](server-state.md)). The tombstone is no profile and is carried by no profile's row; a row number
   would not serve as a mark, because SQLite reuses the number of a deleted row.
 - Steps of their own then remove the tombstoned rows, each in one write transaction: one tick with its islands, entries
   and pairs, else one hourly point with its islands, entries, pairs and the identities of its folded ticks, else the
-  tombstone once nothing is left. A tick of the deleted profile that arrives during the steps creates the profile again,
-  unnamed until its next hello, with rows under its own identity that the steps leave alone.
+  tombstone once nothing is left. A tick or a trade-routes message of the deleted profile that arrives during the steps creates
+  the profile again, unnamed until its next hello, with rows under its own identity that the steps leave alone.
 - **Clean-up.** The server's connection runs with secure delete, so SQLite overwrites everything this version deletes
   (retention included), and after the steps the write-ahead log is checkpointed and truncated, under the write gate. A
   reader that holds an older snapshot blocks the truncation: the clean-up then logs the warning below and the next run
@@ -181,8 +181,7 @@ series read.
   left to sweep is made under the same write gate: while a tombstone exists (a deletion arrived after the last sweep step)
   the clean-up does nothing, logs nothing and keeps its request, and the run the deletion asked for sweeps the rows
   first. Once the clean-up line is
-  logged, none of the names that only the deleted profile held occurs in the database file or in its `-wal` and `-shm`
-  files; a test with the real schema checks that.
+  logged, none of the names that only the deleted profile held (route and folder names included) occurs in the database file or in its `-wal` and `-shm` files; a test with the real schema checks that.
 - **Residue of older versions.** A version before this one deleted nothing and left copies of changed names in the free
   space of the file; those stay until the operator runs `VACUUM` with the server stopped ([`USER_GUIDE.md`](../USER_GUIDE.md)).
   The file never shrinks by retention or deletion; the space is reused by new data.
@@ -233,8 +232,8 @@ three runs unless a row says otherwise. The limit is 10 seconds a step at the bo
 | A store queued 33 ms into a removal step of the tick at the bounds | acknowledged 8 to 10 ms after the step ended (0.41 to 0.43 s after the step began), in all three runs |
 | The deletion's first transaction, 7 days of fixture ticks (5,040 ticks) | 12, 11 and 17 ms |
 | The deletion's first transaction, a year of hourly points (8,684, built from the 167 real hours of the 7-day run) and 20,190 unfolded ticks | 1,133, 1,130 and 1,134 ms |
-| The series read over 7 days of ticks (5,040 points) | 146, 82 and 82 ms |
-| The series read over a year of hourly points (8,714 points) | 163, 152 and 126 ms |
+| By a throwaway test outside the repository through the real `ServerStore`: a full replace of a profile's trade routes at the contract's bounds (1,024 routes, 52,428 stations, names of 765 ASCII characters), twice on a new file in each of three runs | 0.498, 0.301 and 0.245 s; 0.360, 0.245 and 0.238 s |
+| The same: the deletion's first transaction for a profile with that set (53,453 rows) and no ticks | 94, 46 and 58 ms |
 
 The tick rows of the deletion's measurement over a year were written as rows of the tick table alone, since the first
 transaction changes only the profile of those rows and of the hourly points; no figure here extends beyond those sizes.
