@@ -251,8 +251,8 @@ game times, close reasons and session events as the original's, with every recei
   refused, so a mistake in the writing never copies bytes. A trade-route or item-offer frame is checked the same way
   (counts, IDs, island keys, owners, named flags, GUIDs and loading flags).
 - A frame of any type whose rewritten form is longer than 1 MiB is refused with the same error and its line: a
-  trade-routes frame (each route name and folder grows to its invented name) or an island frame whose invented name is
-  longer than the original. The reader accepts no longer frame, so it would not be replayable.
+  trade-routes frame whose invented route and folder names are longer than the originals, or an island frame whose
+  invented name is longer than the original. The reader accepts no longer frame, so it would not be replayable.
 
 ### Fixtures
 
