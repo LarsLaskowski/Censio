@@ -142,8 +142,6 @@ public sealed class PipeTickResult
         return new PipeTickResult(PipeTickResultKind.TickLimit, null, null, null, null, key, null);
     }
 
-    // Skeleton: removed with the implementation
-#pragma warning disable RH2003, S1172
     /// <summary>
     /// Creates a trade-routes result.
     /// </summary>
@@ -151,9 +149,8 @@ public sealed class PipeTickResult
     /// <returns>The result</returns>
     public static PipeTickResult FromTradeRoutes(TradeRoutesMessage message)
     {
-        throw new NotImplementedException();
+        return new PipeTickResult(PipeTickResultKind.TradeRoutes, null, null, null, null, null, message);
     }
-#pragma warning restore RH2003, S1172
 
     #endregion // Methods
 }

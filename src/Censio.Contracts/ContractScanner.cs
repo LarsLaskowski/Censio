@@ -88,6 +88,31 @@ internal sealed class ContractScanner
     private const int FloatValue = 14;
 
     /// <summary>
+    /// The array <c>routes</c> of the root.
+    /// </summary>
+    private const int Routes = 15;
+
+    /// <summary>
+    /// A route: an item of <see cref="Routes" />.
+    /// </summary>
+    private const int Route = 16;
+
+    /// <summary>
+    /// The array <c>stations</c> of a route.
+    /// </summary>
+    private const int Stations = 17;
+
+    /// <summary>
+    /// A station: an item of <see cref="Stations" />.
+    /// </summary>
+    private const int Station = 18;
+
+    /// <summary>
+    /// The value of the property <c>name</c> or <c>folder</c> of a route.
+    /// </summary>
+    private const int RouteNameValue = 19;
+
+    /// <summary>
     /// The number of levels the pass follows: the reader refuses a document deeper than 64 levels.
     /// </summary>
     private const int Levels = 66;
@@ -190,6 +215,21 @@ internal sealed class ContractScanner
     /// The number of pairs of the current map.
     /// </summary>
     private int _pairs;
+
+    /// <summary>
+    /// The number of routes so far.
+    /// </summary>
+    private int _routes;
+
+    /// <summary>
+    /// The number of stations so far.
+    /// </summary>
+    private int _stations;
+
+    /// <summary>
+    /// The number of stations of the current route.
+    /// </summary>
+    private int _stationsPerRoute;
 
     /// <summary>
     /// The number of supported versions so far.
@@ -301,6 +341,21 @@ internal sealed class ContractScanner
     }
 
     /// <summary>
+    /// Gets the most UTF-8 bytes of a string by what it is.
+    /// </summary>
+    /// <param name="role">What the string is</param>
+    /// <returns>The bound</returns>
+    private static int GetMaxBytes(int role)
+    {
+        return role switch
+               {
+                   IslandNameValue => ContractReader.MaxIslandNameBytes,
+                   RouteNameValue => ContractReader.MaxRouteNameBytes,
+                   _ => ContractReader.MaxStringBytes
+               };
+    }
+
+    /// <summary>
     /// Finds what the value of a property of the root is.
     /// </summary>
     /// <param name="reader">The reader, positioned on the property name</param>
@@ -320,6 +375,11 @@ internal sealed class ContractScanner
         if (reader.ValueTextEquals("islands"u8))
         {
             return Islands;
+        }
+
+        if (reader.ValueTextEquals("routes"u8))
+        {
+            return Routes;
         }
 
         if (reader.ValueTextEquals("supportedVersions"u8))
@@ -348,6 +408,21 @@ internal sealed class ContractScanner
         }
 
         return reader.ValueTextEquals("entries"u8) ? Entries : Other;
+    }
+
+    /// <summary>
+    /// Finds what the value of a property of a route is.
+    /// </summary>
+    /// <param name="reader">The reader, positioned on the property name</param>
+    /// <returns>What the value is</returns>
+    private static int ClassifyRouteProperty(ref Utf8JsonReader reader)
+    {
+        if (reader.ValueTextEquals("name"u8) || reader.ValueTextEquals("folder"u8))
+        {
+            return RouteNameValue;
+        }
+
+        return reader.ValueTextEquals("stations"u8) ? Stations : Other;
     }
 
     /// <summary>
@@ -386,6 +461,8 @@ internal sealed class ContractScanner
                    (Islands, JsonTokenType.StartObject) => Island,
                    (Entries, JsonTokenType.StartObject) => Entry,
                    (Map, JsonTokenType.StartArray) => Pair,
+                   (Routes, JsonTokenType.StartObject) => Route,
+                   (Stations, JsonTokenType.StartObject) => Station,
                    _ => Other
                };
     }
@@ -472,6 +549,7 @@ internal sealed class ContractScanner
                     Root => ClassifyRootProperty(ref reader),
                     Island => ClassifyIslandProperty(ref reader),
                     Entry => ClassifyEntryProperty(ref reader),
+                    Route => ClassifyRouteProperty(ref reader),
                     _ => Other
                 };
 
@@ -530,10 +608,10 @@ internal sealed class ContractScanner
     /// <returns>The error when a count bound is exceeded, or <c>null</c></returns>
     private ContractError? Place(int parent, JsonTokenType type, out int role, out int kind)
     {
-        if (parent is Root or Island or Entry)
+        if (parent is Root or Island or Entry or Route)
         {
             role = _next;
-            kind = role is Islands or Entries or Map or Versions or Icons ? role : Other;
+            kind = role is Islands or Entries or Map or Versions or Icons or Routes or Stations ? role : Other;
             _next = Other;
 
             return null;
@@ -555,14 +633,19 @@ internal sealed class ContractScanner
     private void Open(int depth, int kind, int role, JsonTokenType type)
     {
         var isArray = type == JsonTokenType.StartArray;
-        var isArrayKind = kind is Islands or Entries or Map or Versions or Icons;
-        var isObjectKind = kind is Root or Island or Entry;
+        var isArrayKind = kind is Islands or Entries or Map or Versions or Icons or Routes or Stations;
+        var isObjectKind = kind is Root or Island or Entry or Route or Station;
 
         _kinds[depth] = (isArray && isArrayKind) || (isArray == false && isObjectKind) ? kind : Other;
 
         if (_kinds[depth] == Map)
         {
             _pairs = 0;
+        }
+
+        if (_kinds[depth] == Stations)
+        {
+            _stationsPerRoute = 0;
         }
 
         _versionBad |= role == VersionValue;
@@ -590,6 +673,14 @@ internal sealed class ContractScanner
 
             case Map:
                 exceeded = ++_entriesAndPairs > ContractReader.MaxEntriesAndPairs || ++_pairs > ContractReader.MaxPairsPerMap;
+                break;
+
+            case Routes:
+                exceeded = ++_routes > ContractReader.MaxTradeRoutes;
+                break;
+
+            case Stations:
+                exceeded = ++_stations > ContractReader.MaxStations || ++_stationsPerRoute > ContractReader.MaxStationsPerRoute;
                 break;
 
             case Versions:
@@ -637,7 +728,7 @@ internal sealed class ContractScanner
             return null;
         }
 
-        return CheckString(ref reader, role == IslandNameValue ? ContractReader.MaxIslandNameBytes : ContractReader.MaxStringBytes, buffer);
+        return CheckString(ref reader, GetMaxBytes(role), buffer);
     }
 
     /// <summary>

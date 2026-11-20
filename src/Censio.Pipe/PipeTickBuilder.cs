@@ -170,6 +170,12 @@ public sealed class PipeTickBuilder
                     items.Add(PipeTickResult.FromVersion(version.Version));
                 }
                 break;
+
+            case TradeRoutesMessage tradeRoutes:
+                {
+                    items.Add(PipeTickResult.FromTradeRoutes(tradeRoutes));
+                }
+                break;
         }
     }
 

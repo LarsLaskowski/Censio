@@ -90,6 +90,10 @@ public static class ContractWriter
                 JsonSerializer.Serialize(writer, acknowledgement, ContractJsonContext.Default.ContractAcknowledgement);
                 break;
 
+            case ContractTradeRoutes tradeRoutes:
+                JsonSerializer.Serialize(writer, tradeRoutes, ContractJsonContext.Default.ContractTradeRoutes);
+                break;
+
             default:
                 throw new ArgumentException("The message is of no type of the contract.", nameof(message));
         }
