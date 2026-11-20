@@ -56,8 +56,9 @@ Scope as the Product Manager chose (*Open questions*, Q1): trade routes now, ite
   shows `–` in the stations cell.
 - E5: A trade-routes message older than the profile's latest (by receive time, then storing order) is acknowledged and
   replaces nothing.
-- E6: A trade-routes message the server's contract reader refuses (malformed, too large, invalid) is acknowledged with
-  its refusal and changes nothing.
+- E6: A trade-routes message the server's contract reader refuses as invalid is acknowledged with its refusal by its id
+  and changes nothing; one refused as malformed or too large closes the connection as for a tick
+  ([ingest](../../docs/areas/ingest.md), *Closes*) and changes nothing.
 - E7: A route or folder name that looks like markup is shown as text.
 - E8: An unknown or malformed profile in the address shows `Not found.`; a profile that is not held shows `Loading…`
   and the read-failure text of [web-pages](../../docs/areas/web-pages.md) as the other data pages do.
@@ -111,8 +112,8 @@ Scope as the Product Manager chose (*Open questions*, Q1): trade routes now, ite
   them, shows the dialog text of E9 and leaves no route or folder name of the profile in the database files after the
   clean-up (real schema); a trade-routes message during the removal recreates the profile (S5, E9, N2, N3).
 - AC7: The contract reader accepts a message at every bound of N1 and with no routes, and refuses one over a bound as
-  *too large* and one that breaks its form or value rules as *malformed* or *invalid*, the refusal acknowledged by its
-  `id`; no refusal text or log line holds a route or folder name; a replay counts as E10 says (E6, E10, N1, N2).
+  *too large* and one that breaks its form or value rules as *malformed* or *invalid*, an *invalid* one acknowledged by
+  its `id`, a *malformed* or *too large* one closing the connection with 1008 or 1009 and storing nothing; no refusal text or log line holds a route or folder name; a replay counts as E10 says (E6, E10, N1, N2).
 - AC8: Companion and server write and read contract version 2 only; a hello or a refused hello reply of version 1
   is refused with both versions named, and the texts of N4 name version 2; a database written by v0.3.0 opens with its
   ticks unchanged (N4).
