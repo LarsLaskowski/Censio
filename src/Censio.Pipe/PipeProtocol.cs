@@ -27,6 +27,31 @@ public static class PipeProtocol
     /// </summary>
     public const int MaxMapPairs = 1024;
 
+    /// <summary>
+    /// The largest accepted number of routes in one trade-routes frame.
+    /// </summary>
+    public const int MaxTradeRoutes = 1024;
+
+    /// <summary>
+    /// The largest accepted number of stations in one trade route.
+    /// </summary>
+    public const int MaxRouteStations = 256;
+
+    /// <summary>
+    /// The largest accepted number of goods in one trade route station.
+    /// </summary>
+    public const int MaxStationGoods = 256;
+
+    /// <summary>
+    /// The largest accepted number of offers in one item-offers frame.
+    /// </summary>
+    public const int MaxItemOffers = 1024;
+
+    /// <summary>
+    /// The largest accepted number of items in one item offer.
+    /// </summary>
+    public const int MaxOfferItems = 1024;
+
     #endregion // Constants
 
     #region Methods

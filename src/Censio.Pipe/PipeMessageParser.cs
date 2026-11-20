@@ -20,6 +20,51 @@ public static class PipeMessageParser
     /// </summary>
     private const int PairSize = 8;
 
+    /// <summary>
+    /// The smallest size of a trade route in bytes: ID, two empty strings, four integers and the station count
+    /// </summary>
+    private const int MinRouteSize = 26;
+
+    /// <summary>
+    /// The smallest size of a trade route station in bytes, the goods count included
+    /// </summary>
+    private const int MinStationSize = 20;
+
+    /// <summary>
+    /// The size of one good of a station in bytes
+    /// </summary>
+    private const int MinGoodSize = 9;
+
+    /// <summary>
+    /// The smallest size of an item offer in bytes, the item count included
+    /// </summary>
+    private const int MinOfferSize = 8;
+
+    /// <summary>
+    /// The size of one item GUID in bytes
+    /// </summary>
+    private const int ItemSize = 4;
+
+    /// <summary>
+    /// The station flag bit for throwing goods overboard
+    /// </summary>
+    private const byte ThrowOverboardFlag = 1;
+
+    /// <summary>
+    /// The station flag bit for waiting until full
+    /// </summary>
+    private const byte WaitUntilFullFlag = 2;
+
+    /// <summary>
+    /// The station flag bit for waiting until empty
+    /// </summary>
+    private const byte WaitUntilEmptyFlag = 4;
+
+    /// <summary>
+    /// The good flag bit for loading
+    /// </summary>
+    private const byte LoadingFlag = 1;
+
     #endregion // Constants
 
     #region Methods
@@ -69,7 +114,8 @@ public static class PipeMessageParser
                                    PipeMessageType.Version => ParseVersion(frame, ref position),
                                    PipeMessageType.SessionStart => ParseSessionStart(frame, ref position),
                                    PipeMessageType.SessionEnd => new SessionEndMessage(),
-                                   PipeMessageType.TradeRoutes or PipeMessageType.ItemOffers => ParseUndecoded((PipeMessageType)typeValue, frame, ref position),
+                                   PipeMessageType.TradeRoutes => ParseTradeRoutes(frame, ref position),
+                                   PipeMessageType.ItemOffers => ParseItemOffers(frame, ref position),
                                    _ => ParseStatistics(frame, ref position)
                                };
 
@@ -108,24 +154,248 @@ public static class PipeMessageParser
     }
 
     /// <summary>
-    /// Parses the leading count of a trade-route or item-offer payload and leaves the rest undecoded.
+    /// Parses a trade-routes payload.
     /// </summary>
-    /// <param name="messageType">The message type of the frame</param>
     /// <param name="frame">The frame</param>
-    /// <param name="position">The read position; on failure the offset of the count</param>
-    /// <returns>The message, or <c>null</c> when the count is missing or negative</returns>
-    private static UndecodedMessage? ParseUndecoded(PipeMessageType messageType, ReadOnlySpan<byte> frame, ref int position)
+    /// <param name="position">The read position; on failure the offset of the field that did not fit</param>
+    /// <returns>The message, or <c>null</c> when the payload is malformed</returns>
+    private static TradeRoutesMessage? ParseTradeRoutes(ReadOnlySpan<byte> frame, ref int position)
     {
-        var countPosition = position;
-
-        if (TryReadInt(frame, ref position, out var count) == false || count < 0)
+        if (TryReadCount(frame, ref position, MinRouteSize, PipeProtocol.MaxTradeRoutes, out var routeCount) == false)
         {
-            position = countPosition;
-
             return null;
         }
 
-        return new UndecodedMessage(messageType);
+        var routes = new List<TradeRoute>(routeCount);
+
+        for (var index = 0; index < routeCount; index++)
+        {
+            var route = ParseTradeRoute(frame, ref position);
+
+            if (route is null)
+            {
+                return null;
+            }
+
+            routes.Add(route);
+        }
+
+        return new TradeRoutesMessage
+               {
+                   Routes = routes
+               };
+    }
+
+    /// <summary>
+    /// Parses one trade route.
+    /// </summary>
+    /// <param name="frame">The frame</param>
+    /// <param name="position">The read position; on failure the offset of the field that did not fit</param>
+    /// <returns>The route, or <c>null</c> when it is malformed</returns>
+    private static TradeRoute? ParseTradeRoute(ReadOnlySpan<byte> frame, ref int position)
+    {
+        if (TryReadInt(frame, ref position, out var id) == false
+            || TryReadString(frame, ref position, out var name) == false
+            || TryReadString(frame, ref position, out var folder) == false
+            || TryReadInt(frame, ref position, out var majorProblems) == false
+            || TryReadInt(frame, ref position, out var minorProblems) == false
+            || TryReadInt(frame, ref position, out var ships) == false
+            || TryReadInt(frame, ref position, out var lostShips) == false
+            || TryReadCount(frame, ref position, MinStationSize, PipeProtocol.MaxRouteStations, out var stationCount) == false)
+        {
+            return null;
+        }
+
+        var stations = new List<TradeRouteStation>(stationCount);
+
+        for (var index = 0; index < stationCount; index++)
+        {
+            var station = ParseStation(frame, ref position);
+
+            if (station is null)
+            {
+                return null;
+            }
+
+            stations.Add(station);
+        }
+
+        return new TradeRoute
+               {
+                   Id = id,
+                   Name = name,
+                   Folder = folder,
+                   MajorProblems = majorProblems,
+                   MinorProblems = minorProblems,
+                   Ships = ships,
+                   LostShips = lostShips,
+                   Stations = stations
+               };
+    }
+
+    /// <summary>
+    /// Parses one station of a trade route.
+    /// </summary>
+    /// <param name="frame">The frame</param>
+    /// <param name="position">The read position; on failure the offset of the field that did not fit</param>
+    /// <returns>The station, or <c>null</c> when it is malformed</returns>
+    private static TradeRouteStation? ParseStation(ReadOnlySpan<byte> frame, ref int position)
+    {
+        if (TryReadInt(frame, ref position, out var id) == false
+            || TryReadByte(frame, ref position, out var sessionId) == false
+            || TryReadByte(frame, ref position, out var islandId) == false
+            || TryReadByte(frame, ref position, out var areaIndex) == false
+            || TryReadInt(frame, ref position, out var sessionGuid) == false
+            || TryReadInt(frame, ref position, out var owner) == false
+            || TryReadByte(frame, ref position, out var flags) == false
+            || TryReadCount(frame, ref position, MinGoodSize, PipeProtocol.MaxStationGoods, out var goodCount) == false)
+        {
+            return null;
+        }
+
+        var goods = new List<TradeRouteGood>(goodCount);
+
+        for (var index = 0; index < goodCount; index++)
+        {
+            var good = ParseGood(frame, ref position);
+
+            if (good is null)
+            {
+                return null;
+            }
+
+            goods.Add(good);
+        }
+
+        return new TradeRouteStation
+               {
+                   Id = id,
+                   SessionId = sessionId,
+                   IslandId = islandId,
+                   AreaIndex = areaIndex,
+                   SessionGuid = sessionGuid,
+                   Owner = owner,
+                   ThrowOverboard = (flags & ThrowOverboardFlag) != 0,
+                   WaitUntilFull = (flags & WaitUntilFullFlag) != 0,
+                   WaitUntilEmpty = (flags & WaitUntilEmptyFlag) != 0,
+                   Goods = goods
+               };
+    }
+
+    /// <summary>
+    /// Parses one good of a trade route station.
+    /// </summary>
+    /// <param name="frame">The frame</param>
+    /// <param name="position">The read position; on failure the offset of the field that did not fit</param>
+    /// <returns>The good, or <c>null</c> when it is malformed</returns>
+    private static TradeRouteGood? ParseGood(ReadOnlySpan<byte> frame, ref int position)
+    {
+        if (TryReadInt(frame, ref position, out var productGuid) == false
+            || TryReadInt(frame, ref position, out var amount) == false
+            || TryReadByte(frame, ref position, out var flags) == false)
+        {
+            return null;
+        }
+
+        return new TradeRouteGood
+               {
+                   ProductGuid = productGuid,
+                   Amount = amount,
+                   Loading = (flags & LoadingFlag) != 0
+               };
+    }
+
+    /// <summary>
+    /// Parses an item-offers payload.
+    /// </summary>
+    /// <param name="frame">The frame</param>
+    /// <param name="position">The read position; on failure the offset of the field that did not fit</param>
+    /// <returns>The message, or <c>null</c> when the payload is malformed</returns>
+    private static ItemOffersMessage? ParseItemOffers(ReadOnlySpan<byte> frame, ref int position)
+    {
+        if (TryReadCount(frame, ref position, MinOfferSize, PipeProtocol.MaxItemOffers, out var offerCount) == false)
+        {
+            return null;
+        }
+
+        var offers = new List<ItemOffer>(offerCount);
+
+        for (var index = 0; index < offerCount; index++)
+        {
+            var offer = ParseItemOffer(frame, ref position);
+
+            if (offer is null)
+            {
+                return null;
+            }
+
+            offers.Add(offer);
+        }
+
+        return new ItemOffersMessage
+               {
+                   Offers = offers
+               };
+    }
+
+    /// <summary>
+    /// Parses one item offer of a trader.
+    /// </summary>
+    /// <param name="frame">The frame</param>
+    /// <param name="position">The read position; on failure the offset of the field that did not fit</param>
+    /// <returns>The offer, or <c>null</c> when it is malformed</returns>
+    private static ItemOffer? ParseItemOffer(ReadOnlySpan<byte> frame, ref int position)
+    {
+        if (TryReadInt(frame, ref position, out var traderId) == false
+            || TryReadCount(frame, ref position, ItemSize, PipeProtocol.MaxOfferItems, out var itemCount) == false)
+        {
+            return null;
+        }
+
+        var items = new List<int>(itemCount);
+
+        for (var index = 0; index < itemCount; index++)
+        {
+            if (TryReadInt(frame, ref position, out var itemGuid) == false)
+            {
+                return null;
+            }
+
+            items.Add(itemGuid);
+        }
+
+        return new ItemOffer
+               {
+                   TraderId = traderId,
+                   ItemGuids = items
+               };
+    }
+
+    /// <summary>
+    /// Reads a count of elements and checks it against its cap and the bytes the frame still holds.
+    /// </summary>
+    /// <param name="frame">The frame</param>
+    /// <param name="position">The read position; on failure the offset of the count</param>
+    /// <param name="minimumSize">The smallest size of one element in bytes</param>
+    /// <param name="cap">The largest accepted count</param>
+    /// <param name="count">The count</param>
+    /// <returns><c>true</c> when the count is present, not negative, within the cap and the frame can hold that many elements</returns>
+    private static bool TryReadCount(ReadOnlySpan<byte> frame, ref int position, int minimumSize, int cap, out int count)
+    {
+        var countPosition = position;
+
+        if (TryReadInt(frame, ref position, out count) == false
+            || count < 0
+            || count > cap
+            || count > (frame.Length - position) / minimumSize)
+        {
+            position = countPosition;
+            count = 0;
+
+            return false;
+        }
+
+        return true;
     }
 
     /// <summary>

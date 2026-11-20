@@ -132,6 +132,11 @@ public sealed class PipeRecordingAnonymiserTests
     private static readonly KeyValuePair<int, int>[] _noPairs = [];
 
     /// <summary>
+    /// Problem, ship and lost-ship counts of 0.
+    /// </summary>
+    private static readonly (int Major, int Minor, int Ships, int Lost) _noCounts = (0, 0, 0, 0);
+
+    /// <summary>
     /// An empty map of amounts.
     /// </summary>
     private static readonly Dictionary<int, int> _noAmounts = [];
@@ -970,47 +975,368 @@ public sealed class PipeRecordingAnonymiserTests
     }
 
     /// <summary>
-    /// A trade-route or item-offer frame with a count above 0, entries with names and trailing bytes is written as its
-    /// type byte and a count of 0, nothing of its content copied.
+    /// Route names become <c>Route n</c> and folder names <c>Folder n</c>, numbered per kind from 1 in the order of first
+    /// appearance over the file; one original name keeps one invented name, also in a later frame.
     /// </summary>
-    /// <param name="type">The type byte</param>
     /// <returns>The task</returns>
     [TestMethod]
-    [TestCategory("AC5")]
-    [DataRow((byte)4)]
-    [DataRow((byte)5)]
-    public async Task PipeRecordingAnonymiserTradeRoutesOrItemOffersAreWrittenEmpty(byte type)
+    [TestCategory("AC8")]
+    public async Task PipeRecordingAnonymiserRouteAndFolderNamesAreInvented()
     {
         // Arrange
-        var frame = new PipeFrameBuilder().Byte(type).Int32Value(2).UndecodedEntries(type, 2).Raw(0xAA, 0xBB).Build();
-        var recording = RecordingOf(_version3, frame, _sessionEnd);
+        var first = TradeRoutesFrame(TradeRouteOf(1, "Via Appia", "North", _noCounts),
+                                     TradeRouteOf(2, "Via Appia", string.Empty, _noCounts),
+                                     TradeRouteOf(3, "Ostia Run", "North", _noCounts));
+        var second = TradeRoutesFrame(TradeRouteOf(3, "Ostia Run", "South", _noCounts), TradeRouteOf(1, "Via Appia", "North", _noCounts));
+        var recording = RecordingOf(_version3, SessionStart("Alice"), StandardIsland(1, "Ostia", 100), first, second, _sessionEnd);
 
         // Act
         var (result, output) = await AnonymiseAsync(recording, new ScriptedPipeAnonymiserRandom(Up));
 
         // Assert
-        var frames = OutputFrames(output);
+        string[] expected = ["-", "Player 1", "Island 1", "Route 1|Folder 1; Route 1|; Route 2|Folder 1", "Route 2|Folder 2; Route 1|Folder 1", "-"];
 
-        Assert.AreEqual(PipeAnonymiseResultKind.Anonymised, result.Kind, $"A recording with a type {type} frame should be anonymised");
-        Assert.HasCount(4, OutputLines(output), "The output should have the input's line count");
-        Assert.AreSequenceEqual(new byte[] { type, 0, 0, 0, 0 }, frames[1].Frame, $"The type {type} frame should be its type byte and a count of 0");
+        Assert.AreEqual(PipeAnonymiseResultKind.Anonymised, result.Kind, "The recording should be anonymised");
+        Assert.AreSequenceEqual(expected, OutputFrames(output).Select(line => NamesOf(line.Frame)).ToArray(), "Route and folder names should be invented per kind in the order of first appearance");
     }
 
     /// <summary>
-    /// A trade-route or item-offer frame without its count or with a negative count is refused with its line.
+    /// An invented name never equals an original name of the file of any kind, ignoring case: a route or folder number
+    /// whose name is a figure, island or route name is skipped, and an island number whose name is a route name too.
     /// </summary>
-    /// <param name="frame">The malformed frame</param>
     /// <returns>The task</returns>
     [TestMethod]
-    [TestCategory("AC5")]
-    [DataRow(new byte[] { 4 })]
-    [DataRow(new byte[] { 4, 1, 0, 0 })]
-    [DataRow(new byte[] { 5, 1, 0, 0 })]
-    [DataRow(new byte[] { 4, 0xFF, 0xFF, 0xFF, 0xFF })]
-    [DataRow(new byte[] { 5, 0, 0, 0, 0x80 })]
-    public async Task PipeRecordingAnonymiserMalformedTradeRoutesIsRefused(byte[] frame)
+    [TestCategory("AC8")]
+    public async Task PipeRecordingAnonymiserInventedRouteNameSkipsOriginalOfAnotherKind()
     {
         // Arrange
+        var routes = TradeRoutesFrame(TradeRouteOf(1, "Alpha", "Gamma", _noCounts),
+                                      TradeRouteOf(2, "Beta", "Gamma", _noCounts),
+                                      TradeRouteOf(3, "Route 3", "Gamma", _noCounts),
+                                      TradeRouteOf(4, "island 1", "Gamma", _noCounts));
+        var recording = RecordingOf(_version3, SessionStart("ROUTE 1"), StandardIsland(1, "folder 1", 100), routes);
+
+        // Act
+        var (_, output) = await AnonymiseAsync(recording, new ScriptedPipeAnonymiserRandom(Up));
+
+        // Assert
+        string[] expected = ["-", "Player 1", "Island 2", "Route 2|Folder 2; Route 4|Folder 2; Route 5|Folder 2; Route 6|Folder 2"];
+
+        Assert.AreSequenceEqual(expected, OutputFrames(output).Select(line => NamesOf(line.Frame)).ToArray(), "No invented name should equal an original name of any kind, ignoring case");
+    }
+
+    /// <summary>
+    /// An empty route or folder name stays empty and takes no number.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    [TestCategory("AC8")]
+    public async Task PipeRecordingAnonymiserEmptyRouteAndFolderNamesStayEmpty()
+    {
+        // Arrange
+        var routes = TradeRoutesFrame(TradeRouteOf(1, string.Empty, string.Empty, _noCounts), TradeRouteOf(2, "Alpha", "Gamma", _noCounts));
+
+        // Act
+        var (_, output) = await AnonymiseAsync(RecordingOf(_version3, routes), new ScriptedPipeAnonymiserRandom(Up));
+
+        // Assert
+        Assert.AreEqual("|; Route 1|Folder 1", NamesOf(OutputFrames(output)[1].Frame), "An empty name should stay empty and take no number");
+    }
+
+    /// <summary>
+    /// A trade-route frame is written from its decoded fields: route, station and good IDs and GUIDs, island keys, owners,
+    /// named flags, loading, list lengths and order are kept, repeats included, and the written frame parses back to them.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    [TestCategory("AC9")]
+    public async Task PipeRecordingAnonymiserTradeRoutesKeepStructure()
+    {
+        // Arrange
+        var original = new TradeRoutesMessage
+                       {
+                           Routes = [
+                                        TradeRouteOf(7,
+                                                     "Via Appia",
+                                                     "North",
+                                                     (1, 2, 3, 1),
+                                                     StationOf(11, 200, -1, (true, false, true), GoodOf(1010, 5, true), GoodOf(1010, 7, false)),
+                                                     StationOf(11, 130, 0, (false, true, false), GoodOf(1020, 50, true))),
+                                        TradeRouteOf(-8, "Ostia Run", "North", _noCounts),
+                                        TradeRouteOf(7, "Via Appia", "South", (0, 0, 2, 0), StationOf(12, 255, 123456, (false, false, false)))
+                                    ]
+                       };
+        var frame = new PipeFrameBuilder().Byte(4).TradeRoutes(original.Routes).Raw(0xAA, 0xBB).Build();
+
+        // Act
+        var (result, output) = await AnonymiseAsync(RecordingOf(_version3, frame, _sessionEnd), new ScriptedPipeAnonymiserRandom(Up));
+
+        // Assert
+        Assert.AreEqual(PipeAnonymiseResultKind.Anonymised, result.Kind, "The recording should be anonymised");
+        Assert.AreEqual(DescribeTradeStructure(original), DescribeTradeStructure(ParseTradeRoutes(OutputFrames(output)[1].Frame)), "The structure of the routes should be kept");
+    }
+
+    /// <summary>
+    /// The problem, ship and lost-ship counts and the goods amounts change by the integer rule, drawn strictly in frame
+    /// order: per route its four counts, then its goods station by station. Every value takes a side and a magnitude
+    /// draw, a zero included; a negative goods amount takes none. No non-zero original amount is written.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    [TestCategory("AC9")]
+    public async Task PipeRecordingAnonymiserTradeRouteAmountsChange()
+    {
+        // Arrange
+        var routes = TradeRoutesFrame(TradeRouteOf(7,
+                                                   "Via Appia",
+                                                   "North",
+                                                   (2, 0, 100, 3),
+                                                   StationOf(11, 200, 1, (false, false, false), GoodOf(1010, 3, true), GoodOf(1011, -7, true), GoodOf(1012, 50, false)),
+                                                   StationOf(12, 201, 1, (false, false, false), GoodOf(1020, 4, true))),
+                                      TradeRouteOf(8, "Ostia Run", "North", (1, 9, 2, 0)));
+        var random = new ScriptedPipeAnonymiserRandom(Up,
+                                                      Up,
+                                                      Down,
+                                                      0.5,
+                                                      Up,
+                                                      0.5,
+                                                      Up,
+                                                      Up,
+                                                      Down,
+                                                      0.5,
+                                                      Up,
+                                                      0.5,
+                                                      Down,
+                                                      Down,
+                                                      Down,
+                                                      0.5,
+                                                      Down,
+                                                      0.5,
+                                                      Up,
+                                                      Up,
+                                                      Up,
+                                                      0.5,
+                                                      Down,
+                                                      0.5);
+
+        // Act
+        var (_, output) = await AnonymiseAsync(RecordingOf(_version3, routes), random);
+
+        // Assert
+        Assert.AreEqual("1/0/115/2 [4,-7,47|3]; 2/10/3/0 []", DescribeTradeAmounts(ParseTradeRoutes(OutputFrames(output)[1].Frame)), "Each amount should take its own draws in frame order");
+        Assert.AreEqual(23, random.DrawCount, "The offset and two draws for each of the 11 amounts that are not negative should be drawn");
+    }
+
+    /// <summary>
+    /// Where the original lost-ship count is at most the ship count, the written one is too: when the perturbed lost ships
+    /// exceed the perturbed ships, they become the perturbed ships, or one less where that would be the original non-zero
+    /// lost-ship count; never the original and never below 0. A lost-ship count above the ship count is perturbed freely.
+    /// </summary>
+    /// <param name="ships">The original ship count</param>
+    /// <param name="lostShips">The original lost-ship count</param>
+    /// <param name="shipsSide">The side draw of the ship count</param>
+    /// <param name="lostSide">The side draw of the lost-ship count</param>
+    /// <param name="expected">The written ship and lost-ship counts</param>
+    /// <returns>The task</returns>
+    [TestMethod]
+    [TestCategory("AC9")]
+    [DataRow(2, 2, Down, Up, "1/1")]
+    [DataRow(3, 2, Down, Up, "2/1")]
+    [DataRow(2, 1, Down, Up, "1/0")]
+    [DataRow(1, 1, Down, Up, "2/2")]
+    [DataRow(4, 3, Up, Up, "5/4")]
+    [DataRow(2, 0, Down, Up, "1/0")]
+    [DataRow(0, 0, Up, Up, "0/0")]
+    [DataRow(2, 4, Up, Up, "3/5")]
+    public async Task PipeRecordingAnonymiserLostShipsStayAtMostShips(int ships, int lostShips, double shipsSide, double lostSide, string expected)
+    {
+        // Arrange
+        var routes = TradeRoutesFrame(TradeRouteOf(7, "Via Appia", "North", (0, 0, ships, lostShips)));
+        var random = new ScriptedPipeAnonymiserRandom(Up, Up, Up, Up, Up, Up, shipsSide, 0.5, lostSide, 0.5);
+
+        // Act
+        var (_, output) = await AnonymiseAsync(RecordingOf(_version3, routes), random);
+
+        // Assert
+        Assert.AreEqual($"0/0/{expected} []", DescribeTradeAmounts(ParseTradeRoutes(OutputFrames(output)[1].Frame)), $"The ships {ships} and lost ships {lostShips} should be written by the lost-ship rule");
+    }
+
+    /// <summary>
+    /// A negative goods amount (possibly a special value) is written unchanged and takes no draw.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    [TestCategory("AC9")]
+    public async Task PipeRecordingAnonymiserNegativeGoodsAmountIsKept()
+    {
+        // Arrange
+        var routes = TradeRoutesFrame(TradeRouteOf(7,
+                                                   "Via Appia",
+                                                   "North",
+                                                   _noCounts,
+                                                   StationOf(11, 200, 1, (false, false, false), GoodOf(1010, -1, true), GoodOf(1011, int.MinValue, true), GoodOf(1012, 5, false))));
+        var random = new ScriptedPipeAnonymiserRandom(Up);
+
+        // Act
+        var (_, output) = await AnonymiseAsync(RecordingOf(_version3, routes), random);
+
+        // Assert
+        Assert.AreEqual("0/0/0/0 [-1,-2147483648,6]", DescribeTradeAmounts(ParseTradeRoutes(OutputFrames(output)[1].Frame)), "The negative goods amounts should be kept");
+        Assert.AreEqual(11, random.DrawCount, "The offset and two draws for each of the four counts and the positive amount should be drawn");
+    }
+
+    /// <summary>
+    /// The flags of a station and a good are written from their named bits only; the unnamed bits are written as 0.
+    /// </summary>
+    /// <param name="stationFlags">The raw flags byte of the station</param>
+    /// <param name="goodFlags">The raw flags byte of the good</param>
+    /// <param name="expectedStationFlags">The written flags byte of the station</param>
+    /// <param name="expectedGoodFlags">The written flags byte of the good</param>
+    /// <returns>The task</returns>
+    [TestMethod]
+    [TestCategory("AC9")]
+    [DataRow((byte)0xFD, (byte)0xFF, (byte)0x05, (byte)0x01)]
+    [DataRow((byte)0xF8, (byte)0xFE, (byte)0x00, (byte)0x00)]
+    [DataRow((byte)0xFA, (byte)0x80, (byte)0x02, (byte)0x00)]
+    public async Task PipeRecordingAnonymiserUnnamedFlagBitsAreWrittenAsZero(byte stationFlags, byte goodFlags, byte expectedStationFlags, byte expectedGoodFlags)
+    {
+        // Arrange
+        var route = TradeRouteOf(7, string.Empty, string.Empty, _noCounts);
+        var good = GoodOf(1010, 0, false);
+        var station = StationOf(11, 200, 1, (false, false, false), good);
+        var frame = new PipeFrameBuilder().Byte(4)
+                                          .Int32Value(1)
+                                          .RouteFields(route)
+                                          .Int32Value(1)
+                                          .StationFields(station, stationFlags)
+                                          .Int32Value(1)
+                                          .Good(good, goodFlags)
+                                          .Build();
+
+        // Act
+        var (_, output) = await AnonymiseAsync(RecordingOf(_version3, frame), new ScriptedPipeAnonymiserRandom(Up));
+
+        // Assert
+        var written = OutputFrames(output)[1].Frame;
+
+        Assert.HasCount(60, written, "The frame without names should keep its length");
+        Assert.AreEqual(expectedStationFlags, written[46], $"The station flags 0x{stationFlags:X2} should be written from their named bits");
+        Assert.AreEqual(expectedGoodFlags, written[59], $"The good flags 0x{goodFlags:X2} should be written from their named bit");
+    }
+
+    /// <summary>
+    /// An item-offer frame is written from its decoded fields: trader IDs, item GUIDs, repeats, list lengths and order
+    /// kept, trailing bytes dropped.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    [TestCategory("AC9")]
+    public async Task PipeRecordingAnonymiserItemOffersKeepStructure()
+    {
+        // Arrange
+        ItemOffer[] offers = [OfferOf(7, 100, 100, -5), OfferOf(8), OfferOf(7, int.MaxValue)];
+        var frame = new PipeFrameBuilder().Byte(5).ItemOffers(offers).Build();
+
+        // Act
+        var (result, output) = await AnonymiseAsync(RecordingOf(_version3, [.. frame, 0xAA, 0xBB], _sessionEnd), new ScriptedPipeAnonymiserRandom(Up));
+
+        // Assert
+        Assert.AreEqual(PipeAnonymiseResultKind.Anonymised, result.Kind, "The recording should be anonymised");
+        Assert.AreSequenceEqual(frame, OutputFrames(output)[1].Frame, "The offers should be written as decoded, without the trailing bytes");
+    }
+
+    /// <summary>
+    /// An island frame whose rewritten form, with its invented name, would exceed 1 MiB is refused with its line; one 8
+    /// bytes shorter, whose rewritten form fits, is anonymised. The one-byte name <c>a</c> grows by 7 bytes when it
+    /// becomes <c>Island 1</c>: 1,048,574 bytes become 1,048,581, and 1,048,566 become 1,048,573.
+    /// </summary>
+    /// <param name="lastBuildings">The number of building pairs of the last entry</param>
+    /// <param name="expected">The expected result</param>
+    /// <returns>The task</returns>
+    [TestMethod]
+    [TestCategory("AC10")]
+    [DataRow(573, PipeAnonymiseResultKind.FrameNotAnonymisable)]
+    [DataRow(572, PipeAnonymiseResultKind.Anonymised)]
+    public async Task PipeRecordingAnonymiserIslandOverOneMebibyteAfterRewritingIsRefused(int lastBuildings, PipeAnonymiseResultKind expected)
+    {
+        // Arrange
+        var frame = LargeIsland(lastBuildings);
+
+        Assert.IsLessThanOrEqualTo(PipeProtocol.MaxFrameLength, frame.Length, "The original frame should fit into a frame");
+
+        // Act
+        var (result, output) = await AnonymiseAsync(RecordingOf(_version3, frame, _sessionEnd), new ScriptedPipeAnonymiserRandom(Up));
+
+        // Assert
+        Assert.AreEqual(expected, result.Kind, $"An island frame of {frame.Length} bytes, {frame.Length + 7} after rewriting, should give {expected}");
+        Assert.AreEqual(expected == PipeAnonymiseResultKind.Anonymised ? null : 3L, result.LineNumber, "A refusal should name the line of the frame");
+        Assert.HasCount(expected == PipeAnonymiseResultKind.Anonymised ? 4 : 2, OutputLines(output), "The frame over 1 MiB should not be written: only the header and the version line come before it");
+    }
+
+    /// <summary>
+    /// A trade-route frame whose rewritten form, with its invented names, would exceed 1 MiB is refused with its line; one
+    /// whose rewritten form fits is anonymised. 1,024 routes named <c>a</c> in folder <c>b</c> grow by 13 bytes each.
+    /// </summary>
+    /// <param name="goods">The number of goods of each route's one station</param>
+    /// <param name="expected">The expected result</param>
+    /// <returns>The task</returns>
+    [TestMethod]
+    [TestCategory("AC10")]
+    [DataRow(106, PipeAnonymiseResultKind.Anonymised)]
+    [DataRow(107, PipeAnonymiseResultKind.FrameNotAnonymisable)]
+    public async Task PipeRecordingAnonymiserTradeRoutesOverOneMebibyteAfterRewritingAreRefused(int goods, PipeAnonymiseResultKind expected)
+    {
+        // Arrange
+        var frame = LargeTradeRoutesFrame(goods);
+
+        Assert.IsLessThanOrEqualTo(PipeProtocol.MaxFrameLength, frame.Length, "The original frame should fit into a frame");
+
+        // Act
+        var (result, _) = await AnonymiseAsync(RecordingOf(_version3, frame, _sessionEnd), new ScriptedPipeAnonymiserRandom(Up));
+
+        // Assert
+        Assert.AreEqual(expected, result.Kind, $"A frame of {frame.Length} bytes, {frame.Length + (1024 * 13)} after rewriting, should give {expected}");
+        Assert.AreEqual(expected == PipeAnonymiseResultKind.Anonymised ? null : 3L, result.LineNumber, "A refusal should name the line of the frame");
+    }
+
+    /// <summary>
+    /// A malformed trade-route or item-offer frame is refused with its line: a count missing, negative or beyond the
+    /// frame at the route, station, goods, offer and item level, and a short route field.
+    /// </summary>
+    /// <param name="type">The type byte of the reference frame</param>
+    /// <param name="offset">The offset of the count written anew</param>
+    /// <param name="value">The count written at the offset</param>
+    /// <param name="length">The length the frame is cut to</param>
+    /// <returns>The task</returns>
+    [TestMethod]
+    [TestCategory("AC10")]
+    [DataRow((byte)4, 1, 1, 1)]
+    [DataRow((byte)4, 1, 1, 4)]
+    [DataRow((byte)4, 1, -1, 71)]
+    [DataRow((byte)4, 1, int.MinValue, 71)]
+    [DataRow((byte)4, 1, 2, 71)]
+    [DataRow((byte)4, 1, 1, 36)]
+    [DataRow((byte)4, 38, 1, 40)]
+    [DataRow((byte)4, 38, -1, 71)]
+    [DataRow((byte)4, 38, 2, 71)]
+    [DataRow((byte)4, 58, 1, 60)]
+    [DataRow((byte)4, 58, -1, 71)]
+    [DataRow((byte)4, 58, 2, 71)]
+    [DataRow((byte)5, 1, 1, 4)]
+    [DataRow((byte)5, 1, -1, 17)]
+    [DataRow((byte)5, 1, 2, 17)]
+    [DataRow((byte)5, 9, 1, 11)]
+    [DataRow((byte)5, 9, -1, 17)]
+    [DataRow((byte)5, 9, 2, 17)]
+    public async Task PipeRecordingAnonymiserMalformedTradeRoutesOrItemOffersAreRefused(byte type, int offset, int value, int length)
+    {
+        // Arrange
+        var reference = ReferenceTradeFrame(type);
+
+        Assert.HasCount(type == 4 ? 71 : 17, reference, "The reference frame should have the layout the offsets assume");
+        Assert.AreEqual(PipeReadResultKind.Message, PipeMessageParser.Parse(reference).Kind, "The reference frame should be well formed");
+
+        var frame = WithInt(reference, offset, value)[..length];
         var recording = RecordingOf(_version3, frame, _sessionEnd);
 
         // Act
@@ -1617,6 +1943,228 @@ public sealed class PipeRecordingAnonymiserTests
                                                                    $"{entry.ProductGuid} bc={entry.BuildingCount} w=[{string.Join(",", entry.WorkforceAmounts.Keys.Order())}] b=[{string.Join(",", entry.BuildingAmounts.OrderBy(pair => pair.Key).Select(DescribePair))}]"));
 
         return string.Create(CultureInfo.InvariantCulture, $"{island.Key} session={island.SessionId} [{string.Join(",", entries)}]");
+    }
+
+    /// <summary>
+    /// Creates a trade route.
+    /// </summary>
+    /// <param name="id">The route ID</param>
+    /// <param name="name">The route name</param>
+    /// <param name="folder">The folder name</param>
+    /// <param name="counts">The major and minor problem counts, the ship count and the lost-ship count</param>
+    /// <param name="stations">The stations</param>
+    /// <returns>The route</returns>
+    private static TradeRoute TradeRouteOf(int id, string name, string folder, (int Major, int Minor, int Ships, int Lost) counts, params TradeRouteStation[] stations)
+    {
+        return new TradeRoute
+               {
+                   Id = id,
+                   Name = name,
+                   Folder = folder,
+                   MajorProblems = counts.Major,
+                   MinorProblems = counts.Minor,
+                   Ships = counts.Ships,
+                   LostShips = counts.Lost,
+                   Stations = stations
+               };
+    }
+
+    /// <summary>
+    /// Creates a station whose island ID, area index and session GUID are derived from its ID and session ID.
+    /// </summary>
+    /// <param name="id">The station ID</param>
+    /// <param name="sessionId">The session ID</param>
+    /// <param name="owner">The owner</param>
+    /// <param name="flags">The throw-overboard, wait-until-full and wait-until-empty flags</param>
+    /// <param name="goods">The goods</param>
+    /// <returns>The station</returns>
+    private static TradeRouteStation StationOf(int id, byte sessionId, int owner, (bool ThrowOverboard, bool WaitUntilFull, bool WaitUntilEmpty) flags, params TradeRouteGood[] goods)
+    {
+        return new TradeRouteStation
+               {
+                   Id = id,
+                   SessionId = sessionId,
+                   IslandId = (byte)(255 - sessionId),
+                   AreaIndex = (byte)(id % 3),
+                   SessionGuid = -1000 * id,
+                   Owner = owner,
+                   ThrowOverboard = flags.ThrowOverboard,
+                   WaitUntilFull = flags.WaitUntilFull,
+                   WaitUntilEmpty = flags.WaitUntilEmpty,
+                   Goods = goods
+               };
+    }
+
+    /// <summary>
+    /// Creates a good.
+    /// </summary>
+    /// <param name="productGuid">The product GUID</param>
+    /// <param name="amount">The amount</param>
+    /// <param name="loading">Whether the good is loaded</param>
+    /// <returns>The good</returns>
+    private static TradeRouteGood GoodOf(int productGuid, int amount, bool loading)
+    {
+        return new TradeRouteGood
+               {
+                   ProductGuid = productGuid,
+                   Amount = amount,
+                   Loading = loading
+               };
+    }
+
+    /// <summary>
+    /// Creates an item offer.
+    /// </summary>
+    /// <param name="traderId">The trader ID</param>
+    /// <param name="itemGuids">The item GUIDs</param>
+    /// <returns>The offer</returns>
+    private static ItemOffer OfferOf(int traderId, params int[] itemGuids)
+    {
+        return new ItemOffer
+               {
+                   TraderId = traderId,
+                   ItemGuids = itemGuids
+               };
+    }
+
+    /// <summary>
+    /// Creates a trade-route frame of routes.
+    /// </summary>
+    /// <param name="routes">The routes</param>
+    /// <returns>The frame</returns>
+    private static byte[] TradeRoutesFrame(params TradeRoute[] routes)
+    {
+        return new PipeFrameBuilder().Byte(4).TradeRoutes(routes).Build();
+    }
+
+    /// <summary>
+    /// Creates a well-formed frame of one element per level. Type 4: one route (station count at 38) of one station (goods
+    /// count at 58) of one good, 71 bytes. Type 5: one offer (item count at 9) of one item, 17 bytes. The top count is at 1.
+    /// </summary>
+    /// <param name="type">The type byte, 4 or 5</param>
+    /// <returns>The frame</returns>
+    private static byte[] ReferenceTradeFrame(byte type)
+    {
+        var station = StationOf(11, 200, 1, (false, false, false), GoodOf(1010, 5, true));
+
+        return type == (byte)PipeMessageType.TradeRoutes
+                   ? TradeRoutesFrame(TradeRouteOf(7, "Route", "Folder", _noCounts, station))
+                   : new PipeFrameBuilder().Byte(5).ItemOffers([OfferOf(8, 1000)]).Build();
+    }
+
+    /// <summary>
+    /// Overwrites a little-endian 32-bit integer of a frame.
+    /// </summary>
+    /// <param name="frame">The frame</param>
+    /// <param name="offset">The offset of the integer</param>
+    /// <param name="value">The new value</param>
+    /// <returns>A copy of the frame with the new value</returns>
+    private static byte[] WithInt(byte[] frame, int offset, int value)
+    {
+        var copy = frame.ToArray();
+
+        BinaryPrimitives.WriteInt32LittleEndian(copy.AsSpan(offset), value);
+
+        return copy;
+    }
+
+    /// <summary>
+    /// Creates an island frame named <c>a</c> of 64 entries with distinct workforce and building GUIDs: 63 of 1,024 pairs
+    /// per map and the last of 1,024 workforce pairs and a number of building pairs; 1,048,574 bytes for 573.
+    /// </summary>
+    /// <param name="lastBuildings">The number of building pairs of the last entry</param>
+    /// <returns>The frame</returns>
+    private static byte[] LargeIsland(int lastBuildings)
+    {
+        var entries = Enumerable.Range(0, 64)
+                                .Select(index => EntryBytes(Entry(10 + index, 1000f, 50, 500f, 400), Pairs(index * 10000, 1024), Pairs((index * 10000) + 5000, index == 63 ? lastBuildings : 1024)))
+                                .ToArray();
+
+        return Island(1, "a", 100, entries);
+    }
+
+    /// <summary>
+    /// Creates map pairs of consecutive GUIDs, each with the amount 3.
+    /// </summary>
+    /// <param name="firstGuid">The first GUID</param>
+    /// <param name="count">The number of pairs</param>
+    /// <returns>The pairs</returns>
+    private static KeyValuePair<int, int>[] Pairs(int firstGuid, int count)
+    {
+        return [.. Enumerable.Range(firstGuid, count).Select(guid => new KeyValuePair<int, int>(guid, 3))];
+    }
+
+    /// <summary>
+    /// Creates a trade-route frame of 1,024 routes named <c>a</c> in folder <c>b</c>, each with one station of a number of
+    /// goods: 1,011 bytes per route for 107 goods.
+    /// </summary>
+    /// <param name="goods">The number of goods per station</param>
+    /// <returns>The frame</returns>
+    private static byte[] LargeTradeRoutesFrame(int goods)
+    {
+        var station = StationOf(11, 200, 1, (false, false, false), [.. Enumerable.Range(1, goods).Select(index => GoodOf(1000 + index, index, true))]);
+        var route = TradeRouteOf(7, "a", "b", (1, 1, 2, 1), station);
+
+        return TradeRoutesFrame([.. Enumerable.Repeat(route, PipeProtocol.MaxTradeRoutes)]);
+    }
+
+    /// <summary>
+    /// Parses a trade-route frame.
+    /// </summary>
+    /// <param name="frame">The frame</param>
+    /// <returns>The message</returns>
+    private static TradeRoutesMessage ParseTradeRoutes(byte[] frame)
+    {
+        return PipeMessageParser.Parse(frame).Message as TradeRoutesMessage ?? throw new InvalidOperationException("The frame is no trade-route frame");
+    }
+
+    /// <summary>
+    /// Gives the names a frame carries: per route its name and folder, or the name of <see cref="NameOf" />.
+    /// </summary>
+    /// <param name="frame">The frame</param>
+    /// <returns>The names</returns>
+    private static string NamesOf(byte[] frame)
+    {
+        return PipeMessageParser.Parse(frame).Message is TradeRoutesMessage routes
+                   ? string.Join("; ", routes.Routes.Select(route => $"{route.Name}|{route.Folder}"))
+                   : NameOf(frame);
+    }
+
+    /// <summary>
+    /// Describes what of a trade-route message the anonymiser keeps: per route its ID; per station its ID, island key,
+    /// owner and named flags; per good its GUID and loading flag; in order.
+    /// </summary>
+    /// <param name="message">The message</param>
+    /// <returns>The description</returns>
+    private static string DescribeTradeStructure(TradeRoutesMessage message)
+    {
+        return string.Join("; ", message.Routes.Select(route => string.Create(CultureInfo.InvariantCulture, $"route {route.Id} [{string.Join(", ", route.Stations.Select(DescribeStationStructure))}]")));
+    }
+
+    /// <summary>
+    /// Describes what of a station the anonymiser keeps.
+    /// </summary>
+    /// <param name="station">The station</param>
+    /// <returns>The description</returns>
+    private static string DescribeStationStructure(TradeRouteStation station)
+    {
+        var goods = station.Goods.Select(good => string.Create(CultureInfo.InvariantCulture, $"{good.ProductGuid} loading {good.Loading}"));
+
+        return string.Create(CultureInfo.InvariantCulture,
+                             $"station {station.Id} {station.SessionId}/{station.IslandId}/{station.AreaIndex}/{station.SessionGuid} owner {station.Owner} {station.ThrowOverboard}/{station.WaitUntilFull}/{station.WaitUntilEmpty} goods [{string.Join(", ", goods)}]");
+    }
+
+    /// <summary>
+    /// Describes the amounts of a trade-route message: per route its major and minor problem, ship and lost-ship counts and
+    /// the goods amounts of its stations.
+    /// </summary>
+    /// <param name="message">The message</param>
+    /// <returns>The description</returns>
+    private static string DescribeTradeAmounts(TradeRoutesMessage message)
+    {
+        return string.Join("; ",
+                           message.Routes.Select(route => string.Create(CultureInfo.InvariantCulture,
+                                                                        $"{route.MajorProblems}/{route.MinorProblems}/{route.Ships}/{route.LostShips} [{string.Join("|", route.Stations.Select(station => string.Join(",", station.Goods.Select(good => good.Amount.ToString(CultureInfo.InvariantCulture)))))}]")));
     }
 
     /// <summary>

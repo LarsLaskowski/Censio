@@ -44,6 +44,36 @@ internal sealed class PipeAnonymousNames
     /// </summary>
     private readonly Dictionary<string, string> _inventedFigures = [with(StringComparer.Ordinal)];
 
+    /// <summary>
+    /// The trade route names in the order of first appearance.
+    /// </summary>
+    private readonly List<string> _routes = [];
+
+    /// <summary>
+    /// The route folder names in the order of first appearance.
+    /// </summary>
+    private readonly List<string> _folders = [];
+
+    /// <summary>
+    /// The trade route names added, compared exactly.
+    /// </summary>
+    private readonly HashSet<string> _routeSet = [with(StringComparer.Ordinal)];
+
+    /// <summary>
+    /// The route folder names added, compared exactly.
+    /// </summary>
+    private readonly HashSet<string> _folderSet = [with(StringComparer.Ordinal)];
+
+    /// <summary>
+    /// The invented names of the trade routes by original name.
+    /// </summary>
+    private readonly Dictionary<string, string> _inventedRoutes = [with(StringComparer.Ordinal)];
+
+    /// <summary>
+    /// The invented names of the route folders by original name.
+    /// </summary>
+    private readonly Dictionary<string, string> _inventedFolders = [with(StringComparer.Ordinal)];
+
     #endregion // Fields
 
     #region Methods
@@ -74,6 +104,8 @@ internal sealed class PipeAnonymousNames
     {
         Invent("Island", _islands, _inventedIslands);
         Invent("Player", _figures, _inventedFigures);
+        Invent("Route", _routes, _inventedRoutes);
+        Invent("Folder", _folders, _inventedFolders);
     }
 
     /// <summary>
@@ -96,6 +128,46 @@ internal sealed class PipeAnonymousNames
     public bool TryGetFigure(string original, out string invented)
     {
         return TryGet(original, _inventedFigures, out invented);
+    }
+
+    /// <summary>
+    /// Adds the name of a trade route.
+    /// </summary>
+    /// <param name="name">The original name</param>
+    public void AddRoute(string name)
+    {
+        Add(name, _routeSet, _routes);
+    }
+
+    /// <summary>
+    /// Adds the name of a route folder.
+    /// </summary>
+    /// <param name="name">The original name</param>
+    public void AddFolder(string name)
+    {
+        Add(name, _folderSet, _folders);
+    }
+
+    /// <summary>
+    /// Looks up the invented name of a trade route.
+    /// </summary>
+    /// <param name="original">The original name</param>
+    /// <param name="invented">The invented name</param>
+    /// <returns><see langword="true" /> when the name was added</returns>
+    public bool TryGetRoute(string original, out string invented)
+    {
+        return TryGet(original, _inventedRoutes, out invented);
+    }
+
+    /// <summary>
+    /// Looks up the invented name of a route folder.
+    /// </summary>
+    /// <param name="original">The original name</param>
+    /// <param name="invented">The invented name</param>
+    /// <returns><see langword="true" /> when the name was added</returns>
+    public bool TryGetFolder(string original, out string invented)
+    {
+        return TryGet(original, _inventedFolders, out invented);
     }
 
     /// <summary>

@@ -4,9 +4,9 @@ using System.Text;
 namespace Censio.Pipe.Tests;
 
 /// <summary>
-/// The local deny list of the fixtures and the check of the fixtures against it: every non-empty name must be an
-/// invented name and equal no denied name ignoring case, and every non-zero finite economic value must differ from the
-/// value at the same line, entry and field of the fixture's original recording.
+/// The local deny list of the fixtures and the check of the fixtures against it: every non-empty name (figure, island,
+/// route, folder) must be an invented name and equal no denied name ignoring case, and every non-zero finite economic
+/// value and trade-route amount must differ from the value at the same place of the fixture's original recording.
 /// </summary>
 public sealed class FixtureDenyList
 {
@@ -36,6 +36,21 @@ public sealed class FixtureDenyList
     /// The start of an invented figure name.
     /// </summary>
     private const string PlayerPrefix = "Player ";
+
+    /// <summary>
+    /// The start of an invented route name.
+    /// </summary>
+    private const string RoutePrefix = "Route ";
+
+    /// <summary>
+    /// The start of an invented folder name.
+    /// </summary>
+    private const string FolderPrefix = "Folder ";
+
+    /// <summary>
+    /// The character a reader puts in place of an invalid UTF-8 byte.
+    /// </summary>
+    private const char ReplacementCharacter = (char)0xFFFD;
 
     #endregion // Constants
 
@@ -162,6 +177,175 @@ public sealed class FixtureDenyList
     }
 
     /// <summary>
+    /// Checks every trade-route and item-offer frame of a fixture's original: it must decode, end exactly at the frame's
+    /// end and hold no U+FFFD in a route or folder name. Findings name the line, route and field, never a value.
+    /// </summary>
+    /// <param name="fixture">The fixture file name whose original is checked</param>
+    /// <param name="cancellationToken">The token that cancels the check</param>
+    /// <returns>The report</returns>
+    public async Task<FixtureDenyListReport> CheckOriginalTradeFramesAsync(string fixture, CancellationToken cancellationToken)
+    {
+        var report = new FixtureDenyListReport();
+
+        if (_originals.TryGetValue(fixture, out var path) == false)
+        {
+            report.AddFinding($"{fixture}: no original in the deny list");
+
+            return report;
+        }
+
+        await using var stream = TryOpen(path);
+
+        if (stream is null)
+        {
+            report.AddFinding($"{fixture}: the original is missing or unreadable");
+
+            return report;
+        }
+
+        var reader = new PipeRecordingReader(stream);
+        var line = await reader.ReadAsync(cancellationToken).ConfigureAwait(false);
+
+        while (line.Kind == PipeRecordingLineKind.Frame)
+        {
+            CheckOriginalTradeFrame(report, string.Create(CultureInfo.InvariantCulture, $"{fixture}: original line {line.LineNumber}"), line.Frame);
+
+            line = await reader.ReadAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        if (line.Kind == PipeRecordingLineKind.Problem)
+        {
+            report.AddFinding(string.Create(CultureInfo.InvariantCulture, $"{fixture}: the original is not readable ({line.Problem?.Kind} in line {line.Problem?.LineNumber})"));
+        }
+
+        return report;
+    }
+
+    /// <summary>
+    /// Checks one frame of an original when it is a trade-route or item-offer frame.
+    /// </summary>
+    /// <param name="report">The report</param>
+    /// <param name="place">The fixture and the original's line</param>
+    /// <param name="frame">The frame</param>
+    private static void CheckOriginalTradeFrame(FixtureDenyListReport report, string place, byte[] frame)
+    {
+        if (frame.Length == 0 || frame[0] is not ((byte)PipeMessageType.TradeRoutes or (byte)PipeMessageType.ItemOffers))
+        {
+            return;
+        }
+
+        report.AddTradeFrame();
+
+        var result = PipeMessageParser.Parse(frame, out var consumed);
+
+        if (result.Message is null)
+        {
+            report.AddFinding($"{place}: frame does not decode");
+
+            return;
+        }
+
+        if (consumed != frame.Length)
+        {
+            report.AddFinding($"{place}: frame has bytes after its last field");
+        }
+
+        if (result.Message is not TradeRoutesMessage routes)
+        {
+            return;
+        }
+
+        for (var index = 0; index < routes.Routes.Count; index++)
+        {
+            var routePlace = string.Create(CultureInfo.InvariantCulture, $"{place}: route {index + 1}");
+
+            CheckReplacement(report, routePlace, routes.Routes[index].Name, "route");
+            CheckReplacement(report, routePlace, routes.Routes[index].Folder, "folder");
+        }
+    }
+
+    /// <summary>
+    /// Reports a name of an original that holds U+FFFD, by place and kind only.
+    /// </summary>
+    /// <param name="report">The report</param>
+    /// <param name="place">The fixture, the original's line and the route</param>
+    /// <param name="name">The name</param>
+    /// <param name="kind">The kind of the name, for the finding</param>
+    private static void CheckReplacement(FixtureDenyListReport report, string place, string name, string kind)
+    {
+        if (name.Contains(ReplacementCharacter, StringComparison.Ordinal))
+        {
+            report.AddFinding($"{place}: {kind} name holds U+FFFD");
+        }
+    }
+
+    /// <summary>
+    /// Compares the amounts of two trade-route messages of the same line: per route the problem, ship and lost-ship
+    /// counts, per good its amount unless the original's is negative (kept by design).
+    /// </summary>
+    /// <param name="report">The report</param>
+    /// <param name="place">The fixture and line</param>
+    /// <param name="routes">The fixture's message</param>
+    /// <param name="original">The original's message</param>
+    private static void CompareTradeRoutes(FixtureDenyListReport report, string place, TradeRoutesMessage routes, TradeRoutesMessage original)
+    {
+        if (HasSameShape(routes, original) == false)
+        {
+            report.AddFinding($"{place}: frame differs in structure from the original");
+
+            return;
+        }
+
+        for (var index = 0; index < routes.Routes.Count; index++)
+        {
+            CompareRoute(report, string.Create(CultureInfo.InvariantCulture, $"{place}: route {index + 1}"), routes.Routes[index], original.Routes[index]);
+        }
+    }
+
+    /// <summary>
+    /// Checks that two trade-route messages have the same number of routes, stations per route and goods per station.
+    /// </summary>
+    /// <param name="routes">The fixture's message</param>
+    /// <param name="original">The original's message</param>
+    /// <returns><see langword="true" /> when the shape is the same</returns>
+    private static bool HasSameShape(TradeRoutesMessage routes, TradeRoutesMessage original)
+    {
+        return routes.Routes.Count == original.Routes.Count
+               && routes.Routes.Zip(original.Routes)
+                               .All(pair => pair.First.Stations.Count == pair.Second.Stations.Count
+                                            && pair.First.Stations.Zip(pair.Second.Stations).All(stations => stations.First.Goods.Count == stations.Second.Goods.Count));
+    }
+
+    /// <summary>
+    /// Compares the amounts of two routes.
+    /// </summary>
+    /// <param name="report">The report</param>
+    /// <param name="place">The fixture, line and route</param>
+    /// <param name="route">The fixture's route</param>
+    /// <param name="original">The original's route</param>
+    private static void CompareRoute(FixtureDenyListReport report, string place, TradeRoute route, TradeRoute original)
+    {
+        Compare(report, place, nameof(TradeRoute.MajorProblems), route.MajorProblems, original.MajorProblems);
+        Compare(report, place, nameof(TradeRoute.MinorProblems), route.MinorProblems, original.MinorProblems);
+        Compare(report, place, nameof(TradeRoute.Ships), route.Ships, original.Ships);
+        Compare(report, place, nameof(TradeRoute.LostShips), route.LostShips, original.LostShips);
+
+        for (var station = 0; station < route.Stations.Count; station++)
+        {
+            var goods = route.Stations[station].Goods;
+            var originalGoods = original.Stations[station].Goods;
+
+            for (var good = 0; good < goods.Count; good++)
+            {
+                if (originalGoods[good].Amount >= 0)
+                {
+                    Compare(report, string.Create(CultureInfo.InvariantCulture, $"{place}: station {station + 1}: good {good + 1}"), nameof(TradeRouteGood.Amount), goods[good].Amount, originalGoods[good].Amount);
+                }
+            }
+        }
+    }
+
+    /// <summary>
     /// Checks whether a name is an invented name: the prefix and a number from 1 without leading zeros.
     /// </summary>
     /// <param name="name">The name</param>
@@ -260,6 +444,13 @@ public sealed class FixtureDenyList
         if (message?.MessageType != originalMessage?.MessageType)
         {
             report.AddFinding($"{place}: frame differs in structure from the original");
+
+            return;
+        }
+
+        if (message is TradeRoutesMessage routes && originalMessage is TradeRoutesMessage originalRoutes)
+        {
+            CompareTradeRoutes(report, place, routes, originalRoutes);
 
             return;
         }
@@ -389,6 +580,27 @@ public sealed class FixtureDenyList
             case AreaProductionStatisticsMessage area:
                 CheckName(report, place, area.AreaName, IslandPrefix, "island");
                 break;
+
+            case TradeRoutesMessage routes:
+                CheckRouteNames(report, place, routes);
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Checks the route and folder names of a trade-route message.
+    /// </summary>
+    /// <param name="report">The report</param>
+    /// <param name="place">The fixture and line</param>
+    /// <param name="routes">The message</param>
+    private void CheckRouteNames(FixtureDenyListReport report, string place, TradeRoutesMessage routes)
+    {
+        for (var index = 0; index < routes.Routes.Count; index++)
+        {
+            var routePlace = string.Create(CultureInfo.InvariantCulture, $"{place}: route {index + 1}");
+
+            CheckName(report, routePlace, routes.Routes[index].Name, RoutePrefix, "route");
+            CheckName(report, routePlace, routes.Routes[index].Folder, FolderPrefix, "folder");
         }
     }
 

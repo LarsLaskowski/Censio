@@ -453,14 +453,14 @@ public sealed class PipeConnectionTests : IDisposable
     /// </summary>
     /// <returns>The task</returns>
     [TestMethod]
-    [TestCategory("AC4")]
+    [TestCategory("AC7")]
     public async Task PipeConnectionTradeRoutesAndItemOffersRaiseNoEvent()
     {
         // Arrange
         var stream = await StartConnectedAsync(VersionFrame(3), IslandFrame());
 
         // Act
-        stream.Feed(Concat(UndecodedFrame(PipeMessageType.TradeRoutes), UndecodedFrame(PipeMessageType.ItemOffers), IslandFrame()));
+        stream.Feed(Concat(TradeRoutesFrame(), ItemOffersFrame(), IslandFrame()));
 
         await WaitForPendingReadsAsync(stream, 2);
 
@@ -2033,14 +2033,59 @@ public sealed class PipeConnectionTests : IDisposable
     }
 
     /// <summary>
-    /// Creates a trade-route or item-offer frame in the reference layout with a count of 1 and its entry, with its length
+    /// Creates a trade-route frame in the reference layout with one route of one station of one good, with its length
     /// prefix.
     /// </summary>
-    /// <param name="type">The message type, trade routes or item offers</param>
     /// <returns>The bytes</returns>
-    private static byte[] UndecodedFrame(PipeMessageType type)
+    private static byte[] TradeRoutesFrame()
     {
-        return new PipeFrameBuilder().Byte((byte)type).Int32Value(1).UndecodedEntries((byte)type, 1).BuildWithPrefix();
+        var good = new TradeRouteGood
+                   {
+                       ProductGuid = 1010,
+                       Amount = 5,
+                       Loading = true
+                   };
+        var station = new TradeRouteStation
+                      {
+                          Id = 11,
+                          SessionId = 1,
+                          IslandId = 2,
+                          AreaIndex = 0,
+                          SessionGuid = 180023,
+                          Owner = 7,
+                          ThrowOverboard = false,
+                          WaitUntilFull = false,
+                          WaitUntilEmpty = true,
+                          Goods = [good]
+                      };
+        var route = new TradeRoute
+                    {
+                        Id = 42,
+                        Name = "Route",
+                        Folder = "Folder",
+                        MajorProblems = 0,
+                        MinorProblems = 1,
+                        Ships = 2,
+                        LostShips = 0,
+                        Stations = [station]
+                    };
+
+        return new PipeFrameBuilder().Byte((byte)PipeMessageType.TradeRoutes).TradeRoutes([route]).BuildWithPrefix();
+    }
+
+    /// <summary>
+    /// Creates an item-offer frame in the reference layout with one offer of one item, with its length prefix.
+    /// </summary>
+    /// <returns>The bytes</returns>
+    private static byte[] ItemOffersFrame()
+    {
+        var offer = new ItemOffer
+                    {
+                        TraderId = 8,
+                        ItemGuids = [1000]
+                    };
+
+        return new PipeFrameBuilder().Byte((byte)PipeMessageType.ItemOffers).ItemOffers([offer]).BuildWithPrefix();
     }
 
     /// <summary>

@@ -476,7 +476,7 @@ public sealed class PipeMessageReaderTests
     public async Task PipeMessageReaderTradeRoutesOrItemOffersBeforeVersionReturnsMismatch(byte type)
     {
         // Arrange
-        using var stream = new ChunkedStream(PipeFrameBuilder.WithPrefix(UndecodedFrame(type)));
+        using var stream = new ChunkedStream(PipeFrameBuilder.WithPrefix(TradeRoutesOrItemOffersFrame(type)));
         var reader = new PipeMessageReader(stream);
 
         // Act
@@ -490,16 +490,16 @@ public sealed class PipeMessageReaderTests
     }
 
     /// <summary>
-    /// A trade-route frame after version 3 is delivered as an undecoded message of its type, carrying its whole frame,
-    /// and the frame after it is decoded.
+    /// A trade-route frame after version 3 is delivered as a trade-routes message with its routes, carrying its whole
+    /// frame, and the frame after it is decoded.
     /// </summary>
     /// <returns>The task of the test</returns>
     [TestMethod]
-    [TestCategory("AC2")]
-    public async Task PipeMessageReaderTradeRoutesAfterVersionThreeReturnsUndecodedMessage()
+    [TestCategory("AC1")]
+    public async Task PipeMessageReaderTradeRoutesAfterVersionThreeReturnsTradeRoutesMessage()
     {
         // Arrange
-        var frame = UndecodedFrame((byte)PipeMessageType.TradeRoutes);
+        var frame = TradeRoutesFrame();
         using var stream = new ChunkedStream([.. VersionFrame(3), .. PipeFrameBuilder.WithPrefix(frame), .. SessionEndFrame()]);
         var reader = new PipeMessageReader(stream);
 
@@ -510,11 +510,30 @@ public sealed class PipeMessageReaderTests
         var next = await reader.ReadAsync(TestContext.CancellationToken);
 
         // Assert
-        Assert.AreEqual(PipeReadResultKind.Message, result.Kind, "The trade-route frame should give a message");
-        Assert.IsInstanceOfType<UndecodedMessage>(result.Message, "The trade-route frame should give an undecoded message");
-        Assert.AreEqual(PipeMessageType.TradeRoutes, result.Message.MessageType, "The undecoded message should carry the trade-route type");
-        Assert.AreSequenceEqual(frame, result.Frame?.ToArray() ?? [], "The result should carry the whole frame");
+        AssertTradeRoutes(result, frame);
         Assert.IsInstanceOfType<SessionEndMessage>(next.Message, "The frame after the trade routes should be decoded");
+    }
+
+    /// <summary>
+    /// A trade-route frame after version 2 is decoded as well: the parser has no version.
+    /// </summary>
+    /// <returns>The task of the test</returns>
+    [TestMethod]
+    [TestCategory("AC1")]
+    public async Task PipeMessageReaderTradeRoutesAfterVersionTwoReturnsTradeRoutesMessage()
+    {
+        // Arrange
+        var frame = TradeRoutesFrame();
+        using var stream = new ChunkedStream([.. VersionFrame(2), .. PipeFrameBuilder.WithPrefix(frame)]);
+        var reader = new PipeMessageReader(stream);
+
+        await reader.ReadAsync(TestContext.CancellationToken);
+
+        // Act
+        var result = await reader.ReadAsync(TestContext.CancellationToken);
+
+        // Assert
+        AssertTradeRoutes(result, frame);
     }
 
     /// <summary>
@@ -617,8 +636,10 @@ public sealed class PipeMessageReaderTests
     [TestMethod]
     [TestCategory("AC6")]
     [TestCategory("AC7")]
+    [TestCategory("AC11")]
     [DataRow("long-session.jsonl", "Version=1 SessionStart=2 SessionEnd=2 AreaProductionStatistics=789 TradeRoutes=0 ItemOffers=0 Error=0 entries=21091")]
     [DataRow("protocol-3-session.jsonl", "Version=1 SessionStart=1 SessionEnd=1 AreaProductionStatistics=101 TradeRoutes=5 ItemOffers=4 Error=0 entries=2752")]
+    [DataRow("protocol-3-trade-routes.jsonl", "Version=1 SessionStart=1 SessionEnd=0 AreaProductionStatistics=300 TradeRoutes=11 ItemOffers=12 Error=0 entries=7679")]
     public async Task PipeMessageReaderFixturesGiveReadmeFrameCounts(string fixture, string expected)
     {
         // Arrange
@@ -631,6 +652,32 @@ public sealed class PipeMessageReaderTests
         // Assert
         Assert.AreEqual(expected, CountKinds(results), $"The fixture {fixture} should give the frame counts of its README");
         Assert.AreEqual(PipeReadResultKind.EndOfStream, results[^1].Kind, "The replay should end with the end of the stream");
+        Assert.IsNull(replay.Problem, "The fixture should be a valid recording");
+    }
+
+    /// <summary>
+    /// The trade-route and item-offer frames of the protocol 3 fixture, emptied by the anonymiser that made it, decode as
+    /// messages without routes or traders.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    [TestCategory("AC3")]
+    public async Task PipeMessageReaderProtocolThreeFixtureGivesEmptyTradeRoutesAndItemOffers()
+    {
+        // Arrange
+        using var replay = new PipeReplayStream(File.OpenRead(Path.Combine(FixtureDenyList.FixturesFolder, "protocol-3-session.jsonl")), PipeReplaySpeed.Maximum, new PipeReplayClock(DateTimeOffset.UnixEpoch), TimeProvider.System);
+        var reader = new PipeMessageReader(replay);
+
+        // Act
+        var results = await ReadFixtureToEndAsync(reader);
+
+        // Assert
+        var messages = results.Select(result => result.Message).ToList();
+        var routeCounts = string.Join(' ', messages.OfType<TradeRoutesMessage>().Select(message => message.Routes.Count));
+        var offerCounts = string.Join(' ', messages.OfType<ItemOffersMessage>().Select(message => message.Offers.Count));
+
+        Assert.AreEqual("0 0 0 0 0", routeCounts, "The five trade-route frames should decode as messages without routes");
+        Assert.AreEqual("0 0 0 0", offerCounts, "The four item-offer frames should decode as messages without traders");
         Assert.IsNull(replay.Problem, "The fixture should be a valid recording");
     }
 
@@ -674,14 +721,85 @@ public sealed class PipeMessageReaderTests
     }
 
     /// <summary>
-    /// Creates a trade-route or item-offer frame in the reference layout with a count of 1 and its entry, without its
-    /// length prefix.
+    /// Creates a trade-route frame in the reference layout with one route of one station of one good, without its length
+    /// prefix.
+    /// </summary>
+    /// <returns>The frame bytes</returns>
+    private static byte[] TradeRoutesFrame()
+    {
+        var good = new TradeRouteGood
+                   {
+                       ProductGuid = 1010,
+                       Amount = 5,
+                       Loading = true
+                   };
+        var station = new TradeRouteStation
+                      {
+                          Id = 11,
+                          SessionId = 1,
+                          IslandId = 2,
+                          AreaIndex = 0,
+                          SessionGuid = 180023,
+                          Owner = 7,
+                          ThrowOverboard = false,
+                          WaitUntilFull = false,
+                          WaitUntilEmpty = true,
+                          Goods = [good]
+                      };
+        var route = new TradeRoute
+                    {
+                        Id = 42,
+                        Name = "Route",
+                        Folder = "Folder",
+                        MajorProblems = 0,
+                        MinorProblems = 1,
+                        Ships = 2,
+                        LostShips = 0,
+                        Stations = [station]
+                    };
+
+        return new PipeFrameBuilder().Byte((byte)PipeMessageType.TradeRoutes).TradeRoutes([route]).Build();
+    }
+
+    /// <summary>
+    /// Creates a trade-route or item-offer frame in the reference layout with one entry, without its length prefix.
     /// </summary>
     /// <param name="type">The type byte, 4 or 5</param>
     /// <returns>The frame bytes</returns>
-    private static byte[] UndecodedFrame(byte type)
+    private static byte[] TradeRoutesOrItemOffersFrame(byte type)
     {
-        return new PipeFrameBuilder().Byte(type).Int32Value(1).UndecodedEntries(type, 1).Build();
+        var offer = new ItemOffer
+                    {
+                        TraderId = 8,
+                        ItemGuids = [1000]
+                    };
+
+        return type == (byte)PipeMessageType.TradeRoutes
+                   ? TradeRoutesFrame()
+                   : new PipeFrameBuilder().Byte(type).ItemOffers([offer]).Build();
+    }
+
+    /// <summary>
+    /// Asserts that a result is the trade-routes message of <see cref="TradeRoutesFrame" />, carrying that frame.
+    /// </summary>
+    /// <param name="result">The result</param>
+    /// <param name="frame">The frame it was read from</param>
+    private static void AssertTradeRoutes(PipeReadResult result, byte[] frame)
+    {
+        Assert.AreEqual(PipeReadResultKind.Message, result.Kind, "The trade-route frame should give a message");
+
+        var message = result.Message as TradeRoutesMessage;
+
+        Assert.IsNotNull(message, "The trade-route frame should give a trade-routes message");
+        Assert.HasCount(1, message.Routes, "The route should be delivered");
+        Assert.AreEqual(42, message.Routes[0].Id, "The route ID should be delivered");
+        Assert.AreEqual("Folder", message.Routes[0].Folder, "The folder should be delivered");
+        Assert.AreEqual(2, message.Routes[0].Ships, "The ship count should be delivered");
+        Assert.HasCount(1, message.Routes[0].Stations, "The station should be delivered");
+        Assert.IsTrue(message.Routes[0].Stations[0].WaitUntilEmpty, "The station's flag should be delivered");
+        Assert.HasCount(1, message.Routes[0].Stations[0].Goods, "The good should be delivered");
+        Assert.AreEqual(5, message.Routes[0].Stations[0].Goods[0].Amount, "The good's amount should be delivered");
+        Assert.AreSequenceEqual(frame, result.Frame?.ToArray() ?? [], "The result should carry the whole frame");
     }
 
     /// <summary>

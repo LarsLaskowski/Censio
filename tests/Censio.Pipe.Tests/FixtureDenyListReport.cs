@@ -35,6 +35,11 @@ public sealed class FixtureDenyListReport
     public long ComparedValueCount { get; private set; }
 
     /// <summary>
+    /// Gets the number of trade-route and item-offer frames of an original that were checked.
+    /// </summary>
+    public long TradeFrameCount { get; private set; }
+
+    /// <summary>
     /// Gets the findings, each naming a fixture or a deny-list line, a line number and a field.
     /// </summary>
     public IReadOnlyList<string> Findings => _findings;
@@ -65,6 +70,14 @@ public sealed class FixtureDenyListReport
     public void AddComparedValue()
     {
         ComparedValueCount++;
+    }
+
+    /// <summary>
+    /// Counts a checked trade-route or item-offer frame of an original.
+    /// </summary>
+    public void AddTradeFrame()
+    {
+        TradeFrameCount++;
     }
 
     /// <summary>

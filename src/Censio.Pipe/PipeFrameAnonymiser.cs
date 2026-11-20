@@ -93,13 +93,25 @@ internal sealed class PipeFrameAnonymiser
         switch (message)
         {
             case SessionStartMessage start:
-                _names.AddFigure(start.Headline);
-
+                {
+                    _names.AddFigure(start.Headline);
+                }
                 break;
 
             case AreaProductionStatisticsMessage area:
-                _names.AddIsland(area.AreaName);
+                {
+                    _names.AddIsland(area.AreaName);
+                }
+                break;
 
+            case TradeRoutesMessage routes:
+                {
+                    foreach (var route in routes.Routes)
+                    {
+                        _names.AddRoute(route.Name);
+                        _names.AddFolder(route.Folder);
+                    }
+                }
                 break;
         }
 
@@ -124,7 +136,8 @@ internal sealed class PipeFrameAnonymiser
                           VersionMessage version => WriteVersion(version),
                           SessionStartMessage start => WriteSessionStart(start),
                           AreaProductionStatisticsMessage area => WriteIsland(frame, area),
-                          UndecodedMessage undecoded => [(byte)undecoded.MessageType, 0, 0, 0, 0],
+                          TradeRoutesMessage routes => WriteTradeRoutes(routes),
+                          ItemOffersMessage offers => WriteItemOffers(offers),
                           _ => [(byte)PipeMessageType.SessionEnd]
                       };
 
@@ -373,8 +386,61 @@ internal sealed class PipeFrameAnonymiser
             return false;
         }
 
-        return original is not AreaProductionStatisticsMessage area
-               || (result.Message is AreaProductionStatisticsMessage back && KeepsStructure(area, back));
+        return original switch
+               {
+                   AreaProductionStatisticsMessage area => result.Message is AreaProductionStatisticsMessage back && KeepsStructure(area, back),
+                   TradeRoutesMessage routes => result.Message is TradeRoutesMessage backRoutes && KeepsStructure(routes, backRoutes),
+                   ItemOffersMessage offers => result.Message is ItemOffersMessage backOffers && KeepsStructure(offers, backOffers),
+                   _ => true
+               };
+    }
+
+    /// <summary>
+    /// Compares the structure of two trade-routes messages: the counts, IDs, keys, owners, named flags and GUIDs.
+    /// </summary>
+    /// <param name="original">The original message</param>
+    /// <param name="written">The message of the written frame</param>
+    /// <returns><see langword="true" /> when the structure is the same</returns>
+    private static bool KeepsStructure(TradeRoutesMessage original, TradeRoutesMessage written)
+    {
+        return original.Routes.Count == written.Routes.Count
+               && original.Routes.Zip(written.Routes)
+                                 .All(pair => pair.First.Id == pair.Second.Id
+                                              && pair.First.Stations.Count == pair.Second.Stations.Count
+                                              && pair.First.Stations.Zip(pair.Second.Stations).All(stations => KeepsStructure(stations.First, stations.Second)));
+    }
+
+    /// <summary>
+    /// Compares the structure of two stations.
+    /// </summary>
+    /// <param name="original">The original station</param>
+    /// <param name="written">The written station</param>
+    /// <returns><see langword="true" /> when the structure is the same</returns>
+    private static bool KeepsStructure(TradeRouteStation original, TradeRouteStation written)
+    {
+        return original.Id == written.Id
+               && original.SessionId == written.SessionId
+               && original.IslandId == written.IslandId
+               && original.AreaIndex == written.AreaIndex
+               && original.SessionGuid == written.SessionGuid
+               && original.Owner == written.Owner
+               && original.ThrowOverboard == written.ThrowOverboard
+               && original.WaitUntilFull == written.WaitUntilFull
+               && original.WaitUntilEmpty == written.WaitUntilEmpty
+               && original.Goods.Count == written.Goods.Count
+               && original.Goods.Zip(written.Goods).All(goods => goods.First.ProductGuid == goods.Second.ProductGuid && goods.First.Loading == goods.Second.Loading);
+    }
+
+    /// <summary>
+    /// Compares the structure of two item-offers messages: the counts, trader IDs and item GUIDs.
+    /// </summary>
+    /// <param name="original">The original message</param>
+    /// <param name="written">The message of the written frame</param>
+    /// <returns><see langword="true" /> when the structure is the same</returns>
+    private static bool KeepsStructure(ItemOffersMessage original, ItemOffersMessage written)
+    {
+        return original.Offers.Count == written.Offers.Count
+               && original.Offers.Zip(written.Offers).All(pair => pair.First.TraderId == pair.Second.TraderId && pair.First.ItemGuids.SequenceEqual(pair.Second.ItemGuids));
     }
 
     /// <summary>
@@ -390,6 +456,52 @@ internal sealed class PipeFrameAnonymiser
                                   .All(pair => pair.First.ProductGuid == pair.Second.ProductGuid
                                                && pair.First.WorkforceAmounts.Keys.ToHashSet().SetEquals(pair.Second.WorkforceAmounts.Keys)
                                                && pair.First.BuildingAmounts.Keys.ToHashSet().SetEquals(pair.Second.BuildingAmounts.Keys));
+    }
+
+    /// <summary>
+    /// Writes an item-offers frame from the decoded message.
+    /// </summary>
+    /// <param name="offers">The message</param>
+    /// <returns>The frame</returns>
+    private static byte[] WriteItemOffers(ItemOffersMessage offers)
+    {
+        using var stream = new MemoryStream();
+        using var writer = new BinaryWriter(stream);
+
+        writer.Write((byte)PipeMessageType.ItemOffers);
+        writer.Write(offers.Offers.Count);
+
+        foreach (var offer in offers.Offers)
+        {
+            writer.Write(offer.TraderId);
+            writer.Write(offer.ItemGuids.Count);
+
+            foreach (var item in offer.ItemGuids)
+            {
+                writer.Write(item);
+            }
+        }
+
+        writer.Flush();
+
+        return stream.ToArray();
+    }
+
+    /// <summary>
+    /// Keeps the lost ships of a route at most its ships where the original did, and away from the original value.
+    /// </summary>
+    /// <param name="route">The original route</param>
+    /// <param name="ships">The perturbed ships</param>
+    /// <param name="lostShips">The perturbed lost ships</param>
+    /// <returns>The lost ships to write</returns>
+    private static int LimitLostShips(TradeRoute route, int ships, int lostShips)
+    {
+        if (route.LostShips > route.Ships || lostShips <= ships)
+        {
+            return lostShips;
+        }
+
+        return ships == route.LostShips && route.LostShips != 0 ? ships - 1 : ships;
     }
 
     /// <summary>
@@ -500,6 +612,77 @@ internal sealed class PipeFrameAnonymiser
         }
 
         return message is not null && _supported;
+    }
+
+    /// <summary>
+    /// Writes a trade-routes frame from the decoded message with the names invented and the amounts perturbed.
+    /// </summary>
+    /// <param name="routes">The message</param>
+    /// <returns>The frame, or <see langword="null" /> when a name was not collected</returns>
+    private byte[]? WriteTradeRoutes(TradeRoutesMessage routes)
+    {
+        using var stream = new MemoryStream();
+        using var writer = new BinaryWriter(stream);
+
+        writer.Write((byte)PipeMessageType.TradeRoutes);
+        writer.Write(routes.Routes.Count);
+
+        foreach (var route in routes.Routes)
+        {
+            if (_names.TryGetRoute(route.Name, out var name) == false || _names.TryGetFolder(route.Folder, out var folder) == false)
+            {
+                return null;
+            }
+
+            var major = PerturbInteger(route.MajorProblems);
+            var minor = PerturbInteger(route.MinorProblems);
+            var ships = PerturbInteger(route.Ships);
+            var lost = LimitLostShips(route, ships, PerturbInteger(route.LostShips));
+
+            writer.Write(route.Id);
+            writer.Write(NameBytes(name));
+            writer.Write(NameBytes(folder));
+            writer.Write(major);
+            writer.Write(minor);
+            writer.Write(ships);
+            writer.Write(lost);
+            writer.Write(route.Stations.Count);
+
+            foreach (var station in route.Stations)
+            {
+                WriteStation(writer, station);
+            }
+        }
+
+        writer.Flush();
+
+        return stream.ToArray();
+    }
+
+    /// <summary>
+    /// Writes a station of a trade route with the named flags only and the goods amounts perturbed.
+    /// </summary>
+    /// <param name="writer">The writer</param>
+    /// <param name="station">The original station</param>
+    private void WriteStation(BinaryWriter writer, TradeRouteStation station)
+    {
+        var flags = (station.ThrowOverboard ? 1 : 0) | (station.WaitUntilFull ? 2 : 0) | (station.WaitUntilEmpty ? 4 : 0);
+
+        writer.Write(station.Id);
+        writer.Write(station.SessionId);
+        writer.Write(station.IslandId);
+        writer.Write(station.AreaIndex);
+        writer.Write(station.SessionGuid);
+        writer.Write(station.Owner);
+        writer.Write((byte)flags);
+        writer.Write(station.Goods.Count);
+
+        foreach (var good in station.Goods)
+        {
+            writer.Write(good.ProductGuid);
+            writer.Write(good.Amount < 0 ? good.Amount : PerturbInteger(good.Amount));
+            writer.Write((byte)(good.Loading ? 1 : 0));
+        }
     }
 
     /// <summary>

@@ -170,28 +170,121 @@ public sealed class PipeFrameBuilder
     }
 
     /// <summary>
-    /// Appends the entries of a trade-route (type 4) or item-offer (type 5) payload, after its count, in the layout of the
-    /// reference reader (commit <c>4cc8ad7</c>): per trade route an ID, a name and a folder, a problem count, a ship count
-    /// and a station count of 0; per trader an ID and a list of one item GUID.
+    /// Appends a trade-route (type 4) payload in the layout of the reference reader (commit <c>4cc8ad7</c>,
+    /// <c>src/pipe.cpp</c>): the route count and every route.
     /// </summary>
-    /// <param name="type">The type byte of the frame, 4 or 5</param>
-    /// <param name="count">The number of entries</param>
+    /// <param name="routes">The routes, written in their order</param>
     /// <returns>This builder</returns>
-    public PipeFrameBuilder UndecodedEntries(byte type, int count)
+    public PipeFrameBuilder TradeRoutes(IReadOnlyCollection<TradeRoute> routes)
     {
-        for (var index = 0; index < count; index++)
-        {
-            if (type == (byte)PipeMessageType.TradeRoutes)
-            {
-                Int32Value(100 + index).StringValue("Route").StringValue("Folder").Int32Value(0).Int32Value(2).Int32Value(0);
-            }
-            else
-            {
-                Int32Value(200 + index).Int32Value(1).Int32Value(1000 + index);
-            }
-        }
+        Int32Value(routes.Count);
 
-        return this;
+        return routes.Aggregate(this, (builder, route) => builder.Route(route));
+    }
+
+    /// <summary>
+    /// Appends one trade route: its fields, its station count and every station.
+    /// </summary>
+    /// <param name="route">The route</param>
+    /// <returns>This builder</returns>
+    public PipeFrameBuilder Route(TradeRoute route)
+    {
+        RouteFields(route).Int32Value(route.Stations.Count);
+
+        return route.Stations.Aggregate(this, (builder, station) => builder.Station(station));
+    }
+
+    /// <summary>
+    /// Appends the fields of a trade route before its station count: the ID, the name, the folder, the major and minor
+    /// problem counts, the ship count and the lost-ship count.
+    /// </summary>
+    /// <param name="route">The route; its stations are not written</param>
+    /// <returns>This builder</returns>
+    public PipeFrameBuilder RouteFields(TradeRoute route)
+    {
+        return Int32Value(route.Id).StringValue(route.Name)
+                                   .StringValue(route.Folder)
+                                   .Int32Value(route.MajorProblems)
+                                   .Int32Value(route.MinorProblems)
+                                   .Int32Value(route.Ships)
+                                   .Int32Value(route.LostShips);
+    }
+
+    /// <summary>
+    /// Appends one station: its fields with the flags byte of its named flags, its goods count and every good.
+    /// </summary>
+    /// <param name="station">The station</param>
+    /// <returns>This builder</returns>
+    public PipeFrameBuilder Station(TradeRouteStation station)
+    {
+        var flags = (station.ThrowOverboard ? 1 : 0) | (station.WaitUntilFull ? 2 : 0) | (station.WaitUntilEmpty ? 4 : 0);
+
+        StationFields(station, (byte)flags).Int32Value(station.Goods.Count);
+
+        return station.Goods.Aggregate(this, (builder, good) => builder.Good(good));
+    }
+
+    /// <summary>
+    /// Appends the fields of a station before its goods count: the ID, the session ID, the island ID, the area index, the
+    /// session GUID, the owner and a raw flags byte (bit 0 throw overboard, bit 1 wait until full, bit 2 wait until empty).
+    /// </summary>
+    /// <param name="station">The station; its flags and goods are not written</param>
+    /// <param name="flags">The raw flags byte</param>
+    /// <returns>This builder</returns>
+    public PipeFrameBuilder StationFields(TradeRouteStation station, byte flags)
+    {
+        return Int32Value(station.Id).Byte(station.SessionId)
+                                     .Byte(station.IslandId)
+                                     .Byte(station.AreaIndex)
+                                     .Int32Value(station.SessionGuid)
+                                     .Int32Value(station.Owner)
+                                     .Byte(flags);
+    }
+
+    /// <summary>
+    /// Appends one good with the flags byte of its loading flag.
+    /// </summary>
+    /// <param name="good">The good</param>
+    /// <returns>This builder</returns>
+    public PipeFrameBuilder Good(TradeRouteGood good)
+    {
+        return Good(good, good.Loading ? (byte)1 : (byte)0);
+    }
+
+    /// <summary>
+    /// Appends one good: its product GUID, its amount and a raw flags byte (bit 0 loading).
+    /// </summary>
+    /// <param name="good">The good; its loading flag is not written</param>
+    /// <param name="flags">The raw flags byte</param>
+    /// <returns>This builder</returns>
+    public PipeFrameBuilder Good(TradeRouteGood good, byte flags)
+    {
+        return Int32Value(good.ProductGuid).Int32Value(good.Amount).Byte(flags);
+    }
+
+    /// <summary>
+    /// Appends an item-offer (type 5) payload in the layout of the reference reader (commit <c>4cc8ad7</c>,
+    /// <c>src/pipe.cpp</c>): the offer count and every offer.
+    /// </summary>
+    /// <param name="offers">The offers, written in their order</param>
+    /// <returns>This builder</returns>
+    public PipeFrameBuilder ItemOffers(IReadOnlyCollection<ItemOffer> offers)
+    {
+        Int32Value(offers.Count);
+
+        return offers.Aggregate(this, (builder, offer) => builder.Offer(offer));
+    }
+
+    /// <summary>
+    /// Appends one item offer: the trader ID, the item count and every item GUID.
+    /// </summary>
+    /// <param name="offer">The offer</param>
+    /// <returns>This builder</returns>
+    public PipeFrameBuilder Offer(ItemOffer offer)
+    {
+        Int32Value(offer.TraderId).Int32Value(offer.ItemGuids.Count);
+
+        return offer.ItemGuids.Aggregate(this, (builder, guid) => builder.Int32Value(guid));
     }
 
     /// <summary>

@@ -13,6 +13,9 @@ Sources:
   unless a statement names the others.
 - Three more recordings of #17 (2026-11-03, 2026-11-04 and 2026-11-07), about 1,360 frames in all four. Only the
   statements on the session start text and the connect sequence rest on all four.
+- A second version 3 recording supplied by a user (325 frames, no session end). Derived facts only: 1 version frame
+  (`3`), 1 session start, 300 island frames, 11 trade-route and 12 item-offer frames; these are this recording's
+  values, not protocol constants. It is the source of the layout of types 4 and 5 below.
 - One version 3 recording supplied by a user (about 113 frames, started mid-connection, build `26.39954.4.58957`).
   Derived facts only: 1 version frame (`3`), 1 session start, 1 session end, 101 island frames, 5 trade-route frames
   (each: count 57, 8,186 bytes) and 4 item-offer frames (each: count 7, 229 bytes); these are this recording's values, not protocol constants. Its island frames decode with the
@@ -84,8 +87,20 @@ One island per frame; the frames of one tick follow each other. *Confirmed*: 789
 
 - Types 4 and 5 of protocol version 3. *Confirmed* (version 3 recording): every such frame starts with a non-negative
   int32 count (each type 4 frame: count 57, 8,186 bytes; each type 5 frame: count 7, 229 bytes; this recording's values, not protocol constants) and stays far within 1 MiB. *Assumed*
-  (reference at commit `4cc8ad7`): the rest is nested data with strings (route name, folder) and further counts. The reader checks the leading count only and skips the rest ([`areas/pipe.md`](areas/pipe.md),
-  *Message types*).
+  (reference at commit `4cc8ad7`): the rest is nested data with strings (route name, folder) and further counts.
+- Layout, as [`areas/pipe.md`](areas/pipe.md), *Message types*, states it: type 4 is a route count, then per route ID,
+  name, folder, four int32 (major problems, minor problems, ships, lost ships) and a station count; per station ID,
+  three key bytes, session GUID, owner, a flags byte and a goods count; per good GUID, amount and a flags byte. Type 5
+  is a trader count, then per trader ID, an item count and that many item GUIDs.
+- *Confirmed* (second version 3 recording, counts only; the check reads the raw recording, not the anonymiser's
+  output): every type 4 and type 5 frame (11 and 12) decodes with that layout and ends exactly at the frame's end; no
+  route or folder name holds U+FFFD or a non-ASCII byte. Each type 4 frame holds 57 routes, at most 4 stations per
+  route and at most 5 goods per station; each type 5 frame 7 traders with at most 6 items. No count is missing or
+  negative at any level, and the problem counts, ship counts and goods amounts are never negative, the lost ships never
+  above the ships. The 11 trade-route frames are byte-identical; the 12 item-offer frames are 9 distinct ones.
+  Some route names contain `_`.
+- The reader decodes both types with caps far above these counts ([`areas/pipe.md`](areas/pipe.md), *Limits and
+  errors*).
 
 ## Timing
 
