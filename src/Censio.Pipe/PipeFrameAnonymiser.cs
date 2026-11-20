@@ -61,16 +61,6 @@ internal sealed class PipeFrameAnonymiser
 
     #endregion // Fields
 
-    #region Properties
-
-    /// <summary>
-    /// Gets a value indicating whether the last <see cref="Anonymise" /> call refused its frame because the written frame
-    /// exceeded <see cref="PipeProtocol.MaxFrameLength" />.
-    /// </summary>
-    public bool LastFrameTooLong { get; private set; }
-
-    #endregion // Properties
-
     #region Constructors
 
     /// <summary>
@@ -135,8 +125,6 @@ internal sealed class PipeFrameAnonymiser
     /// <returns>The rewritten frame, or <see langword="null" /> when it cannot be anonymised</returns>
     public byte[]? Anonymise(ReadOnlySpan<byte> frame)
     {
-        LastFrameTooLong = false;
-
         if (TryAccept(frame, out var message) == false)
         {
             return null;
@@ -152,13 +140,6 @@ internal sealed class PipeFrameAnonymiser
                           ItemOffersMessage offers => WriteItemOffers(offers),
                           _ => [(byte)PipeMessageType.SessionEnd]
                       };
-
-        if (written is not null && written.Length > PipeProtocol.MaxFrameLength)
-        {
-            LastFrameTooLong = true;
-
-            return null;
-        }
 
         return written is not null && (message is null || IsReadBack(written, message)) ? written : null;
     }

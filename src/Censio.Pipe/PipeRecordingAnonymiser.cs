@@ -161,13 +161,16 @@ public sealed class PipeRecordingAnonymiser
 
             if (rewritten is null)
             {
-                return frames.LastFrameTooLong
-                           ? new PipeAnonymiseResult
-                             {
-                                 Kind = PipeAnonymiseResultKind.FrameNotAnonymisable,
-                                 LineNumber = line.LineNumber
-                             }
-                           : ReadFailed();
+                return ReadFailed();
+            }
+
+            if (rewritten.Length > PipeProtocol.MaxFrameLength)
+            {
+                return new PipeAnonymiseResult
+                       {
+                           Kind = PipeAnonymiseResultKind.FrameNotAnonymisable,
+                           LineNumber = line.LineNumber
+                       };
             }
 
             await WriteAsync(output, PipeRecordingFormat.FormatFrameLine(line.ReceiveTime - offset, rewritten), cancellationToken).ConfigureAwait(false);
