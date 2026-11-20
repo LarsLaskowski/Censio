@@ -982,7 +982,7 @@ public sealed class PipeRecordingAnonymiserTests
     public async Task PipeRecordingAnonymiserTradeRoutesOrItemOffersAreWrittenEmpty(byte type)
     {
         // Arrange
-        var frame = new PipeFrameBuilder().Byte(type).Int32Value(2).UndecodedEntries(type, 2).Raw(0xAA, 0xBB).Build();
+        var frame = TradeRoutesOrItemOffersFrame(type);
         var recording = RecordingOf(_version3, frame, _sessionEnd);
 
         // Act
@@ -1617,6 +1617,56 @@ public sealed class PipeRecordingAnonymiserTests
                                                                    $"{entry.ProductGuid} bc={entry.BuildingCount} w=[{string.Join(",", entry.WorkforceAmounts.Keys.Order())}] b=[{string.Join(",", entry.BuildingAmounts.OrderBy(pair => pair.Key).Select(DescribePair))}]"));
 
         return string.Create(CultureInfo.InvariantCulture, $"{island.Key} session={island.SessionId} [{string.Join(",", entries)}]");
+    }
+
+    /// <summary>
+    /// Creates a trade-route or item-offer frame in the reference layout with two named entries and trailing bytes.
+    /// </summary>
+    /// <param name="type">The type byte, 4 or 5</param>
+    /// <returns>The frame bytes</returns>
+    private static byte[] TradeRoutesOrItemOffersFrame(byte type)
+    {
+        TradeRoute[] routes = [
+                                  new TradeRoute
+                                  {
+                                      Id = 100,
+                                      Name = "Route",
+                                      Folder = "Folder",
+                                      MajorProblems = 0,
+                                      MinorProblems = 0,
+                                      Ships = 2,
+                                      LostShips = 0,
+                                      Stations = []
+                                  },
+                                  new TradeRoute
+                                  {
+                                      Id = 101,
+                                      Name = "Route",
+                                      Folder = "Folder",
+                                      MajorProblems = 0,
+                                      MinorProblems = 0,
+                                      Ships = 2,
+                                      LostShips = 0,
+                                      Stations = []
+                                  }
+                              ];
+        ItemOffer[] offers = [
+                                 new ItemOffer
+                                 {
+                                     TraderId = 200,
+                                     ItemGuids = [1000]
+                                 },
+                                 new ItemOffer
+                                 {
+                                     TraderId = 201,
+                                     ItemGuids = [1001]
+                                 }
+                             ];
+        var builder = type == (byte)PipeMessageType.TradeRoutes
+                          ? new PipeFrameBuilder().Byte(type).TradeRoutes(routes)
+                          : new PipeFrameBuilder().Byte(type).ItemOffers(offers);
+
+        return builder.Raw(0xAA, 0xBB).Build();
     }
 
     /// <summary>

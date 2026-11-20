@@ -1,3 +1,5 @@
+using System.Buffers.Binary;
+using System.Globalization;
 using System.Text;
 
 namespace Censio.Pipe.Tests;
@@ -8,6 +10,35 @@ namespace Censio.Pipe.Tests;
 [TestClass]
 public sealed class PipeMessageParserTests
 {
+    #region Constants
+
+    /// <summary>
+    /// The level of the routes of a trade-route frame.
+    /// </summary>
+    private const string RoutesLevel = "routes";
+
+    /// <summary>
+    /// The level of the stations of a route.
+    /// </summary>
+    private const string StationsLevel = "stations";
+
+    /// <summary>
+    /// The level of the goods of a station.
+    /// </summary>
+    private const string GoodsLevel = "goods";
+
+    /// <summary>
+    /// The level of the offers of an item-offer frame.
+    /// </summary>
+    private const string OffersLevel = "offers";
+
+    /// <summary>
+    /// The level of the items of an offer.
+    /// </summary>
+    private const string ItemsLevel = "items";
+
+    #endregion // Constants
+
     #region Fields
 
     /// <summary>
@@ -288,99 +319,422 @@ public sealed class PipeMessageParserTests
     }
 
     /// <summary>
-    /// A trade-route or item-offer frame with a count that is not negative gives an undecoded message of its type,
-    /// whatever follows the count.
+    /// A trade-route frame of the reference layout gives every field of every route, station and good in frame order.
     /// </summary>
-    /// <param name="type">The type byte</param>
-    /// <param name="count">The count, followed by as many entries in the reference layout</param>
     [TestMethod]
-    [TestCategory("AC2")]
-    [DataRow((byte)4, 0)]
-    [DataRow((byte)4, 1)]
-    [DataRow((byte)5, 0)]
-    [DataRow((byte)5, 1)]
-    public void PipeMessageParserTradeRoutesOrItemOffersReturnsUndecodedMessage(byte type, int count)
+    [TestCategory("AC1")]
+    public void PipeMessageParserTradeRoutesReturnsEveryField()
     {
         // Arrange
-        var frame = new PipeFrameBuilder().Byte(type).Int32Value(count).UndecodedEntries(type, count).Build();
+        var expected = new TradeRoutesMessage
+                       {
+                           Routes = [
+                                        .. ReferenceRoutes(),
+                                        CreateRoute(-8, "Second", "Other", CreateStation(13, 250, false, false, false))
+                                    ]
+                       };
+        var frame = FrameOf(expected);
+
+        Assert.HasCount(166, frame, "The frame should hold the reference layout: 109 bytes of the first route, 57 of the second");
 
         // Act
-        var message = ParseMessage<UndecodedMessage>(frame);
+        var result = PipeMessageParser.Parse(frame);
 
         // Assert
-        Assert.AreEqual((PipeMessageType)type, message.MessageType, $"The undecoded message should carry type {type}");
+        Assert.AreEqual(Describe(expected), Describe(result.Message), "Every field of every route, station and good should be delivered in frame order");
     }
 
     /// <summary>
-    /// The consumed length of a trade-route or item-offer frame ends behind its count: the entries and trailing bytes
-    /// after it are not read.
+    /// A repeated route ID, station ID or product GUID is delivered twice, in its place.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC1")]
+    public void PipeMessageParserTradeRoutesKeepsRepeatedIds()
+    {
+        // Arrange
+        var expected = new TradeRoutesMessage
+                       {
+                           Routes = [
+                                        CreateRoute(7,
+                                                    "First",
+                                                    "Folder",
+                                                    CreateStation(11, 200, true, false, false, CreateGood(1010, 5, true), CreateGood(1010, 6, false)),
+                                                    CreateStation(11, 201, false, true, false)),
+                                        CreateRoute(8, "Between", "Folder"),
+                                        CreateRoute(7, "Again", "Folder", CreateStation(11, 202, false, false, true))
+                                    ]
+                       };
+
+        // Act
+        var result = PipeMessageParser.Parse(FrameOf(expected));
+
+        // Assert
+        Assert.AreEqual(Describe(expected), Describe(result.Message), "Repeated IDs should be delivered in their place, nothing merged or dropped");
+    }
+
+    /// <summary>
+    /// Route and folder names follow the string rules: not trimmed, underscores and non-ASCII text kept, an empty text
+    /// allowed and an invalid UTF-8 byte delivered as U+FFFD.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC1")]
+    public void PipeMessageParserTradeRoutesKeepsNamesAsDecoded()
+    {
+        // Arrange
+        var replacement = ((char)0xFFFD).ToString();
+        var plain = CreateRoute(7, "Zycada ", string.Empty);
+        var marked = CreateRoute(8, "R_mische K_ste", " Köln ");
+        var invalid = CreateRoute(9, "A" + replacement, replacement);
+        var expected = new TradeRoutesMessage
+                       {
+                           Routes = [plain, marked, invalid]
+                       };
+        var frame = new PipeFrameBuilder().Byte(4)
+                                          .Int32Value(3)
+                                          .Route(plain)
+                                          .Route(marked)
+                                          .Int32Value(invalid.Id)
+                                          .Byte(2)
+                                          .Raw(0x41, 0xFF)
+                                          .Byte(1)
+                                          .Raw(0xC3)
+                                          .Int32Value(invalid.MajorProblems)
+                                          .Int32Value(invalid.MinorProblems)
+                                          .Int32Value(invalid.Ships)
+                                          .Int32Value(invalid.LostShips)
+                                          .Int32Value(0)
+                                          .Build();
+
+        // Act
+        var result = PipeMessageParser.Parse(frame);
+
+        // Assert
+        Assert.AreEqual(Describe(expected), Describe(result.Message), "The names should be delivered under the string rules");
+    }
+
+    /// <summary>
+    /// Bytes after the last field of a trade-route or item-offer frame are ignored: the message is delivered in full and
+    /// the consumed length ends behind its last field.
     /// </summary>
     /// <param name="type">The type byte</param>
     [TestMethod]
+    [TestCategory("AC1")]
     [TestCategory("AC2")]
     [DataRow((byte)4)]
     [DataRow((byte)5)]
-    public void PipeMessageParserTradeRoutesOrItemOffersReportsConsumedAfterCount(byte type)
+    public void PipeMessageParserTradeRoutesOrItemOffersIgnoresTrailingBytes(byte type)
     {
         // Arrange
-        var frame = new PipeFrameBuilder().Byte(type).Int32Value(1).UndecodedEntries(type, 1).Raw(0xAA, 0xBB).Build();
+        var expected = ReferenceMessage(type);
+        var frame = FrameOf(expected);
 
         // Act
-        var result = PipeMessageParser.Parse(frame, out var consumed);
+        var result = PipeMessageParser.Parse(Concat(frame, [0xAA, 0xBB]), out var consumed);
 
         // Assert
-        Assert.IsInstanceOfType<UndecodedMessage>(result.Message, $"The type {type} frame should give an undecoded message");
-        Assert.AreEqual(5, consumed, "The consumed length should end behind the type byte and the count");
+        Assert.AreEqual(Describe(expected), Describe(result.Message), $"The type {type} frame should be delivered despite the trailing bytes");
+        Assert.AreEqual(frame.Length, consumed, $"The consumed length of the type {type} frame should end behind its last field");
     }
 
     /// <summary>
-    /// A trade-route or item-offer frame with fewer than 4 payload bytes gives the malformed-message error at the count.
+    /// An item-offer frame of the reference layout gives every trader and item in frame order.
     /// </summary>
-    /// <param name="type">The type byte</param>
-    /// <param name="payloadLength">The number of payload bytes</param>
     [TestMethod]
     [TestCategory("AC2")]
-    [DataRow((byte)4, 0)]
-    [DataRow((byte)4, 1)]
-    [DataRow((byte)4, 2)]
-    [DataRow((byte)4, 3)]
-    [DataRow((byte)5, 0)]
-    [DataRow((byte)5, 1)]
-    [DataRow((byte)5, 2)]
-    [DataRow((byte)5, 3)]
-    public void PipeMessageParserTradeRoutesOrItemOffersWithoutCountReturnsMalformed(byte type, int payloadLength)
+    public void PipeMessageParserItemOffersReturnsEveryOffer()
     {
         // Arrange
-        var frame = new PipeFrameBuilder().Byte(type).Raw([.. Enumerable.Repeat((byte)0x01, payloadLength)]).Build();
+        var expected = new ItemOffersMessage
+                       {
+                           Offers = [CreateOffer(7, 100, -5, int.MaxValue), CreateOffer(-8, 42), CreateOffer(9, 0, int.MinValue)]
+                       };
+        var frame = FrameOf(expected);
+
+        Assert.HasCount(53, frame, "The frame should hold the reference layout: type, count, three traders and six items");
+
+        // Act
+        var result = PipeMessageParser.Parse(frame);
+
+        // Assert
+        Assert.AreEqual(Describe(expected), Describe(result.Message), "Every trader and item should be delivered in frame order");
+    }
+
+    /// <summary>
+    /// A repeated trader ID or item GUID is delivered twice, in its place.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC2")]
+    public void PipeMessageParserItemOffersKeepsRepeatedTradersAndItems()
+    {
+        // Arrange
+        var expected = new ItemOffersMessage
+                       {
+                           Offers = [CreateOffer(7, 1, 1, 2), CreateOffer(8, 3), CreateOffer(7, 4)]
+                       };
+
+        // Act
+        var result = PipeMessageParser.Parse(FrameOf(expected));
+
+        // Assert
+        Assert.AreEqual(Describe(expected), Describe(result.Message), "A repeated trader and a repeated item should be delivered in their place");
+    }
+
+    /// <summary>
+    /// A count of 0 at each of the five levels gives an empty list there.
+    /// </summary>
+    /// <param name="level">The level whose count is 0</param>
+    [TestMethod]
+    [TestCategory("AC3")]
+    [DataRow(RoutesLevel)]
+    [DataRow(StationsLevel)]
+    [DataRow(GoodsLevel)]
+    [DataRow(OffersLevel)]
+    [DataRow(ItemsLevel)]
+    public void PipeMessageParserTradeRoutesOrItemOffersZeroCountGivesEmptyList(string level)
+    {
+        // Arrange
+        var expected = ZeroCountMessage(level);
+
+        // Act
+        var result = PipeMessageParser.Parse(FrameOf(expected));
+
+        // Assert
+        Assert.AreEqual(Describe(expected), Describe(result.Message), $"A count of 0 in the {level} should give an empty list");
+    }
+
+    /// <summary>
+    /// A count with fewer than 4 bytes left, at each of the five levels, gives the malformed-message error at the count.
+    /// </summary>
+    /// <param name="type">The type byte</param>
+    /// <param name="length">The length the reference frame is cut to</param>
+    /// <param name="expectedOffset">The offset of the count that is missing</param>
+    [TestMethod]
+    [TestCategory("AC4")]
+    [DataRow((byte)4, 1, 1)]
+    [DataRow((byte)4, 4, 1)]
+    [DataRow((byte)4, 38, 38)]
+    [DataRow((byte)4, 41, 38)]
+    [DataRow((byte)4, 96, 96)]
+    [DataRow((byte)4, 99, 96)]
+    [DataRow((byte)5, 1, 1)]
+    [DataRow((byte)5, 4, 1)]
+    [DataRow((byte)5, 25, 25)]
+    [DataRow((byte)5, 28, 25)]
+    public void PipeMessageParserTradeRoutesOrItemOffersMissingCountReturnsMalformed(byte type, int length, int expectedOffset)
+    {
+        // Arrange
+        var frame = FrameOf(ReferenceMessage(type))[..length];
 
         // Act
         var error = ParseMalformed(frame);
 
         // Assert
-        Assert.AreEqual(1, error.Offset, $"The offset should be the position of the count ({payloadLength} payload bytes)");
+        Assert.AreEqual(expectedOffset, error.Offset, $"The offset should be the position of the missing count (type {type}, cut at {length})");
     }
 
     /// <summary>
-    /// A trade-route or item-offer frame with a negative count gives the malformed-message error at the count.
+    /// A negative count at each of the five levels gives the malformed-message error at the count.
     /// </summary>
     /// <param name="type">The type byte</param>
+    /// <param name="countOffset">The offset of the count in the reference frame</param>
     /// <param name="count">The negative count</param>
     [TestMethod]
-    [TestCategory("AC2")]
-    [DataRow((byte)4, -1)]
-    [DataRow((byte)4, int.MinValue)]
-    [DataRow((byte)5, -1)]
-    [DataRow((byte)5, int.MinValue)]
-    public void PipeMessageParserTradeRoutesOrItemOffersNegativeCountReturnsMalformed(byte type, int count)
+    [TestCategory("AC4")]
+    [DataRow((byte)4, 1, -1)]
+    [DataRow((byte)4, 1, int.MinValue)]
+    [DataRow((byte)4, 38, -1)]
+    [DataRow((byte)4, 38, int.MinValue)]
+    [DataRow((byte)4, 58, -1)]
+    [DataRow((byte)4, 58, int.MinValue)]
+    [DataRow((byte)5, 1, -1)]
+    [DataRow((byte)5, 1, int.MinValue)]
+    [DataRow((byte)5, 9, -1)]
+    [DataRow((byte)5, 9, int.MinValue)]
+    public void PipeMessageParserTradeRoutesOrItemOffersNegativeCountReturnsMalformed(byte type, int countOffset, int count)
     {
         // Arrange
-        var frame = new PipeFrameBuilder().Byte(type).Int32Value(count).UndecodedEntries(type, 1).Build();
+        var frame = WithInt(FrameOf(ReferenceMessage(type)), countOffset, count);
 
         // Act
         var error = ParseMalformed(frame);
 
         // Assert
-        Assert.AreEqual(1, error.Offset, $"The offset should be the position of the count {count}");
+        Assert.AreEqual(countOffset, error.Offset, $"The offset should be the position of the count {count} (type {type})");
+    }
+
+    /// <summary>
+    /// A field past the end of the frame (a route value, a station ID, a station's key byte, session GUID, owner or flags
+    /// byte, a good's loading byte) gives the malformed-message error. A short field of the last good is found at its goods
+    /// count, which the bytes left cannot hold.
+    /// </summary>
+    /// <param name="length">The length the reference trade-route frame is cut to</param>
+    /// <param name="expectedOffset">The offset of the field that does not fit</param>
+    [TestMethod]
+    [TestCategory("AC4")]
+    [DataRow(33, 30)]
+    [DataRow(82, 80)]
+    [DataRow(86, 86)]
+    [DataRow(89, 87)]
+    [DataRow(93, 91)]
+    [DataRow(95, 95)]
+    [DataRow(108, 96)]
+    public void PipeMessageParserTradeRoutesShortFieldReturnsMalformed(int length, int expectedOffset)
+    {
+        // Arrange
+        var frame = FrameOf(ReferenceMessage(4))[..length];
+
+        // Act
+        var error = ParseMalformed(frame);
+
+        // Assert
+        Assert.AreEqual(expectedOffset, error.Offset, $"The offset should be the position of the field that does not fit (cut at {length})");
+    }
+
+    /// <summary>
+    /// A route name or folder whose length byte points past the frame gives the malformed-message error at the string.
+    /// </summary>
+    /// <param name="emptyStrings">The number of empty strings before the long one: 0 for the name, 1 for the folder</param>
+    /// <param name="expectedOffset">The offset of the long string</param>
+    [TestMethod]
+    [TestCategory("AC4")]
+    [DataRow(0, 9)]
+    [DataRow(1, 10)]
+    public void PipeMessageParserTradeRoutesStringPastFrameReturnsMalformed(int emptyStrings, int expectedOffset)
+    {
+        // Arrange
+        var frame = new PipeFrameBuilder().Byte(4).Int32Value(1).Int32Value(7).Raw(new byte[emptyStrings]).Byte(200).Raw(new byte[30]).Build();
+
+        // Act
+        var error = ParseMalformed(frame);
+
+        // Assert
+        Assert.AreEqual(expectedOffset, error.Offset, "The offset should be the position of the string that does not fit");
+    }
+
+    /// <summary>
+    /// A count one above its cap, in a frame that holds that many complete elements, gives the malformed-message error at
+    /// the count.
+    /// </summary>
+    /// <param name="level">The level of the count</param>
+    /// <param name="count">The count, one above the cap of its level</param>
+    /// <param name="expectedOffset">The offset of the count</param>
+    [TestMethod]
+    [TestCategory("AC5")]
+    [DataRow(RoutesLevel, PipeProtocol.MaxTradeRoutes + 1, 1)]
+    [DataRow(StationsLevel, PipeProtocol.MaxRouteStations + 1, 27)]
+    [DataRow(GoodsLevel, PipeProtocol.MaxStationGoods + 1, 47)]
+    [DataRow(OffersLevel, PipeProtocol.MaxItemOffers + 1, 1)]
+    [DataRow(ItemsLevel, PipeProtocol.MaxOfferItems + 1, 9)]
+    public void PipeMessageParserTradeRoutesOrItemOffersCountAboveCapReturnsMalformed(string level, int count, int expectedOffset)
+    {
+        // Arrange
+        var frame = LevelFrame(level, count, count);
+
+        // Act
+        var error = ParseMalformed(frame);
+
+        // Assert
+        Assert.AreEqual(expectedOffset, error.Offset, $"The {level} count {count} should be rejected at its own offset");
+    }
+
+    /// <summary>
+    /// A count at its cap is delivered with every element.
+    /// </summary>
+    /// <param name="level">The level of the count</param>
+    /// <param name="count">The count, the cap of its level</param>
+    [TestMethod]
+    [TestCategory("AC5")]
+    [DataRow(RoutesLevel, PipeProtocol.MaxTradeRoutes)]
+    [DataRow(StationsLevel, PipeProtocol.MaxRouteStations)]
+    [DataRow(GoodsLevel, PipeProtocol.MaxStationGoods)]
+    [DataRow(OffersLevel, PipeProtocol.MaxItemOffers)]
+    [DataRow(ItemsLevel, PipeProtocol.MaxOfferItems)]
+    public void PipeMessageParserTradeRoutesOrItemOffersCountAtCapReturnsMessage(string level, int count)
+    {
+        // Arrange
+        var frame = LevelFrame(level, count, count);
+
+        // Act
+        var result = PipeMessageParser.Parse(frame);
+
+        // Assert
+        Assert.AreEqual(PipeReadResultKind.Message, result.Kind, $"The {level} count at its cap should give a message");
+        Assert.AreEqual(count, LevelCount(level, result.Message), $"Every one of the {count} {level} should be delivered");
+    }
+
+    /// <summary>
+    /// A count the rest of the frame cannot hold, with one complete element after it, gives the malformed-message error at
+    /// the count, before any collection of that size is created.
+    /// </summary>
+    /// <param name="level">The level of the count</param>
+    /// <param name="count">The count</param>
+    /// <param name="expectedOffset">The offset of the count</param>
+    [TestMethod]
+    [TestCategory("AC5")]
+    [DataRow(RoutesLevel, 2, 1)]
+    [DataRow(RoutesLevel, int.MaxValue, 1)]
+    [DataRow(StationsLevel, 2, 27)]
+    [DataRow(StationsLevel, int.MaxValue, 27)]
+    [DataRow(GoodsLevel, 2, 47)]
+    [DataRow(GoodsLevel, int.MaxValue, 47)]
+    [DataRow(OffersLevel, 2, 1)]
+    [DataRow(OffersLevel, int.MaxValue, 1)]
+    [DataRow(ItemsLevel, 2, 9)]
+    [DataRow(ItemsLevel, int.MaxValue, 9)]
+    public void PipeMessageParserTradeRoutesOrItemOffersCountBeyondFrameReturnsMalformed(string level, int count, int expectedOffset)
+    {
+        // Arrange
+        var frame = LevelFrame(level, count, 1);
+
+        // Act
+        var error = ParseMalformed(frame);
+
+        // Assert
+        Assert.AreEqual(expectedOffset, error.Offset, $"The {level} count {count} should be rejected at its own offset");
+    }
+
+    /// <summary>
+    /// Flag bits the reference does not name (bits 3 to 7 of a station, 1 to 7 of a good) change nothing: the named flags
+    /// beside them are delivered as set, and the rest of the frame is read as before.
+    /// </summary>
+    /// <param name="stationFlags">The raw flags byte of the station</param>
+    /// <param name="goodFlags">The raw flags byte of the good</param>
+    /// <param name="throwOverboard">The expected throw-overboard flag</param>
+    /// <param name="waitUntilFull">The expected wait-until-full flag</param>
+    /// <param name="waitUntilEmpty">The expected wait-until-empty flag</param>
+    /// <param name="loading">The expected loading flag</param>
+    [TestMethod]
+    [TestCategory("AC6")]
+    [DataRow((byte)0xF8, (byte)0xFE, false, false, false, false)]
+    [DataRow((byte)0xFF, (byte)0xFF, true, true, true, true)]
+    [DataRow((byte)0xFD, (byte)0xFF, true, false, true, true)]
+    [DataRow((byte)0xFA, (byte)0xFE, false, true, false, false)]
+    public void PipeMessageParserTradeRoutesUnnamedFlagBitsAreIgnored(byte stationFlags, byte goodFlags, bool throwOverboard, bool waitUntilFull, bool waitUntilEmpty, bool loading)
+    {
+        // Arrange
+        var good = CreateGood(1010, 5, loading);
+        var flagged = CreateStation(11, 200, throwOverboard, waitUntilFull, waitUntilEmpty, good);
+        var plain = CreateStation(12, 130, false, true, false, CreateGood(1020, 50, true));
+        var route = CreateRoute(7, "Route", "Folder", flagged, plain);
+        var expected = new TradeRoutesMessage
+                       {
+                           Routes = [route]
+                       };
+        var frame = new PipeFrameBuilder().Byte(4)
+                                          .Int32Value(1)
+                                          .RouteFields(route)
+                                          .Int32Value(2)
+                                          .StationFields(flagged, stationFlags)
+                                          .Int32Value(1)
+                                          .Good(good, goodFlags)
+                                          .Station(plain)
+                                          .Build();
+
+        // Act
+        var result = PipeMessageParser.Parse(frame);
+
+        // Assert
+        Assert.AreEqual(Describe(expected), Describe(result.Message), $"The station flags 0x{stationFlags:X2} and good flags 0x{goodFlags:X2} should give their named bits only");
     }
 
     /// <summary>
@@ -634,6 +988,316 @@ public sealed class PipeMessageParserTests
         Assert.AreEqual(plain.Kind, result.Kind, $"The result should be the one of the plain parse ({description})");
         Assert.AreEqual(plain.Message?.MessageType, result.Message?.MessageType, $"The message type should be the one of the plain parse ({description})");
         Assert.AreEqual(plain.Error?.ToString(), result.Error?.ToString(), $"The error should be the one of the plain parse ({description})");
+    }
+
+    /// <summary>
+    /// Creates a trade route whose problem, ship and lost-ship counts are derived from its ID.
+    /// </summary>
+    /// <param name="id">The route ID</param>
+    /// <param name="name">The route name</param>
+    /// <param name="folder">The folder name</param>
+    /// <param name="stations">The stations</param>
+    /// <returns>The route</returns>
+    private static TradeRoute CreateRoute(int id, string name, string folder, params TradeRouteStation[] stations)
+    {
+        return new TradeRoute
+               {
+                   Id = id,
+                   Name = name,
+                   Folder = folder,
+                   MajorProblems = (id * 10) + 1,
+                   MinorProblems = (id * 10) + 2,
+                   Ships = (id * 10) + 3,
+                   LostShips = (id * 10) + 4,
+                   Stations = stations
+               };
+    }
+
+    /// <summary>
+    /// Creates a station whose island key, session GUID and owner are derived from its ID and session ID.
+    /// </summary>
+    /// <param name="id">The station ID</param>
+    /// <param name="sessionId">The session ID, at most 253</param>
+    /// <param name="throwOverboard">The throw-overboard flag</param>
+    /// <param name="waitUntilFull">The wait-until-full flag</param>
+    /// <param name="waitUntilEmpty">The wait-until-empty flag</param>
+    /// <param name="goods">The goods</param>
+    /// <returns>The station</returns>
+    private static TradeRouteStation CreateStation(int id, byte sessionId, bool throwOverboard, bool waitUntilFull, bool waitUntilEmpty, params TradeRouteGood[] goods)
+    {
+        return new TradeRouteStation
+               {
+                   Id = id,
+                   SessionId = sessionId,
+                   IslandId = (byte)(sessionId + 1),
+                   AreaIndex = (byte)(sessionId + 2),
+                   SessionGuid = -100 * id,
+                   Owner = (1000 * id) + 7,
+                   ThrowOverboard = throwOverboard,
+                   WaitUntilFull = waitUntilFull,
+                   WaitUntilEmpty = waitUntilEmpty,
+                   Goods = goods
+               };
+    }
+
+    /// <summary>
+    /// Creates a good.
+    /// </summary>
+    /// <param name="productGuid">The product GUID</param>
+    /// <param name="amount">The amount</param>
+    /// <param name="loading">Whether the good is loaded</param>
+    /// <returns>The good</returns>
+    private static TradeRouteGood CreateGood(int productGuid, int amount, bool loading)
+    {
+        return new TradeRouteGood
+               {
+                   ProductGuid = productGuid,
+                   Amount = amount,
+                   Loading = loading
+               };
+    }
+
+    /// <summary>
+    /// Creates an item offer.
+    /// </summary>
+    /// <param name="traderId">The trader ID</param>
+    /// <param name="itemGuids">The item GUIDs</param>
+    /// <returns>The offer</returns>
+    private static ItemOffer CreateOffer(int traderId, params int[] itemGuids)
+    {
+        return new ItemOffer
+               {
+                   TraderId = traderId,
+                   ItemGuids = itemGuids
+               };
+    }
+
+    /// <summary>
+    /// Gets the routes of the reference trade-route frame: one route (ID at 5, station count at 38) with two stations,
+    /// the first (goods count at 58) with two goods, the second (starting at 80, goods count at 96) with one good; 109
+    /// bytes in all.
+    /// </summary>
+    /// <returns>The routes</returns>
+    private static TradeRoute[] ReferenceRoutes()
+    {
+        return
+        [
+            CreateRoute(7,
+                        "Route",
+                        "Folder",
+                        CreateStation(11, 200, true, false, true, CreateGood(1010, 5, true), CreateGood(1011, -3, false)),
+                        CreateStation(12, 130, false, true, false, CreateGood(1020, 50, true)))
+        ];
+    }
+
+    /// <summary>
+    /// Gets the message of a reference frame: the routes of <see cref="ReferenceRoutes" /> for type 4, and for type 5 two
+    /// offers, the first (item count at 9) with two items, the second (item count at 25) with one item; 33 bytes in all.
+    /// </summary>
+    /// <param name="type">The type byte, 4 or 5</param>
+    /// <returns>The message</returns>
+    private static PipeMessage ReferenceMessage(byte type)
+    {
+        return type == (byte)PipeMessageType.TradeRoutes
+                   ? new TradeRoutesMessage
+                     {
+                         Routes = ReferenceRoutes()
+                     }
+                   : new ItemOffersMessage
+                     {
+                         Offers = [CreateOffer(7, 100, 101), CreateOffer(8, 102)]
+                     };
+    }
+
+    /// <summary>
+    /// Gets a message with a count of 0 at one level and one element at every level above it.
+    /// </summary>
+    /// <param name="level">The level whose count is 0</param>
+    /// <returns>The message</returns>
+    private static PipeMessage ZeroCountMessage(string level)
+    {
+        return level switch
+               {
+                   RoutesLevel => new TradeRoutesMessage
+                                  {
+                                      Routes = []
+                                  },
+                   StationsLevel => new TradeRoutesMessage
+                                    {
+                                        Routes = [CreateRoute(7, "Route", "Folder")]
+                                    },
+                   GoodsLevel => new TradeRoutesMessage
+                                 {
+                                     Routes = [CreateRoute(7, "Route", "Folder", CreateStation(11, 200, false, false, false))]
+                                 },
+                   OffersLevel => new ItemOffersMessage
+                                  {
+                                      Offers = []
+                                  },
+                   _ => new ItemOffersMessage
+                        {
+                            Offers = [CreateOffer(7)]
+                        }
+               };
+    }
+
+    /// <summary>
+    /// Writes the frame of a trade-route or item-offer message in the reference layout.
+    /// </summary>
+    /// <param name="message">The message</param>
+    /// <returns>The frame bytes</returns>
+    private static byte[] FrameOf(PipeMessage message)
+    {
+        return message is TradeRoutesMessage routes
+                   ? new PipeFrameBuilder().Byte(4).TradeRoutes(routes.Routes).Build()
+                   : new PipeFrameBuilder().Byte(5).ItemOffers(((ItemOffersMessage)message).Offers).Build();
+    }
+
+    /// <summary>
+    /// Writes a frame with a count at one level, one element at every level above it (empty names, no flags) and a number of
+    /// minimal complete elements after the count. The count lies at offset 1 for routes and offers, 27 for stations, 47
+    /// for goods and 9 for items.
+    /// </summary>
+    /// <param name="level">The level of the count</param>
+    /// <param name="count">The count written</param>
+    /// <param name="elements">The number of elements written after it</param>
+    /// <returns>The frame bytes</returns>
+    private static byte[] LevelFrame(string level, int count, int elements)
+    {
+        var route = CreateRoute(7, string.Empty, string.Empty);
+        var station = CreateStation(11, 200, false, false, false);
+        var good = CreateGood(1010, 5, false);
+        var offer = CreateOffer(8);
+
+        var builder = level switch
+                      {
+                          RoutesLevel => Repeat(new PipeFrameBuilder().Byte(4).Int32Value(count), elements, current => current.Route(route)),
+                          StationsLevel => Repeat(new PipeFrameBuilder().Byte(4).Int32Value(1).RouteFields(route).Int32Value(count), elements, current => current.Station(station)),
+                          GoodsLevel => Repeat(new PipeFrameBuilder().Byte(4).Int32Value(1).RouteFields(route).Int32Value(1).StationFields(station, 0).Int32Value(count), elements, current => current.Good(good)),
+                          OffersLevel => Repeat(new PipeFrameBuilder().Byte(5).Int32Value(count), elements, current => current.Offer(offer)),
+                          _ => Repeat(new PipeFrameBuilder().Byte(5).Int32Value(1).Int32Value(7).Int32Value(count), elements, current => current.Int32Value(100))
+                      };
+
+        return builder.Build();
+    }
+
+    /// <summary>
+    /// Appends the same element a number of times.
+    /// </summary>
+    /// <param name="builder">The builder</param>
+    /// <param name="times">The number of elements</param>
+    /// <param name="append">Appends one element</param>
+    /// <returns>The builder</returns>
+    private static PipeFrameBuilder Repeat(PipeFrameBuilder builder, int times, Func<PipeFrameBuilder, PipeFrameBuilder> append)
+    {
+        return Enumerable.Range(0, times).Aggregate(builder, (current, _) => append(current));
+    }
+
+    /// <summary>
+    /// Gets the number of elements of the first list at a level of a frame built by <see cref="LevelFrame" />.
+    /// </summary>
+    /// <param name="level">The level</param>
+    /// <param name="message">The message</param>
+    /// <returns>The number of elements, or <c>null</c> when the message or the list above the level is missing</returns>
+    private static int? LevelCount(string level, PipeMessage? message)
+    {
+        var routes = (message as TradeRoutesMessage)?.Routes;
+        var offers = (message as ItemOffersMessage)?.Offers;
+
+        return level switch
+               {
+                   RoutesLevel => routes?.Count,
+                   StationsLevel => FirstOrNull(routes)?.Stations.Count,
+                   GoodsLevel => FirstOrNull(FirstOrNull(routes)?.Stations)?.Goods.Count,
+                   OffersLevel => offers?.Count,
+                   _ => FirstOrNull(offers)?.ItemGuids.Count
+               };
+    }
+
+    /// <summary>
+    /// Gets the first element of a list.
+    /// </summary>
+    /// <typeparam name="T">The element type</typeparam>
+    /// <param name="list">The list, or <c>null</c></param>
+    /// <returns>The first element, or <c>null</c> when the list is missing or empty</returns>
+    private static T? FirstOrNull<T>(IReadOnlyList<T>? list)
+        where T : class
+    {
+        return list is { Count: > 0 } ? list[0] : null;
+    }
+
+    /// <summary>
+    /// Overwrites a little-endian 32-bit integer of a frame.
+    /// </summary>
+    /// <param name="frame">The frame</param>
+    /// <param name="offset">The offset of the integer</param>
+    /// <param name="value">The new value</param>
+    /// <returns>A copy of the frame with the new value</returns>
+    private static byte[] WithInt(byte[] frame, int offset, int value)
+    {
+        var copy = frame.ToArray();
+
+        BinaryPrimitives.WriteInt32LittleEndian(copy.AsSpan(offset), value);
+
+        return copy;
+    }
+
+    /// <summary>
+    /// Describes a decoded message with every field of its routes, stations, goods and offers, in frame order.
+    /// </summary>
+    /// <param name="message">The message, or <c>null</c> for an error</param>
+    /// <returns>The description</returns>
+    private static string Describe(PipeMessage? message)
+    {
+        return message switch
+               {
+                   TradeRoutesMessage routes => string.Create(CultureInfo.InvariantCulture, $"trade routes ({routes.Routes.Count}): {string.Join("; ", routes.Routes.Select(DescribeRoute))}"),
+                   ItemOffersMessage offers => string.Create(CultureInfo.InvariantCulture, $"item offers ({offers.Offers.Count}): {string.Join("; ", offers.Offers.Select(DescribeOffer))}"),
+                   null => "no message",
+                   _ => message.MessageType.ToString()
+               };
+    }
+
+    /// <summary>
+    /// Describes a route with every field.
+    /// </summary>
+    /// <param name="route">The route</param>
+    /// <returns>The description</returns>
+    private static string DescribeRoute(TradeRoute route)
+    {
+        return string.Create(CultureInfo.InvariantCulture,
+                             $"route {route.Id} name '{route.Name}' folder '{route.Folder}' problems {route.MajorProblems}/{route.MinorProblems} ships {route.Ships} lost {route.LostShips} stations [{string.Join(", ", route.Stations.Select(DescribeStation))}]");
+    }
+
+    /// <summary>
+    /// Describes a station with every field.
+    /// </summary>
+    /// <param name="station">The station</param>
+    /// <returns>The description</returns>
+    private static string DescribeStation(TradeRouteStation station)
+    {
+        return string.Create(CultureInfo.InvariantCulture,
+                             $"station {station.Id} island {station.SessionId}/{station.IslandId}/{station.AreaIndex}/{station.SessionGuid} owner {station.Owner} throw {station.ThrowOverboard} full {station.WaitUntilFull} empty {station.WaitUntilEmpty} goods [{string.Join(", ", station.Goods.Select(DescribeGood))}]");
+    }
+
+    /// <summary>
+    /// Describes a good with every field.
+    /// </summary>
+    /// <param name="good">The good</param>
+    /// <returns>The description</returns>
+    private static string DescribeGood(TradeRouteGood good)
+    {
+        return string.Create(CultureInfo.InvariantCulture, $"good {good.ProductGuid} amount {good.Amount} loading {good.Loading}");
+    }
+
+    /// <summary>
+    /// Describes an offer with every field.
+    /// </summary>
+    /// <param name="offer">The offer</param>
+    /// <returns>The description</returns>
+    private static string DescribeOffer(ItemOffer offer)
+    {
+        return string.Create(CultureInfo.InvariantCulture, $"trader {offer.TraderId} items [{string.Join(", ", offer.ItemGuids.Select(guid => guid.ToString(CultureInfo.InvariantCulture)))}]");
     }
 
     /// <summary>
