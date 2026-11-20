@@ -30,11 +30,14 @@ script):
 Scope as the Product Manager chose (*Open questions*, Q1): trade routes now, item offers later.
 
 - S1: Given a replay of the fixture sent to the server, when the user opens `Trade routes` / `Handelsrouten` of the
-  profile, then a table lists the 57 routes of the profile's latest trade-routes message, each with its name, folder,
-  ships, lost ships, major problems, minor problems and its stations as island names in route order, under the as-of
-  line of that message's receive time.
+  profile, then a page headed `Trade routes` / `Handelsrouten` (tab title `Censio – Trade routes`) lists in a table the
+  57 routes of the profile's latest trade-routes message, each with its name, folder, ships, lost ships, major
+  problems, minor problems and its stations as island names in route order. Its as-of line gives that message's
+  receive time, not the latest tick's; the Companion banner shows as on every data page; the page has no
+  `Delete history` button.
 - S2: Given routes with major problems, minor problems or lost ships, when the page opens, then a line above the table
-  reads `<n> trade routes, <p> with problems or lost ships.` and those routes come first, a count above 0 marked.
+  reads `<n> trade routes, <p> with problems or lost ships.` / `<n> Handelsrouten, <p> mit Problemen oder verlorenen
+  Schiffen.` and those routes come first, each count above 0 in the error colour.
 - S3: Given the page is open, when a newer trade-routes message of the shown profile arrives, then the table shows it
   without a reload.
 - S4: Given any page, when the user picks the navigation entry, then it leads to the trade routes of the shown profile,
@@ -49,40 +52,52 @@ Scope as the Product Manager chose (*Open questions*, Q1): trade routes now, ite
 - E2: A station's island that the profile's island list lacks shows `Island <session GUID>/<island ID>/<area index>`
   / `Insel …`; an island with an empty name `Unnamed island` / `Unbenannte Insel`.
 - E3: Two routes with one name or one ID (the fixture repeats a name) are two rows; nothing is merged.
-- E4: Lost ships above ships are shown as received.
+- E4: Every count is shown as received, also lost ships above ships or a negative value; a route without stations
+  shows `–` in the stations cell.
 - E5: A trade-routes message older than the profile's latest (by receive time, then storing order) is acknowledged and
   replaces nothing.
 - E6: A trade-routes message the server's contract reader refuses (malformed, too large, invalid) is acknowledged with
-  its refusal and changes nothing; a replay counts it as refused in `Replay finished: <n> ticks sent, <r> refused`.
+  its refusal and changes nothing.
 - E7: A route or folder name that looks like markup is shown as text.
 - E8: An unknown or malformed profile in the address shows `Not found.`; a profile that is not held shows `Loading…`
   and the read-failure text of [web-pages](../../docs/areas/web-pages.md) as the other data pages do.
-- E9: Deleting a profile's history removes its trade routes too.
+- E9: Deleting a profile's history removes its trade routes too; the dialog text reads `… its regions, islands, goods,
+  trade routes and history. …` / `… seine Regionen, Inseln, Waren, Handelsrouten und sein Verlauf. …`. A trade-routes
+  message of the deleted profile that arrives during the removal creates the profile again, as a tick does.
+- E10: A replay counts a sent trade-routes message in no `<n>` of `Replay finished: <n> ticks sent, <r> refused` and of
+  the log line `Replay sent <n> ticks, <r> refused`, and in `<r>` when it is refused.
 
 ## Non-functional requirements
 
 - N1: Every trade-routes frame the pipe reader accepts (its caps and 1 MiB, [pipe](../../docs/areas/pipe.md),
-  *Limits and errors*) crosses the contract and is shown whole; the contract bounds a trade-routes message before it
-  is parsed, as it bounds a tick.
+  *Limits and errors*) crosses the contract and is shown whole. The contract bounds a trade-routes message before it
+  is parsed, at no less than the pipe allows: 1,024 routes, 256 stations a route, 52,428 stations a message (1 MiB at
+  20 bytes a station), names of 765 UTF-8 bytes (255 pipe bytes, each possibly U+FFFD). Its value rules allow no
+  routes, repeated route IDs and names, any int32 count and a route without stations.
 - N2: Route and folder names are typed by the player and private like island names: no log line, refusal text or
-  string form of a message holds them.
+  string form of a message holds them, and after a deletion's clean-up none that only the deleted profile held occurs
+  in the database file or its `-wal` and `-shm` files ([history](../../docs/areas/history.md), *Deleting a profile*).
 - N3: Only the latest trade routes of a profile are kept: no history, no chart. A page reads a profile that is not held
   through the one reader of [record 0074](../../docs/decisions/0074-pages-keep-derived-views-and-read-unheld-profiles-one-at-a-time.md).
-- N4: Compatibility: a contract change follows record
-  [0058](../../docs/decisions/0058-contract-read-strictly-by-exact-version-with-a-frozen-hello.md), so a Companion and
-  a server of different contract versions refuse each other with the versions named; a database of an earlier release
-  is read and extended, its ticks unchanged.
+- N4: Compatibility: the contract becomes version 2 (record
+  [0058](../../docs/decisions/0058-contract-read-strictly-by-exact-version-with-a-frozen-hello.md): every change of
+  what a message may hold raises the version), read exactly; a Companion and a server of different versions refuse
+  each other with the versions named, and the texts naming version 1 (`supported: 1`, `breaks a rule of contract
+  version 1` in [contract](../../docs/areas/contract.md), `server does not support contract version 1` in
+  [replay-sending](../../docs/areas/replay-sending.md)) name version 2. A database of an earlier release is read and
+  extended, its ticks unchanged.
 - N5: The pages need no login, like every data page (record 0006). No new configuration.
 
 ## Acceptance criteria
 
-- AC1: A replay of `protocol-3-trade-routes.jsonl` to a server makes `/profiles/{profile}/trade-routes` list the 57
-  routes of the file's last trade-routes frame, each with name, folder, ships, lost ships, major and minor problems and
-  its stations' island names in route order, under `As of` of that frame's receive time (S1, E3, E4, N1).
-- AC2: The routes are ordered by major problems, minor problems and lost ships, each descending, then by shown name
-  (ordinal, letter case ignored), folder and ID; the summary line of S2 counts the routes with any of the three above 0,
-  and each such count shows in the palette's `Error` colour (major problems, lost ships) or `Warning` colour (minor
-  problems) (S2).
+- AC1: A replay of `protocol-3-trade-routes.jsonl` to a server makes `/profiles/{profile}/trade-routes`, headed and
+  titled as S1 says, list the 57 routes of the file's last trade-routes frame (the repeated name as two rows), each
+  with name, folder, ships, lost ships, major and minor problems and its stations' island names in route order, under
+  `As of` of that frame's receive time, with the Companion banner and without `Delete history` (S1, E3, N1).
+- AC2: On messages with counts above 0, the routes are ordered by major problems, minor problems and lost ships, each
+  descending, then by shown name (ordinal, letter case ignored), folder and ID; the summary line of S2 counts the
+  routes with any of the three above 0, and each such count shows in the palette's `Error` colour, its number carrying
+  the meaning without the colour (S2).
 - AC3: The navigation lists `Trade routes` / `Handelsrouten` after `Regions`, leading to
   `/profiles/{profile}/trade-routes` of the shown profile and to `/trade-routes` (the newest profile, followed live)
   elsewhere, marked on every address that starts with its link; both routes open without a login (S4, E8, N5).
@@ -91,15 +106,19 @@ Scope as the Product Manager chose (*Open questions*, Q1): trade routes now, ite
 - AC5: The page shows `No trade routes received yet.` / `Noch keine Handelsrouten empfangen.` for a profile without
   trade routes, `No trade routes in the latest data.` / `Keine Handelsrouten in den letzten Daten.` for an empty latest
   message, and the texts of E1, E2 and E7 (S6, E1, E2, E7).
-- AC6: After a restart the server shows each profile's latest trade routes as before the stop; a deletion of the
-  profile's history removes them (S5, E9, N3).
-- AC7: The contract reader refuses a trade-routes message over its bounds as *too large* and one that breaks its form or
-  value rules as *malformed* or *invalid*, the refusal acknowledged by its `id`, and no refusal text or log line holds a
-  route or folder name (E6, N1, N2).
-- AC8: A server of this version answers a hello of contract version 1 and a Companion of this version a refused hello
-  as record 0058 says, with the versions named; a database written by v0.3.0 opens with its ticks unchanged (N4).
+- AC6: After a restart the server shows each profile's latest trade routes as before the stop; a deletion removes
+  them, shows the dialog text of E9 and leaves no route or folder name of the profile in the database files after the
+  clean-up (real schema); a trade-routes message during the removal recreates the profile (S5, E9, N2, N3).
+- AC7: The contract reader accepts a message at every bound of N1 and with no routes, and refuses one over a bound as
+  *too large* and one that breaks its form or value rules as *malformed* or *invalid*, the refusal acknowledged by its
+  `id`; no refusal text or log line holds a route or folder name; a replay counts as E10 says (E6, E10, N1, N2).
+- AC8: Companion and server write and read contract version 2 only; a hello or a refused hello reply of version 1
+  is refused with both versions named, and the texts of N4 name version 2; a database written by v0.3.0 opens with its
+  ticks unchanged (N4).
 - AC9: On the Product Manager's game, a route the game shows with a problem or a lost ship shows a count above 0 in
   the matching column after a replay of a recording of it (manual, Product Manager) (S2).
+- AC10: A message with a repeated route ID, lost ships above ships, a negative count and a route without stations is
+  shown row for row as received (E3, E4).
 
 ## Out of scope
 
@@ -119,11 +138,31 @@ Scope as the Product Manager chose (*Open questions*, Q1): trade routes now, ite
 
 ## Area documents
 
-- [web-pages](../../docs/areas/web-pages.md): the trade-routes routes, the table, its order, marks, summary and texts.
-- [web-ui](../../docs/areas/web-ui.md): the navigation entry and its texts.
-- [contract](../../docs/areas/contract.md): the trade-routes message, its bounds, value rules and privacy.
+- [web-pages](../../docs/areas/web-pages.md): the trade-routes routes, heading, the table, its order, marks, summary,
+  texts, and the page's as-of time as an exception to the latest-tick rule.
+- [web-ui](../../docs/areas/web-ui.md): the navigation entry, its texts and the changed deletion dialog text.
+- [contract](../../docs/areas/contract.md): version 2, the trade-routes message, its bounds, value rules and privacy.
 - [pipe](../../docs/areas/pipe.md): the tick assembler delivers a trade-routes item (today "produces no item").
-- [replay-sending](../../docs/areas/replay-sending.md) and [ingest](../../docs/areas/ingest.md): what is sent and
-  acknowledged.
+- [replay-sending](../../docs/areas/replay-sending.md) and [ingest](../../docs/areas/ingest.md): what is sent, counted
+  and acknowledged, the version texts.
 - [server-state](../../docs/areas/server-state.md), [server-data](../../docs/areas/server-data.md) and
-  [history](../../docs/areas/history.md): the latest trade routes per profile, stored, restored and deleted.
+  [history](../../docs/areas/history.md): the latest trade routes per profile, stored, restored, deleted and cleaned up.
+
+## Challenge
+
+- 1 (major, `Warning` colour not in the palette): accepted. The palette has no tested warning value; every count above
+  0 now takes the `Error` colour, already checked at 4.5:1 on surface in both palettes, and the number itself carries
+  the meaning (S2, AC2). No new palette value.
+- 2 (minor, contract version): accepted. N4 and AC8 name version 2, read exactly, and list the version-1 texts that
+  change; reading both versions was not chosen, since only replays send and record 0058 reads one version exactly.
+- 3 (minor, value rules and station bound): accepted. N1 states the value rules (no routes, repeats, any int32, a
+  route without stations), the bounds including 52,428 stations a message and 765-byte names; E4 gives the empty
+  stations cell; AC7 tests every bound.
+- 4 (minor, fixture cannot show E4 or AC2): accepted. AC1 covers only what the fixture holds; AC2 is tested on
+  messages with counts above 0, and the new AC10 covers repeated IDs, lost ships above ships, negative counts and a
+  route without stations on built messages.
+- 5 (minor, replay counts): accepted. E10, tested in AC7.
+- 6 (minor, deletion guarantees): accepted. E9, N2 and AC6 carry the clean-up of names from the database files, the
+  recreation during removal and the dialog text in both languages.
+- 7 (minor, page frame): accepted. S1 and AC1 give heading, tab title, the as-of time of the trade-routes message (an
+  exception recorded in web-pages), the banner and no `Delete history` button.
