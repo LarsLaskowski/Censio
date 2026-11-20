@@ -41,12 +41,19 @@ injected clock, so the same rules serve a live connection ([`pipe-connection.md`
 | 1 | SessionStart | string (player figure's name) |
 | 2 | SessionEnd | empty |
 | 3 | AreaProductionStatistics | session ID, island ID, area index (one unsigned byte each, 0 to 255); session GUID (int32); area name (string); timestamp (int64); entry count (int32); that many entries |
-| 4 | TradeRoutes | int32 count; the rest is not decoded (protocol version 3) |
-| 5 | ItemOffers | int32 count; the rest is not decoded (protocol version 3) |
+| 4 | TradeRoutes | int32 route count; that many routes (protocol version 3) |
+| 5 | ItemOffers | int32 trader count; that many offers (protocol version 3) |
 
-- A frame of type 4 or 5 is delivered as an undecoded message of its type once its leading count is read and is not
-  negative; whatever follows the count, strings of route names and folders included, is never read, held or logged.
-  The message changes no state. The types are accepted under version 2 too: the parser has no version.
+- A route is: ID (int32); name and folder (strings); major problems, minor problems, ships, lost ships (int32 each);
+  station count (int32); that many stations. A station is: ID (int32); session ID, island ID, area index (one
+  unsigned byte each); session GUID, owner (int32 each); one flags byte (bit 0 throw overboard, bit 1 wait until full,
+  bit 2 wait until empty); goods count (int32); that many goods. A good is: product GUID, amount (int32 each); one flags
+  byte (bit 0 loading). An offer is: trader ID (int32); item count (int32); that many item GUIDs (int32 each).
+- A trade-routes or item-offers message holds its routes or offers, and their stations, goods and items, in frame
+  order, each value as decoded. A repeated ID or GUID is delivered again in its place: nothing is merged, dropped or
+  sorted. Flag bits other than the named ones are ignored. Names follow the string rules above (not trimmed, empty
+  allowed, an empty folder is an empty text). Bytes after the last field are ignored. The message changes no state and
+  nothing of it is logged. The types are accepted under version 2 too: the parser has no version.
 
 - An entry is: product GUID (int32); generation, consumption, delta, perfect generation, perfect consumption
   (float32); building count, maintenance (int32); income (float32); profit (int32); summed and average
@@ -92,9 +99,9 @@ A tick is delivered when it closes, once, and is never reopened. It closes when:
 5. the stream ends, also with a truncated-frame, oversized-frame or read-failed error (*stream ended*); the tick is
    delivered before the error and the end.
 
-- A version message, an undecoded message (type 4 or 5) or a skipped-frame error does not close the tick and does not
-  restart the quiet period: only an island frame does. An undecoded message produces no item and does not change
-  whether a following session end is a repeated one.
+- A version message, a trade-routes or item-offers message (type 4 or 5) or a skipped-frame error does not close the
+  tick and does not restart the quiet period: only an island frame does. A trade-routes or item-offers message
+  produces no item and does not change whether a following session end is a repeated one.
 - The receive time of a tick is the time its last island frame was received; the receive time of a frame is the
   moment its read completed.
 - A frame that is dropped for a tick limit does not restart the quiet period and its key does not count as present.
@@ -139,6 +146,12 @@ A tick is delivered when it closes, once, and is never reopened. It closes when:
   limit opens no tick. The limits bound the memory of an open tick: at both limits, with every island full of
   entries and no pairs (the worst shape), it held 124.1 MiB (measured with frames decoded by the parser; distinct
   pairs: 10.9 MiB; 1,024-pair maps of one repeated GUID: 7.3 MiB).
+- A trade-routes frame holds at most 1,024 routes, a route at most 256 stations and a station at most 256 goods; an
+  item-offers frame holds at most 1,024 offers and an offer at most 1,024 items. Every such count is also checked
+  against the bytes the frame still holds (at least 26 bytes per route, 20 per station, 9 per good, 8 per offer and 4 per
+  item), before any list of that size is created, so a count never makes the reader do work its frame does not pay
+  for; the error is reported at the count's own offset. A real version 3 recording stays far below the caps
+  ([`../protocol.md`](../protocol.md)).
 - Every error is a typed result with its kind and, where they apply, the type value, length, offset and versions.
   An error carries no payload text, so a caller that logs it logs no pipe content.
 
@@ -146,7 +159,7 @@ A tick is delivered when it closes, once, and is never reopened. It closes when:
 | ---------- | ----- | ------ |
 | Empty frame | Length `0` | Frame skipped |
 | Unknown type | Type byte other than 0 to 5 | Frame skipped |
-| Malformed message | Payload too short for its type, string length beyond the frame, negative count, count the rest of the frame cannot hold, map over 1,024 pairs, duplicate-amount sum outside the int32 range, type 4 or 5 without its count (fewer than 4 payload bytes) or with a negative one | Frame skipped; no message with a `0` in place of a missing value |
+| Malformed message | Payload too short for its type, string length beyond the frame, negative count, count the rest of the frame cannot hold, map over 1,024 pairs, duplicate-amount sum outside the int32 range, type 4 or 5 with a count that is missing (fewer than 4 bytes left) or negative at any of its five levels, above its cap or above what the rest of the frame can hold, and a field of a route, station or good that does not fit in the frame | Frame skipped; no message with a `0` in place of a missing value |
 | Protocol mismatch | Version other than `2` or `3`, or a non-version frame while the version is unknown or not supported | Frame skipped |
 | Truncated frame | Stream ends inside the length prefix or a payload | Stream ends |
 | Oversized frame | Length over 1 MiB, or negative | Stream ends |
@@ -175,6 +188,11 @@ The reference reads leniently; this reader is strict and fails closed (record 00
 - **Map cap.** The reference has no cap. Integer keys hash to themselves, so colliding keys would cost seconds of CPU
   per frame; the cap of 1,024 pairs per map bounds it. A future game with larger maps would see its frames rejected
   until the cap is raised.
+- Types 4 and 5: the reference reads a missing integer as 0, returns early from a short station or good with defaults
+  and loops zero times on a negative top-level count; a negative nested count makes it fail and exit. This reader
+  rejects every missing or negative count and every short field as a malformed message.
+- Types 4 and 5: the reference keeps only the last offer of a repeated trader and groups routes by folder without their
+  ID. This reader delivers every offer and route in frame order with its ID, repeats included.
 
 ### Residual risks
 
@@ -192,8 +210,9 @@ Until more fixtures from real recordings test the reader (two anonymised fixture
   and islands as before) and one real recording of the game after the update, whose 101 island frames decode without
   an error ([`../protocol.md`](../protocol.md)); a field added at the end of an island frame
   is ignored, one inserted earlier is misread or rejected as malformed.
-- The reference reads a missing count of a type 4 or 5 frame as 0 and a negative one as no entries; this reader
-  rejects both, so a game that ever sends such a frame has it skipped.
+- The reference reads a missing count of a type 4 or 5 frame as 0 and a negative top-level count as no entries; this
+  reader rejects both, so a game that ever sends such a frame has it skipped. None was seen in two version 3
+  recordings.
 - One recording confirms the timing (frames about one second apart, ticks about two minutes), the shared timestamp,
   the zero-entry tick after a load and the number of islands per tick (at most 24, with at most 1,934 entries and
   pairs); the double session end was not seen ([`../protocol.md`](../protocol.md)). Other games and updates may differ.

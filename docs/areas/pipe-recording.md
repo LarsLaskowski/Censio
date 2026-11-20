@@ -154,7 +154,7 @@ still go to a maintainer privately; the tool is for the fixtures that are commit
 | file not found | The recording cannot be opened (it does not exist, access is refused, the path is refused by the platform, another program such as a running Companion holds it for writing) |
 | not a recording, unsupported version, invalid line `<n>` | As for a replay (*Limits and errors*); also a receive time that the shift would move before the earliest representable time |
 | read failed | The recording cannot be read on, cannot seek (a pipe or device), or differs between the two passes |
-| frame cannot be anonymised in line `<n>` | Line `n` holds a frame the tool does not decode (*What is refused*) |
+| frame cannot be anonymised in line `<n>` | Line `n` holds a frame the tool does not decode, or whose rewritten form is longer than 1 MiB (*What is refused*) |
 | output file exists | The output exists as a file or a folder, or appears before the finished file is moved to it |
 | output is the input | The full paths are equal (ignoring case on Windows) |
 | write failed | The output or its temporary file cannot be created, written or moved (also a folder that does not exist) |
@@ -208,12 +208,31 @@ still go to a maintainer privately; the tool is for the fixtures that are commit
 - **Randomness.** Offset and factors come from the operating system's cryptographic random source, fresh for every
   run; there is no seed, and a result cannot be reproduced.
 
-- **Trade routes and item offers.** A frame of type 4 or 5 (protocol version 3) is written as its type byte and a count
-  of 0 (five bytes); nothing of the original is copied, so route names, folders and counts do not reach the output.
+- **Trade routes and item offers.** A frame of type 4 or 5 (protocol version 3) is written from its decoded message,
+  never from the frame's bytes:
+  - Every non-empty route name becomes `Route <n>` and every non-empty folder name `Folder <n>`, numbered from 1 in the
+    order of first appearance, under the rules of island and figure names; the skip of a number whose name equals an
+    original name now spans all four kinds (figure, island, route, folder).
+  - A route's major problems, minor problems, ships and lost ships and every goods amount of 0 or more change by the
+    integer rule of maintenance, each value drawing a side and a magnitude (two draws, a zero included), in frame
+    order: route 1's four counts, then its goods station by station, then route 2. A negative goods amount (possibly
+    a special value) is kept and takes no draw.
+  - Where the original lost-ship count is at most the ship count, the written one is too: when the perturbed lost ships
+    exceed the perturbed ships they become the perturbed ships, or one less where that would equal the original
+    non-zero lost-ship count; the written value is never the original and at least 0 where the original ship count is
+    positive.
+  - Flags are written from their named bits only; unnamed bits are 0.
+  - An offer's trader ID and item GUIDs are written as decoded.
+  - Every frame draws its amounts afresh, as island frames do. A recording that repeats one frame (the real recording's
+    trade-route frames are byte-identical) therefore lets a reader infer a small original value from the spread of its
+    copies (a value of 2 to 4 moves by exactly 1, a 1 always becomes 2). This is a residual risk, accepted: the goal is
+    no exact value in public, not the secrecy of an amount (record 0042).
 
 ### What is kept
 
-Line count and order, frame types, `Version` frames, session ends, session ID, island ID, area index, session GUID,
+For trade routes and item offers: route, station and trader IDs, island keys (session ID, island ID, area index),
+session GUIDs, station owners, named flag bits, product and item GUIDs, the loading flag, and every list's length and
+order. Line count and order, frame types, `Version` frames, session ends, session ID, island ID, area index, session GUID,
 game time, entry count and order, product GUIDs, building counts, the building map and the workforce map's GUIDs, pair
 count and order (a GUID that repeats keeps every pair in its place). A replay of the output gives the same ticks, keys,
 game times, close reasons and session events as the original's, with every receive time earlier by the offset.
@@ -221,7 +240,7 @@ game times, close reasons and session events as the original's, with every recei
 ### What is refused
 
 - A frame the tool does not decode gives `frame cannot be anonymised in line <n>`: an unknown type, a malformed
-  message, and a trade-route or item-offer frame without its count or with a negative one, and any frame but `Version` before a
+  message, and a trade-route or item-offer frame that is malformed at any level (a missing or negative count, a count above its cap, a short field), and any frame but `Version` before a
   `Version 2` or `3` or after a `Version` of another number. Its bytes could
   hold a name, so it is neither copied nor dropped. An empty frame holds nothing and is copied. A `Version` frame of
   any number is written anew.
@@ -229,12 +248,17 @@ game times, close reasons and session events as the original's, with every recei
   writers: unknown JSON fields, escapes, time offsets, a byte order mark, carriage returns, base64 padding bits and
   bytes after the last field of a frame do not reach the output. Each written island frame is parsed back and must end
   where the parser ends and keep the entry count, product GUIDs and the GUIDs of both maps; otherwise the frame is
-  refused, so a mistake in the writing never copies bytes.
+  refused, so a mistake in the writing never copies bytes. A trade-route or item-offer frame is checked the same way
+  (counts, IDs, island keys, owners, named flags, GUIDs and loading flags).
+- A frame of any type whose rewritten form is longer than 1 MiB is refused with the same error and its line: a
+  trade-routes frame (each route name and folder grows to its invented name) or an island frame whose invented name is
+  longer than the original. The reader accepts no longer frame, so it would not be replayable.
 
 ### Fixtures
 
-Anonymised recordings under `tests/Censio.Pipe.Tests/Fixtures/` (`long-session.jsonl` of protocol version 2 and
-`protocol-3-session.jsonl` of protocol version 3, with trade routes and item offers emptied) are read by the tests of
+Anonymised recordings under `tests/Censio.Pipe.Tests/Fixtures/` (`long-session.jsonl` of protocol version 2,
+`protocol-3-session.jsonl` of protocol version 3, with trade routes and item offers emptied, and
+`protocol-3-trade-routes.jsonl` of protocol version 3, with them decoded and anonymised) are read by the tests of
 the message reader and the tick assembler; their `README.md` says how each was made and which facts it shows, never an original name, file name
 or time. A maintainer may keep a local deny list (names that must not appear and the path of each fixture's original,
 named by the environment variable `CENSIO_FIXTURE_DENY_LIST`); the test that uses it is inconclusive where it is
