@@ -245,3 +245,59 @@ item.
   types 4 and 5 in `Censio.Pipe` only. Decide how they are shown, for example routes with problems or lost ships on a
   server page, which needs a contract message and the server's live state. Spec it against the decoded fixture of
   #221.
+
+## Security notes
+
+Security plan review: feature 221 (trade routes and item offers), tier security, of `specs/feature-221-pipe-trade-routes-item-offers/spec.md` and `plan.md` at branch head `8c43ffd`.
+
+I found no blocking findings. The tier is right: the change alters a parser of untrusted input and the anonymiser's privacy rules, and both are security controls. *Security areas touched* lists both areas the plan touches. The Companion and the server do not use the new messages: a grep of `src` outside `Censio.Pipe` finds no `TradeRoutes`, `ItemOffers` or `Undecoded`.
+
+**What I checked**
+
+- **Count checks in the parser:** I read `src/Censio.Pipe/PipeMessageParser.cs` and went through every input shape the parser takes for types 4 and 5. Every rejection path is covered by an E-case or an AC:
+  - Counts that are missing, negative, zero, above the cap, or above what the remaining bytes can hold, at all five levels (E1–E3).
+  - Short key, flags and loading-byte fields (E4).
+  - A string length byte that points past the frame end, and invalid UTF-8, which becomes U+FFFD as in `TryReadString` (E7).
+  - Unnamed flag bits (E5) and trailing bytes (E8).
+- **Minimum sizes:** route 26, station 20, good 9, offer 8, item 4. All match the layout in fact 3, where a minimum string is its length byte only. The bytes-left divisor in `TryReadCount` is therefore never too small.
+- **Memory (N1) and time (N2):** both hold.
+  - Every loop pass either uses up at least the minimum size in bytes or fails.
+  - A failed parse leaves at most three partly filled lists, all limited by the caps.
+  - A successful parse allocates only what it filled. So memory stays proportional to the frame (about 116,000 goods at most for 1 MiB), and the caps alone already limit it.
+- **Privacy:**
+  - The anonymiser writes from the decoded fields and never copies frame bytes. So unnamed flag bits are written as 0, and trailing bytes cannot get through: `IsReadBack` also requires that the frame was read exactly to its end.
+  - The collision set `_originals` in `PipeAnonymousNames.cs` is case-insensitive and shared by all name kinds, so E12 holds across all four kinds.
+  - `Perturb` never keeps a non-zero value. The lost-ship rule never writes the original non-zero count: `S'` differs from `L` by its condition, and `S'-1` differs from `L` when `S' == L`.
+  - The 1 MiB limit on written frames now applies to every frame type. This also closes the existing gap where invented island names could make a frame longer.
+- **Logging and errors (N3):** `PipeError` carries only the kind, type value and offset. `CompanionLog.ConnectionStateChanged` logs only the error kind. The `FixtureDenyList` findings (`tests/Censio.Pipe.Tests/FixtureDenyList.cs`) name a place and a field, never a value. The anonymiser's refusal message does not change.
+- **Library behavior the plan relies on:** I measured it once with `dotnet run probe.cs` (SDK 11.0.100, scratch file `/tmp/claude-0/-home-user-Censio/85a27a5b-a848-5bd1-8736-052ae677ba91/scratchpad/listprobe/probe.cs`). Output:
+  ```
+  System.OutOfMemoryException: Array dimensions exceeded supported range.   (List<object>(int.MaxValue))
+  System.OutOfMemoryException: Array dimensions exceeded supported range.   (List<int>(int.MaxValue))
+  255                                                                         (UTF-8 decode of 255 x 0xFF)
+  ```
+  This confirms the plan's out-of-memory claim and the security claim that 255 invalid bytes decode to 255 U+FFFD.
+
+**Findings**
+
+1. **[NON-BLOCKING] The tests named for the count limit do not show it.** Plan, *Approach* G1, the paragraph "The seam the tests observe the bytes-left bound through: a count of `int.MaxValue` …"; AC5.
+   - With caps of at most 1,024, a count of `int.MaxValue` is rejected by the cap check before the bytes-left check runs. That test passes even if the bytes-left check is missing.
+   - A count at or below the cap that the frame cannot hold (`CountBeyondFrameReturnsMalformed`) is malformed either way: without the check, parsing just fails later. So the result alone does not show the check.
+   - The error offset does show it. `TryReadCount` resets the position to the count's offset; without the check, the error points at a deeper field.
+   - The same applies to `CountAboveCapReturnsMalformed`. It only shows the cap check if the frame actually holds cap+1 complete elements, otherwise it passes by running out of bytes.
+
+   Smallest fix (recommended: fix now in the plan), replace that paragraph with:
+   ```
+     The seam the tests observe the bounds through: a count above its cap in a frame that holds that many complete
+     elements, and a count at most its cap that the rest of the frame cannot hold, each give the malformed error at the
+     count's own offset (`PipeError.Offset`); without the check the parse fails later, at a deeper offset.
+   ```
+
+2. **[NON-BLOCKING] The lost-ship rule claims a value is "at least 0", which is not always true.** Plan, *Approach* G2, "That value is at least 0 and never the original."
+   - Ship counts are signed int32 values from the wire. With a negative original ship count (for example S = -3, L = -5), the written value `S'` is negative.
+   - The privacy part, never the original, still holds, so this only matters if a test asserts "at least 0".
+
+   Smallest fix (recommended: fix now), replace the sentence with:
+   ```
+     That value is never the original, and at least 0 when the original ship count is positive.
+   ```
