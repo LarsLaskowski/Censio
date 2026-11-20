@@ -636,8 +636,10 @@ public sealed class PipeMessageReaderTests
     [TestMethod]
     [TestCategory("AC6")]
     [TestCategory("AC7")]
+    [TestCategory("AC11")]
     [DataRow("long-session.jsonl", "Version=1 SessionStart=2 SessionEnd=2 AreaProductionStatistics=789 TradeRoutes=0 ItemOffers=0 Error=0 entries=21091")]
     [DataRow("protocol-3-session.jsonl", "Version=1 SessionStart=1 SessionEnd=1 AreaProductionStatistics=101 TradeRoutes=5 ItemOffers=4 Error=0 entries=2752")]
+    [DataRow("protocol-3-trade-routes.jsonl", "Version=1 SessionStart=1 SessionEnd=0 AreaProductionStatistics=300 TradeRoutes=11 ItemOffers=12 Error=0 entries=7679")]
     public async Task PipeMessageReaderFixturesGiveReadmeFrameCounts(string fixture, string expected)
     {
         // Arrange

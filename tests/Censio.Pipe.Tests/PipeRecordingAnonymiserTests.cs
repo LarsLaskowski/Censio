@@ -1246,6 +1246,34 @@ public sealed class PipeRecordingAnonymiserTests
     }
 
     /// <summary>
+    /// An island frame whose rewritten form, with its invented name, would exceed 1 MiB is refused with its line; one 8
+    /// bytes shorter, whose rewritten form fits, is anonymised. The one-byte name <c>a</c> grows by 7 bytes when it
+    /// becomes <c>Island 1</c>: 1,048,574 bytes become 1,048,581, and 1,048,566 become 1,048,573.
+    /// </summary>
+    /// <param name="lastBuildings">The number of building pairs of the last entry</param>
+    /// <param name="expected">The expected result</param>
+    /// <returns>The task</returns>
+    [TestMethod]
+    [TestCategory("AC10")]
+    [DataRow(573, PipeAnonymiseResultKind.FrameNotAnonymisable)]
+    [DataRow(572, PipeAnonymiseResultKind.Anonymised)]
+    public async Task PipeRecordingAnonymiserIslandOverOneMebibyteAfterRewritingIsRefused(int lastBuildings, PipeAnonymiseResultKind expected)
+    {
+        // Arrange
+        var frame = LargeIsland(lastBuildings);
+
+        Assert.IsLessThanOrEqualTo(PipeProtocol.MaxFrameLength, frame.Length, "The original frame should fit into a frame");
+
+        // Act
+        var (result, output) = await AnonymiseAsync(RecordingOf(_version3, frame, _sessionEnd), new ScriptedPipeAnonymiserRandom(Up));
+
+        // Assert
+        Assert.AreEqual(expected, result.Kind, $"An island frame of {frame.Length} bytes, {frame.Length + 7} after rewriting, should give {expected}");
+        Assert.AreEqual(expected == PipeAnonymiseResultKind.Anonymised ? null : 3L, result.LineNumber, "A refusal should name the line of the frame");
+        Assert.HasCount(expected == PipeAnonymiseResultKind.Anonymised ? 4 : 2, OutputLines(output), "The frame over 1 MiB should not be written: only the header and the version line come before it");
+    }
+
+    /// <summary>
     /// A trade-route frame whose rewritten form, with its invented names, would exceed 1 MiB is refused with its line; one
     /// whose rewritten form fits is anonymised. 1,024 routes named <c>a</c> in folder <c>b</c> grow by 13 bytes each.
     /// </summary>
@@ -2038,6 +2066,32 @@ public sealed class PipeRecordingAnonymiserTests
         BinaryPrimitives.WriteInt32LittleEndian(copy.AsSpan(offset), value);
 
         return copy;
+    }
+
+    /// <summary>
+    /// Creates an island frame named <c>a</c> of 64 entries with distinct workforce and building GUIDs: 63 of 1,024 pairs
+    /// per map and the last of 1,024 workforce pairs and a number of building pairs; 1,048,574 bytes for 573.
+    /// </summary>
+    /// <param name="lastBuildings">The number of building pairs of the last entry</param>
+    /// <returns>The frame</returns>
+    private static byte[] LargeIsland(int lastBuildings)
+    {
+        var entries = Enumerable.Range(0, 64)
+                                .Select(index => EntryBytes(Entry(10 + index, 1000f, 50, 500f, 400), Pairs(index * 10000, 1024), Pairs((index * 10000) + 5000, index == 63 ? lastBuildings : 1024)))
+                                .ToArray();
+
+        return Island(1, "a", 100, entries);
+    }
+
+    /// <summary>
+    /// Creates map pairs of consecutive GUIDs, each with the amount 3.
+    /// </summary>
+    /// <param name="firstGuid">The first GUID</param>
+    /// <param name="count">The number of pairs</param>
+    /// <returns>The pairs</returns>
+    private static KeyValuePair<int, int>[] Pairs(int firstGuid, int count)
+    {
+        return [.. Enumerable.Range(firstGuid, count).Select(guid => new KeyValuePair<int, int>(guid, 3))];
     }
 
     /// <summary>

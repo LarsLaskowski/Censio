@@ -282,6 +282,230 @@ public sealed class FixtureDenyListTests
     }
 
     /// <summary>
+    /// A non-empty route or folder name that is not an invented name of its kind fails and names the route.
+    /// </summary>
+    /// <param name="kind">The kind of the name: route or folder</param>
+    /// <param name="name">The name</param>
+    /// <returns>The task</returns>
+    [TestMethod]
+    [TestCategory("AC8")]
+    [DataRow("route", "Via Appia")]
+    [DataRow("route", "Folder 1")]
+    [DataRow("route", "Route 01")]
+    [DataRow("route", "route 1")]
+    [DataRow("folder", "North")]
+    [DataRow("folder", "Route 1")]
+    [DataRow("folder", "Folder 0")]
+    public async Task FixtureDenyListNonInventedRouteOrFolderNameFails(string kind, string name)
+    {
+        // Arrange
+        var route = kind == "route" ? TradeRouteOf(name, string.Empty) : TradeRouteOf(string.Empty, name);
+
+        WriteFixture(RecordingOf(_version2, TradeRoutesFrame(TradeRouteOf("Route 1", "Folder 1"), route)));
+
+        // Act
+        var report = await FixtureDenyList.Empty.CheckAsync(FixturesFolder, TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreSequenceEqual(new[] { $"a.jsonl: line 3: route 2: {kind} name is not an invented name" }, report.Findings.ToArray(), "The name should not pass as invented");
+        Assert.AreEqual(3L, report.NameCount, "The three non-empty route and folder names should be checked");
+    }
+
+    /// <summary>
+    /// A non-zero problem, ship, lost-ship count or goods amount equal to the original's at the same line, route, station
+    /// and good fails, by field name only; zero values and a negative goods amount (kept by design) are not compared.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    [TestCategory("AC11")]
+    public async Task FixtureDenyListUnchangedTradeRouteAmountFails()
+    {
+        // Arrange
+        var frames = RecordingOf(_version2, TradeRoutesFrame(AmountsRoute("Route 1", "Folder 1"), TradeRouteOf("Route 2", "Folder 1")));
+        var original = WriteOriginal(frames);
+
+        WriteFixture(frames);
+
+        var list = FixtureDenyList.Parse($"original {FixtureName} {original}\n", _root);
+
+        // Act
+        var report = await list.CheckAsync(FixturesFolder, TestContext.CancellationToken);
+
+        // Assert
+        string[] expected = [
+                                "a.jsonl: line 3: route 1: MajorProblems equals the original",
+                                "a.jsonl: line 3: route 1: MinorProblems equals the original",
+                                "a.jsonl: line 3: route 1: Ships equals the original",
+                                "a.jsonl: line 3: route 1: LostShips equals the original",
+                                "a.jsonl: line 3: route 1: station 1: good 1: Amount equals the original"
+                            ];
+
+        Assert.AreSequenceEqual(expected, report.Findings.ToArray(), "Every unchanged non-zero amount should fail, by field name only");
+        Assert.AreEqual(5L, report.ComparedValueCount, "The zero and negative values should not be compared");
+    }
+
+    /// <summary>
+    /// A recording with trade routes and item offers anonymised by the anonymiser passes the check against its original,
+    /// with its route and folder names and its amounts checked.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    [TestCategory("AC11")]
+    public async Task FixtureDenyListAnonymisedTradeRoutesPass()
+    {
+        // Arrange
+        var offers = new PipeFrameBuilder().Byte(5).ItemOffers([
+                                                                   new ItemOffer
+                                                                   {
+                                                                       TraderId = 8,
+                                                                       ItemGuids = [1000, 1001]
+                                                                   }
+                                                               ]).Build();
+        var original = WriteOriginal(RecordingOf(_version2, SessionStart("Alice"), TradeRoutesFrame(AmountsRoute("Via Appia", "North")), offers));
+
+        await AnonymiseAsync(original, Path.Combine(FixturesFolder, FixtureName));
+
+        var list = FixtureDenyList.Parse($"deny Alice\ndeny via appia\ndeny North\noriginal {FixtureName} {original}\n", _root);
+
+        // Act
+        var report = await list.CheckAsync(FixturesFolder, TestContext.CancellationToken);
+
+        // Assert
+        Assert.IsEmpty(report.Findings, report.ToString());
+        Assert.AreEqual(3L, report.NameCount, "The figure, route and folder names should be checked");
+        Assert.AreEqual(5L, report.ComparedValueCount, "The four counts and the positive goods amount should be compared");
+    }
+
+    /// <summary>
+    /// With the local deny list, every trade-route and item-offer frame of the original of
+    /// <c>protocol-3-trade-routes.jsonl</c> decodes, ends exactly at the frame's end and holds no U+FFFD in a name; without
+    /// the variable the test is inconclusive, not passed.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    [TestCategory("AC12")]
+    public async Task FixtureDenyListOriginalTradeFramesDecodeToTheirEnd()
+    {
+        // Arrange
+        var list = await FixtureDenyList.LoadAsync(RequireDenyListPath(), TestContext.CancellationToken);
+
+        // Act
+        var report = await list.CheckOriginalTradeFramesAsync("protocol-3-trade-routes.jsonl", TestContext.CancellationToken);
+
+        // Assert
+        Assert.IsEmpty(report.Findings, report.ToString());
+        Assert.IsGreaterThan(0L, report.TradeFrameCount, "The original should hold trade-route or item-offer frames");
+    }
+
+    /// <summary>
+    /// A trade-route or item-offer frame of an original with bytes after its last field is reported by its line only.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    [TestCategory("AC12")]
+    public async Task FixtureDenyListOriginalTradeFrameWithTrailingBytesIsReported()
+    {
+        // Arrange
+        var routes = TradeRoutesFrame(TradeRouteOf("Via Appia", "North"));
+        var offers = new PipeFrameBuilder().Byte(5).ItemOffers([
+                                                                   new ItemOffer
+                                                                   {
+                                                                       TraderId = 8,
+                                                                       ItemGuids = [1000]
+                                                                   }
+                                                               ]).Build();
+        var original = WriteOriginal(RecordingOf(_version2, [.. routes, 0xAA, 0xBB], [.. offers, 0x00], routes, offers));
+        var list = FixtureDenyList.Parse($"original {FixtureName} {original}\n", _root);
+
+        // Act
+        var report = await list.CheckOriginalTradeFramesAsync(FixtureName, TestContext.CancellationToken);
+
+        // Assert
+        string[] expected = ["a.jsonl: original line 3: frame has bytes after its last field", "a.jsonl: original line 4: frame has bytes after its last field"];
+
+        Assert.AreSequenceEqual(expected, report.Findings.ToArray(), "Both frames with trailing bytes should be reported by line");
+        Assert.AreEqual(4L, report.TradeFrameCount, "Every trade-route and item-offer frame should be checked");
+    }
+
+    /// <summary>
+    /// A route or folder name of an original that holds U+FFFD (an invalid UTF-8 byte) is reported by line, route and
+    /// field only.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    [TestCategory("AC12")]
+    public async Task FixtureDenyListOriginalTradeFrameWithReplacementCharacterIsReported()
+    {
+        // Arrange
+        var frame = new PipeFrameBuilder().Byte(4)
+                                          .Int32Value(2)
+                                          .Route(TradeRouteOf("Via Appia", "North"))
+                                          .Int32Value(9)
+                                          .Byte(2)
+                                          .Raw(0x41, 0xFF)
+                                          .Byte(1)
+                                          .Raw(0xC3)
+                                          .Raw(new byte[20])
+                                          .Build();
+        var original = WriteOriginal(RecordingOf(_version2, frame));
+        var list = FixtureDenyList.Parse($"original {FixtureName} {original}\n", _root);
+
+        // Act
+        var report = await list.CheckOriginalTradeFramesAsync(FixtureName, TestContext.CancellationToken);
+
+        // Assert
+        string[] expected = ["a.jsonl: original line 3: route 2: route name holds U+FFFD", "a.jsonl: original line 3: route 2: folder name holds U+FFFD"];
+
+        Assert.AreSequenceEqual(expected, report.Findings.ToArray(), "Both names with a replacement character should be reported by route and field");
+    }
+
+    /// <summary>
+    /// A trade-route or item-offer frame of an original that does not decode is reported by its line; frames of other
+    /// types are not checked.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    [TestCategory("AC12")]
+    public async Task FixtureDenyListOriginalTradeFrameThatDoesNotDecodeIsReported()
+    {
+        // Arrange
+        var original = WriteOriginal(RecordingOf(_version2, [4, 0xFF, 0xFF, 0xFF, 0xFF], [3, 1], [5, 2, 0, 0, 0]));
+        var list = FixtureDenyList.Parse($"original {FixtureName} {original}\n", _root);
+
+        // Act
+        var report = await list.CheckOriginalTradeFramesAsync(FixtureName, TestContext.CancellationToken);
+
+        // Assert
+        string[] expected = ["a.jsonl: original line 3: frame does not decode", "a.jsonl: original line 5: frame does not decode"];
+
+        Assert.AreSequenceEqual(expected, report.Findings.ToArray(), "Both malformed frames should be reported by line");
+        Assert.AreEqual(2L, report.TradeFrameCount, "Only the trade-route and item-offer frames should be checked");
+    }
+
+    /// <summary>
+    /// The original check of a fixture without an original line, or with a missing original, names the fixture only.
+    /// </summary>
+    /// <param name="listed">Whether the deny list names an original that does not exist</param>
+    /// <param name="expected">The expected finding</param>
+    /// <returns>The task</returns>
+    [TestMethod]
+    [TestCategory("AC12")]
+    [DataRow(false, "a.jsonl: no original in the deny list")]
+    [DataRow(true, "a.jsonl: the original is missing or unreadable")]
+    public async Task FixtureDenyListOriginalTradeFramesWithoutOriginalFails(bool listed, string expected)
+    {
+        // Arrange
+        var text = listed ? $"original {FixtureName} originals/missing.jsonl\n" : "deny Alice\n";
+        var list = FixtureDenyList.Parse(text, _root);
+
+        // Act
+        var report = await list.CheckOriginalTradeFramesAsync(FixtureName, TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreSequenceEqual(new[] { expected }, report.Findings.ToArray(), "The fixture should be named without its original");
+    }
+
+    /// <summary>
     /// Gives the path of the local deny list, or reports the test inconclusive when the variable is not set.
     /// </summary>
     /// <returns>The path</returns>
@@ -345,6 +569,93 @@ public sealed class FixtureDenyListTests
     private static byte[] ZeroEntry()
     {
         return new PipeFrameBuilder().Int32Value(10).Raw(new byte[44]).Int32Value(0).Int32Value(0).Build();
+    }
+
+    /// <summary>
+    /// Creates a trade route without counts and stations.
+    /// </summary>
+    /// <param name="name">The route name</param>
+    /// <param name="folder">The folder name</param>
+    /// <returns>The route</returns>
+    private static TradeRoute TradeRouteOf(string name, string folder)
+    {
+        return new TradeRoute
+               {
+                   Id = 7,
+                   Name = name,
+                   Folder = folder,
+                   MajorProblems = 0,
+                   MinorProblems = 0,
+                   Ships = 0,
+                   LostShips = 0,
+                   Stations = []
+               };
+    }
+
+    /// <summary>
+    /// Creates a trade route with non-zero counts (lost ships at most ships) and one station of three goods: a positive,
+    /// a negative and a zero amount.
+    /// </summary>
+    /// <param name="name">The route name</param>
+    /// <param name="folder">The folder name</param>
+    /// <returns>The route</returns>
+    private static TradeRoute AmountsRoute(string name, string folder)
+    {
+        TradeRouteGood[] goods = [
+                                     new TradeRouteGood
+                                     {
+                                         ProductGuid = 1010,
+                                         Amount = 30,
+                                         Loading = true
+                                     },
+                                     new TradeRouteGood
+                                     {
+                                         ProductGuid = 1011,
+                                         Amount = -4,
+                                         Loading = false
+                                     },
+                                     new TradeRouteGood
+                                     {
+                                         ProductGuid = 1012,
+                                         Amount = 0,
+                                         Loading = true
+                                     }
+                                 ];
+        var station = new TradeRouteStation
+                      {
+                          Id = 11,
+                          SessionId = 1,
+                          IslandId = 2,
+                          AreaIndex = 0,
+                          SessionGuid = 180023,
+                          Owner = 7,
+                          ThrowOverboard = false,
+                          WaitUntilFull = true,
+                          WaitUntilEmpty = false,
+                          Goods = goods
+                      };
+
+        return new TradeRoute
+               {
+                   Id = 7,
+                   Name = name,
+                   Folder = folder,
+                   MajorProblems = 2,
+                   MinorProblems = 9,
+                   Ships = 12,
+                   LostShips = 3,
+                   Stations = [station]
+               };
+    }
+
+    /// <summary>
+    /// Creates a trade-route frame.
+    /// </summary>
+    /// <param name="routes">The routes</param>
+    /// <returns>The frame</returns>
+    private static byte[] TradeRoutesFrame(params TradeRoute[] routes)
+    {
+        return new PipeFrameBuilder().Byte(4).TradeRoutes(routes).Build();
     }
 
     /// <summary>

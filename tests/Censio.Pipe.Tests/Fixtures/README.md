@@ -4,14 +4,15 @@ Anonymised recordings of the Anno 117 statistics pipe (recording format version 
 the fixture-based tests of `Censio.Pipe.Tests`. The Product Manager made `long-session.jsonl` (protocol version 2) from
 the recordings of issue #17 with the anonymiser of the pull request that added the fixtures; `protocol-3-session.jsonl`
 (protocol version 3) was made in the pull request for issue #125 from a recording a user supplied, with the anonymiser
-of that pull request:
+of that pull request; `protocol-3-trade-routes.jsonl` (protocol version 3) was made in the pull request for issue #221
+from a second recording the Product Manager supplied, with the anonymiser of that pull request:
 
 ```bash
 dotnet run --project src/Censio.Anonymiser -c Release -- <recording> <fixture>.jsonl
 ```
 
-Every name in them is invented (`Island <n>`, `Player <n>`), every economic value perturbed and every receive time
-shifted by a random offset; the structure, the game times and the pauses are kept
+Every name in them is invented (`Island <n>`, `Player <n>`, `Route <n>`, `Folder <n>`), every economic value and
+trade-route amount perturbed and every receive time shifted by a random offset; the structure, the game times and the pauses are kept
 ([`pipe-recording.md`](../../../docs/areas/pipe-recording.md), *Anonymising*). No original recording, original name,
 original file name or original time is in the repository, and none may be added: the raw recordings stay with the
 Product Manager.
@@ -21,7 +22,8 @@ Product Manager.
 | Fixture | Variants it shows |
 | ------- | ----------------- |
 | `long-session.jsonl` | a long session (about 1.5 hours of receive time, 31 ticks with data); islands of three regions (three session GUIDs); an island renamed during the session; a pause of about 18 minutes between two ticks; a session end before the first session start; a session end followed by a new session start of the same figure; ticks without data at the start and at the end |
-| `protocol-3-session.jsonl` | protocol version 3; a recording started in the middle of a connection; trade routes and item offers emptied (each written as its type byte and a count of 0) |
+| `protocol-3-session.jsonl` | protocol version 3; a recording started in the middle of a connection; trade routes and item offers emptied by the anonymiser of its time (each written as its type byte and a count of 0) |
+| `protocol-3-trade-routes.jsonl` | protocol version 3; trade routes and item offers decoded and anonymised: invented route and folder names (one route name repeated), perturbed problem, ship, lost-ship counts and goods amounts, the IDs, island keys, owners, flags and GUIDs kept; a recording without a session end |
 
 ## Facts the tests assert
 
@@ -43,13 +45,27 @@ its facts below and a `DataRow` in both tests.
 `protocol-3-session.jsonl`:
 
 - 114 lines: the header and 113 frames, all decoded: 1 `Version` (3), 1 session start, 1 session end, 101 island
-  frames with 2,752 production entries, 5 trade-route and 4 item-offer frames (undecoded messages, each five bytes),
-  no error.
+  frames with 2,752 production entries, 5 trade-route and 4 item-offer frames without routes or offers (each five
+  bytes), no error.
 - Replayed: `Version`, `RepeatedSessionEnd` (the session end before the session start), `SessionStart`, 5 ticks, end
   of stream.
 - 5 ticks: 1 closed because the game time changed, 3 by the quiet period, 1 by the end of the stream; 1 tick without
   data.
 - 25 island keys, none renamed; the figure is `Player 1`.
+
+`protocol-3-trade-routes.jsonl`:
+
+- 326 lines: the header and 325 frames, all decoded: 1 `Version` (3), 1 session start, no session end, 300 island frames
+  with 7,679 production entries, 11 trade-route and 12 item-offer frames, no error.
+- Replayed: `Version`, `SessionStart`, 12 ticks, end of stream; the same ticks, close reasons and session events as a
+  replay of its original.
+- 12 ticks: 1 closed because the game time changed, 10 by the quiet period, 1 by the end of the stream; 1 tick without
+  data.
+- 25 island keys, none renamed; the figure is `Player 1`.
+- Shown by the file but not asserted: each trade-route frame holds 57 routes (56 route names, 9 folders) with 2 to 4
+  stations of 1 to 5 goods, 7,409 bytes; each item-offer frame 7 traders with 6 items each, 229 bytes; the lost-ship
+  count never above the ship count, no negative goods amount; the 11 trade-route frames, byte-identical in the
+  original, differ here because every frame draws its amounts afresh.
 
 `long-session.jsonl` is also linked into `Censio.Server.Tests` (as `Fixtures/Pipe/long-session.jsonl`). The
 `PageReaderFixture…` tests (in `PageReaderTests`) replay it through `PipeReplayStream`, `PipeTickAssembler` and
@@ -74,9 +90,13 @@ The pause is shown by the file but not asserted.
 `FixtureDenyListTests` check the fixtures with `FixtureDenyList`:
 
 - `FixtureDenyListFixturesHaveInventedNames` always runs: every non-empty island name of every fixture is
-  `Island <n>`, every figure name `Player <n>`, `n` from 1 without leading zeros.
+  `Island <n>`, every figure name `Player <n>`, every route name `Route <n>` and every folder name `Folder <n>`, `n` from
+  1 without leading zeros.
 - `FixtureDenyListFixturesAgainstLocalDenyList` runs only when the environment variable `CENSIO_FIXTURE_DENY_LIST` holds
   the path of the local deny list; without it the test is reported inconclusive, not passed.
+- `FixtureDenyListOriginalTradeFramesDecodeToTheirEnd` runs under the same variable: every trade-route and item-offer
+  frame of the original of `protocol-3-trade-routes.jsonl` must decode, end exactly at the frame's end and hold no
+  U+FFFD in a route or folder name; a failing frame is reported by its line, route and field only.
 
 The deny list is a UTF-8 text file kept outside the repository (as `censio-fixture-deny-list.txt`); it is never
 committed. Its lines:
@@ -90,5 +110,7 @@ committed. Its lines:
 With an `original` line, the fixture and its original are walked line by line, and every non-zero, finite economic
 value of the original (generation, consumption, delta, perfect generation, perfect consumption, maintenance, income,
 profit, summed and average productivity, and each workforce amount by GUID after the reader's merge) must differ from
-the value at the same line, entry and field of the fixture. A missing or unreadable original fails and names the
+the value at the same line, entry and field of the fixture; so must every non-zero problem, ship and lost-ship count of
+a route and every goods amount above 0, at the same line, route, station and good (a negative goods amount is kept by
+the anonymiser and not compared). A missing or unreadable original fails and names the
 fixture. The report holds counts, fixture names, line numbers and field names only, never a name, a value or a path.
