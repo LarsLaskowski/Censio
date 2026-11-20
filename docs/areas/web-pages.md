@@ -316,7 +316,7 @@ value ([`server-state.md`](server-state.md), *Logging*); a failed read of a char
   markup too). Closed tabs give their memory back slowly: the runtime's array pool keeps the arrays of the render trees. The
   plan's estimate was 5 MB for the view and 9 MB a tab; a tab needs 3 to 6 times that. Not measured: the batches a circuit
   keeps until the browser acknowledges them. Like a page's island list (record 0074), the number of open tabs is not bounded
-  by the server.
+  by the server; the risk is accepted in [record 0097](../decisions/0097-latest-trade-routes-per-profile-stored-as-rows-on-a-page-of-their-own.md).
 - The bytes of an icon stay in memory after the icon read is released, until the response is written: up to 17,825,792
   bytes for each request in flight ([`contract.md`](contract.md), *Bounds*). The number of requests in flight is not
   limited, like the uploads of an accepted risk of [`ingest.md`](ingest.md) (*Accepted risks*).

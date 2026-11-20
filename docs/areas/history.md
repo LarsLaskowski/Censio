@@ -232,6 +232,8 @@ three runs unless a row says otherwise. The limit is 10 seconds a step at the bo
 | A store queued 33 ms into a removal step of the tick at the bounds | acknowledged 8 to 10 ms after the step ended (0.41 to 0.43 s after the step began), in all three runs |
 | The deletion's first transaction, 7 days of fixture ticks (5,040 ticks) | 12, 11 and 17 ms |
 | The deletion's first transaction, a year of hourly points (8,684, built from the 167 real hours of the 7-day run) and 20,190 unfolded ticks | 1,133, 1,130 and 1,134 ms |
+| The series read over 7 days of ticks (5,040 points) | 146, 82 and 82 ms |
+| The series read over a year of hourly points (8,714 points) | 163, 152 and 126 ms |
 | By a throwaway test outside the repository through the real `ServerStore`: a full replace of a profile's trade routes at the contract's bounds (1,024 routes, 52,428 stations, names of 765 ASCII characters), twice on a new file in each of three runs | 0.498, 0.301 and 0.245 s; 0.360, 0.245 and 0.238 s |
 | The same: the deletion's first transaction for a profile with that set (53,453 rows) and no ticks | 94, 46 and 58 ms |
 
