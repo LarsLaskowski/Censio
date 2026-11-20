@@ -84,6 +84,21 @@ public static class ContractMessageConverter
                };
     }
 
+    // Skeleton: removed with the implementation
+#pragma warning disable RH2003, S1172
+    /// <summary>
+    /// Converts the trade routes of the pipe into a contract message with a new identity.
+    /// </summary>
+    /// <param name="message">The trade-routes message</param>
+    /// <param name="profileId">The profile identity</param>
+    /// <param name="receiveTime">The time the message was received</param>
+    /// <returns>The contract trade routes</returns>
+    public static ContractTradeRoutes ToTradeRoutes(TradeRoutesMessage message, Guid profileId, DateTimeOffset receiveTime)
+    {
+        throw new NotImplementedException();
+    }
+#pragma warning restore RH2003, S1172
+
     /// <summary>
     /// Converts a pipe island into a contract island.
     /// </summary>

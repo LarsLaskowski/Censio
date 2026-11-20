@@ -149,6 +149,8 @@ public sealed class PipeTickResult
     /// <returns>The result</returns>
     public static PipeTickResult FromTradeRoutes(TradeRoutesMessage message)
     {
+        ArgumentNullException.ThrowIfNull(message);
+
         return new PipeTickResult(PipeTickResultKind.TradeRoutes, null, null, null, null, null, message);
     }
 
