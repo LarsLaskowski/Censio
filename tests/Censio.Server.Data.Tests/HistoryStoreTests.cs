@@ -127,6 +127,36 @@ public sealed class HistoryStoreTests
     /// </summary>
     private const string KeptIslandName = "Kept island 3f6e";
 
+    /// <summary>
+    /// The route name of a replaced set of the profile that is deleted.
+    /// </summary>
+    private const string DeletedReplacedRouteName = "Deleted replaced route 2d4b";
+
+    /// <summary>
+    /// The folder name of a replaced set of the profile that is deleted.
+    /// </summary>
+    private const string DeletedReplacedFolderName = "Deleted replaced folder 93ae";
+
+    /// <summary>
+    /// The route name of the latest set of the profile that is deleted.
+    /// </summary>
+    private const string DeletedRouteName = "Deleted route 6c15";
+
+    /// <summary>
+    /// The folder name of the latest set of the profile that is deleted.
+    /// </summary>
+    private const string DeletedFolderName = "Deleted folder e7f0";
+
+    /// <summary>
+    /// The route name of the profile that is kept.
+    /// </summary>
+    private const string KeptRouteName = "Kept route 18c9";
+
+    /// <summary>
+    /// The folder name of the profile that is kept.
+    /// </summary>
+    private const string KeptFolderName = "Kept folder 4b7a";
+
     #endregion // Constants
 
     #region Fields
@@ -1049,6 +1079,44 @@ public sealed class HistoryStoreTests
 
         Assert.AreEqual(HistoryOutcome.Done, result.Outcome, "The clean-up should be done");
         Assert.AreSequenceEqual(new[] { KeptProfileName, KeptIslandName }, found, "Only the kept profile's names should occur in the database files");
+    }
+
+    /// <summary>
+    /// Once the clean-up after a deletion is done, no route or folder name only the deleted profile's trade routes held,
+    /// those of a replaced set included, occurs in the bytes of the database file or its <c>-wal</c> and <c>-shm</c>
+    /// files, while the kept profile's route and folder names still do.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC6")]
+    public async Task HistoryStoreClearDeletedLeavesNoRouteNameInFiles()
+    {
+        // Arrange
+        var (store, history, databaseFile) = await OpenAsync();
+
+        var profileId = Guid.NewGuid();
+        var keptId = Guid.NewGuid();
+        var cancellationToken = TestContext.CancellationToken;
+
+        await store.StoreProfileAsync(profileId, DeletedProfileName, cancellationToken);
+        await store.StoreProfileAsync(keptId, KeptProfileName, cancellationToken);
+        await StoreAsync(store,
+                         Tick(profileId, 10 * Minute, 10, Island(IslandKey, DeletedIslandName, PlainEntry(ProductGuid))),
+                         Tick(keptId, 2 * Hour, 40, Island(IslandKey, KeptIslandName, PlainEntry(ProductGuid))));
+        await store.StoreTradeRoutesAsync(TradeRoutes(profileId, 10 * Minute, DeletedReplacedRouteName, DeletedReplacedFolderName), cancellationToken);
+        await store.StoreTradeRoutesAsync(TradeRoutes(profileId, 20 * Minute, DeletedRouteName, DeletedFolderName), cancellationToken);
+        await store.StoreTradeRoutesAsync(TradeRoutes(keptId, 20 * Minute, KeptRouteName, KeptFolderName), cancellationToken);
+        await store.DeleteProfileAsync(profileId, cancellationToken);
+        await SweepAllAsync(history);
+
+        // Act
+        var result = await history.ClearDeletedAsync(cancellationToken);
+
+        // Assert
+        var found = FindNamesInFiles(databaseFile, DeletedReplacedRouteName, DeletedReplacedFolderName, DeletedRouteName, DeletedFolderName, KeptRouteName, KeptFolderName);
+
+        Assert.AreEqual(HistoryOutcome.Done, result.Outcome, "The clean-up should be done");
+        Assert.AreSequenceEqual(new[] { KeptRouteName, KeptFolderName }, found, "Only the kept profile's route and folder names should occur in the database files");
     }
 
     /// <summary>
@@ -2547,6 +2615,44 @@ public sealed class HistoryStoreTests
                    ReceiveTime = _hour.AddSeconds(seconds),
                    GameTime = gameTime,
                    Islands = islands
+               };
+    }
+
+    /// <summary>
+    /// Creates a set of trade routes of one route with one station on the island.
+    /// </summary>
+    /// <param name="profileId">The profile identity</param>
+    /// <param name="seconds">The receive time in seconds after the hour <c>H</c></param>
+    /// <param name="name">The route name</param>
+    /// <param name="folder">The folder name</param>
+    /// <returns>The set</returns>
+    private static ContractTradeRoutes TradeRoutes(Guid profileId, long seconds, string name, string folder)
+    {
+        return new ContractTradeRoutes
+               {
+                   Id = Guid.NewGuid(),
+                   ProfileId = profileId,
+                   ReceiveTime = _hour.AddSeconds(seconds),
+                   Routes = [
+                                new ContractTradeRoute
+                                {
+                                    Id = 1,
+                                    Name = name,
+                                    Folder = folder,
+                                    MajorProblems = 0,
+                                    MinorProblems = 0,
+                                    Ships = 1,
+                                    LostShips = 0,
+                                    Stations = [
+                                                   new ContractTradeRouteStation
+                                                   {
+                                                       SessionGuid = IslandKey,
+                                                       IslandId = IslandKey,
+                                                       AreaIndex = 0
+                                                   }
+                                               ]
+                                }
+                            ]
                };
     }
 
