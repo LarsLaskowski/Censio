@@ -69,7 +69,8 @@ public static class PipeMessageParser
                                    PipeMessageType.Version => ParseVersion(frame, ref position),
                                    PipeMessageType.SessionStart => ParseSessionStart(frame, ref position),
                                    PipeMessageType.SessionEnd => new SessionEndMessage(),
-                                   PipeMessageType.TradeRoutes or PipeMessageType.ItemOffers => ParseUndecoded((PipeMessageType)typeValue, frame, ref position),
+                                   PipeMessageType.TradeRoutes => ParseTradeRoutes(frame, ref position),
+                                   PipeMessageType.ItemOffers => ParseItemOffers(frame, ref position),
                                    _ => ParseStatistics(frame, ref position)
                                };
 
@@ -108,13 +109,46 @@ public static class PipeMessageParser
     }
 
     /// <summary>
-    /// Parses the leading count of a trade-route or item-offer payload and leaves the rest undecoded.
+    /// Parses a trade-routes payload.
     /// </summary>
-    /// <param name="messageType">The message type of the frame</param>
     /// <param name="frame">The frame</param>
     /// <param name="position">The read position; on failure the offset of the count</param>
     /// <returns>The message, or <c>null</c> when the count is missing or negative</returns>
-    private static UndecodedMessage? ParseUndecoded(PipeMessageType messageType, ReadOnlySpan<byte> frame, ref int position)
+    private static TradeRoutesMessage? ParseTradeRoutes(ReadOnlySpan<byte> frame, ref int position)
+    {
+        // Skeleton: removed with the implementation
+        return TryReadCountOnly(frame, ref position)
+                   ? new TradeRoutesMessage
+                     {
+                         Routes = []
+                     }
+                   : null;
+    }
+
+    /// <summary>
+    /// Parses an item-offers payload.
+    /// </summary>
+    /// <param name="frame">The frame</param>
+    /// <param name="position">The read position; on failure the offset of the count</param>
+    /// <returns>The message, or <c>null</c> when the count is missing or negative</returns>
+    private static ItemOffersMessage? ParseItemOffers(ReadOnlySpan<byte> frame, ref int position)
+    {
+        // Skeleton: removed with the implementation
+        return TryReadCountOnly(frame, ref position)
+                   ? new ItemOffersMessage
+                     {
+                         Offers = []
+                     }
+                   : null;
+    }
+
+    /// <summary>
+    /// Reads the leading count and leaves the rest undecoded.
+    /// </summary>
+    /// <param name="frame">The frame</param>
+    /// <param name="position">The read position; on failure the offset of the count</param>
+    /// <returns><see langword="true"/> when the count is present and not negative</returns>
+    private static bool TryReadCountOnly(ReadOnlySpan<byte> frame, ref int position)
     {
         var countPosition = position;
 
@@ -122,10 +156,10 @@ public static class PipeMessageParser
         {
             position = countPosition;
 
-            return null;
+            return false;
         }
 
-        return new UndecodedMessage(messageType);
+        return true;
     }
 
     /// <summary>

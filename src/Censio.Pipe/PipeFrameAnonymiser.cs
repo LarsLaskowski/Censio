@@ -124,7 +124,7 @@ internal sealed class PipeFrameAnonymiser
                           VersionMessage version => WriteVersion(version),
                           SessionStartMessage start => WriteSessionStart(start),
                           AreaProductionStatisticsMessage area => WriteIsland(frame, area),
-                          UndecodedMessage undecoded => [(byte)undecoded.MessageType, 0, 0, 0, 0],
+                          TradeRoutesMessage or ItemOffersMessage => [(byte)message.MessageType, 0, 0, 0, 0],
                           _ => [(byte)PipeMessageType.SessionEnd]
                       };
 
