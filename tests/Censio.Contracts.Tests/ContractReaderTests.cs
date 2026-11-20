@@ -331,6 +331,12 @@ public sealed class ContractReaderTests
     }
 
     /// <summary>
+    /// Gets a valid message of every type but the refused hello reply, its version set to 1: the message type and the message
+    /// as JSON text.
+    /// </summary>
+    private static IEnumerable<object[]> VersionOneRows => new[] { (ContractMessageType.Hello, HelloNotation), (ContractMessageType.HelloAccepted, HelloAcceptedNotation), (ContractMessageType.CatalogUpload, CatalogUploadNotation), (ContractMessageType.IconImage, IconImageNotation), (ContractMessageType.Tick, TickNotation), (ContractMessageType.SessionStart, SessionStartNotation), (ContractMessageType.SessionEnd, SessionEndNotation), (ContractMessageType.Status, StatusNotation), (ContractMessageType.Acknowledgement, AcknowledgementNotation), (ContractMessageType.TradeRoutes, TradeRoutesNotation) }.Select(row => new object[] { row.Item1, Substitute(row.Item2, "'contractVersion':2", "'contractVersion':1") });
+
+    /// <summary>
     /// Gets the version cases: the contract version and the body after it in single-quote notation.
     /// </summary>
     private static IEnumerable<object[]> OtherVersionRows => new[] { 0, 1, 3, -1, int.MaxValue, int.MinValue }.SelectMany(version => OtherVersionBodies().Select(body => new object[] { version, body }));
@@ -634,6 +640,52 @@ public sealed class ContractReaderTests
 
         // Assert
         AssertUnsupportedVersion(result, version, notation);
+    }
+
+    /// <summary>
+    /// A message of contract version 1 that is valid in version 1 is refused as unsupported, its text naming version 1 as
+    /// found and version 2 as supported.
+    /// </summary>
+    /// <param name="type">The message type</param>
+    /// <param name="text">The message as JSON text</param>
+    [TestMethod]
+    [TestCategory("AC8")]
+    [DynamicData(nameof(VersionOneRows))]
+    public void ContractReaderVersionOneRefusedNamingBothVersions(ContractMessageType type, string text)
+    {
+        // Arrange
+        var json = Encoding.UTF8.GetBytes(text);
+
+        // Act
+        var result = ContractReader.Read(json);
+
+        // Assert
+        Assert.Contains("\"contractVersion\":1,", text, $"The {type} should be of version 1");
+        AssertRefusal(result, ContractErrorKind.UnsupportedVersion, "Contract version 1 is not supported; supported: 2", type.ToString());
+        Assert.AreEqual(1, result.Error!.Version, $"The refusal of the {type} should carry version 1");
+    }
+
+    /// <summary>
+    /// The refused hello reply of a server of contract version 1 to a hello of version 2 is read with both versions: 2 as
+    /// received, 1 as supported.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC8")]
+    public void ContractReaderVersionOneServerRefusalReadsBothVersions()
+    {
+        // Arrange
+        var json = Utf8("{'type':'helloRefused','contractVersion':1,'reason':'unsupportedVersion','receivedVersion':2,'supportedVersions':[1]}");
+
+        // Act
+        var result = ContractReader.Read(json);
+
+        // Assert
+        var refused = AssertRead<ContractHelloRefused>(result, "refusal of a version 1 server");
+
+        Assert.AreEqual(ContractHelloRefusal.UnsupportedVersion, refused.Reason, "The refusal should be for the version");
+        Assert.AreEqual(2, refused.ReceivedVersion, "The refusal should name version 2 as received");
+        Assert.HasCount(1, refused.SupportedVersions, "The refusal should name one supported version");
+        Assert.AreEqual(1, refused.SupportedVersions[0], "The refusal should name version 1 as supported");
     }
 
     /// <summary>

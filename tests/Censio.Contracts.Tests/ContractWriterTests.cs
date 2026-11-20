@@ -202,6 +202,17 @@ public sealed class ContractWriterTests
                                                                                                                                                                                       RefusedVersion = null,
                                                                                                                                                                                       MissingIcons = null!
                                                                                                                                                                                   }),
+                                                                                                                       ["trade routes identity all zero"] = (ContractErrorKind.Invalid, () => TradeRoutesOf(Guid.Empty, _profileA, _time, [Route(7, "Via", "North", [1, 2, 3, 4], Station(1, 1, 0))])),
+                                                                                                                       ["trade routes profile all zero"] = (ContractErrorKind.Invalid, () => TradeRoutesOf(_id, Guid.Empty, _time, [Route(7, "Via", "North", [1, 2, 3, 4], Station(1, 1, 0))])),
+                                                                                                                       ["trade routes receive time with an offset"] = (ContractErrorKind.Invalid, () => TradeRoutesOf(_id, _profileA, new DateTimeOffset(2026, 11, 12, 11, 20, 30, TimeSpan.FromHours(1)), [Route(7, "Via", "North", [1, 2, 3, 4], Station(1, 1, 0))])),
+                                                                                                                       ["routes null"] = (ContractErrorKind.Invalid, () => TradeRoutesOf(_id, _profileA, _time, null!)),
+                                                                                                                       ["route item null"] = (ContractErrorKind.Invalid, () => TradeRoutes(Route(7, "Via", "North", [1, 2, 3, 4], Station(1, 1, 0)), null!)),
+                                                                                                                       ["stations null"] = (ContractErrorKind.Invalid, () => TradeRoutes(Route(7, "Via", "North", [1, 2, 3, 4], (ContractTradeRouteStation[])null!))),
+                                                                                                                       ["station item null"] = (ContractErrorKind.Invalid, () => TradeRoutes(Route(7, "Via", "North", [1, 2, 3, 4], Station(1, 1, 0), null!))),
+                                                                                                                       ["route name null"] = (ContractErrorKind.Invalid, () => TradeRoutes(Route(7, null!, "North", [1, 2, 3, 4], Station(1, 1, 0)))),
+                                                                                                                       ["folder null"] = (ContractErrorKind.Invalid, () => TradeRoutes(Route(7, "Via", null!, [1, 2, 3, 4], Station(1, 1, 0)))),
+                                                                                                                       ["route name with a lone surrogate"] = (ContractErrorKind.Invalid, () => TradeRoutes(Route(7, "Vi" + (char)0xD800, "North", [1, 2, 3, 4], Station(1, 1, 0)))),
+                                                                                                                       ["folder with a lone surrogate"] = (ContractErrorKind.Invalid, () => TradeRoutes(Route(7, "Via", string.Concat((char)0xDC00, "North"), [1, 2, 3, 4], Station(1, 1, 0)))),
                                                                                                                        ["token of 1,025 bytes"] = (ContractErrorKind.TooLarge, () => Hello(new string('a', 1025), "0.3.0", _profileA, "Alice")),
                                                                                                                        ["profile name of 1,026 bytes"] = (ContractErrorKind.TooLarge, () => Hello("t", "0.3.0", _profileA, new string('ä', 513))),
                                                                                                                        ["companion version of 1,025 bytes"] = (ContractErrorKind.TooLarge, () => Hello("t", new string('1', 1025), _profileA, "Alice")),
@@ -1428,6 +1439,25 @@ public sealed class ContractWriterTests
                    Id = _id,
                    ProfileId = _profileA,
                    ReceiveTime = _time,
+                   Routes = routes
+               };
+    }
+
+    /// <summary>
+    /// Builds a trade-routes message of an identity, a profile, a receive time and routes.
+    /// </summary>
+    /// <param name="id">The message identity</param>
+    /// <param name="profileId">The profile identity</param>
+    /// <param name="receiveTime">The receive time</param>
+    /// <param name="routes">The routes</param>
+    /// <returns>The message</returns>
+    private static ContractTradeRoutes TradeRoutesOf(Guid id, Guid profileId, DateTimeOffset receiveTime, IReadOnlyList<ContractTradeRoute> routes)
+    {
+        return new ContractTradeRoutes
+               {
+                   Id = id,
+                   ProfileId = profileId,
+                   ReceiveTime = receiveTime,
                    Routes = routes
                };
     }
