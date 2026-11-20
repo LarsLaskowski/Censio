@@ -27,7 +27,7 @@ script):
 
 ## Scenarios
 
-This spec is written for the scope the Lead recommends in *Open questions* (trade routes now, item offers later).
+Scope as the Product Manager chose (*Open questions*, Q1): trade routes now, item offers later.
 
 - S1: Given a replay of the fixture sent to the server, when the user opens `Trade routes` / `Handelsrouten` of the
   profile, then a table lists the 57 routes of the profile's latest trade-routes message, each with its name, folder,
@@ -103,16 +103,17 @@ This spec is written for the scope the Lead recommends in *Open questions* (trad
 
 ## Out of scope
 
-- Item offers: shown in a follow-up issue once the catalog names items and traders (*Open questions*).
+- Item offers: a follow-up issue, which first extends the catalog to items and traders (Q1).
 - A route's goods, the station flags and the owner; a route detail page; history or charts of trade routes.
 - Live sending (#40): until it lands, trade routes reach the server by a replay, as ticks do.
 - The Companion's diagnostics window.
 
 ## Open questions
 
-- Q1: Which part of the issue does this feature build, and how are the meanings of the problem counts confirmed? Not
-  answered: escalated to the Product Manager. The Lead recommends trade routes only, with AC9 as the check on a real
-  game, and item offers in a follow-up issue that first extends the catalog to items and traders.
+- Q1: Which part of the issue does this feature build, and how are the meanings of the problem counts confirmed?
+  Answered: by the Product Manager, option A: trade routes only, the counts shown under the reference's names and
+  confirmed by AC9 on the Product Manager's game; item offers go to a follow-up issue that first extends the catalog
+  to items and traders.
 - Q2: Is the server's state of trade routes kept across a restart? Answered: yes (Lead), as the rest of a profile's
   state ([server-state](../../docs/areas/server-state.md), *Restore at start*), latest only.
 
