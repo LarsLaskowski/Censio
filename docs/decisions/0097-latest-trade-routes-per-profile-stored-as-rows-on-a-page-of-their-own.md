@@ -4,7 +4,7 @@
 - **Date:** 2026-11-20
 - **Area:** web-pages
 - **Source:** Issue #225
-- **Supersedes:** —
+- **Supersedes:** 0074 — amends only its 500 rows: the trade-routes page keeps the whole latest set in its view.
 
 ## Context
 
@@ -29,6 +29,9 @@ database files ([history](../areas/history.md), *Deleting a profile*).
    database faster than the ticks' hourly folding allows.
 5. **A column on the island pages instead of a page** — a route spans islands of several regions, so no island page
    can show it whole.
+6. **A cap on the page's rows or stations** (500 rows, like the goods table) — would hide routes the Companion
+   legitimately sends, though the page exists to show every problem route, and a cap on rows alone bounds no stations:
+   500 routes may hold more than a message's 52,428.
 
 ## Decision
 
@@ -44,3 +47,11 @@ and [server-data](../areas/server-data.md).
   re-read of their trends.
 - The meanings of the problem and lost-ship counts rest on the reference reader's names, confirmed once on the
   Product Manager's game (spec AC9).
+- The trade-routes page keeps the whole set in its view, up to 1,024 rows and 52,428 stops. At those bounds a tab
+  retained about 30 MiB (56 MiB right after a live update), because its render trees keep arrays rented from the
+  runtime's pool, which closed tabs give back slowly ([web-pages](../areas/web-pages.md), *Reads and memory*); the
+  number of open tabs is not bounded and the pages need no login (record
+  [0006](0006-server-plain-http-and-open-health.md)). The risk is accepted: a set at the bounds needs a message the
+  ingest token admits (anyone's while the token is switched off, record
+  [0019](0019-websocket-transport-with-shared-token.md)), the server holds at most two sets, and a real game sends a small fraction of
+  the bounds (the fixture: 57 routes).

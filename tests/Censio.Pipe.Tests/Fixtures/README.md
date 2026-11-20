@@ -47,8 +47,9 @@ its facts below and a `DataRow` in both tests.
 - 114 lines: the header and 113 frames, all decoded: 1 `Version` (3), 1 session start, 1 session end, 101 island
   frames with 2,752 production entries, 5 trade-route and 4 item-offer frames without routes or offers (each five
   bytes), no error.
-- Replayed: `Version`, `RepeatedSessionEnd` (the session end before the session start), `SessionStart`, 5 ticks, end
-  of stream.
+- Replayed: `Version`, `RepeatedSessionEnd` (the session end before the session start), `TradeRoutes`, `SessionStart`,
+  then 4 times a tick followed by `TradeRoutes`, a last tick, end of stream: 5 ticks and 5 `TradeRoutes` items, each
+  without routes (`routes=0 0 0 0 0`); the item-offer frames give no item.
 - 5 ticks: 1 closed because the game time changed, 3 by the quiet period, 1 by the end of the stream; 1 tick without
   data.
 - 25 island keys, none renamed; the figure is `Player 1`.
@@ -57,15 +58,17 @@ its facts below and a `DataRow` in both tests.
 
 - 326 lines: the header and 325 frames, all decoded: 1 `Version` (3), 1 session start, no session end, 300 island frames
   with 7,679 production entries, 11 trade-route and 12 item-offer frames, no error.
-- Replayed: `Version`, `SessionStart`, 12 ticks, end of stream; the same ticks, close reasons and session events as a
-  replay of its original.
+- Replayed: `Version`, `SessionStart`, then 11 times a tick followed by `TradeRoutes`, a last tick, end of stream: 12
+  ticks and 11 `TradeRoutes` items with 57 routes each (`routes=57 … 57`); the item-offer frames give no item; the same
+  ticks, close reasons and session events as a replay of its original.
 - 12 ticks: 1 closed because the game time changed, 10 by the quiet period, 1 by the end of the stream; 1 tick without
   data.
 - 25 island keys, none renamed; the figure is `Player 1`.
-- Shown by the file but not asserted: each trade-route frame holds 57 routes (56 route names, 9 folders) with 2 to 4
-  stations of 1 to 5 goods, 7,409 bytes; each item-offer frame 7 traders with 6 items each, 229 bytes; the lost-ship
-  count never above the ship count, no negative goods amount; the 11 trade-route frames, byte-identical in the
-  original, differ here because every frame draws its amounts afresh.
+- Shown by the file but not asserted: each trade-route frame holds 56 route names (the server tests below assert them
+  for the last frame only) and 9 folders, its routes have 2 to 4 stations of 1 to 5 goods, and it is 7,409 bytes;
+  each item-offer frame holds 7 traders with 6 items each, 229 bytes; the lost-ship count never above the ship count,
+  no negative goods amount; the 11 trade-route frames, byte-identical in the original, differ here because every frame
+  draws its amounts afresh.
 
 `long-session.jsonl` is also linked into `Censio.Server.Tests` (as `Fixtures/Pipe/long-session.jsonl`). The
 `PageReaderFixture…` tests (in `PageReaderTests`) replay it through `PipeReplayStream`, `PipeTickAssembler` and
@@ -76,12 +79,25 @@ tick; after the final empty tick the 24 islands stay listed without values; with
 two session GUIDs one region GUID, the two form one region. A change to the fixture is checked against these facts
 too.
 
-The `IngestEndpointReplaySent…` tests and `IngestEndpointSecondReplayCreatesSecondProfile` (in `IngestEndpointTests`)
-replay the same linked file through `PipeReplayRunner` and `ReplaySender` into the server's real ingest endpoint (over
-`TestServerReplayConnector`) and assert the facts above for the replay's profile: the three regions with their islands,
-the 24 islands without values after the final tick, the replay ending with `<n> ticks sent, 0 refused` where `<n>` is
-the number of the fixture's ticks with at least one island, computed by the test from its own replay of the file, a
-notice to the server state's followers for the profile and each sent tick, and a second profile for a second replay.
+The `IngestEndpointReplaySent…` tests (except the `IngestEndpointReplaySentTradeRoutesFixture…` ones, below) and
+`IngestEndpointSecondReplayCreatesSecondProfile` (in `IngestEndpointTests`) replay the same linked file through
+`PipeReplayRunner` and `ReplaySender` into the server's real ingest endpoint (over `TestServerReplayConnector`) and
+assert the facts above for the replay's profile: the three regions with their islands, the 24 islands without values
+after the final tick, the replay ending with `<n> ticks sent, 0 refused` where `<n>` is the number of the fixture's
+ticks with at least one island, computed by the test from its own replay of the file, a notice to the server state's
+followers for the profile and each sent tick, and a second profile for a second replay.
+
+`protocol-3-trade-routes.jsonl` is linked into `Censio.Server.Tests` too (as
+`Fixtures/Pipe/protocol-3-trade-routes.jsonl`). The `IngestEndpointReplaySentTradeRoutesFixture…` tests (in
+`IngestEndpointTests`) replay it through `PipeReplayRunner` and `ReplaySender` into the server's real ingest endpoint
+(over `TestServerReplayConnector`) and assert: the profile's latest trade routes are the 57 routes of the file's last
+trade-route frame (56 route names, the repeated one as two routes), in order with every value, under that frame's
+recorded stamp; and the replay ends with `<n> ticks sent, 0 refused` where `<n>` is the number of the fixture's ticks
+with at least one island, computed by the test from its own replay of the file, so the trade routes count in neither
+number. `TradeRoutesFixtureReplayListsLastFrameRoutes` (in `TradeRoutesTests`) replays it through `PipeReplayStream` and
+`PipeTickAssembler`, stores its ticks and trade routes in a real `ServerState` and asserts that the trade-routes page
+lists the 57 routes of the last frame, one row each, under that frame's receive time. A change to the fixture is checked
+against these facts too.
 
 The pause is shown by the file but not asserted.
 
