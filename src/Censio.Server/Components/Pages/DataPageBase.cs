@@ -118,6 +118,11 @@ public abstract class DataPageBase : ComponentBase, IDisposable
     protected virtual bool FollowsNewestProfile => false;
 
     /// <summary>
+    /// Gets a value that indicates whether the page shows the trade routes of the profile.
+    /// </summary>
+    protected virtual bool ReadsTradeRoutes => false;
+
+    /// <summary>
     /// Gets or sets the server state.
     /// </summary>
     [Inject]
@@ -147,6 +152,16 @@ public abstract class DataPageBase : ComponentBase, IDisposable
     /// <param name="view">The view</param>
     /// <returns><see langword="true" /> when the view holds it</returns>
     protected abstract bool IsKnown(ProfileView view);
+
+    /// <summary>
+    /// Checks that the profile's view holds data the page shows.
+    /// </summary>
+    /// <param name="view">The view</param>
+    /// <returns><see langword="true" /> when the view holds data</returns>
+    protected virtual bool HasData(ProfileView view)
+    {
+        return view.AsOf is not null && view.Regions.Count > 0;
+    }
 
     /// <summary>
     /// Reads what a page shows beyond the profile's view, once the view is ready.
@@ -247,7 +262,7 @@ public abstract class DataPageBase : ComponentBase, IDisposable
         }
 
         var detailsToken = _detailsToken;
-        var read = await Reader.ReadAsync(profileId, island, _cancellationToken).ConfigureAwait(true);
+        var read = await Reader.ReadAsync(profileId, island, ReadsTradeRoutes, _cancellationToken).ConfigureAwait(true);
 
         if (_isDisposed)
         {
@@ -303,7 +318,7 @@ public abstract class DataPageBase : ComponentBase, IDisposable
         {
             Show(PageMode.NotFound, null);
         }
-        else if (view.AsOf is null || view.Regions.Count == 0)
+        else if (HasData(view) == false)
         {
             Show(PageMode.NoData, null);
         }

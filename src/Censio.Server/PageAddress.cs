@@ -111,6 +111,29 @@ public static class PageAddress
         return "/regions";
     }
 
+    // Skeleton: removed with the implementation
+#pragma warning disable RH2003
+    /// <summary>
+    /// Gives the address of a profile's trade routes.
+    /// </summary>
+    /// <param name="profileId">The profile identity</param>
+    /// <returns>The address</returns>
+    public static string TradeRoutesLink(Guid profileId)
+    {
+        throw new NotImplementedException();
+    }
+
+    /// <summary>
+    /// Gives the address the trade-routes navigation entry leads to: the trade routes of the profile the address shows, or the ones of the newest profile.
+    /// </summary>
+    /// <param name="relativePath">The base-relative address, query and fragment included</param>
+    /// <returns>The address</returns>
+    public static string TradeRoutesEntryLink(string? relativePath)
+    {
+        throw new NotImplementedException();
+    }
+#pragma warning restore RH2003
+
     /// <summary>
     /// Gives the address of the island list of the region that holds a session.
     /// </summary>

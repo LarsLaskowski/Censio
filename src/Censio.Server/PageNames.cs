@@ -120,6 +120,63 @@ public static class PageNames
                    : name;
     }
 
+    // Skeleton: removed with the implementation
+#pragma warning disable RH2003
+    /// <summary>
+    /// Gives the shown name of a trade route.
+    /// </summary>
+    /// <param name="name">The name of the route</param>
+    /// <param name="language">The language</param>
+    /// <returns>The shown name</returns>
+    public static string TradeRoute(string name, UiLanguage language)
+    {
+        throw new NotImplementedException();
+    }
+
+    /// <summary>
+    /// Gives the shown name of a trade route's folder.
+    /// </summary>
+    /// <param name="folder">The folder of the route</param>
+    /// <returns>The shown name</returns>
+    public static string Folder(string folder)
+    {
+        throw new NotImplementedException();
+    }
+
+    /// <summary>
+    /// Gives the shown name of a stop of a trade route.
+    /// </summary>
+    /// <param name="stop">The stop</param>
+    /// <param name="language">The language</param>
+    /// <returns>The shown name</returns>
+    public static string Station(TradeRouteStop stop, UiLanguage language)
+    {
+        throw new NotImplementedException();
+    }
+
+    /// <summary>
+    /// Orders the trade routes for a page.
+    /// </summary>
+    /// <param name="routes">The routes</param>
+    /// <param name="language">The language</param>
+    /// <returns>The ordered routes</returns>
+    public static IReadOnlyList<TradeRouteView> OrderTradeRoutes(IReadOnlyList<TradeRouteView> routes, UiLanguage language)
+    {
+        throw new NotImplementedException();
+    }
+
+    /// <summary>
+    /// Gives the summary line of the trade routes.
+    /// </summary>
+    /// <param name="routes">The routes</param>
+    /// <param name="language">The language</param>
+    /// <returns>The summary</returns>
+    public static string TradeRoutesSummary(IReadOnlyList<TradeRouteView> routes, UiLanguage language)
+    {
+        throw new NotImplementedException();
+    }
+#pragma warning restore RH2003
+
     /// <summary>
     /// Takes the names of a catalog entry, the other language's for a language the entry lacks, or the fallbacks.
     /// </summary>

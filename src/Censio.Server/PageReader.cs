@@ -53,13 +53,26 @@ public sealed class PageReader
     /// <param name="island">The shown island, or <see langword="null"/> for none</param>
     /// <param name="cancellationToken">The cancellation token</param>
     /// <returns>The read result</returns>
-    public async Task<PageRead> ReadAsync(Guid profileId, IslandKey? island, CancellationToken cancellationToken)
+    public Task<PageRead> ReadAsync(Guid profileId, IslandKey? island, CancellationToken cancellationToken)
+    {
+        return ReadAsync(profileId, island, false, cancellationToken);
+    }
+
+    /// <summary>
+    /// Reads the view of a profile.
+    /// </summary>
+    /// <param name="profileId">The profile identity</param>
+    /// <param name="island">The shown island, or <see langword="null"/> for none</param>
+    /// <param name="tradeRoutes">Whether the view carries the trade routes</param>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>The read result</returns>
+    public async Task<PageRead> ReadAsync(Guid profileId, IslandKey? island, bool tradeRoutes, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
         if (_source.TryGetHeld(profileId, out var held) && held is not null)
         {
-            return Build(held, island);
+            return Build(held, island, tradeRoutes);
         }
 
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -70,7 +83,7 @@ public sealed class PageReader
 
             if (read.State is { } state)
             {
-                return Build(state, island);
+                return Build(state, island, tradeRoutes);
             }
 
             return new PageRead
@@ -90,14 +103,15 @@ public sealed class PageReader
     /// </summary>
     /// <param name="state">The profile state</param>
     /// <param name="island">The shown island, or <see langword="null"/> for none</param>
+    /// <param name="tradeRoutes">Whether the view carries the trade routes</param>
     /// <returns>The read result</returns>
-    private PageRead Build(StoredProfileState state, IslandKey? island)
+    private PageRead Build(StoredProfileState state, IslandKey? island, bool tradeRoutes)
     {
         var catalog = _source.Catalog;
 
         return new PageRead
                {
-                   View = ProfileViewBuilder.Build(state, catalog.Lookup, catalog.MissingIcons, island),
+                   View = ProfileViewBuilder.Build(state, catalog.Lookup, catalog.MissingIcons, island, tradeRoutes),
                    IsFailed = false
                };
     }

@@ -15,6 +15,20 @@ public sealed class UiTexts
                                                    NavigationButton = "Open or close the navigation",
                                                    HomeEntry = "Home",
                                                    RegionsEntry = "Regions",
+                                                   TradeRoutesEntry = string.Empty,
+                                                   ColumnRoute = string.Empty,
+                                                   ColumnFolder = string.Empty,
+                                                   ColumnShips = string.Empty,
+                                                   ColumnLostShips = string.Empty,
+                                                   ColumnMajorProblems = string.Empty,
+                                                   ColumnMinorProblems = string.Empty,
+                                                   ColumnStations = string.Empty,
+                                                   UnnamedRoute = string.Empty,
+                                                   StationFallbackFormat = string.Empty,
+                                                   NoTradeRoutes = string.Empty,
+                                                   EmptyTradeRoutes = string.Empty,
+                                                   TradeRoutesSummaryFormat = string.Empty,
+                                                   TradeRoutesSummaryOneFormat = string.Empty,
                                                    ProfileSwitch = "Profile",
                                                    SwitchToDarkTheme = "Switch to the dark theme",
                                                    SwitchToLightTheme = "Switch to the light theme",
@@ -85,6 +99,20 @@ public sealed class UiTexts
                                                   NavigationButton = "Navigation öffnen oder schließen",
                                                   HomeEntry = "Startseite",
                                                   RegionsEntry = "Regionen",
+                                                  TradeRoutesEntry = string.Empty,
+                                                  ColumnRoute = string.Empty,
+                                                  ColumnFolder = string.Empty,
+                                                  ColumnShips = string.Empty,
+                                                  ColumnLostShips = string.Empty,
+                                                  ColumnMajorProblems = string.Empty,
+                                                  ColumnMinorProblems = string.Empty,
+                                                  ColumnStations = string.Empty,
+                                                  UnnamedRoute = string.Empty,
+                                                  StationFallbackFormat = string.Empty,
+                                                  NoTradeRoutes = string.Empty,
+                                                  EmptyTradeRoutes = string.Empty,
+                                                  TradeRoutesSummaryFormat = string.Empty,
+                                                  TradeRoutesSummaryOneFormat = string.Empty,
                                                   ProfileSwitch = "Profil",
                                                   SwitchToDarkTheme = "Zum dunklen Design wechseln",
                                                   SwitchToLightTheme = "Zum hellen Design wechseln",
@@ -180,6 +208,76 @@ public sealed class UiTexts
     /// Gets the text of the navigation entry of the region overview, also its heading.
     /// </summary>
     public required string RegionsEntry { get; init; }
+
+    /// <summary>
+    /// Gets the text of the navigation entry of the trade routes, also their heading.
+    /// </summary>
+    public required string TradeRoutesEntry { get; init; }
+
+    /// <summary>
+    /// Gets the heading of the route column.
+    /// </summary>
+    public required string ColumnRoute { get; init; }
+
+    /// <summary>
+    /// Gets the heading of the folder column.
+    /// </summary>
+    public required string ColumnFolder { get; init; }
+
+    /// <summary>
+    /// Gets the heading of the ships column.
+    /// </summary>
+    public required string ColumnShips { get; init; }
+
+    /// <summary>
+    /// Gets the heading of the lost-ships column.
+    /// </summary>
+    public required string ColumnLostShips { get; init; }
+
+    /// <summary>
+    /// Gets the heading of the major-problems column.
+    /// </summary>
+    public required string ColumnMajorProblems { get; init; }
+
+    /// <summary>
+    /// Gets the heading of the minor-problems column.
+    /// </summary>
+    public required string ColumnMinorProblems { get; init; }
+
+    /// <summary>
+    /// Gets the heading of the stations column.
+    /// </summary>
+    public required string ColumnStations { get; init; }
+
+    /// <summary>
+    /// Gets the shown name of a route without a name.
+    /// </summary>
+    public required string UnnamedRoute { get; init; }
+
+    /// <summary>
+    /// Gets the format of the shown name of a station no island list entry names.
+    /// </summary>
+    public required string StationFallbackFormat { get; init; }
+
+    /// <summary>
+    /// Gets the text when no trade routes were received yet.
+    /// </summary>
+    public required string NoTradeRoutes { get; init; }
+
+    /// <summary>
+    /// Gets the text when the latest trade routes hold no route.
+    /// </summary>
+    public required string EmptyTradeRoutes { get; init; }
+
+    /// <summary>
+    /// Gets the format of the summary of the trade routes.
+    /// </summary>
+    public required string TradeRoutesSummaryFormat { get; init; }
+
+    /// <summary>
+    /// Gets the format of the summary of one trade route.
+    /// </summary>
+    public required string TradeRoutesSummaryOneFormat { get; init; }
 
     /// <summary>
     /// Gets the text of the profile switch.

@@ -51,5 +51,10 @@ public sealed class ProfileView
     /// </summary>
     public required int RowCount { get; init; }
 
+    /// <summary>
+    /// Gets the trade routes, or <see langword="null"/> when the page reads none or none are stored.
+    /// </summary>
+    public TradeRoutesView? TradeRoutes { get; init; }
+
     #endregion // Properties
 }

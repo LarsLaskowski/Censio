@@ -20,6 +20,20 @@ public static class ProfileViewBuilder
     /// <returns>The view</returns>
     public static ProfileView Build(StoredProfileState state, PageCatalog? catalog, IReadOnlySet<string>? missingIcons, IslandKey? island)
     {
+        return Build(state, catalog, missingIcons, island, false);
+    }
+
+    /// <summary>
+    /// Builds the view of a profile.
+    /// </summary>
+    /// <param name="state">The profile state</param>
+    /// <param name="catalog">The catalog lookup, or <see langword="null"/> when none is usable</param>
+    /// <param name="missingIcons">The references of the icons not stored, or <see langword="null"/> when unknown</param>
+    /// <param name="island">The shown island, or <see langword="null"/> for none</param>
+    /// <param name="tradeRoutes">Whether the view carries the trade routes</param>
+    /// <returns>The view</returns>
+    public static ProfileView Build(StoredProfileState state, PageCatalog? catalog, IReadOnlySet<string>? missingIcons, IslandKey? island, bool tradeRoutes)
+    {
         var tick = state.LatestTick;
         var tickIslands = new Dictionary<IslandKey, ContractTickIsland>();
         var names = new Dictionary<IslandKey, string>();
