@@ -370,7 +370,7 @@ public static class TrayMenu
                    ReplaySendProblemKind.ServerUnreachable => "server unreachable",
                    ReplaySendProblemKind.TokenRefused => "token refused",
                    ReplaySendProblemKind.CompanionConnected => "another Companion is connected",
-                   ReplaySendProblemKind.VersionNotSupported => "server does not support contract version 1",
+                   ReplaySendProblemKind.VersionNotSupported => "server does not support contract version 2",
                    ReplaySendProblemKind.NoAnswer => "server does not answer",
                    ReplaySendProblemKind.ConnectionLost => "server connection lost",
                    ReplaySendProblemKind.InvalidReply => "invalid server reply",

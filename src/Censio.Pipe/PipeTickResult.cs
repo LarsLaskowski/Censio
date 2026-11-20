@@ -16,7 +16,8 @@ public sealed class PipeTickResult
     /// <param name="version">The version</param>
     /// <param name="error">The error</param>
     /// <param name="islandKey">The island key</param>
-    private PipeTickResult(PipeTickResultKind kind, PipeTick? tick, string? headline, int? version, PipeError? error, PipeIslandKey? islandKey)
+    /// <param name="tradeRoutes">The trade routes</param>
+    private PipeTickResult(PipeTickResultKind kind, PipeTick? tick, string? headline, int? version, PipeError? error, PipeIslandKey? islandKey, TradeRoutesMessage? tradeRoutes)
     {
         Kind = kind;
         Tick = tick;
@@ -24,6 +25,7 @@ public sealed class PipeTickResult
         Version = version;
         Error = error;
         IslandKey = islandKey;
+        TradeRoutes = tradeRoutes;
     }
 
     #endregion // Constructors
@@ -33,17 +35,17 @@ public sealed class PipeTickResult
     /// <summary>
     /// Gets the end-of-stream result.
     /// </summary>
-    public static PipeTickResult End { get; } = new(PipeTickResultKind.EndOfStream, null, null, null, null, null);
+    public static PipeTickResult End { get; } = new(PipeTickResultKind.EndOfStream, null, null, null, null, null, null);
 
     /// <summary>
     /// Gets the session-end result.
     /// </summary>
-    public static PipeTickResult SessionEnd { get; } = new(PipeTickResultKind.SessionEnd, null, null, null, null, null);
+    public static PipeTickResult SessionEnd { get; } = new(PipeTickResultKind.SessionEnd, null, null, null, null, null, null);
 
     /// <summary>
     /// Gets the repeated-session-end result.
     /// </summary>
-    public static PipeTickResult RepeatedSessionEnd { get; } = new(PipeTickResultKind.RepeatedSessionEnd, null, null, null, null, null);
+    public static PipeTickResult RepeatedSessionEnd { get; } = new(PipeTickResultKind.RepeatedSessionEnd, null, null, null, null, null, null);
 
     /// <summary>
     /// Gets the kind.
@@ -75,6 +77,11 @@ public sealed class PipeTickResult
     /// </summary>
     public PipeIslandKey? IslandKey { get; }
 
+    /// <summary>
+    /// Gets the trade routes of a <see cref="PipeTickResultKind.TradeRoutes" /> result.
+    /// </summary>
+    public TradeRoutesMessage? TradeRoutes { get; }
+
     #endregion // Properties
 
     #region Methods
@@ -88,7 +95,7 @@ public sealed class PipeTickResult
     {
         ArgumentNullException.ThrowIfNull(tick);
 
-        return new PipeTickResult(PipeTickResultKind.Tick, tick, null, null, null, null);
+        return new PipeTickResult(PipeTickResultKind.Tick, tick, null, null, null, null, null);
     }
 
     /// <summary>
@@ -100,7 +107,7 @@ public sealed class PipeTickResult
     {
         ArgumentNullException.ThrowIfNull(headline);
 
-        return new PipeTickResult(PipeTickResultKind.SessionStart, null, headline, null, null, null);
+        return new PipeTickResult(PipeTickResultKind.SessionStart, null, headline, null, null, null, null);
     }
 
     /// <summary>
@@ -110,7 +117,7 @@ public sealed class PipeTickResult
     /// <returns>The result</returns>
     public static PipeTickResult FromVersion(int version)
     {
-        return new PipeTickResult(PipeTickResultKind.Version, null, null, version, null, null);
+        return new PipeTickResult(PipeTickResultKind.Version, null, null, version, null, null, null);
     }
 
     /// <summary>
@@ -122,7 +129,7 @@ public sealed class PipeTickResult
     {
         ArgumentNullException.ThrowIfNull(error);
 
-        return new PipeTickResult(PipeTickResultKind.Error, null, null, null, error, null);
+        return new PipeTickResult(PipeTickResultKind.Error, null, null, null, error, null, null);
     }
 
     /// <summary>
@@ -132,8 +139,21 @@ public sealed class PipeTickResult
     /// <returns>The result</returns>
     public static PipeTickResult FromTickLimit(PipeIslandKey key)
     {
-        return new PipeTickResult(PipeTickResultKind.TickLimit, null, null, null, null, key);
+        return new PipeTickResult(PipeTickResultKind.TickLimit, null, null, null, null, key, null);
     }
+
+    // Skeleton: removed with the implementation
+#pragma warning disable RH2003, S1172
+    /// <summary>
+    /// Creates a trade-routes result.
+    /// </summary>
+    /// <param name="message">The trade-routes message</param>
+    /// <returns>The result</returns>
+    public static PipeTickResult FromTradeRoutes(TradeRoutesMessage message)
+    {
+        throw new NotImplementedException();
+    }
+#pragma warning restore RH2003, S1172
 
     #endregion // Methods
 }
