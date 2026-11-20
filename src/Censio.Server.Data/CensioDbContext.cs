@@ -157,6 +157,35 @@ internal sealed class CensioDbContext : DbContext
                                                    entity.Property(row => row.TombstoneId).ValueGeneratedNever();
                                                });
 
+        modelBuilder.Entity<TradeRouteSetRow>(entity =>
+                                              {
+                                                  entity.ToTable("TradeRouteSets");
+                                                  entity.HasKey(row => row.ProfileId);
+                                                  entity.Property(row => row.ProfileId).ValueGeneratedNever();
+                                              });
+
+        modelBuilder.Entity<TradeRouteRow>(entity =>
+                                           {
+                                               entity.ToTable("TradeRoutes");
+                                               entity.HasKey(row => row.Id);
+                                               entity.HasIndex(row => new
+                                                                      {
+                                                                          row.ProfileId,
+                                                                          row.Position
+                                                                      }).IsUnique();
+                                           });
+
+        modelBuilder.Entity<TradeRouteStationRow>(entity =>
+                                                  {
+                                                      entity.ToTable("TradeRouteStations");
+                                                      entity.HasKey(row => row.Id);
+                                                      entity.HasIndex(row => new
+                                                                             {
+                                                                                 row.TradeRouteId,
+                                                                                 row.Position
+                                                                             }).IsUnique();
+                                                  });
+
         modelBuilder.Entity<CatalogRow>(entity =>
                                         {
                                             entity.ToTable("Catalog");

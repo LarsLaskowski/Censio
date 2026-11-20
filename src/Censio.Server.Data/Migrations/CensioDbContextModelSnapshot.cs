@@ -15,7 +15,7 @@ partial class CensioDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261116182423_AddTickEntryProductIndex";
+    public override string LastMigrationId => "20261120130740_AddTradeRoutes";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -452,6 +452,94 @@ partial class CensioDbContextModelSnapshot : ModelSnapshot
                 b.HasIndex("ProfileId", "ReceiveTicks", "Number");
 
                 b.ToTable("Ticks");
+            });
+
+        modelBuilder.Entity("Censio.Server.Data.TradeRouteRow", b =>
+            {
+                b.Property<long>("Id")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("INTEGER");
+
+                b.Property<string>("Folder")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.Property<int>("LostShips")
+                    .HasColumnType("INTEGER");
+
+                b.Property<int>("MajorProblems")
+                    .HasColumnType("INTEGER");
+
+                b.Property<int>("MinorProblems")
+                    .HasColumnType("INTEGER");
+
+                b.Property<string>("Name")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.Property<int>("Position")
+                    .HasColumnType("INTEGER");
+
+                b.Property<Guid>("ProfileId")
+                    .HasColumnType("TEXT");
+
+                b.Property<int>("RouteId")
+                    .HasColumnType("INTEGER");
+
+                b.Property<int>("Ships")
+                    .HasColumnType("INTEGER");
+
+                b.HasKey("Id");
+
+                b.HasIndex("ProfileId", "Position")
+                    .IsUnique();
+
+                b.ToTable("TradeRoutes");
+            });
+
+        modelBuilder.Entity("Censio.Server.Data.TradeRouteSetRow", b =>
+            {
+                b.Property<Guid>("ProfileId")
+                    .HasColumnType("TEXT");
+
+                b.Property<Guid>("MessageId")
+                    .HasColumnType("TEXT");
+
+                b.Property<long>("ReceiveTicks")
+                    .HasColumnType("INTEGER");
+
+                b.HasKey("ProfileId");
+
+                b.ToTable("TradeRouteSets");
+            });
+
+        modelBuilder.Entity("Censio.Server.Data.TradeRouteStationRow", b =>
+            {
+                b.Property<long>("Id")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("INTEGER");
+
+                b.Property<byte>("AreaIndex")
+                    .HasColumnType("INTEGER");
+
+                b.Property<byte>("IslandId")
+                    .HasColumnType("INTEGER");
+
+                b.Property<int>("Position")
+                    .HasColumnType("INTEGER");
+
+                b.Property<int>("SessionGuid")
+                    .HasColumnType("INTEGER");
+
+                b.Property<long>("TradeRouteId")
+                    .HasColumnType("INTEGER");
+
+                b.HasKey("Id");
+
+                b.HasIndex("TradeRouteId", "Position")
+                    .IsUnique();
+
+                b.ToTable("TradeRouteStations");
             });
 #pragma warning restore 612, 618
     }

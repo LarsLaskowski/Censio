@@ -11,6 +11,15 @@ namespace Censio.Server.Data;
 /// </summary>
 public sealed class ServerStore
 {
+    #region Constants
+
+    /// <summary>
+    /// The name of the profile parameter of the trade-route statements.
+    /// </summary>
+    private const string ProfileParameter = "$profile";
+
+    #endregion // Constants
+
     #region Fields
 
     /// <summary>
@@ -136,6 +145,7 @@ public sealed class ServerStore
 
                                           await StoreAccess.ExecuteAsync(connection, "DELETE FROM \"Profiles\" WHERE \"Id\" = $id;", cancellationToken, ("$id", profileId)).ConfigureAwait(false);
                                           await StoreAccess.ExecuteAsync(connection, "DELETE FROM \"Islands\" WHERE \"ProfileId\" = $id;", cancellationToken, ("$id", profileId)).ConfigureAwait(false);
+                                          await DeleteTradeRoutesAsync(connection, profileId, cancellationToken).ConfigureAwait(false);
                                           await StoreAccess.ExecuteAsync(connection, "INSERT INTO \"DeletedProfiles\" (\"TombstoneId\") VALUES ($tombstone);", cancellationToken, ("$tombstone", tombstone)).ConfigureAwait(false);
                                           await StoreAccess.ExecuteAsync(connection, "UPDATE \"Ticks\" SET \"ProfileId\" = $tombstone WHERE \"ProfileId\" = $id;", cancellationToken, ("$tombstone", tombstone), ("$id", profileId)).ConfigureAwait(false);
                                           await StoreAccess.ExecuteAsync(connection, "UPDATE \"HourlyPoints\" SET \"ProfileId\" = $tombstone WHERE \"ProfileId\" = $id;", cancellationToken, ("$tombstone", tombstone), ("$id", profileId)).ConfigureAwait(false);
@@ -213,13 +223,14 @@ public sealed class ServerStore
 
                              var latestTick = await TickReader.ReadInTransactionAsync(connection, TickReader.LatestSql, profileId, cancellationToken).ConfigureAwait(false);
                              var islands = await ReadIslandsAsync(connection, profileId, cancellationToken).ConfigureAwait(false);
+                             var latestTradeRoutes = await ReadTradeRoutesAsync(connection, profileId, cancellationToken).ConfigureAwait(false);
 
                              return new StoredProfileState
                                     {
                                         Profile = profile,
                                         LatestTick = latestTick,
                                         Islands = islands,
-                                        LatestTradeRoutes = null
+                                        LatestTradeRoutes = latestTradeRoutes
                                     };
                          },
                          cancellationToken);
@@ -252,17 +263,43 @@ public sealed class ServerStore
                                               cancellationToken);
     }
 
-    // Skeleton: removed with the implementation
-#pragma warning disable RH2003, S2325
     /// <summary>
-    /// Stores the trade routes of a profile, replacing the earlier ones.
+    /// Stores the trade routes of a profile, replacing the earlier ones: a message with the stored identity or an earlier
+    /// receive time than the stored set writes nothing.
     /// </summary>
     /// <param name="routes">The trade routes</param>
     /// <param name="cancellationToken">The cancellation token</param>
     /// <returns>The store result</returns>
     public Task<ServerStoreResult> StoreTradeRoutesAsync(ContractTradeRoutes routes, CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        return WriteAsync(async connection =>
+                          {
+                              using (var stored = StoreAccess.CreateCommand(connection,
+                                                                            "SELECT 1 FROM \"TradeRouteSets\" WHERE \"ProfileId\" = $profile AND (\"MessageId\" = $message OR \"ReceiveTicks\" > $receive);",
+                                                                            (ProfileParameter, routes.ProfileId),
+                                                                            ("$message", routes.Id),
+                                                                            ("$receive", routes.ReceiveTime.UtcTicks)))
+                              {
+                                  if (await stored.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is not null)
+                                  {
+                                      return ServerStoreOutcome.AlreadyStored;
+                                  }
+                              }
+
+                              await StoreAccess.ExecuteAsync(connection, "INSERT OR IGNORE INTO \"Profiles\" (\"Id\", \"Name\") VALUES ($id, NULL);", cancellationToken, ("$id", routes.ProfileId)).ConfigureAwait(false);
+                              await DeleteTradeRoutesAsync(connection, routes.ProfileId, cancellationToken).ConfigureAwait(false);
+                              await StoreAccess.ExecuteAsync(connection,
+                                                             "INSERT INTO \"TradeRouteSets\" (\"ProfileId\", \"MessageId\", \"ReceiveTicks\") VALUES ($profile, $message, $receive);",
+                                                             cancellationToken,
+                                                             (ProfileParameter, routes.ProfileId),
+                                                             ("$message", routes.Id),
+                                                             ("$receive", routes.ReceiveTime.UtcTicks)).ConfigureAwait(false);
+
+                              await WriteTradeRoutesAsync(connection, routes, cancellationToken).ConfigureAwait(false);
+
+                              return ServerStoreOutcome.Stored;
+                          },
+                          cancellationToken);
     }
 
     /// <summary>
@@ -273,9 +310,16 @@ public sealed class ServerStore
     /// <returns>The trade routes, or <see langword="null"/> when none are stored</returns>
     public Task<ContractTradeRoutes?> ReadTradeRoutesAsync(Guid profileId, CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        return ReadAsync(async connection =>
+                         {
+#pragma warning disable S6966 // The async overload has no deferred form and begins an immediate (write) transaction
+                             using var transaction = connection.BeginTransaction(true);
+#pragma warning restore S6966
+
+                             return await ReadTradeRoutesAsync(connection, profileId, cancellationToken).ConfigureAwait(false);
+                         },
+                         cancellationToken);
     }
-#pragma warning restore RH2003, S2325
 
     /// <summary>
     /// Stores the catalog, replacing an earlier one.
@@ -394,6 +438,167 @@ public sealed class ServerStore
     }
 
     /// <summary>
+    /// Deletes the stored trade routes of a profile: its stations, routes and set.
+    /// </summary>
+    /// <param name="connection">The opened connection, inside a write transaction</param>
+    /// <param name="profileId">The profile identity</param>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>A task that represents the asynchronous operation</returns>
+    private static async Task DeleteTradeRoutesAsync(SqliteConnection connection, Guid profileId, CancellationToken cancellationToken)
+    {
+        await StoreAccess.ExecuteAsync(connection, "DELETE FROM \"TradeRouteStations\" WHERE \"TradeRouteId\" IN (SELECT \"Id\" FROM \"TradeRoutes\" WHERE \"ProfileId\" = $id);", cancellationToken, ("$id", profileId)).ConfigureAwait(false);
+        await StoreAccess.ExecuteAsync(connection, "DELETE FROM \"TradeRoutes\" WHERE \"ProfileId\" = $id;", cancellationToken, ("$id", profileId)).ConfigureAwait(false);
+        await StoreAccess.ExecuteAsync(connection, "DELETE FROM \"TradeRouteSets\" WHERE \"ProfileId\" = $id;", cancellationToken, ("$id", profileId)).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Writes the routes and stations of a set in order.
+    /// </summary>
+    /// <param name="connection">The opened connection, inside a write transaction</param>
+    /// <param name="routes">The trade routes</param>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>A task that represents the asynchronous operation</returns>
+    private static async Task WriteTradeRoutesAsync(SqliteConnection connection, ContractTradeRoutes routes, CancellationToken cancellationToken)
+    {
+        using var routeCommand = TickWriter.Create(connection,
+                                                   "INSERT INTO \"TradeRoutes\" (\"ProfileId\", \"Position\", \"RouteId\", \"Name\", \"Folder\", \"MajorProblems\", \"MinorProblems\", \"Ships\", \"LostShips\") VALUES ($profile, $position, $route, $name, $folder, $major, $minor, $ships, $lost) RETURNING \"Id\";",
+                                                   (ProfileParameter, SqliteType.Text),
+                                                   ("$position", SqliteType.Integer),
+                                                   ("$route", SqliteType.Integer),
+                                                   ("$name", SqliteType.Text),
+                                                   ("$folder", SqliteType.Text),
+                                                   ("$major", SqliteType.Integer),
+                                                   ("$minor", SqliteType.Integer),
+                                                   ("$ships", SqliteType.Integer),
+                                                   ("$lost", SqliteType.Integer));
+        using var stationCommand = TickWriter.Create(connection,
+                                                     "INSERT INTO \"TradeRouteStations\" (\"TradeRouteId\", \"Position\", \"SessionGuid\", \"IslandId\", \"AreaIndex\") VALUES ($route, $position, $guid, $island, $area);",
+                                                     ("$route", SqliteType.Integer),
+                                                     ("$position", SqliteType.Integer),
+                                                     ("$guid", SqliteType.Integer),
+                                                     ("$island", SqliteType.Integer),
+                                                     ("$area", SqliteType.Integer));
+
+        await routeCommand.PrepareAsync(cancellationToken).ConfigureAwait(false);
+        await stationCommand.PrepareAsync(cancellationToken).ConfigureAwait(false);
+
+        for (var position = 0; position < routes.Routes.Count; position++)
+        {
+            var route = routes.Routes[position];
+
+            routeCommand.Parameters[0].Value = routes.ProfileId;
+            routeCommand.Parameters[1].Value = position;
+            routeCommand.Parameters[2].Value = route.Id;
+            routeCommand.Parameters[3].Value = route.Name;
+            routeCommand.Parameters[4].Value = route.Folder;
+            routeCommand.Parameters[5].Value = route.MajorProblems;
+            routeCommand.Parameters[6].Value = route.MinorProblems;
+            routeCommand.Parameters[7].Value = route.Ships;
+            routeCommand.Parameters[8].Value = route.LostShips;
+
+            var routeRow = (long)(await routeCommand.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false))!;
+
+            for (var index = 0; index < route.Stations.Count; index++)
+            {
+                var station = route.Stations[index];
+
+                stationCommand.Parameters[0].Value = routeRow;
+                stationCommand.Parameters[1].Value = index;
+                stationCommand.Parameters[2].Value = station.SessionGuid;
+                stationCommand.Parameters[3].Value = station.IslandId;
+                stationCommand.Parameters[4].Value = station.AreaIndex;
+
+                await stationCommand.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Reads the trade routes of a profile on an opened connection.
+    /// </summary>
+    /// <param name="connection">The opened connection</param>
+    /// <param name="profileId">The profile identity</param>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>The trade routes, or <see langword="null"/> when none are stored</returns>
+    private static async Task<ContractTradeRoutes?> ReadTradeRoutesAsync(SqliteConnection connection, Guid profileId, CancellationToken cancellationToken)
+    {
+        Guid messageId;
+        long receiveTicks;
+
+        using (var command = StoreAccess.CreateCommand(connection, "SELECT \"MessageId\", \"ReceiveTicks\" FROM \"TradeRouteSets\" WHERE \"ProfileId\" = $profile;", (ProfileParameter, profileId)))
+        {
+            using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+
+            if (await reader.ReadAsync(cancellationToken).ConfigureAwait(false) == false)
+            {
+                return null;
+            }
+
+            messageId = reader.GetGuid(0);
+            receiveTicks = reader.GetInt64(1);
+        }
+
+        var stations = new Dictionary<long, List<ContractTradeRouteStation>>();
+
+        using (var command = StoreAccess.CreateCommand(connection,
+                                                       "SELECT s.\"TradeRouteId\", s.\"SessionGuid\", s.\"IslandId\", s.\"AreaIndex\" FROM \"TradeRouteStations\" s JOIN \"TradeRoutes\" r ON r.\"Id\" = s.\"TradeRouteId\" WHERE r.\"ProfileId\" = $profile ORDER BY r.\"Position\", s.\"Position\";",
+                                                       (ProfileParameter, profileId)))
+        {
+            using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+
+            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            {
+                var routeRow = reader.GetInt64(0);
+
+                if (stations.TryGetValue(routeRow, out var list) == false)
+                {
+                    list = [];
+                    stations.Add(routeRow, list);
+                }
+
+                list.Add(new ContractTradeRouteStation
+                         {
+                             SessionGuid = reader.GetInt32(1),
+                             IslandId = reader.GetByte(2),
+                             AreaIndex = reader.GetByte(3)
+                         });
+            }
+        }
+
+        var routes = new List<ContractTradeRoute>();
+
+        using (var command = StoreAccess.CreateCommand(connection,
+                                                       "SELECT \"Id\", \"RouteId\", \"Name\", \"Folder\", \"MajorProblems\", \"MinorProblems\", \"Ships\", \"LostShips\" FROM \"TradeRoutes\" WHERE \"ProfileId\" = $profile ORDER BY \"Position\";",
+                                                       (ProfileParameter, profileId)))
+        {
+            using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+
+            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            {
+                routes.Add(new ContractTradeRoute
+                           {
+                               Id = reader.GetInt32(1),
+                               Name = reader.GetString(2),
+                               Folder = reader.GetString(3),
+                               MajorProblems = reader.GetInt32(4),
+                               MinorProblems = reader.GetInt32(5),
+                               Ships = reader.GetInt32(6),
+                               LostShips = reader.GetInt32(7),
+                               Stations = stations.TryGetValue(reader.GetInt64(0), out var list) ? list : []
+                           });
+            }
+        }
+
+        return new ContractTradeRoutes
+               {
+                   Id = messageId,
+                   ProfileId = profileId,
+                   ReceiveTime = new DateTimeOffset(receiveTicks, TimeSpan.Zero),
+                   Routes = routes
+               };
+    }
+
+    /// <summary>
     /// Reads the islands of a profile on an opened connection.
     /// </summary>
     /// <param name="connection">The opened connection</param>
@@ -406,7 +611,7 @@ public sealed class ServerStore
 
         using var command = StoreAccess.CreateCommand(connection,
                                                       "SELECT \"SessionGuid\", \"IslandId\", \"AreaIndex\", \"Name\" FROM \"Islands\" WHERE \"ProfileId\" = $profile ORDER BY \"SessionGuid\", \"IslandId\", \"AreaIndex\";",
-                                                      ("$profile", profileId));
+                                                      (ProfileParameter, profileId));
         using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
 
         while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
