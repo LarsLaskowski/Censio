@@ -157,6 +157,6 @@ once in the [area document](../areas/README.md) of the record's area, and the re
 | [0093](0093-sparklines-drawn-as-one-svg-path-of-our-own.md) | Sparklines are drawn as one SVG path of our own | Accepted | 2026-11-18 |
 | [0094](0094-pipe-reader-accepts-protocol-versions-2-and-3.md) | The pipe reader accepts protocol versions 2 and 3 | Accepted | 2026-11-18 |
 | [0095](0095-trade-routes-and-item-offers-decoded-strictly-and-anonymised-with-invented-names.md) | Trade routes and item offers are decoded strictly with caps and anonymised with invented names | Accepted | 2026-11-20 |
-| [0096](0096-contract-version-2-adds-trade-routes-read-exactly.md) | Contract version 2 adds the trade routes and is read exactly | Proposed | 2026-11-20 |
-| [0097](0097-latest-trade-routes-per-profile-stored-as-rows-on-a-page-of-their-own.md) | The latest trade routes of a profile are stored as rows and shown on a page of their own | Proposed | 2026-11-20 |
+| [0096](0096-contract-version-2-adds-trade-routes-read-exactly.md) | Contract version 2 adds the trade routes and is read exactly | Accepted | 2026-11-20 |
+| [0097](0097-latest-trade-routes-per-profile-stored-as-rows-on-a-page-of-their-own.md) | The latest trade routes of a profile are stored as rows and shown on a page of their own | Accepted | 2026-11-20 |
 <!-- project:end index -->

@@ -1,6 +1,6 @@
 # 0097: The latest trade routes of a profile are stored as rows and shown on a page of their own
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-20
 - **Area:** web-pages
 - **Source:** Issue #225

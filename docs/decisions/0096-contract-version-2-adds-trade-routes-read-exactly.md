@@ -1,6 +1,6 @@
 # 0096: Contract version 2 adds the trade routes and is read exactly
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-20
 - **Area:** contract
 - **Source:** Issue #225
