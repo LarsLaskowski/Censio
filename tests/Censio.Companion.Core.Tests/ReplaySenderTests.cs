@@ -251,6 +251,34 @@ public sealed class ReplaySenderTests
     }
 
     /// <summary>
+    /// A refused hello reply of contract version 1, as a server of the earlier release sends it, is version not supported
+    /// and logs the text that names version 2.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC8")]
+    public async Task ReplaySenderRefusedHelloOfVersionOneReportsVersionNotSupported()
+    {
+        // Arrange
+        await using var server = ScriptedIngestServer.Create();
+        var logger = new RecordingLogger();
+        await using var sender = CreateSender(new DuplexReplayConnector(server.ClientSocket), CreateTimeProvider(), logger, null);
+        var reply = """{"type":"helloRefused","contractVersion":1,"reason":"unsupportedVersion","receivedVersion":2,"supportedVersions":[1]}""";
+
+        // Act
+        var connecting = sender.ConnectServerAsync(TestContext.CancellationToken);
+
+        await server.ReceiveAsync(TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+        await server.SendRawAsync(Encoding.UTF8.GetBytes(reply), WebSocketMessageType.Text, TestContext.CancellationToken);
+
+        var problem = await connecting.WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(ReplaySendProblemKind.VersionNotSupported, problem, "The refused hello reply of version 1 should be version not supported");
+        Assert.Contains("Replay refused by the server: server does not support contract version 2", logger.Entries.Select(entry => entry.Message), "The refusal should log the text that names version 2");
+    }
+
+    /// <summary>
     /// A hello without a reply within the reply timeout is no answer, not before, and the connection is closed.
     /// </summary>
     /// <returns>A task that completes when the test is done</returns>

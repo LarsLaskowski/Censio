@@ -828,6 +828,30 @@ public sealed class TrayMenuTests
     }
 
     /// <summary>
+    /// A replay a server refused for its version names contract version 2, the only version this build sends, in the
+    /// tooltip and in the reason.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC8")]
+    public void TrayMenuVersionNotSupportedNamesVersionTwo()
+    {
+        // Arrange
+        var status = new PipeReplayStatus
+                     {
+                         State = PipeConnectionState.Receiving,
+                         IsFinished = true,
+                         SendProblem = ReplaySendProblemKind.VersionNotSupported
+                     };
+
+        // Act
+        var toolTip = TrayMenu.FormatReplayToolTip(status);
+
+        // Assert
+        Assert.AreEqual("Censio Companion: Replay error: server does not support contract version 2", toolTip, "The tooltip should name contract version 2");
+        Assert.AreEqual("server does not support contract version 2", TrayMenu.FormatReplaySendReason(ReplaySendProblemKind.VersionNotSupported), "The reason should name contract version 2");
+    }
+
+    /// <summary>
     /// A send problem wins over a problem of the recording, the end of the replay and the counts.
     /// </summary>
     [TestMethod]
