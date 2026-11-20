@@ -318,6 +318,41 @@ public sealed class ProfileViewBuilderTests
     }
 
     /// <summary>
+    /// Without trade routes asked for, the view carries no trade routes even when the state holds a set, through the
+    /// overload with the flag and through the one without it.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC6")]
+    public void ProfileViewBuilderWithoutTradeRoutesKeepsNoRoutes()
+    {
+        // Arrange
+        var state = CreateState(CreateTick(TickIsland(10, 1, "Isle A", Entry(1, 1, 1f))));
+        var withRoutes = new StoredProfileState
+                         {
+                             Profile = state.Profile,
+                             LatestTick = state.LatestTick,
+                             Islands = state.Islands,
+                             LatestTradeRoutes = new ContractTradeRoutes
+                                                 {
+                                                     Id = Guid.NewGuid(),
+                                                     ProfileId = _profileId,
+                                                     ReceiveTime = _receiveTime,
+                                                     Routes = [TradeRoute(7, "Ostia", 1, 0, Station(10, 1))]
+                                                 }
+                         };
+
+        // Act
+        var withFlag = ProfileViewBuilder.Build(withRoutes, null, null, null, false);
+        var withoutFlag = ProfileViewBuilder.Build(withRoutes, null, null, null);
+        var asked = ProfileViewBuilder.Build(withRoutes, null, null, null, true);
+
+        // Assert
+        Assert.IsNotNull(asked.TradeRoutes, "With the flag set the view should carry the set, or the checks below would prove less");
+        Assert.IsNull(withFlag.TradeRoutes, "With the flag false the view should carry no trade routes");
+        Assert.IsNull(withoutFlag.TradeRoutes, "The overload without the flag should carry no trade routes");
+    }
+
+    /// <summary>
     /// Collects every unreachable object, so that a weak reference to one is cleared.
     /// </summary>
 #pragma warning disable S1215 // The test checks that the view leaves the state collectable, which only a collection shows

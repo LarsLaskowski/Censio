@@ -381,6 +381,44 @@ public sealed class PageReaderTests : IDisposable
     }
 
     /// <summary>
+    /// A read without the trade-routes flag gives a view without trade routes even when the state holds a set, for a held
+    /// profile and for one read from the source, through the overload with the flag and through the one without it.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC6")]
+    public async Task PageReaderWithoutTradeRoutesFlagKeepsNoRoutes()
+    {
+        // Arrange
+        var source = CreateSource(false);
+        var held = Guid.NewGuid();
+        var stored = Guid.NewGuid();
+
+        source.Hold(CreateStateWithTradeRoutes(held));
+        source.Store(stored, StoredRead(CreateStateWithTradeRoutes(stored)));
+
+        var reader = new PageReader(source);
+
+        // Act
+        var heldAsked = await reader.ReadAsync(held, null, true, TestContext.CancellationToken);
+        var storedAsked = await reader.ReadAsync(stored, null, true, TestContext.CancellationToken);
+        var heldWithFlag = await reader.ReadAsync(held, null, false, TestContext.CancellationToken);
+        var storedWithFlag = await reader.ReadAsync(stored, null, false, TestContext.CancellationToken);
+        var heldWithoutFlag = await reader.ReadAsync(held, null, TestContext.CancellationToken);
+        var storedWithoutFlag = await reader.ReadAsync(stored, null, TestContext.CancellationToken);
+
+        // Assert
+        Assert.IsNotNull(heldAsked.View?.TradeRoutes, "With the flag set the held profile's view should carry the set, or the checks below would prove less");
+        Assert.IsNotNull(storedAsked.View?.TradeRoutes, "With the flag set the stored profile's view should carry the set, or the checks below would prove less");
+        Assert.IsNull(heldWithFlag.View?.TradeRoutes, "With the flag false the held profile's view should carry no trade routes");
+        Assert.IsNull(storedWithFlag.View?.TradeRoutes, "With the flag false the stored profile's view should carry no trade routes");
+        Assert.IsNull(heldWithoutFlag.View?.TradeRoutes, "The overload without the flag should give the held profile no trade routes");
+        Assert.IsNull(storedWithoutFlag.View?.TradeRoutes, "The overload without the flag should give the stored profile no trade routes");
+        Assert.AreEqual(held, heldWithFlag.View?.ProfileId, "The held profile should still get a view");
+        Assert.AreEqual(stored, storedWithFlag.View?.ProfileId, "The stored profile should still get a view");
+    }
+
+    /// <summary>
     /// Creates a state of a profile with one island and one entry.
     /// </summary>
     /// <param name="profileId">The profile identity</param>
@@ -440,6 +478,49 @@ public sealed class PageReaderTests : IDisposable
                                      Name = "Island 1"
                                  }
                              ]
+               };
+    }
+
+    /// <summary>
+    /// Creates the state of <see cref="CreateState" /> with a set of one trade route.
+    /// </summary>
+    /// <param name="profileId">The profile identity</param>
+    /// <returns>The state</returns>
+    private static StoredProfileState CreateStateWithTradeRoutes(Guid profileId)
+    {
+        var state = CreateState(profileId);
+
+        return new StoredProfileState
+               {
+                   Profile = state.Profile,
+                   LatestTick = state.LatestTick,
+                   Islands = state.Islands,
+                   LatestTradeRoutes = new ContractTradeRoutes
+                                       {
+                                           Id = Guid.NewGuid(),
+                                           ProfileId = profileId,
+                                           ReceiveTime = new DateTimeOffset(2026, 11, 13, 12, 0, 0, TimeSpan.Zero),
+                                           Routes = [
+                                                        new ContractTradeRoute
+                                                        {
+                                                            Id = 7,
+                                                            Name = "Ostia",
+                                                            Folder = string.Empty,
+                                                            MajorProblems = 1,
+                                                            MinorProblems = 0,
+                                                            Ships = 1,
+                                                            LostShips = 0,
+                                                            Stations = [
+                                                                           new ContractTradeRouteStation
+                                                                           {
+                                                                               SessionGuid = 10,
+                                                                               IslandId = 1,
+                                                                               AreaIndex = 0
+                                                                           }
+                                                                       ]
+                                                        }
+                                                    ]
+                                       }
                };
     }
 
