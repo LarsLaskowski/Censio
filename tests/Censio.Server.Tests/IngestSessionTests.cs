@@ -1258,14 +1258,17 @@ public sealed class IngestSessionTests : IDisposable
 
         var (reply, _, _) = await IngestClient.ReceiveAsync(client);
 
+        await told.WaitAsync(_followerBound, TestContext.CancellationToken);
+
+        // Read before the close, whose disconnect tells the followers of the Companion
+        var toldNotices = notices.ToList();
+
         await FinishAsync(client, run);
 
         // Assert
-        await told.WaitAsync(_followerBound, TestContext.CancellationToken);
-
         AssertAcknowledgement(reply, Id1, null, null, []);
         Assert.AreSequenceEqual(ExpectedClientTradeRoutes(Id1), DescribeTradeRoutes(await _store.ReadTradeRoutesAsync(Guid.Parse(IngestClient.Profile), TestContext.CancellationToken)), "The trade routes should be stored with every value");
-        Assert.AreSequenceEqual(new[] { $"TradeRoutes {IngestClient.Profile}" }, notices.ToList(), "The followers should be told that the profile's trade routes changed");
+        Assert.AreSequenceEqual(new[] { $"TradeRoutes {IngestClient.Profile}" }, toldNotices, "The followers should be told that the profile's trade routes changed");
         Assert.Contains("Companion disconnected; 1 messages accepted, 0 refused.", LogMessages(), "The trade routes should be counted as accepted");
         AssertNoMarkerInLog();
     }
@@ -1330,6 +1333,78 @@ public sealed class IngestSessionTests : IDisposable
         Assert.Contains("Companion disconnected; 0 messages accepted, 1 refused.", LogMessages(), "The trade routes should be counted as refused");
         Assert.IsNull(await _store.ReadTradeRoutesAsync(Guid.Parse(IngestClient.Profile), TestContext.CancellationToken), "The trade routes should not be stored");
         AssertNoMarkerInLog();
+    }
+
+    /// <summary>
+    /// A trade-routes message that breaks a value rule but has a usable id (an all-zero profile identity, a receive time
+    /// not in UTC) is acknowledged by that id with the refusal invalid, stores nothing and tells no follower; the
+    /// connection stays open.
+    /// </summary>
+    /// <param name="label">The name of the broken rule</param>
+    /// <param name="replaced">The text of <see cref="IngestClient.TradeRoutes" /> that is replaced</param>
+    /// <param name="replacement">The text that breaks the rule</param>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC7")]
+    [DataRow("all-zero profile identity", IngestClient.Profile, ZeroId)]
+    [DataRow("receive time not in UTC", IngestClient.Time, "2026-11-12T11:20:30.1234567+01:00")]
+    public async Task IngestSessionTradeRoutesRefusedAcknowledgedById(string label, string replaced, string replacement)
+    {
+        // Arrange
+        var (_, client, _) = await StartAcceptedSessionAsync();
+        var (notices, told) = Follow(1);
+
+        var refused = IngestClient.TradeRoutes(Id1).Replace(replaced, replacement, StringComparison.Ordinal);
+
+        // Act
+        await SendAllAsync(client, [refused, TickOfOtherProfile(Id2)]);
+
+        var replies = await ReceiveMessagesAsync(client, 2);
+
+        // Assert
+        await told.WaitAsync(_followerBound, TestContext.CancellationToken);
+
+        AssertAcknowledgement(replies[0], Id1, ContractAcknowledgementRefusal.Invalid, null, []);
+        AssertAcknowledgement(replies[1], Id2, null, null, []);
+        Assert.IsNull(await _store.ReadTradeRoutesAsync(Guid.Parse(IngestClient.Profile), TestContext.CancellationToken), $"No trade routes should be stored for the hello's profile: {label}");
+        Assert.IsNull(await _store.ReadTradeRoutesAsync(Guid.Empty, TestContext.CancellationToken), $"No trade routes should be stored for the all-zero profile: {label}");
+        Assert.AreSequenceEqual(new[] { $"Profile {OtherProfile}" }, notices.ToList(), $"No follower should be told of the refused trade routes, only of the later tick: {label}");
+    }
+
+    /// <summary>
+    /// A trade-routes message the reader refuses as too large (a route name of 766 bytes) closes the connection with 1009,
+    /// a malformed one with 1008, both without a reply and an empty reason; nothing is stored and the message counts as
+    /// refused.
+    /// </summary>
+    /// <param name="label">The name of the case</param>
+    /// <param name="status">The expected close status</param>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC7")]
+    [DataRow("too large", WebSocketCloseStatus.MessageTooBig)]
+    [DataRow("malformed", WebSocketCloseStatus.PolicyViolation)]
+    public async Task IngestSessionTradeRoutesTooLargeClosesWithoutStoring(string label, WebSocketCloseStatus status)
+    {
+        // Arrange
+        var (run, client, _) = await StartAcceptedSessionAsync();
+
+        var message = label == "malformed"
+                          ? "{'type':'tradeRoutes','contractVersion':2"
+                          : IngestClient.TradeRoutes(Id1).Replace("'MARKERROUTE'", $"'{new string('a', 766)}'", StringComparison.Ordinal);
+
+        // Act
+        await IngestClient.SendAsync(client, message);
+
+        var (messages, closeStatus, closeDescription) = await IngestClient.ReceiveUntilCloseAsync(client);
+
+        await FinishAsync(client, run);
+
+        // Assert
+        Assert.IsEmpty(messages, $"No reply should be sent: {label}");
+        Assert.AreEqual(status, closeStatus, $"The connection should be closed with the expected status: {label}");
+        Assert.AreEqual(string.Empty, closeDescription, $"The close should carry an empty reason: {label}");
+        Assert.Contains("Companion disconnected; 0 messages accepted, 1 refused.", LogMessages(), $"The message should be counted as refused: {label}");
+        Assert.IsNull(await _store.ReadTradeRoutesAsync(Guid.Parse(IngestClient.Profile), TestContext.CancellationToken), $"The trade routes should not be stored: {label}");
     }
 
     /// <summary>

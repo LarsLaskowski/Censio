@@ -78,6 +78,17 @@ public sealed class ServerStateTests
     private const string RepairIslandReadsSql = "DROP VIEW temp.\"Islands\";";
 
     /// <summary>
+    /// The statement that makes every read of the stored trade-route sets fail on a pooled connection, as
+    /// <see cref="BreakIslandReadsSql" /> does for the islands.
+    /// </summary>
+    private const string BreakTradeRouteReadsSql = "CREATE TEMP VIEW \"TradeRouteSets\" AS SELECT * FROM main.\"TradeRouteSets\" WHERE json('not json') IS NOT NULL;";
+
+    /// <summary>
+    /// The statement that removes the view of <see cref="BreakTradeRouteReadsSql" />.
+    /// </summary>
+    private const string RepairTradeRouteReadsSql = "DROP VIEW temp.\"TradeRouteSets\";";
+
+    /// <summary>
     /// The statement that renames the icon table back.
     /// </summary>
     private const string RestoreIconsSql = "ALTER TABLE \"IconsMoved\" RENAME TO \"Icons\";";
@@ -2059,6 +2070,49 @@ public sealed class ServerStateTests
         // Assert
         Assert.DoesNotContain(profiles[0], heldBefore, "The profile should not be held before its tick, or the test would prove less");
         Assert.AreSequenceEqual(DescribeTradeRoutes(routes), DescribeTradeRoutes(GetHeld(state, profiles[0])?.LatestTradeRoutes), "The entering profile should hold its stored trade routes");
+    }
+
+    /// <summary>
+    /// A profile whose trade routes cannot be read as it enters the held profiles is handled as a failed island read: the
+    /// tick is stored, the error logged once, the profile stays unheld and marked, and it enters with its stored latest
+    /// state, trade routes included, at its next tick.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC6")]
+    public async Task ServerStateStoreTickAsyncEnteringTradeRoutesReadFailureKeepsProfileMarked()
+    {
+        // Arrange
+        var databaseFile = CreateDatabaseFile();
+        var (store, state) = await OpenRestoredAsync(databaseFile);
+
+        var heldId = Guid.NewGuid();
+        var markedId = Guid.NewGuid();
+        var routes = CreateEveryValueTradeRoutes(markedId, 15);
+
+        await StoreTicksAsync(state, CreateTick(heldId, 20, CreateIsland(1, IslandName, CreateEntry(1))));
+
+        // Written to the store alone, so the entering read has a set to read
+        await store.StoreTradeRoutesAsync(routes, TestContext.CancellationToken);
+        ExecutePooled(databaseFile, BreakTradeRouteReadsSql);
+
+        // Act
+        var failed = await state.StoreTickAsync(CreateTick(markedId, 30, CreateIsland(1, IslandName, CreateEntry(2))), TestContext.CancellationToken);
+
+        // Assert
+        var heldAfterFailure = state.HeldProfiles.ToList();
+
+        ExecutePooled(databaseFile, RepairTradeRouteReadsSql);
+        await StoreTicksAsync(state, CreateTick(markedId, 10, CreateIsland(2, "Island of an older tick", CreateEntry(3))));
+
+        var stored = await store.ReadProfileStateAsync(markedId, TestContext.CancellationToken);
+
+        Assert.AreEqual(ServerStoreOutcome.Stored, failed.Outcome, "The tick should be stored although the trade routes cannot be read");
+        Assert.AreSequenceEqual(new[] { (LogLevel.Error, ReadFailureLine, true) }, _logger.Entries.Select(entry => (entry.Level, entry.Message, entry.Exception is SqliteException)).ToList(), "The failed trade-routes read should be logged once as an error with its exception");
+        Assert.AreSequenceEqual(new[] { heldId }, heldAfterFailure, "The profile should stay unheld after the failed read");
+        Assert.AreSequenceEqual(new[] { heldId, markedId }.Order().ToList(), state.HeldProfiles.Order().ToList(), "The marked profile should be held after its next tick");
+        Assert.AreSequenceEqual(DescribeTradeRoutes(routes), DescribeTradeRoutes(GetHeld(state, markedId)?.LatestTradeRoutes), "The profile should enter with its stored trade routes");
+        Assert.AreSequenceEqual(DescribeState(stored), DescribeState(await ReadStateAsync(state, markedId)), "The held state should be the stored latest state, not the older tick");
     }
 
     /// <summary>
