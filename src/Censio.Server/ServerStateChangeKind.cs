@@ -18,5 +18,10 @@ public enum ServerStateChangeKind
     /// <summary>
     /// The Companion's connection or pipe state changed.
     /// </summary>
-    Companion
+    Companion,
+
+    /// <summary>
+    /// The trade routes of a profile changed.
+    /// </summary>
+    TradeRoutes
 }

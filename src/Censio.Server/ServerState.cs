@@ -306,6 +306,20 @@ public sealed partial class ServerState : IProfileStateSource
         }
     }
 
+    // Skeleton: removed with the implementation
+#pragma warning disable RH2003, S2325
+    /// <summary>
+    /// Stores the trade routes of a profile.
+    /// </summary>
+    /// <param name="routes">The trade routes</param>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>The result of the store</returns>
+    public async Task<ServerStoreResult> StoreTradeRoutesAsync(ContractTradeRoutes routes, CancellationToken cancellationToken)
+    {
+        throw new NotImplementedException();
+    }
+#pragma warning restore RH2003, S2325
+
     /// <summary>
     /// Stores a catalog.
     /// </summary>
