@@ -417,7 +417,7 @@ A settings file that is invalid as a whole (too large, not JSON, unreadable) sho
 
 **Accepted risk.** The pages need no login (*Web interface*), and the server listens on your PC's loopback port: every program and every other signed-in Windows user of the same PC can reach the port, read every profile and delete history. Without the ingest token, which lies in your private folder `%LOCALAPPDATA%\Censio\Server`, none of them can send data. No other device of your network reaches the server. Use local mode only on a PC whose users and programs you trust.
 
-Not yet tried: the release ZIP on a Windows 11 machine without .NET, that a loopback bind raises no firewall prompt, a port taken by a program that listens on all interfaces, and a port that Windows reserves.
+Tried by the Product Manager on a Windows 11 x64 machine without .NET: the release ZIP with the steps above, that a loopback bind raises no firewall prompt, and a port taken by a standalone `Censio.Server` that listens on all interfaces. Not yet tried: a port that Windows reserves.
 
 ### Build from source
 
@@ -947,7 +947,7 @@ Eine Einstellungsdatei, die als Ganzes ungültig ist (zu groß, kein JSON, nicht
 
 **Akzeptiertes Risiko.** Die Seiten brauchen keine Anmeldung (*Weboberfläche*), und der Server lauscht auf dem Loopback-Port Ihres PCs: Jedes Programm und jeder andere angemeldete Windows-Benutzer desselben PCs kann den Port erreichen, jedes Profil lesen und den Verlauf löschen. Ohne das Ingest-Token, das in Ihrem privaten Ordner `%LOCALAPPDATA%\Censio\Server` liegt, kann keiner von ihnen Daten senden. Kein anderes Gerät Ihres Netzes erreicht den Server. Den lokalen Modus nur auf einem PC verwenden, dessen Benutzern und Programmen Sie vertrauen.
 
-Noch nicht ausprobiert: das Release-ZIP auf einem Windows-11-Rechner ohne .NET, dass ein Loopback-Bind keine Firewall-Abfrage auslöst, ein Port, den ein Programm belegt, das auf allen Schnittstellen lauscht, und ein Port, den Windows reserviert.
+Vom Product Manager auf einem Windows-11-x64-Rechner ohne .NET ausprobiert: das Release-ZIP mit den Schritten oben, dass ein Loopback-Bind keine Firewall-Abfrage auslöst, und ein Port, den ein eigenständiger `Censio.Server` belegt, der auf allen Schnittstellen lauscht. Noch nicht ausprobiert: ein Port, den Windows reserviert.
 
 ### Aus dem Quellcode bauen
 

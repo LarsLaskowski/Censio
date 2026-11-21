@@ -42,9 +42,9 @@ running another assembly's start-up code, unless the builder's options set both.
 
 `Censio.Companion.Core` references `Censio.Server`. The Companion's publish adds the server's published `wwwroot` and
 endpoints manifest and leaves out its `appsettings.json`. In local mode the host is built only from the values the
-Companion passes: the host settings (application name, environment, content root, web root, no hosting startup) in its
-options, everything else in memory, with no environment variables and no configuration files; the rules are in
-[local-mode](../areas/local-mode.md).
+Companion passes: the host settings (application name, environment, content root, web root, no hosting startup, no
+preferred hosting URLs) in its options, everything else in memory, with no environment variables and no configuration
+files; the rules are in [local-mode](../areas/local-mode.md).
 
 ## Consequences
 

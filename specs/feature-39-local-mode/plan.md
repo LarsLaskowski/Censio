@@ -27,7 +27,7 @@ replay, live data is #40.
 | 12 | A loopback bind does not raise the Windows Defender Firewall prompt. | to verify: AC7, Product Manager (basis: Windows documents prompts for listeners on non-loopback addresses) | unverified |
 | 13 | The issue's dependencies #13 and #32 are closed; records 0015 and 0066 already decide local mode and the database under local app data. | `gh api` issue reads; the records | confirmed |
 | 14 | The Companion log sanitizes and cuts every message, also of foreign categories. | `LogFileLogger.Log` → `LogLine.Format` → `Sanitize` | confirmed |
-| 15 | `WebApplication.CreateBuilder` reads the `ASPNETCORE_` host settings before `Configuration.Sources.Clear()`: `ASPNETCORE_WEBROOT` moves the web root and `ASPNETCORE_HOSTINGSTARTUPASSEMBLIES` runs a named assembly's `IHostingStartup`; `WebRootPath` and `Args = ["--preventHostingStartup=true"]` in the options win over both (also with `ASPNETCORE_PREVENTHOSTINGSTARTUP=false`), and the options win over `ASPNETCORE_CONTENTROOT`, `_APPLICATIONNAME` and `DOTNET_ENVIRONMENT`. | Security's and the Devil's Advocate's probes, SDK 11.0.100 (*Security review*, *Challenge* 1) | confirmed |
+| 15 | `WebApplication.CreateBuilder` reads the `ASPNETCORE_` host settings before `Configuration.Sources.Clear()`: `ASPNETCORE_WEBROOT` moves the web root and `ASPNETCORE_HOSTINGSTARTUPASSEMBLIES` runs a named assembly's `IHostingStartup`; `ASPNETCORE_URLS` with `ASPNETCORE_PREFERHOSTINGURLS=true` replaces the explicit `Listen` calls; `WebRootPath` and `Args = ["--preventHostingStartup=true", "--preferHostingUrls=false"]` in the options win over all three (also with `ASPNETCORE_PREVENTHOSTINGSTARTUP=false`), and the options win over `ASPNETCORE_CONTENTROOT`, `_APPLICATIONNAME` and `DOTNET_ENVIRONMENT`. | Security's and the Devil's Advocate's probes, SDK 11.0.100 (*Security review*, *Challenge* 1) | confirmed |
 | 16 | `HostFilteringOptions.AllowEmptyHosts` is `true` by default and not bound from configuration (only `AllowedHosts` is read), so a request without `Host` passes unless the option is set in code; Kestrel accepts an HTTP/1.0 request without `Host`. | to verify: the Tester's AC6 case "HTTP/1.0 without `Host`" in step 5 (basis: ASP.NET Core `HostFilteringOptions`, `GenericWebHostBuilder` post-configuration of `AllowedHosts`) | unverified |
 
 ## Tests per criterion
@@ -53,7 +53,7 @@ ring, token, database, state, retention, the middleware and maps in today's orde
 stay identical. `StartLocalAsync`:
 - builds the host with `WebApplicationOptions` `ApplicationName` `Censio.Server`, `EnvironmentName` `Production`,
   `ContentRootPath` `options.ContentRoot`, `WebRootPath` `Path.Combine(options.ContentRoot, "wwwroot")`, `Args`
-  `["--preventHostingStartup=true"]` (fact 15); clears `builder.Configuration.Sources` and adds in memory only
+  `["--preventHostingStartup=true", "--preferHostingUrls=false"]` (fact 15); clears `builder.Configuration.Sources` and adds in memory only
   `Censio:DataDirectory` = `options.DataDirectory`, `AllowedHosts` = `localhost;127.0.0.1;[::1]` (record 0100); then
   calls `UseStaticWebAssets()`; configures `HostFilteringOptions.AllowEmptyHosts = false` in code (fact 16);
 - listens on `LocalEndpoints(port, listenOnIPv6)` through `ConfigureKestrel` (explicit `Listen` calls; no URLs);

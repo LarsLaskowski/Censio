@@ -53,8 +53,9 @@ without Docker rely on it.
 
 - The hosted server is the server of [`server.md`](server.md) with the same pages, `/health` and `/ingest`, and shows
   the version of the build. It takes no setting from outside: no environment variable, no configuration file, no command
-  line takes effect; the tests show `ASPNETCORE_URLS`, `ASPNETCORE_WEBROOT`, `ASPNETCORE_HOSTINGSTARTUPASSEMBLIES` and
-  `CENSIO__INGEST__REQUIRETOKEN` changing nothing. The host settings come from the Companion, the rest from memory.
+  line takes effect; the tests show `ASPNETCORE_URLS` (also with `ASPNETCORE_PREFERHOSTINGURLS` set to `true`),
+  `ASPNETCORE_WEBROOT`, `ASPNETCORE_HOSTINGSTARTUPASSEMBLIES` and `CENSIO__INGEST__REQUIRETOKEN` changing nothing. The
+  host settings come from the Companion, the rest from memory.
 - The data folder is `%LOCALAPPDATA%\Censio\Server`. It is fixed, private to the Windows user like the other Companion
   folders, and kept when the Companion is removed. The server creates it at the first start with its database `censio.db`,
   its data-protection key ring and its ingest token file `ingest-token`, under the rules of [`server.md`](server.md),
@@ -121,8 +122,8 @@ send data. The host rule stops other sites in the player's browser, not programs
 - Local mode is for Windows 11 x64 with no installed .NET, no installer, no administrator rights and a default
   browser. On Windows 10 22H2 the Companion still runs as [`companion.md`](companion.md) (*Platform*) states; local mode
   is neither supported, nor tried, nor refused there.
-- Not yet verified on Windows: the one-file ZIP on a machine without .NET, that a loopback bind raises no firewall
-  prompt, and that a program bound to all interfaces of the port makes the bind fail.
+- Verified on Windows 11 x64 without .NET: the one-file ZIP, that a loopback bind raises no firewall prompt, and that a
+  program bound to all interfaces of the port makes the bind fail (`Server: port <port> in use`).
 
 ## Related decisions
 
