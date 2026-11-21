@@ -5,7 +5,7 @@
 Sending a replayed recording to a server: the Companion's switches `--server` and `--token-file`, the token file, the
 connection and its rules, the hello and the profile a run creates, what is sent and in which order, one message in
 flight, the keep-alive, the timeouts, the status texts and counts, the log lines, and what never leaves the machine.
-A tester who runs the server without the game relies on it. It is no live sending: forward mode, the buffer and the
+A tester who runs the server without the game relies on it. In local mode a replay without `--server` sends to the server the Companion hosts (*Local mode*). It is no live sending: forward mode, the buffer and the
 resend are #40 and #41, and the catalog and icons are #42. The messages themselves are in [`contract.md`](contract.md),
 what the server does with them in [`ingest.md`](ingest.md).
 
@@ -20,7 +20,7 @@ what the server does with them in [`ingest.md`](ingest.md).
   `--record`.
 - The address must be an absolute `ws://` or `wss://` address with a host and without user name, password or fragment;
   its text holds no `#`, no white space and no control character. A query is allowed. The address is used as given.
-- Without `--server` a replay behaves as before and opens no network connection.
+- Without `--server` a replay behaves as before and opens no network connection, except in local mode (*Local mode*).
 
 ### Token file
 
@@ -51,6 +51,23 @@ what the server does with them in [`ingest.md`](ingest.md).
 5. At the end of the recording the connection is closed.
 6. Closing: the Companion sends a close frame with status 1000 and waits at most 2 seconds for the server's close, then
    aborts the connection.
+
+### Local mode
+
+- In local mode ([`local-mode.md`](local-mode.md)), `--replay` without `--server` sends to the hosted server; `--server`
+  and `--token-file` keep the rules above, and `--token-file` without `--server` stays an invalid command line. A replay
+  without `--server` is therefore no longer offline in local mode.
+- The run is the one of *Order of a run* with these differences: there is no token file, so step 1 does nothing. In step 3 the status text
+  reads `Replay: Connecting to server` until the hosted server runs, then the Companion connects to
+  `ws://127.0.0.1:<port>/ingest` (the port of the setting) and the hello is answered; the hello carries the token the hosted
+  server holds in the process, not read from a file. The hello and everything after it are as above, so the pages show the
+  profile `Replay <time>`.
+- The wait has no time limit of its own: it ends when the server runs or when it is known not to start. A server that
+  does not start (`Server: port <port> in use`, `Server: failed` or `Server: settings invalid`) ends the replay with
+  `Replay error: local server not running`; nothing is retried. A server that stops after it ran ends the replay with
+  the reason of a lost connection (*Limits and errors*).
+- Only one Companion runs per Windows session ([`companion.md`](companion.md), *Single instance*), so a replay is started
+  after `Exit`; the Companion of the replay hosts the server and keeps it running after `Replay finished` until `Exit`.
 
 ### Connection
 
@@ -149,6 +166,7 @@ below are done by the Companion at once.
 | server does not support contract version 2 | `helloRefused` `unsupportedVersion`, a server of release 0.3.0 that reads version 1 among them |
 | server does not answer | No `helloAccepted` or `helloRefused` within 30 seconds of the hello, a message the server does not take within 30 seconds, or no acknowledgement within 30 seconds of a message |
 | server connection lost | The connection ends after the hello (a close frame, a failed send or receive, a server that stops) |
+| local server not running | Local mode only: the hosted server did not start (its port is in use, it failed, or the settings are invalid) |
 | invalid server reply | A frame that is not a readable contract message, is binary, is larger than 65,536 bytes, is of a type the server does not send at that point, or acknowledges another message than the awaited one, also one that arrives while nothing is awaited |
 
 - A reply is read up to 65,536 bytes and never further.
@@ -217,11 +235,12 @@ shell's encoding is confirmed. Not tried: `docker cp` for the token file, a toke
 - [`decisions/0036-pipe-recording-raw-frames-and-replay-on-a-recorded-clock.md`](../decisions/0036-pipe-recording-raw-frames-and-replay-on-a-recorded-clock.md) — the replay's receive times are the recorded ones.
 - [`decisions/0019-websocket-transport-with-shared-token.md`](../decisions/0019-websocket-transport-with-shared-token.md) — the WebSocket with a shared token the sender presents.
 - [`decisions/0096-contract-version-2-adds-trade-routes-read-exactly.md`](../decisions/0096-contract-version-2-adds-trade-routes-read-exactly.md) — version 2 adds the trade-routes message a replay sends.
+- [`decisions/0101-local-replay-sent-to-the-hosted-server-with-the-token-in-memory.md`](../decisions/0101-local-replay-sent-to-the-hosted-server-with-the-token-in-memory.md) — in local mode a replay without `--server` waits for the hosted server and sends with the token held in the process.
 
 ## Not here
 
 - The messages, their reader and writer and the refusal texts: [`contract.md`](contract.md).
 - The server's endpoint and answers: [`ingest.md`](ingest.md); token rules: [`ingest-token.md`](ingest-token.md); what it keeps: [`server-state.md`](server-state.md).
-- The recording file and the replay's pacing: [`pipe-recording.md`](pipe-recording.md); the tray and the command line: [`companion.md`](companion.md).
+- The recording file and the replay's pacing: [`pipe-recording.md`](pipe-recording.md); the tray and the command line: [`companion.md`](companion.md); the hosted server: [`local-mode.md`](local-mode.md).
 - Live sending, the buffer and the resend (#40, #41); the catalog and the icons (#42).
 - The code: `ReplaySender`, `ClientWebSocketConnector`, `ReplayTokenFile` and `PipeReplayRunner` in `src/Censio.Companion.Core`.

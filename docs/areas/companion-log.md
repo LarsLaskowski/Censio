@@ -24,7 +24,7 @@ background writer with its bounds. A user who checks a log before sharing it, an
   connection state with the error kind, the Windows error code and the received version (only changes, never a line
   per skipped frame); recording started and stopped at the click, its file name (the name only) when the file is
   created, a recording failure and the failure of a stopped recording; the result of the game installation search at every start (found with its source, build and folder, or the warning of its failure; [`game-installation.md`](game-installation.md), *Log*), where the folder and the settings file path are logged as written and may hold the Windows user name; the catalog (below); a replay's start (the file name only), its
-  end and its problem reason; for a replay sent to a server the four lines of [`replay-sending.md`](replay-sending.md) (*Log*): `Replay connected to the server`, `Replay refused by the server: <reason>`, `Replay sending failed: <reason>` and `Replay sent <n> ticks, <r> refused`, never with the token, the address, a name or an exception text; a folder that could not be opened; the autostart turned on (`Autostart enabled`) or off (`Autostart disabled`) and, as warnings, `Could not read the autostart setting` (once until a read succeeds again, so a blocked registry does not log at every menu opening) and `Could not change the autostart setting`, with the exception where there is one and never the exe path; an unexpected error of a background task; and `Exit`.
+  end and its problem reason; for a replay sent to a server the four lines of [`replay-sending.md`](replay-sending.md) (*Log*): `Replay connected to the server`, `Replay refused by the server: <reason>`, `Replay sending failed: <reason>` and `Replay sent <n> ticks, <r> refused`, never with the token, the address, a name or an exception text; a folder that could not be opened; the lines of local mode (below); the autostart turned on (`Autostart enabled`) or off (`Autostart disabled`) and, as warnings, `Could not read the autostart setting` (once until a read succeeds again, so a blocked registry does not log at every menu opening) and `Could not change the autostart setting`, with the exception where there is one and never the exe path; an unexpected error of a background task; and `Exit`.
 - **Catalog lines** ([`game-catalog.md`](game-catalog.md)), none with a name or text, only GUIDs, kinds, archive paths and
   counts: `Catalog built: <n> entries; <i> inherited assets left out; <d> unknown region types dropped`
   (Information); `Catalog failed: <kind>` (Warning; the kinds `ArchiveUnreadable`, `FileMissing`, `FileUnreadable`,
@@ -52,6 +52,14 @@ background writer with its bounds. A user who checks a log before sharing it, an
   (<archive>)` (Warning; the kinds `ArchiveMissing`, `ArchiveUnreadable`, `DuplicateArchiveNumber` and `IconSetTooLarge`,
   the archive as a path relative to `maindata`, `maindata` itself when the listing failed). One of them is written per extraction, and
   none while the catalog fails, no game is found or the catalog is loaded from the cache.
+- **Local mode lines** ([`local-mode.md`](local-mode.md), *Log*): `Local server settings invalid: <problem>` (Warning; the
+  problem is one of `mode is not local`, `mode occurs more than once`, `localPort is not a port from 1 to 65535`,
+  `localPort occurs more than once`), `Local server running on port <port>` (Information), `Local server port <port> in
+  use` (Warning), `Local server failed` (Error, with the exception), `Local server stopped unexpectedly` (Error) and `Could
+  not open the browser` (Warning, with the exception). Of the hosted server itself, lines of level Warning and above are
+  written, under the rules of this document (sanitized and cut), among them the `Critical` lines of its start checks and
+  `The ingest token file could not be read back; the server stops.`; lower levels are not. The ingest token is never
+  logged.
 - The log holds no pipe content (figure name, island names, values): recording files and folders are logged by name only.
 - Text that came from outside (a replay file name, exception texts) is sanitized: each control character, format
   character, line or paragraph separator and unpaired surrogate becomes one `?`, so a text cannot add a line or hide
@@ -77,4 +85,5 @@ background writer with its bounds. A user who checks a log before sharing it, an
 - The menu entry `Open log folder` and the other folders: [`companion.md`](companion.md) (*Folders*).
 - The tray icon, the menu, the settings file and the other Companion behavior: [`companion.md`](companion.md).
 - The diagnostics window: [`companion-diagnostics.md`](companion-diagnostics.md).
+- The hosted server and the meaning of its lines: [`local-mode.md`](local-mode.md), [`server.md`](server.md).
 - The catalog, its icons and its cache that the lines report on: [`game-catalog.md`](game-catalog.md), [`game-catalog-icons.md`](game-catalog-icons.md), [`game-catalog-cache.md`](game-catalog-cache.md).

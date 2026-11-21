@@ -5,7 +5,7 @@
 The server's HTTP surface: the address it listens on, the start page, the health check, the ingest route and what is open
 without login, how unknown paths and plain HTTP are treated, the version it shows, the data directory with its
 data-protection key ring, ingest token file and database file, the order of the start checks, and the Docker image it ships in. Operators who run the server and
-the Docker health probe rely on it.
+the Docker health probe rely on it. The server also runs inside the Companion ([`local-mode.md`](local-mode.md)).
 
 ## Behavior
 
@@ -16,6 +16,10 @@ the Docker health probe rely on it.
   `Now listening on: http://localhost:5000`. The image listens on all interfaces of the container on port 8080
   (*Docker image*). No launch profile is committed, so `dotnet run` and `dotnet
   Censio.Server.dll` both start in the `Production` environment on that address.
+- The Companion can host this server in its own process for local use; it then listens on the loopback addresses
+  `127.0.0.1` and `[::1]` at the port of the Companion's settings (default 5000) and answers only the host names
+  `localhost`, `127.0.0.1` and `[::1]`; its rules are in [`local-mode.md`](local-mode.md) and do not apply to the
+  standalone server.
 - Another address is set with the standard ASP.NET Core settings (`--urls`, `ASPNETCORE_URLS`,
   `ASPNETCORE_HTTP_PORTS`); the server has no setting of its own for it.
 
@@ -80,6 +84,10 @@ the Docker health probe rely on it.
   `Critical` entry `The data-protection key ring cannot be stored in '<key directory>'; the server stops. Make the data directory writable for the user the server runs as.`
   with the exception and exits with code 1 before it listens. ASP.NET Core logs its own `Error` entry about the
   refused write before the `Critical` one. A failure of another kind is not handled by the server.
+
+- Hosted by the Companion, the data directory is `%LOCALAPPDATA%\Censio\Server` and is not set by a setting
+  ([`local-mode.md`](local-mode.md), *Hosted server and its data*); the key ring, the token file and the database lie in
+  it as above.
 
 ### Database file and start order
 
@@ -161,10 +169,12 @@ the Docker health probe rely on it.
 - [`decisions/0012-release-pre-release-first-and-secret-free-builds.md`](../decisions/0012-release-pre-release-first-and-secret-free-builds.md) — releases run as pre-release first, artifacts are built without secrets and `latest` is set by digest at the promotion.
 - [`decisions/0026-server-image-linux-amd64-on-docker-hub-no-compose.md`](../decisions/0026-server-image-linux-amd64-on-docker-hub-no-compose.md) — linux/amd64 only, on Docker Hub, no compose file.
 - [`decisions/0061-ingest-token-generated-into-a-file-of-the-data-directory.md`](../decisions/0061-ingest-token-generated-into-a-file-of-the-data-directory.md) — the ingest token lives in a file of the data directory or in a file named by `Censio:Ingest:TokenFile`.
+- [`decisions/0098-companion-hosts-the-server-from-a-reference-with-bundled-web-assets.md`](../decisions/0098-companion-hosts-the-server-from-a-reference-with-bundled-web-assets.md), [`0100`](../decisions/0100-local-server-on-loopback-only-with-host-filtering.md) — the Companion hosts the server on the loopback addresses only.
 - [`decisions/0065-database-schema-kept-by-migrations-applied-at-start.md`](../decisions/0065-database-schema-kept-by-migrations-applied-at-start.md), [`0066`](../decisions/0066-database-file-setting-and-in-memory-without-data-directory.md) — the database file in the data directory, set by `Censio:Database:File`, in memory without either.
 
 ## Not here
 
+- The server inside the Companion (settings, menu, failures): [`local-mode.md`](local-mode.md).
 - The Companion's WebSocket ingest: [`ingest.md`](ingest.md); its token and the `Censio:Ingest:RequireToken` switch: [`ingest-token.md`](ingest-token.md).
 - The data pages and the icon route: [`web-pages.md`](web-pages.md).
 - The database: its file, schema, start failures and storing rules: [`server-data.md`](server-data.md).

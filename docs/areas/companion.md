@@ -4,7 +4,7 @@
 
 The Companion process on Windows: its tray icon, tooltip and menu, how it exits, how many instances run, the
 version it shows, its command line (recording the pipe, replaying a recording and sending it to a server), starting and stopping a recording
-from the menu, the optional start with Windows, the menu entry for the diagnostics window, the game installation line, the folders it opens, its settings file, and the release ZIP it ships in. The window itself is in [`companion-diagnostics.md`](companion-diagnostics.md) and the log file in [`companion-log.md`](companion-log.md). The user who starts the Companion relies on it.
+from the menu, the optional start with Windows, the menu entry for the diagnostics window, the game installation line, the folders it opens, its settings file, the entries of local mode, and the release ZIP it ships in. The window itself is in [`companion-diagnostics.md`](companion-diagnostics.md) and the log file in [`companion-log.md`](companion-log.md). Local mode itself (the hosted server) is in [`local-mode.md`](local-mode.md). The user who starts the Companion relies on it.
 
 ## Behavior
 
@@ -31,7 +31,7 @@ from the menu, the optional start with Windows, the menu entry for the diagnosti
   (*problem*) for `Protocol mismatch`, `Error` and an invalid command line. In a replay the icon follows the replayed
   state, shows *waiting* after `Replay finished` and *problem* after `Replay error`.
 - The context menu holds, top to bottom: `Status: <status text>` (greyed out), `Last tick: <time>, <n> islands` or
-  `Last tick: none` (greyed out), `Game: <state>` (greyed out), `Catalog: <state>` (greyed out), a separator, `Open diagnostics`, `Start recording` or `Stop recording`, `Open recordings folder`, `Open
+  `Last tick: none` (greyed out), `Game: <state>` (greyed out), `Catalog: <state>` (greyed out), in local mode `Server: <state>` (greyed out, [`local-mode.md`](local-mode.md), *Menu*), a separator, in local mode `Open Censio`, `Open diagnostics`, `Start recording` or `Stop recording`, `Open recordings folder`, `Open
   log folder`, a separator, `Start with Windows` (checked while the autostart is on, enabled in every mode), a separator, `Version <version>` (greyed out, nothing happens on click), a separator and `Exit`. The
   values are current each time the menu opens. `Open diagnostics` is enabled in every mode (live, `--record`, replay and an invalid command line); `Start recording` is greyed out in a replay and with an invalid command
   line. The menu is light, also with Windows in dark mode.
@@ -48,11 +48,11 @@ from the menu, the optional start with Windows, the menu entry for the diagnosti
   ended in a settings error) or `Catalog: failed`. The catalog is loaded from the cache or built in the background at
   every start in every mode, the invalid command line included, and again when a check at a new pipe connection finds the
   game changed; neither the menu, the connection, the diagnostics window nor `Exit` waits for it, and `Exit` during an
-  extraction or a cache write ends the process within 2 seconds as always.
+  extraction or a cache write ends the process within 2 seconds as always (5 in local mode).
 - `<version>` is the informational version the Companion was built with: `0.0.0` without a version, otherwise
   the build property `Version` exactly as passed.
-- `Exit` removes the icon at once and ends the process with exit code 0 within 2 seconds in every connection state;
-  the tray never waits for a pending pipe call, the disk or the log.
+- `Exit` removes the icon at once and ends the process with exit code 0 within 2 seconds in every connection state, in local mode within 5 seconds so that the server can stop ([`local-mode.md`](local-mode.md), *Stop*);
+  the tray never waits for a pending pipe call, the disk, the log, the server or the browser.
 - When Windows Explorer restarts, the icon appears again once the notification area is back. Sign-out and
   shutdown end the Companion without a dialog.
 
@@ -98,7 +98,7 @@ described in the other sections.
   while no recording runs or while no frame arrives.
 - `Stop recording` writes the frames still waiting in the background and closes the file; the tray never waits for the
   disk. A new start can run while the stopped recording still writes.
-- `Exit` ends the Companion as without a recording, within 2 seconds with exit code 0; the frames still waiting get
+- `Exit` ends the Companion as without a recording, within 2 seconds (5 in local mode) with exit code 0; the frames still waiting get
   the time [`pipe-recording.md`](pipe-recording.md) (*Writing*) states.
 - If the recording fails, the status text ends with ` (recording failed)` and the entry reads `Start recording`. The
   connection is not affected. A new `Start recording` tries again with a new file and shows ` (recording)`. A stopped
@@ -114,6 +114,7 @@ described in the other sections.
   (`<Windows folder>\explorer.exe`) with the folder as its one argument, and only for a fully qualified folder path.
 - The menu does not wait for the disk or for Explorer. If a folder cannot be created or opened, or is not a full path
   (local app data unresolved), a warning is logged and nothing else changes.
+- In local mode the hosted server's data folder is `%LOCALAPPDATA%\Censio\Server` ([`local-mode.md`](local-mode.md), *Hosted server and its data*): fixed, without a menu entry, created by the server at its first start, private like the recordings folder, and kept when the Companion is removed.
 - The catalog cache lies in `%LOCALAPPDATA%\Censio\Cache` (file `catalog.bin`, [`game-catalog-cache.md`](game-catalog-cache.md)):
   fixed, without a menu entry, created at the first write, private like the recordings folder, and kept when the Companion is removed.
 
@@ -129,11 +130,13 @@ described in the other sections.
 ### Settings file
 
 - The Companion reads the optional file `%LOCALAPPDATA%\Censio\settings.json` once per start, for the game folder
-  ([`game-installation.md`](game-installation.md)). The path is fixed and the file is never written, created or
+  ([`game-installation.md`](game-installation.md)) and for local mode (`mode` and `localPort`, below). The path is fixed and the file is never written, created or
   repaired by the Companion; a missing file, or a path that is not a full path, is no error. A change counts after a
   restart.
 - The file is UTF-8 JSON whose root is an object. A leading byte order mark, `//` and `/* */` comments and trailing
-  commas are accepted. The key `gameFolder` is matched ignoring case (`GameFolder`); every other key, and a
+  commas are accepted. The key `gameFolder` is matched ignoring case (`GameFolder`); so are `mode` and `localPort`, which switch local mode on
+  and set its port ([`local-mode.md`](local-mode.md), *Switching on*: `"mode": "local"`, `localPort` from 1 to 65535,
+  default 5000, read only with `mode` `local`); every other key, and a
   `gameFolder` nested in another object, is ignored so that later settings can share the file. The value is used as
   written, without expanding variables; a blank text counts as no game folder.
 - It is invalid, with the menu text `Game: settings file invalid`, when it is larger than 1 MiB (1,048,576 bytes,
@@ -143,6 +146,8 @@ described in the other sections.
   cannot be decoded (invalid UTF-8 or a lone surrogate) makes the whole file invalid, even under an unknown key;
   invalid bytes in a comment or in another key's value are accepted.
 - The reason is logged as a warning ([`companion-log.md`](companion-log.md)); no automatic search follows an invalid file.
+  A wrong value of `mode` or `localPort` does not make the file invalid for `gameFolder`; it shows `Server: settings invalid`
+  ([`local-mode.md`](local-mode.md)).
 
 ### Replay
 
@@ -157,7 +162,7 @@ described in the other sections.
 - With `--server` the status text reads `Replay: Connecting to server` first (*waiting* look), and after the last frame
   `Replay finished: <n> ticks sent, <r> refused` (`1 tick sent` for one); a problem of sending ends it with `Replay
   error: <reason>` and the *problem* look, the reason one of [`replay-sending.md`](replay-sending.md) (*Limits and
-  errors*), which wins over a problem of the file. Without `--server` a replay opens no network connection.
+  errors*), which wins over a problem of the file. Without `--server` a replay opens no network connection, except in local mode, where it sends to the hosted server on `127.0.0.1` and shows `Replay: Connecting to server` first ([`replay-sending.md`](replay-sending.md), *Local mode*).
 - The tooltip, the last tick and the icon show the progress, and the diagnostics window shows the replayed ticks and follows the replay tick by tick; after `Replay finished` it keeps the last tick of the file. The last tick is the recorded receive time of the latest replayed tick.
 
 ### Single instance
@@ -172,7 +177,7 @@ described in the other sections.
   Windows, and a local build needs the .NET 11 Desktop Runtime (the release ZIP below does not).
 - Every release attaches the ZIP `Censio-<version>-win-x64.zip`. It holds exactly one file at its root, the
   self-contained single-file `Censio.Companion.exe` with the native libraries embedded, and needs no installed .NET,
-  installer or administrator rights, on Windows 10 22H2 and Windows 11, x64. The exe is not signed, so SmartScreen
+  installer or administrator rights, on Windows 10 22H2 and Windows 11, x64; local mode is for Windows 11 x64 only ([`local-mode.md`](local-mode.md), *Target host*) and makes the exe larger, because it holds the server and its pages' assets (about 232 MB in a measured build). The exe is not signed, so SmartScreen
   asks once ("More info", "Run anyway"). Its tray menu shows `Version <version>`; the exe's file properties show no
   product version.
 
@@ -181,7 +186,7 @@ described in the other sections.
 - The Companion shows no error message or dialog; a connection problem shows only as a status text, a recording
   problem as `(recording failed)`, a replay problem as `Replay error`, and details go to the log ([`companion-log.md`](companion-log.md)).
 - A folder that cannot be opened, or a log that cannot be written, changes nothing else and shows no message (the writer rules are in [`companion-log.md`](companion-log.md)).
-- A game folder that is missing or wrong, or a settings file that cannot be used, shows only as the `Game:` line of the menu, with the detail in the log.
+- A game folder that is missing or wrong, or a settings file that cannot be used, shows only as the `Game:` line of the menu, with the detail in the log; a local server that does not start shows only as the `Server:` line ([`local-mode.md`](local-mode.md), *Limits and errors*).
 - A read failure (access denied, a policy, a value that is not a string): the entry is shown unchecked and stays clickable, and `Could not read the autostart setting` is logged once until a read succeeds again. If the value cannot be written or deleted, a click changes nothing, `Could not change the autostart setting` is logged and the player gets no message; the next opening shows the state read then. A policy that stops Windows from starting the user's startup programs while the value can still be written is not visible: the menu shows the state of the value only. A switch-off in Windows' startup apps list is not read: the entry stays checked while Windows does not start the Companion, and the player switches it on in that list; a click deletes the value, and a later click writes it again with Windows' switch-off still in place. An exe started from inside the ZIP runs from a temporary folder, so the entry registers that path and nothing starts at sign-in once Windows cleans the folder.
 - Manual runs on Windows confirmed the behavior above (issues #13, #14 and #15, and the Product Manager's run on
   Windows 11 26H2 with the real game). Not verified yet: that the menu stays light with Windows in dark mode, that the
@@ -201,6 +206,8 @@ described in the other sections.
 - [`decisions/0044-game-installation-found-through-ubisoft-connect-or-the-settings-file.md`](../decisions/0044-game-installation-found-through-ubisoft-connect-or-the-settings-file.md) — the installation comes from Ubisoft Connect or the settings file.
 - [`decisions/0045-companion-settings-in-a-json-file-under-local-app-data.md`](../decisions/0045-companion-settings-in-a-json-file-under-local-app-data.md) — the settings are a hand-edited JSON file, never written by the Companion.
 - [`decisions/0046-game-build-is-the-program-files-version.md`](../decisions/0046-game-build-is-the-program-files-version.md) — the build is the program file's version.
+- [`decisions/0098-companion-hosts-the-server-from-a-reference-with-bundled-web-assets.md`](../decisions/0098-companion-hosts-the-server-from-a-reference-with-bundled-web-assets.md) — the Companion hosts the server and the ZIP bundles its web assets; `Exit` may take 5 seconds.
+- [`decisions/0099-local-mode-switched-on-in-the-settings-file-off-by-default.md`](../decisions/0099-local-mode-switched-on-in-the-settings-file-off-by-default.md) — local mode is switched on by `mode` in the settings file.
 
 ## Not here
 
@@ -211,4 +218,5 @@ described in the other sections.
 - The diagnostics window: [`companion-diagnostics.md`](companion-diagnostics.md).
 - The log file, its lines and its writer: [`companion-log.md`](companion-log.md).
 - Building the catalog: [`game-catalog.md`](game-catalog.md); the icons: [`game-catalog-icons.md`](game-catalog-icons.md); the cache: [`game-catalog-cache.md`](game-catalog-cache.md).
+- The hosted server, its settings, menu line and failures: [`local-mode.md`](local-mode.md).
 - Reading the game files: [`game-files.md`](game-files.md); the connection to the server for a replay: [`replay-sending.md`](replay-sending.md); the connection to the server in a live run and a settings window (later issues).
