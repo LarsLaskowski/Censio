@@ -202,6 +202,23 @@ public sealed class ReplaySender : IAsyncDisposable
     #region Methods
 
     /// <summary>
+    /// Creates a sender that sends to the local server.
+    /// </summary>
+    /// <param name="port">The port of the local server</param>
+    /// <param name="waitForToken">The delegate that waits for the token of the local server</param>
+    /// <param name="companionVersion">The version of the Companion</param>
+    /// <param name="connector">The connector</param>
+    /// <param name="timeProvider">The time provider</param>
+    /// <param name="logger">The logger</param>
+    /// <returns>The sender</returns>
+    public static ReplaySender ForLocalServer(int port, Func<CancellationToken, Task<string?>> waitForToken, string companionVersion, IReplayServerConnector connector, TimeProvider timeProvider, ILogger logger)
+    {
+#pragma warning disable RH2003, S1172 // Skeleton: removed with the implementation
+        throw new NotImplementedException();
+#pragma warning restore RH2003, S1172 // Skeleton: removed with the implementation
+    }
+
+    /// <summary>
     /// Reads the token file, if one is named.
     /// </summary>
     /// <returns>The problem, or <c>null</c> if there is none</returns>

@@ -48,5 +48,10 @@ public enum ReplaySendProblemKind
     /// <summary>
     /// The server sent a reply that is not valid.
     /// </summary>
-    InvalidReply
+    InvalidReply,
+
+    /// <summary>
+    /// The local server is not running.
+    /// </summary>
+    LocalServerNotRunning
 }

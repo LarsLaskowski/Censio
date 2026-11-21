@@ -20,9 +20,36 @@ public static class CompanionSettings
     /// </summary>
     public const string GameFolderKey = "gameFolder";
 
+    /// <summary>
+    /// The key of the mode in the settings file.
+    /// </summary>
+    public const string ModeKey = "mode";
+
+    /// <summary>
+    /// The key of the local server's port in the settings file.
+    /// </summary>
+    public const string LocalPortKey = "localPort";
+
+    /// <summary>
+    /// The port of the local server when the settings file names none.
+    /// </summary>
+    public const int DefaultLocalPort = 5000;
+
     #endregion // Constants
 
     #region Methods
+
+    /// <summary>
+    /// Reads the local server setting of the settings file.
+    /// </summary>
+    /// <param name="path">The path of the settings file</param>
+    /// <returns>The setting</returns>
+    public static LocalServerSetting ReadLocalServer(string path)
+    {
+#pragma warning disable RH2003, S1172 // Skeleton: removed with the implementation
+        throw new NotImplementedException();
+#pragma warning restore RH2003, S1172 // Skeleton: removed with the implementation
+    }
 
     /// <summary>
     /// Reads the settings file.

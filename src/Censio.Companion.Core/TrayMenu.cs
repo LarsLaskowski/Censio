@@ -66,6 +66,11 @@ public static class TrayMenu
     /// </summary>
     public const string StartWithWindowsText = "Start with Windows";
 
+    /// <summary>
+    /// The text of the entry that opens Censio in the browser.
+    /// </summary>
+    public const string OpenCensioText = "Open Censio";
+
     #endregion // Constants
 
     #region Methods
@@ -270,10 +275,11 @@ public static class TrayMenu
     /// <param name="snapshot">The snapshot</param>
     /// <param name="game">The status of the game installation search</param>
     /// <param name="catalog">The status of the game catalog</param>
+    /// <param name="localServer">The status of the local server, or <see langword="null" /> when none is hosted</param>
     /// <param name="isAutostartEnabled">Whether the Companion starts with Windows</param>
     /// <param name="clock">The clock</param>
     /// <returns>The entries in display order</returns>
-    public static IReadOnlyList<TrayMenuEntry> Create(string version, TraySnapshot snapshot, GameInstallationStatus game, GameCatalogStatus catalog, bool isAutostartEnabled, TimeProvider clock)
+    public static IReadOnlyList<TrayMenuEntry> Create(string version, TraySnapshot snapshot, GameInstallationStatus game, GameCatalogStatus catalog, LocalServerStatus? localServer, bool isAutostartEnabled, TimeProvider clock)
     {
         return [
                    new TrayMenuEntry(TrayMenuEntryKind.Status, $"Status: {snapshot.StatusText}", false),
@@ -292,6 +298,18 @@ public static class TrayMenu
                    new TrayMenuEntry(TrayMenuEntryKind.Separator, string.Empty, false),
                    new TrayMenuEntry(TrayMenuEntryKind.Exit, ExitText, true)
                ];
+    }
+
+    /// <summary>
+    /// Formats the text of the local server entry.
+    /// </summary>
+    /// <param name="status">The status of the local server</param>
+    /// <returns>The text</returns>
+    public static string FormatLocalServer(LocalServerStatus status)
+    {
+#pragma warning disable RH2003, S1172 // Skeleton: removed with the implementation
+        throw new NotImplementedException();
+#pragma warning restore RH2003, S1172 // Skeleton: removed with the implementation
     }
 
     /// <summary>
@@ -374,6 +392,9 @@ public static class TrayMenu
                    ReplaySendProblemKind.NoAnswer => "server does not answer",
                    ReplaySendProblemKind.ConnectionLost => "server connection lost",
                    ReplaySendProblemKind.InvalidReply => "invalid server reply",
+#pragma warning disable RH2003 // Skeleton: removed with the implementation
+                   ReplaySendProblemKind.LocalServerNotRunning => throw new NotImplementedException(),
+#pragma warning restore RH2003 // Skeleton: removed with the implementation
                    _ => null
                };
     }

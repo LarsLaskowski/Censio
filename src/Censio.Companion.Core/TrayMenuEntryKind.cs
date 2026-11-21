@@ -63,5 +63,15 @@ public enum TrayMenuEntryKind
     /// <summary>
     /// The entry that shows the game catalog.
     /// </summary>
-    Catalog
+    Catalog,
+
+    /// <summary>
+    /// The entry that shows the local server.
+    /// </summary>
+    LocalServer,
+
+    /// <summary>
+    /// The entry that opens Censio in the browser.
+    /// </summary>
+    OpenCensio
 }

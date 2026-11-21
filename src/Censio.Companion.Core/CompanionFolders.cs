@@ -37,5 +37,17 @@ public static class CompanionFolders
         return Path.Combine(localApplicationData, "Censio", "settings.json");
     }
 
+    /// <summary>
+    /// Gets the data folder of the local server.
+    /// </summary>
+    /// <param name="localApplicationData">The local application data folder</param>
+    /// <returns>The server folder</returns>
+    public static string Server(string localApplicationData)
+    {
+#pragma warning disable RH2003, S1172 // Skeleton: removed with the implementation
+        throw new NotImplementedException();
+#pragma warning restore RH2003, S1172 // Skeleton: removed with the implementation
+    }
+
     #endregion // Methods
 }
