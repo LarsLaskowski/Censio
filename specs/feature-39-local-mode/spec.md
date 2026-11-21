@@ -1,7 +1,7 @@
 # Spec: Local mode — the Companion hosts the server in its own process
 
 Source: Issue #39
-Status: Draft
+Status: Approved by Product Manager
 
 ## Problem
 
