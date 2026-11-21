@@ -13,7 +13,7 @@ namespace Censio.Server;
 /// <summary>
 /// Hosts the Censio server: the standalone process and the one the Companion starts in its own process.
 /// </summary>
-public static class CensioServer
+public static partial class CensioServer
 {
     #region Methods
 
@@ -60,6 +60,7 @@ public static class CensioServer
     {
         var parts = new ServerParts();
         var app = BuildLocalApp(options, parts);
+        string token;
 
         try
         {
@@ -69,6 +70,17 @@ public static class CensioServer
             {
                 return await FailAsync(app, parts, LocalServerStartKind.Failed, null).ConfigureAwait(false);
             }
+
+            var readToken = IngestTokenSetup.ReadTokenFile(Path.Combine(options.DataDirectory, IngestTokenSetup.TokenFileName));
+
+            if (readToken is null)
+            {
+                LogTokenNotReadBack(app.Logger);
+
+                return await FailAsync(app, parts, LocalServerStartKind.Failed, null).ConfigureAwait(false);
+            }
+
+            token = readToken;
 
             MapEndpoints(app, setUp.Value.Access, setUp.Value.State);
 
@@ -81,15 +93,6 @@ public static class CensioServer
         catch (Exception exception)
         {
             return await FailAsync(app, parts, LocalServerStartKind.Failed, exception).ConfigureAwait(false);
-        }
-
-        var token = IngestTokenSetup.ReadTokenFile(Path.Combine(options.DataDirectory, IngestTokenSetup.TokenFileName));
-
-        if (token is null)
-        {
-            await StopQuietlyAsync(app).ConfigureAwait(false);
-
-            return await FailAsync(app, parts, LocalServerStartKind.Failed, null).ConfigureAwait(false);
         }
 
         return new LocalServerStart
@@ -270,24 +273,6 @@ public static class CensioServer
     }
 
     /// <summary>
-    /// Stops a started application, ignoring a failure.
-    /// </summary>
-    /// <param name="app">The application.</param>
-    /// <returns>A task that completes when the stop is done.</returns>
-    private static async Task StopQuietlyAsync(WebApplication app)
-    {
-        try
-        {
-            await app.StopAsync().ConfigureAwait(false);
-        }
-        catch (OperationCanceledException exception)
-        {
-            // The application is disposed right after; the stop result does not matter.
-            _ = exception;
-        }
-    }
-
-    /// <summary>
     /// Releases what a start created, in the order retention, database, application, and builds the failed result.
     /// </summary>
     /// <param name="app">The built application.</param>
@@ -306,6 +291,13 @@ public static class CensioServer
                    Exception = exception
                };
     }
+
+    /// <summary>
+    /// Logs that the token file cannot be read back after the start checks.
+    /// </summary>
+    /// <param name="logger">The logger.</param>
+    [LoggerMessage(Level = LogLevel.Critical, Message = "The ingest token file could not be read back; the server stops.")]
+    private static partial void LogTokenNotReadBack(ILogger logger);
 
     #endregion // Methods
 }
