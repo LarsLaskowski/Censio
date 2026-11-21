@@ -1227,6 +1227,157 @@ public sealed class TrayMenuTests
     }
 
     /// <summary>
+    /// The server line reads the text of each state, with the port where the state names one (S1, S3, E1, E2, E4).
+    /// </summary>
+    /// <param name="state">The state</param>
+    /// <param name="port">The port</param>
+    /// <param name="expected">The expected text</param>
+    [TestMethod]
+    [TestCategory("AC2")]
+    [DataRow(LocalServerState.Starting, 5000, "Server: starting")]
+    [DataRow(LocalServerState.Starting, 5117, "Server: starting")]
+    [DataRow(LocalServerState.Running, 5000, "Server: running at http://localhost:5000/")]
+    [DataRow(LocalServerState.Running, 5117, "Server: running at http://localhost:5117/")]
+    [DataRow(LocalServerState.PortInUse, 5000, "Server: port 5000 in use")]
+    [DataRow(LocalServerState.PortInUse, 5117, "Server: port 5117 in use")]
+    [DataRow(LocalServerState.Failed, 5000, "Server: failed")]
+    [DataRow(LocalServerState.Failed, 5117, "Server: failed")]
+    [DataRow(LocalServerState.SettingsInvalid, 5000, "Server: settings invalid")]
+    [DataRow(LocalServerState.SettingsInvalid, 5117, "Server: settings invalid")]
+    public void TrayMenuFormatLocalServerReturnsTextPerState(LocalServerState state, int port, string expected)
+    {
+        // Arrange
+        var status = CreateLocalServerStatus(state, port);
+
+        // Act
+        var text = TrayMenu.FormatLocalServer(status);
+
+        // Assert
+        Assert.AreEqual(expected, text, $"The server line of {state} at port {port} should be its text");
+    }
+
+    /// <summary>
+    /// In local mode the greyed, unchecked server line is directly below the catalog entry and directly above the first
+    /// separator, with the text of the status (S1).
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC2")]
+    public void TrayMenuCreateInLocalModeShowsServerLineBelowCatalog()
+    {
+        // Arrange
+        var snapshot = CreateSnapshot("Receiving", canRecord: true, isRecording: false);
+        var localServer = CreateLocalServerStatus(LocalServerState.Running, 5117);
+
+        // Act
+        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, localServer, false, CreateClock(1));
+
+        // Assert
+        var kinds = entries.Select(entry => entry.Kind).ToList();
+        var index = kinds.IndexOf(TrayMenuEntryKind.LocalServer);
+
+        Assert.ContainsSingle(entryKind => entryKind == TrayMenuEntryKind.LocalServer, kinds, "The menu should hold exactly one server line");
+        Assert.AreEqual(kinds.IndexOf(TrayMenuEntryKind.Catalog) + 1, index, "The server line should be directly below the catalog entry");
+        Assert.AreEqual(kinds.IndexOf(TrayMenuEntryKind.Separator) - 1, index, "The server line should be directly above the first separator");
+        Assert.AreEqual("Server: running at http://localhost:5117/", entries[index].Text, "The server line should show the text of the status");
+        Assert.IsFalse(entries[index].IsEnabled, "The server line should be greyed out");
+        Assert.IsFalse(entries[index].IsChecked, "The server line should not be checked");
+    }
+
+    /// <summary>
+    /// In local mode the menu lists the server line below the catalog and Open Censio directly above Open diagnostics,
+    /// the rest of the menu in today's order (S1).
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC3")]
+    public void TrayMenuCreateInLocalModeShowsOpenCensioAboveDiagnostics()
+    {
+        // Arrange
+        var snapshot = CreateSnapshot("Receiving", canRecord: true, isRecording: false);
+        var localServer = CreateLocalServerStatus(LocalServerState.Running, 5000);
+        var expectedKinds = new[]
+                            {
+                                TrayMenuEntryKind.Status,
+                                TrayMenuEntryKind.LastTick,
+                                TrayMenuEntryKind.Game,
+                                TrayMenuEntryKind.Catalog,
+                                TrayMenuEntryKind.LocalServer,
+                                TrayMenuEntryKind.Separator,
+                                TrayMenuEntryKind.OpenCensio,
+                                TrayMenuEntryKind.OpenDiagnostics,
+                                TrayMenuEntryKind.ToggleRecording,
+                                TrayMenuEntryKind.OpenRecordingsFolder,
+                                TrayMenuEntryKind.OpenLogFolder,
+                                TrayMenuEntryKind.Separator,
+                                TrayMenuEntryKind.ToggleAutostart,
+                                TrayMenuEntryKind.Separator,
+                                TrayMenuEntryKind.Version,
+                                TrayMenuEntryKind.Separator,
+                                TrayMenuEntryKind.Exit
+                            };
+
+        // Act
+        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, localServer, false, CreateClock(1));
+
+        // Assert
+        var openCensio = entries.Single(entry => entry.Kind == TrayMenuEntryKind.OpenCensio);
+
+        Assert.AreSequenceEqual(expectedKinds, entries.Select(entry => entry.Kind).ToArray(), "Open Censio should be directly above Open diagnostics and the server line below the catalog");
+        Assert.AreEqual("Open Censio", openCensio.Text, "The entry should read Open Censio");
+        Assert.AreEqual(TrayMenu.OpenCensioText, openCensio.Text, "The entry should carry the text of the constant");
+        Assert.IsFalse(openCensio.IsChecked, "Open Censio should not be checked");
+    }
+
+    /// <summary>
+    /// Open Censio is enabled only while the server runs (S1, E1, E4).
+    /// </summary>
+    /// <param name="state">The state of the server</param>
+    /// <param name="expected">Whether Open Censio is enabled</param>
+    [TestMethod]
+    [TestCategory("AC3")]
+    [DataRow(LocalServerState.Starting, false)]
+    [DataRow(LocalServerState.Running, true)]
+    [DataRow(LocalServerState.PortInUse, false)]
+    [DataRow(LocalServerState.Failed, false)]
+    [DataRow(LocalServerState.SettingsInvalid, false)]
+    public void TrayMenuCreateEnablesOpenCensioOnlyWhileRunning(LocalServerState state, bool expected)
+    {
+        // Arrange
+        var snapshot = CreateSnapshot("Receiving", canRecord: true, isRecording: false);
+        var localServer = CreateLocalServerStatus(state, 5000);
+
+        // Act
+        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, localServer, false, CreateClock(1));
+
+        // Assert
+        var openCensio = entries.Single(entry => entry.Kind == TrayMenuEntryKind.OpenCensio);
+
+        Assert.AreEqual(expected, openCensio.IsEnabled, $"Open Censio should be enabled only while the server runs, not in {state}");
+    }
+
+    /// <summary>
+    /// A replay that ends because the local server does not run names the reason in the tooltip and the reason text (E10).
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC9")]
+    public void TrayMenuFormatReplaySendReasonLocalServerNotRunningReturnsText()
+    {
+        // Arrange
+        var status = new PipeReplayStatus
+                     {
+                         State = PipeConnectionState.Receiving,
+                         IsFinished = true,
+                         SendProblem = ReplaySendProblemKind.LocalServerNotRunning
+                     };
+
+        // Act
+        var reason = TrayMenu.FormatReplaySendReason(ReplaySendProblemKind.LocalServerNotRunning);
+
+        // Assert
+        Assert.AreEqual("local server not running", reason, "The reason should read local server not running");
+        Assert.AreEqual("Censio Companion: Replay error: local server not running", TrayMenu.FormatReplayToolTip(status), "The tooltip should name the reason");
+    }
+
+    /// <summary>
     /// A found installation shows its build and its source.
     /// </summary>
     /// <param name="source">The source</param>
@@ -1427,6 +1578,21 @@ public sealed class TrayMenuTests
                                                       },
                                                       _todayTick),
                    _ => TraySnapshot.ForInvalidCommandLine()
+               };
+    }
+
+    /// <summary>
+    /// Creates a status of the local server.
+    /// </summary>
+    /// <param name="state">The state</param>
+    /// <param name="port">The port</param>
+    /// <returns>The status</returns>
+    private static LocalServerStatus CreateLocalServerStatus(LocalServerState state, int port)
+    {
+        return new LocalServerStatus
+               {
+                   State = state,
+                   Port = port
                };
     }
 

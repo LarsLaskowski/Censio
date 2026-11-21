@@ -7,6 +7,7 @@ using System.Text.RegularExpressions;
 
 using Censio.Companion.Core;
 using Censio.Contracts;
+using Censio.Pipe;
 using Censio.Server.Data;
 using Censio.Server.Data.Tests;
 
@@ -70,6 +71,11 @@ public sealed class CensioServerTests
     /// </summary>
     private const string AfterStopText = "MARKER-after-stop: the provider still writes";
 
+    /// <summary>
+    /// The anonymised recording the local replay sends.
+    /// </summary>
+    private const string LongSessionFixture = "long-session.jsonl";
+
     #endregion // Constants
 
     #region Fields
@@ -85,6 +91,12 @@ public sealed class CensioServerTests
     private static readonly Regex _version = new("<p>Version ([^<]*)</p>", RegexOptions.None, TimeSpan.FromSeconds(5));
 
     /// <summary>
+    /// The real-time limit of a local replay of the fixture and of a stop, which keeps a broken implementation from
+    /// hanging a test.
+    /// </summary>
+    private static readonly TimeSpan _replayBound = TimeSpan.FromSeconds(10);
+
+    /// <summary>
     /// The temporary directories of the running test, deleted afterwards.
     /// </summary>
     private readonly List<string> _temporaryDirectories = [];
@@ -93,6 +105,11 @@ public sealed class CensioServerTests
     /// The servers the running test started, disposed afterwards.
     /// </summary>
     private readonly List<ILocalServer> _servers = [];
+
+    /// <summary>
+    /// The sessions the running test started, stopped afterwards.
+    /// </summary>
+    private readonly List<LocalServerSession> _sessions = [];
 
     #endregion // Fields
 
@@ -127,6 +144,12 @@ public sealed class CensioServerTests
     [TestCleanup]
     public async Task CleanupAsync()
     {
+        foreach (var session in _sessions)
+        {
+            await session.StopAsync(_replayBound).WaitAsync(_replayBound, TestContext.CancellationToken);
+            await session.DisposeAsync();
+        }
+
         foreach (var server in _servers)
         {
             await server.DisposeAsync();
@@ -521,6 +544,67 @@ public sealed class CensioServerTests
     }
 
     /// <summary>
+    /// A replay without <c>--server</c> in local mode, started before the hosted server runs, waits for it, sends the
+    /// fixture with the token taken in the process, and the pages of the hosted server show the profile (S5).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC9")]
+    public async Task CensioServerStartLocalFillsProfileFromLocalReplay()
+    {
+        // Arrange
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 11, 21, 12, 0, 0, TimeSpan.Zero));
+        var session = CreateLocalSession(CreateTemporaryDirectory(), FindFreePort(), timeProvider);
+        await using var sender = CreateLocalReplaySender(session, timeProvider);
+        var runner = CreateFixtureRunner(sender);
+        var replay = runner.RunAsync(TestContext.CancellationToken);
+
+        // Act
+        await RunSessionAsync(session);
+        await replay.WaitAsync(_replayBound, TestContext.CancellationToken);
+
+        // Assert
+        Assert.IsNull(runner.Status.SendProblem, "The replay should end without a send problem");
+        Assert.IsNull(runner.Status.Problem, "The replay should end without a problem of the recording");
+        Assert.AreEqual(LocalServerState.Running, session.Status.State, "The hosted server should run: " + session.Status);
+        Assert.IsGreaterThan(0, sender.Counts.Ticks, "The replay should send ticks to the hosted server");
+        Assert.AreEqual(0, sender.Counts.Refused, "The hosted server should refuse no tick");
+        Assert.Contains(sender.ProfileName, await ReadRegionsPageAsync(session.Status.Port, sender.ProfileId), "The pages of the hosted server should show the replayed profile");
+    }
+
+    /// <summary>
+    /// A profile the local replay stored is shown again after the hosted server was stopped and started anew on the same
+    /// data directory (S6).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC5")]
+    public async Task CensioServerStartLocalKeepsStoredProfileAfterRestart()
+    {
+        // Arrange
+        var dataDirectory = CreateTemporaryDirectory();
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 11, 21, 12, 0, 0, TimeSpan.Zero));
+        var first = CreateLocalSession(dataDirectory, FindFreePort(), timeProvider);
+
+        await RunSessionAsync(first);
+
+        await using var sender = CreateLocalReplaySender(first, timeProvider);
+
+        await CreateFixtureRunner(sender).RunAsync(TestContext.CancellationToken).WaitAsync(_replayBound, TestContext.CancellationToken);
+        await first.StopAsync(_replayBound).WaitAsync(_replayBound, TestContext.CancellationToken);
+
+        var second = CreateLocalSession(dataDirectory, FindFreePort(), timeProvider);
+
+        // Act
+        await RunSessionAsync(second);
+
+        // Assert
+        Assert.AreEqual(LocalServerState.Running, second.Status.State, "The hosted server should start again on the same data directory: " + second.Status);
+        Assert.IsGreaterThan(0, sender.Counts.Ticks, "The replay should have stored ticks before the restart");
+        Assert.Contains(sender.ProfileName, await ReadRegionsPageAsync(second.Status.Port, sender.ProfileId), "The pages should show the stored profile after the restart");
+    }
+
+    /// <summary>
     /// Creates the options of a local server whose content root is the test's base folder.
     /// </summary>
     /// <param name="port">The port</param>
@@ -678,6 +762,56 @@ public sealed class CensioServerTests
     }
 
     /// <summary>
+    /// Creates a runner that replays the fixture at maximum speed into a sender.
+    /// </summary>
+    /// <param name="sender">The sender</param>
+    /// <returns>The runner</returns>
+    private static PipeReplayRunner CreateFixtureRunner(ReplaySender sender)
+    {
+        return new PipeReplayRunner(() => File.OpenRead(Path.Combine(AppContext.BaseDirectory, "Fixtures", "Pipe", LongSessionFixture)), PipeReplaySpeed.Maximum, TimeProvider.System, NullLogger.Instance, sender);
+    }
+
+    /// <summary>
+    /// Creates the sender of a replay without <c>--server</c> in local mode, as the Companion chooses it.
+    /// </summary>
+    /// <param name="session">The session of the hosted server</param>
+    /// <param name="timeProvider">The time provider</param>
+    /// <returns>The sender</returns>
+    private static ReplaySender CreateLocalReplaySender(LocalServerSession session, TimeProvider timeProvider)
+    {
+        var commandLine = new CompanionCommandLine
+                          {
+                              Mode = CompanionMode.Replay,
+                              ReplayPath = LongSessionFixture,
+                              Speed = PipeReplaySpeed.Maximum
+                          };
+
+        return ReplaySenderFactory.Create(commandLine, session, "1.0.0", new ClientWebSocketConnector(timeProvider), timeProvider, NullLogger.Instance)
+                   ?? throw new AssertFailedException("A replay without --server in local mode should be sent");
+    }
+
+    /// <summary>
+    /// Creates the session of a server hosted in local mode at a port, which starts the server on the data directory.
+    /// </summary>
+    /// <param name="dataDirectory">The data directory</param>
+    /// <param name="port">The port</param>
+    /// <param name="timeProvider">The time provider</param>
+    /// <returns>The session</returns>
+    private static LocalServerSession CreateLocalSession(string dataDirectory, int port, TimeProvider timeProvider)
+    {
+        var setting = new LocalServerSetting
+                      {
+                          Kind = LocalServerSettingKind.Local,
+                          Port = port
+                      };
+
+        return new LocalServerSession(setting,
+                                      (startPort, cancellationToken) => CensioServer.StartLocalAsync(CreateOptions(startPort, dataDirectory, NullLoggerProvider.Instance, Socket.OSSupportsIPv6), cancellationToken),
+                                      timeProvider,
+                                      NullLogger.Instance);
+    }
+
+    /// <summary>
     /// Starts a local server at a free port, retrying once on a port taken in the meantime, and asserts that it runs.
     /// </summary>
     /// <param name="dataDirectory">The data directory</param>
@@ -698,6 +832,32 @@ public sealed class CensioServerTests
         _servers.Add(start.Server);
 
         return start.Server;
+    }
+
+    /// <summary>
+    /// Runs a session, which is stopped after the test, until its server runs or its start ended.
+    /// </summary>
+    /// <param name="session">The session</param>
+    /// <returns>A task that completes when the start ended</returns>
+    private async Task RunSessionAsync(LocalServerSession session)
+    {
+        _ = session.RunAsync(TestContext.CancellationToken);
+        _sessions.Add(session);
+
+        await session.WaitForTokenAsync(TestContext.CancellationToken).WaitAsync(_replayBound, TestContext.CancellationToken);
+    }
+
+    /// <summary>
+    /// Reads the regions page of a profile from the hosted server.
+    /// </summary>
+    /// <param name="port">The port of the server</param>
+    /// <param name="profileId">The identity of the profile</param>
+    /// <returns>The page</returns>
+    private async Task<string> ReadRegionsPageAsync(int port, Guid profileId)
+    {
+        using var client = CreateHttpClient(port);
+
+        return await client.GetStringAsync($"/profiles/{profileId:D}/regions", TestContext.CancellationToken);
     }
 
     /// <summary>
