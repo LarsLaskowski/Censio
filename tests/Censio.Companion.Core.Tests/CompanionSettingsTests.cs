@@ -561,6 +561,48 @@ public sealed class CompanionSettingsTests
     }
 
     /// <summary>
+    /// A relative path to a settings file with the mode <c>local</c> is not read, so no local server is hosted.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC1")]
+    public void CompanionSettingsReadLocalServerWithRelativePathReturnsOff()
+    {
+        // Arrange
+        var path = Path.GetRelativePath(Environment.CurrentDirectory, WriteSettings("""{"mode": "local", "localPort": 5117}"""));
+
+        // Act
+        var setting = CompanionSettings.ReadLocalServer(path);
+
+        // Assert
+        Assert.IsFalse(Path.IsPathFullyQualified(path), "The path of the case should be relative");
+        Assert.AreEqual(LocalServerSettingKind.Off, setting.Kind, "A relative settings path should host no local server");
+        Assert.IsNull(setting.Problem, "A relative settings path is no problem of the setting");
+    }
+
+    /// <summary>
+    /// Invalid <c>mode</c> and <c>localPort</c> keys do not change the game folder of the file (E2).
+    /// </summary>
+    /// <param name="text">The settings text</param>
+    [TestMethod]
+    [TestCategory("AC1")]
+    [DataRow("""{"gameFolder": "E:/Anno 117 - Pax Romana/", "mode": "forward", "localPort": 0}""", DisplayName = "Invalid mode and port")]
+    [DataRow("""{"mode": 1, "mode": null, "gameFolder": "E:/Anno 117 - Pax Romana/"}""", DisplayName = "Mode twice, not a text")]
+    [DataRow("""{"mode": "local", "localPort": "abc", "LOCALPORT": 5117, "gameFolder": "E:/Anno 117 - Pax Romana/"}""", DisplayName = "Port invalid and twice")]
+    public void CompanionSettingsReadWithInvalidLocalServerKeysKeepsGameFolder(string text)
+    {
+        // Arrange
+        var path = WriteSettings(text);
+
+        // Act
+        var result = CompanionSettings.Read(path);
+
+        // Assert
+        Assert.AreEqual(CompanionSettingsResultKind.GameFolder, result.Kind, "Invalid local server keys should not make the settings invalid");
+        Assert.AreEqual(ValidFolder, result.GameFolder, "The game folder should be read past invalid local server keys");
+        Assert.IsNull(result.Problem, "Invalid local server keys should be no problem of the game folder");
+    }
+
+    /// <summary>
     /// Turns a test text into the bytes of the file: <see cref="ByteOrderMarkMarker" /> becomes the UTF-8 byte order
     /// mark and <see cref="InvalidByteMarker" /> the byte <c>0xFF</c>, the rest is encoded as UTF-8.
     /// </summary>

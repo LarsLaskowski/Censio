@@ -1284,6 +1284,32 @@ public sealed class TrayMenuTests
     }
 
     /// <summary>
+    /// Without local mode the menu shows neither the server line nor Open Censio, in every mode of the Companion (S7).
+    /// </summary>
+    /// <param name="mode">The mode of the Companion: live, recording, replay or invalid</param>
+    [TestMethod]
+    [TestCategory("AC2")]
+    [DataRow("live")]
+    [DataRow("recording")]
+    [DataRow("replay")]
+    [DataRow("invalid")]
+    public void TrayMenuCreateWithoutLocalModeShowsNoServerEntries(string mode)
+    {
+        // Arrange
+        var snapshot = CreateSnapshotForMode(mode);
+
+        // Act
+        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, null, false, CreateClock(1));
+
+        // Assert
+        var kinds = entries.Select(entry => entry.Kind).ToList();
+
+        Assert.DoesNotContain(TrayMenuEntryKind.LocalServer, kinds, $"Without local mode the menu should hold no server line: {mode}");
+        Assert.DoesNotContain(TrayMenuEntryKind.OpenCensio, kinds, $"Without local mode the menu should hold no Open Censio: {mode}");
+        Assert.IsEmpty(entries.Where(entry => entry.Text.StartsWith("Server:", StringComparison.Ordinal) || entry.Text == TrayMenu.OpenCensioText).ToList(), $"Without local mode no entry should carry a server text: {mode}");
+    }
+
+    /// <summary>
     /// In local mode the menu lists the server line below the catalog and Open Censio directly above Open diagnostics,
     /// the rest of the menu in today's order (S1).
     /// </summary>

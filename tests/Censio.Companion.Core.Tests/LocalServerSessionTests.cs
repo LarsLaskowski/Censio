@@ -329,16 +329,47 @@ public sealed class LocalServerSessionTests
     }
 
     /// <summary>
-    /// A start that throws shows failed and logs the exception as an error, without throwing (E4).
+    /// A start that returns failed with an exception shows failed and logs the exception once as an error (E4).
     /// </summary>
     /// <returns>A task that completes when the test is done</returns>
     [TestMethod]
     [TestCategory("AC4")]
-    public async Task LocalServerSessionRunWhenStartThrowsShowsFailedAndLogs()
+    public async Task LocalServerSessionRunWhenStartFailsWithExceptionShowsFailedAndLogs()
+    {
+        // Arrange
+        var failure = new InvalidOperationException("The host could not be started");
+        var session = CreateSession(CreateLocalSetting(), new RecordingTimeProvider(_start));
+
+        _startResult.SetResult(new LocalServerStart
+                               {
+                                   Kind = LocalServerStartKind.Failed,
+                                   Exception = failure
+                               });
+
+        // Act
+        await session.RunAsync(TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(Status(LocalServerState.Failed), session.Status, "The session should show failed");
+        Assert.AreEqual(Status(LocalServerState.Failed), _statuses.LastOrDefault(), "The session should raise failed");
+        Assert.ContainsSingle(entry => entry.Level == LogLevel.Error && entry.Message == "Local server failed" && ReferenceEquals(entry.Exception, failure), _logger.Entries, "The failure should be logged once as an error with its exception");
+    }
+
+    /// <summary>
+    /// A start that throws, as a faulted task or synchronously, shows failed and logs the exception as an error, without
+    /// throwing (E4).
+    /// </summary>
+    /// <param name="isSynchronous">Whether the start delegate throws synchronously instead of returning a faulted task</param>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC4")]
+    [DataRow(false, DisplayName = "Faulted task")]
+    [DataRow(true, DisplayName = "Synchronous throw")]
+    public async Task LocalServerSessionRunWhenStartThrowsShowsFailedAndLogs(bool isSynchronous)
     {
         // Arrange
         var failure = new IOException("The data folder cannot be created");
-        var session = new LocalServerSession(CreateLocalSetting(), (_, _) => Task.FromException<LocalServerStart>(failure), new RecordingTimeProvider(_start), _logger);
+        var session = new LocalServerSession(CreateLocalSetting(), CreateThrowingStart(failure, isSynchronous), new RecordingTimeProvider(_start), _logger);
 
         _sessions.Add(session);
 
@@ -365,7 +396,8 @@ public sealed class LocalServerSessionTests
         var failed = WaitForStateAsync(session, LocalServerState.Failed);
 
         _startResult.SetResult(Running(server));
-        _ = session.RunAsync(TestContext.CancellationToken);
+
+        var run = session.RunAsync(TestContext.CancellationToken);
 
         await running.WaitAsync(_guard, TestContext.CancellationToken);
 
@@ -374,7 +406,10 @@ public sealed class LocalServerSessionTests
 
         var status = await failed.WaitAsync(_guard, TestContext.CancellationToken);
 
+        await run.WaitAsync(_guard, TestContext.CancellationToken);
+
         // Assert
+        Assert.IsTrue(run.IsCompletedSuccessfully, "The run should end once the server stopped on its own");
         Assert.AreEqual(Status(LocalServerState.Failed), status, "A server that stops on its own should show failed");
         Assert.ContainsSingle(entry => entry.Level == LogLevel.Error && entry.Message == "Local server stopped unexpectedly", _logger.Entries, "The unexpected stop should be logged once as an error");
         Assert.HasCount(1, _startPorts, "A stopped server should not be started again");
@@ -394,14 +429,17 @@ public sealed class LocalServerSessionTests
         var running = WaitForStateAsync(session, LocalServerState.Running);
 
         _startResult.SetResult(Running(server));
-        _ = session.RunAsync(TestContext.CancellationToken);
+
+        var run = session.RunAsync(TestContext.CancellationToken);
 
         await running.WaitAsync(_guard, TestContext.CancellationToken);
 
         // Act
         await session.StopAsync(_stopTimeout).WaitAsync(_guard, TestContext.CancellationToken);
+        await run.WaitAsync(_guard, TestContext.CancellationToken);
 
         // Assert
+        Assert.IsTrue(run.IsCompletedSuccessfully, "The run should end once the server stopped");
         Assert.IsTrue(server.StopRequested.IsCompleted, "The running server should be stopped");
         Assert.IsTrue(server.Stopped.IsCompleted, "The server should have stopped when the stop returns");
         Assert.IsEmpty(_statuses.Where(status => status.State == LocalServerState.Failed).ToList(), "A stop of the session should not show failed");
@@ -480,6 +518,71 @@ public sealed class LocalServerSessionTests
     }
 
     /// <summary>
+    /// A stop before the run starts no server, raises no status, and the run that follows ends at once (S6, E9).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC5")]
+    public async Task LocalServerSessionStopAsyncBeforeRunStartsNoServer()
+    {
+        // Arrange
+        var session = CreateSession(CreateLocalSetting(), new RecordingTimeProvider(_start));
+
+        await session.StopAsync(_stopTimeout).WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Act
+        await session.RunAsync(TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+
+        var token = await session.WaitForTokenAsync(TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        Assert.IsEmpty(_startPorts, "A stopped session should start no server");
+        Assert.IsEmpty(_statuses, "A stopped session should raise no status");
+        Assert.IsNull(token, "The wait for the token should return no token");
+        Assert.IsEmpty(_logger.Entries, "A stopped session should log nothing");
+    }
+
+    /// <summary>
+    /// A stop that arrives while the server starts, whose start then returns a running server at once, stops that server
+    /// and never shows it running (E9).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC5")]
+    public async Task LocalServerSessionStopAsyncDuringStartThatReturnsRunningStopsServer()
+    {
+        // Arrange
+        var server = CreateServer(false);
+        var stopping = Task.CompletedTask;
+        var isStartCancelled = false;
+        LocalServerSession? session = null;
+
+        session = new LocalServerSession(CreateLocalSetting(),
+                                         (_, cancellationToken) =>
+                                         {
+                                             stopping = session?.StopAsync(_stopTimeout) ?? Task.CompletedTask;
+                                             isStartCancelled = SpinWait.SpinUntil(() => cancellationToken.IsCancellationRequested, _guard);
+
+                                             return Task.FromResult(Running(server));
+                                         },
+                                         new RecordingTimeProvider(_start),
+                                         _logger);
+        session.StatusChanged += (_, status) => _statuses.Enqueue(status);
+        _sessions.Add(session);
+
+        // Act
+        await session.RunAsync(TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+        await stopping.WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        Assert.IsTrue(isStartCancelled, "The stop should cancel the start in progress");
+        Assert.AreEqual(1, server.StopRequests, "The server the start returned should be stopped once");
+        Assert.IsTrue(server.Stopped.IsCompleted, "The server should have stopped when the run ends");
+        Assert.IsEmpty(_statuses, "A server started during the stop should raise no status");
+        Assert.IsEmpty(_logger.Entries, "A stop during the start should log nothing");
+    }
+
+    /// <summary>
     /// The wait for the token, begun while the server starts, returns the token of the server once it runs (S5).
     /// </summary>
     /// <returns>A task that completes when the test is done</returns>
@@ -549,6 +652,22 @@ public sealed class LocalServerSessionTests
                    Kind = LocalServerSettingKind.Local,
                    Port = Port
                };
+    }
+
+    /// <summary>
+    /// Creates a start delegate that fails with an exception.
+    /// </summary>
+    /// <param name="failure">The exception</param>
+    /// <param name="isSynchronous">Whether the delegate throws instead of returning a faulted task</param>
+    /// <returns>The start delegate</returns>
+    private static Func<int, CancellationToken, Task<LocalServerStart>> CreateThrowingStart(Exception failure, bool isSynchronous)
+    {
+        if (isSynchronous)
+        {
+            return (_, _) => throw failure;
+        }
+
+        return (_, _) => Task.FromException<LocalServerStart>(failure);
     }
 
     /// <summary>

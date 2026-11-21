@@ -111,6 +111,11 @@ public sealed class CensioServerTests
     /// </summary>
     private readonly List<LocalServerSession> _sessions = [];
 
+    /// <summary>
+    /// The replay senders of the running test, disposed afterwards.
+    /// </summary>
+    private readonly List<ReplaySender> _senders = [];
+
     #endregion // Fields
 
     #region Constructors
@@ -144,6 +149,11 @@ public sealed class CensioServerTests
     [TestCleanup]
     public async Task CleanupAsync()
     {
+        foreach (var sender in _senders)
+        {
+            await sender.DisposeAsync();
+        }
+
         foreach (var session in _sessions)
         {
             await session.StopAsync(_replayBound).WaitAsync(_replayBound, TestContext.CancellationToken);
@@ -288,8 +298,10 @@ public sealed class CensioServerTests
 
     /// <summary>
     /// A setting of the environment takes no effect on a local server: each case sets one variable (and allows hosting
-    /// startups), and every case checks that the token is required, no other port is listened on, the web root named by
-    /// the environment is not served and the test assembly's hosting startup does not run. Every variable is restored.
+    /// startups), and every case checks that the token is required, no other port is listened on, the Blazor script of
+    /// the web root named by the environment is not served and the test assembly's hosting startup does not run. Every
+    /// variable is restored. The web-root case checks the build-output layout only, whose development manifest maps every
+    /// asset to its source, so it cannot fail there; the published layout rests on fact 15 of the plan.
     /// </summary>
     /// <param name="variable">The environment variable of the case</param>
     /// <param name="value">Its value, with a placeholder for the other port or the foreign web root</param>
@@ -482,6 +494,10 @@ public sealed class CensioServerTests
         await server.StopAsync(TestContext.CancellationToken);
 
         // Assert
+        await server.Stopped.WaitAsync(_replayBound, TestContext.CancellationToken);
+
+        Assert.IsTrue(server.Stopped.IsCompletedSuccessfully, "Stopped should complete once the server was stopped");
+
         provider.CreateLogger("Censio.Server.Tests").Log(LogLevel.Warning, new EventId(1), AfterStopText, null, (state, _) => state);
 
         await provider.FlushAsync(TimeSpan.FromSeconds(5));
@@ -489,6 +505,32 @@ public sealed class CensioServerTests
         var written = string.Concat(Directory.GetFiles(logFolder).Order().Select(File.ReadAllText));
 
         Assert.Contains(AfterStopText, written, "A warning written after the stop should reach the log file");
+    }
+
+    /// <summary>
+    /// A start whose token is already cancelled fails with the cancellation as its exception, hands out no server and
+    /// leaves <c>127.0.0.1</c> at the port free (E9).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC5")]
+    public async Task CensioServerStartLocalWhenCancelledReturnsFailedAndReleasesPort()
+    {
+        // Arrange
+        var port = FindFreePort();
+        var options = CreateOptions(port, CreateTemporaryDirectory(), NullLoggerProvider.Instance, Socket.OSSupportsIPv6);
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.CancellationToken);
+
+        await cancellation.CancelAsync();
+
+        // Act
+        var start = await CensioServer.StartLocalAsync(options, cancellation.Token);
+
+        // Assert
+        Assert.AreEqual(LocalServerStartKind.Failed, start.Kind, "A cancelled start should fail");
+        Assert.IsNull(start.Server, "No server should be handed out");
+        Assert.IsInstanceOfType<OperationCanceledException>(start.Exception, "The cancellation should be the exception of the failed start");
+        Assert.IsTrue(CanBind(IPAddress.Loopback, port), "127.0.0.1 at the port should be free after the cancelled start");
     }
 
     /// <summary>
@@ -554,13 +596,10 @@ public sealed class CensioServerTests
     {
         // Arrange
         var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 11, 21, 12, 0, 0, TimeSpan.Zero));
-        var session = CreateLocalSession(CreateTemporaryDirectory(), FindFreePort(), timeProvider);
-        await using var sender = CreateLocalReplaySender(session, timeProvider);
-        var runner = CreateFixtureRunner(sender);
-        var replay = runner.RunAsync(TestContext.CancellationToken);
 
         // Act
-        await RunSessionAsync(session);
+        var (session, (sender, runner, replay)) = await RunSessionOnFreePortAsync(CreateTemporaryDirectory(), timeProvider, started => StartLocalReplay(started, timeProvider));
+
         await replay.WaitAsync(_replayBound, TestContext.CancellationToken);
 
         // Assert
@@ -584,19 +623,15 @@ public sealed class CensioServerTests
         // Arrange
         var dataDirectory = CreateTemporaryDirectory();
         var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 11, 21, 12, 0, 0, TimeSpan.Zero));
-        var first = CreateLocalSession(dataDirectory, FindFreePort(), timeProvider);
-
-        await RunSessionAsync(first);
+        var first = await RunSessionOnFreePortAsync(dataDirectory, timeProvider);
 
         await using var sender = CreateLocalReplaySender(first, timeProvider);
 
         await CreateFixtureRunner(sender).RunAsync(TestContext.CancellationToken).WaitAsync(_replayBound, TestContext.CancellationToken);
         await first.StopAsync(_replayBound).WaitAsync(_replayBound, TestContext.CancellationToken);
 
-        var second = CreateLocalSession(dataDirectory, FindFreePort(), timeProvider);
-
         // Act
-        await RunSessionAsync(second);
+        var second = await RunSessionOnFreePortAsync(dataDirectory, timeProvider);
 
         // Assert
         Assert.AreEqual(LocalServerState.Running, second.Status.State, "The hosted server should start again on the same data directory: " + second.Status);
@@ -832,6 +867,64 @@ public sealed class CensioServerTests
         _servers.Add(start.Server);
 
         return start.Server;
+    }
+
+    /// <summary>
+    /// Creates the sender of a local replay into a session, which is disposed after the test, and starts the replay of the
+    /// fixture.
+    /// </summary>
+    /// <param name="session">The session of the hosted server</param>
+    /// <param name="timeProvider">The time provider</param>
+    /// <returns>The sender, its runner and the running replay</returns>
+    private (ReplaySender Sender, PipeReplayRunner Runner, Task Replay) StartLocalReplay(LocalServerSession session, TimeProvider timeProvider)
+    {
+        var sender = CreateLocalReplaySender(session, timeProvider);
+        var runner = CreateFixtureRunner(sender);
+
+        _senders.Add(sender);
+
+        return (sender, runner, runner.RunAsync(TestContext.CancellationToken));
+    }
+
+    /// <summary>
+    /// Runs the session of a server hosted at a free port until its server runs, retrying once with a new session at a new
+    /// free port when the port was taken in the meantime.
+    /// </summary>
+    /// <param name="dataDirectory">The data directory</param>
+    /// <param name="timeProvider">The time provider</param>
+    /// <returns>The session</returns>
+    private async Task<LocalServerSession> RunSessionOnFreePortAsync(string dataDirectory, TimeProvider timeProvider)
+    {
+        var (session, _) = await RunSessionOnFreePortAsync(dataDirectory, timeProvider, static _ => 0);
+
+        return session;
+    }
+
+    /// <summary>
+    /// Runs the session of a server hosted at a free port until its server runs, after a step that is given the session
+    /// before it runs, retrying once with a new session at a new free port when the port was taken in the meantime.
+    /// </summary>
+    /// <typeparam name="T">The result of the step</typeparam>
+    /// <param name="dataDirectory">The data directory</param>
+    /// <param name="timeProvider">The time provider</param>
+    /// <param name="beforeRun">The step before the session runs</param>
+    /// <returns>The session and the result of the step of the session that ran</returns>
+    private async Task<(LocalServerSession Session, T Result)> RunSessionOnFreePortAsync<T>(string dataDirectory, TimeProvider timeProvider, Func<LocalServerSession, T> beforeRun)
+    {
+        var session = CreateLocalSession(dataDirectory, FindFreePort(), timeProvider);
+        var result = beforeRun(session);
+
+        await RunSessionAsync(session);
+
+        if (session.Status.State == LocalServerState.PortInUse)
+        {
+            session = CreateLocalSession(dataDirectory, FindFreePort(), timeProvider);
+            result = beforeRun(session);
+
+            await RunSessionAsync(session);
+        }
+
+        return (session, result);
     }
 
     /// <summary>

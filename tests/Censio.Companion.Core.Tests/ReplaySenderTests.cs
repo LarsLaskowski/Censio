@@ -1374,6 +1374,31 @@ public sealed class ReplaySenderTests
     }
 
     /// <summary>
+    /// A sender to the local server whose server stops during the replay, ending the connection while an acknowledgement
+    /// is awaited, ends with connection lost, the reason of a lost connection (E10).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC9")]
+    public async Task ReplaySenderForLocalServerWhenConnectionLostReturnsConnectionLost()
+    {
+        // Arrange
+        await using var server = ScriptedIngestServer.Create();
+        var connector = new DuplexReplayConnector(server.ClientSocket);
+        await using var sender = ReplaySender.ForLocalServer(LocalPort, _ => Task.FromResult<string?>(Token), CompanionVersion, connector, CreateTimeProvider(), new RecordingLogger());
+
+        await ConnectAcceptedAsync(sender, server);
+
+        // Act
+        var problem = await SendTickThroughBrokenConnectionAsync(sender, server, false, true);
+
+        // Assert
+        Assert.AreEqual(ReplaySendProblemKind.ConnectionLost, problem, "A local server that stops during the replay should end it as connection lost");
+        Assert.AreEqual(0, sender.Counts.Ticks, "No tick should be counted as sent");
+        Assert.HasCount(1, connector.Addresses, "The connection should not be tried again");
+    }
+
+    /// <summary>
     /// Creates a time provider that records its timers, at the start time in the local zone of the tests.
     /// </summary>
     /// <returns>The time provider</returns>
