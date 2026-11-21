@@ -86,7 +86,7 @@ itself is in [`server-data.md`](server-data.md), what the ingest answers in [`in
 
 ### Deleting a profile
 
-- Deleting a profile's history ([`history.md`](history.md)) takes the state's write gate like a stored message, has the
+- Deleting a profile's history ([`history-deletion.md`](history-deletion.md)) takes the state's write gate like a stored message, has the
   store delete the profile, and, once the store reports it done, reads the profile list and the two held profiles again
   from the database as the restore does (the catalog stays, the marks of a failed island read are dropped). The deleted
   profile is then neither listed nor held, the profile that follows it by its latest tick is held in its place, and the
@@ -96,7 +96,7 @@ itself is in [`server-data.md`](server-data.md), what the ingest answers in [`in
   memory instead; the followers are told and the caller gets the store's result. The held profiles can then miss the
   profile that would have followed, until the next tick or restart.
 - A tick or a trade-routes message of the deleted profile that arrives later creates it again without a name
-  ([`history.md`](history.md)); the deletion has removed its trade routes with the rest.
+  ([`history-deletion.md`](history-deletion.md)); the deletion has removed its trade routes with the rest.
 
 ### Catalog
 
@@ -209,4 +209,4 @@ anyone who reaches the server ([`web-pages.md`](web-pages.md)).
 - Storing, the schema and the database file: [`server-data.md`](server-data.md).
 - What the ingest answers and when it closes: [`ingest.md`](ingest.md).
 - The pages, the profile switch and the banner that show it: [`web-pages.md`](web-pages.md), [`web-ui.md`](web-ui.md).
-- Retention, deleting a profile's history in the database and the retention job: [`history.md`](history.md).
+- Retention and the retention job: [`history.md`](history.md); deleting a profile's history in the database: [`history-deletion.md`](history-deletion.md).

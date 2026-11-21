@@ -4,9 +4,8 @@
 
 The time series the server keeps per profile, island and good: the read of a series and its points and gaps, the
 trend reads of the charts with the trend gate, the retention rule (ticks at full resolution for 7 days, then hourly sums and counts without limit), the fold and its cutoff,
-the latest hour, late and resent ticks, repeated goods, the retention job with its schedule and log lines, deleting a
-profile's history with its removal steps, secure delete and the clean-up of the database file, the legacy residue and the
-measurements. Operators who run the server rely on the retention and the deletion; the charts ([`web-charts.md`](web-charts.md))
+the latest hour, late and resent ticks, repeated goods, the retention job with its schedule and log lines and the
+measurements. Deleting a profile's history is in [`history-deletion.md`](history-deletion.md). Operators who run the server rely on the retention; the charts ([`web-charts.md`](web-charts.md))
 and the trend column ([`web-trends.md`](web-trends.md)) call the trend reads, and the charts of later features (#49 to #51) call these or the
 series read.
 
@@ -110,7 +109,7 @@ series read.
     ([`web-charts.md`](web-charts.md), *Limits and errors*).
 - **The trend gate.** Every transaction of a trend read, the times' and each part's, runs under the database's trend gate,
   taken before the in-memory database's write gate, so the trend reads of the whole server run one at a time and the
-  clean-up of a deleted profile (*Deleting a profile*) waits for the part in progress and lets none start until it has
+  clean-up of a deleted profile ([`history-deletion.md`](history-deletion.md), *Deleting a profile*) waits for the part in progress and lets none start until it has
   truncated the write-ahead log. On the in-memory database every transaction also takes the write gate, so the ingest waits
   at most for one part (*Measurements*).
 - **A fold or a deletion between two parts.** A fold can remove a tick whose time a read already holds. The tick's point then
@@ -144,7 +143,7 @@ series read.
   once, then one an hour after each run ended, and one more whenever a deletion asks for it. The job also runs for the in-memory
   database. Runs never overlap. The first run folds the backlog of a database that an older version filled, step by step while
   the server serves.
-- A run first sweeps what a deletion left (*Deleting a profile*), then clears the database file when a clean-up is
+- A run first sweeps what a deletion left ([`history-deletion.md`](history-deletion.md), *Deleting a profile*), then clears the database file when a clean-up is
   requested, then folds profile by profile, steps until a profile has nothing to fold, over the profiles known when the
   folding starts; a profile created meanwhile waits for the next run. Before each fold step the run checks whether a
   deletion asked meanwhile and, if so, sweeps first, so a deletion waits at most for the fold step in progress, not for
@@ -159,33 +158,6 @@ series read.
   waits at most for one step, which the measurements put at about 4 seconds at the contract's bounds, within the Companion's
   30 seconds ([`replay-sending.md`](replay-sending.md), *Failures*).
 
-### Deleting a profile
-
-- Deleting a profile's history removes the profile completely: its row, its islands, its trade routes, its ticks and its hourly points.
-  The catalog, the icons and the other profiles stay. A profile that is not stored changes nothing.
-- One write transaction removes the profile's row, its islands and its trade routes, creates a fresh random identity (a tombstone) and sets
-  it as the profile of the profile's ticks and hourly points, one row per tick or hour. From then on no read by profile
-  and no read of a tick by its identity returns them, and the server's state drops the profile
-  ([`server-state.md`](server-state.md)). The tombstone is no profile and is carried by no profile's row; a row number
-  would not serve as a mark, because SQLite reuses the number of a deleted row.
-- Steps of their own then remove the tombstoned rows, each in one write transaction: one tick with its islands, entries
-  and pairs, else one hourly point with its islands, entries, pairs and the identities of its folded ticks, else the
-  tombstone once nothing is left. A tick or a trade-routes message of the deleted profile that arrives during the steps creates
-  the profile again, unnamed until its next hello, with rows under its own identity that the steps leave alone.
-- **Clean-up.** The server's connection runs with secure delete, so SQLite overwrites everything this version deletes
-  (retention included), and after the steps the write-ahead log is checkpointed and truncated, under the write gate. A
-  reader that holds an older snapshot blocks the truncation: the clean-up then logs the warning below and the next run
-  tries again until it succeeds. A chart read's part never overlaps the truncation: the clean-up waits for the part in
-  progress, takes the trend gate before the write gate and holds it through the checkpoint, so no part starts during it
-  and no chart read can keep a deleted profile's names in the write-ahead log (*The trend reads*). The in-memory database has no file and counts as cleared. The decision that nothing is
-  left to sweep is made under the same write gate: while a tombstone exists (a deletion arrived after the last sweep step)
-  the clean-up does nothing, logs nothing and keeps its request, and the run the deletion asked for sweeps the rows
-  first. Once the clean-up line is
-  logged, none of the names that only the deleted profile held (route and folder names included) occurs in the database file or in its `-wal` and `-shm` files; a test with the real schema checks that.
-- **Residue of older versions.** A version before this one deleted nothing and left copies of changed names in the free
-  space of the file; those stay until the operator runs `VACUUM` with the server stopped ([`USER_GUIDE.md`](../USER_GUIDE.md)).
-  The file never shrinks by retention or deletion; the space is reused by new data.
-
 ### Log lines
 
 Category `Censio.Server.History`. No line names a profile or an island or holds a value.
@@ -194,21 +166,12 @@ Category `Censio.Server.History`. No line names a profile or an island or holds 
 | ----- | ---- | ---- |
 | Information | `History reduced to hourly averages: <h> hours from <t> ticks.` | a run folded at least one tick; `<h>` counts the distinct profile and hour pairs, `<t>` the ticks |
 | Warning | `The history could not be reduced; the next run tries again.` with the exception | a fold step failed |
-| Information | `The history of a profile was deleted.` | the rows of a deletion are gone |
-| Warning | `The history of a profile could not be deleted.` with the exception | a deletion failed before its rows were gone |
-| Information | `The deleted history was cleared from the database file.` | the clean-up finished |
-| Warning | `The deleted history could not yet be cleared from the database file; the next retention run tries again.` (with the exception unless a read blocked it) | a removal step or the truncation failed, or a read blocks it |
 
 After a failed fold step the warning comes first, then the line of the ticks already folded in that run.
 
 ## Limits and errors
 
-- A deletion that fails before its rows are gone stores no change: the profile stays whole and the dialog of
-  [`web-pages.md`](web-pages.md) shows its failure text. A deletion counts as done once its rows are gone, also when the
-  clean-up has not finished.
 - A write that fails (disk full, file removed) changes nothing of its step ([`server-data.md`](server-data.md)).
-- The deletion is reachable without a login, from a page opened by a trusted host only ([`web-pages.md`](web-pages.md),
-  record 0085).
 
 ### Measurements
 
@@ -225,20 +188,10 @@ three runs unless a row says otherwise. The limit is 10 seconds a step at the bo
 | Fold step, one fixture tick | median 18.6 to 22.3 ms, minimum 1.2 to 1.7 ms, maximum 23.6 to 84.1 ms; 5,010 steps in one run: median 16.1 ms, 90th percentile 20.7 ms, maximum 371.0 ms |
 | Store of the tick at the bounds | 2.1 to 2.5 s |
 | Fold step, tick at the bounds | 3.85 to 3.92 s |
-| Removal step, tick at the bounds | 0.41 to 0.45 s |
-| Removal step, hourly point at the bounds | 0.46 to 0.64 s |
-| Removal step, hourly point of the fixture (682 entries, about 1,250 pairs) | median 3.2 ms, maximum 12.6 ms (200 steps) |
 | A store queued 0.3 s into a fold step at the bounds | acknowledged 3.56 to 3.63 s later, about 10 ms after the step ended and before the next fold step queued behind it, in all three runs |
-| A store queued 33 ms into a removal step of the tick at the bounds | acknowledged 8 to 10 ms after the step ended (0.41 to 0.43 s after the step began), in all three runs |
-| The deletion's first transaction, 7 days of fixture ticks (5,040 ticks) | 12, 11 and 17 ms |
-| The deletion's first transaction, a year of hourly points (8,684, built from the 167 real hours of the 7-day run) and 20,190 unfolded ticks | 1,133, 1,130 and 1,134 ms |
 | The series read over 7 days of ticks (5,040 points) | 146, 82 and 82 ms |
 | The series read over a year of hourly points (8,714 points) | 163, 152 and 126 ms |
 | By a throwaway test outside the repository through the real `ServerStore`: a full replace of a profile's trade routes at the contract's bounds (1,024 routes, 52,428 stations, names of 765 ASCII characters), twice on a new file in each of three runs | 0.498, 0.301 and 0.245 s; 0.360, 0.245 and 0.238 s |
-| The same: the deletion's first transaction for a profile with that set (53,453 rows) and no ticks | 94, 46 and 58 ms |
-
-The tick rows of the deletion's measurement over a year were written as rows of the tick table alone, since the first
-transaction changes only the profile of those rows and of the hourly points; no figure here extends beyond those sizes.
 
 The rows above were measured before the index of the tick entries by good (record 0087). A second scratch program measured
 the steps again with and without it (the index dropped from a copy of the schema, the same ticks at the bounds, three
@@ -294,8 +247,6 @@ ticks are gone.
 - [`decisions/0021-sqlite-history-with-retention.md`](../decisions/0021-sqlite-history-with-retention.md) — full resolution for 7 days, then hourly values kept without limit, deletion per profile.
 - [`decisions/0031-bounded-local-tick-buffer-gaps-accepted.md`](../decisions/0031-bounded-local-tick-buffer-gaps-accepted.md) — a gap stays a gap.
 - [`decisions/0083-history-folded-tick-by-tick-into-hourly-sums-and-counts.md`](../decisions/0083-history-folded-tick-by-tick-into-hourly-sums-and-counts.md) — the fold, one tick per transaction, sums and counts, the latest hour and the kept identities.
-- [`decisions/0084-profile-deleted-in-steps-and-cleared-from-the-file.md`](../decisions/0084-profile-deleted-in-steps-and-cleared-from-the-file.md) — a profile is gone at once for its readers, its rows are removed in steps, the file is cleared of them.
-- [`decisions/0085-deletion-only-from-pages-opened-by-a-trusted-host.md`](../decisions/0085-deletion-only-from-pages-opened-by-a-trusted-host.md) — the deletion needs a page opened by a trusted host.
 - [`decisions/0087-chart-reads-aggregate-per-point-bounded-in-parts-with-a-product-index.md`](../decisions/0087-chart-reads-aggregate-per-point-bounded-in-parts-with-a-product-index.md) — the chart reads aggregate per point, read the newest 2,880 points in parts under a trend gate and use an index of tick entries by good.
 - [`decisions/0089-chart-ranges-wide-ones-as-hourly-means-read-at-request.md`](../decisions/0089-chart-ranges-wide-ones-as-hourly-means-read-at-request.md) — the wide ranges read one mean per hour from ticks and hourly points when asked.
 
@@ -303,6 +254,5 @@ ticks are gone.
 
 - The tables, the file, the start and the rules of storing: [`server-data.md`](server-data.md).
 - The state a deletion drops and rebuilds: [`server-state.md`](server-state.md).
-- The button, the dialog and the host rule: [`web-pages.md`](web-pages.md); the setting `AllowedHosts`: [`server.md`](server.md).
+- Deleting a profile's history, its clean-up and its measurements: [`history-deletion.md`](history-deletion.md).
 - The charts: [`web-charts.md`](web-charts.md); the trend column's batch reads: [`web-trends.md`](web-trends.md).
-- Shrinking the database file and removing the residue of older versions: the user guide.

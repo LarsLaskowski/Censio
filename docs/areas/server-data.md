@@ -49,8 +49,8 @@ before the update only reads an existing file:
    lock row an earlier tool left behind cannot block the start.
 6. The journal mode is write-ahead logging (file only); synchronization stays at SQLite's default `FULL`, so a tick
    reported stored survives a power loss. Secure delete is switched on for the server's kept connection, a file and an
-   in-memory database alike, so SQLite overwrites everything this version deletes ([`history.md`](history.md), *Deleting
-   a profile*); a failure to switch it on counts as not writable, as in step 4.
+   in-memory database alike, so SQLite overwrites everything this version deletes ([`history-deletion.md`](history-deletion.md)); a failure
+   to switch it on counts as not writable, as in step 4.
 7. The result kind is *created* for a file this start created, *updated* when versions were applied to an existing file
    (an empty file included), *opened* otherwise.
 8. After the database is open and before the server listens, the current state is restored from it
@@ -96,7 +96,7 @@ The schema has these tables; the server's store is the only code that reads or w
   UTC hour, island and good ([`history.md`](history.md)).
 - **Folded ticks:** the identity of every tick folded into an hourly point, with the number of that point.
 - **Deleted profiles:** one random identity (a tombstone) per deletion; the ticks and hourly points of the deleted profile
-  carry it as their profile until the steps of [`history.md`](history.md) have removed them.
+  carry it as their profile until the steps of [`history-deletion.md`](history-deletion.md) have removed them.
 
 A float is stored as its 32-bit pattern in an INTEGER column (`NULL` for no value, record 0067), so a value reads back
 bit for bit, negative zero included, and a missing value never reads back as zero.
@@ -136,7 +136,7 @@ bit for bit, negative zero included, and a missing value never reads back as zer
 - **Deleting a profile.** One write transaction removes the profile's row, islands and trade routes (set, routes and stations) and gives its ticks and hourly
   points a fresh tombstone as their profile, so no read by profile returns them and a read of a tick by its identity
   gives none; an unknown profile changes nothing, and the catalog, the icons and the other profiles are untouched. Steps
-  of their own then remove the rows ([`history.md`](history.md)).
+  of their own then remove the rows ([`history-deletion.md`](history-deletion.md)).
 - **Catalog.** Storing a catalog replaces an earlier one; it reads back byte for byte with its identity.
 - **Icons.** Storing an icon whose reference is stored changes nothing and is reported as already stored. The query for
   missing icons takes a list of references and returns those with no stored icon, each once, ordinally sorted. It passes
@@ -197,4 +197,4 @@ the bounds; the retention job folds ticks 7 days old or older into hourly points
 - The data directory and the Docker image: [`server.md`](server.md).
 - What the ingest accepts and answers and when it stores: [`ingest.md`](ingest.md); the state kept from the store: [`server-state.md`](server-state.md).
 - The contract's messages and bounds: [`contract.md`](contract.md); the catalog document: [`game-catalog-format.md`](game-catalog-format.md).
-- Retention, hourly averages, deleting a profile's history, the series read and the trend reads: [`history.md`](history.md); the pages that show the data: [`web-pages.md`](web-pages.md); the charts: [`web-charts.md`](web-charts.md).
+- Retention, hourly averages, the series read and the trend reads: [`history.md`](history.md); deleting a profile's history: [`history-deletion.md`](history-deletion.md); the pages that show the data: [`web-pages.md`](web-pages.md); the charts: [`web-charts.md`](web-charts.md).

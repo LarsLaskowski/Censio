@@ -14,7 +14,7 @@ now, not how they changed. The server keeps a profile's state across a restart a
 memory ([server-state](../areas/server-state.md), record
 [0069](0069-current-state-of-the-newest-profiles-held-in-memory-and-restored-at-start.md)); ticks are stored as rows
 (record [0067](0067-ticks-stored-as-rows-with-float-bit-patterns.md)) and a deletion must leave no name in the
-database files ([history](../areas/history.md), *Deleting a profile*).
+database files ([history-deletion](../areas/history-deletion.md)).
 
 ## Options considered
 

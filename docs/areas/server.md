@@ -43,7 +43,7 @@ the Docker health probe rely on it.
   need no login: anyone who reaches the port reads every stored profile ([`web-pages.md`](web-pages.md),
   `SECURITY.md`). Antiforgery protection is on.
 - `/ingest` is a WebSocket route for the Companion that needs no web login either: it authenticates a connection by the
-  token of the first message, unless the setting `Censio:Ingest:RequireToken` is `false` ([`ingest.md`](ingest.md)).
+  token of the first message, unless the setting `Censio:Ingest:RequireToken` is `false` ([`ingest-token.md`](ingest-token.md)).
   Its limits count the TCP peer's address: `ASPNETCORE_FORWARDEDHEADERS_ENABLED` `true` takes the scheme from
   `X-Forwarded-Proto` only, and `X-Forwarded-For` never replaces the client address (record 0082).
   It speaks plain HTTP and WebSocket like the rest.
@@ -70,7 +70,7 @@ the Docker health probe rely on it.
   `No XML encryptor configured` when it creates the first key.
 - With the token required (the default), a data directory set and `Censio:Ingest:TokenFile` unset, the server also
   keeps the ingest token in the file `<data directory>/ingest-token`, created at the first start and read at every
-  later one; its rules, its mode and the start failures are in [`ingest.md`](ingest.md). The server creates it after
+  later one; its rules, its mode and the start failures are in [`ingest-token.md`](ingest-token.md). The server creates it after
   the key ring, so a key ring failure stops the start first. With `Censio:Ingest:TokenFile` set, the token comes from
   that file instead, `ingest-token` is neither read nor created, and a data directory is not needed for the token.
 - A value that is not an absolute path (including the empty string) stops the start: the server logs one `Critical`
@@ -103,7 +103,7 @@ the Docker health probe rely on it.
   non-root user; the application files are readable by every UID.
 - `/config` exists in the image, owned by 1654, and is the data directory: the image sets
   `CENSIO__DATADIRECTORY=/config`, so the key ring lies in `/config/data-protection-keys` (*Data directory and key
-  ring*) the database in `/config/censio.db` and the ingest token in `/config/ingest-token` unless `Censio:Ingest:TokenFile` names another file ([`ingest.md`](ingest.md)). The image declares no `VOLUME`. The setting can be pointed to another absolute path but not disabled
+  ring*) the database in `/config/censio.db` and the ingest token in `/config/ingest-token` unless `Censio:Ingest:TokenFile` names another file ([`ingest-token.md`](ingest-token.md)). The image declares no `VOLUME`. The setting can be pointed to another absolute path but not disabled
   (`docker run -e` cannot unset an image `ENV`, and an empty value stops the start). A directory the runtime user
   cannot write (a bind mount owned by another UID, a named volume combined with another `--user`) stops the
   container at start with exit code 1; it is made writable by starting with `--user <uid>:<gid>` of the
@@ -165,7 +165,7 @@ the Docker health probe rely on it.
 
 ## Not here
 
-- The Companion's WebSocket ingest, its token and the `Censio:Ingest:RequireToken` switch: [`ingest.md`](ingest.md).
+- The Companion's WebSocket ingest: [`ingest.md`](ingest.md); its token and the `Censio:Ingest:RequireToken` switch: [`ingest-token.md`](ingest-token.md).
 - The data pages and the icon route: [`web-pages.md`](web-pages.md).
 - The database: its file, schema, start failures and storing rules: [`server-data.md`](server-data.md).
 - The web UI's frame, themes and languages: [`web-ui.md`](web-ui.md).

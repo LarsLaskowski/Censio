@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-11-16
-- **Area:** history
+- **Area:** history-deletion
 - **Source:** Issue #35
 - **Supersedes:** —
 
@@ -34,7 +34,7 @@ deletes, not what an older version left in free space).
 
 Option 2 with secure delete and a truncating checkpoint: the rows of a deleted profile move to a tombstone no profile
 carries, so no read sees them, and are removed one tick or hourly point per transaction, and the write-ahead log is truncated once they are gone; a checkpoint
-blocked by a reader is retried by the next run. The rules are in [`history.md`](../areas/history.md).
+blocked by a reader is retried by the next run. The rules are in [`history-deletion.md`](../areas/history-deletion.md).
 
 ## Consequences
 
