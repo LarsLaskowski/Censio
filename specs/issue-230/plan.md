@@ -35,7 +35,8 @@ area document and warns past `AREA_MAX_WORDS` (5,000, `squad_settings.py:47`): `
 - AC3: each moved behavior is stated once: these strings occur in exactly one file under `docs/areas/` — `The history of a
   profile was deleted.`, `The deleted history was cleared from the database file.`, `Residue of older versions`,
   `An ingest token was generated and stored in`, `exclude each other; the server stops.`, `cannot be created; the server
-  stops.`, `created with mode` — and that file is the new document.
+  stops.`, `created with mode`, `Use the switch only on a network where every host is trusted.`, `compared by its
+  SHA-256`, `A deletion counts as done once its rows are gone` — and that file is the new document.
 - AC4: moved text is unchanged apart from link targets and the reworded lead-ins named under *Approach*; every link that
   named a moved section, or the old document for moved content, points at the new document (the list under
   *Documentation updates*), and every relative link in the changed files resolves.
@@ -67,7 +68,7 @@ Steps 4, 5 and the *Coverage gate* are not applicable: Markdown only (step 7: *F
 
 ## Approach
 
-Move text verbatim; write new only the *Scope*, *Not here*, index rows and these lead-ins. Section names are those of
+Move text verbatim; write new only the *Scope*, *Not here*, index rows and these lead-ins (the lead-in sentences below and the bullet lead **The generated file on Windows.**). Section names are those of
 the template; the Dev writes each new document from `docs/areas/_template.md`.
 
 **`docs/areas/history-deletion.md`** (`# History deletion`, about 1,250 words):
@@ -98,8 +99,8 @@ gains "Deleting a profile's history, its clean-up and its measurements: history-
 - *Behavior*, `### Token`: ingest.md lines 51–87 as they stand; "as in *The hello*" and "step 4 of *The hello*" link
   ingest.md, *The hello*.
 - *Limits and errors*: `### Start failures` (lines 225–249), and `### Accepted risks` with **Token off** (264–265), **The
-  configured file's access rules** (269–271), and the second sentence of **Plain text** (the Windows share), which
-  joins the access-rules bullet.
+  configured file's access rules** (269–271), and the second sentence of **Plain text** (the Windows share of the
+  generated file) as a bullet of its own under the new lead-in **The generated file on Windows.**
 - *Related decisions*: 0019, 0061 (0061 leaves ingest.md, 0019 stays in both).
 - *Not here*: the endpoint, the hello and the `tokenRefused` refusal, the session's log lines and their privacy
   (ingest.md); the data directory and the place of the token file (server.md); the Companion's token file
@@ -207,45 +208,14 @@ edits only.
 - Squad lesson (step 12): `plan-check.py` *Areas* cannot express a document that shrinks (`+N words` only), so a split
   plan always gets the size warning for the document it splits.
 
-## Security notes
+## Security review
 
-Security plan review: specs/issue-230/plan.md (mode plan, round 1)
+Security plan review, round 1: `APPROVED` with two non-blocking notes, both to fix now; no blocking finding.
 
-I read the plan and checked it against the sources: /home/user/Censio/docs/areas/ingest.md (lines 1-100, 186-290, 340-371), /home/user/Censio/docs/areas/history.md (lines 1-260), /home/user/Censio/.squad/project.md (*Security areas*, *Guarantees*), /home/user/Censio/.squad/routing.md (*Tiers*), /home/user/Censio/SECURITY.md, and every `ingest.md`/`history.md` link in the repository (`grep -rn 'ingest\.md\|history\.md' --include=*.md .`). No measurement is needed because nothing in the plan rests on measured behavior.
-
-**Tier.** `standard` is correct. The diff changes no security control. It adds links to two *Security areas* entries and narrows or removes none, and routing.md lines 99-102 make such an edit `standard` once it is beyond the `patch` budget, with `.squad/project.md` listed under *Security areas touched*. The plan does that. Fact 3 is right that `docs` does not apply, because the diff edits Markdown under `docs/areas/` and `docs/decisions/`.
-
-**Token statements (ingest.md).**
-- *Moved:* the Token section (lines 51-87: sources, form and bounds, the temporary file and the move, mode `0600`, rotation, the SHA-256 fixed-time comparison, the `RequireToken` switch, the case with no data directory), *Start failures* (225-249) and the risks *Token off* (264-265) and *configured file's access rules* (269-271).
-- *Stays:* hello step 4 and the refusal, the log-privacy paragraph (215-219), and the risks *A token holder that never reads* (262-263) and *Growth by a token holder* (272). These are endpoint rules, and the plan links ingest-token.md from step 4 and from *Not here*.
-- *Bounds-table row:* dropping the *Token* row (line 206) loses nothing. Its three values (43 characters; 32 to 1,024; 65,536 bytes) are in lines 52 and 66-67, which move.
-- *Log privacy:* stated consistently in both documents and not contradicted. Lines 60 and 64 move; line 215-217 stays.
-- *Internal references:* `(*Start failures*)` at line 84 moves with its target. The two references to *The hello* become links, as the plan says.
-- *Links:* server-state.md:160 and web-pages.md:322 point at *Accepted risks* in ingest.md for the token-holder growth risk. That risk stays, so they stay correct. SECURITY.md:36 states the token-off risk itself and links ingest.md only for the endpoint risks that stay, so leaving it unchanged is right. Released record 0061 is left unedited and its link still resolves.
-
-**Deletion statements (history.md).**
-- *Moved:* lines 164-187 (removal, tombstone, steps, *Clean-up*, *Residue of older versions*), the four deletion log rows, the limits at 206-208 and 210-211, and the deletion measurement rows.
-- *Stays:* the deletion rules the retention job carries out. These are the sweep and clean-up order and their retry (147-153), the trend gate held through the truncation (111-115), resent ticks of a deleted profile (137-139), and a deletion between two read parts (116-120). history-deletion's *Not here* points back to them, and the Server database entry will link both documents.
-- *Clean-up rule:* record 0087:44 and server-data.md:111 point at history.md for the gate that the clean-up holds. Lines 111-114 keep stating that rule, so leaving 0087 unchanged is right.
-- *Internal references:* "the warning below" in the moved text stays true, because the log table moves after it in *Behavior*.
-- *Release status:* records 0084 and 0097 are unreleased. I checked that `git tag --contains` on the commit that added each is empty; the tags are v0.1.0 to v0.3.0.
-
-**Security areas entries.**
-- *Ingest token and Companion authentication* will link ingest + ingest-token + record 0019. That covers every document that states the token's rules.
-- *Server database* will link server-data, server-state, history + history-deletion, web-trends and 0097. That covers the deletion and clean-up rules.
-- *Network exposure* covers the deletion's host rule. It needs no new link: web-pages.md and record 0085 state that rule, and history.md:210-211 (moving) only points there.
-- Both guarantees, the token one and the history one, get the new links.
-
-**AC3 strings.** I ran `grep -rnF '<s>' docs/areas` for each of the seven strings. Each occurs today in exactly one file: history.md:197, 199 and 185, then ingest.md:60, 232, 246 and 71. So the check works as planned.
-
-Findings:
-
-1. [NON-BLOCKING] The plan (*Approach*, ingest-token.md, *Accepted risks*) moves the second sentence of **Plain text** ("On Windows the token file takes its folder's access rules, so a share that exposes the data directory exposes the token.") into the bullet **The configured file's access rules**. That sentence is about the generated `ingest-token` in the data directory, not the file named by `Censio:Ingest:TokenFile`. Under that lead it would read as a rule for the configured file, whose access rules the server never touches (ingest.md:63, 269). The Windows-share exposure would then sit under the wrong file.
-   - Smallest fix: keep the sentence as a bullet of its own in ingest-token.md *Accepted risks*. Use the lead-in "**The generated file on Windows.**" and add that lead-in to the list of reworded lead-ins under *Approach* so AC4 allows it.
-   - Recommendation: fix now, in the Lead's revision.
-
-2. [NON-BLOCKING] AC3 pins the moved log lines, start failures and mode, but not two of the security statements you asked to keep whole: the token-off risk, and the rule that a failed deletion stores no change. AC4's moved-lines diff covers them only by reading.
-   - Smallest fix: add to AC3's string list `Use the switch only on a network where every host is trusted.` (today only in ingest.md:265), `A deletion counts as done once its rows are gone` (only in history.md:207) and `compared by its SHA-256` (only in ingest.md:77).
-   - Recommendation: fix now; it is three strings.
-
-No blocking findings. No security statement is lost or left contradictory. The only duplication is the log-privacy rule, which the two documents already state the same way. Both entries point to every document that states their rules, and the tier is right.
+1. The Windows-share sentence of **Plain text** is about the generated `ingest-token`, not the configured file —
+   accepted: *Approach* keeps it as its own bullet **The generated file on Windows.** in ingest-token.md *Accepted
+   risks*, and that lead-in is among the reworded lead-ins AC4 allows.
+2. AC3 did not pin the token-off risk, the failed-deletion rule and the hash comparison — accepted: AC3 adds
+   `Use the switch only on a network where every host is trusted.` (today only ingest.md:265), `compared by its SHA-256`
+   (only ingest.md:77) and `A deletion counts as done once its rows are gone` (only history.md:207), each checked with
+   `grep -rlF` over `docs/areas`; after the move each lies in the new document.
