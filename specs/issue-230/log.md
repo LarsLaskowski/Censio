@@ -17,3 +17,5 @@ are quoted in full.
 | 2026-11-21 07:28 | 8 Review | Reviewer | VERDICT: BLOCKING 0 \| NON-BLOCKING 1 on eb88638f02c4023a170c6200d2d6dec6103e0595. Non-blocking (verbatim fix): ARCHITECTURE.md:22 history row must keep the history.md link beside history-deletion.md; applied (opus/medium · 57,920 tokens · 13 tool uses · 85 s · 26 in · 7,344 out · 469,648 cache read · 45,606 cache write · 234,472 weighted) |
 | 2026-11-21 07:28 | 8 Verbatim | Orchestrator | verbatim: [NON-BLOCKING, verbatim] docs/ARCHITECTURE.md:22 |
 | 2026-11-21 07:29 | 7 Gate stamp | Orchestrator | PASS on 84b463b8700788e49df000a692900121f76c2743 (tier standard, verbatim): Format check pass; decision-check.py pass; scope-check.py pass |
+| 2026-11-21 07:29 | 9 PR approval | Orchestrator | approved by checklist (no record, no plan deviation beyond one index-row wording fix in docs/areas/README.md) |
+| 2026-11-21 07:29 | 10 Pull request | Orchestrator | Matrix filled; working record posted to issue 230; draft PR opened |
