@@ -81,9 +81,11 @@ catalog upload #42.
   written by the Companion, a change counts after a restart, and the reading rules of `gameFolder` are unchanged.
 - N5: The tray, the menu, the pipe and `Exit` never wait for the server's start, its stop or the browser; the start
   of the server does not delay the tray icon.
-- N6: The release ZIP keeps its form: one file `Censio.Companion.exe`, self-contained, no installed .NET, installer or
-  administrator rights, on Windows 10 22H2 and Windows 11 x64 ([companion](../../docs/areas/companion.md),
-  *Platform*); the pages, their scripts, styles and fonts come from that file.
+- N6: Target host of local mode (Product Manager): Windows 11 x64 only, with no installed .NET, no installer, no
+  administrator rights and a default browser. The release ZIP keeps its form: one self-contained file
+  `Censio.Companion.exe`, which also serves the pages' assets. The Companion's platform does not
+  change: on Windows 10 22H2 it still runs as [companion](../../docs/areas/companion.md) (*Platform*) states. There,
+  local mode is not supported: it is neither tried nor refused, and the README and the user guide say so.
 - N7: The server's log entries of level warning and above go to the Companion's log file under the rules of
   [companion-log](../../docs/areas/companion-log.md) (length cuts, sanitizing, nothing it forbids); the token is never
   logged.
@@ -118,22 +120,26 @@ catalog upload #42.
 - A settings window or a menu switch for the mode and the port (#43); a menu entry for the data folder.
 - Restarting a failed server without restarting the Companion (E5).
 - The tooltip and the icon looks: they keep showing the pipe connection only.
+- Local mode on Windows 10 22H2: unsupported, neither tried nor refused (N6).
 
 ## Open questions
 
 1. What does local mode show from the running game in this feature? Live sending is #40 and the catalog upload #42,
-   neither a dependency of #39. **Not answered — escalated to the Product Manager.** This spec is written for the
-   recommended answer (the server is hosted and filled by a replay; #40 sends live data to it and #42 the catalog).
-   Answered: pending the Product Manager's answer.
+   neither a dependency of #39. Answered: (Product Manager, option B) #39 hosts the server and adds `Open Censio`.
+   Its pages fill from a replay sent to `ws://localhost:<port>/ingest` (S5). #40 later sends live data to the local
+   server as well, and #42 adds the catalog.
 2. How is local mode switched on before the settings window? Answered: (Lead, record 0045) keys `mode` and `localPort`
    in the existing settings file, which #43 will write; a command-line switch would be lost at autostart.
 3. Which default port? Answered: (Lead) 5000, the server's own default outside the image
    ([server](../../docs/areas/server.md), *Listen address*), configurable as the issue asks.
 4. Which addresses does it listen on? Answered: (Lead) loopback only (N1), the closed default for the security area
-   *Network exposure*; a LAN address is out of scope until the Product Manager asks for it.
+   *Network exposure*, confirmed by the Product Manager ("nur lokaler Server"); LAN access is out of scope.
 5. Is the ingest token still required? Answered: (`.squad/project.md`, *Guarantees*, record 0019) yes, unchanged.
-6. What does the target host have? Answered: ([companion](../../docs/areas/companion.md), *Platform*): Windows 10 22H2
-   or 11 x64, no .NET, no administrator rights, a default browser; the Product Manager confirms with Open question 1.
+6. What does the target host have? Answered: (Product Manager, "nur ab Windows 11 x64") Windows 11 x64 only (N6).
+   This is narrower than [companion](../../docs/areas/companion.md) (*Platform*) and `README.md`, which name
+   Windows 10 22H2 and Windows 11 for the Companion; no decision record fixes Windows 10. The spec applies the answer
+   to local mode only. Dropping Windows 10 for the whole Companion would change its platform for every player, which
+   is outside #39.
 
 ## Area documents
 
