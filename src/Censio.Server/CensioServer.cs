@@ -1,7 +1,10 @@
 using System.Net;
+using System.Net.Sockets;
 
 using Censio.Server;
 using Censio.Server.Data;
+
+using Microsoft.AspNetCore.HostFiltering;
 
 using MudBlazor.Services;
 
@@ -21,72 +24,26 @@ public static class CensioServer
     /// <returns>The exit code: <c>0</c> after a regular stop, <c>1</c> when a start check failed.</returns>
     public static async Task<int> RunAsync(string[] args)
     {
-        ServerState? state = null;
-        HistoryRetention? retention = null;
-        HistoryStore? historyStore = null;
+        using var parts = new ServerParts();
 
         var builder = WebApplication.CreateBuilder(args);
 
         builder.WebHost.UseStaticWebAssets();
 
-        builder.Services.AddRazorComponents()
-                        .AddInteractiveServerComponents();
-        builder.Services.AddMudServices();
-        builder.Services.AddHealthChecks();
-        builder.Services.AddCensioDataProtection();
-        builder.Services.AddCensioIngest();
-        builder.Services.AddSingleton(_ => state ?? throw new InvalidOperationException("The server state is not restored yet."));
-        builder.Services.AddSingleton<IProfileStateSource>(_ => state ?? throw new InvalidOperationException("The server state is not restored yet."));
-        builder.Services.AddSingleton(_ => retention ?? throw new InvalidOperationException("The history retention is not created yet."));
-        builder.Services.AddSingleton<IHistoryTrends>(_ => historyStore ?? throw new InvalidOperationException("The history store is not created yet."));
-        builder.Services.AddSingleton<PageReader>();
-        builder.Services.AddSingleton<TrendReader>();
+        AddServices(builder.Services, parts);
 
         var app = builder.Build();
 
         await using var appDisposal = app.ConfigureAwait(false);
 
-        if (DataProtectionSetup.TryCreateKeyRing(app.Services, app.Configuration, app.Logger) == false)
+        var setUp = await TrySetUpAsync(app, parts, app.Lifetime.ApplicationStopping).ConfigureAwait(false);
+
+        if (setUp is null)
         {
             return 1;
         }
 
-        var ingestAccess = IngestTokenSetup.TryCreateAccess(app.Configuration, app.Logger);
-
-        if (ingestAccess is null)
-        {
-            return 1;
-        }
-
-        using var database = await DatabaseSetup.TryOpenAsync(app.Configuration, app.Services.GetRequiredService<ILoggerFactory>(), app.Logger, app.Lifetime.ApplicationStopping).ConfigureAwait(false);
-
-        if (database is null)
-        {
-            return 1;
-        }
-
-        state = new ServerState(new ServerStore(database), app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Censio.Server.State"));
-
-        if (await ServerStateSetup.TryRestoreAsync(state, database.DatabaseFile, app.Logger, app.Lifetime.ApplicationStopping).ConfigureAwait(false) == false)
-        {
-            return 1;
-        }
-
-        historyStore = new HistoryStore(database);
-
-        using var history = new HistoryRetention(state, historyStore, TimeProvider.System, app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Censio.Server.History"));
-
-        retention = history;
-        app.Lifetime.ApplicationStarted.Register(() => history.Start(app.Lifetime.ApplicationStopping));
-
-        app.UseWebSockets();
-        app.UseAntiforgery();
-        app.MapStaticAssets();
-        app.MapHealthChecks("/health");
-        app.MapCensioIngest(ingestAccess, state);
-        app.MapCensioIcons(state);
-        app.MapRazorComponents<Censio.Server.Components.App>()
-           .AddInteractiveServerRenderMode();
+        MapEndpoints(app, setUp.Value.Access, setUp.Value.State);
 
         await app.RunAsync().ConfigureAwait(false);
 
@@ -99,11 +56,47 @@ public static class CensioServer
     /// <param name="options">The options of the local server.</param>
     /// <param name="cancellationToken">The token that cancels the start.</param>
     /// <returns>The result of the start.</returns>
-    public static Task<LocalServerStart> StartLocalAsync(LocalServerOptions options, CancellationToken cancellationToken)
+    public static async Task<LocalServerStart> StartLocalAsync(LocalServerOptions options, CancellationToken cancellationToken)
     {
-#pragma warning disable RH2003, S1172 // Skeleton: removed with the implementation
-        throw new NotImplementedException();
-#pragma warning restore RH2003, S1172 // Skeleton: removed with the implementation
+        var parts = new ServerParts();
+        var app = BuildLocalApp(options, parts);
+
+        try
+        {
+            var setUp = await TrySetUpAsync(app, parts, cancellationToken).ConfigureAwait(false);
+
+            if (setUp is null)
+            {
+                return await FailAsync(app, parts, LocalServerStartKind.Failed, null).ConfigureAwait(false);
+            }
+
+            MapEndpoints(app, setUp.Value.Access, setUp.Value.State);
+
+            await app.StartAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (IsAddressInUse(exception))
+        {
+            return await FailAsync(app, parts, LocalServerStartKind.PortInUse, exception).ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            return await FailAsync(app, parts, LocalServerStartKind.Failed, exception).ConfigureAwait(false);
+        }
+
+        var token = IngestTokenSetup.ReadTokenFile(Path.Combine(options.DataDirectory, IngestTokenSetup.TokenFileName));
+
+        if (token is null)
+        {
+            await StopQuietlyAsync(app).ConfigureAwait(false);
+
+            return await FailAsync(app, parts, LocalServerStartKind.Failed, null).ConfigureAwait(false);
+        }
+
+        return new LocalServerStart
+               {
+                   Kind = LocalServerStartKind.Running,
+                   Server = new LocalServerHost(app, parts, options.Port, token)
+               };
     }
 
     /// <summary>
@@ -114,9 +107,204 @@ public static class CensioServer
     /// <returns>The endpoints.</returns>
     public static IReadOnlyList<IPEndPoint> LocalEndpoints(int port, bool listenOnIPv6)
     {
-#pragma warning disable RH2003, S1172 // Skeleton: removed with the implementation
-        throw new NotImplementedException();
-#pragma warning restore RH2003, S1172 // Skeleton: removed with the implementation
+        var endpoints = new List<IPEndPoint>
+                        {
+                            new(IPAddress.Loopback, port)
+                        };
+
+        if (listenOnIPv6)
+        {
+            endpoints.Add(new IPEndPoint(IPAddress.IPv6Loopback, port));
+        }
+
+        return endpoints;
+    }
+
+    /// <summary>
+    /// Registers the services both entry points share.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <param name="parts">The parts the services resolve once the start checks have created them.</param>
+    private static void AddServices(IServiceCollection services, ServerParts parts)
+    {
+        services.AddRazorComponents()
+                .AddInteractiveServerComponents();
+        services.AddMudServices();
+        services.AddHealthChecks();
+        services.AddCensioDataProtection();
+        services.AddCensioIngest();
+        services.AddSingleton(_ => parts.State ?? throw new InvalidOperationException("The server state is not restored yet."));
+        services.AddSingleton<IProfileStateSource>(_ => parts.State ?? throw new InvalidOperationException("The server state is not restored yet."));
+        services.AddSingleton(_ => parts.Retention ?? throw new InvalidOperationException("The history retention is not created yet."));
+        services.AddSingleton<IHistoryTrends>(_ => parts.HistoryStore ?? throw new InvalidOperationException("The history store is not created yet."));
+        services.AddSingleton<PageReader>();
+        services.AddSingleton<TrendReader>();
+    }
+
+    /// <summary>
+    /// Builds the host of a local server: no outside setting reaches it.
+    /// </summary>
+    /// <param name="options">The options of the local server.</param>
+    /// <param name="parts">The parts the services resolve once the start checks have created them.</param>
+    /// <returns>The built application.</returns>
+    private static WebApplication BuildLocalApp(LocalServerOptions options, ServerParts parts)
+    {
+        var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+                                                   {
+                                                       ApplicationName = "Censio.Server",
+                                                       EnvironmentName = Environments.Production,
+                                                       ContentRootPath = options.ContentRoot,
+                                                       WebRootPath = Path.Combine(options.ContentRoot, "wwwroot"),
+                                                       Args = ["--preventHostingStartup=true"]
+                                                   });
+
+        builder.Configuration.Sources.Clear();
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+                                                    {
+                                                        [DataProtectionSetup.DataDirectoryKey] = options.DataDirectory,
+                                                        ["AllowedHosts"] = "localhost;127.0.0.1;[::1]"
+                                                    });
+        builder.WebHost.UseStaticWebAssets();
+        builder.WebHost.ConfigureKestrel(kestrel =>
+                                         {
+                                             foreach (var endpoint in LocalEndpoints(options.Port, options.ListenOnIPv6))
+                                             {
+                                                 kestrel.Listen(endpoint);
+                                             }
+                                         });
+        builder.Logging.ClearProviders();
+        builder.Logging.SetMinimumLevel(LogLevel.Warning);
+        builder.Logging.AddProvider(new BorrowedLoggerProvider(options.LogProvider));
+        builder.Services.Configure<HostFilteringOptions>(filtering => filtering.AllowEmptyHosts = false);
+        builder.Services.Configure<HostOptions>(host => host.ShutdownTimeout = TimeSpan.FromSeconds(2));
+
+        AddServices(builder.Services, parts);
+
+        return builder.Build();
+    }
+
+    /// <summary>
+    /// Runs the start checks both entry points share and creates the state and the history retention.
+    /// </summary>
+    /// <param name="app">The built application.</param>
+    /// <param name="parts">The parts the checks create.</param>
+    /// <param name="cancellationToken">The token that cancels the checks.</param>
+    /// <returns>The ingest access and the state, or <c>null</c> when a check failed (its line is logged).</returns>
+    private static async Task<(IngestAccess Access, ServerState State)?> TrySetUpAsync(WebApplication app, ServerParts parts, CancellationToken cancellationToken)
+    {
+        if (DataProtectionSetup.TryCreateKeyRing(app.Services, app.Configuration, app.Logger) == false)
+        {
+            return null;
+        }
+
+        var ingestAccess = IngestTokenSetup.TryCreateAccess(app.Configuration, app.Logger);
+
+        if (ingestAccess is null)
+        {
+            return null;
+        }
+
+        var loggerFactory = app.Services.GetRequiredService<ILoggerFactory>();
+        var database = await DatabaseSetup.TryOpenAsync(app.Configuration, loggerFactory, app.Logger, cancellationToken).ConfigureAwait(false);
+
+        if (database is null)
+        {
+            return null;
+        }
+
+        parts.Database = database;
+
+        var state = new ServerState(new ServerStore(database), loggerFactory.CreateLogger("Censio.Server.State"));
+
+        parts.State = state;
+
+        if (await ServerStateSetup.TryRestoreAsync(state, database.DatabaseFile, app.Logger, cancellationToken).ConfigureAwait(false) == false)
+        {
+            return null;
+        }
+
+        var historyStore = new HistoryStore(database);
+        var history = new HistoryRetention(state, historyStore, TimeProvider.System, loggerFactory.CreateLogger("Censio.Server.History"));
+
+        parts.HistoryStore = historyStore;
+        parts.Retention = history;
+        app.Lifetime.ApplicationStarted.Register(() => history.Start(app.Lifetime.ApplicationStopping));
+
+        return (ingestAccess, state);
+    }
+
+    /// <summary>
+    /// Adds the middleware and the endpoints both entry points share.
+    /// </summary>
+    /// <param name="app">The application.</param>
+    /// <param name="ingestAccess">The ingest access.</param>
+    /// <param name="state">The server state.</param>
+    private static void MapEndpoints(WebApplication app, IngestAccess ingestAccess, ServerState state)
+    {
+        app.UseWebSockets();
+        app.UseAntiforgery();
+        app.MapStaticAssets();
+        app.MapHealthChecks("/health");
+        app.MapCensioIngest(ingestAccess, state);
+        app.MapCensioIcons(state);
+        app.MapRazorComponents<Censio.Server.Components.App>()
+           .AddInteractiveServerRenderMode();
+    }
+
+    /// <summary>
+    /// Determines whether an exception of a start comes from an address another program holds.
+    /// </summary>
+    /// <param name="exception">The exception.</param>
+    /// <returns><c>true</c> when the chain holds a socket exception for an address in use; otherwise, <c>false</c>.</returns>
+    private static bool IsAddressInUse(Exception exception)
+    {
+        for (var current = exception; current is not null; current = current.InnerException)
+        {
+            if (current is SocketException { SocketErrorCode: SocketError.AddressAlreadyInUse })
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Stops a started application, ignoring a failure.
+    /// </summary>
+    /// <param name="app">The application.</param>
+    /// <returns>A task that completes when the stop is done.</returns>
+    private static async Task StopQuietlyAsync(WebApplication app)
+    {
+        try
+        {
+            await app.StopAsync().ConfigureAwait(false);
+        }
+        catch (OperationCanceledException exception)
+        {
+            // The application is disposed right after; the stop result does not matter.
+            _ = exception;
+        }
+    }
+
+    /// <summary>
+    /// Releases what a start created, in the order retention, database, application, and builds the failed result.
+    /// </summary>
+    /// <param name="app">The built application.</param>
+    /// <param name="parts">The parts the start created.</param>
+    /// <param name="kind">The outcome.</param>
+    /// <param name="exception">The exception behind the outcome, or <c>null</c>.</param>
+    /// <returns>The failed result.</returns>
+    private static async Task<LocalServerStart> FailAsync(WebApplication app, ServerParts parts, LocalServerStartKind kind, Exception? exception)
+    {
+        parts.Dispose();
+        await app.DisposeAsync().ConfigureAwait(false);
+
+        return new LocalServerStart
+               {
+                   Kind = kind,
+                   Exception = exception
+               };
     }
 
     #endregion // Methods

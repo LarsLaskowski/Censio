@@ -130,9 +130,11 @@ public static partial class IngestTokenSetup
     /// <returns>The token, or <c>null</c> when the file cannot be read or holds no valid token.</returns>
     public static string? ReadTokenFile(string tokenFile)
     {
-#pragma warning disable RH2003, S1172 // Skeleton: removed with the implementation
-        throw new NotImplementedException();
-#pragma warning restore RH2003, S1172 // Skeleton: removed with the implementation
+        var content = ReadBounded(tokenFile, out _);
+
+        return content is null
+                   ? null
+                   : ParseToken(content);
     }
 
     /// <summary>
