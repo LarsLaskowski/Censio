@@ -219,7 +219,7 @@ text and is not retried until the page is loaded again: a notice of the server s
 - A deletion that is done, or that finds the profile already gone (two browsers), closes the dialog and goes to
   `/regions`. A failed deletion keeps the dialog open and adds a second paragraph `The history could not be deleted.` /
   `Der Verlauf konnte nicht gelöscht werden.`; the exception goes to the log of the retention job, never to the page
-  ([`history.md`](history.md)). After a deletion a page that shows the profile shows `Not found.`, and the profile switch
+  ([`history-deletion.md`](history-deletion.md)). After a deletion a page that shows the profile shows `Not found.`, and the profile switch
   no longer lists it ([`server-state.md`](server-state.md), *Deleting a profile*).
 - **Host rule.** The server decides when it renders a page, from the request's host and the setting `AllowedHosts`
   ([`server.md`](server.md)), whether the page may delete, and hands the answer to the interactive page in the root
@@ -256,7 +256,7 @@ text and is not retried until the page is loaded again: a notice of the server s
 ### Logging
 
 The pages log nothing of their own, a deletion included: the retention job logs it without a name
-([`history.md`](history.md), *Log lines*). A failed read of a profile is logged by the server state without a name or a
+([`history-deletion.md`](history-deletion.md), *Log lines*). A failed read of a profile is logged by the server state without a name or a
 value ([`server-state.md`](server-state.md), *Logging*); a failed read of a chart or of the trends of a table logs the warning
 `A chart could not be read from the database.` with the exception and nothing else ([`web-charts.md`](web-charts.md),
 *Logging*); an address, a name, a figure and the browser's offset are never logged.
@@ -351,6 +351,6 @@ value ([`server-state.md`](server-state.md), *Logging*); a failed read of a char
 - The frame, the theme, the language and the profile switch's look: [`web-ui.md`](web-ui.md).
 - The state the pages read, its memory and its followers: [`server-state.md`](server-state.md).
 - What the Companion sends and how it is stored: [`ingest.md`](ingest.md), [`contract.md`](contract.md).
-- The stored history, the series read and the deletion's rules: [`history.md`](history.md).
+- The stored history and the series read: [`history.md`](history.md); the deletion's rules: [`history-deletion.md`](history-deletion.md).
 - The charts, their range, gaps, tooltip, colours and reads: [`web-charts.md`](web-charts.md).
 - Deficits and surpluses per region, efficiency, economics, workforce, search, the phone layout and sorting by column: later features (#47 to #51, #53). The trend column's sparklines and arrows: [`web-trends.md`](web-trends.md).

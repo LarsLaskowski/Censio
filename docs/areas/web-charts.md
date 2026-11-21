@@ -227,7 +227,7 @@ English and German. The sparklines and trend arrows of the tables are in [`web-t
   cancelled with the page.
 - A page holds, per chart, the points of its read (at most 2,880, three values each) and the series it draws.
 - A chart read never holds the clean-up of a deleted profile back: the clean-up waits for the chart read's part in progress,
-  and no part starts while it truncates the write-ahead log ([`history.md`](history.md), *Deleting a profile*).
+  and no part starts while it truncates the write-ahead log ([`history-deletion.md`](history-deletion.md)).
 
 ### Logging
 

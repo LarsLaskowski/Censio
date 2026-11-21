@@ -277,7 +277,7 @@ input.
 
 ## Not here
 
-- The server's endpoint, its token and what it answers to each message: [`ingest.md`](ingest.md).
+- The server's endpoint and what it answers to each message: [`ingest.md`](ingest.md); its token: [`ingest-token.md`](ingest-token.md).
 - The Companion's sending of a replay: [`replay-sending.md`](replay-sending.md); live sending, the buffer and the resend (#40, #41); uploading the catalog and the icons (#42).
 - The catalog document itself: [`game-catalog-format.md`](game-catalog-format.md).
 - The pipe's frames and ticks: [`pipe.md`](pipe.md).

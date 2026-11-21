@@ -25,7 +25,7 @@ what the server does with them in [`ingest.md`](ingest.md).
 ### Token file
 
 - `--token-file` names the file the token is read from, once, before the recording is opened. Without it the hello
-  carries no token, which a server with the token switched off accepts ([`ingest.md`](ingest.md), *Token*).
+  carries no token, which a server with the token switched off accepts ([`ingest-token.md`](ingest-token.md), *Token*).
 - The file is opened for reading only and read up to 65,536 bytes; a larger file holds no valid token. It is decoded by
   its byte order mark: UTF-8 (`EF BB BF`), UTF-16 little endian (`FF FE`) or UTF-16 big endian (`FE FF`); without a
   mark it is UTF-8. A byte sequence that is invalid in its encoding holds no valid token. This is the one difference
@@ -162,13 +162,13 @@ below are done by the Companion at once.
 - **UNC paths.** A UNC path given for `--replay` or `--token-file` is read over SMB with the user's credentials; it is the
   user's own path.
 - **A FIFO or device as token file** blocks the start of the replay until it is written; the same holds for the server's
-  configured token file ([`ingest.md`](ingest.md), *Accepted risks*).
+  configured token file ([`ingest-token.md`](ingest-token.md), *Accepted risks*).
 - **The token file's access rules** are the user's; the Companion neither checks nor changes them. A token file left in a
   folder others can read leaks the token (`SECURITY.md`).
 - **No buffer.** The replay is no live Companion: it buffers nothing and a lost connection loses the rest of the run.
 - **Growth.** Every run adds a profile `Replay <time>` and its ticks. A replay keeps the recorded receive times, so the
   ticks of an old recording are folded into hourly points at the next retention run, except those of the profile's
-  latest hour, which stay as ticks, and the operator removes a profile in the web interface ([`history.md`](history.md)).
+  latest hour, which stay as ticks, and the operator removes a profile in the web interface ([`history-deletion.md`](history-deletion.md)).
 
 ## Measurements
 
@@ -221,7 +221,7 @@ shell's encoding is confirmed. Not tried: `docker cp` for the token file, a toke
 ## Not here
 
 - The messages, their reader and writer and the refusal texts: [`contract.md`](contract.md).
-- The server's endpoint, token rules and answers: [`ingest.md`](ingest.md); what it keeps: [`server-state.md`](server-state.md).
+- The server's endpoint and answers: [`ingest.md`](ingest.md); token rules: [`ingest-token.md`](ingest-token.md); what it keeps: [`server-state.md`](server-state.md).
 - The recording file and the replay's pacing: [`pipe-recording.md`](pipe-recording.md); the tray and the command line: [`companion.md`](companion.md).
 - Live sending, the buffer and the resend (#40, #41); the catalog and the icons (#42).
 - The code: `ReplaySender`, `ClientWebSocketConnector`, `ReplayTokenFile` and `PipeReplayRunner` in `src/Censio.Companion.Core`.
