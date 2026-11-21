@@ -1,7 +1,7 @@
 # Project
 
-What the squad needs to know about this project that is not stack-specific. A product PR updates it when the change
-makes an entry untrue (`.squad/routing.md`, *Scope of a product PR*).
+What the squad needs to know beyond the stack; a product PR updates an entry it makes untrue (`.squad/routing.md`,
+*Scope of a product PR*).
 
 Every entry points: it names files, types or endpoints and links the document that says more. Behavior, values,
 limits and sequences live in the area documents (`docs/areas/README.md`), reasons in the decision records.
@@ -9,22 +9,21 @@ limits and sequences live in the area documents (`docs/areas/README.md`), reason
 
 ## Security areas
 
-A change that touches one of these lists it under *Security areas touched* in its plan, so Security reviews the
-plan (`.squad/routing.md`, *Tiers*, which also says when a change is tier `security`). One line per area: what is
-protected, the concrete types, files or endpoints, and a link to the area document that states its rules; no limits,
-patterns or sequences.
+A plan lists every area its change touches under *Security areas touched*, so Security reviews it
+(`.squad/routing.md`, *Tiers*). One line per area: what is protected, its types, files or endpoints, and the area
+document with its rules.
 
-- Ingest token and Companion authentication: the WebSocket endpoint `/ingest` and its token (`IngestEndpoint`, `IngestSession`, `IngestConnections`, `IngestHosts`, `IngestHost`, `IngestAdmission`, `IngestTokenSetup`, `IngestAccess` in `src/Censio.Server`, `IngestSession` storing and acknowledging every message type after the accepted hello, `ContractTradeRoutes` included, the file `ingest-token` in the data directory, the setting `Censio:Ingest:TokenFile` and the file it names) — [ingest](../docs/areas/ingest.md), [record 0019](../docs/decisions/0019-websocket-transport-with-shared-token.md).
+- Ingest token and Companion authentication: the WebSocket endpoint `/ingest` and its token (`IngestEndpoint`, `IngestSession` with every message type it handles, `ContractTradeRoutes` included, `IngestConnections`, `IngestHosts`, `IngestHost`, `IngestAdmission`, `IngestTokenSetup`, `IngestAccess` in `src/Censio.Server`; the data directory's `ingest-token`; `Censio:Ingest:TokenFile` and the file it names) — [ingest](../docs/areas/ingest.md), [record 0019](../docs/decisions/0019-websocket-transport-with-shared-token.md).
 - Network exposure: the server's listener and its routes reachable without login (`/`, `/health`, `/ingest`, the data pages (`/regions`, `/trade-routes`, `/profiles/…` including `/profiles/{profile}/trade-routes`), `/icons/{reference}`, the Blazor hub, static assets) in `src/Censio.Server/Program.cs`, `IconEndpoint` and `src/Censio.Server/Dockerfile`; the history deletion (`DeletionHostRule`); the preference cookies and `Accept-Language` (`UiPreferences`, `App.razor`) — [server](../docs/areas/server.md), [web-ui](../docs/areas/web-ui.md), [web-pages](../docs/areas/web-pages.md).
 - Data-protection key ring: `DataProtectionSetup` under the data directory — [server](../docs/areas/server.md), *Data directory and key ring*.
-- Server database: the file, its side files and folders, owner-only (`ServerDatabase`, `DatabaseSetup`), the history in it (`HistoryStore`, `HistoryRetention`), a profile's latest trade routes (tables `TradeRouteSets`, `TradeRoutes`, `TradeRouteStations`; `ServerStore.StoreTradeRoutesAsync`, `ReadTradeRoutesAsync`, removed by `DeleteProfileAsync`), and the in-memory state of the stored data (`ServerState`, `ServerStateSetup`) — [server-data](../docs/areas/server-data.md), [server-state](../docs/areas/server-state.md), [history](../docs/areas/history.md), [web-trends](../docs/areas/web-trends.md) (*The batch reads of the trend column*), [record 0097](../docs/decisions/0097-latest-trade-routes-per-profile-stored-as-rows-on-a-page-of-their-own.md).
+- Server database: the file with its side files and folders, owner-only (`ServerDatabase`, `DatabaseSetup`), its history (`HistoryStore`, `HistoryRetention`), each profile's latest trade routes (tables `TradeRouteSets`, `TradeRoutes`, `TradeRouteStations`; `ServerStore.StoreTradeRoutesAsync`, `ReadTradeRoutesAsync`, `DeleteProfileAsync`) and the in-memory state (`ServerState`, `ServerStateSetup`) — [server-data](../docs/areas/server-data.md), [server-state](../docs/areas/server-state.md), [history](../docs/areas/history.md), [web-trends](../docs/areas/web-trends.md) (*The batch reads of the trend column*), [record 0097](../docs/decisions/0097-latest-trade-routes-per-profile-stored-as-rows-on-a-page-of-their-own.md).
 - Local pipe connection: `NamedPipeConnector` and `PipeEndpoint` open the game's pipe read-only at identification level — [pipe-connection](../docs/areas/pipe-connection.md), *Opening*.
-- Parsing of external input: all of `src/Censio.Pipe` and `src/Censio.GameData`; `CatalogDocumentReader` and `ContractReader` in `src/Censio.Contracts`; `CompanionSettings`, `RegistryUbisoftInstallRecords`, `GameInstallationSearch`, `PageAddress`, `PngHeader` and `BrowserOffset` (the browser's UTC offset) — [contract](../docs/areas/contract.md), [pipe](../docs/areas/pipe.md), [pipe-recording](../docs/areas/pipe-recording.md), [game-files](../docs/areas/game-files.md), [game-catalog](../docs/areas/game-catalog.md), [game-catalog-icons](../docs/areas/game-catalog-icons.md), [game-catalog-cache](../docs/areas/game-catalog-cache.md), [game-catalog-format](../docs/areas/game-catalog-format.md), [game-installation](../docs/areas/game-installation.md), [companion](../docs/areas/companion.md) (*Settings file*), [web-pages](../docs/areas/web-pages.md), [web-charts](../docs/areas/web-charts.md).
+- Parsing of external input: all of `src/Censio.Pipe` and `src/Censio.GameData`; `CatalogDocumentReader` and `ContractReader` in `src/Censio.Contracts`; `CompanionSettings`, `RegistryUbisoftInstallRecords`, `GameInstallationSearch`, `PageAddress`, `PngHeader`, `BrowserOffset` — [contract](../docs/areas/contract.md), [pipe](../docs/areas/pipe.md), [pipe-recording](../docs/areas/pipe-recording.md), [game-files](../docs/areas/game-files.md), [game-catalog](../docs/areas/game-catalog.md), [game-catalog-icons](../docs/areas/game-catalog-icons.md), [game-catalog-cache](../docs/areas/game-catalog-cache.md), [game-catalog-format](../docs/areas/game-catalog-format.md), [game-installation](../docs/areas/game-installation.md), [companion](../docs/areas/companion.md) (*Settings file*), [web-pages](../docs/areas/web-pages.md), [web-charts](../docs/areas/web-charts.md).
 - File paths the Companion writes, prunes or opens: `CompanionFolders`, `PipeRecordingFiles`, `LogFileLoggerProvider`, `LogFileNames`, `CompanionSettings`, `GameCatalogCacheStore`, `FolderOpener`, the replay file, `AnonymiserCommand` (output and temporary file), `ReplayTokenFile`; read-only the installation and its archives (`GameInstallation`, `WindowsFileVersionReader`, `RdaArchive`, `RdaInstallationSurvey`, `GameCatalogReader.Load`, `GameIconReader.Load`) — [companion](../docs/areas/companion.md) (*Recording*, *Folders*, *Settings file*), [companion-log](../docs/areas/companion-log.md), [pipe-recording](../docs/areas/pipe-recording.md) (*Anonymising*), [game-files](../docs/areas/game-files.md), [game-catalog](../docs/areas/game-catalog.md), [game-catalog-icons](../docs/areas/game-catalog-icons.md), [game-catalog-cache](../docs/areas/game-catalog-cache.md), [game-installation](../docs/areas/game-installation.md).
 - Windows autostart: `CompanionAutostart` over `RegistryStartupEntryStore`, the per-user Run value — [companion](../docs/areas/companion.md), *Start with Windows*.
-- Logging and showing external data: the Companion's log (`LogLine`, `LogFileLoggerProvider`, `CompanionLog`, `GameCatalogLoader`, `GameCatalogReporter`), its diagnostics window (`DiagnosticsWindow`, `GameIconImageConverter`, PNGs from `PngWriter` and `GameCatalogCacheFile`), the server's request logging and pages (`ProfileViewBuilder`, `PageNames`, `IconEndpoint`, `PngHeader`, `HistoryRetention`, `Regions`, `TradeRoutes` (route, folder and island names are shown as text), `TrendChart`, `TrendCell`, `SparklineBuilder`, `TrendSeriesBuilder`, `TrendReader`) — [companion-log](../docs/areas/companion-log.md), [companion-diagnostics](../docs/areas/companion-diagnostics.md), [pipe](../docs/areas/pipe.md), [server](../docs/areas/server.md), [web-pages](../docs/areas/web-pages.md), [web-charts](../docs/areas/web-charts.md), [web-trends](../docs/areas/web-trends.md), [game-catalog](../docs/areas/game-catalog.md), [game-catalog-icons](../docs/areas/game-catalog-icons.md), [game-catalog-cache](../docs/areas/game-catalog-cache.md).
+- Logging and showing external data: the Companion's log (`LogLine`, `LogFileLoggerProvider`, `CompanionLog`, `GameCatalogLoader`, `GameCatalogReporter`), its diagnostics window (`DiagnosticsWindow`, `GameIconImageConverter`, PNGs from `PngWriter` and `GameCatalogCacheFile`), the server's request logging and pages (`ProfileViewBuilder`, `PageNames`, `IconEndpoint`, `PngHeader`, `HistoryRetention`, `Regions`, `TradeRoutes`, `TrendChart`, `TrendCell`, `SparklineBuilder`, `TrendSeriesBuilder`, `TrendReader`) — [companion-log](../docs/areas/companion-log.md), [companion-diagnostics](../docs/areas/companion-diagnostics.md), [pipe](../docs/areas/pipe.md), [server](../docs/areas/server.md), [web-pages](../docs/areas/web-pages.md), [web-charts](../docs/areas/web-charts.md), [web-trends](../docs/areas/web-trends.md), [game-catalog](../docs/areas/game-catalog.md), [game-catalog-icons](../docs/areas/game-catalog-icons.md), [game-catalog-cache](../docs/areas/game-catalog-cache.md).
 - Release publishing: `.github/workflows/release.yml` and `notify-website.yml`, their secrets in the environment `release`, Docker Hub `latest` — [record 0012](../docs/decisions/0012-release-pre-release-first-and-secret-free-builds.md), `docs/CONTRIBUTING.md` (*Versioning and releases*), [server](../docs/areas/server.md) (*Docker image*).
-- Outbound calls: only the replay's WebSocket to `--server` (`ReplaySender`, which sends ticks, trade routes, session events and status, and `ClientWebSocketConnector`), token from `ReplayTokenFile`; any other call to a server is a new security area. A UNC path (`--replay`, `--token-file`, the installation folder of the settings file) is read over SMB (`GameInstallation`, `GameArchiveStateReader`, `GameCatalogReader.Load`, `GameIconReader.Load`) — [replay-sending](../docs/areas/replay-sending.md), [game-installation](../docs/areas/game-installation.md), *Folders from outside*, [game-catalog](../docs/areas/game-catalog.md), *Limits and errors*.
+- Outbound calls: only the replay's WebSocket to `--server` (`ReplaySender`, `ClientWebSocketConnector`, token from `ReplayTokenFile`); any other call to a server is a new security area. A UNC path (`--replay`, `--token-file`, the settings file's installation folder) is read over SMB (`GameInstallation`, `GameArchiveStateReader`, `GameCatalogReader.Load`, `GameIconReader.Load`) — [replay-sending](../docs/areas/replay-sending.md), [game-installation](../docs/areas/game-installation.md), *Folders from outside*, [game-catalog](../docs/areas/game-catalog.md), *Limits and errors*.
 
 ## Guarantees
 
@@ -37,26 +36,25 @@ Deliberate behavior that changes only with the Product Manager. One line each, w
 
 ## Integration surface
 
-What the Reviewer checks when the diff introduces or changes a thing of this kind: every place that must
-change with it.
+Every place the Reviewer checks when a diff adds or changes a thing of this kind.
 
 **A new or changed configuration option** touches:
 - the key and its validation: `Censio:DataDirectory` in `DataProtectionSetup`; `Censio:Database:File` in `DatabaseSetup`; `Censio:Ingest:RequireToken` and `Censio:Ingest:TokenFile` in `IngestTokenSetup`; `AllowedHosts` in `DeletionHostRule`; the Companion's switches in `CompanionCommandLine`; `gameFolder` in `CompanionSettings`
 - registration and binding: `src/Censio.Server/Program.cs`, `src/Censio.Companion/App.xaml.cs`
-- the defaults: `src/Censio.Server/appsettings.json` and the `ENV` lines of `src/Censio.Server/Dockerfile`
-- the configuration table in `README.md` (English and German) and the user guide
-- its area document: `docs/areas/server.md` or `docs/areas/companion.md` (*Command line*, *Settings file*)
-- the tests that pin it: `DataProtectionSetupTests`, `DatabaseSetupTests`, `IngestTokenSetupTests`, `DeletionHostRuleTests`, `ProgramTests`, `CompanionCommandLineTests`, `CompanionSettingsTests`
+- defaults: `src/Censio.Server/appsettings.json`, the `ENV` lines of `src/Censio.Server/Dockerfile`
+- the configuration table of `README.md` and the user guide (English and German)
+- `docs/areas/server.md` or `docs/areas/companion.md` (*Command line*, *Settings file*)
+- its tests: `DataProtectionSetupTests`, `DatabaseSetupTests`, `IngestTokenSetupTests`, `DeletionHostRuleTests`, `ProgramTests`, `CompanionCommandLineTests`, `CompanionSettingsTests`
 
 **A new or changed service / module** touches:
 - its interface where platform-neutral logic meets Windows: `IPipeConnector`, `IStartupEntryStore`, `IDiagnosticsWindow`, `IUbisoftInstallRecords`, `IFileVersionReader` in `Censio.Companion.Core`
 - registration and lifetime: `Program.cs` (server) or `App.xaml.cs` (Companion)
-- the fake or stub in the test project (*Test doubles* below)
-- the project table in `docs/ARCHITECTURE.md` and the area document in `docs/areas/`
+- its fake or stub (*Test doubles*)
+- the project table in `docs/ARCHITECTURE.md` and its area document
 
 **A new external API call or DTO** touches:
 - the reader of the external shape and its types (`Censio.Pipe`, `Censio.GameData`, `ContractReader` and `CatalogDocumentReader` in `Censio.Contracts`), past which the shape must not leak
-- `PipeFrameBuilder` or other synthetic input in the tests, never real recordings, except the anonymised fixtures under `tests/Censio.Pipe.Tests/Fixtures/` (records 0029, 0033, 0042)
+- synthetic test input such as `PipeFrameBuilder`, never real recordings except the anonymised fixtures in `tests/Censio.Pipe.Tests/Fixtures/` (records 0029, 0033, 0042)
 
 **A new or changed contract message** touches:
 - the message class, `ContractMessageType`, `ContractReader` (`CurrentVersion`, bounds, `Deserialize`, `GetRefusedId`), `ContractScanner`, `ContractRules`, `ContractJsonContext` and the serialize switch of `ContractWriter` in `Censio.Contracts`, and the version texts (`ContractError`, `TrayMenu`)
@@ -65,8 +63,8 @@ change with it.
 
 **A new pipe message type, field or tick rule** touches:
 - `PipeMessageType`, `PipeMessageParser` and the message class in `Censio.Pipe`; `PipeFrameAnonymiser` (record 0042); `PipeTickBuilder` and `PipeTickLimits` for a tick rule
-- the recording format version in `PipeRecordingFormat` when the recorded content changes
-- the diagnostics columns in `DiagnosticsView`
+- `PipeRecordingFormat`'s version when the recorded content changes
+- the columns of `DiagnosticsView`
 - `docs/areas/pipe.md` (*Message types*, *Limits and errors*)
 
 **A new tray menu entry, tooltip text or icon look** touches:
@@ -79,34 +77,34 @@ change with it.
 
 ## Test doubles
 
-Hand-written fakes and stubs the tests reuse, no mocking library (`docs/UNIT_TESTS.md`). Each entry: the doubles,
-their file or folder and what they stand in for; their behavior is read in their code.
+Hand-written doubles the tests reuse, no mocking library (`docs/UNIT_TESTS.md`): where each lives and what it stands
+in for; their behavior is in their code.
 
-- `RecordingLogger` (`tests/Censio.Server.Tests/RecordingLogger.cs`, linked into the Companion and Server.Data tests) and `ConcurrentRecordingLogger` (`tests/Censio.Server.Tests/ConcurrentRecordingLogger.cs`) — `ILogger`s that keep every entry, the second from any thread.
-- `ExtendedMigrationsAssembly` (`tests/Censio.Server.Data.Tests/`) — an `IMigrationsAssembly` of the real migrations plus test ones, for a test-only schema history.
-- `FakeProfileStateSource` (`tests/Censio.Server.Tests/FakeProfileStateSource.cs`) — an `IProfileStateSource` of held and stored states.
-- `FakeHistoryTrends` (`tests/Censio.Server.Tests/FakeHistoryTrends.cs`) — an `IHistoryTrends` whose reads can be held, fail, ignore their cancellation and are recorded.
-- `HeldTimerTimeProvider` (`tests/Censio.Server.Tests/HeldTimerTimeProvider.cs`) — a `FakeTimeProvider` whose timer callbacks run only by hand, also after disposal (a late thread-pool callback).
-- `BlockingClockTimeProvider` (`tests/Censio.Server.Tests/BlockingClockTimeProvider.cs`) — a `FakeTimeProvider` whose first clock read blocks until released.
-- `ChunkedStream` and `ChunkedClockStream` (`tests/Censio.Pipe.Tests/`) — chunked streams: read-only with faults for the frame reader, and for record-and-replay round trips.
+- `RecordingLogger` (`tests/Censio.Server.Tests/RecordingLogger.cs`, linked into the Companion and Server.Data tests) and `ConcurrentRecordingLogger` (`tests/Censio.Server.Tests/ConcurrentRecordingLogger.cs`) — `ILogger`s keeping every entry, the second from any thread.
+- `ExtendedMigrationsAssembly` (`tests/Censio.Server.Data.Tests/`) — an `IMigrationsAssembly` of the real migrations plus test ones.
+- `FakeProfileStateSource` (`tests/Censio.Server.Tests/FakeProfileStateSource.cs`) — an `IProfileStateSource`.
+- `FakeHistoryTrends` (`tests/Censio.Server.Tests/FakeHistoryTrends.cs`) — an `IHistoryTrends` with held, failing and recorded reads.
+- `HeldTimerTimeProvider` (`tests/Censio.Server.Tests/HeldTimerTimeProvider.cs`) — a `FakeTimeProvider` whose timer callbacks run by hand, also after disposal.
+- `BlockingClockTimeProvider` (`tests/Censio.Server.Tests/BlockingClockTimeProvider.cs`) — a `FakeTimeProvider` whose first clock read blocks.
+- `ChunkedStream` and `ChunkedClockStream` (`tests/Censio.Pipe.Tests/`) — chunked streams for the frame reader and for record-and-replay.
 - `PipeFrameBuilder` (`tests/Censio.Pipe.Tests/PipeFrameBuilder.cs`, linked into the Companion and Anonymiser tests) — synthetic and corrupt pipe frames.
-- `ScriptedPipeMessageSource` with `HeldPipeRead` (`tests/Censio.Pipe.Tests/`) — an `IPipeMessageSource`, for the tick assembler.
-- `ScriptedPipeConnector` (`tests/Censio.Companion.Core.Tests/ScriptedPipeConnector.cs`) — an `IPipeConnector`, for the pipe connection.
+- `ScriptedPipeMessageSource` with `HeldPipeRead` (`tests/Censio.Pipe.Tests/`) — an `IPipeMessageSource`.
+- `ScriptedPipeConnector` (`tests/Censio.Companion.Core.Tests/ScriptedPipeConnector.cs`) — an `IPipeConnector`.
 - `ControlledPipeStream` (`tests/Censio.Companion.Core.Tests/ControlledPipeStream.cs`) — models an asynchronous pipe read's end and cancellation (checked against `dotnet/runtime` `release/11.0` `PipeStream.ValueTaskSource.cs`).
 - `ControlledWriteStream` (`tests/Censio.Pipe.Tests/ControlledWriteStream.cs`, linked into the Companion tests) — models a file stream's write and flush failures (checked against `dotnet/runtime` `release/11.0` `Win32Marshal`).
-- `SparseStream`, `NonSeekableStream`, `TrackingStream`, `RdaArchiveBuilder`, `DdsFileBuilder` (`tests/Censio.GameData.Tests/`) — a sparse seekable stream, a forward-only stream, a memory stream that logs its disposal, and builders of RDA archives and of synthetic BC7 DDS files with their expected pixels.
-- `ScriptedPipeAnonymiserRandom` (`tests/Censio.Pipe.Tests/ScriptedPipeAnonymiserRandom.cs`, linked into the Anonymiser tests) — an `IPipeAnonymiserRandom` of queued draws.
-- `TwoPassRecordingStream` (`tests/Censio.Pipe.Tests/TwoPassRecordingStream.cs`) — a seekable stream that differs per pass, for the anonymiser's two reads.
+- `SparseStream`, `NonSeekableStream`, `TrackingStream`, `RdaArchiveBuilder`, `DdsFileBuilder` (`tests/Censio.GameData.Tests/`) — sparse, forward-only and disposal-logging streams; builders of RDA archives and BC7 DDS files.
+- `ScriptedPipeAnonymiserRandom` (`tests/Censio.Pipe.Tests/ScriptedPipeAnonymiserRandom.cs`, linked into the Anonymiser tests) — an `IPipeAnonymiserRandom`.
+- `TwoPassRecordingStream` (`tests/Censio.Pipe.Tests/TwoPassRecordingStream.cs`) — a stream that differs per pass, for the anonymiser.
 - `FailingTextWriter` (`tests/Censio.Anonymiser.Tests/FailingTextWriter.cs`) — a `TextWriter` whose writes fail.
-- `FakeTimeProvider` (`Microsoft.Extensions.TimeProvider.Testing`) — the clock of every timing test; a test library, not a mocking library.
+- `FakeTimeProvider` (`Microsoft.Extensions.TimeProvider.Testing`) — the clock of every timing test; a test library, not a mocking one.
 - `BackwardsFakeTimeProvider` (`tests/Censio.Pipe.Tests/BackwardsFakeTimeProvider.cs`) — models a system clock set back (checked by a scratch run).
 - `RecordingTimeProvider` (`tests/Censio.Pipe.Tests/RecordingTimeProvider.cs`, linked into the Companion and Server tests) — a `FakeTimeProvider` that records and awaits its timers.
 - `RecordingLoggerProvider` (`tests/Censio.Server.Data.Tests/`, linked into the Server tests) — an `ILoggerProvider` over one `RecordingLogger`.
-- `CascadedLanguageProbe` (`tests/Censio.Server.Tests/CascadedLanguageProbe.cs`) — a page stand-in, for what pages receive from `MainLayout`.
-- `InMemoryDuplexStream` (`tests/Censio.Server.Tests/InMemoryDuplexStream.cs`) — an in-memory connection end, for real `WebSocket` pairs.
-- `FailingWebSocketFeature` (`tests/Censio.Server.Tests/FailingWebSocketFeature.cs`) — an `IHttpWebSocketFeature` whose every accept fails.
-- `FakeStartupEntryStore` (`tests/Censio.Companion.Core.Tests/FakeStartupEntryStore.cs`) — models the store contract of `RegistryStartupEntryStore` (checked against the .NET 11 `RegistryKey` source).
+- `CascadedLanguageProbe` (`tests/Censio.Server.Tests/CascadedLanguageProbe.cs`) — a page, for what `MainLayout` cascades.
+- `InMemoryDuplexStream` (`tests/Censio.Server.Tests/InMemoryDuplexStream.cs`, linked into the Companion tests) — a connection end, for real `WebSocket` pairs.
+- `FailingWebSocketFeature` (`tests/Censio.Server.Tests/FailingWebSocketFeature.cs`) — an `IHttpWebSocketFeature` failing every accept.
+- `FakeStartupEntryStore` (`tests/Censio.Companion.Core.Tests/FakeStartupEntryStore.cs`) — models `RegistryStartupEntryStore` (checked against the .NET 11 `RegistryKey` source).
 - `FakeDiagnosticsWindow`, `FakeUbisoftInstallRecords`, `FakeFileVersionReader` (`tests/Censio.Companion.Core.Tests/`) — an `IDiagnosticsWindow`, `IUbisoftInstallRecords` and `IFileVersionReader`.
-- `RegExportUbisoftInstallRecords` (`tests/Censio.Companion.Core.Tests/RegExportUbisoftInstallRecords.cs`) — an `IUbisoftInstallRecords` over a `reg export` file, for the sample in `Fixtures/GameInstallation/`.
+- `RegExportUbisoftInstallRecords` (`tests/Censio.Companion.Core.Tests/RegExportUbisoftInstallRecords.cs`) — an `IUbisoftInstallRecords` over the `reg export` sample in `Fixtures/GameInstallation/`.
 - `ScriptedIngestServer`, `DuplexReplayConnector`, `ThrowingWebSocket`, `SendFailingWebSocket`, `LoopbackWebSocketHost`, `LoopbackWebProxy` (`tests/Censio.Companion.Core.Tests/`), `TestServerReplayConnector` (`tests/Censio.Server.Tests/`) — doubles of the replay sender's tests.
 - `ForeignContractMessage` (`tests/Censio.Contracts.Tests/ForeignContractMessage.cs`) — a `ContractMessage` of no contract type.
