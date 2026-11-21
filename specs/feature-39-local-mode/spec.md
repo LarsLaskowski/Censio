@@ -27,9 +27,11 @@ catalog upload #42.
   database `censio.db`, its data-protection key ring and its ingest token file `ingest-token`, under the rules of
   [server](../../docs/areas/server.md), [server-data](../../docs/areas/server-data.md) and
   [ingest-token](../../docs/areas/ingest-token.md); a later start opens them again.
-- S5: Given local mode and the server running, when the player replays a recording into it
-  (`--replay <file> --server ws://localhost:<port>/ingest --token-file "%LOCALAPPDATA%\Censio\Server\ingest-token"`;
-  one Companion), then the pages show the replay's profile.
+- S5: Given local mode and no Companion running, when the player starts `Censio.Companion.exe --replay <file>`
+  without `--server`, then the replay shows `Replay: Connecting to server` until the hosted server runs and has
+  answered the hello, sends to it as [replay-sending](../../docs/areas/replay-sending.md) states with the server's
+  token taken in the process (no token file), and the pages show the profile `Replay <time>`. With `--server` the
+  replay goes to that address as today.
 - S6: Given data was stored, when the player chooses `Exit`, then the icon disappears at once, the server stops and
   the process ends with exit code 0 within 5 seconds; after the next start in local mode the pages show the same
   profiles and history.
@@ -40,14 +42,15 @@ catalog upload #42.
 
 ## Errors and edge cases
 
-- E1: The port is taken (another program, a standalone `Censio.Server`, the Companion of another signed-in Windows user
-  on the same port): the line reads `Server: port <port> in use`, `Open Censio` stays greyed, the rest works as
-  without local mode, and the reason is logged.
-- E2: `mode` is a text other than `local` (letter case ignored; `forward` too until #40 defines it), or not a text, or
-  `localPort` is not a whole JSON number from 1 to 65535 (a fraction, a text, `null`, 0, 65536), or either key occurs
-  twice (also in different case): no server is started, the line reads `Server: settings invalid` and the reason is
-  logged as a warning. The game folder is still used: a wrong value of these keys does not make the file invalid for
-  `gameFolder`.
+- E1: The port is taken on `127.0.0.1` or on `[::1]` (another program, a standalone `Censio.Server`, the Companion of
+  another signed-in Windows user): the line reads `Server: port <port> in use`, `Open Censio` stays greyed, the rest
+  works as without local mode, and the reason is logged.
+- E2: `mode` is a text other than `local` (letter case ignored; `forward` too until #40 defines it; a blank text
+  counts as no `mode`), or not a text, or occurs twice (also in different case); or, with `mode` `local`, `localPort`
+  is not an integer literal from 1 to 65535 (`5117.0`, `5.117e3`, `"5117"`, `null`, 0 and 65536 are refused) or occurs
+  twice. Without `mode` `local`, `localPort` is not read. Then no server is started, the line reads `Server: settings
+  invalid` and the reason is logged as a warning. The game folder is still used: a wrong value of these keys does not
+  make the file invalid for `gameFolder`.
 - E3: The settings file as a whole is invalid (too large, not JSON, unreadable): `Game: settings file invalid` as
   today, no server starts and no `Server:` line is shown.
 - E4: Any other start failure of the server — the folder cannot be created or written, the database was written by a
@@ -64,6 +67,11 @@ catalog upload #42.
 - E8: Sign-out or shutdown ends the Companion without a dialog as today; the server is stopped as far as Windows allows,
   and every message the server acknowledged is in the database at the next start
   ([record 0068](../../docs/decisions/0068-ingest-acknowledges-a-message-only-after-it-is-stored.md)).
+- E10: A replay without `--server` in local mode whose server does not start (E1, E2, E4) ends with `Replay error:
+  local server not running`; one whose server stops during the replay ends with the reason of a lost connection
+  ([replay-sending](../../docs/areas/replay-sending.md)). Nothing is retried.
+- E11: IPv6 is switched off on the PC, so `[::1]` does not exist: the server runs on `127.0.0.1` alone. `127.0.0.1`
+  that cannot be bound for any reason but a taken port counts as E4.
 - E9: `Exit` while the server is still starting, or while it stores a message, runs the retention job or deletes a
   profile: the process still ends within 5 seconds; a write in progress is completed or rolled back, never half
   stored.
@@ -75,6 +83,10 @@ catalog upload #42.
 - N2: The guarantees of `.squad/project.md` hold unchanged in local mode: the ingest token is required (generated into
   the data folder), the pages need no login, history retention and per-profile deletion work as on the image
   (`localhost` is a trusted host for deletion, [web-pages](../../docs/areas/web-pages.md)).
+- N9: Accepted risk, stated in `local-mode.md`, `README.md` and the user guide: every program and every other
+  signed-in user of the same PC can reach the loopback port, read every profile and delete history
+  ([record 0006](../../docs/decisions/0006-server-plain-http-and-open-health.md)); without the token, which lies in the
+  player's private folder, none of them can send data.
 - N3: The data folder `%LOCALAPPDATA%\Censio\Server` is fixed, private to the Windows user like the other Companion
   folders, and kept when the Companion is removed. The database is never kept in memory in local mode.
 - N4: Compatibility: without `mode` nothing changes for existing players (S7); the settings file is still never
@@ -95,22 +107,30 @@ catalog upload #42.
 ## Acceptance criteria
 
 - AC1: The settings file's `mode` and `localPort` are read as S1, S3, S7, E2 and E3 state: local mode only with `mode`
-  `local` (case ignored), port 5000 by default, every invalid value or duplicate key yields `Server: settings invalid`
-  without affecting `gameFolder` (S1, S3, S7, E2, E3, N4).
-- AC2: In local mode the Companion hosts the server on `127.0.0.1` and `[::1]` at the port, with the data folder
+  `local` (case ignored, blank as absent), port 5000 by default, `localPort` read only then, every invalid value or
+  duplicate key yields `Server: settings invalid` without affecting `gameFolder` (S1, S3, S7, E2, E3, N4).
+- AC2: In local mode the Companion hosts the server on `127.0.0.1` and `[::1]` at the port (`127.0.0.1` alone without
+  IPv6), with the data folder
   `%LOCALAPPDATA%\Censio\Server`, the token required, and the menu shows `Server: starting`, then `Server: running at
-  http://localhost:<port>/` (S1, S3, S4, S8, N1, N2, N3, N5).
+  http://localhost:<port>/` (S1, S3, S4, S8, E11, N1, N2, N3, N5).
 - AC3: `Open Censio` is shown only in local mode, enabled only while the line reads `Server: running …`, and opens
   `http://localhost:<port>/` in the default browser; a failure is logged (S2, E6, N5).
-- AC4: A start failure shows `Server: port <port> in use` (port taken) or `Server: failed` (every other reason and a
-  stop while running), logs the reason, and leaves pipe, recording, catalog and replay working (E1, E4, E5, N7).
+- AC4: A start failure shows `Server: port <port> in use` (port taken on either address) or `Server: failed` (every
+  other reason and a stop while running), logs the reason, and leaves pipe, recording, catalog and replay working (E1,
+  E4, E5, N7).
 - AC5: `Exit` stops the server and ends the process with exit code 0 within 5 seconds, also while the server starts or
   writes; data stored before is shown after the next start in local mode (S5, S6, E8, E9).
 - AC6: A request to the hosted server whose `Host` is not `localhost`, `127.0.0.1` or `[::1]` is answered `400` (E7).
 - AC7: The release ZIP, extracted on a Windows 11 x64 machine without .NET, runs S1, S2, S5 and S6 with no further
   installation — manual, by the Product Manager on a build of the branch (N6).
 - AC8: `README.md` and `docs/USER_GUIDE.md` describe local mode in English, then German: the two keys, the menu line
-  and `Open Censio`, the data folder and the replay into it (S5) — checked by the Reviewer (N8).
+  and `Open Censio`, the data folder, the replay into it (S5) and the accepted risk of N9 — checked by the Reviewer
+  (N8, N9).
+- AC9: In local mode a replay without `--server` waits for the hosted server, sends to it with the token taken in the
+  process and fills its pages; a server that does not start ends it with `Replay error: local server not running`;
+  with `--server` it behaves as today (S5, E10).
+- AC10: The release check and the CI dry run of the Companion ZIP fail when the published `Censio.Companion.exe` does
+  not carry the Blazor script (`_framework/blazor.web*.js`) and the server's static assets — CI (N6).
 
 ## Out of scope
 
@@ -126,7 +146,7 @@ catalog upload #42.
 
 1. What does local mode show from the running game in this feature? Live sending is #40 and the catalog upload #42,
    neither a dependency of #39. Answered: (Product Manager, option B) #39 hosts the server and adds `Open Censio`.
-   Its pages fill from a replay sent to `ws://localhost:<port>/ingest` (S5). #40 later sends live data to the local
+   Its pages fill from a replay into the hosted server (S5). #40 later sends live data to the local
    server as well, and #42 adds the catalog.
 2. How is local mode switched on before the settings window? Answered: (Lead, record 0045) keys `mode` and `localPort`
    in the existing settings file, which #43 will write; a command-line switch would be lost at autostart.
@@ -149,3 +169,31 @@ catalog upload #42.
   file* and `Exit` within 5 seconds in local mode, each linking `local-mode.md`.
 - `docs/areas/server.md` (*Listen address*, *Data directory*): that the server also runs inside the Companion, linking
   `local-mode.md`; `docs/ARCHITECTURE.md` describes local mode (record 0015, *Consequences*).
+- `docs/areas/replay-sending.md`: the replay without `--server` in local mode, its wait and its new reason (S5, E10).
+
+## Challenge
+
+Spec challenge at f37b489 (Devil's Advocate, 2 major, 4 minor).
+
+1. Major, S5 cannot pass: the token file does not exist on the first start, and the replay connects before Kestrel
+   listens. Checked: `replay-sending.md` (*Order of a run*) reads the token first and retries nothing; `Program.cs`
+   creates the key ring, then the token, and listens only at `RunAsync`. Accepted, with the simpler alternative: in
+   local mode a replay without `--server` waits for the hosted server and sends to it with the token taken inside
+   the process (S5, E10, AC9). There is no token-file path to type and no race. `--server` keeps today's behavior.
+   Sending to the own port with `--server` is not the documented path, and its outcome stays today's: a replay that
+   comes too early ends with `server unreachable` or `token file cannot be read`.
+2. Major, no criterion catches a ZIP whose pages do not load. Checked: `release-check.sh` `companion` checks the
+   bundled dll, the version and the one-file form only, and `ci.yml` (`release-check`) runs that check as a dry run.
+   Accepted: AC10 adds the Blazor script and the server's static assets to that check, run in CI on every PR and in
+   the release.
+3. Minor, E2 and S7 disagree on `localPort` without `mode`. Accepted: `localPort` is read only with `mode` `local`,
+   and a blank `mode` counts as absent, as a blank `gameFolder` does (E2, AC1).
+4. Minor, "whole JSON number" is ambiguous. Accepted: only an integer literal is accepted; `5117.0` and `5.117e3` are
+   refused (E2).
+5. Minor, one loopback address that cannot be bound. Accepted: without IPv6 the server runs on `127.0.0.1` alone. A
+   port taken on either address is `port <port> in use`, and any other bind failure is `failed` (E1, E11, AC2, AC4).
+   Starting on one address while the other is taken was rejected: the browser's `localhost` could reach the other
+   program.
+6. Minor, other Windows users of the same PC. Checked: `DeletionHostRule.IsTrusted` trusts `localhost` and every IP
+   address. Accepted as a stated risk (N9, AC8), as record 0006 accepts it for the image's network. Sending data
+   still needs the token in the player's private folder.
