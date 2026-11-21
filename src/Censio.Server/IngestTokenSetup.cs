@@ -124,6 +124,18 @@ public static partial class IngestTokenSetup
     }
 
     /// <summary>
+    /// Reads the token of a token file without logging anything.
+    /// </summary>
+    /// <param name="tokenFile">The full path of the token file.</param>
+    /// <returns>The token, or <c>null</c> when the file cannot be read or holds no valid token.</returns>
+    public static string? ReadTokenFile(string tokenFile)
+    {
+#pragma warning disable RH2003, S1172 // Skeleton: removed with the implementation
+        throw new NotImplementedException();
+#pragma warning restore RH2003, S1172 // Skeleton: removed with the implementation
+    }
+
+    /// <summary>
     /// Reads the token of the file named by the configuration, logging no path and no exception.
     /// </summary>
     /// <param name="logger">The logger.</param>
