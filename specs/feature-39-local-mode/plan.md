@@ -27,17 +27,19 @@ replay, live data is #40.
 | 12 | A loopback bind does not raise the Windows Defender Firewall prompt. | to verify: AC7, Product Manager (basis: Windows documents prompts for listeners on non-loopback addresses) | unverified |
 | 13 | The issue's dependencies #13 and #32 are closed; records 0015 and 0066 already decide local mode and the database under local app data. | `gh api` issue reads; the records | confirmed |
 | 14 | The Companion log sanitizes and cuts every message, also of foreign categories. | `LogFileLogger.Log` → `LogLine.Format` → `Sanitize` | confirmed |
+| 15 | `WebApplication.CreateBuilder` reads the `ASPNETCORE_` host settings before `Configuration.Sources.Clear()`: `ASPNETCORE_WEBROOT` moves the web root and `ASPNETCORE_HOSTINGSTARTUPASSEMBLIES` runs a named assembly's `IHostingStartup`; `WebRootPath` and `Args = ["--preventHostingStartup=true"]` in the options win over both (also with `ASPNETCORE_PREVENTHOSTINGSTARTUP=false`), and the options win over `ASPNETCORE_CONTENTROOT`, `_APPLICATIONNAME` and `DOTNET_ENVIRONMENT`. | Security's and the Devil's Advocate's probes, SDK 11.0.100 (*Security review*, *Challenge* 1) | confirmed |
+| 16 | `HostFilteringOptions.AllowEmptyHosts` is `true` by default and not bound from configuration (only `AllowedHosts` is read), so a request without `Host` passes unless the option is set in code; Kestrel accepts an HTTP/1.0 request without `Host`. | to verify: the Tester's AC6 case "HTTP/1.0 without `Host`" in step 5 (basis: ASP.NET Core `HostFilteringOptions`, `GenericWebHostBuilder` post-configuration of `AllowedHosts`) | unverified |
 
 ## Tests per criterion
 
 | AC | Test(s) | Test file |
 | -- | ------- | --------- |
 | AC1 | `CompanionSettingsReadLocalServerWithoutFileReturnsOff`, `CompanionSettingsReadLocalServerWithModeLocalReturnsDefaultPort`, `CompanionSettingsReadLocalServerWithModeInAnyCaseReturnsLocal` (`local`, `LOCAL`, `Local`), `CompanionSettingsReadLocalServerWithBlankModeReturnsOff` (`""`, `"  "`), `CompanionSettingsReadLocalServerWithLocalPortReturnsThatPort` (1, 5117, 65535), `CompanionSettingsReadLocalServerWithInvalidModeReturnsInvalid` (`forward`, `remote`, 1, `null`, `true`, `{}`, `[]`), `CompanionSettingsReadLocalServerWithInvalidLocalPortReturnsInvalid` (`5117.0`, `5.117e3`, `"5117"`, `null`, 0, 65536, -1, `true`), `CompanionSettingsReadLocalServerWithDuplicateKeyReturnsInvalid` (`mode` twice, `mode`/`Mode`, `localPort`/`LOCALPORT` with mode local), `CompanionSettingsReadLocalServerWithoutModeIgnoresInvalidLocalPort`, `CompanionSettingsReadLocalServerWithInvalidFileReturnsOff` (not JSON, array root, over 1 MiB), `CompanionSettingsReadWithInvalidLocalServerKeysKeepsGameFolder`, `CompanionSettingsReadLocalServerWithInvalidGameFolderKeepsLocal`; `LocalServerSessionRunWithInvalidSettingStartsNoServerAndLogsWarning`; `LocalServerSessionIsHostedPerModeAndSetting` | `tests/Censio.Companion.Core.Tests/CompanionSettingsTests.cs`, `LocalServerSessionTests.cs` |
-| AC2 | `CensioServerLocalEndpointsReturnsBothLoopbackAddresses`, `CensioServerLocalEndpointsWithoutIPv6ReturnsIPv4Only`, `CensioServerStartLocalServesStartPageWithVersion`, `CensioServerStartLocalServesBlazorScript`, `CensioServerStartLocalCreatesDataDirectoryWithDatabaseKeyRingAndToken`, `CensioServerStartLocalExposesTokenOfTokenFile`, `CensioServerStartLocalIgnoresEnvironmentSettings` (`CENSIO__INGEST__REQUIRETOKEN=false`: a hello without token is refused; `ASPNETCORE_URLS` on another port: not listened on); `IngestTokenSetupReadTokenFileReturnsToken`, `IngestTokenSetupReadTokenFileWithInvalidFileReturnsNull`; `LocalServerSessionRunShowsStartingThenRunning`, `LocalServerSessionRunPassesSettingPort`; `TrayMenuFormatLocalServerReturnsTextPerState` (each state, port 5000 and 5117), `TrayMenuCreateInLocalModeShowsServerLineBelowCatalog`, `TrayMenuCreateWithoutLocalModeShowsNoServerEntries`; `CompanionFoldersServerReturnsServerFolderUnderLocalAppData` | `tests/Censio.Server.Tests/CensioServerTests.cs`, `IngestTokenSetupTests.cs`; `tests/Censio.Companion.Core.Tests/LocalServerSessionTests.cs`, `TrayMenuTests.cs`, `CompanionFoldersTests.cs` |
+| AC2 | `CensioServerLocalEndpointsReturnsBothLoopbackAddresses`, `CensioServerLocalEndpointsWithoutIPv6ReturnsIPv4Only`, `CensioServerStartLocalServesStartPageWithVersion`, `CensioServerStartLocalServesBlazorScript`, `CensioServerStartLocalCreatesDataDirectoryWithDatabaseKeyRingAndToken`, `CensioServerStartLocalExposesTokenOfTokenFile`, `CensioServerStartLocalIgnoresEnvironmentSettings` (`CENSIO__INGEST__REQUIRETOKEN=false`: a hello without token is refused; `ASPNETCORE_URLS` on another port: not listened on; `ASPNETCORE_WEBROOT` at another folder holding a different `_framework/blazor.web.js`: the content root's file is served; `ASPNETCORE_HOSTINGSTARTUPASSEMBLIES=Censio.Server.Tests` with `ASPNETCORE_PREVENTHOSTINGSTARTUP=false`: `RecordingHostingStartup` does not run; every variable restored in `finally`); `IngestTokenSetupReadTokenFileReturnsToken`, `IngestTokenSetupReadTokenFileWithInvalidFileReturnsNull`; `LocalServerSessionRunShowsStartingThenRunning`, `LocalServerSessionRunPassesSettingPort`; `TrayMenuFormatLocalServerReturnsTextPerState` (each state, port 5000 and 5117), `TrayMenuCreateInLocalModeShowsServerLineBelowCatalog`, `TrayMenuCreateWithoutLocalModeShowsNoServerEntries`; `CompanionFoldersServerReturnsServerFolderUnderLocalAppData` | `tests/Censio.Server.Tests/CensioServerTests.cs`, `IngestTokenSetupTests.cs`; `tests/Censio.Companion.Core.Tests/LocalServerSessionTests.cs`, `TrayMenuTests.cs`, `CompanionFoldersTests.cs` |
 | AC3 | `TrayMenuCreateInLocalModeShowsOpenCensioAboveDiagnostics`, `TrayMenuCreateEnablesOpenCensioOnlyWhileRunning` (each state); `LocalServerSessionAddressIsLocalhostWithPort`; `BrowserOpenerOpenLaunchesAddress`, `BrowserOpenerOpenWhenLaunchFailsLogsWarning` | `tests/Censio.Companion.Core.Tests/TrayMenuTests.cs`, `LocalServerSessionTests.cs`, `BrowserOpenerTests.cs` |
-| AC4 | `CensioServerStartLocalWithPortTakenOnIPv4ReturnsPortInUse`, `CensioServerStartLocalWithPortTakenOnIPv6ReturnsPortInUse` (runs where the system supports IPv6, else asserts the IPv4-only endpoints), `CensioServerStartLocalWithUnwritableDataDirectoryReturnsFailed` (a file in place of the folder), `CensioServerStartLocalWithNewerDatabaseReturnsFailed`, `CensioServerStartLocalPassesOnlyWarningsAndAboveToLogProvider` (the `Critical` start line arrives, an `Information` line does not); `LocalServerSessionRunWhenPortInUseShowsPortInUseAndLogs`, `LocalServerSessionRunWhenStartFailsShowsFailed`, `LocalServerSessionRunWhenStartThrowsShowsFailedAndLogs`, `LocalServerSessionRunWhenServerStopsOnItsOwnShowsFailed` | `tests/Censio.Server.Tests/CensioServerTests.cs`; `tests/Censio.Companion.Core.Tests/LocalServerSessionTests.cs` |
+| AC4 | `CensioServerStartLocalWithPortTakenOnIPv4ReturnsPortInUse`, `CensioServerStartLocalWithPortTakenOnIPv6ReturnsPortInUse` (runs where the system supports IPv6, else asserts the IPv4-only endpoints; afterwards `127.0.0.1:<port>` can be bound again), `CensioServerStartLocalWithUnwritableDataDirectoryReturnsFailed` (a file in place of the folder), `CensioServerStartLocalWithNewerDatabaseReturnsFailed` (afterwards the database file can be deleted and the port bound again), `CensioServerStartLocalPassesOnlyWarningsAndAboveToLogProvider` (the `Critical` start line arrives, an `Information` line does not); `LocalServerSessionRunWhenPortInUseShowsPortInUseAndLogs`, `LocalServerSessionRunWhenStartFailsShowsFailed`, `LocalServerSessionRunWhenStartThrowsShowsFailedAndLogs`, `LocalServerSessionRunWhenServerStopsOnItsOwnShowsFailed` | `tests/Censio.Server.Tests/CensioServerTests.cs`; `tests/Censio.Companion.Core.Tests/LocalServerSessionTests.cs` |
 | AC5 | `LocalServerSessionStopAsyncStopsRunningServer`, `LocalServerSessionStopAsyncReturnsAfterTimeoutWhenServerHangs` (`FakeTimeProvider`), `LocalServerSessionStopAsyncWhileStartingCancelsStartAndStopsLateServer`; `CensioServerStartLocalKeepsStoredProfileAfterRestart`, `CensioServerStopLocalLeavesLogProviderUsable` | `tests/Censio.Companion.Core.Tests/LocalServerSessionTests.cs`; `tests/Censio.Server.Tests/CensioServerTests.cs` |
-| AC6 | `CensioServerStartLocalRefusesForeignHostWith400` (`example.com`, `localhost.`, `foo.localhost`, `127.0.0.2`, `[::2]`), `CensioServerStartLocalAcceptsLoopbackHosts` (`localhost`, `LOCALHOST:5000`, `127.0.0.1`, `[::1]`) | `tests/Censio.Server.Tests/CensioServerTests.cs` |
+| AC6 | `CensioServerStartLocalRefusesForeignHostWith400` (`example.com`, `localhost.`, `foo.localhost`, `127.0.0.2`, `[::2]`, `[0:0:0:0:0:0:0:1]`, `127.1`, `2130706433`, an HTTP/1.0 request without `Host` over a raw socket), `CensioServerStartLocalAcceptsLoopbackHosts` (`localhost`, `LOCALHOST:5000`, `127.0.0.1`, `[::1]`) | `tests/Censio.Server.Tests/CensioServerTests.cs` |
 | AC7 | manual: the Product Manager, on Windows 11 x64 without .NET, with the ZIP of the PR's CI artifact `companion-dry-run`: S1, S2, S5 (fixture `long-session.jsonl`), S6 (Exit under 5 s, pages again after restart), E1 (a standalone `Censio.Server` on all interfaces at 5000), no firewall prompt, styled pages | — |
 | AC8 | manual: the Reviewer reads `README.md` and `docs/USER_GUIDE.md` (English and German) against AC8 in step 8 | — |
 | AC9 | `ReplaySenderForLocalServerSendsHelloWithTokenOfLocalServer`, `ReplaySenderForLocalServerWaitsForTokenBeforeConnecting`, `ReplaySenderForLocalServerWhenServerNotRunningReturnsLocalServerNotRunning`; `ReplaySenderFactoryCreateWithServerAddressReturnsRemoteSender`, `ReplaySenderFactoryCreateWithoutServerInLocalModeReturnsLocalSender`, `ReplaySenderFactoryCreateWithoutServerOutsideLocalModeReturnsNull`; `LocalServerSessionWaitForTokenAsyncReturnsTokenOnceRunning`, `LocalServerSessionWaitForTokenAsyncReturnsNullWhenStartFails`; `TrayMenuFormatReplaySendReasonLocalServerNotRunningReturnsText`; `PipeReplayRunnerRunSendingToLocalServerShowsConnectingUntilServerRuns`; `CensioServerStartLocalFillsProfileFromLocalReplay` | `tests/Censio.Companion.Core.Tests/ReplaySenderTests.cs`, `ReplaySenderFactoryTests.cs`, `LocalServerSessionTests.cs`, `TrayMenuTests.cs`, `PipeReplayRunnerTests.cs`; `tests/Censio.Server.Tests/CensioServerTests.cs` |
@@ -50,15 +52,18 @@ replay, live data is #40.
 ring, token, database, state, retention, the middleware and maps in today's order), so start checks and log lines
 stay identical. `StartLocalAsync`:
 - builds the host with `WebApplicationOptions` `ApplicationName` `Censio.Server`, `EnvironmentName` `Production`,
-  `ContentRootPath` `options.ContentRoot`, no args; clears `builder.Configuration.Sources` and adds in memory only
-  `Censio:DataDirectory` = `options.DataDirectory`, `AllowedHosts` = `localhost;127.0.0.1;[::1]` (record 0100);
+  `ContentRootPath` `options.ContentRoot`, `WebRootPath` `Path.Combine(options.ContentRoot, "wwwroot")`, `Args`
+  `["--preventHostingStartup=true"]` (fact 15); clears `builder.Configuration.Sources` and adds in memory only
+  `Censio:DataDirectory` = `options.DataDirectory`, `AllowedHosts` = `localhost;127.0.0.1;[::1]` (record 0100); then
+  calls `UseStaticWebAssets()`; configures `HostFilteringOptions.AllowEmptyHosts = false` in code (fact 16);
 - listens on `LocalEndpoints(port, listenOnIPv6)` through `ConfigureKestrel` (explicit `Listen` calls; no URLs);
 - replaces the logging providers by a wrapper over `options.LogProvider` that never disposes it, minimum level
   `Warning`;
-- sets `HostOptions.ShutdownTimeout` to 3 seconds; calls `UseStaticWebAssets()` as the standalone server does;
+- sets `HostOptions.ShutdownTimeout` to 2 seconds, below the session's 3-second stop, so disposal fits after it;
 - runs the shared set-up with `cancellationToken`; a failed check returns `Failed` (its `Critical` line is already
   logged); `StartAsync` throwing with an `AddressInUseException` in its chain returns `PortInUse`, any other exception
-  `Failed` with the exception logged by the session;
+  `Failed` with the exception logged by the session; every `Failed` or `PortInUse` path first disposes what was
+  created — retention, database, app (which releases an address already bound) — in that order;
 - once started, reads the token with `IngestTokenSetup.ReadTokenFile(<data directory>/ingest-token)`; no token →
   stops the host and returns `Failed`.
 The returned `ILocalServer` (internal class `LocalServerHost`): `Stopped` completes when the host's lifetime ends;
@@ -211,7 +216,11 @@ held start, held stop and a `Stopped` the test completes). Extended: `CompanionS
 The Server.Tests local-host tests bind real loopback ports (find a free one first, retry once on a taken port) and
 use a temporary data directory each; a test that sets an environment variable restores it in `finally`.
 
-Existing call sites of a changed signature: the 15 `TrayMenu.Create` calls in `TrayMenuTests.cs` get `null` for
+New double: `tests/Censio.Server.Tests/RecordingHostingStartup.cs` (an `IHostingStartup` registered with
+`[assembly: HostingStartup]` that records that it ran; it runs only when an environment variable names the test
+assembly, so other host tests are unaffected; the assembly runs without parallelism, `MSTestSettings.cs`).
+
+Existing call sites of a changed signature: the 14 `TrayMenu.Create` calls in `TrayMenuTests.cs` get `null` for
 `localServer` — Tester. `TrayIcon.cs` — Dev. No input of a kept test is handled differently: without local mode
 everything stays as it is (S7).
 
@@ -238,19 +247,28 @@ All by the Dev once the code is green, each English then German where the file h
 - `README.md`: *What works* (local mode, the pages fill from a replay), the Companion section (the two keys with an
   example file, the menu list with `Server:` and `Open Censio`, the replay without `--server`, Windows 11 only for
   local mode), the accepted risk N9, the Companion's settings in the configuration part.
-- `docs/USER_GUIDE.md`: a section "Local mode" with the steps (write `settings.json`, start, `Open Censio`, replay
-  `long-session.jsonl`, `Exit`, start again), the menu texts and failures, the data folder, N9; the menu list; the
-  tooltip/menu table where it lists entries.
+- `docs/USER_GUIDE.md`: a section "Local mode" with the steps (write `settings.json`, start, `Open Censio`, `Exit`,
+  start with `--replay long-session.jsonl` — a running Companion ends a second start silently —, `Open Censio`,
+  `Exit`, start again), the menu texts and failures (`Server: failed`: check the log and try another `localPort`, a
+  port Windows reserves fails that way), the data folder, N9; the menu list; the tooltip/menu table where it lists
+  entries; the data paragraph (line 469: the Companion stores game data also in the local database, kept when it is
+  removed); the replay steps (lines 305–311: in local mode the replay sends into the local database).
+- `README.md` follows the same order of steps and the same `Server: failed` hint.
 - `SECURITY.md`: the local listener (loopback, host filter, N9) and the local replay connection in the scope list
   and the deployment note.
 - `docs/ARCHITECTURE.md`: *Components* and the project table (Companion.Core references Server; the Companion hosts
   the server), *Data flow*, *Configuration* (settings keys), *Security model* (loopback listener, host filter, second
-  outbound call), *Deployment* (the ZIP holds the server), linking records 0098–0101 (record 0015, *Consequences*).
+  outbound call), *Deployment* (the ZIP holds the server), linking records 0098–0101 (record 0015, *Consequences*); line 71 ("The
+  Companion's one setting") and line 90 ("one outbound connection") become false and are rewritten.
+- `docs/areas/companion.md`: line 160 ("Without `--server` a replay opens no network connection") gets the local-mode
+  exception; *Folders* lists `%LOCALAPPDATA%\Censio\Server`, kept when the Companion is removed.
+- `docs/areas/local-mode.md` states the host rules only as far as the tests show them (fact 15, 16).
 - `docs/areas/README.md`: the index row of `local-mode` (text of *Areas*); the five area documents of *Areas*.
 - `.squad/project.md` (exact text from the Dev, written by the orchestrator): *Security areas* — Network exposure adds
   `CensioServer.StartLocalAsync`/`LocalServerHost` with [local-mode]; Outbound calls adds the local replay
   (`ReplaySender.ForLocalServer`) to `127.0.0.1`; File paths adds `CompanionFolders.Server`; Ingest token adds
-  `IngestTokenSetup.ReadTokenFile`. *Integration surface* — config option: `mode`, `localPort` in `CompanionSettings`;
+  `IngestTokenSetup.ReadTokenFile`; *Logging and showing external data* adds the hosted server's warning-and-above
+  lines through the log provider wrapper of `CensioServer` with [local-mode]. *Integration surface* — config option: `mode`, `localPort` in `CompanionSettings`;
   service: `LocalServerSession`, `BrowserOpener`; tray: `LocalServer`, `OpenCensio`. *Test doubles* —
   `FakeLocalServer` (text from the Tester).
 
@@ -271,7 +289,8 @@ and `Socket.OSSupportsIPv6` stay in the shell.
 - Host filtering is on only for the local server; the standalone server's `AllowedHosts` default stays `*`.
 - The token stays in process memory (`ILocalServer.Token`, the sender's hello), never logged or written anew; the
   replay connects to `127.0.0.1` only, the address built from the integer port.
-- Environment variables and configuration files are not read by the hosted server (record 0098).
+- The hosted server reads no configuration file and no environment variable that takes effect: the host settings
+  come from the options (fact 15), everything else from memory (record 0098); a request without `Host` is refused.
 - Key ring unencrypted in the player's private folder, as on Windows today; DPAPI is out of scope.
 
 ## Decision records
@@ -284,50 +303,45 @@ and `Socket.OSSupportsIPv6` stay in the shell.
 Their `Area: local-mode` fails `decision-check.py` until the Dev adds the index row in group G4; the orchestrator
 expects that failure on the WIP commits before G4.
 
+## Challenge
+
+Devil's Advocate, mode `plan`, at f72f617: no major, 8 minor objections (the notes are folded in here).
+
+1. Environment variables partly read (`ASPNETCORE_WEBROOT`; hosting startup unchecked). Accepted — `WebRootPath`
+   and `--preventHostingStartup=true` in the options, `UseStaticWebAssets()` after the sources are cleared, two cases
+   added to `CensioServerStartLocalIgnoresEnvironmentSettings`, fact 15, record 0098; see *Security review* 1.
+2. Clean up on every failed start. Accepted — *Approach*: each `Failed`/`PortInUse` path disposes retention,
+   database and app; the IPv6 port test asserts `127.0.0.1:<port>` binds again, the newer-database test that file
+   and port are released.
+3. Shutdown timeout leaves no time for disposal. Accepted — `HostOptions.ShutdownTimeout` is 2 s, the session's stop
+   stays 3 s, `Exit` stays within 4.5 s.
+4. Requests without `Host` pass the filter. Accepted — `AllowEmptyHosts = false` in code (fact 16; configuration
+   does not bind it), and an HTTP/1.0 request without `Host` is a case of the AC6 refusal test. Record 0100 says so.
+5. Passages that become false. Accepted — each one is in *Documentation updates* (`companion.md` line 160 and
+   *Folders*, `USER_GUIDE.md` lines 305–311 and 469, `ARCHITECTURE.md` lines 71 and 90).
+6. The replay steps must close the running Companion first. Accepted — the *Local mode* steps in `USER_GUIDE.md` and
+   `README.md` are `Exit`, then a start with `--replay`; the guide already warns of the silent second start.
+7. A reserved port shows `Server: failed`. Accepted as documentation — the guide and README tell the player to check
+   the log and try another `localPort`; the state machine stays as the spec has it (E4: every other reason is
+   `failed`).
+8. Call count. Accepted — 14 calls in `TrayMenuTests.cs` (Tester) plus `TrayIcon.cs` (Dev), in *Test files* and
+   `tasks.md`.
+
+## Security review
+
+Security, mode `plan`: `CHANGES_REQUIRED`, one blocking and one non-blocking finding.
+
+1. [BLOCKING] `ASPNETCORE_WEBROOT` and `ASPNETCORE_HOSTINGSTARTUPASSEMBLIES` take effect although the sources are
+   cleared. Resolved — the options set `WebRootPath` = `Path.Combine(options.ContentRoot, "wwwroot")` and `Args` =
+   `["--preventHostingStartup=true"]`, `UseStaticWebAssets()` runs after the sources are cleared (*Approach*, fact
+   15); `CensioServerStartLocalIgnoresEnvironmentSettings` adds the web-root and hosting-startup cases with
+   `ASPNETCORE_PREVENTHOSTINGSTARTUP=false`, restoring every variable in `finally`, in an assembly that never runs
+   tests in parallel; the double `RecordingHostingStartup` is in *Test files*. Record 0098's last *Decision* sentence
+   is replaced by Security's text; *Security considerations* no longer claims that no variable is read.
+2. [NON-BLOCKING] The forwarding log provider is missing from the `.squad/project.md` text. Fixed now — the bullet
+   adds it to *Logging and showing external data*.
+
 ## Out of scope / follow-ups
 
 Live data and the catalog into the local server (#40, #42); a settings window (#43); a restart of a failed server
 without restarting the Companion; DPAPI for the key ring; LAN access.
-
-## Challenge notes
-
-Devil's Advocate, mode `plan`, feature 39 (local mode). Plan commit f72f617, tier security.
-
-I found no major objections. The plan's facts hold where I could check them in the code, and its tier, scope and tests match the spec. Here is what I confirmed:
-
-- **Program.cs order.** It runs key ring, then token, then database, then state, then `RunAsync` (`src/Censio.Server/Program.cs` 31–73).
-- **Token hash only.** `IngestAccess` keeps only the token's hash (`IngestAccess.cs`).
-- **Browser upgrades are refused before they count.** `/ingest` answers 403 to any request with an `Origin` before `TryEnterPendingHello` (`IngestEndpoint.cs` 107–112). So a website cannot use the loopback port to block the local replay.
-- **Host filter set-up works.** I ran a scratch web app on SDK 11.0.100: `CreateBuilder`, then `Configuration.Sources.Clear()`, then an in-memory `AllowedHosts`. `HostFilteringOptions.AllowedHosts` came out as `localhost,127.0.0.1,[::1]`, and the `HostFilteringStartupFilter` is registered.
-- **Deletion rule unchanged.** `DeletionHostRule.IsTrusted` still trusts loopback with the new `AllowedHosts` value.
-
-Minor objections, each written as an instruction for the plan's *Challenge notes*:
-
-1. **The claim that environment variables are not read is partly refuted** (plan *Security considerations*: "Environment variables … are not read"; record 0098). Some host settings are read when `WebApplication.CreateBuilder` runs, before the plan clears the configuration sources. In the same scratch app, with `ASPNETCORE_WEBROOT=/tmp` set and the sources cleared, `app.Environment.WebRootPath` was `/tmp`. The pages' assets would then come from another folder. `ASPNETCORE_URLS` is still overridden by the explicit `Listen` calls, as the plan's test expects.
-   - Instruction (Dev): set `WebRootPath = Path.Combine(options.ContentRoot, "wwwroot")` in the `WebApplicationOptions`.
-   - Instruction (Tester): add `ASPNETCORE_WEBROOT` to `CensioServerStartLocalIgnoresEnvironmentSettings` (assets still served).
-   - Instruction (`local-mode.md`): claim only what the tests show.
-   - For Security: `ASPNETCORE_HOSTINGSTARTUPASSEMBLIES` is also handled when the builder is created. A bogus name did not fail the build; I did not test a real assembly.
-2. **Clean up on every failed start.** Today `Program.cs` disposes the app (line 29, `await using`) and the database (line 45, `using`) on every `return 1`. `StartLocalAsync` must do the same on each `Failed`/`PortInUse` path, after the database was opened or Kestrel bound `127.0.0.1`: dispose the retention, the database and the app before returning. That includes the case where `[::1]` is taken after `127.0.0.1` was bound. Tester: in `CensioServerStartLocalWithPortTakenOnIPv6ReturnsPortInUse`, assert that `127.0.0.1:<port>` can be bound again after the result.
-3. **Shutdown timeout leaves no time for disposal.** `HostOptions.ShutdownTimeout` (3 s, plan line 58) equals the session's stop timeout (3 s, plan line 105). A host stop that takes its full timeout therefore never reaches the disposal of retention, database and app (plan line 65) before Exit moves on. Set `ShutdownTimeout` clearly below the session timeout (for example 2 s), so stop plus disposal fits inside it.
-4. **Requests without a `Host` header pass the filter.** E7 says a request whose `Host` is not one of the three names gets `400`. `HostFilteringOptions.AllowEmptyHosts` defaults to `true` (ASP.NET Core default; I did not check it with a request), so an HTTP/1.0 request without `Host` is let through. Either set `AllowEmptyHosts = false` for the local host and add a request without `Host` to `CensioServerStartLocalRefusesForeignHostWith400`, or state in `local-mode.md` that such a request is accepted.
-5. **Some document passages become false in local mode and are not in the plan's update list.** Update each one:
-   - `docs/areas/companion.md:160`: "Without `--server` a replay opens no network connection."
-   - `docs/USER_GUIDE.md:469`: the Companion "stores game data only in the catalog cache"; the local database now holds it too.
-   - `docs/USER_GUIDE.md:305–311`: the offline replay steps, which in local mode now send into the local database.
-   - `docs/ARCHITECTURE.md:71`: "The Companion's one setting, the game folder".
-   - `docs/ARCHITECTURE.md:90`: "The Companion makes one outbound connection".
-   - `docs/areas/companion.md` *Folders* (lines 109–118): list `%LOCALAPPDATA%\Censio\Server` there, kept when the Companion is removed.
-6. **The guide's replay steps must close the running Companion first.** The `SingleInstanceGuard` (`src/Censio.Companion/App.xaml.cs` 429–498) silently ends a second instance. So `--replay` started while a Companion runs (also one started with Windows) does nothing. In the *Local mode* steps of `docs/USER_GUIDE.md` and `README.md`, say: choose `Exit` first, then start with `--replay`. Do not run the replay between `Open Censio` and `Exit`, which is the order the plan lists.
-7. **A reserved port shows `Server: failed`, not `port in use`.** Kestrel turns only `AddressAlreadyInUse` into `AddressInUseException` (plan fact 8). A port inside a Windows reserved range (Hyper-V/WSL; `netsh int ipv4 show excludedportrange protocol=tcp`) fails with "access forbidden". I did not test this on Windows. Where the README and user guide explain `Server: failed`, tell the player to check the log and try another `localPort`.
-8. **Call count.** `tests/Censio.Companion.Core.Tests/TrayMenuTests.cs` has 14 `TrayMenu.Create(` calls, not 15 (plan *Test files*). Adapt all of them, plus the one in `src/Censio.Companion/TrayIcon.cs`.
-
-Files:
-- /home/user/Censio/specs/feature-39-local-mode/plan.md
-- /home/user/Censio/src/Censio.Server/Program.cs
-- /home/user/Censio/src/Censio.Server/IngestEndpoint.cs
-- /home/user/Censio/src/Censio.Companion/App.xaml.cs
-- /home/user/Censio/docs/areas/companion.md
-- /home/user/Censio/docs/USER_GUIDE.md
-- /home/user/Censio/docs/ARCHITECTURE.md
-- The scratch app is in /tmp/claude-0/-home-user-Censio/1930ab26-7505-5cbb-94f8-2bb53515dc40/scratchpad/envprobe/Program.cs.

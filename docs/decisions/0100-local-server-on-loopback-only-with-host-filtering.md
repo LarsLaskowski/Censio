@@ -29,8 +29,8 @@ On a gaming PC, other signed-in Windows users and programs share the loopback in
 ## Decision
 
 The local server binds `127.0.0.1`, and `[::1]` when the system supports IPv6. A port taken on either address fails
-the start as *port in use*. Requests are accepted only for the host names `localhost`, `127.0.0.1` and `[::1]`; the
-rules are in [local-mode](../areas/local-mode.md).
+the start as *port in use*. Requests are accepted only for the host names `localhost`, `127.0.0.1` and `[::1]`, and a request
+without a host name is refused; the rules are in [local-mode](../areas/local-mode.md).
 
 ## Consequences
 

@@ -17,7 +17,10 @@ WPF Companion with a reference to `Censio.Server`. The ASP.NET Core runtime and 
 The web assets (`_framework/blazor.web.js`, MudBlazor's files, the server's own `wwwroot`) and the endpoints manifest
 were missing, and the server's `appsettings.json` was left beside the exe. A second probe added the server's publish
 output to the Companion's publish list. That bundled all of them into the one exe. The server also reads environment
-variables and `appsettings.json` by default, and on a gaming PC those may belong to another program.
+variables and `appsettings.json` by default, and on a gaming PC those may belong to another program. The web host
+reads its `ASPNETCORE_` settings when the builder is created, before a configuration source can be removed: a probe
+showed `ASPNETCORE_WEBROOT` moving the folder the pages' scripts come from and `ASPNETCORE_HOSTINGSTARTUPASSEMBLIES`
+running another assembly's start-up code, unless the builder's options set both.
 
 ## Options considered
 
@@ -39,7 +42,8 @@ variables and `appsettings.json` by default, and on a gaming PC those may belong
 
 `Censio.Companion.Core` references `Censio.Server`. The Companion's publish adds the server's published `wwwroot` and
 endpoints manifest and leaves out its `appsettings.json`. In local mode the host is built only from the values the
-Companion passes, with no environment variables and no configuration files; the rules are in
+Companion passes: the host settings (application name, environment, content root, web root, no hosting startup) in its
+options, everything else in memory, with no environment variables and no configuration files; the rules are in
 [local-mode](../areas/local-mode.md).
 
 ## Consequences
