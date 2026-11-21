@@ -298,6 +298,32 @@ printf 'not part of the bundle' > "${work}/other.dll"
 expect_error "AC2 dll not bundled" "Censio.Companion.exe does not bundle the checked Censio.Companion.dll." check-companion "${companion_out}/publish" "${work}/other.dll" "$version"
 expect_error "AC8 companion version" "Censio.Companion.exe shows version '${version}', expected '${other_version}'." check-companion "${companion_out}/publish" "$dll" "$other_version"
 
+# AC10: an exe whose bundle manifest lacks a path of the server's web assets fails with the path named. The case makes
+# the path unfindable by changing its last byte in a copy of the real exe (the manifest entry is the length byte and the path).
+for missing in "wwwroot/_framework/blazor.web.js" "Censio.Server.staticwebassets.endpoints.json"; do
+    broken="${work}/companion-broken"
+    rm -rf "$broken"
+    mkdir "$broken"
+    python3 -I - "${companion_out}/publish/Censio.Companion.exe" "${broken}/Censio.Companion.exe" "$missing" << 'PY'
+import sys
+
+source, target, path = sys.argv[1], sys.argv[2], sys.argv[3].encode("utf-8")
+with open(source, "rb") as handle:
+    data = bytearray(handle.read())
+needle = bytes([len(path)]) + path
+position = data.find(needle)
+if position < 0:
+    sys.exit("the bundle holds no entry " + path.decode("utf-8"))
+while position >= 0:
+    data[position + len(needle) - 1] ^= 0x20
+    position = data.find(needle, position + 1)
+with open(target, "wb") as handle:
+    handle.write(data)
+PY
+    expect_error "AC10 missing ${missing}" "Censio.Companion.exe does not bundle ${missing}." check-companion "$broken" "$dll" "$version"
+    rm -rf "$broken"
+done
+
 step "AC3, AC8: server image"
 image_name="censio-release-test:${version}"
 images+=("$image_name")

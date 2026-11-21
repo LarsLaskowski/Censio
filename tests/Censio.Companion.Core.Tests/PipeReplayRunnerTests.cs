@@ -642,6 +642,53 @@ public sealed class PipeReplayRunnerTests
     }
 
     /// <summary>
+    /// A replay sent to the local server shows that it connects while the server starts, opens no connection before the
+    /// server runs, and is sent once it runs (S5).
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    [TestCategory("AC9")]
+    public async Task PipeReplayRunnerRunSendingToLocalServerShowsConnectingUntilServerRuns()
+    {
+        // Arrange
+        var recording = PipeTestFrames.Recording(_start,
+                                                 (_start, PipeTestFrames.Version(2)),
+                                                 (_start.AddSeconds(1), PipeTestFrames.SessionStart("Player 1")),
+                                                 (_start.AddSeconds(2), PipeTestFrames.Island(1, 100)),
+                                                 (_start.AddSeconds(2), PipeTestFrames.Island(2, 100)),
+                                                 (_start.AddSeconds(3), PipeTestFrames.Island(1, 200)),
+                                                 (_start.AddSeconds(4), PipeTestFrames.SessionEnd()));
+        await using var server = ScriptedIngestServer.Create();
+        var connector = new DuplexReplayConnector(server.ClientSocket);
+        var token = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var sender = ReplaySender.ForLocalServer(5000, _ => token.Task, "1.2.3", connector, new FakeTimeProvider(_start), new RecordingLogger());
+        var runner = CreateSendingRunner(() => new MemoryStream(recording), sender);
+        var connecting = WaitForConnectingAsync(runner);
+        var serving = server.AcknowledgeAllAsync(false, TestContext.CancellationToken);
+        var run = runner.RunAsync(TestContext.CancellationToken);
+
+        await connecting.WaitAsync(_guard, TestContext.CancellationToken);
+
+        var addressesWhileStarting = connector.Addresses.Count;
+        var isFinishedWhileStarting = runner.Status.IsFinished;
+
+        // Act
+        token.SetResult("LocalToken-0123456789abcdefghijKLMNOPQRST");
+
+        await run.WaitAsync(_guard, TestContext.CancellationToken);
+
+        var messages = await serving.WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(0, addressesWhileStarting, "No connection should be opened while the local server starts");
+        Assert.IsFalse(isFinishedWhileStarting, "The replay should wait while the local server starts");
+        Assert.AreSequenceEqual(_replayInOrder, messages.Where(message => message is not ContractStatus).Select(Describe), "The hello should come first once the server runs, then the replay in its order");
+        Assert.IsNull(runner.Status.SendProblem, "The replay should end without a send problem");
+        Assert.AreEqual(2, runner.Status.Sent?.Ticks, "The ticks should be sent to the local server");
+        Assert.IsTrue(runner.Status.IsFinished, "The replay should be finished");
+    }
+
+    /// <summary>
     /// A token file that cannot be read or holds no valid token ends the replay with its problem before the recording is
     /// opened and before any connection.
     /// </summary>
@@ -1070,6 +1117,26 @@ public sealed class PipeReplayRunnerTests
     private static ReplaySender CreateSender(IReplayServerConnector connector, string? tokenFilePath)
     {
         return new ReplaySender(new UriBuilder(Uri.UriSchemeWs, "127.0.0.1", 5000, "/ingest").Uri, tokenFilePath, "1.2.3", connector, new FakeTimeProvider(_start), new RecordingLogger());
+    }
+
+    /// <summary>
+    /// Returns a task that completes when the runner shows that it connects.
+    /// </summary>
+    /// <param name="runner">The runner</param>
+    /// <returns>The task</returns>
+    private static Task WaitForConnectingAsync(PipeReplayRunner runner)
+    {
+        var source = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        runner.StatusChanged += (_, status) =>
+                                {
+                                    if (status.IsConnecting)
+                                    {
+                                        source.TrySetResult();
+                                    }
+                                };
+
+        return source.Task;
     }
 
     /// <summary>

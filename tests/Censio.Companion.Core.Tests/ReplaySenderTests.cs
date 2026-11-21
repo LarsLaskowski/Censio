@@ -38,6 +38,11 @@ public sealed class ReplaySenderTests
     /// </summary>
     private const string ServerHost = "secret-host.example";
 
+    /// <summary>
+    /// The port of the local server.
+    /// </summary>
+    private const int LocalPort = 5117;
+
     #endregion // Constants
 
     #region Fields
@@ -1267,6 +1272,130 @@ public sealed class ReplaySenderTests
         await Assert.ThrowsAsync<OperationCanceledException>(() => connecting.WaitAsync(_guard, TestContext.CancellationToken), "The cancellation should be rethrown");
         Assert.HasCount(1, connector.Addresses, "The connector should have been asked");
         Assert.AreEqual(WebSocketState.Open, server.ClientSocket.State, "A socket the connector did not give should be left alone");
+    }
+
+    /// <summary>
+    /// A sender to the local server reads no token file, connects to <c>127.0.0.1</c> at the port of the local server and
+    /// sends the token of the local server in the hello (S5).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC9")]
+    public async Task ReplaySenderForLocalServerSendsHelloWithTokenOfLocalServer()
+    {
+        // Arrange
+        await using var server = ScriptedIngestServer.Create();
+        var connector = new DuplexReplayConnector(server.ClientSocket);
+        await using var sender = ReplaySender.ForLocalServer(LocalPort, _ => Task.FromResult<string?>(Token), CompanionVersion, connector, CreateTimeProvider(), new RecordingLogger());
+
+        // Act
+        var prepared = sender.Prepare();
+        var connecting = sender.ConnectServerAsync(TestContext.CancellationToken);
+        var message = await server.AcceptHelloAsync(TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+        var connected = await connecting.WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        Assert.IsNull(prepared, "A sender to the local server should read no token file");
+        Assert.IsNull(connected, "The accepted hello should connect");
+
+        var hello = Assert.IsInstanceOfType<ContractHello>(message, "The first message should be the hello");
+
+        Assert.AreEqual(Token, hello.Token, "The hello should carry the token of the local server");
+        Assert.AreEqual("Replay 2026-11-14 14:34:56", hello.ProfileName, "The profile name should be the local start time");
+        Assert.AreEqual(CompanionVersion, hello.CompanionVersion, "The hello should carry the Companion's version");
+        Assert.AreSequenceEqual([new Uri("ws://127.0.0.1:5117/ingest")], connector.Addresses, "The connector should be asked once for the ingest address of 127.0.0.1 at the port");
+    }
+
+    /// <summary>
+    /// A sender to the local server connects only once the wait for the token returned, inside the connect (S5).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC9")]
+    public async Task ReplaySenderForLocalServerWaitsForTokenBeforeConnecting()
+    {
+        // Arrange
+        await using var server = ScriptedIngestServer.Create();
+        var connector = new DuplexReplayConnector(server.ClientSocket);
+        var token = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var waited = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var sender = ReplaySender.ForLocalServer(LocalPort,
+                                                             _ =>
+                                                             {
+                                                                 waited.TrySetResult();
+
+                                                                 return token.Task;
+                                                             },
+                                                             CompanionVersion,
+                                                             connector,
+                                                             CreateTimeProvider(),
+                                                             new RecordingLogger());
+        var prepared = sender.Prepare();
+        var connecting = sender.ConnectServerAsync(TestContext.CancellationToken);
+
+        await waited.Task.WaitAsync(_guard, TestContext.CancellationToken);
+
+        var addressesWhileWaiting = connector.Addresses.Count;
+
+        // Act
+        token.SetResult(Token);
+
+        var message = await server.AcceptHelloAsync(TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+        var connected = await connecting.WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        Assert.IsNull(prepared, "A sender to the local server should read no token file");
+        Assert.AreEqual(0, addressesWhileWaiting, "The sender should not connect while it waits for the token");
+        Assert.IsNull(connected, "The hello should connect once the token is there");
+        Assert.AreEqual(Token, Assert.IsInstanceOfType<ContractHello>(message, "The first message should be the hello").Token, "The hello should carry the token the wait returned");
+    }
+
+    /// <summary>
+    /// A sender to the local server whose wait returns no token ends with local server not running, connects never and
+    /// logs the reason (E10).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC9")]
+    public async Task ReplaySenderForLocalServerWhenServerNotRunningReturnsLocalServerNotRunning()
+    {
+        // Arrange
+        var connector = new DuplexReplayConnector(null);
+        var logger = new RecordingLogger();
+        await using var sender = ReplaySender.ForLocalServer(LocalPort, _ => Task.FromResult<string?>(null), CompanionVersion, connector, CreateTimeProvider(), logger);
+
+        // Act
+        var problem = await sender.ConnectServerAsync(TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(ReplaySendProblemKind.LocalServerNotRunning, problem, "A local server that does not run should end the replay");
+        Assert.IsEmpty(connector.Addresses, "No connection should be opened");
+        Assert.ContainsSingle(entry => entry.Level == LogLevel.Warning && entry.Message == "Replay sending failed: local server not running", logger.Entries, "The reason should be logged once");
+    }
+
+    /// <summary>
+    /// A sender to the local server whose server stops during the replay, ending the connection while an acknowledgement
+    /// is awaited, ends with connection lost, the reason of a lost connection (E10).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC9")]
+    public async Task ReplaySenderForLocalServerWhenConnectionLostReturnsConnectionLost()
+    {
+        // Arrange
+        await using var server = ScriptedIngestServer.Create();
+        var connector = new DuplexReplayConnector(server.ClientSocket);
+        await using var sender = ReplaySender.ForLocalServer(LocalPort, _ => Task.FromResult<string?>(Token), CompanionVersion, connector, CreateTimeProvider(), new RecordingLogger());
+
+        await ConnectAcceptedAsync(sender, server);
+
+        // Act
+        var problem = await SendTickThroughBrokenConnectionAsync(sender, server, false, true);
+
+        // Assert
+        Assert.AreEqual(ReplaySendProblemKind.ConnectionLost, problem, "A local server that stops during the replay should end it as connection lost");
+        Assert.AreEqual(0, sender.Counts.Ticks, "No tick should be counted as sent");
+        Assert.HasCount(1, connector.Addresses, "The connection should not be tried again");
     }
 
     /// <summary>

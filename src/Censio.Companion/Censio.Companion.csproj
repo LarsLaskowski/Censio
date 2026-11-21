@@ -19,4 +19,19 @@
   <ItemGroup>
     <ProjectReference Include="..\Censio.Companion.Core\Censio.Companion.Core.csproj" />
   </ItemGroup>
+  <PropertyGroup>
+    <!-- The local server (record 0098): the Companion publishes Censio.Server's web assets next to its own files so the single-file exe bundles them -->
+    <ServerProject>$(MSBuildThisFileDirectory)..\Censio.Server\Censio.Server.csproj</ServerProject>
+    <ServerPublishDir>$(MSBuildThisFileDirectory)obj\server-publish\</ServerPublishDir>
+  </PropertyGroup>
+  <Target Name="BundleServerAssets" AfterTargets="ComputeResolvedFilesToPublishList">
+    <!-- The inner publish folder must be absolute: a relative one resolves against the server's project -->
+    <MSBuild Projects="$(ServerProject)" Targets="Publish" Properties="RuntimeIdentifier=win-x64;SelfContained=false;PublishSingleFile=false;PublishDir=$(ServerPublishDir);Configuration=$(Configuration);Version=$(Version)" RemoveProperties="TargetFramework;OutDir;OutputPath;IntermediateOutputPath;BaseIntermediateOutputPath;DebugType;IncludeNativeLibrariesForSelfExtract;IncludeAllContentForSelfExtract;PublishReadyToRun;PublishDocumentationFile;PublishReferencesDocumentationFiles" />
+    <ItemGroup>
+      <ServerWebAsset Include="$(ServerPublishDir)wwwroot\**" />
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(RelativePath)' == 'appsettings.json' or '%(RelativePath)' == 'Censio.Server.runtimeconfig.json' or '%(RelativePath)' == 'Censio.Server.deps.json'" />
+      <ResolvedFileToPublish Include="@(ServerWebAsset)" RelativePath="wwwroot\%(RecursiveDir)%(Filename)%(Extension)" CopyToPublishDirectory="PreserveNewest" />
+      <ResolvedFileToPublish Include="$(ServerPublishDir)Censio.Server.staticwebassets.endpoints.json" RelativePath="Censio.Server.staticwebassets.endpoints.json" CopyToPublishDirectory="PreserveNewest" />
+    </ItemGroup>
+  </Target>
 </Project>

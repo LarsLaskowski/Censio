@@ -106,6 +106,41 @@ public sealed class IngestTokenSetupTests
     /// </summary>
     private const string NulCharacterCase = "a path containing a NUL character";
 
+    /// <summary>
+    /// The case of an empty token file.
+    /// </summary>
+    private const string EmptyFileCase = "empty";
+
+    /// <summary>
+    /// The case of a token file of white space only.
+    /// </summary>
+    private const string WhiteSpaceOnlyCase = "white space only";
+
+    /// <summary>
+    /// The case of a token of 31 characters.
+    /// </summary>
+    private const string ShortTokenCase = "31 characters";
+
+    /// <summary>
+    /// The case of a token of 1,025 characters.
+    /// </summary>
+    private const string LongTokenCase = "1,025 characters";
+
+    /// <summary>
+    /// The case of a token with a space inside.
+    /// </summary>
+    private const string SpaceInsideCase = "a space inside";
+
+    /// <summary>
+    /// The case of a token with a byte above ASCII.
+    /// </summary>
+    private const string NonAsciiCase = "a byte above ASCII";
+
+    /// <summary>
+    /// The case of a valid token in a file of 65,537 bytes.
+    /// </summary>
+    private const string LargeFileCase = "65,537 bytes";
+
     #endregion // Constants
 
     #region Fields
@@ -1000,6 +1035,77 @@ public sealed class IngestTokenSetupTests
     }
 
     /// <summary>
+    /// The token file is read into its token without the white space around it, and the file stays as it was.
+    /// </summary>
+    /// <param name="before">The white space before the token</param>
+    /// <param name="after">The white space after the token</param>
+    [TestMethod]
+    [TestCategory("AC2")]
+    [DataRow("", "")]
+    [DataRow(" \t", "\r\n")]
+    [DataRow("\n", " \t\r")]
+    public void IngestTokenSetupReadTokenFileReturnsToken(string before, string after)
+    {
+        // Arrange
+        var tokenFile = Path.Combine(CreateTemporaryDirectory(), IngestTokenSetup.TokenFileName);
+
+        File.WriteAllText(tokenFile, $"{before}{DataDirectoryToken}{after}");
+
+        // Act
+        var token = IngestTokenSetup.ReadTokenFile(tokenFile);
+
+        // Assert
+        Assert.AreEqual(DataDirectoryToken, token, "The token of the file should be returned");
+        Assert.AreEqual($"{before}{DataDirectoryToken}{after}", File.ReadAllText(tokenFile), "The token file should stay unchanged");
+    }
+
+    /// <summary>
+    /// A token file that cannot be read or holds no valid token gives no token.
+    /// </summary>
+    /// <param name="label">The case, which names how the token file is arranged</param>
+    [TestMethod]
+    [TestCategory("AC2")]
+    [DataRow(MissingFileCase)]
+    [DataRow(DirectoryCase)]
+    [DataRow(EmptyFileCase)]
+    [DataRow(WhiteSpaceOnlyCase)]
+    [DataRow(ShortTokenCase)]
+    [DataRow(LongTokenCase)]
+    [DataRow(SpaceInsideCase)]
+    [DataRow(NonAsciiCase)]
+    [DataRow(LargeFileCase)]
+    public void IngestTokenSetupReadTokenFileWithInvalidFileReturnsNull(string label)
+    {
+        // Arrange
+        var tokenFile = ArrangeInvalidTokenFile(label);
+
+        // Act
+        var token = IngestTokenSetup.ReadTokenFile(tokenFile);
+
+        // Assert
+        Assert.IsNull(token, $"No token should be returned: {label}");
+    }
+
+    /// <summary>
+    /// Gives the content of an invalid token file of a case.
+    /// </summary>
+    /// <param name="label">The case</param>
+    /// <returns>The content, each character written as one byte</returns>
+    private static string InvalidTokenContent(string label)
+    {
+        return label switch
+               {
+                   EmptyFileCase => string.Empty,
+                   WhiteSpaceOnlyCase => " \t\r\n ",
+                   ShortTokenCase => new string('M', IngestTokenSetup.MinTokenLength - 1),
+                   LongTokenCase => new string('M', IngestTokenSetup.MaxTokenLength + 1),
+                   SpaceInsideCase => "MARKER MARKER-0123456789abcdefghijABCDEF",
+                   NonAsciiCase => "MARKERäMARKER-0123456789abcdefghijABCDEF",
+                   _ => DataDirectoryToken.PadRight(65537, ' ')
+               };
+    }
+
+    /// <summary>
     /// Creates a configuration with the data directory and the switch.
     /// </summary>
     /// <param name="dataDirectory">The data directory, or <c>null</c> for none</param>
@@ -1092,6 +1198,38 @@ public sealed class IngestTokenSetupTests
         if (content is not null)
         {
             File.WriteAllText(tokenFile, content);
+        }
+    }
+
+    /// <summary>
+    /// Arranges a token file that cannot be read or holds no valid token, as the case names it.
+    /// </summary>
+    /// <param name="label">The case</param>
+    /// <returns>The full path of the token file</returns>
+    private string ArrangeInvalidTokenFile(string label)
+    {
+        var tokenFile = Path.Combine(CreateTemporaryDirectory(), IngestTokenSetup.TokenFileName);
+
+        switch (label)
+        {
+            case MissingFileCase:
+                {
+                    return tokenFile;
+                }
+
+            case DirectoryCase:
+                {
+                    Directory.CreateDirectory(tokenFile);
+
+                    return tokenFile;
+                }
+
+            default:
+                {
+                    File.WriteAllBytes(tokenFile, Encoding.Latin1.GetBytes(InvalidTokenContent(label)));
+
+                    return tokenFile;
+                }
         }
     }
 

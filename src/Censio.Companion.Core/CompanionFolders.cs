@@ -5,6 +5,15 @@ namespace Censio.Companion.Core;
 /// </summary>
 public static class CompanionFolders
 {
+    #region Constants
+
+    /// <summary>
+    /// The name of the folder of the Companion below the local application data.
+    /// </summary>
+    private const string ApplicationFolderName = "Censio";
+
+    #endregion // Constants
+
     #region Methods
 
     /// <summary>
@@ -14,7 +23,7 @@ public static class CompanionFolders
     /// <returns>The log folder</returns>
     public static string Logs(string localApplicationData)
     {
-        return Path.Combine(localApplicationData, "Censio", "Logs");
+        return Path.Combine(localApplicationData, ApplicationFolderName, "Logs");
     }
 
     /// <summary>
@@ -24,7 +33,7 @@ public static class CompanionFolders
     /// <returns>The cache folder</returns>
     public static string Cache(string localApplicationData)
     {
-        return Path.Combine(localApplicationData, "Censio", "Cache");
+        return Path.Combine(localApplicationData, ApplicationFolderName, "Cache");
     }
 
     /// <summary>
@@ -34,7 +43,17 @@ public static class CompanionFolders
     /// <returns>The path of the settings file</returns>
     public static string Settings(string localApplicationData)
     {
-        return Path.Combine(localApplicationData, "Censio", "settings.json");
+        return Path.Combine(localApplicationData, ApplicationFolderName, "settings.json");
+    }
+
+    /// <summary>
+    /// Gets the data folder of the local server.
+    /// </summary>
+    /// <param name="localApplicationData">The local application data folder</param>
+    /// <returns>The server folder</returns>
+    public static string Server(string localApplicationData)
+    {
+        return Path.Combine(localApplicationData, ApplicationFolderName, "Server");
     }
 
     #endregion // Methods

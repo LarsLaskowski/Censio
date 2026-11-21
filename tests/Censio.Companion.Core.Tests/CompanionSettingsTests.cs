@@ -30,6 +30,21 @@ public sealed class CompanionSettingsTests
     /// </summary>
     private const string ValidFolder = "E:/Anno 117 - Pax Romana/";
 
+    /// <summary>
+    /// The problem of a mode other than <c>local</c>.
+    /// </summary>
+    private const string ModeNotLocal = "mode is not local";
+
+    /// <summary>
+    /// The problem of a port that is not an integer from 1 to 65535.
+    /// </summary>
+    private const string LocalPortInvalid = "localPort is not a port from 1 to 65535";
+
+    /// <summary>
+    /// A settings text that switches local mode on.
+    /// </summary>
+    private const string LocalSettings = """{"mode": "local"}""";
+
     #endregion // Constants
 
     #region Fields
@@ -294,6 +309,300 @@ public sealed class CompanionSettingsTests
     }
 
     /// <summary>
+    /// Without a settings file no local server is hosted.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC1")]
+    public void CompanionSettingsReadLocalServerWithoutFileReturnsOff()
+    {
+        // Arrange
+        var path = MissingSettingsPath("missing file");
+
+        // Act
+        var setting = CompanionSettings.ReadLocalServer(path);
+
+        // Assert
+        Assert.AreEqual(LocalServerSettingKind.Off, setting.Kind, "Without a settings file no local server should be hosted");
+        Assert.IsNull(setting.Problem, "A missing settings file is no problem");
+    }
+
+    /// <summary>
+    /// The mode <c>local</c> without a port hosts the local server at port 5000 (S1).
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC1")]
+    public void CompanionSettingsReadLocalServerWithModeLocalReturnsDefaultPort()
+    {
+        // Arrange
+        var path = WriteSettings(LocalSettings);
+
+        // Act
+        var setting = CompanionSettings.ReadLocalServer(path);
+
+        // Assert
+        Assert.AreEqual(LocalServerSettingKind.Local, setting.Kind, "The mode local should host the local server");
+        Assert.AreEqual(5000, setting.Port, "Without localPort the port should be 5000");
+        Assert.AreEqual(CompanionSettings.DefaultLocalPort, setting.Port, "Without localPort the port should be the default port");
+        Assert.IsNull(setting.Problem, "A local setting should carry no problem");
+    }
+
+    /// <summary>
+    /// The value <c>local</c> and the key <c>mode</c> are matched ignoring case.
+    /// </summary>
+    /// <param name="text">The settings text</param>
+    [TestMethod]
+    [TestCategory("AC1")]
+    [DataRow("""{"mode": "local"}""", DisplayName = "local")]
+    [DataRow("""{"mode": "LOCAL"}""", DisplayName = "LOCAL")]
+    [DataRow("""{"mode": "Local"}""", DisplayName = "Local")]
+    [DataRow("""{"Mode": "local"}""", DisplayName = "Key in other case")]
+    public void CompanionSettingsReadLocalServerWithModeInAnyCaseReturnsLocal(string text)
+    {
+        // Arrange
+        var path = WriteSettings(text);
+
+        // Act
+        var setting = CompanionSettings.ReadLocalServer(path);
+
+        // Assert
+        Assert.AreEqual(LocalServerSettingKind.Local, setting.Kind, "The mode local should be matched ignoring case");
+        Assert.AreEqual(CompanionSettings.DefaultLocalPort, setting.Port, "Without localPort the port should be the default port");
+    }
+
+    /// <summary>
+    /// A blank mode counts as no mode (S7, E2).
+    /// </summary>
+    /// <param name="text">The settings text</param>
+    [TestMethod]
+    [TestCategory("AC1")]
+    [DataRow("""{"mode": ""}""", DisplayName = "Empty")]
+    [DataRow("""{"mode": "  "}""", DisplayName = "Spaces")]
+    public void CompanionSettingsReadLocalServerWithBlankModeReturnsOff(string text)
+    {
+        // Arrange
+        var path = WriteSettings(text);
+
+        // Act
+        var setting = CompanionSettings.ReadLocalServer(path);
+
+        // Assert
+        Assert.AreEqual(LocalServerSettingKind.Off, setting.Kind, "A blank mode should count as no mode");
+        Assert.IsNull(setting.Problem, "A blank mode is no problem");
+    }
+
+    /// <summary>
+    /// A <c>localPort</c> from 1 to 65535 is the port of the local server, its key matched ignoring case (S3).
+    /// </summary>
+    /// <param name="text">The settings text</param>
+    /// <param name="expected">The expected port</param>
+    [TestMethod]
+    [TestCategory("AC1")]
+    [DataRow("""{"mode": "local", "localPort": 1}""", 1, DisplayName = "Lowest port")]
+    [DataRow("""{"mode": "local", "localPort": 5117}""", 5117, DisplayName = "Port 5117")]
+    [DataRow("""{"mode": "local", "localPort": 65535}""", 65535, DisplayName = "Highest port")]
+    [DataRow("""{"localPort": 5117, "MODE": "local"}""", 5117, DisplayName = "Port before the mode")]
+    [DataRow("""{"mode": "local", "LocalPort": 5117}""", 5117, DisplayName = "Key in other case")]
+    public void CompanionSettingsReadLocalServerWithLocalPortReturnsThatPort(string text, int expected)
+    {
+        // Arrange
+        var path = WriteSettings(text);
+
+        // Act
+        var setting = CompanionSettings.ReadLocalServer(path);
+
+        // Assert
+        Assert.AreEqual(LocalServerSettingKind.Local, setting.Kind, "A valid port should host the local server");
+        Assert.AreEqual(expected, setting.Port, "The port should be the value of localPort");
+        Assert.IsNull(setting.Problem, "A valid port should carry no problem");
+    }
+
+    /// <summary>
+    /// A mode that is not the text <c>local</c> is invalid with its fixed problem text (E2).
+    /// </summary>
+    /// <param name="text">The settings text</param>
+    [TestMethod]
+    [TestCategory("AC1")]
+    [DataRow("""{"mode": "forward"}""", DisplayName = "forward")]
+    [DataRow("""{"mode": "remote"}""", DisplayName = "remote")]
+    [DataRow("""{"mode": " local"}""", DisplayName = "local with a leading space")]
+    [DataRow("""{"mode": 1}""", DisplayName = "Number")]
+    [DataRow("""{"mode": null}""", DisplayName = "Null")]
+    [DataRow("""{"mode": true}""", DisplayName = "Boolean")]
+    [DataRow("""{"mode": {}}""", DisplayName = "Object")]
+    [DataRow("""{"mode": []}""", DisplayName = "Array")]
+    public void CompanionSettingsReadLocalServerWithInvalidModeReturnsInvalid(string text)
+    {
+        // Arrange
+        var path = WriteSettings(text);
+
+        // Act
+        var setting = CompanionSettings.ReadLocalServer(path);
+
+        // Assert
+        Assert.AreEqual(LocalServerSettingKind.Invalid, setting.Kind, "A mode other than local should be invalid");
+        Assert.AreEqual(ModeNotLocal, setting.Problem, "The problem should be the fixed text of a mode other than local");
+    }
+
+    /// <summary>
+    /// With the mode <c>local</c>, a <c>localPort</c> that is not an integer literal from 1 to 65535 is invalid with its
+    /// fixed problem text (E2).
+    /// </summary>
+    /// <param name="value">The value of localPort as written</param>
+    [TestMethod]
+    [TestCategory("AC1")]
+    [DataRow("5117.0", DisplayName = "Decimal point")]
+    [DataRow("5.117e3", DisplayName = "Exponent")]
+    [DataRow("5117e0", DisplayName = "Exponent of an integer")]
+    [DataRow("\"5117\"", DisplayName = "Text")]
+    [DataRow("null", DisplayName = "Null")]
+    [DataRow("0", DisplayName = "Zero")]
+    [DataRow("-0", DisplayName = "Negative zero")]
+    [DataRow("65536", DisplayName = "One above the highest port")]
+    [DataRow("-1", DisplayName = "Negative")]
+    [DataRow("99999999999999999999", DisplayName = "Beyond a 64-bit integer")]
+    [DataRow("true", DisplayName = "Boolean")]
+    [DataRow("[5117]", DisplayName = "Array")]
+    public void CompanionSettingsReadLocalServerWithInvalidLocalPortReturnsInvalid(string value)
+    {
+        // Arrange
+        var path = WriteSettings($$"""{"mode": "local", "localPort": {{value}}}""");
+
+        // Act
+        var setting = CompanionSettings.ReadLocalServer(path);
+
+        // Assert
+        Assert.AreEqual(LocalServerSettingKind.Invalid, setting.Kind, $"The localPort {value} should be invalid");
+        Assert.AreEqual(LocalPortInvalid, setting.Problem, "The problem should be the fixed text of an invalid port");
+    }
+
+    /// <summary>
+    /// A key that occurs twice, also in different case, is invalid with its fixed problem text (E2).
+    /// </summary>
+    /// <param name="text">The settings text</param>
+    /// <param name="expectedProblem">The expected problem text</param>
+    [TestMethod]
+    [TestCategory("AC1")]
+    [DataRow("""{"mode": "local", "mode": "local"}""", "mode occurs more than once", DisplayName = "mode twice")]
+    [DataRow("""{"mode": "local", "Mode": "local"}""", "mode occurs more than once", DisplayName = "mode and Mode")]
+    [DataRow("""{"mode": "local", "localPort": 5117, "LOCALPORT": 5117}""", "localPort occurs more than once", DisplayName = "localPort and LOCALPORT")]
+    public void CompanionSettingsReadLocalServerWithDuplicateKeyReturnsInvalid(string text, string expectedProblem)
+    {
+        // Arrange
+        var path = WriteSettings(text);
+
+        // Act
+        var setting = CompanionSettings.ReadLocalServer(path);
+
+        // Assert
+        Assert.AreEqual(LocalServerSettingKind.Invalid, setting.Kind, "A key that occurs twice should be invalid");
+        Assert.AreEqual(expectedProblem, setting.Problem, "The problem should name the key that occurs twice");
+    }
+
+    /// <summary>
+    /// Without the mode <c>local</c> the key <c>localPort</c> is not read (E2).
+    /// </summary>
+    /// <param name="text">The settings text</param>
+    [TestMethod]
+    [TestCategory("AC1")]
+    [DataRow("""{"localPort": "abc"}""", DisplayName = "Invalid port without mode")]
+    [DataRow("""{"localPort": 5117, "localPort": 0}""", DisplayName = "Port twice without mode")]
+    [DataRow("""{"mode": " ", "localPort": 0}""", DisplayName = "Invalid port with a blank mode")]
+    public void CompanionSettingsReadLocalServerWithoutModeIgnoresInvalidLocalPort(string text)
+    {
+        // Arrange
+        var path = WriteSettings(text);
+
+        // Act
+        var setting = CompanionSettings.ReadLocalServer(path);
+
+        // Assert
+        Assert.AreEqual(LocalServerSettingKind.Off, setting.Kind, "Without the mode local localPort should not be read");
+        Assert.IsNull(setting.Problem, "A localPort that is not read should be no problem");
+    }
+
+    /// <summary>
+    /// A settings file that is invalid as a whole starts no server and shows no server line (E3).
+    /// </summary>
+    /// <param name="kind">How the file is invalid</param>
+    [TestMethod]
+    [TestCategory("AC1")]
+    [DataRow("not JSON")]
+    [DataRow("array root")]
+    [DataRow("over 1 MiB")]
+    [DataRow("cannot be read")]
+    public void CompanionSettingsReadLocalServerWithInvalidFileReturnsOff(string kind)
+    {
+        // Arrange
+        var path = WriteInvalidLocalSettings(kind);
+
+        // Act
+        var setting = CompanionSettings.ReadLocalServer(path);
+
+        // Assert
+        Assert.AreEqual(LocalServerSettingKind.Off, setting.Kind, $"A settings file that is {kind} should host no local server");
+    }
+
+    /// <summary>
+    /// An invalid <c>gameFolder</c> does not change the local setting (E2).
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC1")]
+    public void CompanionSettingsReadLocalServerWithInvalidGameFolderKeepsLocal()
+    {
+        // Arrange
+        var path = WriteSettings("""{"gameFolder": 5, "gameFolder": null, "mode": "local", "localPort": 5117}""");
+
+        // Act
+        var setting = CompanionSettings.ReadLocalServer(path);
+
+        // Assert
+        Assert.AreEqual(LocalServerSettingKind.Local, setting.Kind, "An invalid gameFolder should not change the local setting");
+        Assert.AreEqual(5117, setting.Port, "The port should be read past an invalid gameFolder");
+    }
+
+    /// <summary>
+    /// A relative path to a settings file with the mode <c>local</c> is not read, so no local server is hosted.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC1")]
+    public void CompanionSettingsReadLocalServerWithRelativePathReturnsOff()
+    {
+        // Arrange
+        var path = Path.GetRelativePath(Environment.CurrentDirectory, WriteSettings("""{"mode": "local", "localPort": 5117}"""));
+
+        // Act
+        var setting = CompanionSettings.ReadLocalServer(path);
+
+        // Assert
+        Assert.IsFalse(Path.IsPathFullyQualified(path), "The path of the case should be relative");
+        Assert.AreEqual(LocalServerSettingKind.Off, setting.Kind, "A relative settings path should host no local server");
+        Assert.IsNull(setting.Problem, "A relative settings path is no problem of the setting");
+    }
+
+    /// <summary>
+    /// Invalid <c>mode</c> and <c>localPort</c> keys do not change the game folder of the file (E2).
+    /// </summary>
+    /// <param name="text">The settings text</param>
+    [TestMethod]
+    [TestCategory("AC1")]
+    [DataRow("""{"gameFolder": "E:/Anno 117 - Pax Romana/", "mode": "forward", "localPort": 0}""", DisplayName = "Invalid mode and port")]
+    [DataRow("""{"mode": 1, "mode": null, "gameFolder": "E:/Anno 117 - Pax Romana/"}""", DisplayName = "Mode twice, not a text")]
+    [DataRow("""{"mode": "local", "localPort": "abc", "LOCALPORT": 5117, "gameFolder": "E:/Anno 117 - Pax Romana/"}""", DisplayName = "Port invalid and twice")]
+    public void CompanionSettingsReadWithInvalidLocalServerKeysKeepsGameFolder(string text)
+    {
+        // Arrange
+        var path = WriteSettings(text);
+
+        // Act
+        var result = CompanionSettings.Read(path);
+
+        // Assert
+        Assert.AreEqual(CompanionSettingsResultKind.GameFolder, result.Kind, "Invalid local server keys should not make the settings invalid");
+        Assert.AreEqual(ValidFolder, result.GameFolder, "The game folder should be read past invalid local server keys");
+        Assert.IsNull(result.Problem, "Invalid local server keys should be no problem of the game folder");
+    }
+
+    /// <summary>
     /// Turns a test text into the bytes of the file: <see cref="ByteOrderMarkMarker" /> becomes the UTF-8 byte order
     /// mark and <see cref="InvalidByteMarker" /> the byte <c>0xFF</c>, the rest is encoded as UTF-8.
     /// </summary>
@@ -352,6 +661,35 @@ public sealed class CompanionSettingsTests
                 stream.Write(padding);
             }
         }
+
+        return path;
+    }
+
+    /// <summary>
+    /// Writes a settings file with the mode <c>local</c> that is invalid as a whole, or a folder in its place.
+    /// </summary>
+    /// <param name="kind">How the file is invalid: not JSON, array root, over 1 MiB or cannot be read</param>
+    /// <returns>The path of the file</returns>
+    private string WriteInvalidLocalSettings(string kind)
+    {
+        return kind switch
+               {
+                   "not JSON" => WriteSettings("""{"mode": "local" """),
+                   "array root" => WriteSettings("""[{"mode": "local"}]"""),
+                   "over 1 MiB" => WriteSettings(LocalSettings + new string(' ', CompanionSettings.MaxFileLength + 1 - LocalSettings.Length)),
+                   _ => CreateFolderInPlaceOfSettings()
+               };
+    }
+
+    /// <summary>
+    /// Creates a folder where the settings file should be, so it cannot be read as a file.
+    /// </summary>
+    /// <returns>The path of the folder</returns>
+    private string CreateFolderInPlaceOfSettings()
+    {
+        var path = Path.Combine(_root, "settings.json");
+
+        Directory.CreateDirectory(path);
 
         return path;
     }

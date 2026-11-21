@@ -124,6 +124,20 @@ public static partial class IngestTokenSetup
     }
 
     /// <summary>
+    /// Reads the token of a token file without logging anything.
+    /// </summary>
+    /// <param name="tokenFile">The full path of the token file.</param>
+    /// <returns>The token, or <c>null</c> when the file cannot be read or holds no valid token.</returns>
+    public static string? ReadTokenFile(string tokenFile)
+    {
+        var content = ReadBounded(tokenFile, out _);
+
+        return content is null
+                   ? null
+                   : ParseToken(content);
+    }
+
+    /// <summary>
     /// Reads the token of the file named by the configuration, logging no path and no exception.
     /// </summary>
     /// <param name="logger">The logger.</param>

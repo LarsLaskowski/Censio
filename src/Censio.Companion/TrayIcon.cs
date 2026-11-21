@@ -32,24 +32,9 @@ internal sealed class TrayIcon : IDisposable
     private readonly string _version;
 
     /// <summary>
-    /// Gets the current snapshot
+    /// Reads what the icon shows
     /// </summary>
-    private readonly Func<TraySnapshot> _snapshot;
-
-    /// <summary>
-    /// Gets whether the Companion starts with Windows
-    /// </summary>
-    private readonly Func<bool> _isAutostartEnabled;
-
-    /// <summary>
-    /// Gets the status of the game installation search
-    /// </summary>
-    private readonly Func<GameInstallationStatus> _game;
-
-    /// <summary>
-    /// Gets the status of the game catalog
-    /// </summary>
-    private readonly Func<GameCatalogStatus> _catalog;
+    private readonly TrayIconSources _sources;
 
     /// <summary>
     /// Runs the action of a menu entry
@@ -70,19 +55,13 @@ internal sealed class TrayIcon : IDisposable
     /// </summary>
     /// <param name="version">The product version</param>
     /// <param name="images">The icons of the looks</param>
-    /// <param name="snapshot">Gets the current snapshot</param>
-    /// <param name="game">Gets the status of the game installation search</param>
-    /// <param name="catalog">Gets the status of the game catalog</param>
-    /// <param name="isAutostartEnabled">Gets whether the Companion starts with Windows</param>
+    /// <param name="sources">Reads what the icon shows</param>
     /// <param name="dispatch">Runs the action of a menu entry</param>
-    public TrayIcon(string version, TrayIconImages images, Func<TraySnapshot> snapshot, Func<GameInstallationStatus> game, Func<GameCatalogStatus> catalog, Func<bool> isAutostartEnabled, Action<TrayMenuEntryKind> dispatch)
+    public TrayIcon(string version, TrayIconImages images, TrayIconSources sources, Action<TrayMenuEntryKind> dispatch)
     {
         _version = version;
         _images = images;
-        _snapshot = snapshot;
-        _game = game;
-        _catalog = catalog;
-        _isAutostartEnabled = isAutostartEnabled;
+        _sources = sources;
         _dispatch = dispatch;
         _menu = new ContextMenuStrip();
 
@@ -144,7 +123,7 @@ internal sealed class TrayIcon : IDisposable
 
         _menu.Items.Clear();
 
-        foreach (var entry in TrayMenu.Create(_version, _snapshot(), _game(), _catalog(), _isAutostartEnabled(), TimeProvider.System))
+        foreach (var entry in TrayMenu.Create(_version, _sources.Snapshot(), _sources.Game(), _sources.Catalog(), _sources.LocalServer(), _sources.IsAutostartEnabled(), TimeProvider.System))
         {
             if (entry.Kind == TrayMenuEntryKind.Separator)
             {
@@ -160,7 +139,7 @@ internal sealed class TrayIcon : IDisposable
                        };
             var kind = entry.Kind;
 
-            if (kind is TrayMenuEntryKind.OpenDiagnostics or TrayMenuEntryKind.ToggleRecording or TrayMenuEntryKind.OpenRecordingsFolder or TrayMenuEntryKind.OpenLogFolder or TrayMenuEntryKind.ToggleAutostart or TrayMenuEntryKind.Exit)
+            if (kind is TrayMenuEntryKind.OpenCensio or TrayMenuEntryKind.OpenDiagnostics or TrayMenuEntryKind.ToggleRecording or TrayMenuEntryKind.OpenRecordingsFolder or TrayMenuEntryKind.OpenLogFolder or TrayMenuEntryKind.ToggleAutostart or TrayMenuEntryKind.Exit)
             {
                 item.Click += (_, _) => _dispatch(kind);
             }

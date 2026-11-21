@@ -98,7 +98,7 @@ public sealed class TrayMenuTests
         var expectedChecked = new bool[15];
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, false, CreateClock(1));
+        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, null, false, CreateClock(1));
 
         // Assert
         Assert.AreSequenceEqual(expectedKinds, entries.Select(entry => entry.Kind).ToArray(), "The entries should be in the order of the menu");
@@ -123,7 +123,7 @@ public sealed class TrayMenuTests
         var snapshot = CreateSnapshotForMode(mode);
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, false, CreateClock(1));
+        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, null, false, CreateClock(1));
 
         // Assert
         var autostart = entries.SingleOrDefault(entry => entry.Kind == TrayMenuEntryKind.ToggleAutostart);
@@ -144,7 +144,7 @@ public sealed class TrayMenuTests
         var snapshot = CreateSnapshot("Receiving", canRecord: true, isRecording: false);
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, true, CreateClock(1));
+        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, null, true, CreateClock(1));
 
         // Assert
         var checkedKinds = entries.Where(entry => entry.IsChecked).Select(entry => entry.Kind).ToArray();
@@ -163,7 +163,7 @@ public sealed class TrayMenuTests
         var snapshot = CreateSnapshot("Receiving", canRecord: true, isRecording: false);
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, false, CreateClock(1));
+        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, null, false, CreateClock(1));
 
         // Assert
         var autostart = entries.SingleOrDefault(entry => entry.Kind == TrayMenuEntryKind.ToggleAutostart);
@@ -189,7 +189,7 @@ public sealed class TrayMenuTests
         var snapshot = CreateSnapshotForMode(mode);
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, false, CreateClock(1));
+        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, null, false, CreateClock(1));
 
         // Assert
         var kinds = entries.Select(entry => entry.Kind).ToList();
@@ -210,7 +210,7 @@ public sealed class TrayMenuTests
         var snapshot = CreateSnapshot("Receiving (recording)", canRecord: true, isRecording: true);
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, false, CreateClock(1));
+        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, null, false, CreateClock(1));
 
         // Assert
         var toggle = entries.Single(entry => entry.Kind == TrayMenuEntryKind.ToggleRecording);
@@ -229,7 +229,7 @@ public sealed class TrayMenuTests
         var snapshot = CreateSnapshot("Replay: Receiving", canRecord: false, isRecording: false);
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, false, CreateClock(1));
+        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, null, false, CreateClock(1));
 
         // Assert
         var toggle = entries.Single(entry => entry.Kind == TrayMenuEntryKind.ToggleRecording);
@@ -252,7 +252,7 @@ public sealed class TrayMenuTests
         var snapshot = TraySnapshot.ForInvalidCommandLine();
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, false, CreateClock(1));
+        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, null, false, CreateClock(1));
 
         // Assert
         var toggle = entries.Single(entry => entry.Kind == TrayMenuEntryKind.ToggleRecording);
@@ -281,7 +281,7 @@ public sealed class TrayMenuTests
         var snapshot = CreateSnapshot(statusText, canRecord: true, isRecording: false);
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, false, CreateClock(1));
+        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, null, false, CreateClock(1));
 
         // Assert
         var status = entries.Single(entry => entry.Kind == TrayMenuEntryKind.Status);
@@ -300,7 +300,7 @@ public sealed class TrayMenuTests
         const string version = "1.2.3";
 
         // Act
-        var entries = TrayMenu.Create(version, CreateSnapshot("Receiving", canRecord: true, isRecording: false), GameInstallationStatus.Searching, GameCatalogStatus.Reading, false, CreateClock(1));
+        var entries = TrayMenu.Create(version, CreateSnapshot("Receiving", canRecord: true, isRecording: false), GameInstallationStatus.Searching, GameCatalogStatus.Reading, null, false, CreateClock(1));
 
         // Assert
         Assert.IsFalse(entries.Single(entry => entry.Kind == TrayMenuEntryKind.Version).IsEnabled, "The version entry should be greyed out");
@@ -316,7 +316,7 @@ public sealed class TrayMenuTests
         const string version = "1.2.3";
 
         // Act
-        var entries = TrayMenu.Create(version, CreateSnapshot("Receiving", canRecord: true, isRecording: false), GameInstallationStatus.Searching, GameCatalogStatus.Reading, false, CreateClock(1));
+        var entries = TrayMenu.Create(version, CreateSnapshot("Receiving", canRecord: true, isRecording: false), GameInstallationStatus.Searching, GameCatalogStatus.Reading, null, false, CreateClock(1));
 
         // Assert
         Assert.IsTrue(entries.Single(entry => entry.Kind == TrayMenuEntryKind.Exit).IsEnabled, "The exit entry should be enabled");
@@ -332,7 +332,7 @@ public sealed class TrayMenuTests
         var version = ProductVersion.Read(typeof(TrayMenu).Assembly);
 
         // Act
-        var entries = TrayMenu.Create(version, CreateSnapshot("Receiving", canRecord: true, isRecording: false), GameInstallationStatus.Searching, GameCatalogStatus.Reading, false, CreateClock(1));
+        var entries = TrayMenu.Create(version, CreateSnapshot("Receiving", canRecord: true, isRecording: false), GameInstallationStatus.Searching, GameCatalogStatus.Reading, null, false, CreateClock(1));
 
         // Assert
         Assert.AreEqual("Version " + version, entries.Single(entry => entry.Kind == TrayMenuEntryKind.Version).Text, "The version entry should read Version followed by the product version");
@@ -1084,7 +1084,7 @@ public sealed class TrayMenuTests
         var game = CreateGameStatus(kind, source, build);
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, game, GameCatalogStatus.Reading, false, CreateClock(1));
+        var entries = TrayMenu.Create("1.2.3", snapshot, game, GameCatalogStatus.Reading, null, false, CreateClock(1));
 
         // Assert
         var kinds = entries.Select(entry => entry.Kind).ToList();
@@ -1212,7 +1212,7 @@ public sealed class TrayMenuTests
                       };
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, catalog, false, CreateClock(1));
+        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, catalog, null, false, CreateClock(1));
 
         // Assert
         var kinds = entries.Select(entry => entry.Kind).ToList();
@@ -1224,6 +1224,183 @@ public sealed class TrayMenuTests
         Assert.AreEqual(expected, entries[index].Text, "The catalog entry should show the text of the status");
         Assert.IsFalse(entries[index].IsEnabled, "The catalog entry should be greyed out");
         Assert.IsFalse(entries[index].IsChecked, "The catalog entry should not be checked");
+    }
+
+    /// <summary>
+    /// The server line reads the text of each state, with the port where the state names one (S1, S3, E1, E2, E4).
+    /// </summary>
+    /// <param name="state">The state</param>
+    /// <param name="port">The port</param>
+    /// <param name="expected">The expected text</param>
+    [TestMethod]
+    [TestCategory("AC2")]
+    [DataRow(LocalServerState.Starting, 5000, "Server: starting")]
+    [DataRow(LocalServerState.Starting, 5117, "Server: starting")]
+    [DataRow(LocalServerState.Running, 5000, "Server: running at http://localhost:5000/")]
+    [DataRow(LocalServerState.Running, 5117, "Server: running at http://localhost:5117/")]
+    [DataRow(LocalServerState.PortInUse, 5000, "Server: port 5000 in use")]
+    [DataRow(LocalServerState.PortInUse, 5117, "Server: port 5117 in use")]
+    [DataRow(LocalServerState.Failed, 5000, "Server: failed")]
+    [DataRow(LocalServerState.Failed, 5117, "Server: failed")]
+    [DataRow(LocalServerState.SettingsInvalid, 5000, "Server: settings invalid")]
+    [DataRow(LocalServerState.SettingsInvalid, 5117, "Server: settings invalid")]
+    public void TrayMenuFormatLocalServerReturnsTextPerState(LocalServerState state, int port, string expected)
+    {
+        // Arrange
+        var status = CreateLocalServerStatus(state, port);
+
+        // Act
+        var text = TrayMenu.FormatLocalServer(status);
+
+        // Assert
+        Assert.AreEqual(expected, text, $"The server line of {state} at port {port} should be its text");
+    }
+
+    /// <summary>
+    /// In local mode the greyed, unchecked server line is directly below the catalog entry and directly above the first
+    /// separator, with the text of the status (S1).
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC2")]
+    public void TrayMenuCreateInLocalModeShowsServerLineBelowCatalog()
+    {
+        // Arrange
+        var snapshot = CreateSnapshot("Receiving", canRecord: true, isRecording: false);
+        var localServer = CreateLocalServerStatus(LocalServerState.Running, 5117);
+
+        // Act
+        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, localServer, false, CreateClock(1));
+
+        // Assert
+        var kinds = entries.Select(entry => entry.Kind).ToList();
+        var index = kinds.IndexOf(TrayMenuEntryKind.LocalServer);
+
+        Assert.ContainsSingle(entryKind => entryKind == TrayMenuEntryKind.LocalServer, kinds, "The menu should hold exactly one server line");
+        Assert.AreEqual(kinds.IndexOf(TrayMenuEntryKind.Catalog) + 1, index, "The server line should be directly below the catalog entry");
+        Assert.AreEqual(kinds.IndexOf(TrayMenuEntryKind.Separator) - 1, index, "The server line should be directly above the first separator");
+        Assert.AreEqual("Server: running at http://localhost:5117/", entries[index].Text, "The server line should show the text of the status");
+        Assert.IsFalse(entries[index].IsEnabled, "The server line should be greyed out");
+        Assert.IsFalse(entries[index].IsChecked, "The server line should not be checked");
+    }
+
+    /// <summary>
+    /// Without local mode the menu shows neither the server line nor Open Censio, in every mode of the Companion (S7).
+    /// </summary>
+    /// <param name="mode">The mode of the Companion: live, recording, replay or invalid</param>
+    [TestMethod]
+    [TestCategory("AC2")]
+    [DataRow("live")]
+    [DataRow("recording")]
+    [DataRow("replay")]
+    [DataRow("invalid")]
+    public void TrayMenuCreateWithoutLocalModeShowsNoServerEntries(string mode)
+    {
+        // Arrange
+        var snapshot = CreateSnapshotForMode(mode);
+
+        // Act
+        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, null, false, CreateClock(1));
+
+        // Assert
+        var kinds = entries.Select(entry => entry.Kind).ToList();
+
+        Assert.DoesNotContain(TrayMenuEntryKind.LocalServer, kinds, $"Without local mode the menu should hold no server line: {mode}");
+        Assert.DoesNotContain(TrayMenuEntryKind.OpenCensio, kinds, $"Without local mode the menu should hold no Open Censio: {mode}");
+        Assert.IsEmpty(entries.Where(entry => entry.Text.StartsWith("Server:", StringComparison.Ordinal) || entry.Text == TrayMenu.OpenCensioText).ToList(), $"Without local mode no entry should carry a server text: {mode}");
+    }
+
+    /// <summary>
+    /// In local mode the menu lists the server line below the catalog and Open Censio directly above Open diagnostics,
+    /// the rest of the menu in today's order (S1).
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC3")]
+    public void TrayMenuCreateInLocalModeShowsOpenCensioAboveDiagnostics()
+    {
+        // Arrange
+        var snapshot = CreateSnapshot("Receiving", canRecord: true, isRecording: false);
+        var localServer = CreateLocalServerStatus(LocalServerState.Running, 5000);
+        var expectedKinds = new[]
+                            {
+                                TrayMenuEntryKind.Status,
+                                TrayMenuEntryKind.LastTick,
+                                TrayMenuEntryKind.Game,
+                                TrayMenuEntryKind.Catalog,
+                                TrayMenuEntryKind.LocalServer,
+                                TrayMenuEntryKind.Separator,
+                                TrayMenuEntryKind.OpenCensio,
+                                TrayMenuEntryKind.OpenDiagnostics,
+                                TrayMenuEntryKind.ToggleRecording,
+                                TrayMenuEntryKind.OpenRecordingsFolder,
+                                TrayMenuEntryKind.OpenLogFolder,
+                                TrayMenuEntryKind.Separator,
+                                TrayMenuEntryKind.ToggleAutostart,
+                                TrayMenuEntryKind.Separator,
+                                TrayMenuEntryKind.Version,
+                                TrayMenuEntryKind.Separator,
+                                TrayMenuEntryKind.Exit
+                            };
+
+        // Act
+        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, localServer, false, CreateClock(1));
+
+        // Assert
+        var openCensio = entries.Single(entry => entry.Kind == TrayMenuEntryKind.OpenCensio);
+
+        Assert.AreSequenceEqual(expectedKinds, entries.Select(entry => entry.Kind).ToArray(), "Open Censio should be directly above Open diagnostics and the server line below the catalog");
+        Assert.AreEqual("Open Censio", openCensio.Text, "The entry should read Open Censio");
+        Assert.AreEqual(TrayMenu.OpenCensioText, openCensio.Text, "The entry should carry the text of the constant");
+        Assert.IsFalse(openCensio.IsChecked, "Open Censio should not be checked");
+    }
+
+    /// <summary>
+    /// Open Censio is enabled only while the server runs (S1, E1, E4).
+    /// </summary>
+    /// <param name="state">The state of the server</param>
+    /// <param name="expected">Whether Open Censio is enabled</param>
+    [TestMethod]
+    [TestCategory("AC3")]
+    [DataRow(LocalServerState.Starting, false)]
+    [DataRow(LocalServerState.Running, true)]
+    [DataRow(LocalServerState.PortInUse, false)]
+    [DataRow(LocalServerState.Failed, false)]
+    [DataRow(LocalServerState.SettingsInvalid, false)]
+    public void TrayMenuCreateEnablesOpenCensioOnlyWhileRunning(LocalServerState state, bool expected)
+    {
+        // Arrange
+        var snapshot = CreateSnapshot("Receiving", canRecord: true, isRecording: false);
+        var localServer = CreateLocalServerStatus(state, 5000);
+
+        // Act
+        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, localServer, false, CreateClock(1));
+
+        // Assert
+        var openCensio = entries.Single(entry => entry.Kind == TrayMenuEntryKind.OpenCensio);
+
+        Assert.AreEqual(expected, openCensio.IsEnabled, $"Open Censio should be enabled only while the server runs, not in {state}");
+    }
+
+    /// <summary>
+    /// A replay that ends because the local server does not run names the reason in the tooltip and the reason text (E10).
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC9")]
+    public void TrayMenuFormatReplaySendReasonLocalServerNotRunningReturnsText()
+    {
+        // Arrange
+        var status = new PipeReplayStatus
+                     {
+                         State = PipeConnectionState.Receiving,
+                         IsFinished = true,
+                         SendProblem = ReplaySendProblemKind.LocalServerNotRunning
+                     };
+
+        // Act
+        var reason = TrayMenu.FormatReplaySendReason(ReplaySendProblemKind.LocalServerNotRunning);
+
+        // Assert
+        Assert.AreEqual("local server not running", reason, "The reason should read local server not running");
+        Assert.AreEqual("Censio Companion: Replay error: local server not running", TrayMenu.FormatReplayToolTip(status), "The tooltip should name the reason");
     }
 
     /// <summary>
@@ -1427,6 +1604,21 @@ public sealed class TrayMenuTests
                                                       },
                                                       _todayTick),
                    _ => TraySnapshot.ForInvalidCommandLine()
+               };
+    }
+
+    /// <summary>
+    /// Creates a status of the local server.
+    /// </summary>
+    /// <param name="state">The state</param>
+    /// <param name="port">The port</param>
+    /// <returns>The status</returns>
+    private static LocalServerStatus CreateLocalServerStatus(LocalServerState state, int port)
+    {
+        return new LocalServerStatus
+               {
+                   State = state,
+                   Port = port
                };
     }
 

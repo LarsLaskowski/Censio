@@ -66,6 +66,11 @@ public static class TrayMenu
     /// </summary>
     public const string StartWithWindowsText = "Start with Windows";
 
+    /// <summary>
+    /// The text of the entry that opens Censio in the browser.
+    /// </summary>
+    public const string OpenCensioText = "Open Censio";
+
     #endregion // Constants
 
     #region Methods
@@ -270,28 +275,63 @@ public static class TrayMenu
     /// <param name="snapshot">The snapshot</param>
     /// <param name="game">The status of the game installation search</param>
     /// <param name="catalog">The status of the game catalog</param>
+    /// <param name="localServer">The status of the local server, or <see langword="null" /> when none is hosted</param>
     /// <param name="isAutostartEnabled">Whether the Companion starts with Windows</param>
     /// <param name="clock">The clock</param>
     /// <returns>The entries in display order</returns>
-    public static IReadOnlyList<TrayMenuEntry> Create(string version, TraySnapshot snapshot, GameInstallationStatus game, GameCatalogStatus catalog, bool isAutostartEnabled, TimeProvider clock)
+    public static IReadOnlyList<TrayMenuEntry> Create(string version, TraySnapshot snapshot, GameInstallationStatus game, GameCatalogStatus catalog, LocalServerStatus? localServer, bool isAutostartEnabled, TimeProvider clock)
     {
-        return [
-                   new TrayMenuEntry(TrayMenuEntryKind.Status, $"Status: {snapshot.StatusText}", false),
-                   new TrayMenuEntry(TrayMenuEntryKind.LastTick, FormatLastTick(snapshot.LastTick, clock), false),
-                   new TrayMenuEntry(TrayMenuEntryKind.Game, FormatGame(game), false),
-                   new TrayMenuEntry(TrayMenuEntryKind.Catalog, FormatCatalog(catalog), false),
-                   new TrayMenuEntry(TrayMenuEntryKind.Separator, string.Empty, false),
-                   new TrayMenuEntry(TrayMenuEntryKind.OpenDiagnostics, OpenDiagnosticsText, true),
-                   new TrayMenuEntry(TrayMenuEntryKind.ToggleRecording, snapshot.IsRecording ? StopRecordingText : StartRecordingText, snapshot.CanRecord),
-                   new TrayMenuEntry(TrayMenuEntryKind.OpenRecordingsFolder, OpenRecordingsFolderText, true),
-                   new TrayMenuEntry(TrayMenuEntryKind.OpenLogFolder, OpenLogFolderText, true),
-                   new TrayMenuEntry(TrayMenuEntryKind.Separator, string.Empty, false),
-                   new TrayMenuEntry(TrayMenuEntryKind.ToggleAutostart, StartWithWindowsText, true, isAutostartEnabled),
-                   new TrayMenuEntry(TrayMenuEntryKind.Separator, string.Empty, false),
-                   new TrayMenuEntry(TrayMenuEntryKind.Version, FormatVersion(version), false),
-                   new TrayMenuEntry(TrayMenuEntryKind.Separator, string.Empty, false),
-                   new TrayMenuEntry(TrayMenuEntryKind.Exit, ExitText, true)
-               ];
+        var entries = new List<TrayMenuEntry>
+                      {
+                          new(TrayMenuEntryKind.Status, $"Status: {snapshot.StatusText}", false),
+                          new(TrayMenuEntryKind.LastTick, FormatLastTick(snapshot.LastTick, clock), false),
+                          new(TrayMenuEntryKind.Game, FormatGame(game), false),
+                          new(TrayMenuEntryKind.Catalog, FormatCatalog(catalog), false)
+                      };
+
+        if (localServer is { } server)
+        {
+            entries.Add(new TrayMenuEntry(TrayMenuEntryKind.LocalServer, FormatLocalServer(server), false));
+        }
+
+        entries.Add(new TrayMenuEntry(TrayMenuEntryKind.Separator, string.Empty, false));
+
+        if (localServer is { } running)
+        {
+            entries.Add(new TrayMenuEntry(TrayMenuEntryKind.OpenCensio, OpenCensioText, running.State == LocalServerState.Running));
+        }
+
+        entries.AddRange([
+                             new TrayMenuEntry(TrayMenuEntryKind.OpenDiagnostics, OpenDiagnosticsText, true),
+                             new TrayMenuEntry(TrayMenuEntryKind.ToggleRecording, snapshot.IsRecording ? StopRecordingText : StartRecordingText, snapshot.CanRecord),
+                             new TrayMenuEntry(TrayMenuEntryKind.OpenRecordingsFolder, OpenRecordingsFolderText, true),
+                             new TrayMenuEntry(TrayMenuEntryKind.OpenLogFolder, OpenLogFolderText, true),
+                             new TrayMenuEntry(TrayMenuEntryKind.Separator, string.Empty, false),
+                             new TrayMenuEntry(TrayMenuEntryKind.ToggleAutostart, StartWithWindowsText, true, isAutostartEnabled),
+                             new TrayMenuEntry(TrayMenuEntryKind.Separator, string.Empty, false),
+                             new TrayMenuEntry(TrayMenuEntryKind.Version, FormatVersion(version), false),
+                             new TrayMenuEntry(TrayMenuEntryKind.Separator, string.Empty, false),
+                             new TrayMenuEntry(TrayMenuEntryKind.Exit, ExitText, true)
+                         ]);
+
+        return entries;
+    }
+
+    /// <summary>
+    /// Formats the text of the local server entry.
+    /// </summary>
+    /// <param name="status">The status of the local server</param>
+    /// <returns>The text</returns>
+    public static string FormatLocalServer(LocalServerStatus status)
+    {
+        return status.State switch
+               {
+                   LocalServerState.Starting => "Server: starting",
+                   LocalServerState.Running => string.Create(CultureInfo.InvariantCulture, $"Server: running at http://localhost:{status.Port}/"),
+                   LocalServerState.PortInUse => string.Create(CultureInfo.InvariantCulture, $"Server: port {status.Port} in use"),
+                   LocalServerState.Failed => "Server: failed",
+                   _ => "Server: settings invalid"
+               };
     }
 
     /// <summary>
@@ -374,6 +414,7 @@ public static class TrayMenu
                    ReplaySendProblemKind.NoAnswer => "server does not answer",
                    ReplaySendProblemKind.ConnectionLost => "server connection lost",
                    ReplaySendProblemKind.InvalidReply => "invalid server reply",
+                   ReplaySendProblemKind.LocalServerNotRunning => "local server not running",
                    _ => null
                };
     }
