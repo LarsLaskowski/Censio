@@ -354,5 +354,52 @@ public static partial class CompanionLog
     [LoggerMessage(Level = LogLevel.Information, Message = "Catalog loaded from cache in {Seconds} s: {Count} entries, {GoodCount} goods and {RegionCount} regions with an icon")]
     public static partial void CatalogLoadedFromCache(ILogger logger, string seconds, int count, int goodCount, int regionCount);
 
+    /// <summary>
+    /// Logs an invalid local server setting.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    /// <param name="problem">The problem</param>
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Local server settings invalid: {Problem}")]
+    public static partial void LocalServerSettingsInvalid(ILogger logger, string problem);
+
+    /// <summary>
+    /// Logs a running local server.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    /// <param name="port">The port</param>
+    [LoggerMessage(Level = LogLevel.Information, Message = "Local server running on port {Port}")]
+    public static partial void LocalServerRunning(ILogger logger, int port);
+
+    /// <summary>
+    /// Logs a port of the local server that another program holds.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    /// <param name="port">The port</param>
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Local server port {Port} in use")]
+    public static partial void LocalServerPortInUse(ILogger logger, int port);
+
+    /// <summary>
+    /// Logs a local server that failed.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    /// <param name="exception">The exception</param>
+    [LoggerMessage(Level = LogLevel.Error, Message = "Local server failed")]
+    public static partial void LocalServerFailed(ILogger logger, Exception exception);
+
+    /// <summary>
+    /// Logs a local server that stopped without being asked.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    [LoggerMessage(Level = LogLevel.Error, Message = "Local server stopped unexpectedly")]
+    public static partial void LocalServerStoppedUnexpectedly(ILogger logger);
+
+    /// <summary>
+    /// Logs a browser that could not be opened.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    /// <param name="exception">The exception</param>
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Could not open the browser")]
+    public static partial void BrowserOpenFailed(ILogger logger, Exception exception);
+
     #endregion // Methods
 }

@@ -281,23 +281,40 @@ public static class TrayMenu
     /// <returns>The entries in display order</returns>
     public static IReadOnlyList<TrayMenuEntry> Create(string version, TraySnapshot snapshot, GameInstallationStatus game, GameCatalogStatus catalog, LocalServerStatus? localServer, bool isAutostartEnabled, TimeProvider clock)
     {
-        return [
-                   new TrayMenuEntry(TrayMenuEntryKind.Status, $"Status: {snapshot.StatusText}", false),
-                   new TrayMenuEntry(TrayMenuEntryKind.LastTick, FormatLastTick(snapshot.LastTick, clock), false),
-                   new TrayMenuEntry(TrayMenuEntryKind.Game, FormatGame(game), false),
-                   new TrayMenuEntry(TrayMenuEntryKind.Catalog, FormatCatalog(catalog), false),
-                   new TrayMenuEntry(TrayMenuEntryKind.Separator, string.Empty, false),
-                   new TrayMenuEntry(TrayMenuEntryKind.OpenDiagnostics, OpenDiagnosticsText, true),
-                   new TrayMenuEntry(TrayMenuEntryKind.ToggleRecording, snapshot.IsRecording ? StopRecordingText : StartRecordingText, snapshot.CanRecord),
-                   new TrayMenuEntry(TrayMenuEntryKind.OpenRecordingsFolder, OpenRecordingsFolderText, true),
-                   new TrayMenuEntry(TrayMenuEntryKind.OpenLogFolder, OpenLogFolderText, true),
-                   new TrayMenuEntry(TrayMenuEntryKind.Separator, string.Empty, false),
-                   new TrayMenuEntry(TrayMenuEntryKind.ToggleAutostart, StartWithWindowsText, true, isAutostartEnabled),
-                   new TrayMenuEntry(TrayMenuEntryKind.Separator, string.Empty, false),
-                   new TrayMenuEntry(TrayMenuEntryKind.Version, FormatVersion(version), false),
-                   new TrayMenuEntry(TrayMenuEntryKind.Separator, string.Empty, false),
-                   new TrayMenuEntry(TrayMenuEntryKind.Exit, ExitText, true)
-               ];
+        var entries = new List<TrayMenuEntry>
+                      {
+                          new(TrayMenuEntryKind.Status, $"Status: {snapshot.StatusText}", false),
+                          new(TrayMenuEntryKind.LastTick, FormatLastTick(snapshot.LastTick, clock), false),
+                          new(TrayMenuEntryKind.Game, FormatGame(game), false),
+                          new(TrayMenuEntryKind.Catalog, FormatCatalog(catalog), false)
+                      };
+
+        if (localServer is { } server)
+        {
+            entries.Add(new TrayMenuEntry(TrayMenuEntryKind.LocalServer, FormatLocalServer(server), false));
+        }
+
+        entries.Add(new TrayMenuEntry(TrayMenuEntryKind.Separator, string.Empty, false));
+
+        if (localServer is { } running)
+        {
+            entries.Add(new TrayMenuEntry(TrayMenuEntryKind.OpenCensio, OpenCensioText, running.State == LocalServerState.Running));
+        }
+
+        entries.AddRange([
+                             new TrayMenuEntry(TrayMenuEntryKind.OpenDiagnostics, OpenDiagnosticsText, true),
+                             new TrayMenuEntry(TrayMenuEntryKind.ToggleRecording, snapshot.IsRecording ? StopRecordingText : StartRecordingText, snapshot.CanRecord),
+                             new TrayMenuEntry(TrayMenuEntryKind.OpenRecordingsFolder, OpenRecordingsFolderText, true),
+                             new TrayMenuEntry(TrayMenuEntryKind.OpenLogFolder, OpenLogFolderText, true),
+                             new TrayMenuEntry(TrayMenuEntryKind.Separator, string.Empty, false),
+                             new TrayMenuEntry(TrayMenuEntryKind.ToggleAutostart, StartWithWindowsText, true, isAutostartEnabled),
+                             new TrayMenuEntry(TrayMenuEntryKind.Separator, string.Empty, false),
+                             new TrayMenuEntry(TrayMenuEntryKind.Version, FormatVersion(version), false),
+                             new TrayMenuEntry(TrayMenuEntryKind.Separator, string.Empty, false),
+                             new TrayMenuEntry(TrayMenuEntryKind.Exit, ExitText, true)
+                         ]);
+
+        return entries;
     }
 
     /// <summary>
@@ -307,9 +324,14 @@ public static class TrayMenu
     /// <returns>The text</returns>
     public static string FormatLocalServer(LocalServerStatus status)
     {
-#pragma warning disable RH2003, S1172 // Skeleton: removed with the implementation
-        throw new NotImplementedException();
-#pragma warning restore RH2003, S1172 // Skeleton: removed with the implementation
+        return status.State switch
+               {
+                   LocalServerState.Starting => "Server: starting",
+                   LocalServerState.Running => string.Create(CultureInfo.InvariantCulture, $"Server: running at http://localhost:{status.Port}/"),
+                   LocalServerState.PortInUse => string.Create(CultureInfo.InvariantCulture, $"Server: port {status.Port} in use"),
+                   LocalServerState.Failed => "Server: failed",
+                   _ => "Server: settings invalid"
+               };
     }
 
     /// <summary>
@@ -392,9 +414,7 @@ public static class TrayMenu
                    ReplaySendProblemKind.NoAnswer => "server does not answer",
                    ReplaySendProblemKind.ConnectionLost => "server connection lost",
                    ReplaySendProblemKind.InvalidReply => "invalid server reply",
-#pragma warning disable RH2003 // Skeleton: removed with the implementation
-                   ReplaySendProblemKind.LocalServerNotRunning => throw new NotImplementedException(),
-#pragma warning restore RH2003 // Skeleton: removed with the implementation
+                   ReplaySendProblemKind.LocalServerNotRunning => "local server not running",
                    _ => null
                };
     }

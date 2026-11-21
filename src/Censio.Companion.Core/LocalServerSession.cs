@@ -1,3 +1,5 @@
+using System.Globalization;
+
 using Censio.Server;
 
 using Microsoft.Extensions.Logging;
@@ -10,8 +12,6 @@ namespace Censio.Companion.Core;
 public sealed class LocalServerSession : IAsyncDisposable
 {
     #region Fields
-
-#pragma warning disable S4487 // Skeleton: removed with the implementation
 
     /// <summary>
     /// The setting.
@@ -33,7 +33,40 @@ public sealed class LocalServerSession : IAsyncDisposable
     /// </summary>
     private readonly ILogger _logger;
 
-#pragma warning restore S4487 // Skeleton: removed with the implementation
+    /// <summary>
+    /// The lock of the status and the flags.
+    /// </summary>
+    private readonly Lock _lock = new();
+
+    /// <summary>
+    /// The cancellation of the run, requested by a stop.
+    /// </summary>
+    private readonly CancellationTokenSource _stop = new();
+
+    /// <summary>
+    /// The token that is cancelled by a stop.
+    /// </summary>
+    private readonly CancellationToken _stopToken;
+
+    /// <summary>
+    /// The completion source of the token of the server.
+    /// </summary>
+    private readonly TaskCompletionSource<string?> _token = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    /// <summary>
+    /// The completion source that completes when the run ended.
+    /// </summary>
+    private readonly TaskCompletionSource _ended = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    /// <summary>
+    /// The status.
+    /// </summary>
+    private LocalServerStatus _status;
+
+    /// <summary>
+    /// Whether a run began.
+    /// </summary>
+    private bool _isRunStarted;
 
     #endregion // Fields
 
@@ -52,6 +85,12 @@ public sealed class LocalServerSession : IAsyncDisposable
         _start = start;
         _timeProvider = timeProvider;
         _logger = logger;
+        _stopToken = _stop.Token;
+        _status = new LocalServerStatus
+                  {
+                      State = LocalServerState.Starting,
+                      Port = setting.Port
+                  };
     }
 
     #endregion // Constructor
@@ -61,9 +100,7 @@ public sealed class LocalServerSession : IAsyncDisposable
     /// <summary>
     /// Occurs when the status changes.
     /// </summary>
-#pragma warning disable CS0067, S3264 // Skeleton: removed with the implementation
     public event EventHandler<LocalServerStatus>? StatusChanged;
-#pragma warning restore CS0067, S3264 // Skeleton: removed with the implementation
 
     #endregion // Events
 
@@ -72,16 +109,21 @@ public sealed class LocalServerSession : IAsyncDisposable
     /// <summary>
     /// Gets the status.
     /// </summary>
-    public LocalServerStatus Status => new()
-                                       {
-                                           State = LocalServerState.Starting,
-                                           Port = _setting.Port
-                                       };
+    public LocalServerStatus Status
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _status;
+            }
+        }
+    }
 
     /// <summary>
     /// Gets the address of the server.
     /// </summary>
-    public Uri Address => new(_setting.Problem ?? "http://localhost/");
+    public Uri Address => new(string.Create(CultureInfo.InvariantCulture, $"http://localhost:{_setting.Port}/"));
 
     #endregion // Properties
 
@@ -95,9 +137,7 @@ public sealed class LocalServerSession : IAsyncDisposable
     /// <returns><see langword="true" /> when a server is hosted</returns>
     public static bool IsHosted(CompanionMode mode, LocalServerSetting setting)
     {
-#pragma warning disable RH2003, S1172 // Skeleton: removed with the implementation
-        throw new NotImplementedException();
-#pragma warning restore RH2003, S1172 // Skeleton: removed with the implementation
+        return setting.Kind != LocalServerSettingKind.Off && mode != CompanionMode.Invalid;
     }
 
     /// <summary>
@@ -105,42 +145,230 @@ public sealed class LocalServerSession : IAsyncDisposable
     /// </summary>
     /// <param name="cancellationToken">The token that cancels the run</param>
     /// <returns>A task that completes when the run ends</returns>
-#pragma warning disable S2325 // Skeleton: removed with the implementation
-    public Task RunAsync(CancellationToken cancellationToken)
+    public async Task RunAsync(CancellationToken cancellationToken)
     {
-#pragma warning disable RH2003, S1172 // Skeleton: removed with the implementation
-        throw new NotImplementedException();
-#pragma warning restore RH2003, S1172 // Skeleton: removed with the implementation
+        lock (_lock)
+        {
+            _isRunStarted = true;
+        }
+
+        try
+        {
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _stopToken);
+
+            await RunCoreAsync(linked.Token).ConfigureAwait(false);
+        }
+        finally
+        {
+            _token.TrySetResult(null);
+            _ended.TrySetResult();
+        }
     }
-#pragma warning restore S2325 // Skeleton: removed with the implementation
 
     /// <summary>
     /// Waits for the token of the running server.
     /// </summary>
     /// <param name="cancellationToken">The token that cancels the wait</param>
     /// <returns>The token, or <see langword="null" /> when the server does not run</returns>
-#pragma warning disable S2325 // Skeleton: removed with the implementation
     public Task<string?> WaitForTokenAsync(CancellationToken cancellationToken)
     {
-#pragma warning disable RH2003, S1172 // Skeleton: removed with the implementation
-        throw new NotImplementedException();
-#pragma warning restore RH2003, S1172 // Skeleton: removed with the implementation
+        return _token.Task.WaitAsync(cancellationToken);
     }
-#pragma warning restore S2325 // Skeleton: removed with the implementation
 
     /// <summary>
     /// Stops the server.
     /// </summary>
     /// <param name="timeout">The longest time to wait</param>
     /// <returns>A task that completes when the server has stopped or the time is over</returns>
-#pragma warning disable S2325 // Skeleton: removed with the implementation
-    public Task StopAsync(TimeSpan timeout)
+    public async Task StopAsync(TimeSpan timeout)
     {
-#pragma warning disable RH2003, S1172 // Skeleton: removed with the implementation
-        throw new NotImplementedException();
-#pragma warning restore RH2003, S1172 // Skeleton: removed with the implementation
+        bool isRunStarted;
+
+        lock (_lock)
+        {
+            isRunStarted = _isRunStarted;
+        }
+
+        using var delayCancellation = new CancellationTokenSource();
+
+        var delay = Task.Delay(timeout, _timeProvider, delayCancellation.Token);
+
+        await _stop.CancelAsync().ConfigureAwait(false);
+
+        if (isRunStarted)
+        {
+            await Task.WhenAny(_ended.Task, delay).ConfigureAwait(false);
+        }
+
+        await delayCancellation.CancelAsync().ConfigureAwait(false);
     }
-#pragma warning restore S2325 // Skeleton: removed with the implementation
+
+    /// <summary>
+    /// Stops the server of a start that finishes after the run was cancelled.
+    /// </summary>
+    /// <param name="startTask">The task of the start</param>
+    /// <returns>A task that completes when the server has stopped</returns>
+    private static async Task StopLateServerAsync(Task<LocalServerStart> startTask)
+    {
+        await Task.WhenAny(startTask).ConfigureAwait(false);
+
+        if (startTask.IsCompletedSuccessfully)
+        {
+            var start = await startTask.ConfigureAwait(false);
+
+            if (start.Server is not null)
+            {
+                await start.Server.StopAsync(CancellationToken.None).ConfigureAwait(false);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Starts the server, waits until it ends or the run is cancelled and stops it then.
+    /// </summary>
+    /// <param name="runToken">The token that ends the run</param>
+    /// <returns>A task that completes when the run ended</returns>
+    private async Task RunCoreAsync(CancellationToken runToken)
+    {
+        if (_setting.Kind != LocalServerSettingKind.Local)
+        {
+            if (_setting.Kind == LocalServerSettingKind.Invalid)
+            {
+                CompanionLog.LocalServerSettingsInvalid(_logger, _setting.Problem ?? string.Empty);
+                SetStatus(LocalServerState.SettingsInvalid);
+            }
+
+            return;
+        }
+
+        if (runToken.IsCancellationRequested)
+        {
+            return;
+        }
+
+        var startTask = StartAsync(runToken);
+        LocalServerStart start;
+
+        try
+        {
+            start = await startTask.WaitAsync(runToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (runToken.IsCancellationRequested)
+        {
+            await StopLateServerAsync(startTask).ConfigureAwait(false);
+
+            return;
+        }
+        catch (Exception exception)
+        {
+            CompanionLog.LocalServerFailed(_logger, exception);
+            SetStatus(LocalServerState.Failed);
+
+            return;
+        }
+
+        if (start.Kind != LocalServerStartKind.Running || start.Server is null)
+        {
+            ReportFailedStart(start);
+
+            return;
+        }
+
+        await RunServerAsync(start.Server, runToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Calls the start delegate, turning a synchronous throw into a faulted task.
+    /// </summary>
+    /// <param name="cancellationToken">The token that cancels the start</param>
+    /// <returns>The task of the start</returns>
+    private Task<LocalServerStart> StartAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            return _start(_setting.Port, cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            return Task.FromException<LocalServerStart>(exception);
+        }
+    }
+
+    /// <summary>
+    /// Shows and logs a start that did not run a server.
+    /// </summary>
+    /// <param name="start">The result of the start</param>
+    private void ReportFailedStart(LocalServerStart start)
+    {
+        if (start.Kind == LocalServerStartKind.PortInUse)
+        {
+            CompanionLog.LocalServerPortInUse(_logger, _setting.Port);
+            SetStatus(LocalServerState.PortInUse);
+
+            return;
+        }
+
+        if (start.Exception is not null)
+        {
+            CompanionLog.LocalServerFailed(_logger, start.Exception);
+        }
+
+        SetStatus(LocalServerState.Failed);
+    }
+
+    /// <summary>
+    /// Shows the running server and waits until it stops on its own or the run is cancelled, which stops it.
+    /// </summary>
+    /// <param name="server">The server</param>
+    /// <param name="runToken">The token that ends the run</param>
+    /// <returns>A task that completes when the server has stopped</returns>
+    private async Task RunServerAsync(ILocalServer server, CancellationToken runToken)
+    {
+        if (runToken.IsCancellationRequested)
+        {
+            await server.StopAsync(CancellationToken.None).ConfigureAwait(false);
+
+            return;
+        }
+
+        CompanionLog.LocalServerRunning(_logger, _setting.Port);
+        _token.TrySetResult(server.Token);
+        SetStatus(LocalServerState.Running);
+
+        try
+        {
+            await server.Stopped.WaitAsync(runToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (runToken.IsCancellationRequested)
+        {
+            await server.StopAsync(CancellationToken.None).ConfigureAwait(false);
+
+            return;
+        }
+
+        CompanionLog.LocalServerStoppedUnexpectedly(_logger);
+        SetStatus(LocalServerState.Failed);
+    }
+
+    /// <summary>
+    /// Sets the state of the status and raises <see cref="StatusChanged" />.
+    /// </summary>
+    /// <param name="state">The state</param>
+    private void SetStatus(LocalServerState state)
+    {
+        LocalServerStatus status;
+
+        lock (_lock)
+        {
+            status = _status with
+                             {
+                                 State = state
+                             };
+            _status = status;
+        }
+
+        StatusChanged?.Invoke(this, status);
+    }
 
     #endregion // Methods
 
@@ -149,6 +377,9 @@ public sealed class LocalServerSession : IAsyncDisposable
     /// <inheritdoc />
     public ValueTask DisposeAsync()
     {
+        _stop.Cancel();
+        _stop.Dispose();
+
         return ValueTask.CompletedTask;
     }
 

@@ -40,6 +40,11 @@ public sealed class ReplaySender : IAsyncDisposable
     private readonly string? _tokenFilePath;
 
     /// <summary>
+    /// The delegate that waits for the token of the local server, or <see langword="null" /> for a remote server.
+    /// </summary>
+    private readonly Func<CancellationToken, Task<string?>>? _waitForToken;
+
+    /// <summary>
     /// The version of the Companion.
     /// </summary>
     private readonly string _companionVersion;
@@ -148,7 +153,23 @@ public sealed class ReplaySender : IAsyncDisposable
     /// <param name="timeProvider">The time provider</param>
     /// <param name="logger">The logger</param>
     public ReplaySender(Uri address, string? tokenFilePath, string companionVersion, IReplayServerConnector connector, TimeProvider timeProvider, ILogger logger)
+        : this(address, tokenFilePath, null, companionVersion, connector, timeProvider, logger)
     {
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ReplaySender" /> class.
+    /// </summary>
+    /// <param name="address">The address of the server</param>
+    /// <param name="tokenFilePath">The path of the token file, if any</param>
+    /// <param name="waitForToken">The delegate that waits for the token of the local server, if any</param>
+    /// <param name="companionVersion">The version of the Companion</param>
+    /// <param name="connector">The connector</param>
+    /// <param name="timeProvider">The time provider</param>
+    /// <param name="logger">The logger</param>
+    private ReplaySender(Uri address, string? tokenFilePath, Func<CancellationToken, Task<string?>>? waitForToken, string companionVersion, IReplayServerConnector connector, TimeProvider timeProvider, ILogger logger)
+    {
+        _waitForToken = waitForToken;
         _address = address;
         _tokenFilePath = tokenFilePath;
         _companionVersion = companionVersion;
@@ -213,9 +234,7 @@ public sealed class ReplaySender : IAsyncDisposable
     /// <returns>The sender</returns>
     public static ReplaySender ForLocalServer(int port, Func<CancellationToken, Task<string?>> waitForToken, string companionVersion, IReplayServerConnector connector, TimeProvider timeProvider, ILogger logger)
     {
-#pragma warning disable RH2003, S1172 // Skeleton: removed with the implementation
-        throw new NotImplementedException();
-#pragma warning restore RH2003, S1172 // Skeleton: removed with the implementation
+        return new ReplaySender(new Uri(string.Create(CultureInfo.InvariantCulture, $"ws://127.0.0.1:{port}/ingest")), null, waitForToken, companionVersion, connector, timeProvider, logger);
     }
 
     /// <summary>
@@ -490,6 +509,16 @@ public sealed class ReplaySender : IAsyncDisposable
     /// <returns>The problem, or <c>null</c> if there is none</returns>
     private async Task<ReplaySendProblemKind?> ConnectCoreAsync(CancellationToken cancellationToken)
     {
+        if (_waitForToken is not null)
+        {
+            _token = await _waitForToken(cancellationToken).ConfigureAwait(false);
+
+            if (_token is null)
+            {
+                return Fail(ReplaySendProblemKind.LocalServerNotRunning);
+            }
+        }
+
         var socket = await _connector.ConnectAsync(_address, cancellationToken).ConfigureAwait(false);
 
         if (socket is null)

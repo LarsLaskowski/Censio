@@ -9,8 +9,6 @@ public sealed class BrowserOpener
 {
     #region Fields
 
-#pragma warning disable S4487 // Skeleton: removed with the implementation
-
     /// <summary>
     /// The delegate that launches the address.
     /// </summary>
@@ -20,8 +18,6 @@ public sealed class BrowserOpener
     /// The logger.
     /// </summary>
     private readonly ILogger _logger;
-
-#pragma warning restore S4487 // Skeleton: removed with the implementation
 
     #endregion // Fields
 
@@ -46,14 +42,17 @@ public sealed class BrowserOpener
     /// Opens an address in the browser.
     /// </summary>
     /// <param name="address">The address</param>
-#pragma warning disable S2325 // Skeleton: removed with the implementation
     public void Open(Uri address)
     {
-#pragma warning disable RH2003, S1172 // Skeleton: removed with the implementation
-        throw new NotImplementedException();
-#pragma warning restore RH2003, S1172 // Skeleton: removed with the implementation
+        try
+        {
+            _launch(address);
+        }
+        catch (Exception exception)
+        {
+            CompanionLog.BrowserOpenFailed(_logger, exception);
+        }
     }
-#pragma warning restore S2325 // Skeleton: removed with the implementation
 
     #endregion // Methods
 }

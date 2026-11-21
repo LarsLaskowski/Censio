@@ -21,9 +21,14 @@ public static class ReplaySenderFactory
     /// <returns>The sender, or <see langword="null" /> when the replay is not sent</returns>
     public static ReplaySender? Create(CompanionCommandLine commandLine, LocalServerSession? localServer, string companionVersion, IReplayServerConnector connector, TimeProvider timeProvider, ILogger logger)
     {
-#pragma warning disable RH2003, S1172 // Skeleton: removed with the implementation
-        throw new NotImplementedException();
-#pragma warning restore RH2003, S1172 // Skeleton: removed with the implementation
+        if (commandLine.ServerAddress is { } address)
+        {
+            return new ReplaySender(address, commandLine.TokenFilePath, companionVersion, connector, timeProvider, logger);
+        }
+
+        return localServer is null
+                   ? null
+                   : ReplaySender.ForLocalServer(localServer.Status.Port, localServer.WaitForTokenAsync, companionVersion, connector, timeProvider, logger);
     }
 
     #endregion // Methods
