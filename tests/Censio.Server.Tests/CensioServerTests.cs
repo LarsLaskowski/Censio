@@ -62,6 +62,16 @@ public sealed class CensioServerTests
     private const string PreventHostingStartupVariable = "ASPNETCORE_PREVENTHOSTINGSTARTUP";
 
     /// <summary>
+    /// The web host's environment variable that makes the URLs of the environment win over the explicit endpoints.
+    /// </summary>
+    private const string PreferHostingUrlsVariable = "ASPNETCORE_PREFERHOSTINGURLS";
+
+    /// <summary>
+    /// The generic host's environment variable that makes the URLs of the environment win over the explicit endpoints.
+    /// </summary>
+    private const string DotnetPreferHostingUrlsVariable = "DOTNET_PREFERHOSTINGURLS";
+
+    /// <summary>
     /// The identity of a schema step no build of Censio knows, as a newer version would record it.
     /// </summary>
     private const string NewerMigrationId = "29991231000000_FromNewerVersion";
@@ -298,7 +308,8 @@ public sealed class CensioServerTests
 
     /// <summary>
     /// A setting of the environment takes no effect on a local server: each case sets one variable (and allows hosting
-    /// startups), and every case checks that the token is required, no other port is listened on, the Blazor script of
+    /// startups and sets <c>ASPNETCORE_PREFERHOSTINGURLS</c> and <c>DOTNET_PREFERHOSTINGURLS</c>, so the URLs of the
+    /// environment would win over the server's own endpoints), and every case checks that the token is required, no other port is listened on, the Blazor script of
     /// the web root named by the environment is not served and the test assembly's hosting startup does not run. Every
     /// variable is restored. The web-root case checks the build-output layout only, whose development manifest maps every
     /// asset to its source, so it cannot fail there; the published layout rests on fact 15 of the plan.
@@ -320,6 +331,8 @@ public sealed class CensioServerTests
         var settings = new Dictionary<string, string?>
                        {
                            [PreventHostingStartupVariable] = "false",
+                           [PreferHostingUrlsVariable] = "true",
+                           [DotnetPreferHostingUrlsVariable] = "true",
                            [variable] = value.Replace(OtherPortPlaceholder, otherPort.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal)
                                              .Replace(WebRootPlaceholder, webRoot, StringComparison.Ordinal)
                        };

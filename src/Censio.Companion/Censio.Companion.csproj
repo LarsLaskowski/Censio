@@ -26,7 +26,7 @@
   </PropertyGroup>
   <Target Name="BundleServerAssets" AfterTargets="ComputeResolvedFilesToPublishList">
     <!-- The inner publish folder must be absolute: a relative one resolves against the server's project -->
-    <MSBuild Projects="$(ServerProject)" Targets="Publish" Properties="RuntimeIdentifier=win-x64;SelfContained=false;PublishSingleFile=false;PublishDir=$(ServerPublishDir);Configuration=$(Configuration);Version=$(Version);NoWarn=NU1503" RemoveProperties="TargetFramework;OutDir;OutputPath;IntermediateOutputPath;BaseIntermediateOutputPath;DebugType;IncludeNativeLibrariesForSelfExtract;IncludeAllContentForSelfExtract;PublishReadyToRun;PublishDocumentationFile;PublishReferencesDocumentationFiles" />
+    <MSBuild Projects="$(ServerProject)" Targets="Publish" Properties="RuntimeIdentifier=win-x64;SelfContained=false;PublishSingleFile=false;PublishDir=$(ServerPublishDir);Configuration=$(Configuration);Version=$(Version)" RemoveProperties="TargetFramework;OutDir;OutputPath;IntermediateOutputPath;BaseIntermediateOutputPath;DebugType;IncludeNativeLibrariesForSelfExtract;IncludeAllContentForSelfExtract;PublishReadyToRun;PublishDocumentationFile;PublishReferencesDocumentationFiles" />
     <ItemGroup>
       <ServerWebAsset Include="$(ServerPublishDir)wwwroot\**" />
       <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(RelativePath)' == 'appsettings.json' or '%(RelativePath)' == 'Censio.Server.runtimeconfig.json' or '%(RelativePath)' == 'Censio.Server.deps.json'" />

@@ -158,7 +158,7 @@ public static partial class CensioServer
                                                        EnvironmentName = Environments.Production,
                                                        ContentRootPath = options.ContentRoot,
                                                        WebRootPath = Path.Combine(options.ContentRoot, "wwwroot"),
-                                                       Args = ["--preventHostingStartup=true"]
+                                                       Args = ["--preventHostingStartup=true", "--preferHostingUrls=false"]
                                                    });
 
         builder.Configuration.Sources.Clear();
