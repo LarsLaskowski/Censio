@@ -199,6 +199,42 @@ check_file_list()
     fi
 }
 
+# Fails when the single-file bundle of the Companion lacks a path of the local server's web assets (feature 39,
+# record 0098): the bundle manifest holds each path as a string with its length in front, so the path must come
+# after the byte that is its length (every path is shorter than 128 bytes).
+check_bundled_assets()
+{
+    local exe="${1-}"
+    local paths=(
+        "Censio.Server.staticwebassets.endpoints.json"
+        "wwwroot/_framework/blazor.web.js"
+        "wwwroot/_content/MudBlazor/MudBlazor.min.css"
+        "wwwroot/_content/MudBlazor/MudBlazor.min.js"
+    )
+    local file
+    local missing
+
+    while IFS= read -r file; do
+        paths+=("wwwroot/${file#src/Censio.Server/wwwroot/}")
+    done < <(git ls-files src/Censio.Server/wwwroot)
+    missing="$(python3 -I - "$exe" "${paths[@]}" << 'PY'
+import mmap
+import sys
+
+with open(sys.argv[1], "rb") as handle:
+    with mmap.mmap(handle.fileno(), 0, access=mmap.ACCESS_READ) as exe:
+        for path in sys.argv[2:]:
+            encoded = path.encode("utf-8")
+            if exe.find(bytes([len(encoded)]) + encoded) < 0:
+                print(path)
+                break
+PY
+)"
+    if [[ -n "$missing" ]]; then
+        error "${exe_name} does not bundle ${missing}."
+    fi
+}
+
 check_companion()
 {
     local directory="${1-}"
@@ -249,6 +285,7 @@ PY
     if [[ "$actual" != "$version" ]]; then
         error "${exe_name} shows version '${actual}', expected '${version}'."
     fi
+    check_bundled_assets "${directory}/${exe_name}"
 }
 
 companion()

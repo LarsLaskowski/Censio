@@ -3,6 +3,6 @@
     <ProjectReference Include="..\Censio.Contracts\Censio.Contracts.csproj" />
     <ProjectReference Include="..\Censio.Pipe\Censio.Pipe.csproj" />
     <ProjectReference Include="..\Censio.GameData\Censio.GameData.csproj" />
-    <ProjectReference Include="..\Censio.Server\Censio.Server.csproj" />
+    <ProjectReference Include="..\Censio.Server\Censio.Server.csproj" UndefineProperties="SelfContained;PublishSingleFile" />
   </ItemGroup>
 </Project>

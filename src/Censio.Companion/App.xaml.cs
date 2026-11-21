@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Net.Sockets;
 using System.Windows;
 using System.Windows.Threading;
 
@@ -6,6 +7,7 @@ using Censio.Companion.Core;
 using Censio.Contracts;
 using Censio.GameData;
 using Censio.Pipe;
+using Censio.Server;
 
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -80,6 +82,21 @@ public sealed partial class App : Application, IDisposable
     private FolderOpener? _folderOpener;
 
     /// <summary>
+    /// The session of the local server, <c>null</c> when none is hosted
+    /// </summary>
+    private LocalServerSession? _localServer;
+
+    /// <summary>
+    /// The opener of the browser
+    /// </summary>
+    private BrowserOpener? _browserOpener;
+
+    /// <summary>
+    /// The updater of the tray, <c>null</c> until the tray exists
+    /// </summary>
+    private volatile TrayStatusUpdater<TraySnapshot>? _updater;
+
+    /// <summary>
     /// The recordings folder
     /// </summary>
     private string _recordingsFolder = string.Empty;
@@ -140,6 +157,18 @@ public sealed partial class App : Application, IDisposable
     }
 
     /// <summary>
+    /// Opens an address in the default browser; the address is built from the port alone and no shell command line is involved.
+    /// </summary>
+    /// <param name="address">The address</param>
+    private static void LaunchBrowser(Uri address)
+    {
+        using var process = Process.Start(new ProcessStartInfo(address.AbsoluteUri)
+                                          {
+                                              UseShellExecute = true
+                                          });
+    }
+
+    /// <summary>
     /// Creates the session of the diagnostics window.
     /// </summary>
     /// <param name="readTick">Reads the latest closed tick</param>
@@ -169,6 +198,7 @@ public sealed partial class App : Application, IDisposable
                                                               trayIcon.SetLook(snapshot.Look);
                                                           });
 
+        _updater = updater;
         _midnightTimer = TimeProvider.System.CreateTimer(_ =>
                                                          {
                                                              updater.Notify();
@@ -200,6 +230,42 @@ public sealed partial class App : Application, IDisposable
         {
             // The application is exiting
         }
+    }
+
+    /// <summary>
+    /// Starts the local server when the settings ask for it and the command line is valid.
+    /// </summary>
+    /// <param name="commandLine">The parsed command line</param>
+    /// <param name="settingsFile">The path of the settings file</param>
+    /// <param name="localAppData">The local application data folder</param>
+    private void StartLocalServer(CompanionCommandLine commandLine, string settingsFile, string localAppData)
+    {
+        var setting = CompanionSettings.ReadLocalServer(settingsFile);
+
+        if (LocalServerSession.IsHosted(commandLine.Mode, setting) == false)
+        {
+            return;
+        }
+
+        var logProvider = _logProvider!;
+        var dataDirectory = CompanionFolders.Server(localAppData);
+        var session = new LocalServerSession(setting,
+                                             (port, token) => CensioServer.StartLocalAsync(new LocalServerOptions
+                                                                                           {
+                                                                                               Port = port,
+                                                                                               DataDirectory = dataDirectory,
+                                                                                               ContentRoot = AppContext.BaseDirectory,
+                                                                                               LogProvider = logProvider,
+                                                                                               ListenOnIPv6 = Socket.OSSupportsIPv6
+                                                                                           },
+                                                                                           token),
+                                             TimeProvider.System,
+                                             _logger);
+
+        session.StatusChanged += (_, _) => _updater?.Notify();
+        _localServer = session;
+
+        Run(session.RunAsync);
     }
 
     /// <summary>
@@ -241,13 +307,10 @@ public sealed partial class App : Application, IDisposable
     private void StartReplay(CompanionCommandLine commandLine)
     {
         var path = commandLine.ReplayPath!;
-        var runner = commandLine.ServerAddress is { } address
-                         ? new PipeReplayRunner(() => System.IO.File.OpenRead(path),
-                                                commandLine.Speed,
-                                                TimeProvider.System,
-                                                _logger,
-                                                new ReplaySender(address, commandLine.TokenFilePath, ProductVersion.Read(typeof(App).Assembly), new ClientWebSocketConnector(TimeProvider.System), TimeProvider.System, _logger))
-                         : new PipeReplayRunner(() => System.IO.File.OpenRead(path), commandLine.Speed, TimeProvider.System, _logger);
+        var sender = ReplaySenderFactory.Create(commandLine, _localServer, ProductVersion.Read(typeof(App).Assembly), new ClientWebSocketConnector(TimeProvider.System), TimeProvider.System, _logger);
+        var runner = sender is null
+                         ? new PipeReplayRunner(() => System.IO.File.OpenRead(path), commandLine.Speed, TimeProvider.System, _logger)
+                         : new PipeReplayRunner(() => System.IO.File.OpenRead(path), commandLine.Speed, TimeProvider.System, _logger, sender);
         var fileName = System.IO.Path.GetFileName(path);
 
         CompanionLog.ReplayStarted(_logger, fileName);
@@ -332,7 +395,17 @@ public sealed partial class App : Application, IDisposable
     private TrayIcon CreateTrayIcon()
     {
         _images = new TrayIconImages();
-        _trayIcon = new TrayIcon(ProductVersion.Read(typeof(App).Assembly), _images, () => _snapshot(), () => _gameSearch?.Status ?? GameInstallationStatus.Searching, () => _catalogLoader?.Status ?? GameCatalogStatus.Reading, () => _autostart?.Refresh() ?? false, Dispatch);
+        _trayIcon = new TrayIcon(ProductVersion.Read(typeof(App).Assembly),
+                                 _images,
+                                 new TrayIconSources
+                                 {
+                                     Snapshot = () => _snapshot(),
+                                     Game = () => _gameSearch?.Status ?? GameInstallationStatus.Searching,
+                                     Catalog = () => _catalogLoader?.Status ?? GameCatalogStatus.Reading,
+                                     LocalServer = () => _localServer?.Status,
+                                     IsAutostartEnabled = () => _autostart?.Refresh() ?? false
+                                 },
+                                 Dispatch);
 
         return _trayIcon;
     }
@@ -369,6 +442,12 @@ public sealed partial class App : Application, IDisposable
                 }
                 break;
 
+            case TrayMenuEntryKind.OpenCensio:
+                {
+                    OpenCensio();
+                }
+                break;
+
             case TrayMenuEntryKind.ToggleAutostart:
                 {
                     _autostart?.Toggle();
@@ -381,6 +460,27 @@ public sealed partial class App : Application, IDisposable
                 }
                 break;
         }
+    }
+
+    /// <summary>
+    /// Opens the pages of the local server in the browser off the UI thread.
+    /// </summary>
+    private void OpenCensio()
+    {
+        var opener = _browserOpener;
+        var session = _localServer;
+
+        if (opener is null || session is null)
+        {
+            return;
+        }
+
+        Run(_ =>
+            {
+                opener.Open(session.Address);
+
+                return Task.CompletedTask;
+            });
     }
 
     /// <summary>
@@ -445,9 +545,12 @@ public sealed partial class App : Application, IDisposable
 
             CompanionLog.Started(_logger, version, commandLine.Mode);
 
-            var gameSearch = new GameInstallationSearch(new RegistryUbisoftInstallRecords(), new WindowsFileVersionReader(), GameInstallation.DefaultUbisoftGamesFolder(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86)), _logger);
             var settingsFile = CompanionFolders.Settings(localAppData);
 
+            _browserOpener = new BrowserOpener(LaunchBrowser, _logger);
+            StartLocalServer(commandLine, settingsFile, localAppData);
+
+            var gameSearch = new GameInstallationSearch(new RegistryUbisoftInstallRecords(), new WindowsFileVersionReader(), GameInstallation.DefaultUbisoftGamesFolder(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86)), _logger);
             var catalogLoader = new GameCatalogLoader(folder => GameCatalogReader.Load(folder, RdaLimits.Default), GameIconReader.Load, status => GameCatalogKeyReader.Read(status, CompanionIdentity.Current), new GameCatalogCacheStore(CompanionFolders.Cache(localAppData), TimeProvider.System), TimeProvider.System, _logger);
 
             _gameSearch = gameSearch;
@@ -527,6 +630,14 @@ public sealed partial class App : Application, IDisposable
 
         _trayIcon?.Dispose();
         _midnightTimer?.Dispose();
+
+        if (_localServer is { } localServer)
+        {
+            var stopServer = Task.Run(() => localServer.StopAsync(TimeSpan.FromSeconds(3)), CancellationToken.None);
+
+            stopServer.Wait(TimeSpan.FromSeconds(3), CancellationToken.None);
+        }
+
         _connectionCancellation?.Cancel();
 
         if (_recording is { } recording)
@@ -545,6 +656,7 @@ public sealed partial class App : Application, IDisposable
 
         _logProvider?.Dispose();
 
+        _localServer?.DisposeAsync().AsTask().Wait(TimeSpan.FromMilliseconds(500), CancellationToken.None);
         _images?.Dispose();
         _connectionCancellation?.Dispose();
         _guard?.Dispose();
