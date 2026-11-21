@@ -1,6 +1,6 @@
 # 0101: In local mode a replay without `--server` waits for the hosted server and sends to it with the token held in the process
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-21
 - **Area:** replay-sending
 - **Source:** Issue #39

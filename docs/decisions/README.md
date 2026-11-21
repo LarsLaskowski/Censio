@@ -159,8 +159,8 @@ once in the [area document](../areas/README.md) of the record's area, and the re
 | [0095](0095-trade-routes-and-item-offers-decoded-strictly-and-anonymised-with-invented-names.md) | Trade routes and item offers are decoded strictly with caps and anonymised with invented names | Accepted | 2026-11-20 |
 | [0096](0096-contract-version-2-adds-trade-routes-read-exactly.md) | Contract version 2 adds the trade routes and is read exactly | Accepted | 2026-11-20 |
 | [0097](0097-latest-trade-routes-per-profile-stored-as-rows-on-a-page-of-their-own.md) | The latest trade routes of a profile are stored as rows and shown on a page of their own | Accepted | 2026-11-20 |
-| [0098](0098-companion-hosts-the-server-from-a-reference-with-bundled-web-assets.md) | The Companion hosts the server through a project reference, with the server's web assets bundled into its exe | Proposed | 2026-11-21 |
-| [0099](0099-local-mode-switched-on-in-the-settings-file-off-by-default.md) | Local mode is switched on in the settings file and is off by default; its port defaults to 5000 | Proposed | 2026-11-21 |
-| [0100](0100-local-server-on-loopback-only-with-host-filtering.md) | The local server listens on the loopback addresses only and answers only loopback host names | Proposed | 2026-11-21 |
-| [0101](0101-local-replay-sent-to-the-hosted-server-with-the-token-in-memory.md) | In local mode a replay without `--server` waits for the hosted server and sends to it with the token held in the process | Proposed | 2026-11-21 |
+| [0098](0098-companion-hosts-the-server-from-a-reference-with-bundled-web-assets.md) | The Companion hosts the server through a project reference, with the server's web assets bundled into its exe | Accepted | 2026-11-21 |
+| [0099](0099-local-mode-switched-on-in-the-settings-file-off-by-default.md) | Local mode is switched on in the settings file and is off by default; its port defaults to 5000 | Accepted | 2026-11-21 |
+| [0100](0100-local-server-on-loopback-only-with-host-filtering.md) | The local server listens on the loopback addresses only and answers only loopback host names | Accepted | 2026-11-21 |
+| [0101](0101-local-replay-sent-to-the-hosted-server-with-the-token-in-memory.md) | In local mode a replay without `--server` waits for the hosted server and sends to it with the token held in the process | Accepted | 2026-11-21 |
 <!-- project:end index -->

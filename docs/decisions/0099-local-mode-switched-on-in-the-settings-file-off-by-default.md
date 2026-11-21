@@ -1,6 +1,6 @@
 # 0099: Local mode is switched on in the settings file and is off by default; its port defaults to 5000
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-21
 - **Area:** local-mode
 - **Source:** Issue #39; Issue #43 (settings window)

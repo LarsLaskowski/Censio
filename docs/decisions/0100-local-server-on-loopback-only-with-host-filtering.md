@@ -1,6 +1,6 @@
 # 0100: The local server listens on the loopback addresses only and answers only loopback host names
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-21
 - **Area:** local-mode
 - **Source:** Issue #39

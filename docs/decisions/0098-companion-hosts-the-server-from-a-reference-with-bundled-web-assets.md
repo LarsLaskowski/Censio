@@ -1,6 +1,6 @@
 # 0098: The Companion hosts the server through a project reference, with the server's web assets bundled into its exe
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-21
 - **Area:** local-mode
 - **Source:** Issue #39
