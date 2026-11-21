@@ -288,3 +288,46 @@ expects that failure on the WIP commits before G4.
 
 Live data and the catalog into the local server (#40, #42); a settings window (#43); a restart of a failed server
 without restarting the Companion; DPAPI for the key ring; LAN access.
+
+## Challenge notes
+
+Devil's Advocate, mode `plan`, feature 39 (local mode). Plan commit f72f617, tier security.
+
+I found no major objections. The plan's facts hold where I could check them in the code, and its tier, scope and tests match the spec. Here is what I confirmed:
+
+- **Program.cs order.** It runs key ring, then token, then database, then state, then `RunAsync` (`src/Censio.Server/Program.cs` 31–73).
+- **Token hash only.** `IngestAccess` keeps only the token's hash (`IngestAccess.cs`).
+- **Browser upgrades are refused before they count.** `/ingest` answers 403 to any request with an `Origin` before `TryEnterPendingHello` (`IngestEndpoint.cs` 107–112). So a website cannot use the loopback port to block the local replay.
+- **Host filter set-up works.** I ran a scratch web app on SDK 11.0.100: `CreateBuilder`, then `Configuration.Sources.Clear()`, then an in-memory `AllowedHosts`. `HostFilteringOptions.AllowedHosts` came out as `localhost,127.0.0.1,[::1]`, and the `HostFilteringStartupFilter` is registered.
+- **Deletion rule unchanged.** `DeletionHostRule.IsTrusted` still trusts loopback with the new `AllowedHosts` value.
+
+Minor objections, each written as an instruction for the plan's *Challenge notes*:
+
+1. **The claim that environment variables are not read is partly refuted** (plan *Security considerations*: "Environment variables … are not read"; record 0098). Some host settings are read when `WebApplication.CreateBuilder` runs, before the plan clears the configuration sources. In the same scratch app, with `ASPNETCORE_WEBROOT=/tmp` set and the sources cleared, `app.Environment.WebRootPath` was `/tmp`. The pages' assets would then come from another folder. `ASPNETCORE_URLS` is still overridden by the explicit `Listen` calls, as the plan's test expects.
+   - Instruction (Dev): set `WebRootPath = Path.Combine(options.ContentRoot, "wwwroot")` in the `WebApplicationOptions`.
+   - Instruction (Tester): add `ASPNETCORE_WEBROOT` to `CensioServerStartLocalIgnoresEnvironmentSettings` (assets still served).
+   - Instruction (`local-mode.md`): claim only what the tests show.
+   - For Security: `ASPNETCORE_HOSTINGSTARTUPASSEMBLIES` is also handled when the builder is created. A bogus name did not fail the build; I did not test a real assembly.
+2. **Clean up on every failed start.** Today `Program.cs` disposes the app (line 29, `await using`) and the database (line 45, `using`) on every `return 1`. `StartLocalAsync` must do the same on each `Failed`/`PortInUse` path, after the database was opened or Kestrel bound `127.0.0.1`: dispose the retention, the database and the app before returning. That includes the case where `[::1]` is taken after `127.0.0.1` was bound. Tester: in `CensioServerStartLocalWithPortTakenOnIPv6ReturnsPortInUse`, assert that `127.0.0.1:<port>` can be bound again after the result.
+3. **Shutdown timeout leaves no time for disposal.** `HostOptions.ShutdownTimeout` (3 s, plan line 58) equals the session's stop timeout (3 s, plan line 105). A host stop that takes its full timeout therefore never reaches the disposal of retention, database and app (plan line 65) before Exit moves on. Set `ShutdownTimeout` clearly below the session timeout (for example 2 s), so stop plus disposal fits inside it.
+4. **Requests without a `Host` header pass the filter.** E7 says a request whose `Host` is not one of the three names gets `400`. `HostFilteringOptions.AllowEmptyHosts` defaults to `true` (ASP.NET Core default; I did not check it with a request), so an HTTP/1.0 request without `Host` is let through. Either set `AllowEmptyHosts = false` for the local host and add a request without `Host` to `CensioServerStartLocalRefusesForeignHostWith400`, or state in `local-mode.md` that such a request is accepted.
+5. **Some document passages become false in local mode and are not in the plan's update list.** Update each one:
+   - `docs/areas/companion.md:160`: "Without `--server` a replay opens no network connection."
+   - `docs/USER_GUIDE.md:469`: the Companion "stores game data only in the catalog cache"; the local database now holds it too.
+   - `docs/USER_GUIDE.md:305–311`: the offline replay steps, which in local mode now send into the local database.
+   - `docs/ARCHITECTURE.md:71`: "The Companion's one setting, the game folder".
+   - `docs/ARCHITECTURE.md:90`: "The Companion makes one outbound connection".
+   - `docs/areas/companion.md` *Folders* (lines 109–118): list `%LOCALAPPDATA%\Censio\Server` there, kept when the Companion is removed.
+6. **The guide's replay steps must close the running Companion first.** The `SingleInstanceGuard` (`src/Censio.Companion/App.xaml.cs` 429–498) silently ends a second instance. So `--replay` started while a Companion runs (also one started with Windows) does nothing. In the *Local mode* steps of `docs/USER_GUIDE.md` and `README.md`, say: choose `Exit` first, then start with `--replay`. Do not run the replay between `Open Censio` and `Exit`, which is the order the plan lists.
+7. **A reserved port shows `Server: failed`, not `port in use`.** Kestrel turns only `AddressAlreadyInUse` into `AddressInUseException` (plan fact 8). A port inside a Windows reserved range (Hyper-V/WSL; `netsh int ipv4 show excludedportrange protocol=tcp`) fails with "access forbidden". I did not test this on Windows. Where the README and user guide explain `Server: failed`, tell the player to check the log and try another `localPort`.
+8. **Call count.** `tests/Censio.Companion.Core.Tests/TrayMenuTests.cs` has 14 `TrayMenu.Create(` calls, not 15 (plan *Test files*). Adapt all of them, plus the one in `src/Censio.Companion/TrayIcon.cs`.
+
+Files:
+- /home/user/Censio/specs/feature-39-local-mode/plan.md
+- /home/user/Censio/src/Censio.Server/Program.cs
+- /home/user/Censio/src/Censio.Server/IngestEndpoint.cs
+- /home/user/Censio/src/Censio.Companion/App.xaml.cs
+- /home/user/Censio/docs/areas/companion.md
+- /home/user/Censio/docs/USER_GUIDE.md
+- /home/user/Censio/docs/ARCHITECTURE.md
+- The scratch app is in /tmp/claude-0/-home-user-Censio/1930ab26-7505-5cbb-94f8-2bb53515dc40/scratchpad/envprobe/Program.cs.
