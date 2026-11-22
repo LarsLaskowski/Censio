@@ -17,8 +17,8 @@ using Microsoft.Extensions.Logging;
 namespace Censio.Companion.Core.Tests;
 
 /// <summary>
-/// A Kestrel host on 127.0.0.1 with ports chosen by the system: a WebSocket endpoint that echoes, an HTTP answer, a redirect and a
-/// held upgrade over plain HTTP, the WebSocket endpoint over TLS with a self-signed certificate created in memory (its key
+/// A Kestrel host on 127.0.0.1 with ports chosen by the system: a WebSocket endpoint that echoes, an HTTP answer, a redirect, a
+/// held upgrade and an accepted connection that is never read over plain HTTP, the WebSocket endpoint over TLS with a self-signed certificate created in memory (its key
 /// never persisted, no certificate store written), and a recording proxy that counts the connections it receives.
 /// </summary>
 public sealed class LoopbackWebSocketHost : IAsyncDisposable
@@ -49,6 +49,11 @@ public sealed class LoopbackWebSocketHost : IAsyncDisposable
     /// The path whose upgrade is held until the host stops.
     /// </summary>
     public const string HeldPath = "/held";
+
+    /// <summary>
+    /// The path whose upgrade is accepted and whose connection is then never read, so pings get no answer.
+    /// </summary>
+    public const string SilentPath = "/silent";
 
     #endregion // Constants
 
@@ -256,6 +261,12 @@ public sealed class LoopbackWebSocketHost : IAsyncDisposable
                 }
                 break;
 
+            case SilentPath:
+                {
+                    await HandleSilentAsync(context).ConfigureAwait(false);
+                }
+                break;
+
             default:
                 {
                     context.Response.StatusCode = StatusCodes.Status404NotFound;
@@ -300,6 +311,31 @@ public sealed class LoopbackWebSocketHost : IAsyncDisposable
         {
             socket.Abort();
         }
+    }
+
+    /// <summary>
+    /// Accepts the upgrade and never reads the connection, so no ping is answered, until the host stops or the client
+    /// gives up.
+    /// </summary>
+    /// <param name="context">The request's context</param>
+    /// <returns>A task that completes when the connection ends</returns>
+    private async Task HandleSilentAsync(HttpContext context)
+    {
+        if (context.WebSockets.IsWebSocketRequest == false)
+        {
+            context.Response.StatusCode = StatusCodes.Status400BadRequest;
+
+            return;
+        }
+
+        using var socket = await context.WebSockets.AcceptWebSocketAsync(new WebSocketAcceptContext
+                                                                         {
+                                                                             KeepAliveInterval = TimeSpan.Zero
+                                                                         }).ConfigureAwait(false);
+
+        await WaitUntilStoppedAsync(context.RequestAborted).ConfigureAwait(false);
+
+        socket.Abort();
     }
 
     /// <summary>
