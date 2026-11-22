@@ -175,7 +175,7 @@ A replay without `--server` ends with `Replay error: local server not running` w
 
 #### Forward mode
 
-Forward mode lets the Companion send what the game reports, live, to a server that runs elsewhere (Docker on a NAS or a home server), and reconnect on its own after a server restart, a network loss. It is off by default, it needs a Companion of a release after `v0.4.0` or a build of `main` and a server of the same release (contract version 2), and it runs wherever the Companion does (Windows 10 22H2 and Windows 11, 64-bit).
+Forward mode lets the Companion send what the game reports, live, to a server that runs elsewhere (Docker on a NAS or a home server), and reconnect on its own after a server restart or a network loss. It is off by default, it needs a Companion of a release after `v0.4.0` or a build of `main` and a server of the same release (contract version 2), and it runs wherever the Companion does (Windows 10 22H2 and Windows 11, 64-bit).
 
 1. Close a running Companion (`Exit` in the tray menu). Create the file `%LOCALAPPDATA%\Censio\settings.json`, or add the keys to the one you have. `serverAddress` is the server's ingest address with its path, and `serverToken` the server's ingest token (for the Docker image `docker exec censio cat /config/ingest-token`; leave the key out when the server has the token switched off, `Censio:Ingest:RequireToken` `false`):
 

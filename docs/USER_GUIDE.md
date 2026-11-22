@@ -421,7 +421,7 @@ Tried by the Product Manager on a Windows 11 x64 machine without .NET: the relea
 
 #### Forward mode
 
-Forward mode lets the Companion send what the game reports, live, to a server that runs elsewhere, typically the Docker image on a NAS or a home server, and connect again on its own after a server restart, a network loss. It is off by default. It is in `main` and in a release after `v0.4.0`, not in `v0.4.0`, and it needs a server of the same release as the Companion (the image `0.2.0` has no ingest, and a server and a Companion of different contract versions refuse each other, *Errors* under *Sending a recording to a server*). It works wherever the Companion does, on Windows 10 22H2 and Windows 11, 64-bit.
+Forward mode lets the Companion send what the game reports, live, to a server that runs elsewhere, typically the Docker image on a NAS or a home server, and connect again on its own after a server restart or a network loss. It is off by default. It is in `main` and in a release after `v0.4.0`, not in `v0.4.0`, and it needs a server of the same release as the Companion (the image `0.2.0` has no ingest, and a server and a Companion of different contract versions refuse each other, *Errors* under *Sending a recording to a server*). It works wherever the Companion does, on Windows 10 22H2 and Windows 11, 64-bit.
 
 **Steps.**
 

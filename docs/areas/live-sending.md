@@ -116,7 +116,8 @@ server) and an operator who reads the log rely on it. The connection rules share
   the server it hosts: once that server runs, to `ws://127.0.0.1:<port>/ingest` with the token the process holds, under
   the same profile `Live`. Messages wait in memory until then.
 - The `Server:` line keeps local mode's texts; a lost connection is retried as above without a menu text. A hosted server
-  that does not start, or that stopped, is not retried and no live-sending line is written for it, except the count of dropped messages.
+  that does not start, or that stopped, is not retried and gets no live-sending line of its own, except the count of dropped messages;
+  a connection that its stop ended is logged once as `Live sending failed: server connection lost; retrying`.
 
 ### Exit
 
