@@ -87,6 +87,11 @@ public sealed partial class App : Application, IDisposable
     private LocalServerSession? _localServer;
 
     /// <summary>
+    /// The live sender, <c>null</c> when no live data is sent
+    /// </summary>
+    private LiveSender? _liveSender;
+
+    /// <summary>
     /// The opener of the browser
     /// </summary>
     private BrowserOpener? _browserOpener;
@@ -236,12 +241,10 @@ public sealed partial class App : Application, IDisposable
     /// Starts the local server when the settings ask for it and the command line is valid.
     /// </summary>
     /// <param name="commandLine">The parsed command line</param>
-    /// <param name="settingsFile">The path of the settings file</param>
+    /// <param name="setting">The server setting, read once at the start</param>
     /// <param name="localAppData">The local application data folder</param>
-    private void StartLocalServer(CompanionCommandLine commandLine, string settingsFile, string localAppData)
+    private void StartLocalServer(CompanionCommandLine commandLine, LocalServerSetting setting, string localAppData)
     {
-        var setting = CompanionSettings.ReadLocalServer(settingsFile);
-
         if (LocalServerSession.IsHosted(commandLine.Mode, setting) == false)
         {
             return;
@@ -272,9 +275,12 @@ public sealed partial class App : Application, IDisposable
     /// Starts the pipe connection and wires its status to the tray.
     /// </summary>
     /// <param name="recording">The recording session</param>
-    /// <param name="start">Whether the recording starts at once</param>
-    private void StartConnection(PipeRecordingSession recording, bool start)
+    /// <param name="commandLine">The parsed command line</param>
+    /// <param name="setting">The server setting, read once at the start</param>
+    private void StartConnection(PipeRecordingSession recording, CompanionCommandLine commandLine, LocalServerSetting setting)
     {
+        var start = commandLine.Mode == CompanionMode.Record;
+
         if (start)
         {
             recording.Start();
@@ -295,9 +301,39 @@ public sealed partial class App : Application, IDisposable
         connection.TickReceived += (_, tick) => _catalogReporter?.Report(tick);
         connection.TickReceived += (_, _) => Notify(updater);
         recording.StateChanged += (_, _) => Notify(updater);
+        StartLiveSending(connection, commandLine, setting, updater);
         updater.Notify();
 
         Run(connection.RunAsync);
+    }
+
+    /// <summary>
+    /// Starts the live sender when the settings and the command line ask for live data.
+    /// </summary>
+    /// <param name="connection">The pipe connection</param>
+    /// <param name="commandLine">The parsed command line</param>
+    /// <param name="setting">The server setting</param>
+    /// <param name="updater">The updater of the tray</param>
+    private void StartLiveSending(PipeConnection connection, CompanionCommandLine commandLine, LocalServerSetting setting, TrayStatusUpdater<TraySnapshot> updater)
+    {
+        if (LiveSender.IsSending(commandLine.Mode, setting) == false)
+        {
+            return;
+        }
+
+        var version = ProductVersion.Read(typeof(App).Assembly);
+        var connector = new ClientWebSocketConnector(TimeProvider.System, LiveSender.KeepAliveInterval, LiveSender.KeepAliveTimeout);
+        var sender = setting.Kind == LocalServerSettingKind.Forward
+                         ? LiveSender.ForServer(setting.Forward!, version, connector, TimeProvider.System, _logger)
+                         : LiveSender.ForLocalServer(setting.Port, _localServer!.WaitForLiveTokenAsync, version, connector, TimeProvider.System, _logger);
+
+        sender.NotifyState(connection.Status.State);
+        connection.ItemReceived += (_, item) => sender.Enqueue(item);
+        connection.StatusChanged += (_, status) => sender.NotifyState(status.State);
+        sender.StatusChanged += (_, _) => updater.Notify();
+        _liveSender = sender;
+
+        Run(sender.RunAsync);
     }
 
     /// <summary>
@@ -402,17 +438,37 @@ public sealed partial class App : Application, IDisposable
                                      Snapshot = () => _snapshot(),
                                      Game = () => _gameSearch?.Status ?? GameInstallationStatus.Searching,
                                      Catalog = () => _catalogLoader?.Status ?? GameCatalogStatus.Reading,
-                                     Server = () => _localServer?.Status is { } status
-                                                        ? new TrayServerStatus
-                                                          {
-                                                              Local = status
-                                                          }
-                                                        : null,
+                                     Server = GetServerStatus,
                                      IsAutostartEnabled = () => _autostart?.Refresh() ?? false
                                  },
                                  Dispatch);
 
         return _trayIcon;
+    }
+
+    /// <summary>
+    /// Gets the status of the server for the tray menu.
+    /// </summary>
+    /// <returns>The status, or <c>null</c> when no server is hosted or forwarded to</returns>
+    private TrayServerStatus? GetServerStatus()
+    {
+        if (_localServer?.Status is { } local)
+        {
+            return new TrayServerStatus
+                   {
+                       Local = local
+                   };
+        }
+
+        if (_liveSender is { } sender)
+        {
+            return new TrayServerStatus
+                   {
+                       Live = sender.Status
+                   };
+        }
+
+        return null;
     }
 
     /// <summary>
@@ -553,7 +609,10 @@ public sealed partial class App : Application, IDisposable
             var settingsFile = CompanionFolders.Settings(localAppData);
 
             _browserOpener = new BrowserOpener(LaunchBrowser, _logger);
-            StartLocalServer(commandLine, settingsFile, localAppData);
+
+            var serverSetting = CompanionSettings.ReadLocalServer(settingsFile);
+
+            StartLocalServer(commandLine, serverSetting, localAppData);
 
             var gameSearch = new GameInstallationSearch(new RegistryUbisoftInstallRecords(), new WindowsFileVersionReader(), GameInstallation.DefaultUbisoftGamesFolder(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86)), _logger);
             var catalogLoader = new GameCatalogLoader(folder => GameCatalogReader.Load(folder, RdaLimits.Default), GameIconReader.Load, status => GameCatalogKeyReader.Read(status, CompanionIdentity.Current), new GameCatalogCacheStore(CompanionFolders.Cache(localAppData), TimeProvider.System), TimeProvider.System, _logger);
@@ -595,7 +654,7 @@ public sealed partial class App : Application, IDisposable
                     {
                         _recording = new PipeRecordingSession(new PipeRecordingFiles(_recordingsFolder, _logger).Create, _logger);
 
-                        StartConnection(_recording, commandLine.Mode == CompanionMode.Record);
+                        StartConnection(_recording, commandLine, serverSetting);
                     }
                     break;
             }
@@ -636,6 +695,13 @@ public sealed partial class App : Application, IDisposable
         _trayIcon?.Dispose();
         _midnightTimer?.Dispose();
 
+        if (_liveSender is { } liveSender)
+        {
+            var stopLive = Task.Run(() => liveSender.DisposeAsync().AsTask(), CancellationToken.None);
+
+            stopLive.Wait(TimeSpan.FromMilliseconds(250), CancellationToken.None);
+        }
+
         if (_localServer is { } localServer)
         {
             var stopServer = Task.Run(() => localServer.StopAsync(TimeSpan.FromSeconds(3)), CancellationToken.None);
@@ -661,6 +727,7 @@ public sealed partial class App : Application, IDisposable
 
         _logProvider?.Dispose();
 
+        _liveSender?.DisposeAsync().AsTask().Wait(TimeSpan.FromMilliseconds(100), CancellationToken.None);
         _localServer?.DisposeAsync().AsTask().Wait(TimeSpan.FromMilliseconds(500), CancellationToken.None);
         _images?.Dispose();
         _connectionCancellation?.Dispose();

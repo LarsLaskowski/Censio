@@ -14,21 +14,15 @@ public sealed class ClientWebSocketConnector : IReplayServerConnector
     /// </summary>
     private readonly TimeProvider _timeProvider;
 
-    // Skeleton: removed with the implementation
-#pragma warning disable S4487
     /// <summary>
     /// The interval of the keep-alive pings, or <see langword="null" /> for the default of the socket.
     /// </summary>
     private readonly TimeSpan? _keepAliveInterval;
-#pragma warning restore S4487
 
-    // Skeleton: removed with the implementation
-#pragma warning disable S4487
     /// <summary>
     /// The time the socket waits for the answer to a ping, or <see langword="null" /> for the default of the socket.
     /// </summary>
     private readonly TimeSpan? _keepAliveTimeout;
-#pragma warning restore S4487
 
     #endregion // Fields
 
@@ -84,6 +78,12 @@ public sealed class ClientWebSocketConnector : IReplayServerConnector
             using var invoker = new HttpMessageInvoker(handler);
             using var timeout = new CancellationTokenSource(ConnectTimeout, _timeProvider);
             using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeout.Token);
+
+            if (_keepAliveInterval is { } interval && _keepAliveTimeout is { } keepAliveTimeout)
+            {
+                socket.Options.KeepAliveInterval = interval;
+                socket.Options.KeepAliveTimeout = keepAliveTimeout;
+            }
 
             await socket.ConnectAsync(address, invoker, linked.Token).ConfigureAwait(false);
 
