@@ -163,4 +163,5 @@ once in the [area document](../areas/README.md) of the record's area, and the re
 | [0099](0099-local-mode-switched-on-in-the-settings-file-off-by-default.md) | Local mode is switched on in the settings file and is off by default; its port defaults to 5000 | Accepted | 2026-11-21 |
 | [0100](0100-local-server-on-loopback-only-with-host-filtering.md) | The local server listens on the loopback addresses only and answers only loopback host names | Accepted | 2026-11-21 |
 | [0101](0101-local-replay-sent-to-the-hosted-server-with-the-token-in-memory.md) | In local mode a replay without `--server` waits for the hosted server and sends to it with the token held in the process | Accepted | 2026-11-21 |
+| [0102](0102-live-data-goes-to-one-fixed-profile-live-until-profiles-are-chosen.md) | Until the player can choose a profile, live data goes to one fixed profile `Live` | Proposed | 2026-11-22 |
 <!-- project:end index -->
