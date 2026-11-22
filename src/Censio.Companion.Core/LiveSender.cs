@@ -581,7 +581,6 @@ public sealed class LiveSender : IAsyncDisposable
                             ProfileId = ProfileId,
                             ProfileName = ProfileName
                         };
-            var opened = _timeProvider.GetUtcNow();
             var refusal = await client.OpenAsync(_address, hello, cancellationToken).ConfigureAwait(false);
 
             if (refusal is not null)
@@ -589,8 +588,7 @@ public sealed class LiveSender : IAsyncDisposable
                 return (refusal, false, TimeSpan.Zero);
             }
 
-            // The time of the connection counts from sending the hello, not from the answer, which is read concurrently.
-            accepted = opened;
+            accepted = _timeProvider.GetUtcNow();
 
             PipeConnectionState? state;
 
