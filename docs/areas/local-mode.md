@@ -19,10 +19,14 @@ without Docker rely on it.
 - `localPort` is read only with `mode` `local`: an integer literal from 1 to 65535, default 5000. `5117.0`, `5.117e3`,
   `"5117"`, `null`, a negative number, 0 and 65536 are refused.
 - The keys are matched ignoring case, and `local` is matched ignoring case. A blank `mode` counts as no `mode`.
-- A `mode` that is not a text, a text other than `local` (`forward` too, until live sending defines it) or that occurs
-  twice (also in different case), and, with `mode` `local`, an invalid or duplicated `localPort`, start no server. The
-  menu line reads `Server: settings invalid` and the reason is logged as a warning (*Log*). The game folder is still read: a
-  wrong value of these keys does not make the file invalid for `gameFolder`.
+- A `mode` that is not a text, a text other than `local` and `forward` or that occurs twice (also in different case),
+  and, with `mode` `local`, an invalid or duplicated `localPort`, start no server. The menu line reads `Server: settings
+  invalid` and the reason is logged as a warning (*Log*). The game folder is still read: a wrong value of these keys does
+  not make the file invalid for `gameFolder`.
+- `"mode": "forward"` hosts no server: the Companion sends live data to the server named by `serverAddress`
+  ([`live-sending.md`](live-sending.md)). An invalid forward setting (its `serverAddress` or `serverToken`) takes the path
+  of an invalid setting above: the line reads `Server: settings invalid`, no server starts, the entry `Open Censio` is shown
+  greyed, and a replay without `--server` ends with `Replay error: local server not running`.
 - A settings file that is invalid as a whole (too large, not JSON, unreadable) shows `Game: settings file invalid` as
   without local mode; no server starts and no `Server:` line is shown.
 - The server is hosted with `--record` and `--replay` too. With an invalid command line it is not hosted, and neither
@@ -36,6 +40,8 @@ without Docker rely on it.
   It is shown only in local mode, enabled only while the line reads `Server: running …`, and opens
   `http://localhost:<port>/` in the default browser. The menu does not wait for the browser; if no browser can be
   started a warning is logged and nothing else changes.
+- In forward mode ([`live-sending.md`](live-sending.md), *Reconnect*) the same place holds the line of the connection to the
+  server, such as `Server: connected`, and there is no `Open Censio`, except greyed for an invalid forward setting.
 - The tooltip and the icon show the pipe connection only.
 
 ### Addresses and host rule
@@ -63,11 +69,12 @@ without Docker rely on it.
   start. The database is never kept in memory.
 - The guarantees of the server hold: the ingest token is required, the pages need no login, history retention and
   per-profile deletion work as on the image. The Companion reads the token from its file once the start checks have
-  passed and holds it in memory for the local replay; it is never logged.
+  passed and holds it in memory for the local replay and for live sending; it is never logged.
 - The pages' scripts and styles are bundled in `Censio.Companion.exe`, so the one-file ZIP needs nothing next to it.
   The exe is about 232 MB in a measured build (record 0098).
-- The pages fill from a replay ([`replay-sending.md`](replay-sending.md), *Local mode*). Live data and the catalog's
-  names and icons are not in local mode yet.
+- The pages fill from the live data the Companion sends to the hosted server ([`live-sending.md`](live-sending.md),
+  *Local mode*) and from a replay ([`replay-sending.md`](replay-sending.md), *Local mode*). The catalog's names and icons
+  are not in local mode yet.
 
 ### Start
 
@@ -89,7 +96,7 @@ without Docker rely on it.
 
 | Menu line | Cause | What else |
 | --------- | ----- | --------- |
-| `Server: settings invalid` | A value of `mode` or `localPort` breaks *Switching on* | No server; warning logged |
+| `Server: settings invalid` | A value of `mode` or `localPort`, or in forward mode of `serverAddress` or `serverToken`, breaks *Switching on* | No server; warning logged |
 | `Server: port <port> in use` | Another program, a standalone server or the Companion of another signed-in Windows user holds the port on `127.0.0.1` or on `[::1]` | `Open Censio` greyed; warning logged; nothing is retried |
 | `Server: failed` | Any other start failure: the folder cannot be created or written, the database was written by a newer Censio, is not a Censio database or cannot be updated, the key ring or the token file cannot be written or read back, an address that cannot be bound for another reason; also a server that stops on its own while the Companion runs. A port that Windows reserves is expected to end here (not yet verified) | `Open Censio` greyed; the reason is logged; the Companion does not restart the server; a restart of the Companion tries again |
 
@@ -100,8 +107,9 @@ without Docker rely on it.
 
 ### Log
 
-- The Companion logs `Local server settings invalid: <problem>` (Warning; the problems `mode is not local`, `mode
-  occurs more than once`, `localPort is not a port from 1 to 65535`, `localPort occurs more than once`), `Local
+- The Companion logs `Server settings invalid: <problem>` (Warning; the problems `mode is not local or forward`, `mode
+  occurs more than once`, `localPort is not a port from 1 to 65535`, `localPort occurs more than once`, and the problems
+  of forward mode in [`live-sending.md`](live-sending.md)), `Local
   server running on port <port>` (Information), `Local server port <port> in use` (Warning), `Local server failed`
   with the exception (Error), `Local server stopped unexpectedly` (Error) and `Could not open the browser` with the
   exception (Warning) ([`companion-log.md`](companion-log.md)).
@@ -135,5 +143,5 @@ send data. The host rule stops other sites in the player's browser, not programs
 ## Not here
 
 - The server's own behavior: [`server.md`](server.md), [`server-data.md`](server-data.md), [`ingest-token.md`](ingest-token.md).
-- The replay into the hosted server: [`replay-sending.md`](replay-sending.md).
+- The replay into the hosted server: [`replay-sending.md`](replay-sending.md); live sending, to the hosted server and to a server elsewhere: [`live-sending.md`](live-sending.md).
 - The menu and the settings file in general: [`companion.md`](companion.md); the log file: [`companion-log.md`](companion-log.md).

@@ -31,7 +31,7 @@ from the menu, the optional start with Windows, the menu entry for the diagnosti
   (*problem*) for `Protocol mismatch`, `Error` and an invalid command line. In a replay the icon follows the replayed
   state, shows *waiting* after `Replay finished` and *problem* after `Replay error`.
 - The context menu holds, top to bottom: `Status: <status text>` (greyed out), `Last tick: <time>, <n> islands` or
-  `Last tick: none` (greyed out), `Game: <state>` (greyed out), `Catalog: <state>` (greyed out), in local mode `Server: <state>` (greyed out, [`local-mode.md`](local-mode.md), *Menu*), a separator, in local mode `Open Censio`, `Open diagnostics`, `Start recording` or `Stop recording`, `Open recordings folder`, `Open
+  `Last tick: none` (greyed out), `Game: <state>` (greyed out), `Catalog: <state>` (greyed out), in local mode `Server: <state>` (greyed out, [`local-mode.md`](local-mode.md), *Menu*) and in forward mode `Server: <connection state>` (greyed out, [`live-sending.md`](live-sending.md), *Reconnect*), a separator, in local mode `Open Censio`, `Open diagnostics`, `Start recording` or `Stop recording`, `Open recordings folder`, `Open
   log folder`, a separator, `Start with Windows` (checked while the autostart is on, enabled in every mode), a separator, `Version <version>` (greyed out, nothing happens on click), a separator and `Exit`. The
   values are current each time the menu opens. `Open diagnostics` is enabled in every mode (live, `--record`, replay and an invalid command line); `Start recording` is greyed out in a replay and with an invalid command
   line. The menu is light, also with Windows in dark mode.
@@ -77,6 +77,7 @@ described in the other sections.
   a password or a fragment ([`replay-sending.md`](replay-sending.md), *Switches*). The tooltip reads `Censio Companion: Invalid command
   line`, the Companion neither records, replays nor opens the pipe, the icon shows the *problem* look, and the menu shows
   `Last tick: none` with `Start recording` greyed out; the folder entries, the log and `Exit` work as usual.
+- In forward mode and in local mode a start without a switch and `--record` send the pipe's data live; `--replay` and an invalid command line open no live connection ([`live-sending.md`](live-sending.md), *Switching on*).
 - The menu has the entries of *Tray icon and menu* with every switch.
 - A start with a switch obeys *Single instance*: if a Companion already runs in the user session, the new one ends
   at once, so close the running one first.
@@ -130,13 +131,12 @@ described in the other sections.
 ### Settings file
 
 - The Companion reads the optional file `%LOCALAPPDATA%\Censio\settings.json` once per start, for the game folder
-  ([`game-installation.md`](game-installation.md)) and for local mode (`mode` and `localPort`, below). The path is fixed and the file is never written, created or
+  ([`game-installation.md`](game-installation.md)), for local mode (`mode` and `localPort`, below) and for forward mode (`mode`, `serverAddress` and `serverToken`). The path is fixed and the file is never written, created or
   repaired by the Companion; a missing file, or a path that is not a full path, is no error. A change counts after a
   restart.
 - The file is UTF-8 JSON whose root is an object. A leading byte order mark, `//` and `/* */` comments and trailing
-  commas are accepted. The key `gameFolder` is matched ignoring case (`GameFolder`); so are `mode` and `localPort`, which switch local mode on
-  and set its port ([`local-mode.md`](local-mode.md), *Switching on*: `"mode": "local"`, `localPort` from 1 to 65535,
-  default 5000, read only with `mode` `local`); every other key, and a
+  commas are accepted. The key `gameFolder` is matched ignoring case (`GameFolder`); so are `mode`, `localPort`, `serverAddress` and `serverToken`: `mode` switches local mode or forward mode on ([`local-mode.md`](local-mode.md), *Switching on*: `"mode": "local"`, `localPort` from 1 to 65535,
+  default 5000, read only with `mode` `local`; [`live-sending.md`](live-sending.md), *Switching on*: `"mode": "forward"`, `serverAddress` and the optional `serverToken`, read only with `mode` `forward`); every other key, and a
   `gameFolder` nested in another object, is ignored so that later settings can share the file. The value is used as
   written, without expanding variables; a blank text counts as no game folder.
 - It is invalid, with the menu text `Game: settings file invalid`, when it is larger than 1 MiB (1,048,576 bytes,
@@ -146,8 +146,8 @@ described in the other sections.
   cannot be decoded (invalid UTF-8 or a lone surrogate) makes the whole file invalid, even under an unknown key;
   invalid bytes in a comment or in another key's value are accepted.
 - The reason is logged as a warning ([`companion-log.md`](companion-log.md)); no automatic search follows an invalid file.
-  A wrong value of `mode` or `localPort` does not make the file invalid for `gameFolder`; it shows `Server: settings invalid`
-  ([`local-mode.md`](local-mode.md)).
+  A wrong value of `mode`, `localPort`, `serverAddress` or `serverToken` does not make the file invalid for `gameFolder`; it shows `Server: settings invalid`
+  ([`local-mode.md`](local-mode.md), [`live-sending.md`](live-sending.md)). The file may hold the ingest token (`serverToken`), so it is not shared.
 
 ### Replay
 
@@ -208,6 +208,7 @@ described in the other sections.
 - [`decisions/0046-game-build-is-the-program-files-version.md`](../decisions/0046-game-build-is-the-program-files-version.md) — the build is the program file's version.
 - [`decisions/0098-companion-hosts-the-server-from-a-reference-with-bundled-web-assets.md`](../decisions/0098-companion-hosts-the-server-from-a-reference-with-bundled-web-assets.md) — the Companion hosts the server and the ZIP bundles its web assets; `Exit` may take 5 seconds.
 - [`decisions/0099-local-mode-switched-on-in-the-settings-file-off-by-default.md`](../decisions/0099-local-mode-switched-on-in-the-settings-file-off-by-default.md) — local mode is switched on by `mode` in the settings file.
+- [`decisions/0103-forward-server-address-and-token-are-keys-of-the-settings-file.md`](../decisions/0103-forward-server-address-and-token-are-keys-of-the-settings-file.md) — forward mode's address and token are keys of the settings file.
 
 ## Not here
 
@@ -218,5 +219,5 @@ described in the other sections.
 - The diagnostics window: [`companion-diagnostics.md`](companion-diagnostics.md).
 - The log file, its lines and its writer: [`companion-log.md`](companion-log.md).
 - Building the catalog: [`game-catalog.md`](game-catalog.md); the icons: [`game-catalog-icons.md`](game-catalog-icons.md); the cache: [`game-catalog-cache.md`](game-catalog-cache.md).
-- The hosted server, its settings, menu line and failures: [`local-mode.md`](local-mode.md).
-- Reading the game files: [`game-files.md`](game-files.md); the connection to the server for a replay: [`replay-sending.md`](replay-sending.md); the connection to the server in a live run and a settings window (later issues).
+- The hosted server, its settings, menu line and failures: [`local-mode.md`](local-mode.md); live sending to a server, its settings and its menu line: [`live-sending.md`](live-sending.md).
+- Reading the game files: [`game-files.md`](game-files.md); the connection to the server for a replay: [`replay-sending.md`](replay-sending.md) and in a live run: [`live-sending.md`](live-sending.md); a settings window (a later issue).
