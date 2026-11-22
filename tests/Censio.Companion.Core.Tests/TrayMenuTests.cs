@@ -1408,6 +1408,122 @@ public sealed class TrayMenuTests
     }
 
     /// <summary>
+    /// An invalid server setting, forward mode's included, keeps the server line reading settings invalid and the greyed
+    /// Open Censio of local mode (S6, feature 40 challenge 1).
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC1")]
+    public void TrayMenuCreateWithInvalidSettingKeepsGreyedOpenCensio()
+    {
+        // Arrange
+        var snapshot = CreateSnapshot("Receiving", canRecord: true, isRecording: false);
+        var server = new TrayServerStatus
+                     {
+                         Local = CreateLocalServerStatus(LocalServerState.SettingsInvalid, 5000)
+                     };
+
+        // Act
+        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, server, false, CreateClock(1));
+
+        // Assert
+        var kinds = entries.Select(entry => entry.Kind).ToList();
+        var serverLine = entries.Single(entry => entry.Kind == TrayMenuEntryKind.LocalServer);
+        var openCensio = entries.Single(entry => entry.Kind == TrayMenuEntryKind.OpenCensio);
+
+        Assert.AreEqual("Server: settings invalid", serverLine.Text, "The server line should read settings invalid");
+        Assert.IsFalse(openCensio.IsEnabled, "Open Censio should stay greyed out with invalid settings");
+        Assert.AreEqual(kinds.IndexOf(TrayMenuEntryKind.OpenDiagnostics) - 1, kinds.IndexOf(TrayMenuEntryKind.OpenCensio), "Open Censio should stay directly above Open diagnostics");
+        Assert.DoesNotContain(TrayMenuEntryKind.ServerConnection, kinds, "Invalid settings should show no forward-mode server line");
+    }
+
+    /// <summary>
+    /// The server line of forward mode reads the text of each state and problem: connecting, connected, the five
+    /// retryable failures, the two final refusals, and not connected for any other status (S1, E3, E4, E6, E7).
+    /// </summary>
+    /// <param name="state">The state of live sending</param>
+    /// <param name="problem">The problem, or <see langword="null" /> when there is none</param>
+    /// <param name="expected">The expected text</param>
+    [TestMethod]
+    [TestCategory("AC2")]
+    [DataRow(LiveSendState.Connecting, null, "Server: connecting")]
+    [DataRow(LiveSendState.Connected, null, "Server: connected")]
+    [DataRow(LiveSendState.Retrying, ReplaySendProblemKind.ServerUnreachable, "Server: unreachable, retrying")]
+    [DataRow(LiveSendState.Retrying, ReplaySendProblemKind.NoAnswer, "Server: not answering, retrying")]
+    [DataRow(LiveSendState.Retrying, ReplaySendProblemKind.ConnectionLost, "Server: connection lost, retrying")]
+    [DataRow(LiveSendState.Retrying, ReplaySendProblemKind.InvalidReply, "Server: invalid reply, retrying")]
+    [DataRow(LiveSendState.Retrying, ReplaySendProblemKind.CompanionConnected, "Server: another Companion is connected, retrying")]
+    [DataRow(LiveSendState.Stopped, ReplaySendProblemKind.TokenRefused, "Server: token refused")]
+    [DataRow(LiveSendState.Stopped, ReplaySendProblemKind.VersionNotSupported, "Server: does not support contract version 2")]
+    [DataRow(LiveSendState.Stopped, ReplaySendProblemKind.LocalServerNotRunning, "Server: not connected")]
+    [DataRow(LiveSendState.Stopped, null, "Server: not connected")]
+    [DataRow(LiveSendState.Retrying, null, "Server: not connected")]
+    [DataRow(LiveSendState.Retrying, ReplaySendProblemKind.TokenFileHoldsNoValidToken, "Server: not connected")]
+    public void TrayMenuFormatLiveSendFormatsEveryState(LiveSendState state, ReplaySendProblemKind? problem, string expected)
+    {
+        // Arrange
+        var status = new LiveSendStatus
+                     {
+                         State = state,
+                         Problem = problem
+                     };
+
+        // Act
+        var text = TrayMenu.FormatLiveSend(status);
+
+        // Assert
+        Assert.AreEqual(expected, text, $"The server line of {state} with {problem} should be its text");
+    }
+
+    /// <summary>
+    /// In forward mode the greyed, unchecked server line is directly below the catalog entry with the text of the live
+    /// status, and the menu holds neither the local server line nor Open Censio (S1).
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC2")]
+    public void TrayMenuCreateWithLiveSendShowsServerLine()
+    {
+        // Arrange
+        var snapshot = CreateSnapshot("Receiving", canRecord: true, isRecording: false);
+        var server = new TrayServerStatus
+                     {
+                         Live = new LiveSendStatus
+                                {
+                                    State = LiveSendState.Connected
+                                }
+                     };
+        var expectedKinds = new[]
+                            {
+                                TrayMenuEntryKind.Status,
+                                TrayMenuEntryKind.LastTick,
+                                TrayMenuEntryKind.Game,
+                                TrayMenuEntryKind.Catalog,
+                                TrayMenuEntryKind.ServerConnection,
+                                TrayMenuEntryKind.Separator,
+                                TrayMenuEntryKind.OpenDiagnostics,
+                                TrayMenuEntryKind.ToggleRecording,
+                                TrayMenuEntryKind.OpenRecordingsFolder,
+                                TrayMenuEntryKind.OpenLogFolder,
+                                TrayMenuEntryKind.Separator,
+                                TrayMenuEntryKind.ToggleAutostart,
+                                TrayMenuEntryKind.Separator,
+                                TrayMenuEntryKind.Version,
+                                TrayMenuEntryKind.Separator,
+                                TrayMenuEntryKind.Exit
+                            };
+
+        // Act
+        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, server, false, CreateClock(1));
+
+        // Assert
+        var serverLine = entries.Single(entry => entry.Kind == TrayMenuEntryKind.ServerConnection);
+
+        Assert.AreSequenceEqual(expectedKinds, entries.Select(entry => entry.Kind).ToArray(), "The server line should be below the catalog, without the local server line or Open Censio");
+        Assert.AreEqual("Server: connected", serverLine.Text, "The server line should show the text of the live status");
+        Assert.IsFalse(serverLine.IsEnabled, "The server line should be greyed out");
+        Assert.IsFalse(serverLine.IsChecked, "The server line should not be checked");
+    }
+
+    /// <summary>
     /// A replay that ends because the local server does not run names the reason in the tooltip and the reason text (E10).
     /// </summary>
     [TestMethod]

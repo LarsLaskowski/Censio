@@ -31,9 +31,44 @@ public sealed class CompanionSettingsTests
     private const string ValidFolder = "E:/Anno 117 - Pax Romana/";
 
     /// <summary>
-    /// The problem of a mode other than <c>local</c>.
+    /// The problem of a mode other than <c>local</c> and <c>forward</c>.
     /// </summary>
-    private const string ModeNotLocal = "mode is not local";
+    private const string ModeNotLocalOrForward = "mode is not local or forward";
+
+    /// <summary>
+    /// The problem of a missing <c>serverAddress</c> in forward mode.
+    /// </summary>
+    private const string ServerAddressMissing = "serverAddress is missing";
+
+    /// <summary>
+    /// The problem of a <c>serverAddress</c> that is not a <c>ws://</c> or <c>wss://</c> address.
+    /// </summary>
+    private const string ServerAddressInvalid = "serverAddress is not a ws:// or wss:// address";
+
+    /// <summary>
+    /// The problem of a <c>serverToken</c> that is not a valid token.
+    /// </summary>
+    private const string ServerTokenInvalid = "serverToken is not a valid token";
+
+    /// <summary>
+    /// A valid server address of forward mode.
+    /// </summary>
+    private const string ServerAddress = "ws://nas:8080/ingest";
+
+    /// <summary>
+    /// A valid token of 39 visible ASCII characters.
+    /// </summary>
+    private const string ServerToken = "ForwardToken-0123456789abcdefghijKLMNOP";
+
+    /// <summary>
+    /// A token of 32 characters, the shortest valid length.
+    /// </summary>
+    private const string ShortestToken = "abcdefghijklmnopqrstuvwxyz012345";
+
+    /// <summary>
+    /// A token of 31 characters, one below the shortest valid length.
+    /// </summary>
+    private const string TooShortToken = "abcdefghijklmnopqrstuvwxyz01234";
 
     /// <summary>
     /// The problem of a port that is not an integer from 1 to 65535.
@@ -417,12 +452,11 @@ public sealed class CompanionSettingsTests
     }
 
     /// <summary>
-    /// A mode that is not the text <c>local</c> is invalid with its fixed problem text (E2).
+    /// A mode that is not the text <c>local</c> or <c>forward</c> is invalid with its fixed problem text (E1).
     /// </summary>
     /// <param name="text">The settings text</param>
     [TestMethod]
     [TestCategory("AC1")]
-    [DataRow("""{"mode": "forward"}""", DisplayName = "forward")]
     [DataRow("""{"mode": "remote"}""", DisplayName = "remote")]
     [DataRow("""{"mode": " local"}""", DisplayName = "local with a leading space")]
     [DataRow("""{"mode": 1}""", DisplayName = "Number")]
@@ -439,8 +473,8 @@ public sealed class CompanionSettingsTests
         var setting = CompanionSettings.ReadLocalServer(path);
 
         // Assert
-        Assert.AreEqual(LocalServerSettingKind.Invalid, setting.Kind, "A mode other than local should be invalid");
-        Assert.AreEqual(ModeNotLocal, setting.Problem, "The problem should be the fixed text of a mode other than local");
+        Assert.AreEqual(LocalServerSettingKind.Invalid, setting.Kind, "A mode other than local or forward should be invalid");
+        Assert.AreEqual(ModeNotLocalOrForward, setting.Problem, "The problem should be the fixed text of a mode other than local or forward");
     }
 
     /// <summary>
@@ -585,7 +619,7 @@ public sealed class CompanionSettingsTests
     /// <param name="text">The settings text</param>
     [TestMethod]
     [TestCategory("AC1")]
-    [DataRow("""{"gameFolder": "E:/Anno 117 - Pax Romana/", "mode": "forward", "localPort": 0}""", DisplayName = "Invalid mode and port")]
+    [DataRow("""{"gameFolder": "E:/Anno 117 - Pax Romana/", "mode": "remote", "localPort": 0}""", DisplayName = "Invalid mode and port")]
     [DataRow("""{"mode": 1, "mode": null, "gameFolder": "E:/Anno 117 - Pax Romana/"}""", DisplayName = "Mode twice, not a text")]
     [DataRow("""{"mode": "local", "localPort": "abc", "LOCALPORT": 5117, "gameFolder": "E:/Anno 117 - Pax Romana/"}""", DisplayName = "Port invalid and twice")]
     public void CompanionSettingsReadWithInvalidLocalServerKeysKeepsGameFolder(string text)
@@ -603,6 +637,168 @@ public sealed class CompanionSettingsTests
     }
 
     /// <summary>
+    /// The mode <c>forward</c>, matched ignoring case, with a valid <c>serverAddress</c> returns the forward setting with
+    /// the address and the trimmed token, or no token without <c>serverToken</c> (S1, E2).
+    /// </summary>
+    /// <param name="text">The settings text</param>
+    /// <param name="expectedAddress">The expected address</param>
+    /// <param name="expectedToken">The expected token</param>
+    /// <param name="backslashes">The number of backslashes the settings text holds for its JSON escapes</param>
+    [TestMethod]
+    [TestCategory("AC1")]
+    [DataRow($$"""{"mode": "forward", "serverAddress": "{{ServerAddress}}", "serverToken": "{{ServerToken}}"}""", ServerAddress, ServerToken, 0, DisplayName = "forward")]
+    [DataRow($$"""{"mode": "FORWARD", "serverAddress": "{{ServerAddress}}", "serverToken": "{{ServerToken}}"}""", ServerAddress, ServerToken, 0, DisplayName = "FORWARD")]
+    [DataRow($$"""{"Mode": "Forward", "ServerAddress": "{{ServerAddress}}", "SERVERTOKEN": "{{ServerToken}}"}""", ServerAddress, ServerToken, 0, DisplayName = "Keys in other case")]
+    [DataRow($$"""{"mode": "forward", "serverAddress": "wss://censio.example.org/ingest", "serverToken": "{{ServerToken}}"}""", "wss://censio.example.org/ingest", ServerToken, 0, DisplayName = "wss")]
+    [DataRow($$"""{"mode": "forward", "serverAddress": "ws://nas:8080/ingest?profile=1", "serverToken": "{{ServerToken}}"}""", "ws://nas:8080/ingest?profile=1", ServerToken, 0, DisplayName = "With query")]
+    [DataRow($$"""{"mode": "forward", "serverAddress": "{{ServerAddress}}", "serverToken": "{{ShortestToken}}"}""", ServerAddress, ShortestToken, 0, DisplayName = "Shortest token")]
+    [DataRow($$"""{"mode": "forward", "serverAddress": "{{ServerAddress}}", "serverToken": " \t\r\n{{ServerToken}} \t\r\n"}""", ServerAddress, ServerToken, 6, DisplayName = "Token trimmed")]
+    [DataRow($$"""{"mode": "forward", "serverAddress": "{{ServerAddress}}"}""", ServerAddress, null, 0, DisplayName = "No token")]
+    public void CompanionSettingsReadLocalServerWithModeForwardReturnsForward(string text, string expectedAddress, string? expectedToken, int backslashes)
+    {
+        // Arrange
+        var path = WriteSettings(text);
+
+        // Act
+        var setting = CompanionSettings.ReadLocalServer(path);
+
+        // Assert
+        Assert.AreEqual(backslashes, text.Count(character => character == '\\'), "The settings text should keep the backslashes of its JSON escapes");
+        Assert.AreEqual(LocalServerSettingKind.Forward, setting.Kind, "The mode forward with a valid address should be forward");
+        Assert.IsNull(setting.Problem, "A valid forward setting should carry no problem");
+        Assert.IsNotNull(setting.Forward, "A forward setting should carry the server setting");
+        Assert.AreEqual(new Uri(expectedAddress), setting.Forward.Address, "The address should be the value of serverAddress");
+        Assert.AreEqual(expectedAddress, setting.Forward.Address.OriginalString, "The address should be the text of serverAddress");
+        Assert.AreEqual(expectedToken, setting.Forward.Token, "The token should be the trimmed value of serverToken, or none without it");
+    }
+
+    /// <summary>
+    /// With the mode <c>forward</c>, a <c>serverAddress</c> that is missing or breaks the <c>--server</c> rules is invalid
+    /// with its fixed problem text, which never quotes the value (E1).
+    /// </summary>
+    /// <param name="value">The value of serverAddress as written, or <see langword="null" /> when the key is missing</param>
+    /// <param name="expectedProblem">The expected problem text</param>
+    [TestMethod]
+    [TestCategory("AC1")]
+    [DataRow(null, ServerAddressMissing, DisplayName = "Missing")]
+    [DataRow("1", ServerAddressInvalid, DisplayName = "Number")]
+    [DataRow("null", ServerAddressInvalid, DisplayName = "Null")]
+    [DataRow("\"http://nas:8080/ingest\"", ServerAddressInvalid, DisplayName = "http")]
+    [DataRow("\"/ingest\"", ServerAddressInvalid, DisplayName = "Relative")]
+    [DataRow("\"ws://user:secret@nas:8080/ingest\"", ServerAddressInvalid, DisplayName = "User information")]
+    [DataRow("\"ws://nas:8080/ingest#top\"", ServerAddressInvalid, DisplayName = "Fragment")]
+    [DataRow("\"ws://nas:8080/my ingest\"", ServerAddressInvalid, DisplayName = "Space")]
+    public void CompanionSettingsReadLocalServerWithInvalidServerAddressReturnsInvalid(string? value, string expectedProblem)
+    {
+        // Arrange
+        var path = WriteSettings(ForwardSettings(value, $"\"{ServerToken}\""));
+
+        // Act
+        var setting = CompanionSettings.ReadLocalServer(path);
+
+        // Assert
+        Assert.AreEqual(LocalServerSettingKind.Invalid, setting.Kind, $"The serverAddress {value} should be invalid");
+        Assert.AreEqual(expectedProblem, setting.Problem, "The problem should be the fixed text of the invalid serverAddress");
+        Assert.IsNull(setting.Forward, "An invalid setting should carry no server setting");
+    }
+
+    /// <summary>
+    /// With the mode <c>forward</c>, a <c>serverToken</c> that is not a text or not 32 to 1,024 visible ASCII characters
+    /// after trimming is invalid with its fixed problem text (E2).
+    /// </summary>
+    /// <param name="value">The value of serverToken as written</param>
+    /// <param name="backslashes">The number of backslashes the value holds for its JSON escapes</param>
+    [TestMethod]
+    [TestCategory("AC1")]
+    [DataRow($"\"{TooShortToken}\"", 0, DisplayName = "31 characters")]
+    [DataRow($"\" {TooShortToken} \"", 0, DisplayName = "31 characters after trimming")]
+    [DataRow($"\"{TooShortToken}\\u00e9\"", 1, DisplayName = "A non-ASCII character")]
+    [DataRow("1", 0, DisplayName = "Number")]
+    [DataRow("null", 0, DisplayName = "Null")]
+    public void CompanionSettingsReadLocalServerWithInvalidServerTokenReturnsInvalid(string value, int backslashes)
+    {
+        // Arrange
+        var path = WriteSettings(ForwardSettings($"\"{ServerAddress}\"", value));
+
+        // Act
+        var setting = CompanionSettings.ReadLocalServer(path);
+
+        // Assert
+        Assert.AreEqual(backslashes, value.Count(character => character == '\\'), "The value should keep the backslashes of its JSON escapes");
+        Assert.AreEqual(LocalServerSettingKind.Invalid, setting.Kind, $"The serverToken {value} should be invalid");
+        Assert.AreEqual(ServerTokenInvalid, setting.Problem, "The problem should be the fixed text of an invalid serverToken");
+        Assert.IsNull(setting.Forward, "An invalid setting should carry no server setting");
+    }
+
+    /// <summary>
+    /// With the mode <c>forward</c>, <c>serverAddress</c> or <c>serverToken</c> occurring twice, also in other case, is
+    /// invalid with its fixed problem text (E1, E2).
+    /// </summary>
+    /// <param name="text">The settings text</param>
+    /// <param name="expectedProblem">The expected problem text</param>
+    [TestMethod]
+    [TestCategory("AC1")]
+    [DataRow($$"""{"mode": "forward", "serverAddress": "{{ServerAddress}}", "ServerAddress": "{{ServerAddress}}"}""", "serverAddress occurs more than once", DisplayName = "serverAddress and ServerAddress")]
+    [DataRow($$"""{"mode": "forward", "serverAddress": "{{ServerAddress}}", "serverToken": "{{ServerToken}}", "serverToken": "{{ServerToken}}"}""", "serverToken occurs more than once", DisplayName = "serverToken twice")]
+    [DataRow($$"""{"mode": "forward", "serverAddress": "{{ServerAddress}}", "serverToken": "{{ServerToken}}", "SERVERTOKEN": "{{ShortestToken}}"}""", "serverToken occurs more than once", DisplayName = "serverToken and SERVERTOKEN")]
+    public void CompanionSettingsReadLocalServerWithDuplicateServerKeysReturnsInvalid(string text, string expectedProblem)
+    {
+        // Arrange
+        var path = WriteSettings(text);
+
+        // Act
+        var setting = CompanionSettings.ReadLocalServer(path);
+
+        // Assert
+        Assert.AreEqual(LocalServerSettingKind.Invalid, setting.Kind, "A server key that occurs twice should be invalid");
+        Assert.AreEqual(expectedProblem, setting.Problem, "The problem should name the server key that occurs twice");
+        Assert.IsNull(setting.Forward, "An invalid setting should carry no server setting");
+    }
+
+    /// <summary>
+    /// With the mode <c>forward</c> the key <c>localPort</c> is not read (N1).
+    /// </summary>
+    /// <param name="text">The settings text</param>
+    [TestMethod]
+    [TestCategory("AC1")]
+    [DataRow($$"""{"mode": "forward", "serverAddress": "{{ServerAddress}}", "localPort": 0}""", DisplayName = "Invalid port")]
+    [DataRow($$"""{"mode": "forward", "serverAddress": "{{ServerAddress}}", "localPort": 5117, "LOCALPORT": 5118}""", DisplayName = "Port twice")]
+    public void CompanionSettingsReadLocalServerWithModeForwardIgnoresLocalPort(string text)
+    {
+        // Arrange
+        var path = WriteSettings(text);
+
+        // Act
+        var setting = CompanionSettings.ReadLocalServer(path);
+
+        // Assert
+        Assert.AreEqual(LocalServerSettingKind.Forward, setting.Kind, "With the mode forward localPort should not be read");
+        Assert.IsNull(setting.Problem, "A localPort that is not read should be no problem");
+        Assert.IsNotNull(setting.Forward, "A forward setting should carry the server setting");
+        Assert.AreEqual(new Uri(ServerAddress), setting.Forward.Address, "The address should be read past localPort");
+    }
+
+    /// <summary>
+    /// The text of a forward setting names the server setting by its type only and never holds the token (N5).
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC10")]
+    public void CompanionSettingsReadLocalServerToStringHoldsNoToken()
+    {
+        // Arrange
+        var path = WriteSettings(ForwardSettings($"\"{ServerAddress}\"", $"\"{ServerToken}\""));
+        var setting = CompanionSettings.ReadLocalServer(path);
+
+        // Act
+        var text = setting.ToString();
+
+        // Assert
+        Assert.Contains("Kind = Forward", text, "The text should name the forward kind");
+        Assert.Contains("Forward = " + typeof(ForwardServerSetting).FullName, text, "The text should name the server setting by its type");
+        Assert.DoesNotContain(ServerToken, text, "The text of the setting should never hold the token");
+    }
+
+    /// <summary>
     /// Turns a test text into the bytes of the file: <see cref="ByteOrderMarkMarker" /> becomes the UTF-8 byte order
     /// mark and <see cref="InvalidByteMarker" /> the byte <c>0xFF</c>, the rest is encoded as UTF-8.
     /// </summary>
@@ -615,6 +811,19 @@ public sealed class CompanionSettingsTests
         return withMark.Split(InvalidByteMarker)
                        .Select(Encoding.UTF8.GetBytes)
                        .Aggregate((left, right) => [.. left, 0xFF, .. right]);
+    }
+
+    /// <summary>
+    /// Creates a settings text with the mode <c>forward</c>.
+    /// </summary>
+    /// <param name="address">The value of serverAddress as written, or <see langword="null" /> to leave the key out</param>
+    /// <param name="token">The value of serverToken as written</param>
+    /// <returns>The settings text</returns>
+    private static string ForwardSettings(string? address, string token)
+    {
+        var addressProperty = address is null ? string.Empty : $"\"serverAddress\": {address}, ";
+
+        return $$"""{"mode": "forward", {{addressProperty}}"serverToken": {{token}}}""";
     }
 
     /// <summary>
