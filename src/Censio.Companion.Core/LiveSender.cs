@@ -303,15 +303,11 @@ public sealed class LiveSender : IAsyncDisposable
     /// <param name="state">The state</param>
     public void NotifyState(PipeConnectionState state)
     {
-        Action<PipeConnectionState>? notify;
-
         lock (_lock)
         {
             _state = state;
-            notify = _notify;
+            _notify?.Invoke(state);
         }
-
-        notify?.Invoke(state);
     }
 
     /// <summary>
@@ -590,21 +586,18 @@ public sealed class LiveSender : IAsyncDisposable
 
             accepted = _timeProvider.GetUtcNow();
 
-            PipeConnectionState? state;
-
             lock (_lock)
             {
                 _notify = client.NotifyState;
-                state = _state;
+
+                if (_state is { } known)
+                {
+                    client.NotifyState(known);
+                }
             }
 
             SetStatus(LiveSendState.Connected, null);
             CompanionLog.LiveSendConnected(_logger);
-
-            if (state is { } known)
-            {
-                client.NotifyState(known);
-            }
 
             var problem = await SendLoopAsync(client, failed, cancellationToken).ConfigureAwait(false);
 
@@ -676,20 +669,17 @@ public sealed class LiveSender : IAsyncDisposable
             lock (_lock)
             {
                 _isSending = false;
+
+                if (acknowledgement is not null && _queue.Count > 0 && _queue[0].Id == id)
+                {
+                    _queuedBytes -= _queue[0].Utf8Json.Length;
+                    _queue.RemoveAt(0);
+                }
             }
 
             if (acknowledgement is null)
             {
                 return client.Failure ?? ReplaySendProblemKind.ConnectionLost;
-            }
-
-            lock (_lock)
-            {
-                if (_queue.Count > 0 && _queue[0].Id == id)
-                {
-                    _queuedBytes -= _queue[0].Utf8Json.Length;
-                    _queue.RemoveAt(0);
-                }
             }
 
             if (acknowledgement.Refusal is { } refusal)
