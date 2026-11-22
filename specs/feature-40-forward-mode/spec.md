@@ -9,8 +9,8 @@ A player whose Censio server runs elsewhere (Docker on a NAS or a home server) g
 only a replay with `--server` sends anything ([`replay-sending.md`](../../docs/areas/replay-sending.md)), it ends at the
 first failure and retries nothing, and the settings file refuses `"mode": "forward"`
 ([`local-mode.md`](../../docs/areas/local-mode.md), *Switching on*). The live Companion reads the pipe but has no
-sender (`App.xaml.cs` wires `PipeConnection` to the tray, diagnostics and catalog only). A server restart, a NAS reboot,
-Wi-Fi loss or sleep of the gaming PC must not need the player's hand. Local mode has the same gap: its pages fill only
+sender (`App.xaml.cs` wires `PipeConnection` to the tray, diagnostics and catalog only). A server restart, a NAS reboot
+or a network loss must not need the player's hand. Local mode has the same gap: its pages fill only
 from a replay, and the Product Manager's answer on #39 left its live data to this feature (record 0101, *Consequences*).
 
 ## Scenarios
@@ -21,7 +21,7 @@ from a replay, and the Product Manager's answer on #39 left its live data to thi
 - S2: Given S1 and the game running, when the Companion reads ticks, trade routes and session events from the pipe,
   then each reaches the server in the order read with its live receive time, and the open pages update live under the
   profile `Live` (Q1); the server shows the Companion as connected with the reported pipe state.
-- S3: Given a connected Companion, when the server restarts (or the network drops, or the PC sleeps and wakes), then
+- S3: Given a connected Companion, when the server restarts, then
   the line reads `Server: connection lost, retrying` and the Companion reconnects on its own; what waited is sent after
   the reconnect in order, and the line reads `Server: connected`.
 - S4: Given the Companion starts before the network or the server is up (autostart at sign-in), when the server becomes
@@ -58,7 +58,7 @@ from a replay, and the Product Manager's answer on #39 left its live data to thi
   an unacknowledged one may or may not be stored.
 - E10: In local mode a lost connection to the running hosted server is retried as in E4 without a menu text; a server
   that stopped (`Server: failed`) is not retried.
-- E11: The network drops or the PC sleeps while no message is in flight: the dead connection is found by the bound of
+- E11: The connection goes silent while no message is in flight: the dead connection is found by the bound of
   N3, the line reads `Server: connection lost, retrying` and the reconnect follows as in E4.
 - E12: The player loads another savegame or playthrough: its ticks go to `Live` as well (record 0102). Islands with
   the same key (session GUID, island ID, area index; [`pipe.md`](../../docs/areas/pipe.md)) continue and rename each

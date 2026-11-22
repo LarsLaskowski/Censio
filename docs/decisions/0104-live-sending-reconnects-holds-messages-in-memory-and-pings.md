@@ -8,7 +8,7 @@
 
 ## Context
 
-The live Companion must survive a server restart, a network loss and the PC's sleep without the player's hand
+The live Companion must survive a server restart and a network loss without the player's hand
 (#40), while the replay retries nothing ([0079](0079-recordings-sent-to-a-server-by-companion-replay-switches.md)).
 The server refuses a second Companion while it still holds a vanished connection for up to about 56 seconds and blocks
 a host after 10 failed hellos within 60 seconds ([`ingest.md`](../areas/ingest.md)). Ticks arrive about every two

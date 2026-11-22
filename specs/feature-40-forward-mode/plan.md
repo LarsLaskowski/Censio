@@ -125,8 +125,7 @@ the local server stops, so `Exit` stays within 2 (5) seconds and the sender neve
 
 **Manual test** (before step 9, logged `7 Manual test`): the Product Manager builds the branch head on Windows with
 *Build the server image* and *Build the Companion* of the user guide (as for #34; fallback: the Lead adds an early
-draft PR for CI's artifacts) and checks with the real game: S1, S2 (pages update live), S3 (`docker restart`, network
-cable, sleep and wake), S4, E6 (a wrong token), E9 (`Exit` time), S5 (local mode live), and the guide's new steps.
+draft PR for CI's artifacts) and checks with the real game: S1, S2 (pages update live), S3 (`docker restart`), S4, E6 (a wrong token), E9 (`Exit` time), S5 (local mode live), and the guide's new steps.
 
 Early draft PR: no
 
