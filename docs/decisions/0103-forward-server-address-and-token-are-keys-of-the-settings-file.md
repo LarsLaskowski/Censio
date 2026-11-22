@@ -2,7 +2,7 @@
 
 - **Status:** Proposed
 - **Date:** 2026-11-22
-- **Area:** companion
+- **Area:** live-sending
 - **Source:** Issue #40; Issue #43 (settings window)
 - **Supersedes:** —
 
@@ -32,7 +32,7 @@ The generated token is 43 characters of Base64url ([`ingest-token.md`](../areas/
 
 Option 1. With `mode` `forward` the Companion reads `serverAddress` by the `--server` address rules and the optional
 `serverToken` by the server's token rule; a wrong value stops live sending only, never the game search. The rules are
-in the area document `live-sending.md` that #40 adds.
+in [`live-sending.md`](../areas/live-sending.md).
 
 ## Consequences
 

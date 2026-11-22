@@ -21,5 +21,5 @@ Orchestrator, from the text its member reports), in the last group. Tasks of the
 | 8 | G2 | Coverage pass of G2; report the `.squad/project.md` *Test doubles* text | `tests/Censio.Companion.Core.Tests/*.cs` | AC2–AC10 | 7 | Tester | [x] |
 | 9 | G2 | Documentation of plan *Documentation updates*: `live-sending.md` and the area index, the area documents, `docs/ARCHITECTURE.md`, `README.md`, `docs/USER_GUIDE.md` (English and German), `SECURITY.md`; report the `.squad/project.md` text | `docs/areas/*.md`, `docs/ARCHITECTURE.md`, `README.md`, `docs/USER_GUIDE.md`, `SECURITY.md` | AC11 | 8 | Dev | [x] |
 | 10 | G2 | Write the reported `.squad/project.md` text verbatim and run *Format* | `.squad/project.md` | AC11 | 8, 9 | Orchestrator | [x] |
-| 11 | PM | Set `Area: live-sending` in records 0102, 0103 and 0104 once task 9 lists the area | `docs/decisions/0102-*.md`, `docs/decisions/0103-*.md`, `docs/decisions/0104-*.md` | AC11 | 9 | Lead | [ ] |
+| 11 | PM | Set `Area: live-sending` in records 0102, 0103 and 0104 once task 9 lists the area | `docs/decisions/0102-*.md`, `docs/decisions/0103-*.md`, `docs/decisions/0104-*.md` | AC11 | 9 | Lead | [x] |
 | 12 | PM | Manual test on the branch head on Windows with the real game and a Docker server (plan *Manual test*) | — | AC9, AC11 | 10 | Product Manager | [ ] |

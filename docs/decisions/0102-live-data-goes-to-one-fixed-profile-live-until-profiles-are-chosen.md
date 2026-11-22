@@ -2,7 +2,7 @@
 
 - **Status:** Proposed
 - **Date:** 2026-11-22
-- **Area:** companion
+- **Area:** live-sending
 - **Source:** Issue #40; Issue #43 (settings window)
 - **Supersedes:** 0020 and 0041, amended only for the time until #43: live data is not kept apart per savegame and
   goes to no profile the player selected, but to one fixed profile.
@@ -32,7 +32,7 @@ holds every island it ever had ([`server-state.md`](../areas/server-state.md)).
 ## Decision
 
 Option 1. Until #43 builds the profile choice, every live message carries the one fixed profile identity of the
-Companion and the hello the name `Live`; the rules are in the area document of #40.
+Companion and the hello the name `Live`; the rules are in [`live-sending.md`](../areas/live-sending.md).
 
 ## Consequences
 

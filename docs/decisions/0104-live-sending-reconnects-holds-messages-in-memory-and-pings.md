@@ -2,7 +2,7 @@
 
 - **Status:** Proposed
 - **Date:** 2026-11-22
-- **Area:** companion
+- **Area:** live-sending
 - **Source:** Issue #40; Issue #41 (persistent buffer)
 - **Supersedes:** —
 
@@ -38,7 +38,7 @@ connection only then.
 
 ## Decision
 
-Options 1, 3 and 5. The values and texts are in the area document `live-sending.md` that #40 adds.
+Options 1, 3 and 5. The values and texts are in [`live-sending.md`](../areas/live-sending.md).
 
 ## Consequences
 
