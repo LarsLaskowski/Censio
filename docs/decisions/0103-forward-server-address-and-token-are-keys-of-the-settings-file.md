@@ -20,8 +20,9 @@ The generated token is 43 characters of Base64url ([`ingest-token.md`](../areas/
 ## Options considered
 
 1. **`"mode": "forward"` with the keys `serverAddress` and `serverToken`** (chosen; token place by the Product
-   Manager) — one file for every setting, which #43 can write; the token needs no JSON escape. The file now holds a
-   credential, so it must not be shared.
+   Manager) — one file for every setting, which #43 can write; the generated token needs no JSON escape (a token from
+   the server's `TokenFile` may hold `"` or `\`, which the user escapes). The file now holds a credential, so it must
+   not be shared.
 2. **A key `serverTokenFile` naming a file read by the replay's token-file rules** — the settings file stays free of
    secrets; two files to keep in step, and #43 would have to write a second file.
 3. **A fixed token file beside `settings.json`** — no path to type; a second file with its own reading rules.

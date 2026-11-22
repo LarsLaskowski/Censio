@@ -29,9 +29,10 @@ connection only then.
    server treats a resend as known (record 0059). Against: `Exit` loses what waits until #41 persists it.
 4. **Drop whatever is taken while no connection is accepted** — no queue across a reconnect; every restart of the
    server is a gap.
-5. **The client's own WebSocket pings with a pong timeout** (chosen) — a dead idle connection is found within the
-   ping interval plus the timeout, without a message of the contract. Against: rests on .NET's client keep-alive
-   timeout, measured by the tests of #40.
+5. **The client's own WebSocket pings with a pong timeout** (chosen) — a dead idle connection is found within 60
+   seconds (ping interval 15 s plus timeout 30 s, and the about 6 s the server's same mechanism measured beyond its
+   sum), without a message of the contract. Against: rests on .NET's client keep-alive timeout, measured by the tests
+   of #40.
 6. **A `status` message as heartbeat** — the server never answers a `status`, so a send into a dead connection still
    succeeds into the socket's buffer.
 
