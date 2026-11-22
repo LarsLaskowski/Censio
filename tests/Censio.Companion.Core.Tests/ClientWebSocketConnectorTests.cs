@@ -223,6 +223,43 @@ public sealed class ClientWebSocketConnectorTests
     }
 
     /// <summary>
+    /// A connection whose server answers the pings stays open while a receive is pending and no message is sent, for
+    /// longer than the keep-alive interval and timeout together (1 and 5 seconds, observed 7 seconds), and still carries a
+    /// message afterwards. <see cref="ClientWebSocket" /> takes no <see cref="TimeProvider" />, so this test waits on the
+    /// real clock, the documented exception of the unit-test rules; it asserts only the outcome, never a duration.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public async Task ClientWebSocketConnectorConnectWithKeepAliveKeepsAnsweringConnection()
+    {
+        // Arrange
+        await using var host = await LoopbackWebSocketHost.StartAsync(TestContext.CancellationToken);
+        var connector = new ClientWebSocketConnector(new FakeTimeProvider(), TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(5));
+        using var socket = await connector.ConnectAsync(host.WebSocketAddress(LoopbackWebSocketHost.IngestPath, false), TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+
+        Assert.IsNotNull(socket, "The endpoint should accept the upgrade");
+
+        var buffer = new byte[64];
+        var receiving = socket.ReceiveAsync(buffer.AsMemory(), TestContext.CancellationToken).AsTask();
+
+        // Act
+        await Task.Delay(TimeSpan.FromSeconds(7), TestContext.CancellationToken);
+
+        var isReceivingAfterIdle = receiving.IsCompleted == false;
+        var stateAfterIdle = socket.State;
+
+        await socket.SendAsync(_message, WebSocketMessageType.Binary, true, TestContext.CancellationToken).AsTask().WaitAsync(_guard, TestContext.CancellationToken);
+
+        var echo = await receiving.WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        Assert.IsTrue(isReceivingAfterIdle, "The pending receive should still wait after the idle time");
+        Assert.AreEqual(WebSocketState.Open, stateAfterIdle, "A connection whose pings are answered should stay open");
+        Assert.AreSequenceEqual(_message, buffer[..echo.Count], "The connection should still carry a message after the idle time");
+    }
+
+    /// <summary>
     /// An upgrade without an answer gives no socket after the connect timeout of the time provider, not before.
     /// </summary>
     /// <returns>A task that completes when the test is done</returns>

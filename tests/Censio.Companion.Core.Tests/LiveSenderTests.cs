@@ -216,7 +216,29 @@ public sealed class LiveSenderTests : IDisposable
         Assert.AreEqual(LiveSender.ProfileId, hello.ProfileId, "The hello should carry the fixed profile identity");
         Assert.AreEqual("Live", hello.ProfileName, "The hello should carry the profile name Live");
         Assert.AreEqual(CompanionVersion, hello.CompanionVersion, "The hello should carry the Companion's version");
+        Assert.AreEqual(2, ContractReader.CurrentVersion, "The server double reads only contract version 2, so the hello it read was written in version 2");
         Assert.AreSequenceEqual([_address], connector.Addresses, "The connector should be asked once for the address of the setting");
+    }
+
+    /// <summary>
+    /// The fixed profile is one identity built into the Companion, the same on every read and on every start, named Live
+    /// (Q1, record 0102).
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC2")]
+    public void LiveSenderProfileIdIsFixed()
+    {
+        // Arrange
+        var expected = new Guid("b6a1f3e2-7c4d-4e8a-9f21-5d3c0a7e1b94");
+
+        // Act
+        var first = LiveSender.ProfileId;
+        var second = LiveSender.ProfileId;
+
+        // Assert
+        Assert.AreEqual(expected, first, "The profile identity should be the fixed identity of the plan");
+        Assert.AreEqual(first, second, "Every read should give the same profile identity");
+        Assert.AreEqual("Live", LiveSender.ProfileName, "The fixed profile should be named Live");
     }
 
     /// <summary>
