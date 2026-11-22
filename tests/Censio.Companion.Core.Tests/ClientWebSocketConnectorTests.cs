@@ -249,7 +249,7 @@ public sealed class ClientWebSocketConnectorTests
         var isReceivingAfterIdle = receiving.IsCompleted == false;
         var stateAfterIdle = socket.State;
 
-        await socket.SendAsync(_message, WebSocketMessageType.Binary, true, TestContext.CancellationToken).AsTask().WaitAsync(_guard, TestContext.CancellationToken);
+        await socket.SendAsync(_message, WebSocketMessageType.Binary, true, TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
 
         var echo = await receiving.WaitAsync(_guard, TestContext.CancellationToken);
 

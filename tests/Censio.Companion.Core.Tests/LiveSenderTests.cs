@@ -985,6 +985,84 @@ public sealed class LiveSenderTests : IDisposable
     }
 
     /// <summary>
+    /// Items queued after the sender was disposed are ignored: queuing never throws, nothing is dropped or logged and no
+    /// connection is opened (E9).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC9")]
+    public async Task LiveSenderEnqueueAfterDisposeAsyncIsIgnored()
+    {
+        // Arrange
+        var connector = new QueuedIngestConnector();
+        var sender = CreateSender(connector, CreateTimeProvider(), Token);
+
+        await sender.DisposeAsync().AsTask().WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Act
+        EnqueueTicks(sender, LiveSender.MaxWaitingMessages + 1);
+
+        // Assert
+        Assert.IsEmpty(Lines(), "Items queued after the dispose should log nothing, no dropped count either");
+        Assert.AreEqual(0, connector.AttemptCount, "A disposed sender should open no connection");
+    }
+
+    /// <summary>
+    /// A status subscriber that throws stops neither the other subscribers nor live sending (S1, S2).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC2")]
+    public async Task LiveSenderStatusChangedWithThrowingSubscriberKeepsSending()
+    {
+        // Arrange
+        var connector = new QueuedIngestConnector();
+        var server = AddServer(connector);
+        var sender = LiveSender.ForServer(new ForwardServerSetting(_address, Token), CompanionVersion, connector, CreateTimeProvider(), _logger);
+
+        sender.StatusChanged += (_, _) => throw new InvalidOperationException("The subscriber failed.");
+        Track(sender);
+        StartRun(sender);
+        await AcceptAsync(server);
+        await WaitForStatusAsync(LiveSendState.Connected, null, 1);
+
+        // Act
+        sender.Enqueue(TickItem(100, 1, 2));
+
+        var message = await ReceiveContentAsync(server);
+
+        // Assert
+        Assert.AreEqual(100L, Assert.IsInstanceOfType<ContractTick>(message, "The tick should be sent").GameTime, "Live sending should go on past the failing subscriber");
+        Assert.AreEqual(Status(LiveSendState.Connected, null), Statuses()[^1], "The subscriber after the failing one should receive the connected status");
+    }
+
+    /// <summary>
+    /// A sender without a status subscriber connects and sends (S1, S2).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC3")]
+    public async Task LiveSenderRunWithoutStatusSubscriberSends()
+    {
+        // Arrange
+        var connector = new QueuedIngestConnector();
+        var server = AddServer(connector);
+        var sender = LiveSender.ForServer(new ForwardServerSetting(_address, Token), CompanionVersion, connector, CreateTimeProvider(), _logger);
+
+        _senders.Add(sender);
+        StartRun(sender);
+        await AcceptAsync(server);
+
+        // Act
+        sender.Enqueue(TickItem(100, 1, 2));
+
+        var message = await ReceiveContentAsync(server);
+
+        // Assert
+        Assert.AreEqual(100L, Assert.IsInstanceOfType<ContractTick>(message, "The tick should be sent").GameTime, "A sender without a status subscriber should send the tick");
+    }
+
+    /// <summary>
     /// A run through every failure kind logs each change of reason once, with fixed texts only: never the token, the
     /// address or an exception (N5, N6).
     /// </summary>

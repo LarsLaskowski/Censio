@@ -1731,6 +1731,37 @@ public sealed class PipeConnectionTests : IDisposable
     }
 
     /// <summary>
+    /// An item handler that throws neither stops the other handlers nor the connection (feature 40, S2).
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    [TestCategory("AC3")]
+    public async Task PipeConnectionThrowingItemHandlerIsIgnored()
+    {
+        // Arrange
+        var stream = EnqueueStream();
+        var connection = CreateConnection(null);
+
+        connection.ItemReceived += (_, _) => throw new InvalidOperationException("The handler failed.");
+        TrackItems(connection);
+        StartRun(connection);
+
+        await WaitForPendingReadsAsync(stream, 1);
+
+        // Act
+        stream.Feed(PipeTestFrames.Wire(PipeTestFrames.Version(2), PipeTestFrames.Island(1, 100), PipeTestFrames.Island(1, 200), PipeTestFrames.Island(1, 300)));
+
+        await WaitForItemsAsync(2);
+        await WaitForPendingReadsAsync(stream, 2);
+
+        // Assert
+        long?[] expected = [100L, 200L];
+
+        Assert.AreSequenceEqual(expected, _items.Select(item => item.Result.Tick?.GameTime).ToArray(), "The other handler should receive every item");
+        Assert.AreEqual(Status(PipeConnectionState.Receiving), connection.Status, "The connection should keep receiving");
+    }
+
+    /// <summary>
     /// A tick that has not closed sets no last tick and raises no tick event, up to the end of its quiet period.
     /// </summary>
     /// <returns>The task</returns>
