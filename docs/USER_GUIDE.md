@@ -421,7 +421,7 @@ Tried by the Product Manager on a Windows 11 x64 machine without .NET: the relea
 
 #### Forward mode
 
-Forward mode lets the Companion send what the game reports, live, to a server that runs elsewhere, typically the Docker image on a NAS or a home server, and connect again on its own after a server restart, a network loss or the PC's sleep. It is off by default. It is in `main` and in a release after `v0.4.0`, not in `v0.4.0`, and it needs a server of the same release as the Companion (the image `0.2.0` has no ingest, and a server and a Companion of different contract versions refuse each other, *Errors* under *Sending a recording to a server*). It works wherever the Companion does, on Windows 10 22H2 and Windows 11, 64-bit.
+Forward mode lets the Companion send what the game reports, live, to a server that runs elsewhere, typically the Docker image on a NAS or a home server, and connect again on its own after a server restart, a network loss. It is off by default. It is in `main` and in a release after `v0.4.0`, not in `v0.4.0`, and it needs a server of the same release as the Companion (the image `0.2.0` has no ingest, and a server and a Companion of different contract versions refuse each other, *Errors* under *Sending a recording to a server*). It works wherever the Companion does, on Windows 10 22H2 and Windows 11, 64-bit.
 
 **Steps.**
 
@@ -460,7 +460,7 @@ A wrong value shows `Server: settings invalid` instead of the lines below, sends
 | `Server: connected` | The server accepted the Companion | Nothing |
 | `Server: unreachable, retrying` | No WebSocket at the address: a wrong host, port or path, a server that is down, a network that is not up yet (the Companion started at sign-in), or an untrusted `wss://` certificate | Nothing if the server or the network comes back; otherwise check the address and the server |
 | `Server: not answering, retrying` | The server did not answer within 30 seconds | Check the server |
-| `Server: connection lost, retrying` | The connection ended: a server restart, a network loss, the PC's sleep. A connection that delivers nothing is found within 60 seconds | Nothing; the Companion connects again and sends what waited |
+| `Server: connection lost, retrying` | The connection ended: a server restart, a network loss. A connection that delivers nothing is found within 60 seconds | Nothing; the Companion connects again and sends what waited |
 | `Server: invalid reply, retrying` | The server sent something the Companion cannot read | Check that the server is a Censio server of the same release |
 | `Server: another Companion is connected, retrying` | The server still holds the earlier connection of this Companion, up to about a minute, or another Companion uses it (a server takes one) | Wait; close the other Companion if it stays |
 | `Server: token refused` | The server does not accept `serverToken`. Not retried | Correct the token in the file and restart the Companion |
@@ -477,7 +477,7 @@ Any other state shows `Server: not connected`. In local mode (*Local mode*) the 
 
 **Accepted risk.** Over `ws://` the Companion sends the ingest token unencrypted at every start and every retry, unattended, to whatever host answers `serverAddress`; a name without a domain (such as `nas`) may be answered by any device of the network the PC is on, so use `wss://`, or an address on a network you trust, when the PC leaves your home network. The data crosses the network unencrypted as well (*Network and TLS*).
 
-Tried so far by automated tests only: reconnecting, the waiting messages and their bound, the refusals and the finding of a silent connection (measured once at 48.75 seconds against a local test endpoint). Not yet tried with the real game and a Docker server on Windows: a server restart, a network cable pulled, the PC's sleep and wake, a wrong token, `Exit` during an outage and local mode's live data.
+Tried so far with the real game and a Docker server on Windows: connecting and the live pages, a server restart (`docker restart`), a start before the server is up, a wrong token, `Exit` (under 2 seconds) and local mode's live data. Covered by automated tests only: losing the network, the waiting messages and their bound, the refusals other than the token and the finding of a silent connection (measured once at 48.75 seconds against a local test endpoint).
 
 ### Build from source
 
@@ -1011,7 +1011,7 @@ Vom Product Manager auf einem Windows-11-x64-Rechner ohne .NET ausprobiert: das 
 
 #### Weiterleitungsmodus
 
-Im Weiterleitungsmodus sendet der Companion, was das Spiel meldet, live an einen Server, der anderswo läuft, typischerweise das Docker-Image auf einem NAS oder einem Heimserver, und verbindet sich nach einem Neustart des Servers, einem Netzausfall oder dem Ruhezustand des PCs von selbst neu. Er ist standardmäßig aus. Er ist in `main` und in einem Release nach `v0.4.0`, nicht in `v0.4.0`, und er braucht einen Server desselben Releases wie der Companion (das Image `0.2.0` hat keinen Ingest, und ein Server und ein Companion mit verschiedenen Vertragsversionen lehnen sich ab, *Fehler* unter *Eine Aufzeichnung an einen Server senden*). Er läuft dort, wo der Companion läuft, unter Windows 10 22H2 und Windows 11, 64 Bit.
+Im Weiterleitungsmodus sendet der Companion, was das Spiel meldet, live an einen Server, der anderswo läuft, typischerweise das Docker-Image auf einem NAS oder einem Heimserver, und verbindet sich nach einem Neustart des Servers oder einem Netzausfall von selbst neu. Er ist standardmäßig aus. Er ist in `main` und in einem Release nach `v0.4.0`, nicht in `v0.4.0`, und er braucht einen Server desselben Releases wie der Companion (das Image `0.2.0` hat keinen Ingest, und ein Server und ein Companion mit verschiedenen Vertragsversionen lehnen sich ab, *Fehler* unter *Eine Aufzeichnung an einen Server senden*). Er läuft dort, wo der Companion läuft, unter Windows 10 22H2 und Windows 11, 64 Bit.
 
 **Schritte.**
 
@@ -1050,7 +1050,7 @@ Ein falscher Wert zeigt `Server: settings invalid` statt der Zeilen unten, sende
 | `Server: connected` | Der Server hat den Companion angenommen | Nichts |
 | `Server: unreachable, retrying` | Unter der Adresse ist kein WebSocket: ein falscher Host, Port oder Pfad, ein Server, der aus ist, ein Netz, das noch nicht steht (der Companion startete bei der Anmeldung), oder ein nicht vertrauenswürdiges `wss://`-Zertifikat | Nichts, wenn der Server oder das Netz zurückkommt; sonst die Adresse und den Server prüfen |
 | `Server: not answering, retrying` | Der Server hat innerhalb von 30 Sekunden nicht geantwortet | Den Server prüfen |
-| `Server: connection lost, retrying` | Die Verbindung endete: ein Neustart des Servers, ein Netzausfall, der Ruhezustand des PCs. Eine Verbindung, über die nichts ankommt, wird innerhalb von 60 Sekunden erkannt | Nichts; der Companion verbindet sich neu und sendet, was wartete |
+| `Server: connection lost, retrying` | Die Verbindung endete: ein Neustart des Servers, ein Netzausfall. Eine Verbindung, über die nichts ankommt, wird innerhalb von 60 Sekunden erkannt | Nichts; der Companion verbindet sich neu und sendet, was wartete |
 | `Server: invalid reply, retrying` | Der Server hat etwas gesendet, das der Companion nicht lesen kann | Prüfen, ob der Server ein Censio-Server desselben Releases ist |
 | `Server: another Companion is connected, retrying` | Der Server hält noch die frühere Verbindung dieses Companions, bis zu etwa eine Minute, oder ein anderer Companion nutzt ihn (ein Server nimmt einen) | Warten; den anderen Companion schließen, wenn es bleibt |
 | `Server: token refused` | Der Server nimmt `serverToken` nicht an. Wird nicht wiederholt | Das Token in der Datei korrigieren und den Companion neu starten |
@@ -1067,7 +1067,7 @@ Jeder andere Zustand zeigt `Server: not connected`. Im lokalen Modus (*Lokaler M
 
 **Akzeptiertes Risiko.** Über `ws://` sendet der Companion das Ingest-Token unverschlüsselt bei jedem Start und jedem erneuten Versuch, unbeaufsichtigt, an jeden Host, der `serverAddress` beantwortet; ein Name ohne Domain (etwa `nas`) kann von jedem Gerät des Netzes beantwortet werden, in dem der PC ist, verwenden Sie also `wss://` oder eine Adresse in einem Netz, dem Sie vertrauen, wenn der PC Ihr Heimnetz verlässt. Auch die Daten laufen unverschlüsselt durch das Netz (*Netzwerk und TLS*).
 
-Bisher nur durch automatisierte Tests ausprobiert: das erneute Verbinden, die wartenden Nachrichten und ihre Grenze, die Ablehnungen und das Erkennen einer stillen Verbindung (einmal mit 48,75 Sekunden gegen einen lokalen Testendpunkt gemessen). Noch nicht mit dem echten Spiel und einem Docker-Server unter Windows ausprobiert: ein Neustart des Servers, ein gezogenes Netzwerkkabel, Ruhezustand und Aufwachen des PCs, ein falsches Token, `Exit` während eines Ausfalls und die Live-Daten des lokalen Modus.
+Bisher mit dem echten Spiel und einem Docker-Server unter Windows ausprobiert: das Verbinden und die Live-Seiten, ein Neustart des Servers (`docker restart`), ein Start vor dem Server, ein falsches Token, `Exit` (unter 2 Sekunden) und die Live-Daten des lokalen Modus. Nur durch automatisierte Tests abgedeckt: der Verlust des Netzwerks, die wartenden Nachrichten und ihre Grenze, die Ablehnungen außer dem Token und das Erkennen einer stillen Verbindung (einmal mit 48,75 Sekunden gegen einen lokalen Testendpunkt gemessen).
 
 ### Aus dem Quellcode bauen
 

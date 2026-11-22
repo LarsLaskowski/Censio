@@ -96,7 +96,7 @@ server) and an operator who reads the log rely on it. The connection rules share
 | ---- | ----- |
 | `Server: unreachable, retrying` | No WebSocket at the address, also a TLS failure such as an untrusted `wss://` certificate, or no upgrade within 30 seconds |
 | `Server: not answering, retrying` | No answer to the hello, no acceptance of a message or no acknowledgement within 30 seconds |
-| `Server: connection lost, retrying` | The connection ended after the hello (a close frame, a failed send or receive, a server that stops, the PC's sleep), also a fault the Companion did not expect |
+| `Server: connection lost, retrying` | The connection ended after the hello (a close frame, a failed send or receive, a server that stops), also a fault the Companion did not expect |
 | `Server: invalid reply, retrying` | A reply that breaks the rules of [`replay-sending.md`](replay-sending.md) (*Limits and errors*) |
 | `Server: another Companion is connected, retrying` | `helloRefused` `companionConnected`: the server still holds a vanished connection, for up to about 56 seconds ([`ingest.md`](ingest.md), *One Companion and silent connections*) |
 | `Server: token refused` | `helloRefused` `tokenRefused`; not retried |
@@ -107,8 +107,7 @@ server) and an operator who reads the log rely on it. The connection rules share
   hosts out of reach ([`ingest.md`](ingest.md), *Limits per host*). Any other state shows `Server: not connected`.
 - A connection that delivers nothing, also while no message is in flight, is found dead within 60 seconds: the Companion
   sends WebSocket pings every 15 seconds and aborts the connection when no answer comes within 30 seconds, which fails its
-  pending receive; the line then reads `Server: connection lost, retrying` and the reconnect follows. This holds after the
-  network drops or the PC sleeps and wakes (*Measurements*).
+  pending receive; the line then reads `Server: connection lost, retrying` and the reconnect follows.
 - The tooltip and the icon keep showing the pipe connection.
 
 ### Local mode

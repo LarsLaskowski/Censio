@@ -175,7 +175,7 @@ A replay without `--server` ends with `Replay error: local server not running` w
 
 #### Forward mode
 
-Forward mode lets the Companion send what the game reports, live, to a server that runs elsewhere (Docker on a NAS or a home server), and reconnect on its own after a server restart, a network loss or the PC's sleep. It is off by default, it needs a Companion of a release after `v0.4.0` or a build of `main` and a server of the same release (contract version 2), and it runs wherever the Companion does (Windows 10 22H2 and Windows 11, 64-bit).
+Forward mode lets the Companion send what the game reports, live, to a server that runs elsewhere (Docker on a NAS or a home server), and reconnect on its own after a server restart, a network loss. It is off by default, it needs a Companion of a release after `v0.4.0` or a build of `main` and a server of the same release (contract version 2), and it runs wherever the Companion does (Windows 10 22H2 and Windows 11, 64-bit).
 
 1. Close a running Companion (`Exit` in the tray menu). Create the file `%LOCALAPPDATA%\Censio\settings.json`, or add the keys to the one you have. `serverAddress` is the server's ingest address with its path, and `serverToken` the server's ingest token (for the Docker image `docker exec censio cat /config/ingest-token`; leave the key out when the server has the token switched off, `Censio:Ingest:RequireToken` `false`):
 
@@ -418,7 +418,7 @@ Ein Abspielen ohne `--server` endet mit `Replay error: local server not running`
 
 #### Weiterleitungsmodus
 
-Im Weiterleitungsmodus sendet der Companion, was das Spiel meldet, live an einen Server, der anderswo läuft (Docker auf einem NAS oder einem Heimserver), und verbindet sich nach einem Neustart des Servers, einem Netzausfall oder dem Ruhezustand des PCs von selbst neu. Er ist standardmäßig aus, braucht einen Companion eines Releases nach `v0.4.0` oder einen Build von `main` und einen Server desselben Releases (Vertragsversion 2) und läuft dort, wo der Companion läuft (Windows 10 22H2 und Windows 11, 64 Bit).
+Im Weiterleitungsmodus sendet der Companion, was das Spiel meldet, live an einen Server, der anderswo läuft (Docker auf einem NAS oder einem Heimserver), und verbindet sich nach einem Neustart des Servers oder einem Netzausfall von selbst neu. Er ist standardmäßig aus, braucht einen Companion eines Releases nach `v0.4.0` oder einen Build von `main` und einen Server desselben Releases (Vertragsversion 2) und läuft dort, wo der Companion läuft (Windows 10 22H2 und Windows 11, 64 Bit).
 
 1. Einen laufenden Companion beenden (`Exit` im Tray-Menü). Die Datei `%LOCALAPPDATA%\Censio\settings.json` anlegen oder die Schlüssel in die vorhandene eintragen. `serverAddress` ist die Ingest-Adresse des Servers mit ihrem Pfad und `serverToken` das Ingest-Token des Servers (beim Docker-Image `docker exec censio cat /config/ingest-token`; den Schlüssel weglassen, wenn beim Server das Token abgeschaltet ist, `Censio:Ingest:RequireToken` `false`):
 
