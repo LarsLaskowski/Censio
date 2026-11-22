@@ -73,5 +73,10 @@ public enum TrayMenuEntryKind
     /// <summary>
     /// The entry that opens Censio in the browser.
     /// </summary>
-    OpenCensio
+    OpenCensio,
+
+    /// <summary>
+    /// The entry that shows the connection to the server in forward mode.
+    /// </summary>
+    ServerConnection
 }

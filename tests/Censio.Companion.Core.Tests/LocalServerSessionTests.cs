@@ -29,7 +29,7 @@ public sealed class LocalServerSessionTests
     /// <summary>
     /// The problem of an invalid setting.
     /// </summary>
-    private const string Problem = "mode is not local";
+    private const string Problem = "serverAddress is missing";
 
     #endregion // Constants
 
@@ -136,7 +136,7 @@ public sealed class LocalServerSessionTests
 
     /// <summary>
     /// A server is hosted for every valid command line when the setting is local or invalid (to show the invalid
-    /// setting), and never when the setting is off or the command line is invalid (S7, S8).
+    /// setting), and never when the setting is off or forward or the command line is invalid (S7, S8).
     /// </summary>
     /// <param name="mode">The mode of the command line</param>
     /// <param name="kind">The kind of the setting</param>
@@ -151,6 +151,8 @@ public sealed class LocalServerSessionTests
     [DataRow(CompanionMode.Invalid, LocalServerSettingKind.Invalid, false)]
     [DataRow(CompanionMode.Normal, LocalServerSettingKind.Off, false)]
     [DataRow(CompanionMode.Replay, LocalServerSettingKind.Off, false)]
+    [DataRow(CompanionMode.Normal, LocalServerSettingKind.Forward, false)]
+    [DataRow(CompanionMode.Record, LocalServerSettingKind.Forward, false)]
     public void LocalServerSessionIsHostedPerModeAndSetting(CompanionMode mode, LocalServerSettingKind kind, bool expected)
     {
         // Arrange
@@ -190,7 +192,31 @@ public sealed class LocalServerSessionTests
         // Assert
         Assert.IsEmpty(_startPorts, "An invalid setting should start no server");
         Assert.AreEqual(LocalServerState.SettingsInvalid, session.Status.State, "The status should be settings invalid");
-        Assert.ContainsSingle(entry => entry.Level == LogLevel.Warning && entry.Message == "Local server settings invalid: " + Problem, _logger.Entries, "The problem should be logged once as a warning");
+        Assert.ContainsSingle(entry => entry.Level == LogLevel.Warning && entry.Message == "Server settings invalid: " + Problem, _logger.Entries, "The problem should be logged once as a warning");
+    }
+
+    /// <summary>
+    /// An invalid setting without a problem text starts no server and logs the warning with an empty problem (E1).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC1")]
+    public async Task LocalServerSessionRunWithInvalidSettingWithoutProblemLogsEmptyProblem()
+    {
+        // Arrange
+        var setting = new LocalServerSetting
+                      {
+                          Kind = LocalServerSettingKind.Invalid
+                      };
+        var session = CreateSession(setting, new RecordingTimeProvider(_start));
+
+        // Act
+        await session.RunAsync(TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        Assert.IsEmpty(_startPorts, "An invalid setting should start no server");
+        Assert.AreEqual(LocalServerState.SettingsInvalid, session.Status.State, "The status should be settings invalid");
+        Assert.ContainsSingle(entry => entry.Level == LogLevel.Warning && entry.Message == "Server settings invalid: ", _logger.Entries, "The warning should be logged once with an empty problem");
     }
 
     /// <summary>
@@ -642,6 +668,66 @@ public sealed class LocalServerSessionTests
     }
 
     /// <summary>
+    /// The wait for the live token, begun while the server starts, returns the token of the server once it runs, and a
+    /// wait begun while it runs returns it at once (S5).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC8")]
+    public async Task LocalServerSessionWaitForLiveTokenAsyncReturnsTokenWhileRunning()
+    {
+        // Arrange
+        var session = CreateSession(CreateLocalSetting(), new RecordingTimeProvider(_start));
+        var running = WaitForStateAsync(session, LocalServerState.Running);
+        var waiting = session.WaitForLiveTokenAsync(TestContext.CancellationToken);
+
+        _ = session.RunAsync(TestContext.CancellationToken);
+
+        await WaitForStartAsync();
+
+        var beforeRunning = waiting.IsCompleted;
+
+        _startResult.SetResult(Running(CreateServer(false)));
+
+        await running.WaitAsync(_guard, TestContext.CancellationToken);
+
+        var firstToken = await waiting.WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Act
+        var laterToken = await session.WaitForLiveTokenAsync(TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        Assert.IsFalse(beforeRunning, "The wait should not end while the server starts");
+        Assert.AreEqual(Token, firstToken, "The wait begun while starting should return the token of the running server");
+        Assert.AreEqual(Token, laterToken, "A wait begun while the server runs should return its token");
+    }
+
+    /// <summary>
+    /// Once the server no longer runs — its start failed, the port was in use, it stopped on its own or the session
+    /// stopped it — the wait for the live token returns <see langword="null" />, so live sending does not retry a server
+    /// that ended (E10).
+    /// </summary>
+    /// <param name="ending">How the server ended: port in use, failed, stopped unexpectedly or stopped</param>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC8")]
+    [DataRow("port in use")]
+    [DataRow("failed")]
+    [DataRow("stopped unexpectedly")]
+    [DataRow("stopped")]
+    public async Task LocalServerSessionWaitForLiveTokenAsyncReturnsNullAfterStop(string ending)
+    {
+        // Arrange
+        var session = await CreateEndedSessionAsync(ending);
+
+        // Act
+        var token = await session.WaitForLiveTokenAsync(TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        Assert.IsNull(token, $"The wait for the live token should return no token once the server ended: {ending}");
+    }
+
+    /// <summary>
     /// Creates a local setting at the port of the tests.
     /// </summary>
     /// <returns>The setting</returns>
@@ -732,6 +818,48 @@ public sealed class LocalServerSessionTests
 
         session.StatusChanged += (_, status) => _statuses.Enqueue(status);
         _sessions.Add(session);
+
+        return session;
+    }
+
+    /// <summary>
+    /// Creates a session whose server ended in the given way and waits until the run ended.
+    /// </summary>
+    /// <param name="ending">How the server ends: port in use, failed, stopped unexpectedly or stopped</param>
+    /// <returns>The session</returns>
+    private async Task<LocalServerSession> CreateEndedSessionAsync(string ending)
+    {
+        var server = CreateServer(false);
+        var session = CreateSession(CreateLocalSetting(), new RecordingTimeProvider(_start));
+        var running = WaitForStateAsync(session, LocalServerState.Running);
+
+        _startResult.SetResult(ending switch
+                               {
+                                   "port in use" => new LocalServerStart
+                                                    {
+                                                        Kind = LocalServerStartKind.PortInUse
+                                                    },
+                                   "failed" => new LocalServerStart
+                                               {
+                                                   Kind = LocalServerStartKind.Failed
+                                               },
+                                   _ => Running(server)
+                               });
+
+        var run = session.RunAsync(TestContext.CancellationToken);
+
+        if (ending == "stopped unexpectedly")
+        {
+            await running.WaitAsync(_guard, TestContext.CancellationToken);
+            server.CompleteStopped();
+        }
+        else if (ending == "stopped")
+        {
+            await running.WaitAsync(_guard, TestContext.CancellationToken);
+            await session.StopAsync(_stopTimeout).WaitAsync(_guard, TestContext.CancellationToken);
+        }
+
+        await run.WaitAsync(_guard, TestContext.CancellationToken);
 
         return session;
     }

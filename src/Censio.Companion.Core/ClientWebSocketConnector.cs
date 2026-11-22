@@ -14,6 +14,16 @@ public sealed class ClientWebSocketConnector : IReplayServerConnector
     /// </summary>
     private readonly TimeProvider _timeProvider;
 
+    /// <summary>
+    /// The interval of the keep-alive pings, or <see langword="null" /> for the default of the socket.
+    /// </summary>
+    private readonly TimeSpan? _keepAliveInterval;
+
+    /// <summary>
+    /// The time the socket waits for the answer to a ping, or <see langword="null" /> for the default of the socket.
+    /// </summary>
+    private readonly TimeSpan? _keepAliveTimeout;
+
     #endregion // Fields
 
     #region Constructor
@@ -25,6 +35,19 @@ public sealed class ClientWebSocketConnector : IReplayServerConnector
     public ClientWebSocketConnector(TimeProvider timeProvider)
     {
         _timeProvider = timeProvider;
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ClientWebSocketConnector" /> class.
+    /// </summary>
+    /// <param name="timeProvider">The time provider</param>
+    /// <param name="keepAliveInterval">The interval of the keep-alive pings</param>
+    /// <param name="keepAliveTimeout">The time the socket waits for the answer to a ping</param>
+    public ClientWebSocketConnector(TimeProvider timeProvider, TimeSpan keepAliveInterval, TimeSpan keepAliveTimeout)
+    {
+        _timeProvider = timeProvider;
+        _keepAliveInterval = keepAliveInterval;
+        _keepAliveTimeout = keepAliveTimeout;
     }
 
     #endregion // Constructor
@@ -55,6 +78,12 @@ public sealed class ClientWebSocketConnector : IReplayServerConnector
             using var invoker = new HttpMessageInvoker(handler);
             using var timeout = new CancellationTokenSource(ConnectTimeout, _timeProvider);
             using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeout.Token);
+
+            if (_keepAliveInterval is { } interval && _keepAliveTimeout is { } keepAliveTimeout)
+            {
+                socket.Options.KeepAliveInterval = interval;
+                socket.Options.KeepAliveTimeout = keepAliveTimeout;
+            }
 
             await socket.ConnectAsync(address, invoker, linked.Token).ConfigureAwait(false);
 

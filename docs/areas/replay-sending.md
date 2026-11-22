@@ -5,8 +5,7 @@
 Sending a replayed recording to a server: the Companion's switches `--server` and `--token-file`, the token file, the
 connection and its rules, the hello and the profile a run creates, what is sent and in which order, one message in
 flight, the keep-alive, the timeouts, the status texts and counts, the log lines, and what never leaves the machine.
-A tester who runs the server without the game relies on it. In local mode a replay without `--server` sends to the server the Companion hosts (*Local mode*). It is no live sending: forward mode, the buffer and the
-resend are #40 and #41, and the catalog and icons are #42. The messages themselves are in [`contract.md`](contract.md),
+A tester who runs the server without the game relies on it. In local mode a replay without `--server` sends to the server the Companion hosts (*Local mode*). It is no live sending ([`live-sending.md`](live-sending.md)); the persistent buffer is #41 and the catalog and icons are #42. The messages themselves are in [`contract.md`](contract.md),
 what the server does with them in [`ingest.md`](ingest.md).
 
 ## Behavior
@@ -242,5 +241,5 @@ shell's encoding is confirmed. Not tried: `docker cp` for the token file, a toke
 - The messages, their reader and writer and the refusal texts: [`contract.md`](contract.md).
 - The server's endpoint and answers: [`ingest.md`](ingest.md); token rules: [`ingest-token.md`](ingest-token.md); what it keeps: [`server-state.md`](server-state.md).
 - The recording file and the replay's pacing: [`pipe-recording.md`](pipe-recording.md); the tray and the command line: [`companion.md`](companion.md); the hosted server: [`local-mode.md`](local-mode.md).
-- Live sending, the buffer and the resend (#40, #41); the catalog and the icons (#42).
+- Live sending, which shares this connection's rules: [`live-sending.md`](live-sending.md); the persistent buffer (#41); the catalog and the icons (#42).
 - The code: `ReplaySender`, `ClientWebSocketConnector`, `ReplayTokenFile` and `PipeReplayRunner` in `src/Censio.Companion.Core`.

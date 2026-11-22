@@ -1,3 +1,4 @@
+using Censio.Contracts;
 using Censio.GameData;
 using Censio.Pipe;
 
@@ -97,6 +98,52 @@ public static partial class CompanionLog
     /// <param name="logger">The logger</param>
     [LoggerMessage(Level = LogLevel.Information, Message = "Replay connected to the server")]
     public static partial void ReplaySendConnected(ILogger logger);
+
+    /// <summary>
+    /// Logs that live sending is connected.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    [LoggerMessage(Level = LogLevel.Information, Message = "Live sending connected to the server")]
+    public static partial void LiveSendConnected(ILogger logger);
+
+    /// <summary>
+    /// Logs that live sending failed and is retried.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    /// <param name="reason">The reason</param>
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Live sending failed: {Reason}; retrying")]
+    public static partial void LiveSendFailed(ILogger logger, string reason);
+
+    /// <summary>
+    /// Logs that the server refused live sending for good.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    /// <param name="reason">The reason</param>
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Live sending refused by the server: {Reason}; not retried")]
+    public static partial void LiveSendRefused(ILogger logger, string reason);
+
+    /// <summary>
+    /// Logs that the server refused a live message.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    /// <param name="refusal">The refusal</param>
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Server refused a live message: {Refusal}")]
+    public static partial void LiveMessageRefused(ILogger logger, ContractAcknowledgementRefusal refusal);
+
+    /// <summary>
+    /// Logs that a live message was not sent because the contract writer refused it.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Live message not sent: the contract writer refused it")]
+    public static partial void LiveMessageNotWritten(ILogger logger);
+
+    /// <summary>
+    /// Logs the number of waiting live messages that were dropped.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    /// <param name="count">The number of messages</param>
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Live messages dropped: {Count}")]
+    public static partial void LiveMessagesDropped(ILogger logger, int count);
 
     /// <summary>
     /// Logs that the server refused a replay.
@@ -359,8 +406,8 @@ public static partial class CompanionLog
     /// </summary>
     /// <param name="logger">The logger</param>
     /// <param name="problem">The problem</param>
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Local server settings invalid: {Problem}")]
-    public static partial void LocalServerSettingsInvalid(ILogger logger, string problem);
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Server settings invalid: {Problem}")]
+    public static partial void ServerSettingsInvalid(ILogger logger, string problem);
 
     /// <summary>
     /// Logs a running local server.

@@ -67,7 +67,7 @@ arrives in parts, and at most 32,768 bytes. The server decides in this order:
   connection without a close frame, and the session ends as after any lost connection, the place freed. A connection whose peer stops reading while the server's replies back up is thus gone about 33 seconds after the last frame the server read (the store, about 3 seconds, plus 30); one whose replies still fit and that then sends nothing is ended by the keep-alive (56.18 seconds measured). A Companion that reads under about 37 KB/s cannot take the largest acknowledgement (a catalog
   upload with 16,384 `missingIcons`, about 1.1 MB) in time: every such upload is aborted and the Companion reconnects
   and resends in a loop.
-- Limit: .NET answers a ping only inside a receive. A Companion that keeps a receive pending, as #40 does, answers at
+- Limit: .NET answers a ping only inside a receive. A Companion that keeps a receive pending, as live sending does ([`live-sending.md`](live-sending.md)), answers at
   once; one without, whose ping is unanswered when a message begins, answers only after that message, which must end
   within 35 seconds of the ping, else the connection is aborted and the Companion reconnects and resends its
   unacknowledged messages (measured: 20 seconds survives, 40 is aborted).
@@ -288,7 +288,7 @@ catalog, not only its size, decides the peak.
 - The messages, their reader and writer, bounds of the message fields and the refusal texts: [`contract.md`](contract.md).
 - The catalog document inside an upload: [`game-catalog-format.md`](game-catalog-format.md).
 - The state kept from what arrives: [`server-state.md`](server-state.md); the database: [`server-data.md`](server-data.md).
-- Showing what arrives: [`web-pages.md`](web-pages.md). The Companion's replay sending: [`replay-sending.md`](replay-sending.md); live sending, buffer and resend (#40, #41), the catalog and
+- Showing what arrives: [`web-pages.md`](web-pages.md). The Companion's replay sending: [`replay-sending.md`](replay-sending.md); live sending ([`live-sending.md`](live-sending.md)), the persistent buffer (#41), the catalog and
   icons it uploads (#42).
 - The ingest token, its file and switch, and the start failures: [`ingest-token.md`](ingest-token.md).
 - The server's HTTP surface, the data directory and the Docker image: [`server.md`](server.md).

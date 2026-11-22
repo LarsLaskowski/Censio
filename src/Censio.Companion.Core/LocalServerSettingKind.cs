@@ -18,5 +18,10 @@ public enum LocalServerSettingKind
     /// <summary>
     /// The setting is not valid.
     /// </summary>
-    Invalid
+    Invalid,
+
+    /// <summary>
+    /// The Companion sends live data to the configured server.
+    /// </summary>
+    Forward
 }

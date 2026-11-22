@@ -25,6 +25,11 @@ public sealed class ClientWebSocketConnectorTests
     /// </summary>
     private static readonly byte[] _message = "replay message"u8.ToArray();
 
+    /// <summary>
+    /// The real-time limit of the keep-alive test, which waits on the socket's own real-clock timers.
+    /// </summary>
+    private static readonly TimeSpan _hangGuard = TimeSpan.FromSeconds(30);
+
     #endregion // Fields
 
     #region Constructors
@@ -75,15 +80,19 @@ public sealed class ClientWebSocketConnectorTests
 
     /// <summary>
     /// A redirect is not followed and gives no socket.
+    /// The rule holds for the replay's connector and for the live sender's connector with keep-alive (feature 40).
     /// </summary>
+    /// <param name="isKeepAlive">Whether the connector is built with the keep-alive of the live sender</param>
     /// <returns>A task that completes when the test is done</returns>
     [TestMethod]
     [TestCategory("AC7")]
-    public async Task ClientWebSocketConnectorRedirectGivesNoSocket()
+    [DataRow(false, DisplayName = "Without keep-alive")]
+    [DataRow(true, DisplayName = "With keep-alive")]
+    public async Task ClientWebSocketConnectorRedirectGivesNoSocket(bool isKeepAlive)
     {
         // Arrange
         await using var host = await LoopbackWebSocketHost.StartAsync(TestContext.CancellationToken);
-        var connector = new ClientWebSocketConnector(new FakeTimeProvider());
+        var connector = CreateConnector(isKeepAlive);
 
         // Act
         using var socket = await connector.ConnectAsync(host.WebSocketAddress(LoopbackWebSocketHost.RedirectPath, false), TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
@@ -95,15 +104,19 @@ public sealed class ClientWebSocketConnectorTests
 
     /// <summary>
     /// A certificate the operating system does not trust gives no socket.
+    /// The rule holds for the replay's connector and for the live sender's connector with keep-alive (feature 40).
     /// </summary>
+    /// <param name="isKeepAlive">Whether the connector is built with the keep-alive of the live sender</param>
     /// <returns>A task that completes when the test is done</returns>
     [TestMethod]
     [TestCategory("AC7")]
-    public async Task ClientWebSocketConnectorUntrustedCertificateGivesNoSocket()
+    [DataRow(false, DisplayName = "Without keep-alive")]
+    [DataRow(true, DisplayName = "With keep-alive")]
+    public async Task ClientWebSocketConnectorUntrustedCertificateGivesNoSocket(bool isKeepAlive)
     {
         // Arrange
         await using var host = await LoopbackWebSocketHost.StartAsync(TestContext.CancellationToken);
-        var connector = new ClientWebSocketConnector(new FakeTimeProvider());
+        var connector = CreateConnector(isKeepAlive);
 
         // Act
         using var socket = await connector.ConnectAsync(host.WebSocketAddress(LoopbackWebSocketHost.IngestPath, true), TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
@@ -115,15 +128,19 @@ public sealed class ClientWebSocketConnectorTests
 
     /// <summary>
     /// The upgrade carries no Origin header and no subprotocol, and gives an open socket.
+    /// The rule holds for the replay's connector and for the live sender's connector with keep-alive (feature 40).
     /// </summary>
+    /// <param name="isKeepAlive">Whether the connector is built with the keep-alive of the live sender</param>
     /// <returns>A task that completes when the test is done</returns>
     [TestMethod]
     [TestCategory("AC7")]
-    public async Task ClientWebSocketConnectorSendsNoOrigin()
+    [DataRow(false, DisplayName = "Without keep-alive")]
+    [DataRow(true, DisplayName = "With keep-alive")]
+    public async Task ClientWebSocketConnectorSendsNoOrigin(bool isKeepAlive)
     {
         // Arrange
         await using var host = await LoopbackWebSocketHost.StartAsync(TestContext.CancellationToken);
-        var connector = new ClientWebSocketConnector(new FakeTimeProvider());
+        var connector = CreateConnector(isKeepAlive);
 
         // Act
         using var socket = await connector.ConnectAsync(host.WebSocketAddress(LoopbackWebSocketHost.IngestPath, false), TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
@@ -140,15 +157,19 @@ public sealed class ClientWebSocketConnectorTests
 
     /// <summary>
     /// A configured system proxy, also one that does not bypass loopback addresses, is not used.
+    /// The rule holds for the replay's connector and for the live sender's connector with keep-alive (feature 40).
     /// </summary>
+    /// <param name="isKeepAlive">Whether the connector is built with the keep-alive of the live sender</param>
     /// <returns>A task that completes when the test is done</returns>
     [TestMethod]
     [TestCategory("AC7")]
-    public async Task ClientWebSocketConnectorBypassesSystemProxy()
+    [DataRow(false, DisplayName = "Without keep-alive")]
+    [DataRow(true, DisplayName = "With keep-alive")]
+    public async Task ClientWebSocketConnectorBypassesSystemProxy(bool isKeepAlive)
     {
         // Arrange
         await using var host = await LoopbackWebSocketHost.StartAsync(TestContext.CancellationToken);
-        var connector = new ClientWebSocketConnector(new FakeTimeProvider());
+        var connector = CreateConnector(isKeepAlive);
         var systemProxy = HttpClient.DefaultProxy;
         WebSocket? socket;
 
@@ -170,6 +191,72 @@ public sealed class ClientWebSocketConnectorTests
         Assert.IsNotNull(connected, "The connection should go to the server directly");
         Assert.AreEqual(0, host.ProxyConnections, "The system proxy should receive no connection");
         Assert.HasCount(1, host.EndpointRequests, "The endpoint should receive the upgrade itself");
+    }
+
+    /// <summary>
+    /// A connection whose server accepts the upgrade and then never reads, so no ping is answered, is aborted by the
+    /// keep-alive: the pending receive fails and the socket is aborted. <see cref="ClientWebSocket" /> takes no
+    /// <see cref="TimeProvider" />, so this test runs on the real clock, the documented exception of the unit-test rules;
+    /// it asserts only the outcome, never a duration, within a 30-second hang guard (fact 7 measured 2.3 seconds for an
+    /// interval and a timeout of 1 second each).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public async Task ClientWebSocketConnectorConnectWithKeepAliveAbortsSilentConnection()
+    {
+        // Arrange
+        await using var host = await LoopbackWebSocketHost.StartAsync(TestContext.CancellationToken);
+        var connector = new ClientWebSocketConnector(new FakeTimeProvider(), TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+        using var socket = await connector.ConnectAsync(host.WebSocketAddress(LoopbackWebSocketHost.SilentPath, false), TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+
+        Assert.IsNotNull(socket, "The silent endpoint should accept the upgrade");
+
+        // Act
+        var receiving = socket.ReceiveAsync(new byte[16].AsMemory(), TestContext.CancellationToken).AsTask();
+        var first = await Task.WhenAny(receiving, Task.Delay(_hangGuard, TestContext.CancellationToken));
+
+        // Assert
+        Assert.AreSame(receiving, first, "The keep-alive should end the pending receive of a connection whose pings get no answer");
+        Assert.IsFalse(receiving.IsCompletedSuccessfully, "The pending receive should fail, not return a message");
+        Assert.AreEqual(WebSocketState.Aborted, socket.State, "The socket should be aborted");
+    }
+
+    /// <summary>
+    /// A connection whose server answers the pings stays open while a receive is pending and no message is sent, for
+    /// longer than the keep-alive interval and timeout together (1 and 5 seconds, observed 7 seconds), and still carries a
+    /// message afterwards. <see cref="ClientWebSocket" /> takes no <see cref="TimeProvider" />, so this test waits on the
+    /// real clock, the documented exception of the unit-test rules; it asserts only the outcome, never a duration.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public async Task ClientWebSocketConnectorConnectWithKeepAliveKeepsAnsweringConnection()
+    {
+        // Arrange
+        await using var host = await LoopbackWebSocketHost.StartAsync(TestContext.CancellationToken);
+        var connector = new ClientWebSocketConnector(new FakeTimeProvider(), TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(5));
+        using var socket = await connector.ConnectAsync(host.WebSocketAddress(LoopbackWebSocketHost.IngestPath, false), TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+
+        Assert.IsNotNull(socket, "The endpoint should accept the upgrade");
+
+        var buffer = new byte[64];
+        var receiving = socket.ReceiveAsync(buffer.AsMemory(), TestContext.CancellationToken).AsTask();
+
+        // Act
+        await Task.Delay(TimeSpan.FromSeconds(7), TestContext.CancellationToken);
+
+        var isReceivingAfterIdle = receiving.IsCompleted == false;
+        var stateAfterIdle = socket.State;
+
+        await socket.SendAsync(_message, WebSocketMessageType.Binary, true, TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+
+        var echo = await receiving.WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        Assert.IsTrue(isReceivingAfterIdle, "The pending receive should still wait after the idle time");
+        Assert.AreEqual(WebSocketState.Open, stateAfterIdle, "A connection whose pings are answered should stay open");
+        Assert.AreSequenceEqual(_message, buffer[..echo.Count], "The connection should still carry a message after the idle time");
     }
 
     /// <summary>
@@ -254,6 +341,18 @@ public sealed class ClientWebSocketConnectorTests
 
         // Assert
         await Assert.ThrowsAsync<OperationCanceledException>(() => connecting.WaitAsync(_guard, TestContext.CancellationToken), "The caller's cancellation should be rethrown");
+    }
+
+    /// <summary>
+    /// Creates the connector of a test: the replay's, or the live sender's with its keep-alive.
+    /// </summary>
+    /// <param name="isKeepAlive">Whether the connector is built with the keep-alive of the live sender</param>
+    /// <returns>The connector</returns>
+    private static ClientWebSocketConnector CreateConnector(bool isKeepAlive)
+    {
+        return isKeepAlive
+                   ? new ClientWebSocketConnector(new FakeTimeProvider(), LiveSender.KeepAliveInterval, LiveSender.KeepAliveTimeout)
+                   : new ClientWebSocketConnector(new FakeTimeProvider());
     }
 
     #endregion // Methods

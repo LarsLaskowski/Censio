@@ -109,6 +109,11 @@ public sealed class PipeConnection
     /// </summary>
     public event EventHandler<PipeTick>? TickReceived;
 
+    /// <summary>
+    /// Occurs when an item has been read: a tick, trade routes, or the start or end of a session.
+    /// </summary>
+    public event EventHandler<PipeConnectionItem>? ItemReceived;
+
     #endregion // Events
 
     #region Properties
@@ -314,10 +319,15 @@ public sealed class PipeConnection
                 // The observer runs on the read, before the assembler hands the read on; it alone writes the end
                 // status and the receiving time, and the loop reads them only after the end of the stream.
                 var endStatus = default(PipeConnectionStatus);
+                var readStamp = default(DateTimeOffset);
 
                 using var assembler = new PipeTickAssembler(new PipeMessageReader(stream),
                                                             _timeProvider,
-                                                            (read, stamp) => endStatus = Observe(recorder, read, stamp, endStatus, cancellationToken));
+                                                            (read, stamp) =>
+                                                            {
+                                                                readStamp = stamp;
+                                                                endStatus = Observe(recorder, read, stamp, endStatus, cancellationToken);
+                                                            });
 
                 while (true)
                 {
@@ -341,6 +351,15 @@ public sealed class PipeConnection
                     if (item.Kind == PipeTickResultKind.EndOfStream)
                     {
                         break;
+                    }
+
+                    if (item.Kind is PipeTickResultKind.Tick or PipeTickResultKind.SessionStart or PipeTickResultKind.SessionEnd or PipeTickResultKind.TradeRoutes)
+                    {
+                        PublishItem(new PipeConnectionItem
+                                    {
+                                        Result = item,
+                                        ReadStamp = readStamp
+                                    });
                     }
 
                     if (item.Tick is { } tick)
@@ -401,6 +420,32 @@ public sealed class PipeConnection
         }
 
         return endStatus;
+    }
+
+    /// <summary>
+    /// Raises <see cref="ItemReceived" /> for an item; a failing subscriber does not stop the connection.
+    /// </summary>
+    /// <param name="item">The item</param>
+    private void PublishItem(PipeConnectionItem item)
+    {
+        var handlers = ItemReceived;
+
+        if (handlers is null)
+        {
+            return;
+        }
+
+        foreach (var handler in handlers.GetInvocationList().Cast<EventHandler<PipeConnectionItem>>())
+        {
+            try
+            {
+                handler(this, item);
+            }
+            catch (Exception)
+            {
+                // A failing subscriber must not stop the connection
+            }
+        }
     }
 
     /// <summary>

@@ -53,9 +53,9 @@ public static class ReplayTokenFile
                    };
         }
 
-        var token = bytes.Length > MaxFileBytes ? null : Decode(bytes)?.Trim(' ', '\t', '\r', '\n');
+        var token = bytes.Length > MaxFileBytes ? null : ReadToken(Decode(bytes));
 
-        return token is not null && token.Length is >= MinTokenLength and <= MaxTokenLength && token.All(IsTokenCharacter)
+        return token is not null
                    ? new ReplayTokenFileResult
                      {
                          Kind = ReplayTokenFileResultKind.Read,
@@ -65,6 +65,20 @@ public static class ReplayTokenFile
                      {
                          Kind = ReplayTokenFileResultKind.NoValidToken
                      };
+    }
+
+    /// <summary>
+    /// Reads the token from a text.
+    /// </summary>
+    /// <param name="text">The text, or <see langword="null" /></param>
+    /// <returns>The trimmed token, or <see langword="null" /> when the text holds no valid token</returns>
+    public static string? ReadToken(string? text)
+    {
+        var token = text?.Trim(' ', '\t', '\r', '\n');
+
+        return token is not null && token.Length is >= MinTokenLength and <= MaxTokenLength && token.All(IsTokenCharacter)
+                   ? token
+                   : null;
     }
 
     /// <summary>

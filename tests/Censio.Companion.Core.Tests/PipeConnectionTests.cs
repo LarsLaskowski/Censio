@@ -65,6 +65,16 @@ public sealed class PipeConnectionTests : IDisposable
     private readonly SemaphoreSlim _tickArrived = new(0);
 
     /// <summary>
+    /// The items the connection raised, in order.
+    /// </summary>
+    private readonly ConcurrentQueue<PipeConnectionItem> _items = [];
+
+    /// <summary>
+    /// Released once for every item the connection raised.
+    /// </summary>
+    private readonly SemaphoreSlim _itemArrived = new(0);
+
+    /// <summary>
     /// The runs started by the test.
     /// </summary>
     private readonly List<Task> _runs = [];
@@ -1676,6 +1686,82 @@ public sealed class PipeConnectionTests : IDisposable
     }
 
     /// <summary>
+    /// Every tick, trade-routes item, session start and first session end is raised as an item in the order read, each with
+    /// the read stamp of the frame that produced it, and a repeated session end raises no item (feature 40, S2).
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    [TestCategory("AC3")]
+    public async Task PipeConnectionRunRaisesItemReceivedInReadOrder()
+    {
+        // Arrange
+        var stream = EnqueueStream();
+        var connection = TrackItems(CreateConnection(null));
+        var tradeRoutes = TradeRoutesFrame()[sizeof(int)..];
+        var expected = new[]
+                       {
+                           DescribeItem(PipeTickResultKind.Tick, 3, 100),
+                           DescribeItem(PipeTickResultKind.TradeRoutes, 4, null),
+                           DescribeItem(PipeTickResultKind.Tick, 5, 200),
+                           DescribeItem(PipeTickResultKind.SessionStart, 5, null),
+                           DescribeItem(PipeTickResultKind.SessionEnd, 6, null),
+                           DescribeItem(PipeTickResultKind.TradeRoutes, 8, null)
+                       };
+
+        StartRun(connection);
+
+        await WaitForPendingReadsAsync(stream, 1);
+
+        // Act
+        await FeedOneSecondApartAsync(stream,
+                                      1,
+                                      PipeTestFrames.Version(2),
+                                      PipeTestFrames.Island(1, 100),
+                                      PipeTestFrames.Island(1, 200),
+                                      tradeRoutes,
+                                      PipeTestFrames.SessionStart("Capital"),
+                                      PipeTestFrames.SessionEnd(),
+                                      PipeTestFrames.SessionEnd(),
+                                      tradeRoutes);
+        await WaitForItemsAsync(expected.Length);
+
+        // Assert
+        Assert.AreSequenceEqual(expected, _items.Select(DescribeItem).ToArray(), "The items should be raised in read order with their read stamps, without one for the repeated session end");
+        Assert.AreEqual(PipeTickResultKind.TradeRoutes, _items.Last().Result.Kind, "The last item should be the trade routes read after the repeated session end");
+    }
+
+    /// <summary>
+    /// An item handler that throws neither stops the other handlers nor the connection (feature 40, S2).
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    [TestCategory("AC3")]
+    public async Task PipeConnectionThrowingItemHandlerIsIgnored()
+    {
+        // Arrange
+        var stream = EnqueueStream();
+        var connection = CreateConnection(null);
+
+        connection.ItemReceived += (_, _) => throw new InvalidOperationException("The handler failed.");
+        TrackItems(connection);
+        StartRun(connection);
+
+        await WaitForPendingReadsAsync(stream, 1);
+
+        // Act
+        stream.Feed(PipeTestFrames.Wire(PipeTestFrames.Version(2), PipeTestFrames.Island(1, 100), PipeTestFrames.Island(1, 200), PipeTestFrames.Island(1, 300)));
+
+        await WaitForItemsAsync(2);
+        await WaitForPendingReadsAsync(stream, 2);
+
+        // Assert
+        long?[] expected = [100L, 200L];
+
+        Assert.AreSequenceEqual(expected, _items.Select(item => item.Result.Tick?.GameTime).ToArray(), "The other handler should receive every item");
+        Assert.AreEqual(Status(PipeConnectionState.Receiving), connection.Status, "The connection should keep receiving");
+    }
+
+    /// <summary>
     /// A tick that has not closed sets no last tick and raises no tick event, up to the end of its quiet period.
     /// </summary>
     /// <returns>The task</returns>
@@ -2137,6 +2223,28 @@ public sealed class PipeConnectionTests : IDisposable
     }
 
     /// <summary>
+    /// Describes an expected item of the connection.
+    /// </summary>
+    /// <param name="kind">The kind of the item</param>
+    /// <param name="seconds">The read stamp in seconds after the start of the clock</param>
+    /// <param name="gameTime">The game time of a tick, or <see langword="null" /> for another item</param>
+    /// <returns>The description</returns>
+    private static string DescribeItem(PipeTickResultKind kind, int seconds, long? gameTime)
+    {
+        return string.Create(CultureInfo.InvariantCulture, $"{kind} read={_start.AddSeconds(seconds):O} game={gameTime}");
+    }
+
+    /// <summary>
+    /// Describes an item the connection raised.
+    /// </summary>
+    /// <param name="item">The item</param>
+    /// <returns>The description</returns>
+    private static string DescribeItem(PipeConnectionItem item)
+    {
+        return string.Create(CultureInfo.InvariantCulture, $"{item.Result.Kind} read={item.ReadStamp:O} game={item.Result.Tick?.GameTime}");
+    }
+
+    /// <summary>
     /// Describes a tick with all its values.
     /// </summary>
     /// <param name="tick">The tick</param>
@@ -2353,6 +2461,39 @@ public sealed class PipeConnectionTests : IDisposable
     }
 
     /// <summary>
+    /// Subscribes the item list of the test to the items of a connection.
+    /// </summary>
+    /// <param name="connection">The connection</param>
+    /// <returns>The connection</returns>
+    private PipeConnection TrackItems(PipeConnection connection)
+    {
+        connection.ItemReceived += (_, item) =>
+                                   {
+                                       _items.Enqueue(item);
+                                       _itemArrived.Release();
+                                   };
+
+        return connection;
+    }
+
+    /// <summary>
+    /// Waits until the connection raised the given number of further items, within the guard.
+    /// </summary>
+    /// <param name="count">The number of items</param>
+    /// <returns>The task</returns>
+    private async Task WaitForItemsAsync(int count)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.CancellationToken);
+
+        timeout.CancelAfter(_guard);
+
+        for (var index = 0; index < count; index++)
+        {
+            await _itemArrived.WaitAsync(timeout.Token);
+        }
+    }
+
+    /// <summary>
     /// Waits until the connection raised the given number of further ticks, within the guard.
     /// </summary>
     /// <param name="count">The number of ticks</param>
@@ -2451,6 +2592,7 @@ public sealed class PipeConnectionTests : IDisposable
     {
         _stop.Dispose();
         _tickArrived.Dispose();
+        _itemArrived.Dispose();
     }
 
     #endregion // IDisposable
