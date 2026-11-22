@@ -266,7 +266,9 @@ public sealed class SparklineLoaderTests
         loader.Request(_address, _asOf, failing, Changed);
 
         var failed = await WaitUntilAsync(() => loader.IsFailedFor(_address));
-        var changedAfterFailure = Volatile.Read(ref _changedCount);
+
+        // The loader marks the failure first and reports the change after it, so the report is waited for too
+        var reported = await WaitUntilAsync(() => Volatile.Read(ref _changedCount) >= 1);
 
         loader.Request(_address, _asOf.AddMinutes(2), Read("retry", Answered(ReadOf())), Changed);
 
@@ -280,7 +282,7 @@ public sealed class SparklineLoaderTests
 
         // Assert
         Assert.IsTrue(failed, "The address should be marked failed");
-        Assert.IsGreaterThanOrEqualTo(1, changedAfterFailure, "The failure should be reported as a change, so the page shows it");
+        Assert.IsTrue(reported, "The failure should be reported as a change, so the page shows it");
         Assert.IsNull(loader.HeldFor(_address), "A failed read should hold nothing");
         Assert.AreEqual(1, callsBeforeOther, "A failed address should not be read again");
         Assert.IsTrue(otherRead, "The loader should go on reading another address");
