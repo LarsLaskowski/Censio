@@ -1,6 +1,6 @@
 # 0102: Until the player can choose a profile, live data goes to one fixed profile `Live`
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-22
 - **Area:** live-sending
 - **Source:** Issue #40; Issue #43 (settings window)

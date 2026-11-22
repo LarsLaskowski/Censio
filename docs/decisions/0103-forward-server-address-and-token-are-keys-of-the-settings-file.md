@@ -1,6 +1,6 @@
 # 0103: Forward mode's server address and ingest token are keys of the settings file
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-22
 - **Area:** live-sending
 - **Source:** Issue #40; Issue #43 (settings window)

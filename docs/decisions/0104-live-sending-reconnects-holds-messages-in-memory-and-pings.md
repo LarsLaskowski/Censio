@@ -1,6 +1,6 @@
 # 0104: Live sending reconnects with growing delays, holds waiting messages in memory and finds a dead connection by its own pings
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-22
 - **Area:** live-sending
 - **Source:** Issue #40; Issue #41 (persistent buffer)
