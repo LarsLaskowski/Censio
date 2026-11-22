@@ -53,9 +53,9 @@ public static class ReplayTokenFile
                    };
         }
 
-        var token = bytes.Length > MaxFileBytes ? null : Decode(bytes)?.Trim(' ', '\t', '\r', '\n');
+        var token = bytes.Length > MaxFileBytes ? null : ReadToken(Decode(bytes));
 
-        return token is not null && token.Length is >= MinTokenLength and <= MaxTokenLength && token.All(IsTokenCharacter)
+        return token is not null
                    ? new ReplayTokenFileResult
                      {
                          Kind = ReplayTokenFileResultKind.Read,
@@ -67,18 +67,19 @@ public static class ReplayTokenFile
                      };
     }
 
-    // Skeleton: removed with the implementation
-#pragma warning disable RH2003
     /// <summary>
     /// Reads the token from a text.
     /// </summary>
-    /// <param name="text">The text</param>
+    /// <param name="text">The text, or <see langword="null" /></param>
     /// <returns>The trimmed token, or <see langword="null" /> when the text holds no valid token</returns>
-    public static string? ReadToken(string text)
+    public static string? ReadToken(string? text)
     {
-        throw new NotImplementedException();
+        var token = text?.Trim(' ', '\t', '\r', '\n');
+
+        return token is not null && token.Length is >= MinTokenLength and <= MaxTokenLength && token.All(IsTokenCharacter)
+                   ? token
+                   : null;
     }
-#pragma warning restore RH2003
 
     /// <summary>
     /// Reads up to a number of bytes from a stream.

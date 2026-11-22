@@ -200,7 +200,7 @@ public static class CompanionSettings
 
         if (modes[0].ValueKind != JsonValueKind.String)
         {
-            return Invalid("mode is not local");
+            return Invalid("mode is not local or forward");
         }
 
         var mode = modes[0].GetString();
@@ -213,9 +213,14 @@ public static class CompanionSettings
                    };
         }
 
+        if (string.Equals(mode, "forward", StringComparison.OrdinalIgnoreCase))
+        {
+            return ReadForward(root);
+        }
+
         if (string.Equals(mode, "local", StringComparison.OrdinalIgnoreCase) == false)
         {
-            return Invalid("mode is not local");
+            return Invalid("mode is not local or forward");
         }
 
         var ports = FindProperties(root, LocalPortKey);
@@ -241,6 +246,57 @@ public static class CompanionSettings
                          Port = port
                      }
                    : Invalid("localPort is not a port from 1 to 65535");
+    }
+
+    /// <summary>
+    /// Reads the forward setting of the root object of a settings file.
+    /// </summary>
+    /// <param name="root">The root object</param>
+    /// <returns>The setting</returns>
+    private static LocalServerSetting ReadForward(JsonElement root)
+    {
+        var addresses = FindProperties(root, ServerAddressKey);
+
+        if (addresses.Count == 0)
+        {
+            return Invalid("serverAddress is missing");
+        }
+
+        if (addresses.Count > 1)
+        {
+            return Invalid("serverAddress occurs more than once");
+        }
+
+        if (addresses[0].ValueKind != JsonValueKind.String
+            || CompanionCommandLine.TryParseServerAddress(addresses[0].GetString() ?? string.Empty, out var address) == false)
+        {
+            return Invalid("serverAddress is not a ws:// or wss:// address");
+        }
+
+        var tokens = FindProperties(root, ServerTokenKey);
+
+        if (tokens.Count > 1)
+        {
+            return Invalid("serverToken occurs more than once");
+        }
+
+        string? token = null;
+
+        if (tokens.Count == 1)
+        {
+            token = tokens[0].ValueKind == JsonValueKind.String ? ReplayTokenFile.ReadToken(tokens[0].GetString() ?? string.Empty) : null;
+
+            if (token is null)
+            {
+                return Invalid("serverToken is not a valid token");
+            }
+        }
+
+        return new LocalServerSetting
+               {
+                   Kind = LocalServerSettingKind.Forward,
+                   Forward = new ForwardServerSetting(address, token)
+               };
     }
 
     /// <summary>

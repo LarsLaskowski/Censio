@@ -338,8 +338,6 @@ public static class TrayMenu
                };
     }
 
-    // Skeleton: removed with the implementation
-#pragma warning disable RH2003
     /// <summary>
     /// Formats the text of the server connection entry of forward mode.
     /// </summary>
@@ -347,9 +345,28 @@ public static class TrayMenu
     /// <returns>The text</returns>
     public static string FormatLiveSend(LiveSendStatus status)
     {
-        throw new NotImplementedException();
+        return status.State switch
+               {
+                   LiveSendState.Connecting => "Server: connecting",
+                   LiveSendState.Connected => "Server: connected",
+                   LiveSendState.Retrying => status.Problem switch
+                                             {
+                                                 ReplaySendProblemKind.ServerUnreachable => "Server: unreachable, retrying",
+                                                 ReplaySendProblemKind.NoAnswer => "Server: not answering, retrying",
+                                                 ReplaySendProblemKind.ConnectionLost => "Server: connection lost, retrying",
+                                                 ReplaySendProblemKind.InvalidReply => "Server: invalid reply, retrying",
+                                                 ReplaySendProblemKind.CompanionConnected => "Server: another Companion is connected, retrying",
+                                                 _ => "Server: not connected"
+                                             },
+                   LiveSendState.Stopped => status.Problem switch
+                                            {
+                                                ReplaySendProblemKind.TokenRefused => "Server: token refused",
+                                                ReplaySendProblemKind.VersionNotSupported => "Server: does not support contract version 2",
+                                                _ => "Server: not connected"
+                                            },
+                   _ => "Server: not connected"
+               };
     }
-#pragma warning restore RH2003
 
     /// <summary>
     /// Formats the text of the catalog entry.

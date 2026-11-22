@@ -175,18 +175,17 @@ public sealed class LocalServerSession : IAsyncDisposable
         return _token.Task.WaitAsync(cancellationToken);
     }
 
-    // Skeleton: removed with the implementation
-#pragma warning disable S2325, RH2003
     /// <summary>
     /// Waits for the token of the running server for live sending.
     /// </summary>
     /// <param name="cancellationToken">The token that cancels the wait</param>
     /// <returns>The token, or <see langword="null" /> when the server does not run</returns>
-    public Task<string?> WaitForLiveTokenAsync(CancellationToken cancellationToken)
+    public async Task<string?> WaitForLiveTokenAsync(CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        var token = await _token.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+
+        return _ended.Task.IsCompleted ? null : token;
     }
-#pragma warning restore S2325, RH2003
 
     /// <summary>
     /// Stops the server.
