@@ -285,3 +285,95 @@ amended by 0102 for the time before #43 (Product Manager). No new listener.
 
 As spec *Out of scope*: the persistent buffer (#41), the catalog (#42), profile choice and the settings window (#43),
 a replay to the forward server without `--server`, the server state in tooltip and icon.
+
+## Challenge notes
+
+## Plan challenge: feature 40, forward mode (`/home/user/Censio/specs/feature-40-forward-mode/plan.md`)
+
+The plan holds up. I checked its verified facts against the code and found them correct:
+- Fact 2: `PipeConnection.cs` publishes only `item.Tick` (lines 346–349).
+- Fact 10: `CompanionSettings.cs` 191–209 and `LocalServerSession.cs` 140.
+- Fact 12: `_token` is set once, at line 335.
+- Fact 13: `TrayMenu.cs` 282.
+- Fact 14: `git tag --contains 466fdcb` returns nothing.
+- Fact 4: there are 18 `TrayMenu.Create` calls in the tests, and `ReplaySenderTests` counts reply timers by `ReplyTimeout` (line 1551), so the `IngestClient` move really is pinned.
+
+Moving the connection logic into `IngestClient`, rather than starting a new `ReplaySender` per attempt, is justified: `SendTickAsync` creates a new identity on every call (`ReplaySender.cs` 326). The server's handling of resends (`docs/areas/ingest.md` 114–115) supports resending with the same identity. Not changing anything is not an option, because nothing sends live data today (`App.xaml.cs` 276–301). I found no major objection.
+
+### Minor objections (each written as an instruction)
+
+1. **Minor — an invalid forward setting goes down the local-mode path.** The plan says "No `Open Censio` in forward mode", but an invalid setting creates a `LocalServerSession`.
+   - Evidence: `TrayMenu.cs` 299–302 adds a greyed `Open Censio` for every `LocalServerStatus`.
+   - Evidence: `ReplaySenderFactory.Create` turns a non-null `_localServer` into `ReplaySender.ForLocalServer`. So `--replay` with an invalid forward setting ends with "local server not running" instead of staying offline. That is today's behavior for `"mode": "forward"`, so S6 "as today" still holds.
+   - Instruction: the Dev states both outcomes in `live-sending.md` and `local-mode.md`. The Tester adds a `TrayMenu` row showing that an invalid setting keeps the greyed `Open Censio`. Alternatively, the Lead decides to drop that entry for a forward-mode invalid setting.
+   - Why minor: a detail of what the user sees, not a wrong build.
+2. **Minor — `IsHosted` must keep its command-line check.** Today it is `setting.Kind != Off && mode != CompanionMode.Invalid` (`LocalServerSession.cs` 140). The plan's "`Kind is Local or Invalid`" drops the mode check if taken literally.
+   - Instruction: write `setting.Kind is Local or Invalid && mode != CompanionMode.Invalid`. Keep the invalid-command-line row of `LocalServerSessionIsHostedPerModeAndSetting`.
+   - Why minor: the existing test catches the mistake.
+3. **Minor — the "within 45 seconds" claim is too tight.**
+   - Evidence: the server uses the same .NET keep-alive (`IngestEndpoint.cs` 35–55, interval 15 s, timeout 35 s, 50 s in total), and its measured worst case was 56.24 s (`ingest.md` 59–62), about 6 s over interval plus timeout.
+   - Instruction: `live-sending.md` and record 0104 promise "within 60 seconds" (spec N3), not 45. Fact 7 cites the server's measurement as prior evidence that the mechanism works.
+   - Why minor: 15 + 30 plus about 6 s still meets N3.
+4. **Minor — the keep-alive connector tests run on the real clock.** `ClientWebSocket` takes no `TimeProvider`, and `docs/UNIT_TESTS.md` 81–82 says never to use the real clock.
+   - Instruction: the Tester notes the exception in the test's documentation and asserts only the outcome (aborted or still open), never a duration.
+   - Instruction: in `…KeepsAnsweringConnection`, use a timeout several times the interval (for example interval 1 s, timeout 5 s, observed over three intervals). A 1 s pong timeout under coverage on CI is likely to fail at random.
+   - Why minor: concerns how the test is written, not the plan.
+5. **Minor — `tasks.md` row 1 and the plan's *Signatures* disagree.** Row 1 asks for "the `required` properties of … `TrayServerStatus`", but *Signatures* gives `Local` and `Live` as plain `{ get; init; }`, and both must be able to be null.
+   - Instruction: the Dev follows *Signatures* (`TrayServerStatus` has no required members).
+   - Why minor: a wording conflict.
+6. **Minor — set the live sender's starting pipe state from the connection.** `PipeConnection` starts as `WaitingForGame` (line 43) and raises `StatusChanged` only on a change (467–476). With the game closed, no event ever fires.
+   - Instruction: in `App`, call `NotifyState(connection.Status.State)` before subscribing, instead of relying on the enum default happening to be right.
+   - Why minor: the result is correct today by coincidence.
+7. **Minor — the user guide's token source covers only the generated token.** `docker exec censio cat /config/ingest-token` holds only while `Censio:Ingest:TokenFile` is unset (README 188, 193). A token from that file may contain `"` or `\` (any visible ASCII), so record 0103's "the token needs no JSON escape" is true only for the generated token.
+   - Instruction: the forward-mode section of `USER_GUIDE.md` names the `TokenFile` case and says to JSON-escape `"` and `\`. It also says to omit `serverToken` when `RequireToken` is `false`. Record 0103 narrows its sentence to the generated token.
+   - Why minor: a documentation detail.
+8. **Minor — the dropped-messages count may never be logged.** `LiveMessagesDropped` is written only "at the next acknowledgement after a drop", so an `Exit` during an outage, or the `Stopped` state after a token refusal, loses the count that spec E5 and AC5 say is logged.
+   - Instruction: `live-sending.md` states that the count is logged after the reconnect and is lost at `Exit` or after a final refusal. The alternative is to log it once at the first drop since the last log line, which keeps N6's bound.
+   - Why minor: the line is a diagnostic, not data.
+
+## Security notes
+
+## Security review: feature #40, forward mode (mode `plan`)
+
+Inputs: `/home/user/Censio/specs/feature-40-forward-mode/spec.md`, `plan.md`, and records `docs/decisions/0102`–`0104`. I read them against `.squad/project.md`, `SECURITY.md`, `docs/areas/replay-sending.md` and the current code: `CompanionSettings.cs`, `ReplayTokenFile.cs`, `CompanionCommandLine.TryParseServerAddress`, `ClientWebSocketConnector.cs`, `LocalServerSession.cs`, `ReplaySender.cs` (its exception mapping), `PipeConnection.cs` (how it guards subscribers), `TrayMenu.FormatReplaySendReason`, `App.xaml.cs` (`Run`, `BackgroundTaskFailed`) and `ClientWebSocketConnectorTests.cs`.
+
+The plan is good to proceed. There are no blocking findings, and three non-blocking ones need a small fix now.
+
+**What I checked and found correct:**
+- **Tier and areas:** the tier `security` is right. The four areas listed under *Security areas touched* are complete. The other changed types (`ReplayTokenFile`, `CompanionCommandLine`, `ClientWebSocketConnector`, `PipeConnection`) fall under outbound calls and parsing, or open nothing new. There is no new listener.
+- **Settings parsing, bypass classes enumerated:**
+  - Key names are matched after JSON unescaping, so an escaped key such as `"serverToken"` is found and counted as a duplicate.
+  - Case variants count as duplicates because `FindProperties` uses `OrdinalIgnoreCase`, which ignores culture. A Kelvin-sign or Turkish-i key matches nothing, so no token is sent and the failure stays closed.
+  - Comments, the BOM and trailing commas are handled by the existing `ParseDocument`. A UTF-16 file or malformed JSON makes the setting `Off`, so nothing is sent.
+  - The token rule (32–1,024 characters from `!` to `~` after trimming) runs on the unescaped value, so `\u0000`, non-ASCII text and surrogates are refused.
+  - The address goes through the `--server` rule. Whitespace and control characters (after unescaping), `#` and user info are refused, and only `ws://` or `wss://` is allowed.
+  - `serverToken` is read only with `mode` `forward`. No problem text quotes a value.
+- **Token handling:**
+  - The token is sent only in the hello.
+  - `ForwardServerSetting` is a class, so the `LocalServerSetting` record prints only its type name, and the plan has a test for that.
+  - `ContractHello` is a class, not a record.
+  - `tokenRefused` and `unsupportedVersion` are final, so the server's block after 10 failed hellos is never reached. `companionConnected` does not count toward that block.
+  - An untrusted `wss://` certificate fails before the upgrade, so no token is sent.
+  - In local mode, `WaitForLiveTokenAsync` returns null once the server has stopped, and `Dispose` cancels the sender before the server stops.
+- **Logging:**
+  - `{Reason}` comes from `FormatReplaySendReason`, which returns fixed texts only.
+  - Refusals are parsed by the strict `ContractEnumJsonConverter` and logged by enum name.
+  - The moved `IngestClient` code maps every exception (catch-all) to a `ReplaySendProblemKind`.
+  - `PipeConnection` already swallows exceptions thrown by subscribers, so `Enqueue` cannot leak an exception text through it.
+- **Memory bound:** the queue keeps only `(id, bytes)`. It is capped at 64 messages and 16 MiB, plus the message in flight and at least the newest. The tests `LiveSenderEnqueueBeyondCountBoundDropsOldest` and `…ByteBoundDropsOldest` pin both caps. Nothing is written to disk.
+- **Fact 7 (the keep-alive timeout):** dead-connection detection is a reliability property, not a security one. The Tester's measurement already gates step 6, so I ran no probe.
+
+**Findings:**
+
+1. [NON-BLOCKING] **An unexpected exception in `LiveSender.RunAsync` would put exception text in the log, breaking N5 and AC10.** `App.Run` (`src/Censio.Companion/App.xaml.cs:512–517`) logs a faulted task with `CompanionLog.BackgroundTaskFailed(_logger, task.Exception!)`. `LogLine.Format` then writes `exception.ToString()`. Only `IngestClient` is said to map every exception. `LiveSender`'s own code (the token wait, the queue, status handling, the retry delay) is not covered. A socket or HTTP exception's text can hold the host and port.
+   Smallest fix: under *Live sender*, add "`RunAsync` lets no exception other than cancellation escape: an unexpected one ends in `Stopped` with `ConnectionLost` and the `LiveSendFailed` line, never `BackgroundTaskFailed`". Pin it with a `LiveSenderTests` row whose token delegate throws, asserting that no log entry carries an exception.
+   Recommendation: fix now
+
+2. [NON-BLOCKING] **The tests for AC7 do not cover the security rules on the live connector.** Every connector test builds `new ClientWebSocketConnector(new FakeTimeProvider())` (`ClientWebSocketConnectorTests.cs` lines 67, 86, 106, 126, 151). That includes the redirect, untrusted-certificate, no-`Origin` and proxy-bypass tests. The live sender uses the new keep-alive constructor, which none of these tests exercise. The plan relies on "the existing connector tests … unchanged".
+   Smallest fix: under AC7, make `ClientWebSocketConnectorRedirectGivesNoSocket`, `…UntrustedCertificateGivesNoSocket`, `…SendsNoOrigin` and `…BypassesSystemProxy` data rows over both constructors (keep-alive 15 s / 30 s).
+   Recommendation: fix now
+
+3. [NON-BLOCKING] **The new cleartext exposure is not stated.** Today's accepted risk (`SECURITY.md` line 36, `replay-sending.md` line 79) covers a replay the user starts once. Forward mode sends the token over `ws://` with no one watching: at every sign-in and every retry (up to every 30 seconds), to whatever answers the configured name. A single-label name such as the spec's `ws://nas:8080/ingest` may be resolved by LLMNR, NetBIOS or mDNS, which any host on the current network can answer. The plan's `SECURITY.md` item says only "`wss://` where the path is not trusted".
+   Smallest fix: add this sentence to the *Accepted risks* of `docs/areas/live-sending.md`, verbatim, and the same sentence to `SECURITY.md` *Deployment* after the replay sentence, verbatim:
+   "Over `ws://` the Companion sends the ingest token unencrypted at every start and every retry, unattended, to whatever host answers `serverAddress`; a name without a domain (such as `nas`) may be answered by any device of the network the PC is on, so use `wss://`, or an address on a network you trust, when the PC leaves your home network."
+   Recommendation: fix now
