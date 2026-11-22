@@ -409,6 +409,41 @@ public sealed class LiveSenderTests : IDisposable
     }
 
     /// <summary>
+    /// A pipe state change raised while the connection is being taken into use, here by a status subscriber at connected,
+    /// is sent after the state known before the connection, so the server ends with the newest state (S2).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC3")]
+    public async Task LiveSenderNotifyStateDuringConnectSendsNewestStateLast()
+    {
+        // Arrange
+        var connector = new QueuedIngestConnector();
+        var server = AddServer(connector);
+        var sender = CreateSender(connector, CreateTimeProvider(), Token);
+
+        sender.NotifyState(PipeConnectionState.Receiving);
+        sender.StatusChanged += (_, status) =>
+                                {
+                                    if (status.State == LiveSendState.Connected)
+                                    {
+                                        sender.NotifyState(PipeConnectionState.ProtocolMismatch);
+                                    }
+                                };
+
+        // Act
+        StartRun(sender);
+        await AcceptAsync(server);
+
+        var first = await server.ReceiveAsync(TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+        var second = await server.ReceiveAsync(TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(ContractPipeState.Receiving, Assert.IsInstanceOfType<ContractStatus>(first, "A status should follow the accept").PipeState, "The first status should be the state known before the connection");
+        Assert.AreEqual(ContractPipeState.ProtocolMismatch, Assert.IsInstanceOfType<ContractStatus>(second, "The change should be sent as a status").PipeState, "The last status sent should be the newest state");
+    }
+
+    /// <summary>
     /// A tick the contract writer refuses is not sent, is logged once, and the next item is sent (E8).
     /// </summary>
     /// <returns>A task that completes when the test is done</returns>
