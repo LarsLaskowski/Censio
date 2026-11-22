@@ -16,11 +16,11 @@ from a replay, and the Product Manager's answer on #39 left its live data to thi
 ## Scenarios
 
 - S1: Given a running server and a settings file with `"mode": "forward"`, `"serverAddress": "ws://nas:8080/ingest"`
-  and the server's ingest token (Open question Q2), when the Companion starts, then the menu line reads
+  and `"serverToken": "<the server's ingest token>"` (Q2), when the Companion starts, then the menu line reads
   `Server: connecting`, then `Server: connected`, without the game running.
 - S2: Given S1 and the game running, when the Companion reads ticks, trade routes and session events from the pipe,
   then each reaches the server in the order read with its live receive time, and the open pages update live under the
-  profile of Q1; the server shows the Companion as connected with the reported pipe state.
+  profile `Live` (Q1); the server shows the Companion as connected with the reported pipe state.
 - S3: Given a connected Companion, when the server restarts (or the network drops, or the PC sleeps and wakes), then
   the line reads `Server: connection lost, retrying` and the Companion reconnects on its own; what waited is sent after
   the reconnect in order, and the line reads `Server: connected`.
@@ -81,7 +81,8 @@ from a replay, and the Product Manager's answer on #39 left its live data to thi
   values show `Server: settings invalid`, log the problem, send nothing and keep the game folder; `forward` is no
   longer an invalid `mode` (S1, E1, E2, N1).
 - AC2: At start, without waiting for the game, the Companion connects and sends one hello with contract version 2,
-  its version, the token and the profile of Q1; the line reads `Server: connecting`, then `Server: connected` (S1, N7).
+  its version, the token and the fixed profile (one identity built into the Companion, the same on every start,
+  named `Live`, Q1); the line reads `Server: connecting`, then `Server: connected` (S1, N7).
 - AC3: After the accepted hello every live tick with islands, trade-routes item, session start and first session end
   is sent in the order read with its live receive time and a new identity, one in flight; a `status` follows the
   accept and each pipe state change (S2, E8).
@@ -113,17 +114,15 @@ from a replay, and the Product Manager's answer on #39 left its live data to thi
 
 ## Open questions
 
-- Q1: Which profile do live ticks go to before #43 lets the player pick one? Pending — escalated to the Product
-  Manager. Recommendation: one fixed profile identity built into the Companion with the name `Live`, the same on every
-  start, so the history continues across restarts and updates without the Companion writing a file; one Companion per
-  server (record 0020) keeps it unique. Alternative: a `profileName` key whose identity is derived from the name.
-- Q2: Where does the token live? Pending — escalated. Recommendation: the key `serverToken` in `settings.json` (#43's
-  window lists "token" among the settings it writes; the file is private to the Windows user; the generated token is
-  Base64url and needs no JSON escape). Alternatives: a key `serverTokenFile` read by the replay's token-file rules, or a
-  fixed file beside `settings.json`.
+- Q1: Which profile do live ticks go to before #43 lets the player pick one? Answered: (Product Manager) one fixed
+  profile identity built into the Companion, the same on every start, with the name `Live`; the history continues
+  across restarts and updates without the Companion writing a file, and one Companion per server (record 0020) keeps it
+  unique. #43 replaces it with the player's choice.
+- Q2: Where does the token live? Answered: (Product Manager) the key `serverToken` in `settings.json`, read with
+  `mode` `forward` only, under E2's rule; the user guide warns not to share the file, which now holds a credential.
 - Q3: Contract version — the issue says "contract v1". Answered: the current contract is version 2
   (`ContractReader.CurrentVersion`, [`contract.md`](../../docs/areas/contract.md)); a version-1 server refuses (E7).
-- Q4: Live data into local mode? Answered: in scope — the Product Manager's answer on #39 left it to #40
+- Q4: Live data into local mode? Answered: (Product Manager) in scope, kept in #40, as the answer on #39 left it
   (`docs/ARCHITECTURE.md`, `local-mode.md`, record 0101).
 - Q5: How is the connection shown? Answered: (Lead) the menu line `Server: <state>` that local mode introduced; the
   tooltip and icon keep the pipe ([`local-mode.md`](../../docs/areas/local-mode.md), *Menu*).
