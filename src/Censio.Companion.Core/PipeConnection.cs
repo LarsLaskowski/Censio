@@ -109,6 +109,14 @@ public sealed class PipeConnection
     /// </summary>
     public event EventHandler<PipeTick>? TickReceived;
 
+    // Skeleton: removed with the implementation
+#pragma warning disable CS0067, S3264
+    /// <summary>
+    /// Occurs when an item has been read: a tick, trade routes, or the start or end of a session.
+    /// </summary>
+    public event EventHandler<PipeConnectionItem>? ItemReceived;
+#pragma warning restore CS0067, S3264
+
     #endregion // Events
 
     #region Properties

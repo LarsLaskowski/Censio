@@ -14,6 +14,22 @@ public sealed class ClientWebSocketConnector : IReplayServerConnector
     /// </summary>
     private readonly TimeProvider _timeProvider;
 
+    // Skeleton: removed with the implementation
+#pragma warning disable S4487
+    /// <summary>
+    /// The interval of the keep-alive pings, or <see langword="null" /> for the default of the socket.
+    /// </summary>
+    private readonly TimeSpan? _keepAliveInterval;
+#pragma warning restore S4487
+
+    // Skeleton: removed with the implementation
+#pragma warning disable S4487
+    /// <summary>
+    /// The time the socket waits for the answer to a ping, or <see langword="null" /> for the default of the socket.
+    /// </summary>
+    private readonly TimeSpan? _keepAliveTimeout;
+#pragma warning restore S4487
+
     #endregion // Fields
 
     #region Constructor
@@ -25,6 +41,19 @@ public sealed class ClientWebSocketConnector : IReplayServerConnector
     public ClientWebSocketConnector(TimeProvider timeProvider)
     {
         _timeProvider = timeProvider;
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ClientWebSocketConnector" /> class.
+    /// </summary>
+    /// <param name="timeProvider">The time provider</param>
+    /// <param name="keepAliveInterval">The interval of the keep-alive pings</param>
+    /// <param name="keepAliveTimeout">The time the socket waits for the answer to a ping</param>
+    public ClientWebSocketConnector(TimeProvider timeProvider, TimeSpan keepAliveInterval, TimeSpan keepAliveTimeout)
+    {
+        _timeProvider = timeProvider;
+        _keepAliveInterval = keepAliveInterval;
+        _keepAliveTimeout = keepAliveTimeout;
     }
 
     #endregion // Constructor
