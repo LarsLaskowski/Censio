@@ -67,6 +67,19 @@ public static class ReplayTokenFile
                      };
     }
 
+    // Skeleton: removed with the implementation
+#pragma warning disable RH2003
+    /// <summary>
+    /// Reads the token from a text.
+    /// </summary>
+    /// <param name="text">The text</param>
+    /// <returns>The trimmed token, or <see langword="null" /> when the text holds no valid token</returns>
+    public static string? ReadToken(string text)
+    {
+        throw new NotImplementedException();
+    }
+#pragma warning restore RH2003
+
     /// <summary>
     /// Reads up to a number of bytes from a stream.
     /// </summary>

@@ -359,8 +359,8 @@ public static partial class CompanionLog
     /// </summary>
     /// <param name="logger">The logger</param>
     /// <param name="problem">The problem</param>
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Local server settings invalid: {Problem}")]
-    public static partial void LocalServerSettingsInvalid(ILogger logger, string problem);
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Server settings invalid: {Problem}")]
+    public static partial void ServerSettingsInvalid(ILogger logger, string problem);
 
     /// <summary>
     /// Logs a running local server.

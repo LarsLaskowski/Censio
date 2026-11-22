@@ -25,9 +25,9 @@ internal sealed class TrayIconSources
     public required Func<GameCatalogStatus> Catalog { get; init; }
 
     /// <summary>
-    /// Gets the reader of the status of the local server, <c>null</c> when none is hosted.
+    /// Gets the reader of the status of the server, <c>null</c> when none is hosted or forwarded to.
     /// </summary>
-    public required Func<LocalServerStatus?> LocalServer { get; init; }
+    public required Func<TrayServerStatus?> Server { get; init; }
 
     /// <summary>
     /// Gets the reader of whether the Companion starts with Windows.

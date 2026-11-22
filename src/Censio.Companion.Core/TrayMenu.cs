@@ -275,11 +275,11 @@ public static class TrayMenu
     /// <param name="snapshot">The snapshot</param>
     /// <param name="game">The status of the game installation search</param>
     /// <param name="catalog">The status of the game catalog</param>
-    /// <param name="localServer">The status of the local server, or <see langword="null" /> when none is hosted</param>
+    /// <param name="server">The status of the server, or <see langword="null" /> when none is hosted or forwarded to</param>
     /// <param name="isAutostartEnabled">Whether the Companion starts with Windows</param>
     /// <param name="clock">The clock</param>
     /// <returns>The entries in display order</returns>
-    public static IReadOnlyList<TrayMenuEntry> Create(string version, TraySnapshot snapshot, GameInstallationStatus game, GameCatalogStatus catalog, LocalServerStatus? localServer, bool isAutostartEnabled, TimeProvider clock)
+    public static IReadOnlyList<TrayMenuEntry> Create(string version, TraySnapshot snapshot, GameInstallationStatus game, GameCatalogStatus catalog, TrayServerStatus? server, bool isAutostartEnabled, TimeProvider clock)
     {
         var entries = new List<TrayMenuEntry>
                       {
@@ -289,14 +289,18 @@ public static class TrayMenu
                           new(TrayMenuEntryKind.Catalog, FormatCatalog(catalog), false)
                       };
 
-        if (localServer is { } server)
+        if (server?.Local is { } local)
         {
-            entries.Add(new TrayMenuEntry(TrayMenuEntryKind.LocalServer, FormatLocalServer(server), false));
+            entries.Add(new TrayMenuEntry(TrayMenuEntryKind.LocalServer, FormatLocalServer(local), false));
+        }
+        else if (server?.Live is { } live)
+        {
+            entries.Add(new TrayMenuEntry(TrayMenuEntryKind.ServerConnection, FormatLiveSend(live), false));
         }
 
         entries.Add(new TrayMenuEntry(TrayMenuEntryKind.Separator, string.Empty, false));
 
-        if (localServer is { } running)
+        if (server?.Local is { } running)
         {
             entries.Add(new TrayMenuEntry(TrayMenuEntryKind.OpenCensio, OpenCensioText, running.State == LocalServerState.Running));
         }
@@ -333,6 +337,19 @@ public static class TrayMenu
                    _ => "Server: settings invalid"
                };
     }
+
+    // Skeleton: removed with the implementation
+#pragma warning disable RH2003
+    /// <summary>
+    /// Formats the text of the server connection entry of forward mode.
+    /// </summary>
+    /// <param name="status">The status of live sending</param>
+    /// <returns>The text</returns>
+    public static string FormatLiveSend(LiveSendStatus status)
+    {
+        throw new NotImplementedException();
+    }
+#pragma warning restore RH2003
 
     /// <summary>
     /// Formats the text of the catalog entry.

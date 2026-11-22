@@ -137,7 +137,7 @@ public sealed class LocalServerSession : IAsyncDisposable
     /// <returns><see langword="true" /> when a server is hosted</returns>
     public static bool IsHosted(CompanionMode mode, LocalServerSetting setting)
     {
-        return setting.Kind != LocalServerSettingKind.Off && mode != CompanionMode.Invalid;
+        return setting.Kind is LocalServerSettingKind.Local or LocalServerSettingKind.Invalid && mode != CompanionMode.Invalid;
     }
 
     /// <summary>
@@ -174,6 +174,19 @@ public sealed class LocalServerSession : IAsyncDisposable
     {
         return _token.Task.WaitAsync(cancellationToken);
     }
+
+    // Skeleton: removed with the implementation
+#pragma warning disable S2325, RH2003
+    /// <summary>
+    /// Waits for the token of the running server for live sending.
+    /// </summary>
+    /// <param name="cancellationToken">The token that cancels the wait</param>
+    /// <returns>The token, or <see langword="null" /> when the server does not run</returns>
+    public Task<string?> WaitForLiveTokenAsync(CancellationToken cancellationToken)
+    {
+        throw new NotImplementedException();
+    }
+#pragma warning restore S2325, RH2003
 
     /// <summary>
     /// Stops the server.
@@ -234,7 +247,7 @@ public sealed class LocalServerSession : IAsyncDisposable
         {
             if (_setting.Kind == LocalServerSettingKind.Invalid)
             {
-                CompanionLog.LocalServerSettingsInvalid(_logger, _setting.Problem ?? string.Empty);
+                CompanionLog.ServerSettingsInvalid(_logger, _setting.Problem ?? string.Empty);
                 SetStatus(LocalServerState.SettingsInvalid);
             }
 

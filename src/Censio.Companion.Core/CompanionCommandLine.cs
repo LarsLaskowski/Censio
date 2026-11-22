@@ -104,6 +104,39 @@ public sealed class CompanionCommandLine
     }
 
     /// <summary>
+    /// Parses the address of the server.
+    /// </summary>
+    /// <param name="argument">The raw argument</param>
+    /// <param name="address">The address if the argument is valid</param>
+    /// <returns>
+    /// <c>true</c> if the argument is an absolute <c>ws</c> or <c>wss</c> address with a host, without user
+    /// information, fragment, white space or control characters
+    /// </returns>
+    public static bool TryParseServerAddress(string argument, [NotNullWhen(true)] out Uri? address)
+    {
+        address = null;
+
+        if (argument.Length == 0
+            || argument.Contains('#')
+            || argument.Any(character => char.IsWhiteSpace(character) || char.IsControl(character)))
+        {
+            return false;
+        }
+
+        if (Uri.TryCreate(argument, UriKind.Absolute, out var parsed) == false
+            || (parsed.Scheme != Uri.UriSchemeWs && parsed.Scheme != Uri.UriSchemeWss)
+            || parsed.Host.Length == 0
+            || parsed.UserInfo.Length > 0)
+        {
+            return false;
+        }
+
+        address = parsed;
+
+        return true;
+    }
+
+    /// <summary>
     /// Takes a switch and its value when the switch is at the index, was not given before and the value is accepted.
     /// </summary>
     /// <param name="args">The arguments</param>
@@ -164,39 +197,6 @@ public sealed class CompanionCommandLine
                {
                    Mode = CompanionMode.Invalid
                };
-    }
-
-    /// <summary>
-    /// Parses the address of the server.
-    /// </summary>
-    /// <param name="argument">The raw argument</param>
-    /// <param name="address">The address if the argument is valid</param>
-    /// <returns>
-    /// <c>true</c> if the argument is an absolute <c>ws</c> or <c>wss</c> address with a host, without user
-    /// information, fragment, white space or control characters
-    /// </returns>
-    private static bool TryParseServerAddress(string argument, [NotNullWhen(true)] out Uri? address)
-    {
-        address = null;
-
-        if (argument.Length == 0
-            || argument.Contains('#')
-            || argument.Any(character => char.IsWhiteSpace(character) || char.IsControl(character)))
-        {
-            return false;
-        }
-
-        if (Uri.TryCreate(argument, UriKind.Absolute, out var parsed) == false
-            || (parsed.Scheme != Uri.UriSchemeWs && parsed.Scheme != Uri.UriSchemeWss)
-            || parsed.Host.Length == 0
-            || parsed.UserInfo.Length > 0)
-        {
-            return false;
-        }
-
-        address = parsed;
-
-        return true;
     }
 
     /// <summary>

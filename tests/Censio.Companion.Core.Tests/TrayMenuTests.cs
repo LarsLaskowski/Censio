@@ -1269,7 +1269,16 @@ public sealed class TrayMenuTests
         var localServer = CreateLocalServerStatus(LocalServerState.Running, 5117);
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, localServer, false, CreateClock(1));
+        var entries = TrayMenu.Create("1.2.3",
+                                      snapshot,
+                                      GameInstallationStatus.Searching,
+                                      GameCatalogStatus.Reading,
+                                      new TrayServerStatus
+                                      {
+                                          Local = localServer
+                                      },
+                                      false,
+                                      CreateClock(1));
 
         // Assert
         var kinds = entries.Select(entry => entry.Kind).ToList();
@@ -1342,7 +1351,16 @@ public sealed class TrayMenuTests
                             };
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, localServer, false, CreateClock(1));
+        var entries = TrayMenu.Create("1.2.3",
+                                      snapshot,
+                                      GameInstallationStatus.Searching,
+                                      GameCatalogStatus.Reading,
+                                      new TrayServerStatus
+                                      {
+                                          Local = localServer
+                                      },
+                                      false,
+                                      CreateClock(1));
 
         // Assert
         var openCensio = entries.Single(entry => entry.Kind == TrayMenuEntryKind.OpenCensio);
@@ -1372,7 +1390,16 @@ public sealed class TrayMenuTests
         var localServer = CreateLocalServerStatus(state, 5000);
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, localServer, false, CreateClock(1));
+        var entries = TrayMenu.Create("1.2.3",
+                                      snapshot,
+                                      GameInstallationStatus.Searching,
+                                      GameCatalogStatus.Reading,
+                                      new TrayServerStatus
+                                      {
+                                          Local = localServer
+                                      },
+                                      false,
+                                      CreateClock(1));
 
         // Assert
         var openCensio = entries.Single(entry => entry.Kind == TrayMenuEntryKind.OpenCensio);

@@ -22,5 +22,10 @@ public sealed record LocalServerSetting
     /// </summary>
     public string? Problem { get; init; }
 
+    /// <summary>
+    /// Gets the server setting of forward mode, or <see langword="null" /> in any other kind.
+    /// </summary>
+    public ForwardServerSetting? Forward { get; init; }
+
     #endregion // Properties
 }

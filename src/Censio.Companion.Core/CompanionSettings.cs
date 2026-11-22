@@ -32,6 +32,16 @@ public static class CompanionSettings
     public const string LocalPortKey = "localPort";
 
     /// <summary>
+    /// The key of the server address in the settings file.
+    /// </summary>
+    public const string ServerAddressKey = "serverAddress";
+
+    /// <summary>
+    /// The key of the server token in the settings file.
+    /// </summary>
+    public const string ServerTokenKey = "serverToken";
+
+    /// <summary>
     /// The port of the local server when the settings file names none.
     /// </summary>
     public const int DefaultLocalPort = 5000;

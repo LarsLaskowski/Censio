@@ -402,7 +402,12 @@ public sealed partial class App : Application, IDisposable
                                      Snapshot = () => _snapshot(),
                                      Game = () => _gameSearch?.Status ?? GameInstallationStatus.Searching,
                                      Catalog = () => _catalogLoader?.Status ?? GameCatalogStatus.Reading,
-                                     LocalServer = () => _localServer?.Status,
+                                     Server = () => _localServer?.Status is { } status
+                                                        ? new TrayServerStatus
+                                                          {
+                                                              Local = status
+                                                          }
+                                                        : null,
                                      IsAutostartEnabled = () => _autostart?.Refresh() ?? false
                                  },
                                  Dispatch);
