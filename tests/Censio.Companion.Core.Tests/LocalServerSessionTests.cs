@@ -196,6 +196,30 @@ public sealed class LocalServerSessionTests
     }
 
     /// <summary>
+    /// An invalid setting without a problem text starts no server and logs the warning with an empty problem (E1).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC1")]
+    public async Task LocalServerSessionRunWithInvalidSettingWithoutProblemLogsEmptyProblem()
+    {
+        // Arrange
+        var setting = new LocalServerSetting
+                      {
+                          Kind = LocalServerSettingKind.Invalid
+                      };
+        var session = CreateSession(setting, new RecordingTimeProvider(_start));
+
+        // Act
+        await session.RunAsync(TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        Assert.IsEmpty(_startPorts, "An invalid setting should start no server");
+        Assert.AreEqual(LocalServerState.SettingsInvalid, session.Status.State, "The status should be settings invalid");
+        Assert.ContainsSingle(entry => entry.Level == LogLevel.Warning && entry.Message == "Server settings invalid: ", _logger.Entries, "The warning should be logged once with an empty problem");
+    }
+
+    /// <summary>
     /// The session shows starting while the server starts, then running with the port, and logs the port (S1).
     /// </summary>
     /// <returns>A task that completes when the test is done</returns>

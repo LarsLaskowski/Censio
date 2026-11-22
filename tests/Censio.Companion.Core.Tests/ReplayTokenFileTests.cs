@@ -152,6 +152,56 @@ public sealed class ReplayTokenFileTests
     }
 
     /// <summary>
+    /// A text of 32 to 1,024 visible ASCII characters, with space, tab, carriage return and line feed around them, gives
+    /// the trimmed token, as the settings file's <c>serverToken</c> uses it (feature 40, E2).
+    /// </summary>
+    /// <param name="length">The length of the token</param>
+    /// <param name="surrounding">The text before and after the token</param>
+    [TestMethod]
+    [TestCategory("AC1")]
+    [DataRow(32, "")]
+    [DataRow(1024, "")]
+    [DataRow(64, " \t\r\n")]
+    public void ReplayTokenFileReadTokenReturnsTrimmedToken(int length, string surrounding)
+    {
+        // Arrange
+        var token = Token(length);
+
+        // Act
+        var result = ReplayTokenFile.ReadToken($"{surrounding}{token}{surrounding}");
+
+        // Assert
+        Assert.AreEqual(token, result, $"A token of {length} characters should be read without the surrounding white space");
+    }
+
+    /// <summary>
+    /// A text that is missing or holds no token of 32 to 1,024 visible ASCII characters after trimming gives no token
+    /// (feature 40, E2).
+    /// </summary>
+    /// <param name="content"><c>null</c>, or the kind of content, see <see cref="InvalidContent" />, decoded as UTF-8</param>
+    [TestMethod]
+    [TestCategory("AC1")]
+    [DataRow("null")]
+    [DataRow("empty")]
+    [DataRow("white space only")]
+    [DataRow("31 characters")]
+    [DataRow("1025 characters")]
+    [DataRow("space inside")]
+    [DataRow("delete character")]
+    [DataRow("character above tilde")]
+    public void ReplayTokenFileReadTokenWithInvalidTextReturnsNull(string content)
+    {
+        // Arrange
+        var text = content == "null" ? null : Encoding.UTF8.GetString(InvalidContent(content));
+
+        // Act
+        var result = ReplayTokenFile.ReadToken(text);
+
+        // Assert
+        Assert.IsNull(result, $"A text of content '{content}' should give no token");
+    }
+
+    /// <summary>
     /// Builds a token of visible ASCII characters, from '!' to '~' and again.
     /// </summary>
     /// <param name="length">The length</param>

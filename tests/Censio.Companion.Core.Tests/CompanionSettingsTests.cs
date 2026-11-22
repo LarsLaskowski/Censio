@@ -688,6 +688,8 @@ public sealed class CompanionSettingsTests
     [DataRow("\"ws://user:secret@nas:8080/ingest\"", ServerAddressInvalid, DisplayName = "User information")]
     [DataRow("\"ws://nas:8080/ingest#top\"", ServerAddressInvalid, DisplayName = "Fragment")]
     [DataRow("\"ws://nas:8080/my ingest\"", ServerAddressInvalid, DisplayName = "Space")]
+    [DataRow("\"\"", ServerAddressInvalid, DisplayName = "Empty")]
+    [DataRow("\"   \"", ServerAddressInvalid, DisplayName = "Blank")]
     public void CompanionSettingsReadLocalServerWithInvalidServerAddressReturnsInvalid(string? value, string expectedProblem)
     {
         // Arrange
@@ -715,6 +717,8 @@ public sealed class CompanionSettingsTests
     [DataRow($"\"{TooShortToken}\\u00e9\"", 1, DisplayName = "A non-ASCII character")]
     [DataRow("1", 0, DisplayName = "Number")]
     [DataRow("null", 0, DisplayName = "Null")]
+    [DataRow("\"\"", 0, DisplayName = "Empty")]
+    [DataRow("\"   \"", 0, DisplayName = "Blank")]
     public void CompanionSettingsReadLocalServerWithInvalidServerTokenReturnsInvalid(string value, int backslashes)
     {
         // Arrange
@@ -776,6 +780,96 @@ public sealed class CompanionSettingsTests
         Assert.IsNull(setting.Problem, "A localPort that is not read should be no problem");
         Assert.IsNotNull(setting.Forward, "A forward setting should carry the server setting");
         Assert.AreEqual(new Uri(ServerAddress), setting.Forward.Address, "The address should be read past localPort");
+    }
+
+    /// <summary>
+    /// A <c>serverToken</c> of 1,024 characters, the longest valid length, is read whole (E2).
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC1")]
+    public void CompanionSettingsReadLocalServerWithLongestServerTokenReturnsForward()
+    {
+        // Arrange
+        var token = new string('t', 1024);
+        var path = WriteSettings(ForwardSettings($"\"{ServerAddress}\"", $"\"{token}\""));
+
+        // Act
+        var setting = CompanionSettings.ReadLocalServer(path);
+
+        // Assert
+        Assert.AreEqual(LocalServerSettingKind.Forward, setting.Kind, "A serverToken of 1,024 characters should be valid");
+        Assert.IsNotNull(setting.Forward, "A forward setting should carry the server setting");
+        Assert.AreEqual(token, setting.Forward.Token, "The token of 1,024 characters should be read whole");
+    }
+
+    /// <summary>
+    /// A <c>serverToken</c> of 1,025 characters, one above the longest valid length, is invalid with its fixed problem
+    /// text (E2).
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC1")]
+    public void CompanionSettingsReadLocalServerWithTooLongServerTokenReturnsInvalid()
+    {
+        // Arrange
+        var path = WriteSettings(ForwardSettings($"\"{ServerAddress}\"", $"\"{new string('t', 1025)}\""));
+
+        // Act
+        var setting = CompanionSettings.ReadLocalServer(path);
+
+        // Assert
+        Assert.AreEqual(LocalServerSettingKind.Invalid, setting.Kind, "A serverToken of 1,025 characters should be invalid");
+        Assert.AreEqual(ServerTokenInvalid, setting.Problem, "The problem should be the fixed text of an invalid serverToken");
+        Assert.IsNull(setting.Forward, "An invalid setting should carry no server setting");
+    }
+
+    /// <summary>
+    /// With the mode <c>local</c> the keys <c>serverAddress</c> and <c>serverToken</c> are not read, also when they are
+    /// invalid or occur twice (N1).
+    /// </summary>
+    /// <param name="text">The settings text</param>
+    /// <param name="expectedPort">The expected port</param>
+    [TestMethod]
+    [TestCategory("AC1")]
+    [DataRow("""{"mode": "local", "serverAddress": "http://nas:8080/ingest", "serverToken": 1}""", CompanionSettings.DefaultLocalPort, DisplayName = "Invalid address and token")]
+    [DataRow($$"""{"mode": "local", "localPort": 5117, "serverAddress": "{{ServerAddress}}", "ServerAddress": "{{ServerAddress}}", "serverToken": "{{TooShortToken}}", "SERVERTOKEN": "{{ServerToken}}"}""", 5117, DisplayName = "Keys twice")]
+    [DataRow($$"""{"mode": "LOCAL", "serverAddress": "{{ServerAddress}}", "serverToken": "{{ServerToken}}"}""", CompanionSettings.DefaultLocalPort, DisplayName = "Valid forward keys")]
+    public void CompanionSettingsReadLocalServerWithModeLocalIgnoresServerKeys(string text, int expectedPort)
+    {
+        // Arrange
+        var path = WriteSettings(text);
+
+        // Act
+        var setting = CompanionSettings.ReadLocalServer(path);
+
+        // Assert
+        Assert.AreEqual(LocalServerSettingKind.Local, setting.Kind, "With the mode local the server keys should not be read");
+        Assert.AreEqual(expectedPort, setting.Port, "The port should be read past the server keys");
+        Assert.IsNull(setting.Problem, "Server keys that are not read should be no problem");
+        Assert.IsNull(setting.Forward, "A local setting should carry no server setting of forward mode");
+    }
+
+    /// <summary>
+    /// The keys of forward mode, valid or not, do not change the game folder of the file (E1).
+    /// </summary>
+    /// <param name="text">The settings text</param>
+    [TestMethod]
+    [TestCategory("AC1")]
+    [DataRow($$"""{"gameFolder": "{{ValidFolder}}", "mode": "forward", "serverAddress": "{{ServerAddress}}", "serverToken": "{{ServerToken}}"}""", DisplayName = "Valid forward keys")]
+    [DataRow($$"""{"mode": "forward", "serverAddress": "http://nas:8080/ingest", "serverToken": 1, "gameFolder": "{{ValidFolder}}"}""", DisplayName = "Invalid address and token")]
+    [DataRow($$"""{"mode": "forward", "gameFolder": "{{ValidFolder}}"}""", DisplayName = "Address missing")]
+    [DataRow($$"""{"mode": "forward", "serverAddress": "{{ServerAddress}}", "SERVERADDRESS": "{{ServerAddress}}", "serverToken": "{{ServerToken}}", "serverToken": "{{ServerToken}}", "gameFolder": "{{ValidFolder}}"}""", DisplayName = "Keys twice")]
+    public void CompanionSettingsReadWithForwardKeysKeepsGameFolder(string text)
+    {
+        // Arrange
+        var path = WriteSettings(text);
+
+        // Act
+        var result = CompanionSettings.Read(path);
+
+        // Assert
+        Assert.AreEqual(CompanionSettingsResultKind.GameFolder, result.Kind, "The keys of forward mode should not make the settings invalid");
+        Assert.AreEqual(ValidFolder, result.GameFolder, "The game folder should be read past the keys of forward mode");
+        Assert.IsNull(result.Problem, "The keys of forward mode should be no problem of the game folder");
     }
 
     /// <summary>

@@ -1437,7 +1437,8 @@ public sealed class TrayMenuTests
     }
 
     /// <summary>
-    /// The server line of forward mode reads the text of each state and problem: connecting, connected, the five
+    /// The server line of forward mode reads the text of each state and problem: connecting (whatever problem the
+    /// status still carries), connected, the five
     /// retryable failures, the two final refusals, and not connected for any other status (S1, E3, E4, E6, E7).
     /// </summary>
     /// <param name="state">The state of live sending</param>
@@ -1446,7 +1447,9 @@ public sealed class TrayMenuTests
     [TestMethod]
     [TestCategory("AC2")]
     [DataRow(LiveSendState.Connecting, null, "Server: connecting")]
+    [DataRow(LiveSendState.Connecting, ReplaySendProblemKind.ConnectionLost, "Server: connecting")]
     [DataRow(LiveSendState.Connected, null, "Server: connected")]
+    [DataRow((LiveSendState)99, null, "Server: not connected")]
     [DataRow(LiveSendState.Retrying, ReplaySendProblemKind.ServerUnreachable, "Server: unreachable, retrying")]
     [DataRow(LiveSendState.Retrying, ReplaySendProblemKind.NoAnswer, "Server: not answering, retrying")]
     [DataRow(LiveSendState.Retrying, ReplaySendProblemKind.ConnectionLost, "Server: connection lost, retrying")]
@@ -1521,6 +1524,47 @@ public sealed class TrayMenuTests
         Assert.AreEqual("Server: connected", serverLine.Text, "The server line should show the text of the live status");
         Assert.IsFalse(serverLine.IsEnabled, "The server line should be greyed out");
         Assert.IsFalse(serverLine.IsChecked, "The server line should not be checked");
+    }
+
+    /// <summary>
+    /// In local mode, whatever the state of live sending into the hosted server, the menu keeps the local server line with
+    /// its text and the enabled Open Censio, and shows no line of forward mode (S5, E10).
+    /// </summary>
+    /// <param name="state">The state of live sending</param>
+    /// <param name="problem">The problem, or <see langword="null" /> when there is none</param>
+    [TestMethod]
+    [TestCategory("AC8")]
+    [DataRow(LiveSendState.Connecting, null)]
+    [DataRow(LiveSendState.Connected, null)]
+    [DataRow(LiveSendState.Retrying, ReplaySendProblemKind.ConnectionLost)]
+    [DataRow(LiveSendState.Stopped, ReplaySendProblemKind.LocalServerNotRunning)]
+    public void TrayMenuCreateInLocalModeKeepsLocalServerLine(LiveSendState state, ReplaySendProblemKind? problem)
+    {
+        // Arrange
+        var snapshot = CreateSnapshot("Receiving", canRecord: true, isRecording: false);
+        var server = new TrayServerStatus
+                     {
+                         Local = CreateLocalServerStatus(LocalServerState.Running, 5117),
+                         Live = new LiveSendStatus
+                                {
+                                    State = state,
+                                    Problem = problem
+                                }
+                     };
+
+        // Act
+        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, server, false, CreateClock(1));
+
+        // Assert
+        var kinds = entries.Select(entry => entry.Kind).ToList();
+        var serverLine = entries.Single(entry => entry.Kind == TrayMenuEntryKind.LocalServer);
+        var openCensio = entries.Single(entry => entry.Kind == TrayMenuEntryKind.OpenCensio);
+
+        Assert.AreEqual(kinds.IndexOf(TrayMenuEntryKind.Catalog) + 1, kinds.IndexOf(TrayMenuEntryKind.LocalServer), "The local server line should stay directly below the catalog entry");
+        Assert.AreEqual("Server: running at http://localhost:5117/", serverLine.Text, $"The local server line should keep its text while live sending is {state} with {problem}");
+        Assert.IsTrue(openCensio.IsEnabled, "Open Censio should stay enabled while the hosted server runs");
+        Assert.DoesNotContain(TrayMenuEntryKind.ServerConnection, kinds, "Local mode should show no server line of forward mode");
+        Assert.ContainsSingle(entry => entry.Text.StartsWith("Server:", StringComparison.Ordinal), entries, "The menu should hold exactly one server text");
     }
 
     /// <summary>
