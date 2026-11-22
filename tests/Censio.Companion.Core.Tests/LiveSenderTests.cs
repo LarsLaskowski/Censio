@@ -321,7 +321,7 @@ public sealed class LiveSenderTests : IDisposable
         var start = Assert.IsInstanceOfType<ContractSessionStart>(messages[2], "The third message should be the session start");
         var end = Assert.IsInstanceOfType<ContractSessionEnd>(messages[3], "The fourth message should be the session end");
 
-        Assert.AreEqual(_start.AddSeconds(1), tick.ReceiveTime, "The tick should carry its live receive time");
+        Assert.AreEqual(_start.AddSeconds(2), tick.ReceiveTime, "The tick should carry its live receive time");
         Assert.AreEqual(_start.AddSeconds(3), routes.ReceiveTime, "The trade routes should carry their read stamp");
         Assert.AreEqual(_start.AddSeconds(4), start.ReceiveTime, "The session start should carry its read stamp");
         Assert.AreEqual(_start.AddSeconds(5), end.ReceiveTime, "The session end should carry its read stamp");
@@ -505,6 +505,7 @@ public sealed class LiveSenderTests : IDisposable
         await AdvanceRetryAsync(timeProvider, TimeSpan.FromSeconds(1), 1);
         await AdvanceRetryAsync(timeProvider, TimeSpan.FromSeconds(2), 1);
         await AcceptAsync(server);
+        await WaitForStatusAsync(LiveSendState.Connected, null, 1);
 
         timeProvider.Advance(LiveSender.SuccessfulConnectionTime);
 
@@ -658,7 +659,8 @@ public sealed class LiveSenderTests : IDisposable
     }
 
     /// <summary>
-    /// Beyond 64 waiting messages the oldest are dropped, and the newest 64 are sent in order (E5, N2).
+    /// Beyond 64 waiting messages the oldest are dropped, and the newest 64 messages are sent in order: 63 ticks and the
+    /// session end, the oldest 2 dropped (E5, N2).
     /// </summary>
     /// <returns>A task that completes when the test is done</returns>
     [TestMethod]
@@ -668,9 +670,9 @@ public sealed class LiveSenderTests : IDisposable
         // Arrange
         var connector = new QueuedIngestConnector();
         var sender = CreateSender(connector, CreateTimeProvider(), Token);
-        var expected = Enumerable.Range(3, LiveSender.MaxWaitingMessages).Select(gameTime => (long)gameTime).ToArray();
+        var expected = Enumerable.Range(3, LiveSender.MaxWaitingMessages - 1).Select(gameTime => (long)gameTime).ToArray();
 
-        EnqueueTicks(sender, LiveSender.MaxWaitingMessages + 2);
+        EnqueueTicks(sender, LiveSender.MaxWaitingMessages + 1);
 
         var server = AddServer(connector);
 
@@ -678,11 +680,12 @@ public sealed class LiveSenderTests : IDisposable
         StartRun(sender);
         await AcceptAsync(server);
 
-        var messages = await ReceiveAndAcknowledgeAsync(server, null, LiveSender.MaxWaitingMessages + 1);
+        var messages = await ReceiveAndAcknowledgeAsync(server, null, LiveSender.MaxWaitingMessages);
 
         // Assert
         Assert.AreEqual(64, LiveSender.MaxWaitingMessages, "The bound should be 64 messages");
-        Assert.AreSequenceEqual(expected, messages.Take(LiveSender.MaxWaitingMessages).Select(message => Assert.IsInstanceOfType<ContractTick>(message, "Every message should be a tick").GameTime).ToArray(), "The newest 64 ticks should be sent in order, the oldest 2 dropped");
+        Assert.HasCount(LiveSender.MaxWaitingMessages, messages, "The newest 64 messages should be sent: 63 ticks and the session end, the oldest 2 dropped");
+        Assert.AreSequenceEqual(expected, messages.Take(LiveSender.MaxWaitingMessages - 1).Select(message => Assert.IsInstanceOfType<ContractTick>(message, "Every message but the last should be a tick").GameTime).ToArray(), "The newest 64 messages should be sent in order: 63 ticks and the session end, the oldest 2 dropped");
         Assert.IsInstanceOfType<ContractSessionEnd>(messages[^1], "The item queued after the drop should follow the kept ticks");
     }
 
@@ -733,7 +736,7 @@ public sealed class LiveSenderTests : IDisposable
         var connector = new QueuedIngestConnector();
         var sender = CreateSender(connector, CreateTimeProvider(), Token);
 
-        EnqueueTicks(sender, LiveSender.MaxWaitingMessages + 2);
+        EnqueueTicks(sender, LiveSender.MaxWaitingMessages + 1);
 
         var server = AddServer(connector);
 
@@ -741,7 +744,7 @@ public sealed class LiveSenderTests : IDisposable
         await AcceptAsync(server);
 
         // Act
-        await ReceiveAndAcknowledgeAsync(server, null, LiveSender.MaxWaitingMessages + 1);
+        await ReceiveAndAcknowledgeAsync(server, null, LiveSender.MaxWaitingMessages);
         await StopRunsAsync();
 
         // Assert
@@ -765,7 +768,7 @@ public sealed class LiveSenderTests : IDisposable
         var connector = new QueuedIngestConnector();
         var sender = CreateSender(connector, timeProvider, Token);
 
-        EnqueueTicks(sender, LiveSender.MaxWaitingMessages + 2);
+        EnqueueTicks(sender, LiveSender.MaxWaitingMessages + 1);
 
         // Act
         await EndAsync(sender, connector, timeProvider, ending);
