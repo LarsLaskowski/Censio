@@ -1,7 +1,7 @@
 # Spec: Forward mode — live sending to a server with token and reconnect
 
 Source: Issue #40
-Status: Draft
+Status: Approved by Lead
 
 ## Problem
 

@@ -1,0 +1,25 @@
+# Tasks: Forward mode — live sending to a server with token and reconnect
+
+Plan: [plan.md](plan.md)
+
+Each task names its criteria, the tasks it waits for and its group (steps 4–6 run per group, one agent per member
+and mode; rows consecutive). *Files* names repository-relative paths, a directory or a glob where a row writes
+several files. A group has a "Skeleton" row for its API in *Signatures*, or says "no new API". Each
+documentation edit is in one row, owned by the Dev (test documentation: the Tester; an edit under `.squad/`: the
+Orchestrator, from the text its member reports), in the last group. Tasks of the Product Manager and the Lead alone
+(a probe, a survey run, a fact correction) go to group `PM`, which steps 4–6 skip.
+
+| # | Group | Task | Files | Criteria | Depends on | Owner | Done |
+| - | ----- | ---- | ----- | -------- | ---------- | ----- | ---- |
+| 1 | G1 | Skeleton: the `sealed` class `ForwardServerSetting` (`Uri` and `string` members), `LocalServerSettingKind.Forward`, `LocalServerSetting.Forward`, the `CompanionSettings` keys, `CompanionCommandLine.TryParseServerAddress` public, `ReplayTokenFile.ReadToken`, `LocalServerSession.WaitForLiveTokenAsync` and the body of `IsHosted`, the `required` properties of `LiveSendStatus` and `TrayServerStatus` (with `LocalServerStatus`), `LiveSendStatus`, `LiveSendState`, `TrayServerStatus`, `TrayMenuEntryKind.ServerConnection`, `TrayMenu.FormatLiveSend` and the new `Create` with its 18 test call sites adapted, `TrayIconSources.Server`, `CompanionLog.ServerSettingsInvalid` (renamed, real) | `src/Censio.Companion.Core/*.cs`, `src/Censio.Companion/TrayIcon.cs`, `src/Censio.Companion/TrayIconSources.cs`, `tests/Censio.Companion.Core.Tests/TrayMenuTests.cs` | AC1, AC2, AC6, AC8 | — | Dev | [ ] |
+| 2 | G1 | Tests first: settings (AC1, AC10 `ToString`), `LocalServerSession` (AC1 adapted, AC8 live token), `TrayMenu` (AC2, AC8) | `tests/Censio.Companion.Core.Tests/CompanionSettingsTests.cs`, `tests/Censio.Companion.Core.Tests/LocalServerSessionTests.cs`, `tests/Censio.Companion.Core.Tests/TrayMenuTests.cs` | AC1, AC2, AC8, AC10 | 1 | Tester | [ ] |
+| 3 | G1 | Implement settings reading, `IsHosted`, `WaitForLiveTokenAsync`, `FormatLiveSend`, `Create` | `src/Censio.Companion.Core/*.cs` | AC1, AC2, AC6, AC8, AC10 | 2 | Dev | [ ] |
+| 4 | G1 | Coverage pass of G1 | `tests/Censio.Companion.Core.Tests/*.cs` | AC1, AC2, AC8 | 3 | Tester | [ ] |
+| 5 | G2 | Skeleton: `IngestClient` with the `ReplaySender` logic moved for real (`ReplaySenderTests` green): `OpenAsync`, `SendAsync`, `NotifyState`, `CloseAsync`, `DisposeAsync`, the `event` `Failed` and `Failure` of `ReplaySendProblemKind`, the `int` and `TimeSpan` members; `LiveSender`: `IsSending`, `ForServer`, `ForLocalServer`, `Enqueue`, `RunAsync`, the `Guid` `ProfileId`, the `IReadOnlyList` `RetryDelays`; `PipeConnectionItem`, `PipeConnection.ItemReceived`, the keep-alive constructor of `ClientWebSocketConnector`, the `CompanionLog` methods `LiveSendConnected`, `LiveSendFailed`, `LiveSendRefused`, `LiveMessageRefused`, `LiveMessageNotWritten`, `LiveMessagesDropped` | `src/Censio.Companion.Core/*.cs` | AC2–AC10 | 4 | Dev | [ ] |
+| 6 | G2 | Tests first: `LiveSenderTests`, `QueuedIngestConnector`, `PipeConnectionTests` (`ItemReceived`), `ClientWebSocketConnectorTests` with the `/silent` path of `LoopbackWebSocketHost` (fact 7's measurement, reported at once) | `tests/Censio.Companion.Core.Tests/LiveSenderTests.cs`, `tests/Censio.Companion.Core.Tests/QueuedIngestConnector.cs`, `tests/Censio.Companion.Core.Tests/PipeConnectionTests.cs`, `tests/Censio.Companion.Core.Tests/ClientWebSocketConnectorTests.cs`, `tests/Censio.Companion.Core.Tests/LoopbackWebSocketHost.cs` | AC2–AC10 | 5 | Tester | [ ] |
+| 7 | G2 | Implement `LiveSender`, `ItemReceived`, the keep-alive, the log lines; wire `App.xaml.cs` (setting read once, sender per mode, events, `Exit` order) | `src/Censio.Companion.Core/*.cs`, `src/Censio.Companion/App.xaml.cs` | AC2–AC10 | 6 | Dev | [ ] |
+| 8 | G2 | Coverage pass of G2; report the `.squad/project.md` *Test doubles* text | `tests/Censio.Companion.Core.Tests/*.cs` | AC2–AC10 | 7 | Tester | [ ] |
+| 9 | G2 | Documentation of plan *Documentation updates*: `live-sending.md` and the area index, the area documents, `docs/ARCHITECTURE.md`, `README.md`, `docs/USER_GUIDE.md` (English and German), `SECURITY.md`; report the `.squad/project.md` text | `docs/areas/*.md`, `docs/ARCHITECTURE.md`, `README.md`, `docs/USER_GUIDE.md`, `SECURITY.md` | AC11 | 8 | Dev | [ ] |
+| 10 | G2 | Write the reported `.squad/project.md` text verbatim and run *Format* | `.squad/project.md` | AC11 | 8, 9 | Orchestrator | [ ] |
+| 11 | PM | Set `Area: live-sending` in records 0102, 0103 and 0104 once task 9 lists the area | `docs/decisions/0102-*.md`, `docs/decisions/0103-*.md`, `docs/decisions/0104-*.md` | AC11 | 9 | Lead | [ ] |
+| 12 | PM | Manual test on the branch head on Windows with the real game and a Docker server (plan *Manual test*) | — | AC9, AC11 | 10 | Product Manager | [ ] |

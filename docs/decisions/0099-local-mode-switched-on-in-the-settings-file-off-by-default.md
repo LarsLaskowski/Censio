@@ -32,5 +32,6 @@ A wrong value of these keys stops only the local server, never the game search. 
 
 ## Consequences
 
-- #43 writes the same keys and may add `forward` for #40; until then `forward` is an invalid value.
+- #43 writes the same keys. #40 adds `forward` with the keys `serverAddress` and `serverToken`
+  ([0103](0103-forward-server-address-and-token-are-keys-of-the-settings-file.md)); an unknown `mode` stays invalid.
 - A change counts after a restart, like `gameFolder`.
