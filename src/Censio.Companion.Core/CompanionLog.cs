@@ -448,5 +448,28 @@ public static partial class CompanionLog
     [LoggerMessage(Level = LogLevel.Warning, Message = "Could not open the browser")]
     public static partial void BrowserOpenFailed(ILogger logger, Exception exception);
 
+    /// <summary>
+    /// Logs the messages the live buffer holds from an earlier run.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    /// <param name="count">The number of messages</param>
+    [LoggerMessage(Level = LogLevel.Information, Message = "Live buffer holds {Count} messages from an earlier run")]
+    public static partial void LiveBufferRestored(ILogger logger, int count);
+
+    /// <summary>
+    /// Logs that the live buffer cannot be written.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Live buffer cannot be written; waiting messages are kept in memory until Exit")]
+    public static partial void LiveBufferNotWritable(ILogger logger);
+
+    /// <summary>
+    /// Logs the live buffer entries that were unreadable and discarded.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    /// <param name="count">The number of entries</param>
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Live buffer entries unreadable: {Count}; discarded")]
+    public static partial void LiveBufferUnreadable(ILogger logger, int count);
+
     #endregion // Methods
 }
