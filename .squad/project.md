@@ -1,11 +1,13 @@
 # Project
 
 What the squad needs to know beyond the stack; a product PR updates an entry it makes untrue (`.squad/routing.md`,
-*Scope of a product PR*).
+*Scope of a product PR*). The test doubles are in `docs/UNIT_TESTS.md` (*Test doubles*).
 
 Every entry points: it names files, types or endpoints and links the document that says more. Behavior, values,
 limits and sequences live in the area documents (`docs/areas/README.md`), reasons in the decision records.
-`config-check.py` warns past `PROJECT_MAX_WORDS` words (`.squad/tools/squad_settings.py`).
+`config-check.py` warns about an entry of more than `PROJECT_ENTRY_MAX_PROSE` prose words (code spans and links do
+not count) and about a change that adds more than `PROJECT_MAX_GROWTH` words to this file
+(`.squad/tools/squad_settings.py`).
 
 ## Security areas
 
@@ -49,7 +51,7 @@ Every place the Reviewer checks when a diff adds or changes a thing of this kind
 **A new or changed service / module** touches:
 - its interface where platform-neutral logic meets Windows: `IPipeConnector`, `IStartupEntryStore`, `IDiagnosticsWindow`, `IUbisoftInstallRecords`, `IFileVersionReader` in `Censio.Companion.Core`
 - registration and lifetime: `CensioServer` (server) or `App.xaml.cs` (Companion, `LocalServerSession`)
-- its fake or stub (*Test doubles*)
+- its fake or stub (`docs/UNIT_TESTS.md`, *Test doubles*)
 - the project table in `docs/ARCHITECTURE.md` and its area document
 
 **A new external API call or DTO** touches:
@@ -74,39 +76,3 @@ Every place the Reviewer checks when a diff adds or changes a thing of this kind
 **A new page or UI text** touches: `UiTexts` (English and German) and its tests, the navigation in `MainLayout.razor`, `docs/areas/web-ui.md` (*Texts*), the user guide.
 
 **A new log message** touches: `CompanionLog` (a `LoggerMessage` method) and the list of what is logged in `docs/areas/companion-log.md`.
-
-## Test doubles
-
-Hand-written doubles the tests reuse, no mocking library (`docs/UNIT_TESTS.md`): where each lives and what it stands
-in for; their behavior is in their code.
-
-- `RecordingLogger` (`tests/Censio.Server.Tests/RecordingLogger.cs`, linked into the Companion and Server.Data tests) and `ConcurrentRecordingLogger` (`tests/Censio.Server.Tests/ConcurrentRecordingLogger.cs`, linked into the Companion tests) — `ILogger`s keeping every entry, the second from any thread.
-- `ExtendedMigrationsAssembly` (`tests/Censio.Server.Data.Tests/`) — an `IMigrationsAssembly` of the real migrations plus test ones.
-- `FakeProfileStateSource` (`tests/Censio.Server.Tests/FakeProfileStateSource.cs`) — an `IProfileStateSource`.
-- `FakeHistoryTrends` (`tests/Censio.Server.Tests/FakeHistoryTrends.cs`) — an `IHistoryTrends` with held, failing and recorded reads.
-- `HeldTimerTimeProvider` (`tests/Censio.Server.Tests/HeldTimerTimeProvider.cs`) — a `FakeTimeProvider` whose timer callbacks run by hand, also after disposal.
-- `BlockingClockTimeProvider` (`tests/Censio.Server.Tests/BlockingClockTimeProvider.cs`) — a `FakeTimeProvider` whose first clock read blocks.
-- `ChunkedStream` and `ChunkedClockStream` (`tests/Censio.Pipe.Tests/`) — chunked streams for the frame reader and for record-and-replay.
-- `PipeFrameBuilder` (`tests/Censio.Pipe.Tests/PipeFrameBuilder.cs`, linked into the Companion and Anonymiser tests) — synthetic and corrupt pipe frames.
-- `ScriptedPipeMessageSource` with `HeldPipeRead` (`tests/Censio.Pipe.Tests/`) — an `IPipeMessageSource`.
-- `ScriptedPipeConnector` (`tests/Censio.Companion.Core.Tests/ScriptedPipeConnector.cs`) — an `IPipeConnector`.
-- `ControlledPipeStream` (`tests/Censio.Companion.Core.Tests/ControlledPipeStream.cs`) — models an asynchronous pipe read's end and cancellation (checked against `dotnet/runtime` `release/11.0` `PipeStream.ValueTaskSource.cs`).
-- `ControlledWriteStream` (`tests/Censio.Pipe.Tests/ControlledWriteStream.cs`, linked into the Companion tests) — models a file stream's write and flush failures (checked against `dotnet/runtime` `release/11.0` `Win32Marshal`).
-- `SparseStream`, `NonSeekableStream`, `TrackingStream`, `RdaArchiveBuilder`, `DdsFileBuilder` (`tests/Censio.GameData.Tests/`) — sparse, forward-only and disposal-logging streams; builders of RDA archives and BC7 DDS files.
-- `ScriptedPipeAnonymiserRandom` (`tests/Censio.Pipe.Tests/ScriptedPipeAnonymiserRandom.cs`, linked into the Anonymiser tests) — an `IPipeAnonymiserRandom`.
-- `TwoPassRecordingStream` (`tests/Censio.Pipe.Tests/TwoPassRecordingStream.cs`) — a stream that differs per pass, for the anonymiser.
-- `FailingTextWriter` (`tests/Censio.Anonymiser.Tests/FailingTextWriter.cs`) — a `TextWriter` whose writes fail.
-- `FakeTimeProvider` (`Microsoft.Extensions.TimeProvider.Testing`) — the clock of every timing test; a test library, not a mocking one.
-- `BackwardsFakeTimeProvider` (`tests/Censio.Pipe.Tests/BackwardsFakeTimeProvider.cs`) — models a system clock set back (checked by a scratch run).
-- `RecordingTimeProvider` (`tests/Censio.Pipe.Tests/RecordingTimeProvider.cs`, linked into the Companion and Server tests) — a `FakeTimeProvider` that records and awaits its timers.
-- `RecordingLoggerProvider` (`tests/Censio.Server.Data.Tests/`, linked into the Server tests) — an `ILoggerProvider` over one `RecordingLogger`.
-- `CascadedLanguageProbe` (`tests/Censio.Server.Tests/CascadedLanguageProbe.cs`) — a page, for what `MainLayout` cascades.
-- `InMemoryDuplexStream` (`tests/Censio.Server.Tests/InMemoryDuplexStream.cs`, linked into the Companion tests) — a connection end, for real `WebSocket` pairs.
-- `FailingWebSocketFeature` (`tests/Censio.Server.Tests/FailingWebSocketFeature.cs`) — an `IHttpWebSocketFeature` failing every accept.
-- `FakeStartupEntryStore` (`tests/Censio.Companion.Core.Tests/FakeStartupEntryStore.cs`) — models `RegistryStartupEntryStore` (checked against the .NET 11 `RegistryKey` source).
-- `FakeDiagnosticsWindow`, `FakeUbisoftInstallRecords`, `FakeFileVersionReader` (`tests/Censio.Companion.Core.Tests/`) — an `IDiagnosticsWindow`, `IUbisoftInstallRecords` and `IFileVersionReader`.
-- `FakeLocalServer` (`tests/Censio.Companion.Core.Tests/FakeLocalServer.cs`) — an `ILocalServer` with a held stop.
-- `RecordingHostingStartup` (`tests/Censio.Server.Tests/RecordingHostingStartup.cs`) — an `IHostingStartup` counting its runs.
-- `RegExportUbisoftInstallRecords` (`tests/Censio.Companion.Core.Tests/RegExportUbisoftInstallRecords.cs`) — an `IUbisoftInstallRecords` over the `reg export` sample in `Fixtures/GameInstallation/`.
-- `ScriptedIngestServer`, `DuplexReplayConnector`, `ThrowingWebSocket`, `SendFailingWebSocket`, `LoopbackWebSocketHost`, `LoopbackWebProxy`, `QueuedIngestConnector` (`tests/Censio.Companion.Core.Tests/`), `TestServerReplayConnector` (`tests/Censio.Server.Tests/`) — doubles of the replay and live senders' tests.
-- `ForeignContractMessage` (`tests/Censio.Contracts.Tests/ForeignContractMessage.cs`) — a `ContractMessage` of no contract type.
