@@ -36,6 +36,19 @@ public static class CompanionFolders
         return Path.Combine(localApplicationData, ApplicationFolderName, "Cache");
     }
 
+#pragma warning disable RH2003
+    // Skeleton: removed with the implementation
+    /// <summary>
+    /// Gets the folder of the live buffer.
+    /// </summary>
+    /// <param name="localApplicationData">The local application data folder</param>
+    /// <returns>The buffer folder</returns>
+    public static string Buffer(string localApplicationData)
+    {
+        throw new NotImplementedException();
+    }
+#pragma warning restore RH2003
+
     /// <summary>
     /// Gets the path of the settings file.
     /// </summary>

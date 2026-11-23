@@ -42,6 +42,16 @@ public static class CompanionSettings
     public const string ServerTokenKey = "serverToken";
 
     /// <summary>
+    /// The key of the age limit of the live buffer in hours in the settings file.
+    /// </summary>
+    public const string BufferHoursKey = "bufferHours";
+
+    /// <summary>
+    /// The key of the size limit of the live buffer in megabytes in the settings file.
+    /// </summary>
+    public const string BufferMegabytesKey = "bufferMegabytes";
+
+    /// <summary>
     /// The port of the local server when the settings file names none.
     /// </summary>
     public const int DefaultLocalPort = 5000;

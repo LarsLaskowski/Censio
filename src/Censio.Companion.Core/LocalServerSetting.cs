@@ -27,5 +27,10 @@ public sealed record LocalServerSetting
     /// </summary>
     public ForwardServerSetting? Forward { get; init; }
 
+    /// <summary>
+    /// Gets the limits of the live buffer.
+    /// </summary>
+    public LiveBufferLimits BufferLimits { get; init; } = LiveBufferLimits.Defaults;
+
     #endregion // Properties
 }
