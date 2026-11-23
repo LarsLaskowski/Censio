@@ -42,7 +42,8 @@ COVERAGE_EXCLUDES = []
 # (.claude/hooks/file-guard.py), so the test project files are listed next to the test classes.
 COVERAGE_TEST_PATHSPECS = ["tests/*.cs", "tests/*.csproj"]
 
-# Size warnings (config-check.py, decision-check.py): a file past its limit is reported with the split it needs.
+# Size warnings (config-check.py, plan-check.py, decision-check.py): a file or a change past its limit is reported with
+# what it needs.
 PROJECT_MAX_GROWTH = 200  # words .squad/project.md may gain in one change (against the merge base with BASE_REF)
 PROJECT_ENTRY_MAX_PROSE = 50  # prose words of one entry of .squad/project.md or *Test doubles* (no code spans, links)
 TEST_DOUBLES_MAX_GROWTH = 100  # words *Test doubles* in docs/UNIT_TESTS.md may gain in one change

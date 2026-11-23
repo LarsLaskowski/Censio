@@ -9,13 +9,49 @@ neighboring test file before inventing a new pattern.
 
 - **MSTest** (`[TestClass]`, `[TestMethod]`, `[DataRow]`). No other test framework.
 - **No assertion library** (no FluentAssertions) and **no mocking library** — use real objects or the
-  hand-written fakes and stubs listed in `.squad/project.md` (*Test doubles*).
+  hand-written fakes and stubs listed under *Test doubles*.
 - Coverage is collected with `coverlet.collector`.
 - **Server endpoint tests** use `WebApplicationFactory` (`Microsoft.AspNetCore.Mvc.Testing`), which hosts the
   real server in memory. It is a test host, not a mocking library, so it does not conflict with the rule above.
 - **Companion logic** (the tray menu entries, the single-instance guard) lives in the platform-neutral
   `Censio.Companion.Core` and is tested in `Censio.Companion.Core.Tests`; the Windows shell `Censio.Companion`
   only wires it to the tray and has no unit tests of its own.
+
+## Test doubles
+
+The hand-written fakes and stubs the tests reuse (no mocking library unless *Test stack* says otherwise), one line
+each: the double, where it lives and what it stands in for; how it behaves is read in its code.
+
+- `RecordingLogger` (`tests/Censio.Server.Tests/RecordingLogger.cs`, linked into the Companion and Server.Data tests) and `ConcurrentRecordingLogger` (`tests/Censio.Server.Tests/ConcurrentRecordingLogger.cs`, linked into the Companion tests) — `ILogger`s keeping every entry, the second from any thread.
+- `ExtendedMigrationsAssembly` (`tests/Censio.Server.Data.Tests/`) — an `IMigrationsAssembly` of the real migrations plus test ones.
+- `FakeProfileStateSource` (`tests/Censio.Server.Tests/FakeProfileStateSource.cs`) — an `IProfileStateSource`.
+- `FakeHistoryTrends` (`tests/Censio.Server.Tests/FakeHistoryTrends.cs`) — an `IHistoryTrends` with held, failing and recorded reads.
+- `HeldTimerTimeProvider` (`tests/Censio.Server.Tests/HeldTimerTimeProvider.cs`) — a `FakeTimeProvider` whose timer callbacks run by hand, also after disposal.
+- `BlockingClockTimeProvider` (`tests/Censio.Server.Tests/BlockingClockTimeProvider.cs`) — a `FakeTimeProvider` whose first clock read blocks.
+- `ChunkedStream` and `ChunkedClockStream` (`tests/Censio.Pipe.Tests/`) — chunked streams for the frame reader and for record-and-replay.
+- `PipeFrameBuilder` (`tests/Censio.Pipe.Tests/PipeFrameBuilder.cs`, linked into the Companion and Anonymiser tests) — synthetic and corrupt pipe frames.
+- `ScriptedPipeMessageSource` with `HeldPipeRead` (`tests/Censio.Pipe.Tests/`) — an `IPipeMessageSource`.
+- `ScriptedPipeConnector` (`tests/Censio.Companion.Core.Tests/ScriptedPipeConnector.cs`) — an `IPipeConnector`.
+- `ControlledPipeStream` (`tests/Censio.Companion.Core.Tests/ControlledPipeStream.cs`) — models an asynchronous pipe read's end and cancellation (checked against `dotnet/runtime` `release/11.0` `PipeStream.ValueTaskSource.cs`).
+- `ControlledWriteStream` (`tests/Censio.Pipe.Tests/ControlledWriteStream.cs`, linked into the Companion tests) — models a file stream's write and flush failures (checked against `dotnet/runtime` `release/11.0` `Win32Marshal`).
+- `SparseStream`, `NonSeekableStream`, `TrackingStream`, `RdaArchiveBuilder`, `DdsFileBuilder` (`tests/Censio.GameData.Tests/`) — sparse, forward-only and disposal-logging streams; builders of RDA archives and BC7 DDS files.
+- `ScriptedPipeAnonymiserRandom` (`tests/Censio.Pipe.Tests/ScriptedPipeAnonymiserRandom.cs`, linked into the Anonymiser tests) — an `IPipeAnonymiserRandom`.
+- `TwoPassRecordingStream` (`tests/Censio.Pipe.Tests/TwoPassRecordingStream.cs`) — a stream that differs per pass, for the anonymiser.
+- `FailingTextWriter` (`tests/Censio.Anonymiser.Tests/FailingTextWriter.cs`) — a `TextWriter` whose writes fail.
+- `FakeTimeProvider` (`Microsoft.Extensions.TimeProvider.Testing`) — the clock of every timing test; a test library, not a mocking one.
+- `BackwardsFakeTimeProvider` (`tests/Censio.Pipe.Tests/BackwardsFakeTimeProvider.cs`) — models a system clock set back (checked by a scratch run).
+- `RecordingTimeProvider` (`tests/Censio.Pipe.Tests/RecordingTimeProvider.cs`, linked into the Companion and Server tests) — a `FakeTimeProvider` that records and awaits its timers.
+- `RecordingLoggerProvider` (`tests/Censio.Server.Data.Tests/`, linked into the Server tests) — an `ILoggerProvider` over one `RecordingLogger`.
+- `CascadedLanguageProbe` (`tests/Censio.Server.Tests/CascadedLanguageProbe.cs`) — a page, for what `MainLayout` cascades.
+- `InMemoryDuplexStream` (`tests/Censio.Server.Tests/InMemoryDuplexStream.cs`, linked into the Companion tests) — a connection end, for real `WebSocket` pairs.
+- `FailingWebSocketFeature` (`tests/Censio.Server.Tests/FailingWebSocketFeature.cs`) — an `IHttpWebSocketFeature` failing every accept.
+- `FakeStartupEntryStore` (`tests/Censio.Companion.Core.Tests/FakeStartupEntryStore.cs`) — models `RegistryStartupEntryStore` (checked against the .NET 11 `RegistryKey` source).
+- `FakeDiagnosticsWindow`, `FakeUbisoftInstallRecords`, `FakeFileVersionReader` (`tests/Censio.Companion.Core.Tests/`) — an `IDiagnosticsWindow`, `IUbisoftInstallRecords` and `IFileVersionReader`.
+- `FakeLocalServer` (`tests/Censio.Companion.Core.Tests/FakeLocalServer.cs`) — an `ILocalServer` with a held stop.
+- `RecordingHostingStartup` (`tests/Censio.Server.Tests/RecordingHostingStartup.cs`) — an `IHostingStartup` counting its runs.
+- `RegExportUbisoftInstallRecords` (`tests/Censio.Companion.Core.Tests/RegExportUbisoftInstallRecords.cs`) — an `IUbisoftInstallRecords` over the `reg export` sample in `Fixtures/GameInstallation/`.
+- `ScriptedIngestServer`, `DuplexReplayConnector`, `ThrowingWebSocket`, `SendFailingWebSocket`, `LoopbackWebSocketHost`, `LoopbackWebProxy`, `QueuedIngestConnector` (`tests/Censio.Companion.Core.Tests/`), `TestServerReplayConnector` (`tests/Censio.Server.Tests/`) — doubles of the replay and live senders' tests.
+- `ForeignContractMessage` (`tests/Censio.Contracts.Tests/ForeignContractMessage.cs`) — a `ContractMessage` of no contract type.
 
 ## Where tests live
 
@@ -56,7 +92,8 @@ neighboring test file before inventing a new pattern.
 
 ## Naming
 
-- Class: `{TypeUnderTest}Tests`.
+- Class: `{TypeUnderTest}Tests`; a type whose tests grow large is split by concern into
+  `{TypeUnderTest}{Concern}Tests` (for example `ParserFailureTests`), one file each.
 - Method: `{TypeUnderTest}{Scenario}{ExpectedResult}` in PascalCase **without underscores**, e.g.
   `ParserEmptyInputReturnsNull`.
 
