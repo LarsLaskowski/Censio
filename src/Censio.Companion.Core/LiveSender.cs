@@ -28,13 +28,10 @@ public sealed class LiveSender : IAsyncDisposable
     /// </summary>
     private readonly LiveSendTarget _target;
 
-#pragma warning disable S4487
-    // Skeleton: removed with the implementation
     /// <summary>
     /// The buffer of the waiting messages.
     /// </summary>
     private readonly LiveBuffer _buffer;
-#pragma warning restore S4487
 
     /// <summary>
     /// The version of the Companion.
@@ -57,39 +54,14 @@ public sealed class LiveSender : IAsyncDisposable
     private readonly ILogger _logger;
 
     /// <summary>
-    /// The lock of the queue, the status and the connection.
+    /// The lock of the status and the connection.
     /// </summary>
     private readonly Lock _lock = new();
-
-    /// <summary>
-    /// The waiting messages, the oldest first; the first one is kept until it is acknowledged.
-    /// </summary>
-    private readonly List<(Guid Id, ReadOnlyMemory<byte> Utf8Json)> _queue = [];
-
-    /// <summary>
-    /// The signal that tells the send loop that a message was queued.
-    /// </summary>
-    private readonly SemaphoreSlim _queued = new(0);
 
     /// <summary>
     /// The cancellation of the run, requested by the dispose.
     /// </summary>
     private readonly CancellationTokenSource _dispose = new();
-
-    /// <summary>
-    /// The size of the waiting messages in bytes.
-    /// </summary>
-    private long _queuedBytes;
-
-    /// <summary>
-    /// Whether the first waiting message is being sent.
-    /// </summary>
-    private bool _isSending;
-
-    /// <summary>
-    /// The number of dropped messages that no log line holds yet.
-    /// </summary>
-    private int _unloggedDropped;
 
     /// <summary>
     /// The state of the pipe connection last passed on, or <see langword="null" /> when none was.
@@ -267,7 +239,7 @@ public sealed class LiveSender : IAsyncDisposable
     }
 
     /// <summary>
-    /// Queues an item of the pipe connection for sending; it never waits.
+    /// Puts an item of the pipe connection into the buffer for sending; it never waits.
     /// </summary>
     /// <param name="item">The item</param>
     public void Enqueue(PipeConnectionItem item)
@@ -293,15 +265,7 @@ public sealed class LiveSender : IAsyncDisposable
                 return;
             }
 
-            _queue.Add((id, written.Utf8Json));
-            _queuedBytes += written.Utf8Json.Length;
-
-            DropOldest();
-
-            if (_queued.CurrentCount == 0)
-            {
-                _queued.Release();
-            }
+            _buffer.Add(id, written.Utf8Json);
         }
     }
 
@@ -392,33 +356,11 @@ public sealed class LiveSender : IAsyncDisposable
     }
 
     /// <summary>
-    /// Removes the oldest waiting messages that are not being sent while the bounds are exceeded; the newest stays.
-    /// The caller holds the lock.
-    /// </summary>
-    private void DropOldest()
-    {
-        var first = _isSending ? 1 : 0;
-
-        while ((_queue.Count > LiveBuffer.MaxMemoryMessages || _queuedBytes > LiveBuffer.MaxMemoryBytes) && _queue.Count - first >= 2)
-        {
-            _queuedBytes -= _queue[first].Utf8Json.Length;
-            _queue.RemoveAt(first);
-            _unloggedDropped++;
-        }
-    }
-
-    /// <summary>
     /// Logs the number of dropped messages that no log line holds yet.
     /// </summary>
     private void LogDropped()
     {
-        int count;
-
-        lock (_lock)
-        {
-            count = _unloggedDropped;
-            _unloggedDropped = 0;
-        }
+        var count = _buffer.TakeUnloggedDropped();
 
         if (count > 0)
         {
@@ -626,8 +568,9 @@ public sealed class LiveSender : IAsyncDisposable
             lock (_lock)
             {
                 _notify = null;
-                _isSending = false;
             }
+
+            _buffer.ReleaseInFlight();
 
             if (client is not null)
             {
@@ -652,43 +595,21 @@ public sealed class LiveSender : IAsyncDisposable
                 return failed.Task.Result;
             }
 
-            (Guid Id, ReadOnlyMemory<byte> Utf8Json)? next = null;
-
-            lock (_lock)
-            {
-                if (_queue.Count > 0)
-                {
-                    next = _queue[0];
-                    _isSending = true;
-                }
-            }
+            var next = await NextOrFailureAsync(failed, cancellationToken).ConfigureAwait(false);
 
             if (next is null)
             {
-                await WaitForMessageAsync(failed, cancellationToken).ConfigureAwait(false);
-
-                continue;
+                return failed.Task.Result;
             }
 
-            var (id, utf8Json) = next.Value;
-
-            var acknowledgement = await client.SendAsync(utf8Json, id, cancellationToken).ConfigureAwait(false);
-
-            lock (_lock)
-            {
-                _isSending = false;
-
-                if (acknowledgement is not null && _queue.Count > 0 && _queue[0].Id == id)
-                {
-                    _queuedBytes -= _queue[0].Utf8Json.Length;
-                    _queue.RemoveAt(0);
-                }
-            }
+            var acknowledgement = await client.SendAsync(next.Utf8Json, next.Id, cancellationToken).ConfigureAwait(false);
 
             if (acknowledgement is null)
             {
                 return client.Failure ?? ReplaySendProblemKind.ConnectionLost;
             }
+
+            _buffer.Acknowledge(next.Id);
 
             if (acknowledgement.Refusal is { } refusal)
             {
@@ -700,28 +621,38 @@ public sealed class LiveSender : IAsyncDisposable
     }
 
     /// <summary>
-    /// Waits until a message is queued or the connection failed.
+    /// Waits for the next message of the buffer or the failure of the connection.
     /// </summary>
     /// <param name="failed">The completion that the failure of the client sets</param>
     /// <param name="cancellationToken">The token that ends the run</param>
-    /// <returns>A task that completes then</returns>
-    private async Task WaitForMessageAsync(TaskCompletionSource<ReplaySendProblemKind> failed, CancellationToken cancellationToken)
+    /// <returns>The message, or <see langword="null" /> when the connection failed first</returns>
+    private async Task<LiveBufferEntry?> NextOrFailureAsync(TaskCompletionSource<ReplaySendProblemKind> failed, CancellationToken cancellationToken)
     {
         using var waitCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
-        var queued = _queued.WaitAsync(waitCancellation.Token);
+        var next = _buffer.NextAsync(waitCancellation.Token);
 
-        await Task.WhenAny(queued, failed.Task).ConfigureAwait(false);
+        await Task.WhenAny(next, failed.Task).ConfigureAwait(false);
+
+        if (next.IsCompletedSuccessfully)
+        {
+            return next.Result;
+        }
+
         await waitCancellation.CancelAsync().ConfigureAwait(false);
 
         try
         {
-            await queued.ConfigureAwait(false);
+            await next.ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested == false)
         {
             // The wait ended because the connection failed.
         }
+
+        _buffer.ReleaseInFlight();
+
+        return null;
     }
 
     #endregion // Methods
@@ -760,7 +691,6 @@ public sealed class LiveSender : IAsyncDisposable
 
         LogDropped();
         _dispose.Dispose();
-        _queued.Dispose();
     }
 
     #endregion // IAsyncDisposable

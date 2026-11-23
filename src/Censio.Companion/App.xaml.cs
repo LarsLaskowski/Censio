@@ -92,6 +92,11 @@ public sealed partial class App : Application, IDisposable
     private LiveSender? _liveSender;
 
     /// <summary>
+    /// The live buffer, <c>null</c> when no live data is sent
+    /// </summary>
+    private LiveBuffer? _liveBuffer;
+
+    /// <summary>
     /// The opener of the browser
     /// </summary>
     private BrowserOpener? _browserOpener;
@@ -324,7 +329,6 @@ public sealed partial class App : Application, IDisposable
         var version = ProductVersion.Read(typeof(App).Assembly);
         var connector = new ClientWebSocketConnector(TimeProvider.System, LiveSender.KeepAliveInterval, LiveSender.KeepAliveTimeout);
 
-        // Skeleton: removed with the wiring of step 9
         var buffer = new LiveBuffer(CompanionFolders.Buffer(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData)), setting.BufferLimits, TimeProvider.System, _logger);
         var sender = setting.Kind == LocalServerSettingKind.Forward
                          ? LiveSender.ForServer(setting.Forward!, buffer, version, connector, TimeProvider.System, _logger)
@@ -335,7 +339,9 @@ public sealed partial class App : Application, IDisposable
         connection.StatusChanged += (_, status) => sender.NotifyState(status.State);
         sender.StatusChanged += (_, _) => updater.Notify();
         _liveSender = sender;
+        _liveBuffer = buffer;
 
+        Run(buffer.RunAsync);
         Run(sender.RunAsync);
     }
 
@@ -459,7 +465,8 @@ public sealed partial class App : Application, IDisposable
         {
             return new TrayServerStatus
                    {
-                       Local = local
+                       Local = local,
+                       Buffer = _liveBuffer?.Status
                    };
         }
 
@@ -467,7 +474,8 @@ public sealed partial class App : Application, IDisposable
         {
             return new TrayServerStatus
                    {
-                       Live = sender.Status
+                       Live = sender.Status,
+                       Buffer = _liveBuffer?.Status
                    };
         }
 
@@ -700,7 +708,16 @@ public sealed partial class App : Application, IDisposable
 
         if (_liveSender is { } liveSender)
         {
-            var stopLive = Task.Run(() => liveSender.DisposeAsync().AsTask(), CancellationToken.None);
+            var stopLive = Task.Run(async () =>
+                                    {
+                                        await liveSender.DisposeAsync().ConfigureAwait(false);
+
+                                        if (_liveBuffer is { } liveBuffer)
+                                        {
+                                            await liveBuffer.DisposeAsync().ConfigureAwait(false);
+                                        }
+                                    },
+                                    CancellationToken.None);
 
             stopLive.Wait(TimeSpan.FromMilliseconds(250), CancellationToken.None);
         }
@@ -731,6 +748,7 @@ public sealed partial class App : Application, IDisposable
         _logProvider?.Dispose();
 
         _liveSender?.DisposeAsync().AsTask().Wait(TimeSpan.FromMilliseconds(100), CancellationToken.None);
+        _liveBuffer?.DisposeAsync().AsTask().Wait(TimeSpan.FromMilliseconds(100), CancellationToken.None);
         _localServer?.DisposeAsync().AsTask().Wait(TimeSpan.FromMilliseconds(500), CancellationToken.None);
         _images?.Dispose();
         _connectionCancellation?.Dispose();

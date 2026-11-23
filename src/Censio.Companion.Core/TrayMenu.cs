@@ -298,6 +298,11 @@ public static class TrayMenu
             entries.Add(new TrayMenuEntry(TrayMenuEntryKind.ServerConnection, FormatLiveSend(live), false));
         }
 
+        if (server?.Buffer is { } buffer)
+        {
+            entries.Add(new TrayMenuEntry(TrayMenuEntryKind.LiveBuffer, FormatLiveBuffer(buffer), false));
+        }
+
         entries.Add(new TrayMenuEntry(TrayMenuEntryKind.Separator, string.Empty, false));
 
         if (server?.Local is { } running)
@@ -338,8 +343,6 @@ public static class TrayMenu
                };
     }
 
-#pragma warning disable RH2003
-    // Skeleton: removed with the implementation
     /// <summary>
     /// Formats the text of the live buffer entry.
     /// </summary>
@@ -347,9 +350,15 @@ public static class TrayMenu
     /// <returns>The text</returns>
     public static string FormatLiveBuffer(LiveBufferStatus status)
     {
-        throw new NotImplementedException();
+        var text = string.Create(CultureInfo.InvariantCulture, $"Buffer: {status.Waiting} waiting");
+
+        if (status.Dropped > 0)
+        {
+            text += string.Create(CultureInfo.InvariantCulture, $", {status.Dropped} dropped");
+        }
+
+        return status.IsMemoryOnly ? text + ", not saved to disk" : text;
     }
-#pragma warning restore RH2003
 
     /// <summary>
     /// Formats the text of the server connection entry of forward mode.
