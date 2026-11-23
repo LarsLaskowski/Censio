@@ -84,6 +84,7 @@ public sealed class TrendSeriesBuilderTests
     /// <returns>A task that represents the asynchronous test</returns>
     [TestMethod]
     [TestCategory("AC1")]
+    [TestCategory("AC7")]
     public async Task TrendSeriesBuilderFixturePauseBreaksSessionChangeJoins()
     {
         // Arrange

@@ -19,34 +19,19 @@ public sealed class LiveSender : IAsyncDisposable
     /// </summary>
     public const string ProfileName = "Live";
 
-    /// <summary>
-    /// The largest number of messages that wait for their acknowledgement.
-    /// </summary>
-    public const int MaxWaitingMessages = 64;
-
-    /// <summary>
-    /// The largest size of the waiting messages in bytes of written JSON.
-    /// </summary>
-    public const int MaxWaitingBytes = 16777216;
-
     #endregion // Constants
 
     #region Fields
 
     /// <summary>
-    /// The address of the server.
+    /// The server the sender sends to.
     /// </summary>
-    private readonly Uri _address;
+    private readonly LiveSendTarget _target;
 
     /// <summary>
-    /// The reader of the token, or <see langword="null" /> when no token is presented.
+    /// The buffer of the waiting messages.
     /// </summary>
-    private readonly Func<CancellationToken, Task<string?>>? _readToken;
-
-    /// <summary>
-    /// Whether the server is the local one.
-    /// </summary>
-    private readonly bool _isLocal;
+    private readonly LiveBuffer _buffer;
 
     /// <summary>
     /// The version of the Companion.
@@ -69,39 +54,14 @@ public sealed class LiveSender : IAsyncDisposable
     private readonly ILogger _logger;
 
     /// <summary>
-    /// The lock of the queue, the status and the connection.
+    /// The lock of the status and the connection.
     /// </summary>
     private readonly Lock _lock = new();
-
-    /// <summary>
-    /// The waiting messages, the oldest first; the first one is kept until it is acknowledged.
-    /// </summary>
-    private readonly List<(Guid Id, ReadOnlyMemory<byte> Utf8Json)> _queue = [];
-
-    /// <summary>
-    /// The signal that tells the send loop that a message was queued.
-    /// </summary>
-    private readonly SemaphoreSlim _queued = new(0);
 
     /// <summary>
     /// The cancellation of the run, requested by the dispose.
     /// </summary>
     private readonly CancellationTokenSource _dispose = new();
-
-    /// <summary>
-    /// The size of the waiting messages in bytes.
-    /// </summary>
-    private long _queuedBytes;
-
-    /// <summary>
-    /// Whether the first waiting message is being sent.
-    /// </summary>
-    private bool _isSending;
-
-    /// <summary>
-    /// The number of dropped messages that no log line holds yet.
-    /// </summary>
-    private int _unloggedDropped;
 
     /// <summary>
     /// The state of the pipe connection last passed on, or <see langword="null" /> when none was.
@@ -140,18 +100,16 @@ public sealed class LiveSender : IAsyncDisposable
     /// <summary>
     /// Initializes a new instance of the <see cref="LiveSender" /> class.
     /// </summary>
-    /// <param name="address">The address of the server</param>
-    /// <param name="readToken">The reader of the token, or <see langword="null" /> when no token is presented</param>
-    /// <param name="isLocal">Whether the server is the local one</param>
+    /// <param name="target">The server the sender sends to</param>
+    /// <param name="buffer">The buffer of the waiting messages</param>
     /// <param name="companionVersion">The version of the Companion</param>
     /// <param name="connector">The connector</param>
     /// <param name="timeProvider">The time provider</param>
     /// <param name="logger">The logger</param>
-    private LiveSender(Uri address, Func<CancellationToken, Task<string?>>? readToken, bool isLocal, string companionVersion, IReplayServerConnector connector, TimeProvider timeProvider, ILogger logger)
+    private LiveSender(LiveSendTarget target, LiveBuffer buffer, string companionVersion, IReplayServerConnector connector, TimeProvider timeProvider, ILogger logger)
     {
-        _address = address;
-        _readToken = readToken;
-        _isLocal = isLocal;
+        _target = target;
+        _buffer = buffer;
         _companionVersion = companionVersion;
         _connector = connector;
         _timeProvider = timeProvider;
@@ -233,14 +191,25 @@ public sealed class LiveSender : IAsyncDisposable
     /// Creates a sender that sends to the server of the forward setting.
     /// </summary>
     /// <param name="setting">The forward setting</param>
+    /// <param name="buffer">The buffer of the waiting messages</param>
     /// <param name="companionVersion">The version of the Companion</param>
     /// <param name="connector">The connector</param>
     /// <param name="timeProvider">The time provider</param>
     /// <param name="logger">The logger</param>
     /// <returns>The sender</returns>
-    public static LiveSender ForServer(ForwardServerSetting setting, string companionVersion, IReplayServerConnector connector, TimeProvider timeProvider, ILogger logger)
+    public static LiveSender ForServer(ForwardServerSetting setting, LiveBuffer buffer, string companionVersion, IReplayServerConnector connector, TimeProvider timeProvider, ILogger logger)
     {
-        return new LiveSender(setting.Address, _ => Task.FromResult(setting.Token), false, companionVersion, connector, timeProvider, logger);
+        return new LiveSender(new LiveSendTarget
+                              {
+                                  Address = setting.Address,
+                                  ReadToken = _ => Task.FromResult(setting.Token),
+                                  IsLocal = false
+                              },
+                              buffer,
+                              companionVersion,
+                              connector,
+                              timeProvider,
+                              logger);
     }
 
     /// <summary>
@@ -248,18 +217,29 @@ public sealed class LiveSender : IAsyncDisposable
     /// </summary>
     /// <param name="port">The port of the local server</param>
     /// <param name="waitForToken">The delegate that waits for the token of the local server</param>
+    /// <param name="buffer">The buffer of the waiting messages</param>
     /// <param name="companionVersion">The version of the Companion</param>
     /// <param name="connector">The connector</param>
     /// <param name="timeProvider">The time provider</param>
     /// <param name="logger">The logger</param>
     /// <returns>The sender</returns>
-    public static LiveSender ForLocalServer(int port, Func<CancellationToken, Task<string?>> waitForToken, string companionVersion, IReplayServerConnector connector, TimeProvider timeProvider, ILogger logger)
+    public static LiveSender ForLocalServer(int port, Func<CancellationToken, Task<string?>> waitForToken, LiveBuffer buffer, string companionVersion, IReplayServerConnector connector, TimeProvider timeProvider, ILogger logger)
     {
-        return new LiveSender(new Uri(string.Create(CultureInfo.InvariantCulture, $"ws://127.0.0.1:{port}/ingest")), waitForToken, true, companionVersion, connector, timeProvider, logger);
+        return new LiveSender(new LiveSendTarget
+                              {
+                                  Address = new Uri(string.Create(CultureInfo.InvariantCulture, $"ws://127.0.0.1:{port}/ingest")),
+                                  ReadToken = waitForToken,
+                                  IsLocal = true
+                              },
+                              buffer,
+                              companionVersion,
+                              connector,
+                              timeProvider,
+                              logger);
     }
 
     /// <summary>
-    /// Queues an item of the pipe connection for sending; it never waits.
+    /// Puts an item of the pipe connection into the buffer for sending; it never waits.
     /// </summary>
     /// <param name="item">The item</param>
     public void Enqueue(PipeConnectionItem item)
@@ -285,15 +265,7 @@ public sealed class LiveSender : IAsyncDisposable
                 return;
             }
 
-            _queue.Add((id, written.Utf8Json));
-            _queuedBytes += written.Utf8Json.Length;
-
-            DropOldest();
-
-            if (_queued.CurrentCount == 0)
-            {
-                _queued.Release();
-            }
+            _buffer.Add(id, written.Utf8Json);
         }
     }
 
@@ -384,33 +356,11 @@ public sealed class LiveSender : IAsyncDisposable
     }
 
     /// <summary>
-    /// Removes the oldest waiting messages that are not being sent while the bounds are exceeded; the newest stays.
-    /// The caller holds the lock.
-    /// </summary>
-    private void DropOldest()
-    {
-        var first = _isSending ? 1 : 0;
-
-        while ((_queue.Count > MaxWaitingMessages || _queuedBytes > MaxWaitingBytes) && _queue.Count - first >= 2)
-        {
-            _queuedBytes -= _queue[first].Utf8Json.Length;
-            _queue.RemoveAt(first);
-            _unloggedDropped++;
-        }
-    }
-
-    /// <summary>
     /// Logs the number of dropped messages that no log line holds yet.
     /// </summary>
     private void LogDropped()
     {
-        int count;
-
-        lock (_lock)
-        {
-            count = _unloggedDropped;
-            _unloggedDropped = 0;
-        }
+        var count = _buffer.TakeUnloggedDropped();
 
         if (count > 0)
         {
@@ -554,11 +504,11 @@ public sealed class LiveSender : IAsyncDisposable
         {
             string? token = null;
 
-            if (_readToken is not null)
+            if (_target.ReadToken is not null)
             {
-                token = await _readToken(cancellationToken).ConfigureAwait(false);
+                token = await _target.ReadToken(cancellationToken).ConfigureAwait(false);
 
-                if (token is null && _isLocal)
+                if (token is null && _target.IsLocal)
                 {
                     return (ReplaySendProblemKind.LocalServerNotRunning, false, TimeSpan.Zero);
                 }
@@ -577,7 +527,7 @@ public sealed class LiveSender : IAsyncDisposable
                             ProfileId = ProfileId,
                             ProfileName = ProfileName
                         };
-            var refusal = await client.OpenAsync(_address, hello, cancellationToken).ConfigureAwait(false);
+            var refusal = await client.OpenAsync(_target.Address, hello, cancellationToken).ConfigureAwait(false);
 
             if (refusal is not null)
             {
@@ -618,8 +568,9 @@ public sealed class LiveSender : IAsyncDisposable
             lock (_lock)
             {
                 _notify = null;
-                _isSending = false;
             }
+
+            _buffer.ReleaseInFlight();
 
             if (client is not null)
             {
@@ -644,43 +595,21 @@ public sealed class LiveSender : IAsyncDisposable
                 return failed.Task.Result;
             }
 
-            (Guid Id, ReadOnlyMemory<byte> Utf8Json)? next = null;
-
-            lock (_lock)
-            {
-                if (_queue.Count > 0)
-                {
-                    next = _queue[0];
-                    _isSending = true;
-                }
-            }
+            var next = await NextOrFailureAsync(failed, cancellationToken).ConfigureAwait(false);
 
             if (next is null)
             {
-                await WaitForMessageAsync(failed, cancellationToken).ConfigureAwait(false);
-
-                continue;
+                return failed.Task.Result;
             }
 
-            var (id, utf8Json) = next.Value;
-
-            var acknowledgement = await client.SendAsync(utf8Json, id, cancellationToken).ConfigureAwait(false);
-
-            lock (_lock)
-            {
-                _isSending = false;
-
-                if (acknowledgement is not null && _queue.Count > 0 && _queue[0].Id == id)
-                {
-                    _queuedBytes -= _queue[0].Utf8Json.Length;
-                    _queue.RemoveAt(0);
-                }
-            }
+            var acknowledgement = await client.SendAsync(next.Utf8Json, next.Id, cancellationToken).ConfigureAwait(false);
 
             if (acknowledgement is null)
             {
                 return client.Failure ?? ReplaySendProblemKind.ConnectionLost;
             }
+
+            _buffer.Acknowledge(next.Id);
 
             if (acknowledgement.Refusal is { } refusal)
             {
@@ -692,28 +621,38 @@ public sealed class LiveSender : IAsyncDisposable
     }
 
     /// <summary>
-    /// Waits until a message is queued or the connection failed.
+    /// Waits for the next message of the buffer or the failure of the connection.
     /// </summary>
     /// <param name="failed">The completion that the failure of the client sets</param>
     /// <param name="cancellationToken">The token that ends the run</param>
-    /// <returns>A task that completes then</returns>
-    private async Task WaitForMessageAsync(TaskCompletionSource<ReplaySendProblemKind> failed, CancellationToken cancellationToken)
+    /// <returns>The message, or <see langword="null" /> when the connection failed first</returns>
+    private async Task<LiveBufferEntry?> NextOrFailureAsync(TaskCompletionSource<ReplaySendProblemKind> failed, CancellationToken cancellationToken)
     {
         using var waitCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
-        var queued = _queued.WaitAsync(waitCancellation.Token);
+        var next = _buffer.NextAsync(waitCancellation.Token);
 
-        await Task.WhenAny(queued, failed.Task).ConfigureAwait(false);
+        await Task.WhenAny(next, failed.Task).ConfigureAwait(false);
+
+        if (next.IsCompletedSuccessfully)
+        {
+            return next.Result;
+        }
+
         await waitCancellation.CancelAsync().ConfigureAwait(false);
 
         try
         {
-            await queued.ConfigureAwait(false);
+            await next.ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested == false)
         {
             // The wait ended because the connection failed.
         }
+
+        _buffer.ReleaseInFlight();
+
+        return null;
     }
 
     #endregion // Methods
@@ -752,7 +691,6 @@ public sealed class LiveSender : IAsyncDisposable
 
         LogDropped();
         _dispose.Dispose();
-        _queued.Dispose();
     }
 
     #endregion // IAsyncDisposable

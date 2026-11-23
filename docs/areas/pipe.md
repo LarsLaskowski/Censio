@@ -133,7 +133,7 @@ A tick is delivered when it closes, once, and is never reopened. It closes when:
   was set back (by a replay's recorded times or by the system) makes the assembler wait on and throws nothing. The
   steps change no item: a deadline that the clock reaches closes the tick as before.
 - The caller must keep requesting: the receive time of a frame is stamped when its read completes, but the next read
-  starts only on a request. A slow consumer belongs behind the tick buffer (#41) or a hand-off that never blocks the
+  starts only on a request. A slow consumer belongs behind the live buffer ([`live-sending.md`](live-sending.md), *Buffer*) or a hand-off that never blocks the
   reading ([`companion-diagnostics.md`](companion-diagnostics.md)).
 
 ## Limits and errors

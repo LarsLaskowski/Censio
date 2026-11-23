@@ -95,7 +95,7 @@ Examples with invented values (shortened where marked):
 - A session event's and a trade-routes message's `receiveTime` is the read stamp of its pipe message. A session result of the pipe carries no time, so
   the caller takes the stamp from the tick assembler's read observer and gives it to the converter; it is never the time
   of conversion or sending (a trade-routes item the same way). A tick's `receiveTime` and `gameTime` are those of the closed pipe tick.
-- A tick for which the Companion's buffer dropped data has no message: silence is the gap (record 0031); #41 needs no
+- A tick for which the Companion's buffer dropped data has no message: silence is the gap (record 0031); the buffer ([`live-sending.md`](live-sending.md), *Buffer*) needs no
   message for it.
 
 ### What never crosses
@@ -278,7 +278,7 @@ input.
 ## Not here
 
 - The server's endpoint and what it answers to each message: [`ingest.md`](ingest.md); its token: [`ingest-token.md`](ingest-token.md).
-- The Companion's sending of a replay: [`replay-sending.md`](replay-sending.md); live sending: [`live-sending.md`](live-sending.md); the persistent buffer (#41); uploading the catalog and the icons (#42).
+- The Companion's sending of a replay: [`replay-sending.md`](replay-sending.md); live sending: [`live-sending.md`](live-sending.md); the persistent buffer ([`live-sending.md`](live-sending.md), *Buffer*); uploading the catalog and the icons (#42).
 - The catalog document itself: [`game-catalog-format.md`](game-catalog-format.md).
 - The pipe's frames and ticks: [`pipe.md`](pipe.md).
 - The code: `ContractReader`, `ContractWriter` and the message types in `src/Censio.Contracts`, the conversion of pipe

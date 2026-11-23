@@ -31,7 +31,7 @@ from the menu, the optional start with Windows, the menu entry for the diagnosti
   (*problem*) for `Protocol mismatch`, `Error` and an invalid command line. In a replay the icon follows the replayed
   state, shows *waiting* after `Replay finished` and *problem* after `Replay error`.
 - The context menu holds, top to bottom: `Status: <status text>` (greyed out), `Last tick: <time>, <n> islands` or
-  `Last tick: none` (greyed out), `Game: <state>` (greyed out), `Catalog: <state>` (greyed out), in local mode `Server: <state>` (greyed out, [`local-mode.md`](local-mode.md), *Menu*) and in forward mode `Server: <connection state>` (greyed out, [`live-sending.md`](live-sending.md), *Reconnect*), a separator, in local mode `Open Censio`, `Open diagnostics`, `Start recording` or `Stop recording`, `Open recordings folder`, `Open
+  `Last tick: none` (greyed out), `Game: <state>` (greyed out), `Catalog: <state>` (greyed out), in local mode `Server: <state>` (greyed out, [`local-mode.md`](local-mode.md), *Menu*) and in forward mode `Server: <connection state>` (greyed out, [`live-sending.md`](live-sending.md), *Reconnect*), where live data is sent `Buffer: <n> waiting[, <d> dropped][, not saved to disk]` (greyed out, directly below the `Server:` line, [`live-sending.md`](live-sending.md), *Buffer*), a separator, in local mode `Open Censio`, `Open diagnostics`, `Start recording` or `Stop recording`, `Open recordings folder`, `Open
   log folder`, a separator, `Start with Windows` (checked while the autostart is on, enabled in every mode), a separator, `Version <version>` (greyed out, nothing happens on click), a separator and `Exit`. The
   values are current each time the menu opens. `Open diagnostics` is enabled in every mode (live, `--record`, replay and an invalid command line); `Start recording` is greyed out in a replay and with an invalid command
   line. The menu is light, also with Windows in dark mode.
@@ -116,6 +116,7 @@ described in the other sections.
 - The menu does not wait for the disk or for Explorer. If a folder cannot be created or opened, or is not a full path
   (local app data unresolved), a warning is logged and nothing else changes.
 - In local mode the hosted server's data folder is `%LOCALAPPDATA%\Censio\Server` ([`local-mode.md`](local-mode.md), *Hosted server and its data*): fixed, without a menu entry, created by the server at its first start, private like the recordings folder, and kept when the Companion is removed.
+- The live buffer lies in `%LOCALAPPDATA%\Censio\Buffer` ([`live-sending.md`](live-sending.md), *Buffer*): fixed, without a menu entry, created when live sending starts, private like the recordings folder, and kept when the Companion is removed.
 - The catalog cache lies in `%LOCALAPPDATA%\Censio\Cache` (file `catalog.bin`, [`game-catalog-cache.md`](game-catalog-cache.md)):
   fixed, without a menu entry, created at the first write, private like the recordings folder, and kept when the Companion is removed.
 
@@ -131,12 +132,12 @@ described in the other sections.
 ### Settings file
 
 - The Companion reads the optional file `%LOCALAPPDATA%\Censio\settings.json` once per start, for the game folder
-  ([`game-installation.md`](game-installation.md)), for local mode (`mode` and `localPort`, below) and for forward mode (`mode`, `serverAddress` and `serverToken`). The path is fixed and the file is never written, created or
+  ([`game-installation.md`](game-installation.md)), for local mode (`mode` and `localPort`, below) and for forward mode (`mode`, `serverAddress` and `serverToken`) and for the live buffer's limits (`bufferHours` and `bufferMegabytes`). The path is fixed and the file is never written, created or
   repaired by the Companion; a missing file, or a path that is not a full path, is no error. A change counts after a
   restart.
 - The file is UTF-8 JSON whose root is an object. A leading byte order mark, `//` and `/* */` comments and trailing
-  commas are accepted. The key `gameFolder` is matched ignoring case (`GameFolder`); so are `mode`, `localPort`, `serverAddress` and `serverToken`: `mode` switches local mode or forward mode on ([`local-mode.md`](local-mode.md), *Switching on*: `"mode": "local"`, `localPort` from 1 to 65535,
-  default 5000, read only with `mode` `local`; [`live-sending.md`](live-sending.md), *Switching on*: `"mode": "forward"`, `serverAddress` and the optional `serverToken`, read only with `mode` `forward`); every other key, and a
+  commas are accepted. The key `gameFolder` is matched ignoring case (`GameFolder`); so are `mode`, `localPort`, `serverAddress`, `serverToken`, `bufferHours` and `bufferMegabytes`: `mode` switches local mode or forward mode on ([`local-mode.md`](local-mode.md), *Switching on*: `"mode": "local"`, `localPort` from 1 to 65535,
+  default 5000, read only with `mode` `local`; [`live-sending.md`](live-sending.md), *Switching on*: `"mode": "forward"`, `serverAddress` and the optional `serverToken`, read only with `mode` `forward`; `bufferHours` from 1 to 168, default 24, and `bufferMegabytes` from 1 to 10,240, default 100, read with `mode` `forward` and `local`, [`live-sending.md`](live-sending.md), *Buffer*); every other key, and a
   `gameFolder` nested in another object, is ignored so that later settings can share the file. The value is used as
   written, without expanding variables; a blank text counts as no game folder.
 - It is invalid, with the menu text `Game: settings file invalid`, when it is larger than 1 MiB (1,048,576 bytes,
@@ -146,7 +147,7 @@ described in the other sections.
   cannot be decoded (invalid UTF-8 or a lone surrogate) makes the whole file invalid, even under an unknown key;
   invalid bytes in a comment or in another key's value are accepted.
 - The reason is logged as a warning ([`companion-log.md`](companion-log.md)); no automatic search follows an invalid file.
-  A wrong value of `mode`, `localPort`, `serverAddress` or `serverToken` does not make the file invalid for `gameFolder`; it shows `Server: settings invalid`
+  A wrong value of `mode`, `localPort`, `serverAddress`, `serverToken`, `bufferHours` or `bufferMegabytes` does not make the file invalid for `gameFolder`; it shows `Server: settings invalid`
   ([`local-mode.md`](local-mode.md), [`live-sending.md`](live-sending.md)). The file may hold the ingest token (`serverToken`), so it is not shared.
 
 ### Replay

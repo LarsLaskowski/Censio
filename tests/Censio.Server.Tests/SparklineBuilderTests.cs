@@ -128,6 +128,7 @@ public sealed partial class SparklineBuilderTests
     /// </summary>
     [TestMethod]
     [TestCategory("AC4")]
+    [TestCategory("AC7")]
     public void SparklineBuilderBreaksAtMissingValueAndAfterFifteenMinutes()
     {
         // Arrange

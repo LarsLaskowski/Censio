@@ -288,7 +288,7 @@ catalog, not only its size, decides the peak.
 - The messages, their reader and writer, bounds of the message fields and the refusal texts: [`contract.md`](contract.md).
 - The catalog document inside an upload: [`game-catalog-format.md`](game-catalog-format.md).
 - The state kept from what arrives: [`server-state.md`](server-state.md); the database: [`server-data.md`](server-data.md).
-- Showing what arrives: [`web-pages.md`](web-pages.md). The Companion's replay sending: [`replay-sending.md`](replay-sending.md); live sending ([`live-sending.md`](live-sending.md)), the persistent buffer (#41), the catalog and
+- Showing what arrives: [`web-pages.md`](web-pages.md). The Companion's replay sending: [`replay-sending.md`](replay-sending.md); live sending ([`live-sending.md`](live-sending.md)), the persistent buffer ([`live-sending.md`](live-sending.md), *Buffer*), the catalog and
   icons it uploads (#42).
 - The ingest token, its file and switch, and the start failures: [`ingest-token.md`](ingest-token.md).
 - The server's HTTP surface, the data directory and the Docker image: [`server.md`](server.md).

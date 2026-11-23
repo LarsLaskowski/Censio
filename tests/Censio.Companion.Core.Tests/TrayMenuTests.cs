@@ -1568,6 +1568,104 @@ public sealed class TrayMenuTests
     }
 
     /// <summary>
+    /// The buffer line reads the waiting count, with the dropped count once messages were dropped and the note on memory
+    /// only after a failed write, in digits without separators (S1, S3, E2).
+    /// </summary>
+    /// <param name="waiting">The number of waiting messages</param>
+    /// <param name="dropped">The number of dropped messages</param>
+    /// <param name="isMemoryOnly">Whether the buffer keeps messages in memory only</param>
+    /// <param name="expected">The expected text</param>
+    [TestMethod]
+    [TestCategory("AC5")]
+    [DataRow(0, 0, false, "Buffer: 0 waiting", DisplayName = "Empty")]
+    [DataRow(1234, 0, false, "Buffer: 1234 waiting", DisplayName = "Waiting")]
+    [DataRow(0, 3, false, "Buffer: 0 waiting, 3 dropped", DisplayName = "Dropped")]
+    [DataRow(5, 1, false, "Buffer: 5 waiting, 1 dropped", DisplayName = "Waiting and dropped")]
+    [DataRow(2, 0, true, "Buffer: 2 waiting, not saved to disk", DisplayName = "Memory only")]
+    [DataRow(1234, 3, true, "Buffer: 1234 waiting, 3 dropped, not saved to disk", DisplayName = "Dropped and memory only")]
+    public void TrayMenuFormatLiveBufferTexts(int waiting, int dropped, bool isMemoryOnly, string expected)
+    {
+        // Arrange
+        var status = new LiveBufferStatus
+                     {
+                         Waiting = waiting,
+                         Dropped = dropped,
+                         IsMemoryOnly = isMemoryOnly
+                     };
+
+        // Act
+        var text = TrayMenu.FormatLiveBuffer(status);
+
+        // Assert
+        Assert.AreEqual(expected, text, $"The buffer line of {waiting} waiting, {dropped} dropped, memory only {isMemoryOnly} should be its text");
+    }
+
+    /// <summary>
+    /// Where live sending runs, in forward and in local mode, one greyed, unchecked buffer line follows directly below the
+    /// server line with the text of the buffer's status (S1, S6).
+    /// </summary>
+    /// <param name="mode">The mode: forward or local</param>
+    /// <param name="serverKind">The kind of the server line of the mode</param>
+    [TestMethod]
+    [TestCategory("AC5")]
+    [DataRow("forward", TrayMenuEntryKind.ServerConnection)]
+    [DataRow("local", TrayMenuEntryKind.LocalServer)]
+    public void TrayMenuCreateShowsBufferLineBelowServerLine(string mode, TrayMenuEntryKind serverKind)
+    {
+        // Arrange
+        var snapshot = CreateSnapshot("Receiving", canRecord: true, isRecording: false);
+        var server = CreateServerStatus(mode) with
+                                              {
+                                                  Buffer = new LiveBufferStatus
+                                                           {
+                                                               Waiting = 3,
+                                                               Dropped = 1,
+                                                               IsMemoryOnly = false
+                                                           }
+                                              };
+
+        // Act
+        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, server, false, CreateClock(1));
+
+        // Assert
+        var kinds = entries.Select(entry => entry.Kind).ToList();
+        var bufferLine = entries.Single(entry => entry.Kind == TrayMenuEntryKind.LiveBuffer);
+
+        Assert.AreEqual(kinds.IndexOf(serverKind) + 1, kinds.IndexOf(TrayMenuEntryKind.LiveBuffer), $"The buffer line should be directly below the server line in {mode} mode");
+        Assert.AreEqual(kinds.IndexOf(TrayMenuEntryKind.Separator) - 1, kinds.IndexOf(TrayMenuEntryKind.LiveBuffer), $"The buffer line should be directly above the first separator in {mode} mode");
+        Assert.AreEqual("Buffer: 3 waiting, 1 dropped", bufferLine.Text, $"The buffer line should show the text of the buffer's status in {mode} mode");
+        Assert.IsFalse(bufferLine.IsEnabled, "The buffer line should be greyed out");
+        Assert.IsFalse(bufferLine.IsChecked, "The buffer line should not be checked");
+        Assert.ContainsSingle(entry => entry.Text.StartsWith("Buffer:", StringComparison.Ordinal), entries, "The menu should hold exactly one buffer text");
+    }
+
+    /// <summary>
+    /// Without a buffer status, that is without live sending (no server setting) or with a server status that carries no
+    /// buffer, the menu shows no buffer line (S8).
+    /// </summary>
+    /// <param name="mode">The mode: none, forward or local</param>
+    [TestMethod]
+    [TestCategory("AC9")]
+    [DataRow("none")]
+    [DataRow("forward")]
+    [DataRow("local")]
+    public void TrayMenuCreateWithoutBufferStatusShowsNoBufferLine(string mode)
+    {
+        // Arrange
+        var snapshot = CreateSnapshot("Receiving", canRecord: true, isRecording: false);
+        TrayServerStatus? server = mode == "none" ? null : CreateServerStatus(mode);
+
+        // Act
+        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, server, false, CreateClock(1));
+
+        // Assert
+        var kinds = entries.Select(entry => entry.Kind).ToList();
+
+        Assert.DoesNotContain(TrayMenuEntryKind.LiveBuffer, kinds, $"The menu should hold no buffer entry without a buffer status in mode {mode}");
+        Assert.DoesNotContain(entry => entry.Text.StartsWith("Buffer:", StringComparison.Ordinal), entries, $"The menu should hold no buffer text without a buffer status in mode {mode}");
+    }
+
+    /// <summary>
     /// A replay that ends because the local server does not run names the reason in the tooltip and the reason text (E10).
     /// </summary>
     [TestMethod]
@@ -1807,6 +1905,31 @@ public sealed class TrayMenuTests
                    State = state,
                    Port = port
                };
+    }
+
+    /// <summary>
+    /// Creates the server status of a mode with live sending: connected in forward mode, a running hosted server in local
+    /// mode.
+    /// </summary>
+    /// <param name="mode">The mode: forward or local</param>
+    /// <returns>The server status</returns>
+    private static TrayServerStatus CreateServerStatus(string mode)
+    {
+        var live = new LiveSendStatus
+                   {
+                       State = LiveSendState.Connected
+                   };
+
+        return mode == "local"
+                   ? new TrayServerStatus
+                     {
+                         Local = CreateLocalServerStatus(LocalServerState.Running, 5117),
+                         Live = live
+                     }
+                   : new TrayServerStatus
+                     {
+                         Live = live
+                     };
     }
 
     /// <summary>

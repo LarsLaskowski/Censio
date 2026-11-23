@@ -17,5 +17,10 @@ public readonly record struct TrayServerStatus
     /// </summary>
     public LiveSendStatus? Live { get; init; }
 
+    /// <summary>
+    /// Gets the status of the live buffer, or <see langword="null" /> when there is none.
+    /// </summary>
+    public LiveBufferStatus? Buffer { get; init; }
+
     #endregion // Properties
 }
