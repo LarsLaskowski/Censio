@@ -14,6 +14,7 @@
     <Compile Include="..\Censio.Pipe.Tests\ControlledWriteStream.cs" Link="ControlledWriteStream.cs" />
     <Compile Include="..\Censio.Pipe.Tests\RecordingTimeProvider.cs" Link="RecordingTimeProvider.cs" />
     <Compile Include="..\Censio.Server.Tests\RecordingLogger.cs" Link="RecordingLogger.cs" />
+    <Compile Include="..\Censio.Server.Tests\ConcurrentRecordingLogger.cs" Link="ConcurrentRecordingLogger.cs" />
     <Compile Include="..\Censio.Server.Tests\InMemoryDuplexStream.cs" Link="InMemoryDuplexStream.cs" />
   </ItemGroup>
   <ItemGroup>
