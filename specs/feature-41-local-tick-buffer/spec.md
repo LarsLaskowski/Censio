@@ -1,7 +1,7 @@
 # Spec: Bounded local tick buffer and gaps
 
 Source: Issue #41
-Status: Draft
+Status: Approved by Lead
 
 ## Problem
 
@@ -53,10 +53,10 @@ waiting messages, `live-sending.md`, *What is sent*); `status` messages stay unb
   name): what is already on disk is still sent first, the messages taken afterwards wait in memory for the rest of the
   run within today's bound (64 messages, 16 MiB; oldest dropped and counted), the menu line gets `, not saved to disk`
   appended, and `Live buffer cannot be written; waiting messages are kept in memory until Exit` is logged once.
-- E3: A buffer that is partly unreadable at start (a torn end after a power cut, a file changed by hand or written by
-  another release): the messages before the first unreadable part are sent in order, the rest is discarded, and
-  `Live buffer partly unreadable; the rest was discarded` is logged. The discarded part is not in the dropped count,
-  because a torn part has no countable messages: a gap only the log reports, an accepted risk of `live-buffer.md`.
+- E3: A buffered message that is unreadable (a torn write after a power cut, a file changed by hand or written by
+  another release), found at start or when it is sent: it is discarded and counted as dropped, the others are sent in
+  order, and `Live buffer entries unreadable: <n>; discarded` is logged. A file of a name the buffer never writes is
+  left alone.
 - E4: A single message larger than the size limit: the newest message always stays, as today, and is sent.
 - E5: The age is the time since the Companion took the message, by the PC's clock: a clock set back keeps messages
   longer, a clock set forward drops them earlier.
@@ -85,8 +85,9 @@ waiting messages, `live-sending.md`, *What is sent*); `status` messages stay unb
 - N5: A message is in the buffer before it is first sent; `Exit` and a crash of the process lose no message written
   to it. `Exit` keeps its bounds (2 seconds, 5 in local mode; `companion.md`).
 - N6: Privacy and security: the buffer lies in the fixed folder `%LOCALAPPDATA%\Censio\Buffer`, like the recordings,
-  logs and cache folders, never in a path from the settings file or from received data; a new record of this change
-  supersedes the path consequence of the released record 0031 ("a path from configuration") with this fixed folder; it holds the messages as sent (island names, the economy, trade
+  logs and cache folders, never in a path from the settings file or from received data; record
+  [0105](../../docs/decisions/0105-unsent-live-messages-kept-one-file-each-in-a-fixed-buffer-folder.md) supersedes
+  the path consequence of the released record 0031 ("a path from configuration") with this fixed folder; it holds the messages as sent (island names, the economy, trade
   routes), never the token; no log line holds a message's content. Reading it back is external input: read into typed
   results, failing closed (record 0033).
 - N7: Compatibility: the contract (version 2) and the server are unchanged; a server of release 0.4.0 receives the
@@ -142,14 +143,12 @@ waiting messages, `live-sending.md`, *What is sent*); `status` messages stay unb
 
 ## Area documents
 
-- New `docs/areas/live-buffer.md`: what is buffered, the folder, the limits and their keys, order and resend, drops and
-  their count, the menu line, the log lines, the failure cases E2 and E3, privacy and the accepted risks (among them a
-  torn buffer's gap that only the log reports).
-- `live-sending.md`: *Waiting messages* and the accepted risk *Memory only* replaced by a pointer to `live-buffer.md`;
-  *Switching on* gains the two keys and their problem texts.
+- `live-sending.md` (the buffer is part of live sending; the document stays well under `AREA_MAX_WORDS`): *Waiting
+  messages* becomes *Buffer* — what is buffered, the folder and its file format, the limits and their keys, order and
+  resend, drops and their count, the menu line, the failure cases E2 and E3; *Switching on* gains the two keys and their
+  problem texts; *Log*, *Privacy* and *Accepted risks* (*Memory only* replaced) follow.
 - `companion.md`: the `Buffer:` menu line, the two keys under *Settings file*, the folder under *Folders*.
-- `companion-log.md`: the new log lines. `docs/areas/README.md`: the index row of `live-buffer.md` and the rows that
-  name "#41".
+- `companion-log.md`: the new log lines. `docs/areas/README.md`: the rows that name "#41".
 
 ## Challenge
 
@@ -164,4 +163,7 @@ waiting messages, `live-sending.md`, *What is sent*); `status` messages stay unb
   message and the message in flight.
 - Minor 4 (E3's discarded part not in the tray count): accepted as the second option. A torn or foreign part has no
   countable messages, so a count would be invented; E3 states the gap only the log reports, and `live-buffer.md` lists
-  it among its accepted risks.
+  it among its accepted risks. Changed while planning: the plan keeps one file per message (record 0105), so an
+  unreadable message is one file and countable; E3 now discards only that file, counts it as dropped (so the tray shows
+  it) and logs `Live buffer entries unreadable: <n>; discarded`, and the buffer's rules stay in `live-sending.md`
+  instead of a new `live-buffer.md`.

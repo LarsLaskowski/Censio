@@ -166,4 +166,6 @@ once in the [area document](../areas/README.md) of the record's area, and the re
 | [0102](0102-live-data-goes-to-one-fixed-profile-live-until-profiles-are-chosen.md) | Until the player can choose a profile, live data goes to one fixed profile `Live` | Accepted | 2026-11-22 |
 | [0103](0103-forward-server-address-and-token-are-keys-of-the-settings-file.md) | Forward mode's server address and ingest token are keys of the settings file | Accepted | 2026-11-22 |
 | [0104](0104-live-sending-reconnects-holds-messages-in-memory-and-pings.md) | Live sending reconnects with growing delays, holds waiting messages in memory and finds a dead connection by its own pings | Accepted | 2026-11-22 |
+| [0105](0105-unsent-live-messages-kept-one-file-each-in-a-fixed-buffer-folder.md) | Unsent live messages are kept one file each in a fixed buffer folder | Proposed | 2026-11-23 |
+| [0106](0106-buffer-limits-are-settings-keys-in-hours-and-megabytes.md) | The buffer's limits are keys of the settings file, in whole hours and megabytes | Proposed | 2026-11-23 |
 <!-- project:end index -->

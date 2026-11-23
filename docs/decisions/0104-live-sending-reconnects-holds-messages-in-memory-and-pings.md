@@ -42,7 +42,8 @@ Options 1, 3 and 5. The values and texts are in [`live-sending.md`](../areas/liv
 
 ## Consequences
 
-- Up to the memory bound a server restart or network loss leaves no gap while the Companion runs; #41 replaces the
-  bound by its persistent buffer.
+- Up to the memory bound a server restart or network loss leaves no gap while the Companion runs; the persistent
+  buffer of #41 ([0105](0105-unsent-live-messages-kept-one-file-each-in-a-fixed-buffer-folder.md)) replaces the bound,
+  which stays the bound of the messages kept in memory when the buffer folder cannot be written.
 - A refused token or contract version shows until the Companion is restarted.
 - The replay keeps its rules: no reconnect, no own pings.
