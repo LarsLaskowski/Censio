@@ -3,7 +3,7 @@
 ## Scope
 
 Live sending from the Companion to a server: forward mode's settings `serverAddress` and `serverToken`, the fixed
-profile `Live`, the start and the hello, what is sent, the waiting messages and their bounds, the reconnect delays and
+profile `Live`, the start and the hello, what is sent, the buffer of the waiting messages and its bounds, the reconnect delays and
 the final refusals, the bound on finding a dead connection, the `Server:` texts of forward mode, live sending in local
 mode, the log lines, privacy and the accepted risks. A player whose server runs elsewhere (Docker on a NAS or a home
 server) and an operator who reads the log rely on it. The connection rules shared with the replay are in
@@ -16,8 +16,8 @@ server) and an operator who reads the log rely on it. The connection rules share
 - Forward mode is off by default. The Companion sends live data to a configured server only when the settings file
   `%LOCALAPPDATA%\Censio\settings.json` ([`companion.md`](companion.md), *Settings file*) holds `"mode": "forward"`
   (matched ignoring case). The file is read once per start, never written, and a change counts after a restart.
-- `serverAddress` and `serverToken` are matched ignoring case and read only with `mode` `forward`; `localPort` is ignored
-  there. Without `mode`, or with `local`, nothing is sent to an address of the file.
+- `serverAddress`, `serverToken`, `bufferHours` and `bufferMegabytes` are matched ignoring case and read with `mode` `forward`, the two buffer keys also with `local`; `localPort` is ignored
+  in forward mode. Without `mode`, or with `local`, nothing is sent to an address of the file.
 - `serverAddress` is required and follows the rules of the replay's `--server` address
   ([`replay-sending.md`](replay-sending.md), *Switches*): an absolute `ws://` or `wss://` address with a host and
   without user name, password or fragment, no `#`, white space or control character in its text, a query allowed, used as
@@ -25,12 +25,17 @@ server) and an operator who reads the log rely on it. The connection rules share
 - `serverToken` is optional: 32 to 1,024 visible ASCII characters (`!` to `~`) after trimming space, tab, carriage return
   and line feed, the server's rule ([`ingest-token.md`](ingest-token.md), *Token*), checked after the JSON text is
   unescaped. Without it the hello carries no token, which a server with the token switched off accepts.
+- `bufferHours` and `bufferMegabytes` are optional and set the limits of the buffer (*Buffer*): a whole number written as
+  decimal digits only, from 1 to 168 and from 1 to 10,240; without them the limits are 24 hours and 100 megabytes. `24.0`,
+  `2.4e1`, `"24"`, `null`, `true`, 0, a negative number, a number above the range and a key that occurs twice, also in
+  another case, make the setting invalid.
 - An invalid setting shows `Server: settings invalid`, sends nothing and logs `Server settings invalid: <problem>` (*Log*;
   local mode's line, renamed). The problem is one of `mode is not local or forward`, `mode occurs more than once`,
   `localPort is not a port from 1 to 65535`, `localPort occurs more than once`, `serverAddress is missing`,
   `serverAddress is not a ws:// or wss:// address` (also a value that is not a text), `serverAddress occurs more than
-  once`, `serverToken is not a valid token` (also a value that is not a text) and `serverToken occurs more than once`. No
-  problem quotes a value. The game folder is still read.
+  once`, `serverToken is not a valid token` (also a value that is not a text), `serverToken occurs more than once`,
+  `bufferHours is not a whole number from 1 to 168`, `bufferHours occurs more than once`, `bufferMegabytes is not a whole
+  number from 1 to 10240` and `bufferMegabytes occurs more than once`. No problem quotes a value. The game folder is still read.
 - An invalid setting takes the path of an invalid local-mode setting: the greyed `Open Censio` stays in the menu, and a
   replay without `--server` ends with `Replay error: local server not running` ([`local-mode.md`](local-mode.md),
   *Switching on*).
@@ -66,24 +71,62 @@ server) and an operator who reads the log rely on it. The connection rules share
 - No catalog, icon or figure name is sent (record 0041). Island names, the economy and trade routes go to the configured
   server, over `ws://` unencrypted.
 
-### Waiting messages
+### Buffer
 
-- One message is in flight: the next is sent after the previous one's acknowledgement, which the Companion waits for at
-  most 30 seconds. A message that waits for a connection is held in memory, in order, whether or not a connection is
-  accepted; taking one from the pipe never waits for the server.
-- At most 64 messages and 16,777,216 bytes of written JSON wait, the one in flight included. Beyond that the oldest
-  message that is not in flight is removed and counted; the newest always stays. The history shows a gap for a dropped
-  tick, never zeros ([`contract.md`](contract.md); record 0031).
-- After a reconnect the message that was in flight and not acknowledged is sent first with the same identity, which a
-  server that stored it acknowledges without storing it again ([`ingest.md`](ingest.md), *Messages after the hello*);
-  then the others follow in order.
-- An acknowledgement with a refusal removes its message; it is not resent and `Server refused a live message: <kind>` is
-  logged.
-- Nothing is written to disk. `Exit` loses the waiting messages, and an unacknowledged one may or may not be stored; a
-  persistent buffer is #41.
-- The number of dropped messages is logged as `Live messages dropped: <n>` once at the next acknowledgement after a
-  drop, and, when no acknowledgement follows, when live sending ends: at a final refusal, a stopped local server or
-  `Exit` (where the Companion waits at most 250 ms for the sender, so the line may then be missing).
+- **What is buffered.** Every message of *What is sent* except `status`: ticks, trade-routes items and session events.
+  Taking one from the pipe never waits for the server or the disk: the Companion stamps it with the time it took it and
+  a background writer writes it to its own file. The same holds in local mode ([`local-mode.md`](local-mode.md)) and when
+  a connection is never accepted, and a start without live sending (no `mode`, an invalid server setting, `--replay`, an
+  invalid command line) neither reads, sends, changes nor removes the buffer and shows no `Buffer:` line.
+- **Folder and files.** The folder is `%LOCALAPPDATA%\Censio\Buffer`, fixed like the log, cache and recordings folders,
+  never a path of the settings file or of received data (record 0105). It is created when live sending starts and kept
+  when the Companion is removed; every Windows user has their own. A message is one file `<sequence>.msg`, the sequence in
+  19 decimal digits (`0000000000000000042.msg`): written as `<sequence>.tmp`, flushed to disk and then renamed, so a
+  finished file is never partly written. The file is a header of 68 bytes (`CNSB`, format version 1, the time taken, the
+  identity, the length of the JSON and a SHA-256 of those fields and the JSON), then the JSON exactly as sent. The
+  contract and the server are unchanged. A file or folder of another name is left alone; a link with a buffer name is
+  deleted as a link, never followed or opened, and counted as unreadable.
+- **Order and resend.** One message is in flight: the next is sent after the previous one's acknowledgement, which the
+  Companion waits for at most 30 seconds. After each `helloAccepted` the buffer is sent oldest first, before messages
+  taken later, each message's file deleted once it is acknowledged. The message in flight at a lost connection, at
+  `Exit` or at a crash is sent first with the same identity, which a server that stored it acknowledges without storing
+  it again ([`ingest.md`](ingest.md), *Messages after the hello*). An acknowledgement with a refusal removes its message;
+  it is not resent and `Server refused a live message: <kind>` is logged.
+- **Limits.** `bufferHours` (default 24) and `bufferMegabytes` (default 100; a megabyte is 1,048,576 bytes of written
+  JSON, the headers not counted) bound the waiting messages, whichever is reached first; the oldest is removed and counted
+  first. The age is the time since the Companion took the message by the PC's clock, a clock set back keeps messages
+  longer, one set forward drops them earlier. No message older than the age limit is sent: it is checked when a message is
+  taken, at the start and before each send. The newest message always stays, so one larger than the size limit is still
+  sent, and the one in flight is not removed. The JSON therefore exceeds the size limit at most by the newest message and
+  the one in flight, and the files add 68 bytes each plus at most one `.tmp` file being written. The history shows a gap
+  for a dropped tick, never zeros ([`contract.md`](contract.md); record 0031); the charts break where more than 15 minutes
+  pass without a point ([`web-charts.md`](web-charts.md)).
+- **Start.** Reading the folder runs in the background, so the tray icon, the menu and the pipe do not wait for it.
+  Messages taken meanwhile come after the stored ones. Only the header and length of a file are checked then, and its
+  hash when it is sent. The Companion holds an index of about 64 bytes per stored message (about 320 KB for 168 hours of
+  ticks every two minutes) and no stored JSON: a message is read from its file when it is sent. At most 16 MiB of messages
+  that wait for their write are in memory, the oldest beyond that dropped. `Live buffer holds <n> messages from an earlier
+  run` is logged for n > 0, after the age limit was applied.
+- **Unreadable files.** A file whose header, length or hash is wrong, whose identity differs from the index, that grew,
+  shrank or vanished after the start, or a link, is deleted, counted as dropped and logged as `Live buffer entries
+  unreadable: <n>; discarded`: once with the count at the start, and with 1 for each file found when it is sent. The
+  others are sent in order. A `.tmp` file of an earlier run is deleted and counted as dropped. A name with a sequence
+  from 10^18 is foreign.
+- **A buffer that cannot be written.** When the folder cannot be created or read, or a file cannot be written or renamed
+  (disk full, access denied, a file of that name), the buffer is memory only for the rest of the run: what is on disk is
+  still sent first, later messages wait in memory, at most 64 messages and 16,777,216 bytes, the oldest dropped and
+  counted, and `Live buffer cannot be written; waiting messages are kept in memory until Exit` is logged once.
+- **Menu line.** `Buffer: <n> waiting` below the `Server:` line, greyed, in every mode that sends live data; n counts the
+  messages that wait, the one in flight included. `, <d> dropped` follows once this run dropped messages and `, not saved
+  to disk` for a buffer that is memory only; the digits carry no separator.
+- **Dropped messages.** The number is logged as `Live messages dropped: <n>` once at the next acknowledgement after a
+  drop, and, when none follows, when live sending ends: at a final refusal, a stopped local server or `Exit` (where the
+  Companion waits at most 250 ms, so the line may be missing).
+- **Final refusals and a hosted server that does not run.** The buffer keeps taking messages within its limits until
+  `Exit`; the next start with the setting or the server fixed sends them.
+- **Exit.** The written files stay, the message in flight included. A message that still waits for its write is lost,
+  and a `.tmp` file left behind is deleted at the next start. An unacknowledged message may or may not be stored.
+- **Another server.** The buffer is sent to the server of the start that sends it; see *Privacy*.
 
 ### Reconnect
 
@@ -114,9 +157,9 @@ server) and an operator who reads the log rely on it. The connection rules share
 
 - In local mode ([`local-mode.md`](local-mode.md)) the Companion sends live data in a normal run and with `--record` to
   the server it hosts: once that server runs, to `ws://127.0.0.1:<port>/ingest` with the token the process holds, under
-  the same profile `Live`. Messages wait in memory until then.
+  the same profile `Live`. Messages wait in the buffer until then.
 - The `Server:` line keeps local mode's texts; a lost connection is retried as above without a menu text. A hosted server
-  that does not start, or that stopped, is not retried and gets no live-sending line of its own, except the count of dropped messages;
+  that does not start, or that stopped, is not retried and gets no live-sending line of its own, except the `Buffer:` line and the count of dropped messages;
   a connection that its stop ended is logged once as `Live sending failed: server connection lost; retrying`.
 
 ### Exit
@@ -126,7 +169,7 @@ server) and an operator who reads the log rely on it. The connection rules share
 
 ### Log
 
-Seven lines ([`companion-log.md`](companion-log.md)); a line is written when the state changes, not per retry:
+Ten lines ([`companion-log.md`](companion-log.md)); a line is written when the state changes, not per retry:
 
 | Line | Level | When |
 | ---- | ----- | ---- |
@@ -136,7 +179,10 @@ Seven lines ([`companion-log.md`](companion-log.md)); a line is written when the
 | `Live sending refused by the server: <reason>; not retried` | Warning | At `tokenRefused` or `unsupportedVersion` |
 | `Server refused a live message: <kind>` | Warning | At an acknowledgement with a refusal, the kind by its name |
 | `Live message not sent: the contract writer refused it` | Warning | When a message could not be written |
-| `Live messages dropped: <n>` | Warning | As in *Waiting messages* |
+| `Live messages dropped: <n>` | Warning | As in *Buffer* |
+| `Live buffer holds <n> messages from an earlier run` | Information | At the start, when the buffer holds stored messages after the age limit was applied |
+| `Live buffer cannot be written; waiting messages are kept in memory until Exit` | Warning | Once, when the buffer turns memory only |
+| `Live buffer entries unreadable: <n>; discarded` | Warning | As in *Buffer*, *Unreadable files* |
 
 The `<reason>` is a text of [`replay-sending.md`](replay-sending.md) (*Limits and errors*). A hosted server that is not
 running ends local mode's live sending without a line of its own, except the count of dropped messages.
@@ -145,6 +191,9 @@ running ends local mode's live sending without a line of its own, except the cou
 
 - The token is in the hello only: in no log line, menu or tooltip text, diagnostics window or other message. The settings
   file holds it in plain text in the player's private folder, so the file is not shared.
+- The buffer holds the messages as sent (island names, the economy, trade routes), never the token, in files readable for
+  whoever can read the player's folder. No log line holds a message's content or a path.
+- Waiting messages go to the server of the start that sends them: after `serverAddress` changed, island names, the economy and trade routes taken for the old server go to the new one. Delete `%LOCALAPPDATA%\Censio\Buffer` before switching to a server that should not receive them.
 - No log line holds the address, a name or an exception text. Every failure of the connection ends as one of the reasons
   above, and the sender lets no exception text reach the log.
 
@@ -160,8 +209,11 @@ running ends local mode's live sending without a line of its own, except the cou
   is on, so use `wss://`, or an address on a network you trust, when the PC leaves your home network.
 - **The token in `settings.json`.** The file holds the ingest token in plain text, readable for whoever can read the
   player's folder; the Companion neither checks nor changes its access rules.
-- **Memory only.** A restart of the Companion, `Exit` and an outage beyond the bounds of *Waiting messages* lose
-  messages; the persistent buffer is #41.
+- **The buffer.** A power cut may tear the file being written, which is then discarded and counted; a clock change moves
+  the age limit (*Buffer*); a writer of the player's folder can change or delete files, which ends as an unreadable file; an
+  outage beyond the limits and a message still waiting for its write at `Exit` lose messages. Two Windows sessions of one
+  user run two Companions with one folder and may disturb each other's writes, which then ends as a buffer that cannot be
+  written or an unreadable file.
 - **One profile.** Playthroughs mix in `Live` until the player can choose a profile (*Start and hello*).
 
 ## Measurements
@@ -176,9 +228,11 @@ is the reason for the bound of 60 seconds rather than 45.
 
 - [`decisions/0102-live-data-goes-to-one-fixed-profile-live-until-profiles-are-chosen.md`](../decisions/0102-live-data-goes-to-one-fixed-profile-live-until-profiles-are-chosen.md) — live data goes to the fixed profile `Live` until the player can choose.
 - [`decisions/0103-forward-server-address-and-token-are-keys-of-the-settings-file.md`](../decisions/0103-forward-server-address-and-token-are-keys-of-the-settings-file.md) — the address and the token are keys of the settings file.
-- [`decisions/0104-live-sending-reconnects-holds-messages-in-memory-and-pings.md`](../decisions/0104-live-sending-reconnects-holds-messages-in-memory-and-pings.md) — reconnect delays, memory-bound waiting messages and own pings.
+- [`decisions/0104-live-sending-reconnects-holds-messages-in-memory-and-pings.md`](../decisions/0104-live-sending-reconnects-holds-messages-in-memory-and-pings.md) — reconnect delays, the memory bound of waiting messages (now the bound of memory-only mode) and own pings.
 - [`decisions/0099-local-mode-switched-on-in-the-settings-file-off-by-default.md`](../decisions/0099-local-mode-switched-on-in-the-settings-file-off-by-default.md) — `mode` in the settings file, extended by `forward`.
 - [`decisions/0031-bounded-local-tick-buffer-gaps-accepted.md`](../decisions/0031-bounded-local-tick-buffer-gaps-accepted.md) — a bounded buffer, gaps accepted.
+- [`decisions/0105-unsent-live-messages-kept-one-file-each-in-a-fixed-buffer-folder.md`](../decisions/0105-unsent-live-messages-kept-one-file-each-in-a-fixed-buffer-folder.md) — one file per message in a fixed folder.
+- [`decisions/0106-buffer-limits-are-settings-keys-in-hours-and-megabytes.md`](../decisions/0106-buffer-limits-are-settings-keys-in-hours-and-megabytes.md) — the limits are settings keys in hours and megabytes.
 
 ## Not here
 
@@ -186,5 +240,5 @@ is the reason for the bound of 60 seconds rather than 45.
 - The messages, their reader and writer and the refusal texts: [`contract.md`](contract.md).
 - The server's endpoint and answers: [`ingest.md`](ingest.md); the token: [`ingest-token.md`](ingest-token.md).
 - The settings file and the menu in general: [`companion.md`](companion.md); the hosted server: [`local-mode.md`](local-mode.md); the log file: [`companion-log.md`](companion-log.md).
-- The persistent buffer (#41), the catalog (#42), the choice of a profile (#43).
-- The code: `LiveSender`, `IngestClient`, `ForwardServerSetting` and `ClientWebSocketConnector` in `src/Censio.Companion.Core`.
+- The catalog (#42), the choice of a profile (#43).
+- The code: `LiveSender`, `LiveBuffer`, `LiveBufferFile`, `IngestClient`, `ForwardServerSetting` and `ClientWebSocketConnector` in `src/Censio.Companion.Core`.

@@ -64,8 +64,10 @@ background writer with its bounds. A user who checks a log before sharing it, an
   none with the token, the address, a name or an exception text: `Live sending connected to the server` (Information),
   `Live sending failed: <reason>; retrying` (Warning, when the reason differs from the last one logged since the last
   accepted hello), `Live sending refused by the server: <reason>; not retried` (Warning), `Server refused a live message:
-  <kind>` (Warning), `Live message not sent: the contract writer refused it` (Warning) and `Live messages dropped: <n>`
-  (Warning); the reasons are those of [`replay-sending.md`](replay-sending.md) (*Limits and errors*).
+  <kind>` (Warning), `Live message not sent: the contract writer refused it` (Warning) `Live messages dropped: <n>`
+  (Warning), `Live buffer holds <n> messages from an earlier run` (Information), `Live buffer cannot be written; waiting
+  messages are kept in memory until Exit` (Warning) and `Live buffer entries unreadable: <n>; discarded` (Warning); no
+  line holds a path or a message's content; the reasons are those of [`replay-sending.md`](replay-sending.md) (*Limits and errors*).
 - The log holds no pipe content (figure name, island names, values): recording files and folders are logged by name only.
 - Text that came from outside (a replay file name, exception texts) is sanitized: each control character, format
   character, line or paragraph separator and unpaired surrogate becomes one `?`, so a text cannot add a line or hide
