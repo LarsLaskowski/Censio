@@ -885,6 +885,98 @@ public sealed class LiveBufferTests
     }
 
     /// <summary>
+    /// After the buffer is disposed, an added message is ignored and a run neither starts nor creates the folder.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    public async Task LiveBufferAddAndRunAsyncAfterDisposeAsyncAreIgnored()
+    {
+        // Arrange
+        var buffer = CreateBuffer(LiveBufferLimits.Defaults);
+
+        await buffer.DisposeAsync().AsTask().WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Act
+        buffer.Add(Id(1), Json(SmallJson, 1));
+
+        var run = buffer.RunAsync(TestContext.CancellationToken);
+
+        // Assert
+        Assert.IsTrue(run.IsCompletedSuccessfully, "A run after disposing should end at once");
+        Assert.AreEqual(0, buffer.Status.Waiting, "A message added after disposing should be ignored");
+        Assert.IsFalse(Directory.Exists(_root), "A run after disposing should create no folder");
+    }
+
+    /// <summary>
+    /// Acknowledging a message that is not in flight changes nothing: the message in flight stays, keeps its file and is
+    /// returned again after a failed connection (E8).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC2")]
+    public async Task LiveBufferAcknowledgeOtherIdKeepsInFlight()
+    {
+        // Arrange
+        var buffer = CreateBuffer(LiveBufferLimits.Defaults);
+
+        Start(buffer);
+        buffer.Add(Id(1), Json(SmallJson, 1));
+        buffer.Add(Id(2), Json(SmallJson, 2));
+
+        var written = await WaitForAsync(() => MessageFiles().Count == 2);
+
+        await NextAsync(buffer);
+
+        // Act
+        buffer.Acknowledge(Id(2));
+        buffer.ReleaseInFlight();
+
+        var again = await NextAsync(buffer);
+
+        // Assert
+        Assert.IsTrue(written, "Both messages should be written");
+        Assert.AreEqual(Id(1), again.Id, "The message in flight should come again after acknowledging another identity");
+        Assert.AreEqual(2, buffer.Status.Waiting, "Both messages should still wait");
+        Assert.AreSequenceEqual(new[] { Id(1), Id(2) }, StoredIds().ToArray(), "Both files should be kept");
+    }
+
+    /// <summary>
+    /// In memory only, the message in flight and the newest message are kept even when together they exceed 16 MiB: the
+    /// bound drops neither (E2).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC8")]
+    public async Task LiveBufferAddAfterWriteFailureKeepsInFlightAndNewest()
+    {
+        // Arrange
+        BlockFolder();
+
+        var buffer = CreateBuffer(LiveBufferLimits.Defaults);
+        var length = 9 * LiveBufferLimits.BytesPerMegabyte;
+
+        Start(buffer);
+
+        var memoryOnly = await WaitForAsync(() => buffer.Status.IsMemoryOnly);
+
+        buffer.Add(Id(1), Json(length, 1));
+
+        var inFlight = await NextAsync(buffer);
+
+        // Act
+        buffer.Add(Id(2), Json(length, 2));
+        buffer.Acknowledge(inFlight.Id);
+
+        var newest = await NextAsync(buffer);
+
+        // Assert
+        Assert.IsTrue(memoryOnly, "A blocked folder should switch the buffer to memory only");
+        Assert.AreEqual(Id(1), inFlight.Id, "The first message should be in flight");
+        Assert.AreEqual(Id(2), newest.Id, "The newest message should be kept beside the one in flight");
+        Assert.AreEqual(0, buffer.Status.Dropped, "Neither the message in flight nor the newest should be dropped");
+    }
+
+    /// <summary>
     /// Gets the identity of a message by its number.
     /// </summary>
     /// <param name="number">The number</param>

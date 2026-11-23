@@ -1640,6 +1640,32 @@ public sealed class TrayMenuTests
     }
 
     /// <summary>
+    /// Without a buffer status, that is without live sending (no server setting) or with a server status that carries no
+    /// buffer, the menu shows no buffer line (S8).
+    /// </summary>
+    /// <param name="mode">The mode: none, forward or local</param>
+    [TestMethod]
+    [TestCategory("AC9")]
+    [DataRow("none")]
+    [DataRow("forward")]
+    [DataRow("local")]
+    public void TrayMenuCreateWithoutBufferStatusShowsNoBufferLine(string mode)
+    {
+        // Arrange
+        var snapshot = CreateSnapshot("Receiving", canRecord: true, isRecording: false);
+        TrayServerStatus? server = mode == "none" ? null : CreateServerStatus(mode);
+
+        // Act
+        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, server, false, CreateClock(1));
+
+        // Assert
+        var kinds = entries.Select(entry => entry.Kind).ToList();
+
+        Assert.DoesNotContain(TrayMenuEntryKind.LiveBuffer, kinds, $"The menu should hold no buffer entry without a buffer status in mode {mode}");
+        Assert.DoesNotContain(entry => entry.Text.StartsWith("Buffer:", StringComparison.Ordinal), entries, $"The menu should hold no buffer text without a buffer status in mode {mode}");
+    }
+
+    /// <summary>
     /// A replay that ends because the local server does not run names the reason in the tooltip and the reason text (E10).
     /// </summary>
     [TestMethod]
