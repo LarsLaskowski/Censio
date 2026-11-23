@@ -18,9 +18,9 @@ zeros. External testers need the behavior described in `README.md` and `docs/USE
 The buffer holds every message live sending waits to send: ticks, trade-routes messages and session events (today's
 waiting messages, `live-sending.md`, *What is sent*); `status` messages stay unbuffered.
 
-- S1: Given forward mode and a running game, when the server is unreachable for two hours and then returns, then every
-  message taken in that time is sent after the next `helloAccepted`, oldest first, before the messages taken after it,
-  and the pages show the two hours without a break. Meanwhile the greyed menu line `Buffer: <n> waiting` counts the
+- S1: Given forward mode and a running game, when the server is unreachable for eight hours (more than 64 messages and
+  more than 16 MiB of written JSON, today's memory bound) and then returns, then every message taken in that time is sent after the next `helloAccepted`, oldest first, before the messages taken after it,
+  and the pages show the eight hours without a break. Meanwhile the greyed menu line `Buffer: <n> waiting` counts the
   messages that wait, and it reads `Buffer: 0 waiting` once all are acknowledged.
 - S2: Given messages waiting during an outage, when the player chooses `Exit` (or the PC restarts) and starts the
   Companion later, then the waiting messages are sent after the next `helloAccepted`, in order, before any message the
@@ -55,7 +55,8 @@ waiting messages, `live-sending.md`, *What is sent*); `status` messages stay unb
   appended, and `Live buffer cannot be written; waiting messages are kept in memory until Exit` is logged once.
 - E3: A buffer that is partly unreadable at start (a torn end after a power cut, a file changed by hand or written by
   another release): the messages before the first unreadable part are sent in order, the rest is discarded, and
-  `Live buffer partly unreadable; the rest was discarded` is logged; the discarded part is not in the dropped count.
+  `Live buffer partly unreadable; the rest was discarded` is logged. The discarded part is not in the dropped count,
+  because a torn part has no countable messages: a gap only the log reports, an accepted risk of `live-buffer.md`.
 - E4: A single message larger than the size limit: the newest message always stays, as today, and is sent.
 - E5: The age is the time since the Companion took the message, by the PC's clock: a clock set back keeps messages
   longer, a clock set forward drops them earlier.
@@ -77,14 +78,15 @@ waiting messages, `live-sending.md`, *What is sent*); `status` messages stay unb
   reached first removes the oldest messages.
 - N2: Disk use: the buffer's files stay within the size limit plus the newest message plus a bookkeeping overhead the
   plan states.
-- N3: Memory does not grow with the buffer: at most 16 MiB of waiting messages, plus the message in flight, are in
-  memory at once, whatever the buffer holds.
+- N3: Memory does not grow with the buffer: at most 16 MiB of waiting messages plus the newest message and the message
+  in flight are in memory at once, whatever the buffer holds.
 - N4: Reading the buffer at start does not delay the tray icon, the menu or the pipe, and the menu never waits for the
   disk.
 - N5: A message is in the buffer before it is first sent; `Exit` and a crash of the process lose no message written
   to it. `Exit` keeps its bounds (2 seconds, 5 in local mode; `companion.md`).
-- N6: Privacy and security: the buffer lies in the fixed folder `%LOCALAPPDATA%\Censio\Buffer`, never in a path from
-  the settings file or from received data (record 0031); it holds the messages as sent (island names, the economy, trade
+- N6: Privacy and security: the buffer lies in the fixed folder `%LOCALAPPDATA%\Censio\Buffer`, like the recordings,
+  logs and cache folders, never in a path from the settings file or from received data; a new record of this change
+  supersedes the path consequence of the released record 0031 ("a path from configuration") with this fixed folder; it holds the messages as sent (island names, the economy, trade
   routes), never the token; no log line holds a message's content. Reading it back is external input: read into typed
   results, failing closed (record 0033).
 - N7: Compatibility: the contract (version 2) and the server are unchanged; a server of release 0.4.0 receives the
@@ -93,7 +95,9 @@ waiting messages, `live-sending.md`, *What is sent*); `status` messages stay unb
 ## Acceptance criteria
 
 - AC1: Messages taken while no connection is accepted, within both limits, are sent after the next `helloAccepted`
-  in the order taken, before messages taken later, each acknowledged message once (S1, S6, E7).
+  in the order taken, before messages taken later, each acknowledged message once; more than 64 messages and more than
+  16,777,216 bytes of written JSON are buffered this way and all sent oldest first, none dropped while both configured
+  limits hold (S1, S6, E7).
 - AC2: Messages waiting at `Exit` or a process crash are read at the next start with live sending and sent in order
   before that run's messages, the message in flight with its identity; `Live buffer holds <n> messages from an earlier
   run` is logged for n > 0 (S2, E8, E9, N5).
@@ -139,9 +143,25 @@ waiting messages, `live-sending.md`, *What is sent*); `status` messages stay unb
 ## Area documents
 
 - New `docs/areas/live-buffer.md`: what is buffered, the folder, the limits and their keys, order and resend, drops and
-  their count, the menu line, the log lines, the failure cases E2 and E3, privacy and the accepted risks.
+  their count, the menu line, the log lines, the failure cases E2 and E3, privacy and the accepted risks (among them a
+  torn buffer's gap that only the log reports).
 - `live-sending.md`: *Waiting messages* and the accepted risk *Memory only* replaced by a pointer to `live-buffer.md`;
   *Switching on* gains the two keys and their problem texts.
 - `companion.md`: the `Buffer:` menu line, the two keys under *Settings file*, the folder under *Folders*.
 - `companion-log.md`: the new log lines. `docs/areas/README.md`: the index row of `live-buffer.md` and the rows that
   name "#41".
+
+## Challenge
+
+- Major 1 (N6 cites record 0031 for a fixed folder it does not state): accepted. The folder stays fixed, as every
+  folder the Companion writes (`companion.md`, *Folders*): a path from the settings file would add a parsed path to a
+  security area for no user need. Record 0031 is released (in `v0.4.0`), so the plan writes a new record that supersedes
+  its path consequence; N6 now says so instead of citing 0031.
+- Major 2 (no criterion fails on a build that persists only today's queue): accepted. S1 is an outage of eight hours,
+  beyond 64 messages and 16 MiB, and AC1 requires more than 64 messages and more than 16,777,216 bytes to be buffered
+  and all sent oldest first, none dropped while both configured limits hold.
+- Minor 3 (N3 cannot hold for a newest message over 16 MiB): accepted. N3 now bounds memory by 16 MiB plus the newest
+  message and the message in flight.
+- Minor 4 (E3's discarded part not in the tray count): accepted as the second option. A torn or foreign part has no
+  countable messages, so a count would be invented; E3 states the gap only the log reports, and `live-buffer.md` lists
+  it among its accepted risks.
