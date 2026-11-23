@@ -323,9 +323,12 @@ public sealed partial class App : Application, IDisposable
 
         var version = ProductVersion.Read(typeof(App).Assembly);
         var connector = new ClientWebSocketConnector(TimeProvider.System, LiveSender.KeepAliveInterval, LiveSender.KeepAliveTimeout);
+
+        // Skeleton: removed with the wiring of step 9
+        var buffer = new LiveBuffer(CompanionFolders.Buffer(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData)), setting.BufferLimits, TimeProvider.System, _logger);
         var sender = setting.Kind == LocalServerSettingKind.Forward
-                         ? LiveSender.ForServer(setting.Forward!, version, connector, TimeProvider.System, _logger)
-                         : LiveSender.ForLocalServer(setting.Port, _localServer!.WaitForLiveTokenAsync, version, connector, TimeProvider.System, _logger);
+                         ? LiveSender.ForServer(setting.Forward!, buffer, version, connector, TimeProvider.System, _logger)
+                         : LiveSender.ForLocalServer(setting.Port, _localServer!.WaitForLiveTokenAsync, buffer, version, connector, TimeProvider.System, _logger);
 
         sender.NotifyState(connection.Status.State);
         connection.ItemReceived += (_, item) => sender.Enqueue(item);

@@ -78,5 +78,10 @@ public enum TrayMenuEntryKind
     /// <summary>
     /// The entry that shows the connection to the server in forward mode.
     /// </summary>
-    ServerConnection
+    ServerConnection,
+
+    /// <summary>
+    /// The entry that shows the live buffer.
+    /// </summary>
+    LiveBuffer
 }

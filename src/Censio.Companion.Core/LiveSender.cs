@@ -19,34 +19,22 @@ public sealed class LiveSender : IAsyncDisposable
     /// </summary>
     public const string ProfileName = "Live";
 
-    /// <summary>
-    /// The largest number of messages that wait for their acknowledgement.
-    /// </summary>
-    public const int MaxWaitingMessages = 64;
-
-    /// <summary>
-    /// The largest size of the waiting messages in bytes of written JSON.
-    /// </summary>
-    public const int MaxWaitingBytes = 16777216;
-
     #endregion // Constants
 
     #region Fields
 
     /// <summary>
-    /// The address of the server.
+    /// The server the sender sends to.
     /// </summary>
-    private readonly Uri _address;
+    private readonly LiveSendTarget _target;
 
+#pragma warning disable S4487
+    // Skeleton: removed with the implementation
     /// <summary>
-    /// The reader of the token, or <see langword="null" /> when no token is presented.
+    /// The buffer of the waiting messages.
     /// </summary>
-    private readonly Func<CancellationToken, Task<string?>>? _readToken;
-
-    /// <summary>
-    /// Whether the server is the local one.
-    /// </summary>
-    private readonly bool _isLocal;
+    private readonly LiveBuffer _buffer;
+#pragma warning restore S4487
 
     /// <summary>
     /// The version of the Companion.
@@ -140,18 +128,16 @@ public sealed class LiveSender : IAsyncDisposable
     /// <summary>
     /// Initializes a new instance of the <see cref="LiveSender" /> class.
     /// </summary>
-    /// <param name="address">The address of the server</param>
-    /// <param name="readToken">The reader of the token, or <see langword="null" /> when no token is presented</param>
-    /// <param name="isLocal">Whether the server is the local one</param>
+    /// <param name="target">The server the sender sends to</param>
+    /// <param name="buffer">The buffer of the waiting messages</param>
     /// <param name="companionVersion">The version of the Companion</param>
     /// <param name="connector">The connector</param>
     /// <param name="timeProvider">The time provider</param>
     /// <param name="logger">The logger</param>
-    private LiveSender(Uri address, Func<CancellationToken, Task<string?>>? readToken, bool isLocal, string companionVersion, IReplayServerConnector connector, TimeProvider timeProvider, ILogger logger)
+    private LiveSender(LiveSendTarget target, LiveBuffer buffer, string companionVersion, IReplayServerConnector connector, TimeProvider timeProvider, ILogger logger)
     {
-        _address = address;
-        _readToken = readToken;
-        _isLocal = isLocal;
+        _target = target;
+        _buffer = buffer;
         _companionVersion = companionVersion;
         _connector = connector;
         _timeProvider = timeProvider;
@@ -233,14 +219,25 @@ public sealed class LiveSender : IAsyncDisposable
     /// Creates a sender that sends to the server of the forward setting.
     /// </summary>
     /// <param name="setting">The forward setting</param>
+    /// <param name="buffer">The buffer of the waiting messages</param>
     /// <param name="companionVersion">The version of the Companion</param>
     /// <param name="connector">The connector</param>
     /// <param name="timeProvider">The time provider</param>
     /// <param name="logger">The logger</param>
     /// <returns>The sender</returns>
-    public static LiveSender ForServer(ForwardServerSetting setting, string companionVersion, IReplayServerConnector connector, TimeProvider timeProvider, ILogger logger)
+    public static LiveSender ForServer(ForwardServerSetting setting, LiveBuffer buffer, string companionVersion, IReplayServerConnector connector, TimeProvider timeProvider, ILogger logger)
     {
-        return new LiveSender(setting.Address, _ => Task.FromResult(setting.Token), false, companionVersion, connector, timeProvider, logger);
+        return new LiveSender(new LiveSendTarget
+                              {
+                                  Address = setting.Address,
+                                  ReadToken = _ => Task.FromResult(setting.Token),
+                                  IsLocal = false
+                              },
+                              buffer,
+                              companionVersion,
+                              connector,
+                              timeProvider,
+                              logger);
     }
 
     /// <summary>
@@ -248,14 +245,25 @@ public sealed class LiveSender : IAsyncDisposable
     /// </summary>
     /// <param name="port">The port of the local server</param>
     /// <param name="waitForToken">The delegate that waits for the token of the local server</param>
+    /// <param name="buffer">The buffer of the waiting messages</param>
     /// <param name="companionVersion">The version of the Companion</param>
     /// <param name="connector">The connector</param>
     /// <param name="timeProvider">The time provider</param>
     /// <param name="logger">The logger</param>
     /// <returns>The sender</returns>
-    public static LiveSender ForLocalServer(int port, Func<CancellationToken, Task<string?>> waitForToken, string companionVersion, IReplayServerConnector connector, TimeProvider timeProvider, ILogger logger)
+    public static LiveSender ForLocalServer(int port, Func<CancellationToken, Task<string?>> waitForToken, LiveBuffer buffer, string companionVersion, IReplayServerConnector connector, TimeProvider timeProvider, ILogger logger)
     {
-        return new LiveSender(new Uri(string.Create(CultureInfo.InvariantCulture, $"ws://127.0.0.1:{port}/ingest")), waitForToken, true, companionVersion, connector, timeProvider, logger);
+        return new LiveSender(new LiveSendTarget
+                              {
+                                  Address = new Uri(string.Create(CultureInfo.InvariantCulture, $"ws://127.0.0.1:{port}/ingest")),
+                                  ReadToken = waitForToken,
+                                  IsLocal = true
+                              },
+                              buffer,
+                              companionVersion,
+                              connector,
+                              timeProvider,
+                              logger);
     }
 
     /// <summary>
@@ -391,7 +399,7 @@ public sealed class LiveSender : IAsyncDisposable
     {
         var first = _isSending ? 1 : 0;
 
-        while ((_queue.Count > MaxWaitingMessages || _queuedBytes > MaxWaitingBytes) && _queue.Count - first >= 2)
+        while ((_queue.Count > LiveBuffer.MaxMemoryMessages || _queuedBytes > LiveBuffer.MaxMemoryBytes) && _queue.Count - first >= 2)
         {
             _queuedBytes -= _queue[first].Utf8Json.Length;
             _queue.RemoveAt(first);
@@ -554,11 +562,11 @@ public sealed class LiveSender : IAsyncDisposable
         {
             string? token = null;
 
-            if (_readToken is not null)
+            if (_target.ReadToken is not null)
             {
-                token = await _readToken(cancellationToken).ConfigureAwait(false);
+                token = await _target.ReadToken(cancellationToken).ConfigureAwait(false);
 
-                if (token is null && _isLocal)
+                if (token is null && _target.IsLocal)
                 {
                     return (ReplaySendProblemKind.LocalServerNotRunning, false, TimeSpan.Zero);
                 }
@@ -577,7 +585,7 @@ public sealed class LiveSender : IAsyncDisposable
                             ProfileId = ProfileId,
                             ProfileName = ProfileName
                         };
-            var refusal = await client.OpenAsync(_address, hello, cancellationToken).ConfigureAwait(false);
+            var refusal = await client.OpenAsync(_target.Address, hello, cancellationToken).ConfigureAwait(false);
 
             if (refusal is not null)
             {

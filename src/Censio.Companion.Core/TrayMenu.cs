@@ -338,6 +338,19 @@ public static class TrayMenu
                };
     }
 
+#pragma warning disable RH2003
+    // Skeleton: removed with the implementation
+    /// <summary>
+    /// Formats the text of the live buffer entry.
+    /// </summary>
+    /// <param name="status">The status of the live buffer</param>
+    /// <returns>The text</returns>
+    public static string FormatLiveBuffer(LiveBufferStatus status)
+    {
+        throw new NotImplementedException();
+    }
+#pragma warning restore RH2003
+
     /// <summary>
     /// Formats the text of the server connection entry of forward mode.
     /// </summary>
