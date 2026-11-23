@@ -34,7 +34,7 @@ security area (`.squad/project.md`). Taking a message from the pipe never waits 
 ## Decision
 
 Option 1 in the fixed folder `%LOCALAPPDATA%\Censio\Buffer`: a message is written there (a header with its identity, the
-time it was taken and the SHA-256 of its JSON) before it is first sent, read back only when it is sent, and deleted
+time it was taken and a SHA-256 over the header's fields and the JSON) before it is first sent, read back only when it is sent, and deleted
 after its acknowledgement or when a bound drops it; a file that fails a check is discarded and counted as dropped. The
 format and the rules are in [`live-sending.md`](../areas/live-sending.md), *Buffer*.
 
@@ -46,3 +46,5 @@ format and the rules are in [`live-sending.md`](../areas/live-sending.md), *Buff
 - Whoever can write the player's `%LOCALAPPDATA%` can put messages in the buffer, as they can change `settings.json`;
   the hash finds damage, not forgery.
 - When the folder cannot be written, the rest of the run keeps record 0104's memory bound.
+- Two sessions of the same Windows user share the folder; their Companions can disturb each other's writes, which then
+  end as a write failure.

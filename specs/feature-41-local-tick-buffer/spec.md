@@ -76,8 +76,8 @@ waiting messages, `live-sending.md`, *What is sent*); `status` messages stay unb
 
 - N1: Defaults 24 hours and 100 MB (1 MB = 1,048,576 bytes, counted as the messages' written JSON); whichever is
   reached first removes the oldest messages.
-- N2: Disk use: the buffer's files stay within the size limit plus the newest message plus a bookkeeping overhead the
-  plan states.
+- N2: Disk use: the buffer's files stay within the size limit plus the newest message and the one in flight, plus 68
+  bytes per file and at most one temporary file being written.
 - N3: Memory does not grow with the buffer: at most 16 MiB of waiting messages plus the newest message and the message
   in flight are in memory at once, whatever the buffer holds.
 - N4: Reading the buffer at start does not delay the tray icon, the menu or the pipe, and the menu never waits for the
@@ -104,7 +104,7 @@ waiting messages, `live-sending.md`, *What is sent*); `status` messages stay unb
   run` is logged for n > 0 (S2, E8, E9, N5).
 - AC3: No message older than `bufferHours` is sent; such messages are removed oldest first and counted (S3, E5, E7).
 - AC4: The waiting messages' written JSON never exceeds `bufferMegabytes` × 1,048,576 bytes except by the newest
-  message, which always stays; the oldest are removed and counted first; the buffer's files stay within N2 (S4, E4, N1,
+  message, which always stays, and the one in flight; the oldest are removed and counted first; the buffer's files stay within N2 (S4, E4, N1,
   N2).
 - AC5: Where live sending runs, the menu shows below the `Server:` line `Buffer: <n> waiting`, with `, <d> dropped`
   appended once this run dropped messages and `, not saved to disk` after a failed write; drops are logged as

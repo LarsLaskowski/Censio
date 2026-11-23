@@ -27,7 +27,7 @@ See [spec.md](spec.md), *Problem*.
 | 13 | Record 0031 is released; 0103 and 0104 are not | `git tag --contains` of each adding commit | confirmed |
 | 14 | The cache writes a temporary file with `FileMode.CreateNew`, `Flush(true)`, then `File.Move` | `GameCatalogCacheStore.cs:120`–`:134` | confirmed |
 | 15 | A rename within one folder is atomic on NTFS | to verify: none needed before the build — the design does not rest on it, a torn final file fails its length or hash check and is discarded and counted (E3); the Product Manager's Windows run of S2 in step 9 shows a restart reading the buffer | unverified |
-| 16 | One Companion runs per Windows session, so one writer per buffer folder | `SingleInstanceGuard`, `companion.md`, *Single instance* | confirmed |
+| 16 | One Companion runs per Windows session; two sessions of one user share `%LOCALAPPDATA%`, so two writers are possible (accepted risk) | `SingleInstanceGuard` (`Local\` name), `companion.md`, *Single instance* | confirmed |
 | 17 | `Exit` waits at most 250 ms for the sender | `App.xaml.cs:698`–`:702` | confirmed |
 | 18 | Ticks come about every two minutes (fixture: 31 ticks in about 1.5 hours) | `tests/Censio.Pipe.Tests/Fixtures/README.md` | confirmed |
 
@@ -37,54 +37,66 @@ See [spec.md](spec.md), *Problem*.
 | -- | ------- | --------- |
 | AC1 | `LiveSenderRunAfterOutageSendsBeyondMemoryBoundInOrder` (70 messages, over 16,777,216 bytes, taken while unreachable, all sent oldest first, none dropped); `LiveBufferNextAsyncReturnsInOrderTaken`; `LiveBufferAddDuringLoadComesAfterStoredMessages` | `LiveSenderTests.cs`, `LiveBufferTests.cs` |
 | AC2 | `LiveBufferRunAsyncReadsEarlierRunInOrderAndLogs`; `LiveSenderRunAfterRestartResendsInFlightWithSameId`; `LiveBufferAcknowledgeDeletesFile`; `LiveBufferRunAsyncDeletesTemporaryFileAndCountsIt` | `LiveBufferTests.cs`, `LiveSenderTests.cs` |
-| AC3 | `LiveBufferNextAsyncDropsMessagesOlderThanLimit`; `LiveBufferRunAsyncDropsExpiredStoredMessages`; `LiveBufferNextAsyncKeepsMessageTakenInFuture` (clock set back) | `LiveBufferTests.cs` |
-| AC4 | `LiveBufferAddBeyondSizeDropsOldestKeepsNewest`; `LiveBufferAddLargerThanLimitKeepsOnlyNewest`; `LiveBufferFilesStayWithinLimitPlusHeaders` | `LiveBufferTests.cs` |
+| AC3 | `LiveBufferNextAsyncDropsMessagesOlderThanLimit` (the expired head is dropped and counted, the next one returned); `LiveBufferRunAsyncDropsExpiredStoredMessages`; `LiveBufferNextAsyncKeepsMessageTakenInFuture` (clock set back) | `LiveBufferTests.cs` |
+| AC4 | `LiveBufferAddBeyondSizeDropsOldestKeepsNewest`; `LiveBufferAddLargerThanLimitKeepsOnlyNewest`; `LiveBufferFilesStayWithinLimitPlusHeaders` (JSON within `MaxBytes` plus the newest and the one in flight; files within that plus 68 bytes each plus at most one `.tmp`) | `LiveBufferTests.cs` |
 | AC5 | `TrayMenuFormatLiveBufferTexts` (DataRows: 0, waiting, dropped, memory only, both); `TrayMenuCreateShowsBufferLineBelowServerLine` (forward and local); `LiveBufferStatusCountsWaitingAndDropped`; existing `LiveSenderRunLogsDroppedCountOnce`, adapted | `TrayMenuTests.cs`, `LiveBufferTests.cs`, `LiveSenderTests.cs` |
-| AC6 | `CompanionSettingsReadLocalServerBufferLimits` (DataRows: defaults, 48/500, bounds 1/168 and 1/10240, both modes); `CompanionSettingsReadLocalServerInvalidBufferLimitIsInvalid` (DataRows: `24.0`, `2.4e1`, `"24"`, `null`, 0, -1, 169, 10241, duplicate in other case — each its exact problem text); `LiveBufferLimitsDefaultsAndConversion` | `CompanionSettingsTests.cs`, `LiveBufferLimitsTests.cs` |
+| AC6 | `CompanionSettingsReadLocalServerBufferLimits` (DataRows: defaults, 48/500, bounds 1/168 and 1/10240; `forward`, `local` with `localPort` and `local` without it); `CompanionSettingsReadLocalServerInvalidBufferLimitIsInvalid` (DataRows: `24.0`, `2.4e1`, `"24"`, `null`, 0, -1, 169, 10241, duplicate in other case — each its exact problem text, in `forward`, `local` with `localPort` and `local` without it); `LiveBufferLimitsDefaultsAndConversion` | `CompanionSettingsTests.cs`, `LiveBufferLimitsTests.cs` |
 | AC7 | existing `TrendSeriesBuilderFixturePauseBreaksSessionChangeJoins` and `SparklineBuilderBreaksAtMissingValueAndAfterFifteenMinutes`, tagged `AC7`; `LiveBufferNextAsyncNeverReturnsDroppedMessage` | `TrendSeriesBuilderTests.cs`, `SparklineBuilderTests.cs`, `LiveBufferTests.cs` |
-| AC8 | `LiveBufferFileReadRefusesDamagedForms` (DataRows: short header, magic, version, empty or all-zero id, time out of range, length 0 or above 25,165,824, file length mismatch, hash mismatch); `LiveBufferFileFormatReadsBack`; `LiveBufferRunAsyncDiscardsUnreadableFileCountsAndLogs`; `LiveBufferRunAsyncLeavesForeignFiles`; `LiveBufferNextAsyncDiscardsFileDamagedAfterLoad`; `LiveBufferRunAsyncFolderBlockedKeepsMemoryOnly` (a file named `Buffer`); `LiveBufferAddAfterWriteFailureKeepsMemoryBound` (64 messages, 16 MiB, order kept) | `LiveBufferFileTests.cs`, `LiveBufferTests.cs` |
+| AC8 | `LiveBufferFileReadRefusesDamagedForms` (DataRows: short header, magic, version, empty or all-zero id, time out of range, length 0 or above 25,165,824, file length mismatch, a JSON byte changed, an identity byte changed and a time byte changed with the JSON untouched); `LiveBufferFileFormatReadsBack`; `LiveBufferRunAsyncDiscardsUnreadableFileCountsAndLogs`; `LiveBufferRunAsyncLeavesForeignFiles`; `LiveBufferNextAsyncDiscardsFileDamagedAfterLoad` (DataRows: content changed, file grown, file shrunk, file deleted, identity differs from the index); `LiveBufferRunAsyncDeletesLinkLeavesTarget` (a file link and a directory link with message names; targets unchanged); `LiveBufferFileTryParseMessageNameRefusesLargeSequence` (`9223372036854775807.msg` and any sequence from 10^18 left alone as foreign); `LiveBufferWriteMoveFailureKeepsMemoryOnly` (temporary file removed before the rename); `LiveBufferRunAsyncFolderBlockedKeepsMemoryOnly` (a file named `Buffer`); `LiveBufferAddAfterWriteFailureKeepsMemoryBound` (64 messages, 16 MiB, order kept) | `LiveBufferFileTests.cs`, `LiveBufferTests.cs` |
 | AC9 | `LiveSenderEnqueueAfterTokenRefusedStillBuffers`; existing `LiveSenderIsSendingPerModeAndSetting`; `TrayMenuCreateWithoutBufferStatusShowsNoBufferLine` | `LiveSenderTests.cs`, `TrayMenuTests.cs` |
-| AC10 | `LiveBufferAddAndStatusTouchNoFileSystem` (folder does not exist after `Add` and `Status` before `RunAsync`); `LiveBufferNextAsyncDiscardsFileDamagedAfterLoad` (the content is read at send, not held); `LiveBufferAddPendingBeyondMemoryBoundDropsOldestPending`; N7: check, Reviewer, step 8 — no file of `src/Censio.Contracts` or `src/Censio.Server*` in the diff | `LiveBufferTests.cs` |
+| AC10 | `LiveBufferAddAndStatusTouchNoFileSystem` (folder does not exist after `Add` and `Status` before `RunAsync`); `LiveBufferNextAsyncDiscardsFileDamagedAfterLoad` (the content is read at send, not held); `LiveBufferAddPendingBeyondMemoryBoundDropsOldestPending`; `LiveBufferNextAsyncReadsWrittenMessagesFromDisk` (20 messages of 1 MiB added and written in this run, then every file's content changed: each comes back unreadable, so no written JSON is held in memory); `LiveBufferDisposeAsyncEndsRunAndKeepsWrittenFiles`; N7: check, Reviewer, step 8 — no file of `src/Censio.Contracts` or `src/Censio.Server*` in the diff | `LiveBufferTests.cs` |
 | AC11 | check: Reviewer, step 8 — `README.md` and `docs/USER_GUIDE.md`, English then German, name the keys with defaults and ranges, the `Buffer:` line and its three forms, the folder and the log lines, and how to try S1 to S3 | — |
 
 ## Approach
 
 **`LiveBuffer`** (new, `Censio.Companion.Core`) replaces `LiveSender`'s queue. It holds, under one lock, an index of the
 stored messages (sequence, identity, time taken, JSON length, about 64 bytes each), a list of messages waiting for their
-write, and, after a write failure, a list of memory-only messages; the JSON of a stored message is not held.
+write, and, after a write failure, a list of memory-only messages; the JSON of a stored message is not held. The index
+grows by about 64 bytes per stored message (about 5,040 entries, about 320 KB, for 168 hours of ticks every two
+minutes); N3 bounds the messages' content, not the index.
 
 - `Add` stamps the message with `TimeProvider.GetUtcNow()`, appends it to the pending list, applies the bounds and
   signals the writer; it never touches the file system or waits. After `DisposeAsync` it ignores the message.
 - `RunAsync` creates the folder, then loads: the top-level files whose whole name is a message name
-  (`<19 decimal digits>.msg`) or a temporary name (`<19 digits>.tmp`), case-sensitive; any other name and a folder are
-  left alone; a link with a buffer name is never followed: it is deleted as a link and counted unreadable. A temporary file is deleted and counted
+  (`<19 decimal digits>.msg`) or a temporary name (`<19 digits>.tmp`), case-sensitive, with a sequence below 10^18 (so
+  "largest plus one" never overflows; a larger one is a foreign name); any other name and a folder are
+  left alone; a link with a buffer name inside the folder is deleted as a link, never opened, and counted unreadable; the folder
+  itself is used as found, as the log and cache folders are. A temporary file is deleted and counted
   dropped. A message file is read up to its header (68 bytes) and checked with `LiveBufferFile.ReadHeader` against its
   length; a refused one is deleted and counted. The next sequence is the largest seen plus one. Then the age and size
   bounds apply, `Live buffer holds <n> messages from an earlier run` is logged for n > 0, the unreadable count is logged,
   and pending messages added during the load are written after the loaded ones. Then it writes pending messages one at
   a time — `<seq>.tmp` created new, the bytes of `LiveBufferFile.Format`, `Flush(true)`, `File.Move` to `<seq>.msg`
-  without overwrite — and deletes the files the bounds or acknowledgements removed, until cancelled.
+  without overwrite — and deletes the files the bounds or acknowledgements removed, until cancelled. `DisposeAsync`
+  cancels the buffer's own token and awaits `RunAsync` (as `LiveSender.DisposeAsync` does), so the writer ends inside
+  `Exit`'s 250 ms; a message still waiting for its write then is lost, and a `.tmp` left behind is deleted and counted at
+  the next start.
 - A failure to create the folder, enumerate it or write a file (`IOException`, `UnauthorizedAccessException`,
-  `SecurityException`, `NotSupportedException`) switches to memory only for the rest of the run: the failed message and
+  `SecurityException`, `NotSupportedException`), a failed `File.Move` and a temporary file gone before the rename
+  included, never an unhandled exception, switches to memory only for the rest of the run: the failed message and
   every later one go to the memory list, the stored ones are still sent first, `LiveBufferNotWritable` is logged once.
   A failed delete is ignored: the file is read again at the next start and resent, and the server acknowledges it as known.
 - `NextAsync` waits until the loader finished and a stored or memory message exists, drops the messages older than the
-  age limit (never the one it returns), reads the first stored file whole with `LiveBufferFile.Read` (an unreadable one
-  is deleted, counted, logged with count 1, and the next tried), marks it in flight and returns it. `Acknowledge(id)`
+  age limit, so it never returns a message older than `MaxAge`, then reads the first stored file: opened with
+  `FileShare.Read`, its `Length` must equal 68 plus the indexed length, exactly that many bytes are read into a buffer
+  of that size, and `LiveBufferFile.Read` must accept them with the indexed identity. A mismatch, damage,
+  `FileNotFoundException`, a sharing violation (`IOException`) or `UnauthorizedAccessException` make it unreadable: it
+  is deleted, counted, logged with count 1, and the next one tried. It marks the message in flight and returns it. `Acknowledge(id)`
   removes the in-flight message and queues its delete; `ReleaseInFlight` clears the mark after a failed connection, so
   the same message (same identity) comes next.
 - Bounds, after every `Add`, at load and in `NextAsync`: a message whose age (now minus taken, negative counts as 0)
   exceeds `MaxAge` is dropped; while the JSON of all waiting messages exceeds `MaxBytes` and at least two remain that are
-  not in flight, the oldest not in flight is dropped; the memory-only list keeps `MaxMemoryMessages` and
+  not in flight, the oldest not in flight is dropped (so the JSON may exceed `MaxBytes` by the newest message and the
+  one in flight); the memory-only list keeps `MaxMemoryMessages` and
   `MaxMemoryBytes`; the pending list keeps `MaxMemoryBytes`, beyond which its oldest is dropped (only with a disk slower
   than the pipe). Each drop increments the run's dropped count and the unlogged count.
-- Seams: N4 through a folder that does not exist until `RunAsync`; N3 through a file damaged after the load, which
-  `NextAsync` must then report unreadable (the content is read at send). Disk-full is not produced in tests; a file named
+- Seams: N4 through a folder that does not exist until `RunAsync`; N3 through files damaged after the load or after
+  their write in the same run, which `NextAsync` must then report unreadable (the content is read at send). Disk-full is not produced in tests; a file named
   `Buffer` in place of the folder and a read-only file stand for a write failure.
 
 **`LiveBufferFile`** — little-endian header: `CNSB`, format version 1 (int32), time taken (UTC `DateTime` ticks, int64,
 from 0 to `DateTime.MaxValue.Ticks`), identity (16 bytes, `Guid.TryWriteBytes`, not all zero), JSON length (int32, 1 to
-`ContractReader.MaxMessageBytes`, checked before any allocation), SHA-256 of the JSON (32 bytes); then the JSON. The file
+`ContractReader.MaxMessageBytes`, checked before any allocation), SHA-256 of header bytes 0 to 35 (magic, version, time, identity, length) followed by the JSON (32 bytes, at bytes 36 to 67); then the JSON. The file
 length must equal 68 plus the length. Every check failure is `Unreadable`, never an exception; the JSON is not parsed (the
 server reads it).
 
@@ -94,7 +106,8 @@ acknowledgement (accepted or refused) and `ReleaseInFlight` in the attempt's `fi
 `TakeUnloggedDropped`, with today's timing. To stay within seven constructor parameters, address, token reader and
 `isLocal` move into the internal `LiveSendTarget`.
 
-**Settings.** `ReadLocalServer`, for `forward` after the token and for `local` after the port, reads `bufferHours` then
+**Settings.** `ReadLocalServer`, for `forward` after the token and for `local` after the port (also on the path
+without `localPort`, which today returns early), reads `bufferHours` then
 `bufferMegabytes` with one shared helper that generalises `TryReadPort` to a range (`TryReadWholeNumber`, used for all
 three keys); problem texts exactly as spec E1.
 
@@ -230,6 +243,20 @@ All by the Dev once the code is green, against that code:
   start it; small limits for S3).
 - `docs/ARCHITECTURE.md` line 66: waiting messages kept in the persistent buffer (link 0105, `live-sending.md`), the
   sentence "The persistent buffer is #41" removed.
+- `SECURITY.md`: line 49, "its reconnects, the waiting messages in memory, and in local mode" becomes "its reconnects,
+  the buffer of waiting messages in `%LOCALAPPDATA%\Censio\Buffer` (its files written, read back, checked and deleted,
+  and the settings `bufferHours` and `bufferMegabytes`), and in local mode"; line 51, "File paths for the cache, for
+  recordings and for the Companion's log folder" becomes "File paths for the cache, for recordings, for the live buffer
+  and for the Companion's log folder"; after "never the figure name or the catalog (`docs/areas/live-sending.md`)." the
+  sentence "Messages that wait for the server are kept with the same content, never the token, in
+  `%LOCALAPPDATA%\Censio\Buffer`, up to the limits `bufferHours` and `bufferMegabytes`; removing the Companion keeps that
+  folder, and its messages go to the server the next start names, also after `serverAddress` changed." is inserted.
+- `live-sending.md` also states: a message still waiting for its write at `Exit` is lost; the JSON may exceed the size
+  limit by the newest message and the one in flight, and the files add 68 bytes each plus at most one `.tmp`; under
+  *Accepted risks* two sessions of the same Windows user (two Companions, one folder) may disturb each other's writes,
+  which then ends as E2; under *Privacy* exactly: "- Waiting messages go to the server of the start that sends them:
+  after `serverAddress` changed, island names, the economy and trade routes taken for the old server go to the new one.
+  Delete `%LOCALAPPDATA%\Censio\Buffer` before switching to a server that should not receive them."
 - `.squad/project.md` (text reported by the Dev, written by the orchestrator): the guarantee line links
   `live-sending.md` (*Buffer*) and records 0031 and 0105 instead of "area document with #41"; *File paths the Companion
   writes* gains `LiveBuffer`, `CompanionFolders.Buffer`; *Parsing of external input* gains `LiveBufferFile`; the
@@ -253,7 +280,7 @@ zeros" is fulfilled, not weakened. Windows-only code stays in `App.xaml.cs`; the
 - [x] Exceptions: file system exceptions of the buffer end as memory only or a discarded file, with the fixed log lines
   above; no exception text, path or message content reaches the menu or the log.
 - Paths: only `CompanionFolders.Buffer` under `%LOCALAPPDATA%`, names built from a sequence number; nothing from the
-  settings file or received data; a link is never followed.
+  settings file or received data; a link with a buffer name inside the folder is deleted as a link and never opened; the folder itself is used as found, as the log and cache folders are.
 - The buffer holds what the server receives (island names, economy, trade routes), never the token; it stays when the
   Companion is removed, like the recordings.
 
@@ -262,6 +289,35 @@ zeros" is fulfilled, not weakened. Windows-only code stays in `App.xaml.cs`; the
 - `docs/decisions/0105-unsent-live-messages-kept-one-file-each-in-a-fixed-buffer-folder.md` (Proposed; amends 0031's path consequence)
 - `docs/decisions/0106-buffer-limits-are-settings-keys-in-hours-and-megabytes.md` (Proposed)
 - `docs/decisions/0104-…` (unreleased, edited in place: its memory bound stays the bound of memory-only mode)
+
+## Challenge
+
+- 1 (local mode without `localPort` returns early): accepted — *Settings* reads the keys on that path too; the AC6 rows
+  cover it.
+- 2 (`LiveBuffer.DisposeAsync` must end its own run): accepted — it cancels and awaits `RunAsync`; the loss of a message
+  still waiting for its write is documented; test `LiveBufferDisposeAsyncEndsRunAndKeepsWrittenFiles`.
+- 3 (the in-flight message beyond the size limit): accepted — the exception is stated in *Approach*, spec AC4 and N2 and
+  `live-sending.md`, N2's overhead is 68 bytes per file plus one `.tmp`, and the AC4 test asserts both.
+- 4 (one writer per folder not proven): accepted — two sessions of one user are an accepted risk in `live-sending.md`;
+  a failed rename or a vanished temporary file is a write failure (E2), test `LiveBufferWriteMoveFailureKeepsMemoryOnly`.
+  Fact 16 now reads per session only.
+- 5 (age wording): accepted — `NextAsync` never returns a message older than `MaxAge`; the AC3 test asserts the dropped
+  head and the returned next.
+- 6 (no AC10 test against holding written JSON): accepted — `LiveBufferNextAsyncReadsWrittenMessagesFromDisk`.
+
+## Security review
+
+- Blocking 1 (the hash leaves identity and time unprotected): resolved — the SHA-256 covers header bytes 0 to 35 and the
+  JSON; DataRows for a changed identity byte and time byte with the JSON untouched.
+- Blocking 2 (the send-time read unbounded): resolved — `FileShare.Read`, length equal to 68 plus the indexed length,
+  exactly that many bytes, the listed exceptions and an identity other than the index's make the file unreadable;
+  DataRows for a file grown, shrunk and deleted after the load.
+- 3 (link wording): fixed in *Approach* and *Security considerations*; test `LiveBufferRunAsyncDeletesLinkLeavesTarget`.
+- 4 (`SECURITY.md`): added to *Documentation updates* with the given text.
+- 5 (privacy after a changed `serverAddress`): the given sentence goes into `live-sending.md`, *Privacy*.
+- 6 (index size): added to *Approach*, with the count corrected to about 5,040 entries for 168 hours of two-minute ticks.
+- 7 (sequence overflow): taken now — sequences from 10^18 are foreign names; test
+  `LiveBufferFileTryParseMessageNameRefusesLargeSequence`.
 
 ## Out of scope / follow-ups
 
