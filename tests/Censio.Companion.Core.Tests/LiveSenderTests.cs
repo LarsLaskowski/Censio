@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net.WebSockets;
 
 using Censio.Contracts;
@@ -51,6 +52,21 @@ public sealed class LiveSenderTests : IDisposable
     /// The number of large trade-routes messages queued: one more than fit the byte bound, about 2 MB each.
     /// </summary>
     private const int LargeMessages = 9;
+
+    /// <summary>
+    /// The number of ticks taken during the outage after the large messages: with them and the session end, 70 messages.
+    /// </summary>
+    private const int OutageTicks = 60;
+
+    /// <summary>
+    /// The number of ten-millisecond polls of a file system condition before it counts as not reached.
+    /// </summary>
+    private const int MaxPolls = 500;
+
+    /// <summary>
+    /// The log line of two messages read from an earlier run.
+    /// </summary>
+    private const string RestoredTwoLine = "Live buffer holds 2 messages from an earlier run";
 
     #endregion // Constants
 
@@ -141,6 +157,26 @@ public sealed class LiveSenderTests : IDisposable
     /// </summary>
     private readonly List<ScriptedIngestServer> _servers = [];
 
+    /// <summary>
+    /// The logger of the buffers, kept apart from the senders' log.
+    /// </summary>
+    private readonly ConcurrentRecordingLogger _bufferLogger = new();
+
+    /// <summary>
+    /// The temporary folder that holds the buffer folders of the test, deleted afterwards.
+    /// </summary>
+    private readonly string _root = Path.Combine(Path.GetTempPath(), "censio-sender-" + Guid.NewGuid().ToString("N"));
+
+    /// <summary>
+    /// The buffers of the test, disposed after the senders.
+    /// </summary>
+    private readonly List<LiveBuffer> _buffers = [];
+
+    /// <summary>
+    /// The runs of the buffers, ended by their dispose.
+    /// </summary>
+    private readonly List<Task> _bufferRuns = [];
+
     #endregion // Fields
 
     #region Constructors
@@ -168,7 +204,7 @@ public sealed class LiveSenderTests : IDisposable
     #region Methods
 
     /// <summary>
-    /// Stops the runs, disposes the senders and the servers.
+    /// Stops the runs, disposes the senders, the buffers and the servers, and deletes the buffer folders.
     /// </summary>
     /// <returns>A task that completes when the cleanup is done</returns>
     [TestCleanup]
@@ -181,9 +217,21 @@ public sealed class LiveSenderTests : IDisposable
             await sender.DisposeAsync().AsTask().WaitAsync(_guard, TestContext.CancellationToken);
         }
 
+        foreach (var buffer in _buffers)
+        {
+            await buffer.DisposeAsync().AsTask().WaitAsync(_guard, TestContext.CancellationToken);
+        }
+
+        await Task.WhenAny(Task.WhenAll(_bufferRuns)).WaitAsync(_guard, TestContext.CancellationToken);
+
         foreach (var server in _servers)
         {
             await server.DisposeAsync();
+        }
+
+        if (Directory.Exists(_root))
+        {
+            Directory.Delete(_root, true);
         }
     }
 
@@ -716,6 +764,134 @@ public sealed class LiveSenderTests : IDisposable
     }
 
     /// <summary>
+    /// Seventy messages of more than 16,777,216 bytes of JSON, taken while the server is unreachable, are all sent after
+    /// the next accepted hello, oldest first, none dropped, and the buffer is empty once all are acknowledged (S1, E7).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC1")]
+    public async Task LiveSenderRunAfterOutageSendsBeyondMemoryBoundInOrder()
+    {
+        // Arrange
+        var timeProvider = CreateTimeProvider();
+        var connector = new QueuedIngestConnector();
+        var folder = NewBufferFolder();
+        var buffer = CreateRunningBuffer(folder, timeProvider);
+        var sender = CreateSender(connector, timeProvider, Token, buffer);
+        var size = ContractWriter.Write(ContractMessageConverter.ToTradeRoutes(CreateLargeTradeRoutes(1), LiveSender.ProfileId, _start)).Utf8Json.Length;
+        PipeConnectionItem[] items = [.. Enumerable.Range(1, LargeMessages).Select(LargeTradeRoutesItem), .. Enumerable.Range(1, OutageTicks).Select(gameTime => TickItem(gameTime, 1, 1)), Item(PipeTickResult.SessionEnd, 2)];
+        string[] expected = [.. Enumerable.Range(1, LargeMessages).Select(routeId => "routes " + routeId.ToString(CultureInfo.InvariantCulture)), .. Enumerable.Range(1, OutageTicks).Select(gameTime => "tick " + gameTime.ToString(CultureInfo.InvariantCulture)), "session end"];
+
+        connector.Enqueue(null);
+
+        var server = AddServer(connector);
+
+        StartRun(sender);
+        await WaitForStatusAsync(LiveSendState.Retrying, ReplaySendProblemKind.ServerUnreachable, 1);
+
+        var written = await EnqueueWrittenAsync(sender, folder, items);
+
+        // Act
+        await AdvanceRetryAsync(timeProvider, TimeSpan.FromSeconds(1), 1);
+        await AcceptAsync(server);
+
+        var messages = await ReceiveUntilSessionEndAsync(server);
+        var isEmpty = await WaitForAsync(() => buffer.Status.Waiting == 0);
+
+        // Assert
+        Assert.HasCount(70, items, "The outage should take 70 messages");
+        Assert.IsGreaterThan(LiveBuffer.MaxMemoryMessages, items.Length, "The outage should take more messages than the memory bound of 64");
+        Assert.IsGreaterThan((long)LiveBuffer.MaxMemoryBytes, (long)LargeMessages * size, $"The large messages of {size} bytes each should exceed 16,777,216 bytes");
+        Assert.IsTrue(written, "Every message taken during the outage should be written to the buffer folder before it is sent");
+        Assert.AreSequenceEqual(expected, messages.Select(Label).ToArray(), "Every message taken during the outage should be sent after the accepted hello, oldest first");
+        Assert.AreEqual(0, buffer.Status.Dropped, "No message should be dropped while both configured limits hold");
+        Assert.IsEmpty(DroppedLines(), "No dropped count should be logged");
+        Assert.IsTrue(isEmpty, "The buffer should read 0 waiting once every message is acknowledged");
+    }
+
+    /// <summary>
+    /// The messages waiting at Exit, the one in flight among them, are read at the next start and sent after the accepted
+    /// hello in order, the one in flight with its identity, before the message the new run takes; the log reads that the
+    /// buffer holds two messages from an earlier run (S2, E8, N5).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC2")]
+    public async Task LiveSenderRunAfterRestartResendsInFlightWithSameId()
+    {
+        // Arrange
+        var timeProvider = CreateTimeProvider();
+        var connector = new QueuedIngestConnector();
+        var folder = NewBufferFolder();
+        var firstServer = AddServer(connector);
+        var firstBuffer = CreateRunningBuffer(folder, timeProvider);
+        var firstSender = CreateSender(connector, timeProvider, Token, firstBuffer);
+        string[] expected = ["tick 100", "tick 200", "tick 300", "session end"];
+
+        StartRun(firstSender);
+        await AcceptAsync(firstServer);
+
+        var written = await EnqueueWrittenAsync(firstSender, folder, [TickItem(100, 1, 1), TickItem(200, 1, 2)]);
+        var inFlight = Assert.IsInstanceOfType<ContractTick>(await ReceiveContentAsync(firstServer), "The first tick should be in flight at Exit");
+
+        await firstSender.DisposeAsync().AsTask().WaitAsync(_guard, TestContext.CancellationToken);
+        await firstBuffer.DisposeAsync().AsTask().WaitAsync(_guard, TestContext.CancellationToken);
+
+        var secondServer = AddServer(connector);
+        var secondSender = CreateSender(connector, timeProvider, Token, CreateRunningBuffer(folder, timeProvider));
+
+        secondSender.Enqueue(TickItem(300, 1, 3));
+        secondSender.Enqueue(Item(PipeTickResult.SessionEnd, 4));
+
+        // Act
+        StartRun(secondSender);
+        await AcceptAsync(secondServer);
+
+        var messages = await ReceiveUntilSessionEndAsync(secondServer);
+
+        // Assert
+        Assert.IsTrue(written, "Both ticks should be written to the buffer folder before Exit");
+        Assert.AreSequenceEqual(expected, messages.Select(Label).ToArray(), "The messages of the earlier run should be sent in order before the message of the new run");
+        Assert.AreEqual(inFlight.Id, (messages[0] as ContractTick)?.Id, "The message in flight at Exit should be sent again with its identity");
+        Assert.ContainsSingle(line => line == RestoredTwoLine, BufferLines(), "The log should read once that the buffer holds two messages from an earlier run");
+    }
+
+    /// <summary>
+    /// After the server refused the token for good, the messages taken until Exit are still written to the buffer and
+    /// counted as waiting, and no connection follows (S7).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC9")]
+    public async Task LiveSenderEnqueueAfterTokenRefusedStillBuffers()
+    {
+        // Arrange
+        var timeProvider = CreateTimeProvider();
+        var connector = new QueuedIngestConnector();
+        var server = AddServer(connector);
+        var folder = NewBufferFolder();
+        var buffer = CreateRunningBuffer(folder, timeProvider);
+        var sender = CreateSender(connector, timeProvider, Token, buffer);
+        var expected = new LiveBufferStatus
+                       {
+                           Waiting = 3,
+                           Dropped = 0,
+                           IsMemoryOnly = false
+                       };
+
+        await RunUntilRefusedAsync(sender, server, timeProvider, ContractHelloRefusal.TokenRefused);
+
+        // Act
+        var written = await EnqueueWrittenAsync(sender, folder, [TickItem(100, 1, 1), TickItem(200, 1, 2), TickItem(300, 1, 3)]);
+
+        // Assert
+        Assert.IsTrue(written, "Every message taken after the refusal should be written to the buffer folder");
+        Assert.AreEqual(expected, buffer.Status, "The buffer should count the three messages as waiting, none dropped");
+        Assert.AreEqual(Status(LiveSendState.Stopped, ReplaySendProblemKind.TokenRefused), sender.Status, "Live sending should stay stopped with the token refused");
+        Assert.AreEqual(1, connector.AttemptCount, "No connection should follow the refusal");
+    }
+
+    /// <summary>
     /// Beyond 64 waiting messages the oldest are dropped, and the newest 64 messages are sent in order: 63 ticks and the
     /// session end, the oldest 2 dropped (E5, N2).
     /// </summary>
@@ -726,10 +902,10 @@ public sealed class LiveSenderTests : IDisposable
     {
         // Arrange
         var connector = new QueuedIngestConnector();
-        var sender = CreateSender(connector, CreateTimeProvider(), Token);
-        var expected = Enumerable.Range(3, LiveSender.MaxWaitingMessages - 1).Select(gameTime => (long)gameTime).ToArray();
+        var sender = await CreateMemoryOnlySenderAsync(connector, CreateTimeProvider());
+        var expected = Enumerable.Range(3, LiveBuffer.MaxMemoryMessages - 1).Select(gameTime => (long)gameTime).ToArray();
 
-        EnqueueTicks(sender, LiveSender.MaxWaitingMessages + 1);
+        EnqueueTicks(sender, LiveBuffer.MaxMemoryMessages + 1);
 
         var server = AddServer(connector);
 
@@ -737,12 +913,12 @@ public sealed class LiveSenderTests : IDisposable
         StartRun(sender);
         await AcceptAsync(server);
 
-        var messages = await ReceiveAndAcknowledgeAsync(server, null, LiveSender.MaxWaitingMessages);
+        var messages = await ReceiveAndAcknowledgeAsync(server, null, LiveBuffer.MaxMemoryMessages);
 
         // Assert
-        Assert.AreEqual(64, LiveSender.MaxWaitingMessages, "The bound should be 64 messages");
-        Assert.HasCount(LiveSender.MaxWaitingMessages, messages, "The newest 64 messages should be sent: 63 ticks and the session end, the oldest 2 dropped");
-        Assert.AreSequenceEqual(expected, messages.Take(LiveSender.MaxWaitingMessages - 1).Select(message => Assert.IsInstanceOfType<ContractTick>(message, "Every message but the last should be a tick").GameTime).ToArray(), "The newest 64 messages should be sent in order: 63 ticks and the session end, the oldest 2 dropped");
+        Assert.AreEqual(64, LiveBuffer.MaxMemoryMessages, "The bound should be 64 messages");
+        Assert.HasCount(LiveBuffer.MaxMemoryMessages, messages, "The newest 64 messages should be sent: 63 ticks and the session end, the oldest 2 dropped");
+        Assert.AreSequenceEqual(expected, messages.Take(LiveBuffer.MaxMemoryMessages - 1).Select(message => Assert.IsInstanceOfType<ContractTick>(message, "Every message but the last should be a tick").GameTime).ToArray(), "The newest 64 messages should be sent in order: 63 ticks and the session end, the oldest 2 dropped");
         Assert.IsInstanceOfType<ContractSessionEnd>(messages[^1], "The item queued after the drop should follow the kept ticks");
     }
 
@@ -756,7 +932,7 @@ public sealed class LiveSenderTests : IDisposable
     {
         // Arrange
         var connector = new QueuedIngestConnector();
-        var sender = CreateSender(connector, CreateTimeProvider(), Token);
+        var sender = await CreateMemoryOnlySenderAsync(connector, CreateTimeProvider());
         var size = ContractWriter.Write(ContractMessageConverter.ToTradeRoutes(CreateLargeTradeRoutes(1), LiveSender.ProfileId, _start)).Utf8Json.Length;
 
         EnqueueLargeTradeRoutes(sender, LargeMessages);
@@ -774,9 +950,9 @@ public sealed class LiveSenderTests : IDisposable
         var next = await ReceiveContentAsync(server);
 
         // Assert
-        Assert.AreEqual(16777216, LiveSender.MaxWaitingBytes, "The bound should be 16 MiB");
-        Assert.IsLessThanOrEqualTo((long)LiveSender.MaxWaitingBytes, (LargeMessages - 1L) * size, $"Eight large messages of {size} bytes should fit the bound");
-        Assert.IsGreaterThan((long)LiveSender.MaxWaitingBytes, (long)LargeMessages * size, $"Nine large messages of {size} bytes should exceed the bound");
+        Assert.AreEqual(16777216, LiveBuffer.MaxMemoryBytes, "The bound should be 16 MiB");
+        Assert.IsLessThanOrEqualTo((long)LiveBuffer.MaxMemoryBytes, (LargeMessages - 1L) * size, $"Eight large messages of {size} bytes should fit the bound");
+        Assert.IsGreaterThan((long)LiveBuffer.MaxMemoryBytes, (long)LargeMessages * size, $"Nine large messages of {size} bytes should exceed the bound");
         Assert.AreSequenceEqual(_keptRouteIds, messages.Select(message => Assert.IsInstanceOfType<ContractTradeRoutes>(message, "Every message should be trade routes").Routes[0].Id).ToArray(), "The oldest message should be dropped and the newest eight sent, below the count bound");
         Assert.IsInstanceOfType<ContractSessionEnd>(next, "No further large message should follow");
     }
@@ -791,9 +967,9 @@ public sealed class LiveSenderTests : IDisposable
     {
         // Arrange
         var connector = new QueuedIngestConnector();
-        var sender = CreateSender(connector, CreateTimeProvider(), Token);
+        var sender = await CreateMemoryOnlySenderAsync(connector, CreateTimeProvider());
 
-        EnqueueTicks(sender, LiveSender.MaxWaitingMessages + 1);
+        EnqueueTicks(sender, LiveBuffer.MaxMemoryMessages + 1);
 
         var server = AddServer(connector);
 
@@ -801,7 +977,7 @@ public sealed class LiveSenderTests : IDisposable
         await AcceptAsync(server);
 
         // Act
-        await ReceiveAndAcknowledgeAsync(server, null, LiveSender.MaxWaitingMessages);
+        await ReceiveAndAcknowledgeAsync(server, null, LiveBuffer.MaxMemoryMessages);
         await StopRunsAsync();
 
         // Assert
@@ -823,9 +999,9 @@ public sealed class LiveSenderTests : IDisposable
         // Arrange
         var timeProvider = CreateTimeProvider();
         var connector = new QueuedIngestConnector();
-        var sender = CreateSender(connector, timeProvider, Token);
+        var sender = await CreateMemoryOnlySenderAsync(connector, timeProvider);
 
-        EnqueueTicks(sender, LiveSender.MaxWaitingMessages + 1);
+        EnqueueTicks(sender, LiveBuffer.MaxMemoryMessages + 1);
 
         // Act
         await EndAsync(sender, connector, timeProvider, ending);
@@ -895,7 +1071,8 @@ public sealed class LiveSenderTests : IDisposable
         // Arrange
         var address = new Uri("wss://censio.example.org:8443/ingest?profile=1");
         var connector = new QueuedIngestConnector();
-        var sender = LiveSender.ForServer(new ForwardServerSetting(address, Token), CompanionVersion, connector, CreateTimeProvider(), _logger);
+        var timeProvider = CreateTimeProvider();
+        var sender = LiveSender.ForServer(new ForwardServerSetting(address, Token), CreateRunningBuffer(timeProvider), CompanionVersion, connector, timeProvider, _logger);
 
         _senders.Add(sender);
 
@@ -1030,12 +1207,12 @@ public sealed class LiveSenderTests : IDisposable
     {
         // Arrange
         var connector = new QueuedIngestConnector();
-        var sender = CreateSender(connector, CreateTimeProvider(), Token);
+        var sender = await CreateMemoryOnlySenderAsync(connector, CreateTimeProvider());
 
         await sender.DisposeAsync().AsTask().WaitAsync(_guard, TestContext.CancellationToken);
 
         // Act
-        EnqueueTicks(sender, LiveSender.MaxWaitingMessages + 1);
+        EnqueueTicks(sender, LiveBuffer.MaxMemoryMessages + 1);
 
         // Assert
         Assert.IsEmpty(Lines(), "Items queued after the dispose should log nothing, no dropped count either");
@@ -1053,7 +1230,8 @@ public sealed class LiveSenderTests : IDisposable
         // Arrange
         var connector = new QueuedIngestConnector();
         var server = AddServer(connector);
-        var sender = LiveSender.ForServer(new ForwardServerSetting(_address, Token), CompanionVersion, connector, CreateTimeProvider(), _logger);
+        var timeProvider = CreateTimeProvider();
+        var sender = LiveSender.ForServer(new ForwardServerSetting(_address, Token), CreateRunningBuffer(timeProvider), CompanionVersion, connector, timeProvider, _logger);
 
         sender.StatusChanged += (_, _) => throw new InvalidOperationException("The subscriber failed.");
         Track(sender);
@@ -1082,7 +1260,8 @@ public sealed class LiveSenderTests : IDisposable
         // Arrange
         var connector = new QueuedIngestConnector();
         var server = AddServer(connector);
-        var sender = LiveSender.ForServer(new ForwardServerSetting(_address, Token), CompanionVersion, connector, CreateTimeProvider(), _logger);
+        var timeProvider = CreateTimeProvider();
+        var sender = LiveSender.ForServer(new ForwardServerSetting(_address, Token), CreateRunningBuffer(timeProvider), CompanionVersion, connector, timeProvider, _logger);
 
         _senders.Add(sender);
         StartRun(sender);
@@ -1408,6 +1587,35 @@ public sealed class LiveSenderTests : IDisposable
     }
 
     /// <summary>
+    /// Names a message as the tests identify it: a tick by its game time, trade routes by their first route.
+    /// </summary>
+    /// <param name="message">The message</param>
+    /// <returns>The name</returns>
+    private static string Label(ContractMessage? message)
+    {
+        return message switch
+               {
+                   ContractTick tick => "tick " + tick.GameTime.ToString(CultureInfo.InvariantCulture),
+                   ContractTradeRoutes routes => "routes " + routes.Routes[0].Id.ToString(CultureInfo.InvariantCulture),
+                   ContractSessionEnd => "session end",
+                   null => "connection ended",
+                   _ => message.GetType().Name
+               };
+    }
+
+    /// <summary>
+    /// Counts the message files of a buffer folder.
+    /// </summary>
+    /// <param name="folder">The buffer folder</param>
+    /// <returns>The number of message files</returns>
+    private static int MessageFileCount(string folder)
+    {
+        return Directory.Exists(folder)
+                   ? Directory.EnumerateFiles(folder, "*.msg").Count()
+                   : 0;
+    }
+
+    /// <summary>
     /// Creates a token reader that throws an exception with a host name in its text at its first call and returns the
     /// token afterwards.
     /// </summary>
@@ -1430,7 +1638,96 @@ public sealed class LiveSenderTests : IDisposable
     /// <returns>The sender</returns>
     private LiveSender CreateSender(QueuedIngestConnector connector, TimeProvider timeProvider, string? token)
     {
-        return Track(LiveSender.ForServer(new ForwardServerSetting(_address, token), CompanionVersion, connector, timeProvider, _logger));
+        return CreateSender(connector, timeProvider, token, CreateRunningBuffer(timeProvider));
+    }
+
+    /// <summary>
+    /// Creates a sender for the server of the tests over a buffer and records its statuses.
+    /// </summary>
+    /// <param name="connector">The connector</param>
+    /// <param name="timeProvider">The time provider</param>
+    /// <param name="token">The token of the setting</param>
+    /// <param name="buffer">The buffer of the waiting messages</param>
+    /// <returns>The sender</returns>
+    private LiveSender CreateSender(QueuedIngestConnector connector, TimeProvider timeProvider, string? token, LiveBuffer buffer)
+    {
+        return Track(LiveSender.ForServer(new ForwardServerSetting(_address, token), buffer, CompanionVersion, connector, timeProvider, _logger));
+    }
+
+    /// <summary>
+    /// Creates a sender for the server of the tests over a running buffer that keeps messages in memory only, because a
+    /// file stands in place of its folder.
+    /// </summary>
+    /// <param name="connector">The connector</param>
+    /// <param name="timeProvider">The time provider</param>
+    /// <returns>The sender</returns>
+    private async Task<LiveSender> CreateMemoryOnlySenderAsync(QueuedIngestConnector connector, TimeProvider timeProvider)
+    {
+        var folder = NewBufferFolder();
+
+        Directory.CreateDirectory(Path.GetDirectoryName(folder)!);
+        await File.WriteAllTextAsync(folder, "not a folder", TestContext.CancellationToken);
+
+        var buffer = CreateRunningBuffer(folder, timeProvider);
+        var isMemoryOnly = await WaitForAsync(() => buffer.Status.IsMemoryOnly);
+
+        Assert.IsTrue(isMemoryOnly, "The buffer should keep messages in memory only when a file blocks its folder");
+
+        return CreateSender(connector, timeProvider, Token, buffer);
+    }
+
+    /// <summary>
+    /// Gets a new buffer folder below the test's temporary folder, not created yet.
+    /// </summary>
+    /// <returns>The path</returns>
+    private string NewBufferFolder()
+    {
+        return Path.Combine(_root, Guid.NewGuid().ToString("N"), "Buffer");
+    }
+
+    /// <summary>
+    /// Creates a buffer with the default limits in a new folder and starts its run; both end after the test.
+    /// </summary>
+    /// <param name="timeProvider">The time provider</param>
+    /// <returns>The buffer</returns>
+    private LiveBuffer CreateRunningBuffer(TimeProvider timeProvider)
+    {
+        return CreateRunningBuffer(NewBufferFolder(), timeProvider);
+    }
+
+    /// <summary>
+    /// Creates a buffer with the default limits in a folder and starts its run; both end after the test.
+    /// </summary>
+    /// <param name="folder">The buffer folder</param>
+    /// <param name="timeProvider">The time provider</param>
+    /// <returns>The buffer</returns>
+    private LiveBuffer CreateRunningBuffer(string folder, TimeProvider timeProvider)
+    {
+        var buffer = new LiveBuffer(folder, LiveBufferLimits.Defaults, timeProvider, _bufferLogger);
+
+        _buffers.Add(buffer);
+        _bufferRuns.Add(buffer.RunAsync(TestContext.CancellationToken));
+
+        return buffer;
+    }
+
+    /// <summary>
+    /// Polls a condition, ten milliseconds apart, until it holds or the polls run out.
+    /// </summary>
+    /// <param name="condition">The condition</param>
+    /// <returns>Whether the condition holds</returns>
+    private async Task<bool> WaitForAsync(Func<bool> condition)
+    {
+        var polls = 0;
+
+        while (condition() == false && polls < MaxPolls)
+        {
+            await Task.Delay(10, TestContext.CancellationToken);
+
+            polls++;
+        }
+
+        return condition();
     }
 
     /// <summary>
@@ -1442,7 +1739,7 @@ public sealed class LiveSenderTests : IDisposable
     /// <returns>The sender</returns>
     private LiveSender CreateLocalSender(QueuedIngestConnector connector, TimeProvider timeProvider, Func<CancellationToken, Task<string?>> waitForToken)
     {
-        return Track(LiveSender.ForLocalServer(LocalPort, waitForToken, CompanionVersion, connector, timeProvider, _logger));
+        return Track(LiveSender.ForLocalServer(LocalPort, waitForToken, CreateRunningBuffer(timeProvider), CompanionVersion, connector, timeProvider, _logger));
     }
 
     /// <summary>
@@ -1807,6 +2104,63 @@ public sealed class LiveSenderTests : IDisposable
     private string[] Lines()
     {
         return [.. _logger.Entries.Select(entry => entry.Message)];
+    }
+
+    /// <summary>
+    /// Returns the messages of the buffers' log entries so far.
+    /// </summary>
+    /// <returns>The messages in order</returns>
+    private List<string> BufferLines()
+    {
+        return [.. _bufferLogger.Entries.Select(entry => entry.Message)];
+    }
+
+    /// <summary>
+    /// Queues items one at a time, each after the one before is written to its file in the buffer folder; once one is not
+    /// written in time, the rest are queued without waiting.
+    /// </summary>
+    /// <param name="sender">The sender</param>
+    /// <param name="folder">The buffer folder of the sender</param>
+    /// <param name="items">The items</param>
+    /// <returns><see langword="true" /> when every item was written</returns>
+    private async Task<bool> EnqueueWrittenAsync(LiveSender sender, string folder, IReadOnlyList<PipeConnectionItem> items)
+    {
+        var written = true;
+
+        foreach (var (item, count) in items.Select((item, index) => (item, index + 1)))
+        {
+            sender.Enqueue(item);
+
+            written = written && await WaitForAsync(() => MessageFileCount(folder) == count);
+        }
+
+        return written;
+    }
+
+    /// <summary>
+    /// Receives and acknowledges the messages that are not statuses until a session end arrives or the connection ends.
+    /// </summary>
+    /// <param name="server">The server</param>
+    /// <returns>The messages in order, the session end or the end of the connection last</returns>
+    private async Task<List<ContractMessage?>> ReceiveUntilSessionEndAsync(ScriptedIngestServer server)
+    {
+        var messages = new List<ContractMessage?>();
+        ContractMessage? message;
+
+        do
+        {
+            message = await ReceiveContentAsync(server);
+
+            messages.Add(message);
+
+            if (message is not null)
+            {
+                await server.AcknowledgeAsync(message, null, TestContext.CancellationToken);
+            }
+        }
+        while (message is not (null or ContractSessionEnd));
+
+        return messages;
     }
 
     /// <summary>
