@@ -41,8 +41,8 @@ public sealed record LiveBufferLimits
     /// </summary>
     public static LiveBufferLimits Defaults { get; } = new()
                                                        {
-                                                           Hours = 0,
-                                                           Megabytes = 0
+                                                           Hours = DefaultHours,
+                                                           Megabytes = DefaultMegabytes
                                                        };
 
     /// <summary>
@@ -55,21 +55,15 @@ public sealed record LiveBufferLimits
     /// </summary>
     public required int Megabytes { get; init; }
 
-#pragma warning disable S2325, CA1822
-    // Skeleton: removed with the implementation
     /// <summary>
     /// Gets the age limit.
     /// </summary>
-    public TimeSpan MaxAge => TimeSpan.Zero;
-#pragma warning restore S2325, CA1822
+    public TimeSpan MaxAge => TimeSpan.FromHours(Hours);
 
-#pragma warning disable S2325, CA1822
-    // Skeleton: removed with the implementation
     /// <summary>
     /// Gets the size limit in bytes.
     /// </summary>
-    public long MaxBytes => 0;
-#pragma warning restore S2325, CA1822
+    public long MaxBytes => (long)Megabytes * BytesPerMegabyte;
 
     #endregion // Properties
 }

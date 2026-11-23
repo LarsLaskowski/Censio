@@ -1,3 +1,9 @@
+using System.Buffers.Binary;
+using System.Globalization;
+using System.Security.Cryptography;
+
+using Censio.Contracts;
+
 namespace Censio.Companion.Core;
 
 /// <summary>
@@ -17,12 +23,64 @@ public static class LiveBufferFile
     /// </summary>
     public const int FormatVersion = 1;
 
+    /// <summary>
+    /// The number of digits of the sequence in a file name.
+    /// </summary>
+    private const int SequenceDigits = 19;
+
+    /// <summary>
+    /// The first sequence that is a foreign name, so that the next sequence never overflows.
+    /// </summary>
+    private const long SequenceLimit = 1000000000000000000L;
+
+    /// <summary>
+    /// The extension of a message file.
+    /// </summary>
+    private const string MessageExtension = ".msg";
+
+    /// <summary>
+    /// The extension of a temporary file.
+    /// </summary>
+    private const string TemporaryExtension = ".tmp";
+
+    /// <summary>
+    /// The offset of the format version in the header.
+    /// </summary>
+    private const int VersionOffset = 4;
+
+    /// <summary>
+    /// The offset of the time taken in the header.
+    /// </summary>
+    private const int TimeOffset = 8;
+
+    /// <summary>
+    /// The offset of the identity in the header.
+    /// </summary>
+    private const int IdentityOffset = 16;
+
+    /// <summary>
+    /// The offset of the JSON length in the header.
+    /// </summary>
+    private const int LengthOffset = 32;
+
+    /// <summary>
+    /// The offset of the SHA-256 in the header.
+    /// </summary>
+    private const int HashOffset = 36;
+
     #endregion // Constants
+
+    #region Fields
+
+    /// <summary>
+    /// The magic of a buffer file.
+    /// </summary>
+    private static readonly byte[] _magic = "CNSB"u8.ToArray();
+
+    #endregion // Fields
 
     #region Methods
 
-#pragma warning disable RH2003
-    // Skeleton: removed with the implementation
     /// <summary>
     /// Formats an entry as the bytes of a file.
     /// </summary>
@@ -30,12 +88,21 @@ public static class LiveBufferFile
     /// <returns>The bytes of the file</returns>
     public static byte[] Format(LiveBufferEntry entry)
     {
-        throw new NotImplementedException();
-    }
-#pragma warning restore RH2003
+        var json = entry.Utf8Json.Span;
+        var file = new byte[HeaderLength + json.Length];
 
-#pragma warning disable RH2003
-    // Skeleton: removed with the implementation
+        _magic.CopyTo(file, 0);
+        BinaryPrimitives.WriteInt32LittleEndian(file.AsSpan(VersionOffset), FormatVersion);
+        BinaryPrimitives.WriteInt64LittleEndian(file.AsSpan(TimeOffset), entry.TakenAt.UtcTicks);
+        entry.Id.TryWriteBytes(file.AsSpan(IdentityOffset));
+        BinaryPrimitives.WriteInt32LittleEndian(file.AsSpan(LengthOffset), json.Length);
+        json.CopyTo(file.AsSpan(HeaderLength));
+
+        SHA256.HashData([.. file.AsSpan(0, HashOffset), .. json]).CopyTo(file, HashOffset);
+
+        return file;
+    }
+
     /// <summary>
     /// Reads the header of a file.
     /// </summary>
@@ -44,12 +111,38 @@ public static class LiveBufferFile
     /// <returns>The result, with the entry holding an empty JSON</returns>
     public static LiveBufferFileResult ReadHeader(ReadOnlySpan<byte> header, long fileLength)
     {
-        throw new NotImplementedException();
-    }
-#pragma warning restore RH2003
+        if (header.Length < HeaderLength
+            || header[..VersionOffset].SequenceEqual(_magic) == false
+            || BinaryPrimitives.ReadInt32LittleEndian(header[VersionOffset..]) != FormatVersion)
+        {
+            return Unreadable();
+        }
 
-#pragma warning disable RH2003
-    // Skeleton: removed with the implementation
+        var ticks = BinaryPrimitives.ReadInt64LittleEndian(header[TimeOffset..]);
+        var id = new Guid(header.Slice(IdentityOffset, 16));
+        var length = BinaryPrimitives.ReadInt32LittleEndian(header[LengthOffset..]);
+
+        if (ticks < 0 || ticks > DateTime.MaxValue.Ticks
+            || id == Guid.Empty
+            || length is < 1 or > ContractReader.MaxMessageBytes
+            || fileLength != HeaderLength + (long)length)
+        {
+            return Unreadable();
+        }
+
+        return new LiveBufferFileResult
+               {
+                   Kind = LiveBufferFileResultKind.Read,
+                   Entry = new LiveBufferEntry
+                           {
+                               Id = id,
+                               TakenAt = new DateTimeOffset(ticks, TimeSpan.Zero),
+                               Utf8Json = ReadOnlyMemory<byte>.Empty
+                           },
+                   Length = length
+               };
+    }
+
     /// <summary>
     /// Reads a whole file.
     /// </summary>
@@ -57,12 +150,35 @@ public static class LiveBufferFile
     /// <returns>The result</returns>
     public static LiveBufferFileResult Read(ReadOnlySpan<byte> file)
     {
-        throw new NotImplementedException();
-    }
-#pragma warning restore RH2003
+        var header = ReadHeader(file, file.Length);
 
-#pragma warning disable RH2003
-    // Skeleton: removed with the implementation
+        if (header.Kind != LiveBufferFileResultKind.Read || header.Entry is null)
+        {
+            return Unreadable();
+        }
+
+        var json = file[HeaderLength..];
+        var expected = file.Slice(HashOffset, SHA256.HashSizeInBytes);
+        var actual = SHA256.HashData([.. file[..HashOffset], .. json]);
+
+        if (expected.SequenceEqual(actual) == false)
+        {
+            return Unreadable();
+        }
+
+        return new LiveBufferFileResult
+               {
+                   Kind = LiveBufferFileResultKind.Read,
+                   Entry = new LiveBufferEntry
+                           {
+                               Id = header.Entry.Id,
+                               TakenAt = header.Entry.TakenAt,
+                               Utf8Json = json.ToArray()
+                           },
+                   Length = header.Length
+               };
+    }
+
     /// <summary>
     /// Gets the name of a message file.
     /// </summary>
@@ -70,12 +186,9 @@ public static class LiveBufferFile
     /// <returns>The file name</returns>
     public static string MessageName(long sequence)
     {
-        throw new NotImplementedException();
+        return SequenceName(sequence, MessageExtension);
     }
-#pragma warning restore RH2003
 
-#pragma warning disable RH2003
-    // Skeleton: removed with the implementation
     /// <summary>
     /// Gets the name of a temporary file.
     /// </summary>
@@ -83,12 +196,9 @@ public static class LiveBufferFile
     /// <returns>The file name</returns>
     public static string TemporaryName(long sequence)
     {
-        throw new NotImplementedException();
+        return SequenceName(sequence, TemporaryExtension);
     }
-#pragma warning restore RH2003
 
-#pragma warning disable RH2003
-    // Skeleton: removed with the implementation
     /// <summary>
     /// Tries to parse the name of a message file.
     /// </summary>
@@ -97,12 +207,9 @@ public static class LiveBufferFile
     /// <returns><see langword="true" /> when the name is a message name</returns>
     public static bool TryParseMessageName(string name, out long sequence)
     {
-        throw new NotImplementedException();
+        return TryParseName(name, MessageExtension, out sequence);
     }
-#pragma warning restore RH2003
 
-#pragma warning disable RH2003
-    // Skeleton: removed with the implementation
     /// <summary>
     /// Tries to parse the name of a temporary file.
     /// </summary>
@@ -111,9 +218,55 @@ public static class LiveBufferFile
     /// <returns><see langword="true" /> when the name is a temporary name</returns>
     public static bool TryParseTemporaryName(string name, out long sequence)
     {
-        throw new NotImplementedException();
+        return TryParseName(name, TemporaryExtension, out sequence);
     }
-#pragma warning restore RH2003
+
+    /// <summary>
+    /// Creates the result of an unreadable file or header.
+    /// </summary>
+    /// <returns>The result</returns>
+    private static LiveBufferFileResult Unreadable()
+    {
+        return new LiveBufferFileResult
+               {
+                   Kind = LiveBufferFileResultKind.Unreadable
+               };
+    }
+
+    /// <summary>
+    /// Gets a file name from a sequence and an extension.
+    /// </summary>
+    /// <param name="sequence">The sequence number</param>
+    /// <param name="extension">The extension with its dot</param>
+    /// <returns>The file name</returns>
+    private static string SequenceName(long sequence, string extension)
+    {
+        return sequence.ToString(new string('0', SequenceDigits), CultureInfo.InvariantCulture) + extension;
+    }
+
+    /// <summary>
+    /// Parses a file name of exactly 19 ASCII digits below 10^18 followed by an extension.
+    /// </summary>
+    /// <param name="name">The file name</param>
+    /// <param name="extension">The extension with its dot, in lower case</param>
+    /// <param name="sequence">The sequence number</param>
+    /// <returns><see langword="true" /> when the name has that form</returns>
+    private static bool TryParseName(string name, string extension, out long sequence)
+    {
+        sequence = 0;
+
+        if (name.Length != SequenceDigits + extension.Length
+            || name.EndsWith(extension, StringComparison.Ordinal) == false)
+        {
+            return false;
+        }
+
+        var digits = name.AsSpan(0, SequenceDigits);
+
+        return digits.IndexOfAnyExceptInRange('0', '9') < 0
+               && long.TryParse(digits, NumberStyles.None, CultureInfo.InvariantCulture, out sequence)
+               && sequence < SequenceLimit;
+    }
 
     #endregion // Methods
 }

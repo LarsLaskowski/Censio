@@ -234,28 +234,28 @@ public static class CompanionSettings
         }
 
         var ports = FindProperties(root, LocalPortKey);
-
-        if (ports.Count == 0)
-        {
-            return new LocalServerSetting
-                   {
-                       Kind = LocalServerSettingKind.Local,
-                       Port = DefaultLocalPort
-                   };
-        }
+        var port = DefaultLocalPort;
 
         if (ports.Count > 1)
         {
             return Invalid("localPort occurs more than once");
         }
 
-        return TryReadPort(ports[0], out var port)
-                   ? new LocalServerSetting
+        if (ports.Count == 1 && TryReadWholeNumber(ports[0], 1, 65535, out port) == false)
+        {
+            return Invalid("localPort is not a port from 1 to 65535");
+        }
+
+        var limits = ReadBufferLimits(root, out var problem);
+
+        return limits is null
+                   ? Invalid(problem ?? string.Empty)
+                   : new LocalServerSetting
                      {
                          Kind = LocalServerSettingKind.Local,
-                         Port = port
-                     }
-                   : Invalid("localPort is not a port from 1 to 65535");
+                         Port = port,
+                         BufferLimits = limits
+                     };
     }
 
     /// <summary>
@@ -302,11 +302,74 @@ public static class CompanionSettings
             }
         }
 
-        return new LocalServerSetting
+        var limits = ReadBufferLimits(root, out var problem);
+
+        return limits is null
+                   ? Invalid(problem ?? string.Empty)
+                   : new LocalServerSetting
+                     {
+                         Kind = LocalServerSettingKind.Forward,
+                         Forward = new ForwardServerSetting(address, token),
+                         BufferLimits = limits
+                     };
+    }
+
+    /// <summary>
+    /// Reads the limits of the live buffer from the root object of a settings file.
+    /// </summary>
+    /// <param name="root">The root object</param>
+    /// <param name="problem">The problem when a key is invalid, otherwise <see langword="null" /></param>
+    /// <returns>The limits, or <see langword="null" /> when a key is invalid</returns>
+    private static LiveBufferLimits? ReadBufferLimits(JsonElement root, out string? problem)
+    {
+        problem = null;
+
+        var hours = LiveBufferLimits.DefaultHours;
+        var megabytes = LiveBufferLimits.DefaultMegabytes;
+
+        if (TryReadBufferKey(root, BufferHoursKey, LiveBufferLimits.MaxHours, ref hours, out problem) == false
+            || TryReadBufferKey(root, BufferMegabytesKey, LiveBufferLimits.MaxMegabytes, ref megabytes, out problem) == false)
+        {
+            return null;
+        }
+
+        return new LiveBufferLimits
                {
-                   Kind = LocalServerSettingKind.Forward,
-                   Forward = new ForwardServerSetting(address, token)
+                   Hours = hours,
+                   Megabytes = megabytes
                };
+    }
+
+    /// <summary>
+    /// Reads one key of the live buffer limits, which stays as it is when the key is missing.
+    /// </summary>
+    /// <param name="root">The root object</param>
+    /// <param name="key">The key</param>
+    /// <param name="maximum">The largest value</param>
+    /// <param name="number">The value</param>
+    /// <param name="problem">The problem when the key is invalid, otherwise <see langword="null" /></param>
+    /// <returns><see langword="true" /> when the key is missing or valid</returns>
+    private static bool TryReadBufferKey(JsonElement root, string key, int maximum, ref int number, out string? problem)
+    {
+        var values = FindProperties(root, key);
+
+        problem = null;
+
+        if (values.Count > 1)
+        {
+            problem = $"{key} occurs more than once";
+
+            return false;
+        }
+
+        if (values.Count == 1 && TryReadWholeNumber(values[0], 1, maximum, out number) == false)
+        {
+            problem = $"{key} is not a whole number from 1 to {maximum.ToString(CultureInfo.InvariantCulture)}";
+
+            return false;
+        }
+
+        return true;
     }
 
     /// <summary>
@@ -324,14 +387,16 @@ public static class CompanionSettings
     }
 
     /// <summary>
-    /// Reads a port from a JSON number written as decimal digits only, from 1 to 65535.
+    /// Reads a whole number from a JSON number written as decimal digits only, within a range.
     /// </summary>
     /// <param name="value">The value</param>
-    /// <param name="port">The port</param>
-    /// <returns><see langword="true" /> when the value is such a port</returns>
-    private static bool TryReadPort(JsonElement value, out int port)
+    /// <param name="minimum">The smallest number</param>
+    /// <param name="maximum">The largest number</param>
+    /// <param name="number">The number</param>
+    /// <returns><see langword="true" /> when the value is such a number</returns>
+    private static bool TryReadWholeNumber(JsonElement value, int minimum, int maximum, out int number)
     {
-        port = 0;
+        number = 0;
 
         if (value.ValueKind != JsonValueKind.Number)
         {
@@ -341,8 +406,9 @@ public static class CompanionSettings
         var text = value.GetRawText().AsSpan();
 
         return text.IndexOfAnyExceptInRange('0', '9') < 0
-               && int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out port)
-               && port is >= 1 and <= 65535;
+               && int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out number)
+               && number >= minimum
+               && number <= maximum;
     }
 
     /// <summary>
