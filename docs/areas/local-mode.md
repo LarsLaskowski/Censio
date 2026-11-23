@@ -20,7 +20,7 @@ without Docker rely on it.
   `"5117"`, `null`, a negative number, 0 and 65536 are refused.
 - The keys are matched ignoring case, and `local` is matched ignoring case. A blank `mode` counts as no `mode`.
 - A `mode` that is not a text, a text other than `local` and `forward` or that occurs twice (also in different case),
-  and, with `mode` `local`, an invalid or duplicated `localPort`, start no server. The menu line reads `Server: settings
+  and, with `mode` `local`, an invalid or duplicated `localPort`, `bufferHours` or `bufferMegabytes` ([`live-sending.md`](live-sending.md), *Switching on*), start no server. The menu line reads `Server: settings
   invalid` and the reason is logged as a warning (*Log*). The game folder is still read: a wrong value of these keys does
   not make the file invalid for `gameFolder`.
 - `"mode": "forward"` hosts no server: the Companion sends live data to the server named by `serverAddress`
@@ -96,7 +96,7 @@ without Docker rely on it.
 
 | Menu line | Cause | What else |
 | --------- | ----- | --------- |
-| `Server: settings invalid` | A value of `mode` or `localPort`, or in forward mode of `serverAddress` or `serverToken`, breaks *Switching on* | No server; warning logged |
+| `Server: settings invalid` | A value of `mode`, `localPort`, `bufferHours` or `bufferMegabytes`, or in forward mode of `serverAddress` or `serverToken`, breaks *Switching on* | No server; warning logged |
 | `Server: port <port> in use` | Another program, a standalone server or the Companion of another signed-in Windows user holds the port on `127.0.0.1` or on `[::1]` | `Open Censio` greyed; warning logged; nothing is retried |
 | `Server: failed` | Any other start failure: the folder cannot be created or written, the database was written by a newer Censio, is not a Censio database or cannot be updated, the key ring or the token file cannot be written or read back, an address that cannot be bound for another reason; also a server that stops on its own while the Companion runs. A port that Windows reserves is expected to end here (not yet verified) | `Open Censio` greyed; the reason is logged; the Companion does not restart the server; a restart of the Companion tries again |
 

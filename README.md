@@ -167,7 +167,8 @@ What the menu line says:
 | `Server: running at http://localhost:<port>/` | It runs; `Open Censio` is enabled | Nothing |
 | `Server: port <port> in use` | Another program, a `Censio.Server` or the Companion of another Windows user holds the port | Close it, or set another `localPort` and restart the Companion |
 | `Server: failed` | Any other failure: the folder or the database cannot be used, a newer Censio wrote the database, or the server stopped; a port that Windows reserves fails this way too | Choose `Open log folder` and read the log of the day (it names the reason, without the token); try another `localPort`; a restart tries again |
-| `Server: settings invalid` | A value of `mode` or `localPort` is wrong (the log names it); no server starts, the game search is not affected | Correct the file and restart |
+| `Server: settings invalid` | A value of `mode`, `localPort`, `bufferHours` or `bufferMegabytes` is wrong (the log names it); no server starts, the game search is not affected | Correct the file and restart |
+| `Buffer: <n> waiting` | Below the `Server:` line: the live messages waiting for the server, with `, <d> dropped` once messages were dropped and `, not saved to disk` when the buffer folder cannot be written (*Forward mode*) | Nothing; after `, not saved to disk` read the log |
 
 A replay without `--server` ends with `Replay error: local server not running` when the server does not start. `Open Censio` that cannot start a browser only writes a warning to the log.
 
@@ -412,7 +413,8 @@ Was die Menüzeile sagt:
 | `Server: running at http://localhost:<port>/` | Er läuft; `Open Censio` ist aktiv | Nichts |
 | `Server: port <port> in use` | Ein anderes Programm, ein `Censio.Server` oder der Companion eines anderen Windows-Benutzers belegt den Port | Es schließen oder einen anderen `localPort` setzen und den Companion neu starten |
 | `Server: failed` | Jeder andere Fehler: Der Ordner oder die Datenbank sind nicht nutzbar, ein neueres Censio hat die Datenbank geschrieben, oder der Server wurde beendet; ein Port, den Windows reserviert, scheitert ebenfalls so | `Open log folder` wählen und das Log des Tages lesen (es nennt den Grund, ohne das Token); einen anderen `localPort` versuchen; ein Neustart versucht es erneut |
-| `Server: settings invalid` | Ein Wert von `mode` oder `localPort` ist falsch (das Log nennt ihn); kein Server startet, die Spielsuche ist nicht betroffen | Die Datei korrigieren und neu starten |
+| `Server: settings invalid` | Ein Wert von `mode`, `localPort`, `bufferHours` oder `bufferMegabytes` ist falsch (das Log nennt ihn); kein Server startet, die Spielsuche ist nicht betroffen | Die Datei korrigieren und neu starten |
+| `Buffer: <n> waiting` | Unter der Zeile `Server:`: die Live-Nachrichten, die auf den Server warten, mit `, <d> dropped`, sobald Nachrichten verworfen wurden, und `, not saved to disk`, wenn der Pufferordner nicht beschrieben werden kann (*Weiterleitungsmodus*) | Nichts; nach `, not saved to disk` das Log lesen |
 
 Ein Abspielen ohne `--server` endet mit `Replay error: local server not running`, wenn der Server nicht startet. Ein `Open Censio`, das keinen Browser starten kann, schreibt nur eine Warnung ins Log.
 
