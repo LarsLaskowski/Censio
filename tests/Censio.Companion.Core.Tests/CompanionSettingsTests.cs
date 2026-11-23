@@ -80,9 +80,77 @@ public sealed class CompanionSettingsTests
     /// </summary>
     private const string LocalSettings = """{"mode": "local"}""";
 
+    /// <summary>
+    /// The problem of a <c>bufferHours</c> that is not an integer from 1 to 168.
+    /// </summary>
+    private const string BufferHoursInvalid = "bufferHours is not a whole number from 1 to 168";
+
+    /// <summary>
+    /// The problem of a <c>bufferHours</c> that occurs more than once.
+    /// </summary>
+    private const string BufferHoursTwice = "bufferHours occurs more than once";
+
+    /// <summary>
+    /// The problem of a <c>bufferMegabytes</c> that is not an integer from 1 to 10240.
+    /// </summary>
+    private const string BufferMegabytesInvalid = "bufferMegabytes is not a whole number from 1 to 10240";
+
+    /// <summary>
+    /// The problem of a <c>bufferMegabytes</c> that occurs more than once.
+    /// </summary>
+    private const string BufferMegabytesTwice = "bufferMegabytes occurs more than once";
+
     #endregion // Constants
 
     #region Fields
+
+    /// <summary>
+    /// The settings that switch live sending on, before the buffer keys: forward mode, local mode with <c>localPort</c>
+    /// and local mode without it, each with the kind it reads as.
+    /// </summary>
+    private static readonly (string Settings, LocalServerSettingKind Kind)[] _bufferModes = [
+                                                                                                ($"\"mode\": \"forward\", \"serverAddress\": \"{ServerAddress}\"", LocalServerSettingKind.Forward),
+                                                                                                ("\"mode\": \"local\", \"localPort\": 5117", LocalServerSettingKind.Local),
+                                                                                                ("\"mode\": \"local\"", LocalServerSettingKind.Local)
+                                                                                            ];
+
+    /// <summary>
+    /// Valid buffer keys as written after the mode, with the limits they read as.
+    /// </summary>
+    private static readonly (string Keys, int Hours, int Megabytes)[] _validBufferKeys = [
+                                                                                             (string.Empty, 24, 100),
+                                                                                             (", \"bufferHours\": 48, \"bufferMegabytes\": 500", 48, 500),
+                                                                                             (", \"bufferHours\": 1, \"bufferMegabytes\": 1", 1, 1),
+                                                                                             (", \"bufferHours\": 168, \"bufferMegabytes\": 10240", 168, 10240),
+                                                                                             (", \"BufferHours\": 48", 48, 100),
+                                                                                             (", \"BUFFERMEGABYTES\": 500", 24, 500)
+                                                                                         ];
+
+    /// <summary>
+    /// Invalid buffer keys as written after the mode, with the fixed problem text each reads as.
+    /// </summary>
+    private static readonly (string Keys, string Problem)[] _invalidBufferKeys = [
+                                                                                     (", \"bufferHours\": 24.0", BufferHoursInvalid),
+                                                                                     (", \"bufferHours\": 2.4e1", BufferHoursInvalid),
+                                                                                     (", \"bufferHours\": 24e0", BufferHoursInvalid),
+                                                                                     (", \"bufferHours\": \"24\"", BufferHoursInvalid),
+                                                                                     (", \"bufferHours\": null", BufferHoursInvalid),
+                                                                                     (", \"bufferHours\": true", BufferHoursInvalid),
+                                                                                     (", \"bufferHours\": 0", BufferHoursInvalid),
+                                                                                     (", \"bufferHours\": -0", BufferHoursInvalid),
+                                                                                     (", \"bufferHours\": -1", BufferHoursInvalid),
+                                                                                     (", \"bufferHours\": 169", BufferHoursInvalid),
+                                                                                     (", \"bufferHours\": 99999999999999999999", BufferHoursInvalid),
+                                                                                     (", \"bufferHours\": 24, \"BufferHours\": 24", BufferHoursTwice),
+                                                                                     (", \"bufferMegabytes\": 100.0", BufferMegabytesInvalid),
+                                                                                     (", \"bufferMegabytes\": 1e2", BufferMegabytesInvalid),
+                                                                                     (", \"bufferMegabytes\": \"100\"", BufferMegabytesInvalid),
+                                                                                     (", \"bufferMegabytes\": null", BufferMegabytesInvalid),
+                                                                                     (", \"bufferMegabytes\": 0", BufferMegabytesInvalid),
+                                                                                     (", \"bufferMegabytes\": -1", BufferMegabytesInvalid),
+                                                                                     (", \"bufferMegabytes\": 10241", BufferMegabytesInvalid),
+                                                                                     (", \"bufferMegabytes\": 100, \"BUFFERMEGABYTES\": 100", BufferMegabytesTwice)
+                                                                                 ];
 
     /// <summary>
     /// The temporary folder of the test, which holds the settings file.
@@ -90,6 +158,22 @@ public sealed class CompanionSettingsTests
     private readonly string _root = Path.Combine(Path.GetTempPath(), "censio-settings-" + Guid.NewGuid().ToString("N"));
 
     #endregion // Fields
+
+    #region Properties
+
+    /// <summary>
+    /// Gets every mode that switches live sending on combined with every valid buffer key: the settings before the keys,
+    /// the kind they read as, the keys, and the expected hours and megabytes.
+    /// </summary>
+    private static IEnumerable<object[]> ValidBufferLimitCases => _bufferModes.SelectMany(_ => _validBufferKeys, (mode, keys) => new object[] { mode.Settings, mode.Kind, keys.Keys, keys.Hours, keys.Megabytes });
+
+    /// <summary>
+    /// Gets every mode that switches live sending on combined with every invalid buffer key: the settings before the
+    /// keys, the keys, and the expected problem text.
+    /// </summary>
+    private static IEnumerable<object[]> InvalidBufferLimitCases => _bufferModes.SelectMany(_ => _invalidBufferKeys, (mode, keys) => new object[] { mode.Settings, keys.Keys, keys.Problem });
+
+    #endregion // Properties
 
     #region Methods
 
@@ -890,6 +974,63 @@ public sealed class CompanionSettingsTests
         Assert.Contains("Kind = Forward", text, "The text should name the forward kind");
         Assert.Contains("Forward = " + typeof(ForwardServerSetting).FullName, text, "The text should name the server setting by its type");
         Assert.DoesNotContain(ServerToken, text, "The text of the setting should never hold the token");
+    }
+
+    /// <summary>
+    /// In forward mode and in local mode with and without <c>localPort</c>, <c>bufferHours</c> and
+    /// <c>bufferMegabytes</c> from 1 to 168 and 1 to 10240, matched ignoring case, are the buffer limits, and a key left
+    /// out is 24 hours or 100 megabytes (S5, E1).
+    /// </summary>
+    /// <param name="mode">The settings before the buffer keys</param>
+    /// <param name="expectedKind">The expected kind of the setting</param>
+    /// <param name="keys">The buffer keys as written after the mode</param>
+    /// <param name="expectedHours">The expected age limit in hours</param>
+    /// <param name="expectedMegabytes">The expected size limit in megabytes</param>
+    [TestMethod]
+    [TestCategory("AC6")]
+    [DynamicData(nameof(ValidBufferLimitCases))]
+    public void CompanionSettingsReadLocalServerBufferLimits(string mode, LocalServerSettingKind expectedKind, string keys, int expectedHours, int expectedMegabytes)
+    {
+        // Arrange
+        var path = WriteSettings($"{{{mode}{keys}}}");
+        var expected = new LiveBufferLimits
+                       {
+                           Hours = expectedHours,
+                           Megabytes = expectedMegabytes
+                       };
+
+        // Act
+        var setting = CompanionSettings.ReadLocalServer(path);
+
+        // Assert
+        Assert.AreEqual(expectedKind, setting.Kind, $"The settings {mode}{keys} should switch live sending on");
+        Assert.IsNull(setting.Problem, "Valid buffer keys should carry no problem");
+        Assert.AreEqual(expected, setting.BufferLimits, $"The buffer limits of {keys} should be {expectedHours} hours and {expectedMegabytes} megabytes");
+    }
+
+    /// <summary>
+    /// In forward mode and in local mode with and without <c>localPort</c>, a <c>bufferHours</c> or
+    /// <c>bufferMegabytes</c> that is not an integer literal in its range, or that occurs twice in any case, makes the
+    /// server setting invalid with its fixed problem text (E1).
+    /// </summary>
+    /// <param name="mode">The settings before the buffer keys</param>
+    /// <param name="keys">The buffer keys as written after the mode</param>
+    /// <param name="expectedProblem">The expected problem text</param>
+    [TestMethod]
+    [TestCategory("AC6")]
+    [DynamicData(nameof(InvalidBufferLimitCases))]
+    public void CompanionSettingsReadLocalServerInvalidBufferLimitIsInvalid(string mode, string keys, string expectedProblem)
+    {
+        // Arrange
+        var path = WriteSettings($"{{{mode}{keys}}}");
+
+        // Act
+        var setting = CompanionSettings.ReadLocalServer(path);
+
+        // Assert
+        Assert.AreEqual(LocalServerSettingKind.Invalid, setting.Kind, $"The settings {mode}{keys} should be an invalid server setting");
+        Assert.AreEqual(expectedProblem, setting.Problem, "The problem should be the fixed text of the invalid buffer key");
+        Assert.IsNull(setting.Forward, "An invalid setting should carry no server setting");
     }
 
     /// <summary>

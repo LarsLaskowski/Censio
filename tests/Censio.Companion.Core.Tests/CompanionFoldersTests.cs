@@ -42,6 +42,23 @@ public sealed class CompanionFoldersTests
     }
 
     /// <summary>
+    /// The live buffer folder is the fixed folder Censio\Buffer below the local application data (N6).
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC8")]
+    public void CompanionFoldersBufferIsUnderCensio()
+    {
+        // Arrange
+        var data = Path.Combine(Path.GetTempPath(), "Local");
+
+        // Act
+        var folder = CompanionFolders.Buffer(data);
+
+        // Assert
+        Assert.AreEqual(Path.Combine(data, "Censio", "Buffer"), folder, "The buffer folder should be Censio\\Buffer below the local application data");
+    }
+
+    /// <summary>
     /// The settings file is Censio\settings.json below the local application data.
     /// </summary>
     [TestMethod]
