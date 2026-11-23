@@ -1,6 +1,6 @@
 # 0106: The buffer's limits are keys of the settings file, in whole hours and megabytes
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-23
 - **Area:** live-sending
 - **Source:** Issue #41

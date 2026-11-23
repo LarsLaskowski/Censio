@@ -1,6 +1,6 @@
 # 0105: Unsent live messages are kept one file each in a fixed buffer folder
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-23
 - **Area:** live-sending
 - **Source:** Issue #41
