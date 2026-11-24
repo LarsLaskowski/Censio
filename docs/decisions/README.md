@@ -170,5 +170,5 @@ once in the [area document](../areas/README.md) of the record's area, and the re
 | [0106](0106-buffer-limits-are-settings-keys-in-hours-and-megabytes.md) | The buffer's limits are keys of the settings file, in whole hours and megabytes | Accepted | 2026-11-23 |
 | [0107](0107-catalog-uploaded-first-on-each-live-connection-deferred-after-a-failure.md) | The catalog is uploaded first on each live connection, deferred after a failed upload and given up after three | Accepted | 2026-11-24 |
 | [0108](0108-companion-reads-a-larger-reply-only-for-a-catalog-acknowledgement.md) | The Companion reads a larger reply only for the acknowledgement of a catalog upload | Accepted | 2026-11-24 |
-| [0109](0109-a-stored-icon-tells-a-notice-of-its-own-that-reads-no-trends.md) | A stored icon tells a notice of its own, which re-renders the pages without reading their trends | Proposed | 2026-11-24 |
+| [0109](0109-a-stored-icon-tells-a-notice-of-its-own-that-reads-no-trends.md) | A stored icon tells a notice of its own, which re-renders the pages without reading their trends | Accepted | 2026-11-24 |
 <!-- project:end index -->

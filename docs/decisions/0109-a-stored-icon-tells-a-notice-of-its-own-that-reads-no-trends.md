@@ -1,6 +1,6 @@
 # 0109: A stored icon tells a notice of its own, which re-renders the pages without reading their trends
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-24
 - **Area:** web-pages
 - **Source:** Issue #247
