@@ -39,6 +39,12 @@ public sealed class ScriptedIngestServer : IAsyncDisposable
     private readonly WebSocket _server;
 
     /// <summary>
+    /// The lock that lets one message at a time be written to the server's socket, as the test and its serving loop may both
+    /// acknowledge.
+    /// </summary>
+    private readonly SemaphoreSlim _sendLock = new(1, 1);
+
+    /// <summary>
     /// Whether the client sent a close frame.
     /// </summary>
     private volatile bool _isClosedByClient;
@@ -117,6 +123,8 @@ public sealed class ScriptedIngestServer : IAsyncDisposable
                    ContractSessionStart start => start.Id,
                    ContractSessionEnd end => end.Id,
                    ContractTradeRoutes routes => routes.Id,
+                   ContractCatalogUpload upload => upload.Id,
+                   ContractIconImage icon => icon.Id,
                    _ => Guid.Empty
                };
     }
@@ -129,12 +137,24 @@ public sealed class ScriptedIngestServer : IAsyncDisposable
     /// <returns>The acknowledgement</returns>
     public static ContractAcknowledgement CreateAcknowledgement(Guid id, ContractAcknowledgementRefusal? refusal)
     {
+        return CreateAcknowledgement(id, refusal, []);
+    }
+
+    /// <summary>
+    /// Creates an acknowledgement that lists the icons the server still misses.
+    /// </summary>
+    /// <param name="id">The identity of the acknowledged message</param>
+    /// <param name="refusal">The refusal, or <c>null</c> for an accepted message</param>
+    /// <param name="missingIcons">The references of the missing icons, in the order the server lists them</param>
+    /// <returns>The acknowledgement</returns>
+    public static ContractAcknowledgement CreateAcknowledgement(Guid id, ContractAcknowledgementRefusal? refusal, IReadOnlyList<string> missingIcons)
+    {
         return new ContractAcknowledgement
                {
                    Id = id,
                    Refusal = refusal,
                    RefusedVersion = null,
-                   MissingIcons = []
+                   MissingIcons = missingIcons
                };
     }
 
@@ -204,14 +224,25 @@ public sealed class ScriptedIngestServer : IAsyncDisposable
     /// </summary>
     /// <param name="cancellationToken">The cancellation token</param>
     /// <returns>The message received first, which should be the hello</returns>
-    public async Task<ContractMessage?> AcceptHelloAsync(CancellationToken cancellationToken)
+    public Task<ContractMessage?> AcceptHelloAsync(CancellationToken cancellationToken)
+    {
+        return AcceptHelloAsync(null, cancellationToken);
+    }
+
+    /// <summary>
+    /// Receives the hello and accepts it, naming the identity of the catalog the server holds.
+    /// </summary>
+    /// <param name="catalogIdentity">The identity the reply names, or <c>null</c> when the server holds no complete catalog</param>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>The message received first, which should be the hello</returns>
+    public async Task<ContractMessage?> AcceptHelloAsync(string? catalogIdentity, CancellationToken cancellationToken)
     {
         var hello = await ReceiveAsync(cancellationToken).ConfigureAwait(false);
 
         await SendAsync(new ContractHelloAccepted
                         {
                             ServerVersion = ServerVersion,
-                            CatalogIdentity = null
+                            CatalogIdentity = catalogIdentity
                         },
                         cancellationToken).ConfigureAwait(false);
 
@@ -276,6 +307,19 @@ public sealed class ScriptedIngestServer : IAsyncDisposable
     }
 
     /// <summary>
+    /// Acknowledges a message and lists the icons the server still misses.
+    /// </summary>
+    /// <param name="message">The message</param>
+    /// <param name="refusal">The refusal, or <c>null</c> for an accepted message</param>
+    /// <param name="missingIcons">The references of the missing icons, in the order the server lists them</param>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>A task that completes when the acknowledgement is sent</returns>
+    public Task AcknowledgeAsync(ContractMessage? message, ContractAcknowledgementRefusal? refusal, IReadOnlyList<string> missingIcons, CancellationToken cancellationToken)
+    {
+        return SendAsync(CreateAcknowledgement(IdOf(message), refusal, missingIcons), cancellationToken);
+    }
+
+    /// <summary>
     /// Sends a message as the contract writer writes it.
     /// </summary>
     /// <param name="message">The message</param>
@@ -295,7 +339,16 @@ public sealed class ScriptedIngestServer : IAsyncDisposable
     /// <returns>A task that completes when the message is sent</returns>
     public async Task SendRawAsync(byte[] data, WebSocketMessageType messageType, CancellationToken cancellationToken)
     {
-        await _server.SendAsync(data, messageType, true, cancellationToken).ConfigureAwait(false);
+        await _sendLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+
+        try
+        {
+            await _server.SendAsync(data, messageType, true, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _sendLock.Release();
+        }
     }
 
     /// <summary>
@@ -350,6 +403,7 @@ public sealed class ScriptedIngestServer : IAsyncDisposable
         ClientSocket.Dispose();
         _serverStream.Dispose();
         _clientStream.Dispose();
+        _sendLock.Dispose();
 
         return ValueTask.CompletedTask;
     }
