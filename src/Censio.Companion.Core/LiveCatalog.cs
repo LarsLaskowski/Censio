@@ -1,3 +1,4 @@
+using Censio.Contracts;
 using Censio.GameData;
 
 namespace Censio.Companion.Core;
@@ -8,8 +9,6 @@ namespace Censio.Companion.Core;
 public sealed class LiveCatalog
 {
     #region Fields
-
-#pragma warning disable S4487 // Skeleton: removed with the implementation
 
     /// <summary>
     /// The catalog.
@@ -26,7 +25,10 @@ public sealed class LiveCatalog
     /// </summary>
     private readonly string? _build;
 
-#pragma warning restore S4487
+    /// <summary>
+    /// The icons by their reference.
+    /// </summary>
+    private readonly Dictionary<string, GameIcon> _iconsByReference;
 
     #endregion // Fields
 
@@ -38,11 +40,15 @@ public sealed class LiveCatalog
     /// <param name="catalog">The catalog</param>
     /// <param name="icons">The icons, or <c>null</c> when there are none</param>
     /// <param name="build">The game build, or <c>null</c> when unknown</param>
-    private LiveCatalog(GameCatalog catalog, GameIconSet? icons, string? build)
+    /// <param name="identity">The identity of the catalog document, or <c>null</c> when the contract writer refused it</param>
+    /// <param name="iconsByReference">The icons by their reference</param>
+    private LiveCatalog(GameCatalog catalog, GameIconSet? icons, string? build, string? identity, Dictionary<string, GameIcon> iconsByReference)
     {
         _catalog = catalog;
         _icons = icons;
         _build = build;
+        Identity = identity;
+        _iconsByReference = iconsByReference;
     }
 
     #endregion // Constructor
@@ -65,23 +71,54 @@ public sealed class LiveCatalog
     /// <param name="icons">The icons, or <c>null</c> when there are none</param>
     /// <param name="build">The game build, or <c>null</c> when unknown</param>
     /// <returns>The catalog state</returns>
-#pragma warning disable RH2003 // Skeleton: removed with the implementation
     public static LiveCatalog Create(GameCatalog catalog, GameIconSet? icons, string? build)
     {
-        _ = new LiveCatalog(catalog, icons, build);
+        var iconsByReference = new Dictionary<string, GameIcon>();
 
-        throw new NotImplementedException();
+        if (icons is not null)
+        {
+            foreach (var icon in icons.Icons.Values.Distinct())
+            {
+                iconsByReference[GameCatalogDocumentConverter.ToIconReference(icon)] = icon;
+            }
+        }
+
+        var written = WriteDocument(catalog, icons, build);
+        string? identity = null;
+
+        if (written.Error is null)
+        {
+            identity = new ContractCatalogUpload
+                       {
+                           Id = Guid.Empty,
+                           Document = written.Utf8Json
+                       }.ComputeIdentity();
+        }
+
+        return new LiveCatalog(catalog, icons, build, identity, iconsByReference);
     }
-#pragma warning restore RH2003
 
     /// <summary>
     /// Writes the catalog upload message.
     /// </summary>
     /// <returns>The written message, or <c>null</c> when the contract writer refused it</returns>
-#pragma warning disable S2325, RH2003 // Skeleton: removed with the implementation
     public LiveCatalogMessage? WriteUpload()
     {
-        throw new NotImplementedException();
+        var document = WriteDocument(_catalog, _icons, _build);
+
+        if (document.Error is not null)
+        {
+            return null;
+        }
+
+        var id = Guid.NewGuid();
+        var written = ContractWriter.Write(new ContractCatalogUpload
+                                           {
+                                               Id = id,
+                                               Document = document.Utf8Json
+                                           });
+
+        return ToMessage(id, written);
     }
 
     /// <summary>
@@ -91,9 +128,50 @@ public sealed class LiveCatalog
     /// <returns>The written message, or <c>null</c> for an unknown reference or a refusal of the contract writer</returns>
     public LiveCatalogMessage? WriteIcon(string reference)
     {
-        throw new NotImplementedException();
+        if (_iconsByReference.TryGetValue(reference, out var icon) == false)
+        {
+            return null;
+        }
+
+        var id = Guid.NewGuid();
+        var written = ContractWriter.Write(new ContractIconImage
+                                           {
+                                               Id = id,
+                                               Reference = reference,
+                                               Png = icon.Png
+                                           });
+
+        return ToMessage(id, written);
     }
-#pragma warning restore S2325, RH2003
+
+    /// <summary>
+    /// Converts the catalog and writes its document.
+    /// </summary>
+    /// <param name="catalog">The catalog</param>
+    /// <param name="icons">The icons, or <c>null</c> when there are none</param>
+    /// <param name="build">The game build, or <c>null</c> when unknown</param>
+    /// <returns>The result of the document writer</returns>
+    private static CatalogDocumentWriteResult WriteDocument(GameCatalog catalog, GameIconSet? icons, string? build)
+    {
+        return CatalogDocumentWriter.Write(GameCatalogDocumentConverter.ToDocument(catalog, icons, build));
+    }
+
+    /// <summary>
+    /// Turns the result of the contract writer into a message.
+    /// </summary>
+    /// <param name="id">The id of the message</param>
+    /// <param name="written">The result of the contract writer</param>
+    /// <returns>The message, or <c>null</c> when the writer refused it</returns>
+    private static LiveCatalogMessage? ToMessage(Guid id, ContractWriteResult written)
+    {
+        return written.Error is null
+                   ? new LiveCatalogMessage
+                     {
+                         Id = id,
+                         Utf8Json = written.Utf8Json
+                     }
+                   : null;
+    }
 
     #endregion // Methods
 }

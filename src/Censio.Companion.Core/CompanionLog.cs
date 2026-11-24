@@ -475,8 +475,8 @@ public static partial class CompanionLog
     /// Logs that the catalog was sent to the server.
     /// </summary>
     /// <param name="logger">The logger</param>
-    /// <param name="iconCount">The number of icons sent</param>
-    /// <param name="refusedCount">The number of icons the server refused</param>
+    /// <param name="iconCount">The number of icons the server accepted</param>
+    /// <param name="refusedCount">The number of icons refused by the server or the contract writer</param>
     [LoggerMessage(Level = LogLevel.Information, Message = "Catalog sent to the server: {IconCount} icons sent, {RefusedCount} refused")]
     public static partial void CatalogSentToServer(ILogger logger, int iconCount, int refusedCount);
 

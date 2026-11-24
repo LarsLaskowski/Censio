@@ -99,6 +99,41 @@ public sealed class LiveSender : IAsyncDisposable
     /// </summary>
     private bool _isDisposed;
 
+    /// <summary>
+    /// The identity of the catalog the server holds on the current connection; only the run reads and writes it.
+    /// </summary>
+    private string? _serverIdentity;
+
+    /// <summary>
+    /// The catalog the current connection needs no more step for; only the run reads and writes it.
+    /// </summary>
+    private LiveCatalog? _settledCatalog;
+
+    /// <summary>
+    /// The catalog that is offered to the server, or <see langword="null" /> when there is none.
+    /// </summary>
+    private LiveCatalog? _catalog;
+
+    /// <summary>
+    /// Whether the offered catalog is not uploaded again in this run.
+    /// </summary>
+    private bool _isCatalogClosed;
+
+    /// <summary>
+    /// Whether the offered catalog waits for the messages that wait at the next hello, after a connection failed during its upload.
+    /// </summary>
+    private bool _isCatalogDeferred;
+
+    /// <summary>
+    /// The number of connections that failed during the upload of the offered catalog.
+    /// </summary>
+    private int _catalogFailures;
+
+    /// <summary>
+    /// The completion that the next change of the offered catalog sets.
+    /// </summary>
+    private TaskCompletionSource _catalogChanged = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
     #endregion // Fields
 
     #region Constructor
@@ -251,12 +286,25 @@ public sealed class LiveSender : IAsyncDisposable
     /// <param name="catalog">The published catalog, or <c>null</c> if none is built</param>
     /// <param name="icons">The published icons, or <c>null</c> if none are built</param>
     /// <param name="build">The build of the published catalog, or <c>null</c> when unknown</param>
-#pragma warning disable S2325, RH2003 // Skeleton: removed with the implementation
     public void SetCatalog(GameCatalogStatus status, GameCatalog? catalog, GameIconSet? icons, string? build)
     {
-        throw new NotImplementedException();
+        switch (status.Kind)
+        {
+            case GameCatalogStatusKind.Ready or GameCatalogStatusKind.NotCached or GameCatalogStatusKind.IconsFailed when catalog is not null:
+                {
+                    OfferCatalog(LiveCatalog.Create(catalog, icons, build));
+                }
+
+                break;
+
+            case GameCatalogStatusKind.NoGame or GameCatalogStatusKind.Failed:
+                {
+                    OfferCatalog(null);
+                }
+
+                break;
+        }
     }
-#pragma warning restore S2325, RH2003
 
     /// <summary>
     /// Puts an item of the pipe connection into the buffer for sending; it never waits.
@@ -373,6 +421,118 @@ public sealed class LiveSender : IAsyncDisposable
     private static string Reason(ReplaySendProblemKind problem)
     {
         return TrayMenu.FormatReplaySendReason(problem) ?? problem.ToString();
+    }
+
+    /// <summary>
+    /// Replaces the offered catalog, unless the new one has the identity of the current one, and wakes the send loop.
+    /// </summary>
+    /// <param name="created">The new catalog, or <see langword="null" /> to clear it</param>
+    private void OfferCatalog(LiveCatalog? created)
+    {
+        TaskCompletionSource changed;
+
+        lock (_lock)
+        {
+            if (_isDisposed || (created?.Identity is not null && _catalog?.Identity == created.Identity))
+            {
+                return;
+            }
+
+            _catalog = created;
+            _isCatalogClosed = created is not null && created.Identity is null;
+            _isCatalogDeferred = false;
+            _catalogFailures = 0;
+            changed = _catalogChanged;
+            _catalogChanged = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        }
+
+        if (created is not null && created.Identity is null)
+        {
+            CompanionLog.CatalogUploadNotWritten(_logger);
+        }
+
+        changed.TrySetResult();
+    }
+
+    /// <summary>
+    /// Reads the catalog that is due for an upload and the completion of its next change.
+    /// </summary>
+    /// <returns>The catalog, or <see langword="null" /> when there is none or it is closed; whether it is deferred; the completion</returns>
+    private (LiveCatalog? Catalog, bool IsDeferred, Task Changed) GetCatalogView()
+    {
+        lock (_lock)
+        {
+            return (_isCatalogClosed ? null : _catalog, _isCatalogDeferred, _catalogChanged.Task);
+        }
+    }
+
+    /// <summary>
+    /// Checks whether the catalog is the one offered now.
+    /// </summary>
+    /// <param name="live">The catalog</param>
+    /// <returns><see langword="true" /> when it is</returns>
+    private bool IsCurrentCatalog(LiveCatalog live)
+    {
+        lock (_lock)
+        {
+            return ReferenceEquals(_catalog, live);
+        }
+    }
+
+    /// <summary>
+    /// Closes a catalog so that it is not uploaded again in this run, when it is the one offered now.
+    /// </summary>
+    /// <param name="live">The catalog</param>
+    private void CloseCatalog(LiveCatalog live)
+    {
+        lock (_lock)
+        {
+            if (ReferenceEquals(_catalog, live))
+            {
+                _isCatalogClosed = true;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Counts a connection that failed during the upload of a catalog and defers the catalog; the third one closes it.
+    /// </summary>
+    /// <param name="live">The catalog</param>
+    private void CountCatalogFailure(LiveCatalog live)
+    {
+        var isAbandoned = false;
+
+        lock (_lock)
+        {
+            if (ReferenceEquals(_catalog, live))
+            {
+                _catalogFailures++;
+                _isCatalogDeferred = true;
+                isAbandoned = _catalogFailures >= MaxCatalogAttempts;
+                _isCatalogClosed |= isAbandoned;
+            }
+        }
+
+        if (isAbandoned)
+        {
+            CompanionLog.CatalogUploadAbandoned(_logger, MaxCatalogAttempts);
+        }
+    }
+
+    /// <summary>
+    /// Ends the count of failures and the deferral of a catalog whose upload completed, when it is the one offered now.
+    /// </summary>
+    /// <param name="live">The catalog</param>
+    private void CompleteCatalog(LiveCatalog live)
+    {
+        lock (_lock)
+        {
+            if (ReferenceEquals(_catalog, live))
+            {
+                _catalogFailures = 0;
+                _isCatalogDeferred = false;
+            }
+        }
     }
 
     /// <summary>
@@ -600,7 +760,7 @@ public sealed class LiveSender : IAsyncDisposable
     }
 
     /// <summary>
-    /// Sends the waiting messages one at a time until the connection fails.
+    /// Uploads the catalog when it is due and sends the waiting messages one at a time until the connection fails.
     /// </summary>
     /// <param name="client">The client of the accepted connection</param>
     /// <param name="failed">The completion that the failure of the client sets</param>
@@ -608,6 +768,12 @@ public sealed class LiveSender : IAsyncDisposable
     /// <returns>The problem that ended the connection</returns>
     private async Task<ReplaySendProblemKind> SendLoopAsync(IngestClient client, TaskCompletionSource<ReplaySendProblemKind> failed, CancellationToken cancellationToken)
     {
+        var waitingAtHello = _buffer.Status.Waiting;
+        var acknowledged = 0;
+
+        _serverIdentity = client.ServerCatalogIdentity;
+        _settledCatalog = null;
+
         while (true)
         {
             if (failed.Task.IsCompleted)
@@ -615,44 +781,222 @@ public sealed class LiveSender : IAsyncDisposable
                 return failed.Task.Result;
             }
 
-            var next = await NextOrFailureAsync(failed, cancellationToken).ConfigureAwait(false);
+            var view = GetCatalogView();
+            var step = await UploadDueCatalogAsync(client, view, acknowledged >= waitingAtHello, cancellationToken).ConfigureAwait(false);
+
+            if (step.Problem is { } problem)
+            {
+                return problem;
+            }
+
+            if (step.IsUploaded)
+            {
+                continue;
+            }
+
+            var next = await NextOrFailureAsync(failed, view.Changed, cancellationToken).ConfigureAwait(false);
 
             if (next is null)
             {
-                return failed.Task.Result;
+                continue;
             }
 
-            var acknowledgement = await client.SendAsync(next.Utf8Json, next.Id, cancellationToken).ConfigureAwait(false);
-
-            if (acknowledgement is null)
+            if (await SendBufferedAsync(client, next, cancellationToken).ConfigureAwait(false) is { } sendProblem)
             {
-                return client.Failure ?? ReplaySendProblemKind.ConnectionLost;
+                return sendProblem;
             }
 
-            _buffer.Acknowledge(next.Id);
-
-            if (acknowledgement.Refusal is { } refusal)
-            {
-                CompanionLog.LiveMessageRefused(_logger, refusal);
-            }
-
-            LogDropped();
+            acknowledged++;
         }
     }
 
     /// <summary>
-    /// Waits for the next message of the buffer or the failure of the connection.
+    /// Skips the catalog when the server holds it, or uploads it when it is due.
+    /// </summary>
+    /// <param name="client">The client of the accepted connection</param>
+    /// <param name="view">The catalog that is offered</param>
+    /// <param name="isDeferralOver">Whether the messages that waited at the hello are acknowledged</param>
+    /// <param name="cancellationToken">The token that ends the run</param>
+    /// <returns>The problem that ended the connection, and whether an upload was made</returns>
+    private async Task<(ReplaySendProblemKind? Problem, bool IsUploaded)> UploadDueCatalogAsync(IngestClient client, (LiveCatalog? Catalog, bool IsDeferred, Task Changed) view, bool isDeferralOver, CancellationToken cancellationToken)
+    {
+        if (view.Catalog is not { } live || ReferenceEquals(live, _settledCatalog))
+        {
+            return (null, false);
+        }
+
+        if (live.Identity == _serverIdentity)
+        {
+            CompanionLog.CatalogAlreadyOnServer(_logger);
+            _settledCatalog = live;
+
+            return (null, false);
+        }
+
+        if (view.IsDeferred && isDeferralOver == false && _buffer.Status.Waiting > 0)
+        {
+            return (null, false);
+        }
+
+        var upload = await UploadCatalogAsync(client, live, cancellationToken).ConfigureAwait(false);
+
+        if (upload.Identity is not null)
+        {
+            _serverIdentity = upload.Identity;
+            _settledCatalog = live;
+        }
+
+        return (upload.Problem, true);
+    }
+
+    /// <summary>
+    /// Sends a message of the buffer and waits for its acknowledgement.
+    /// </summary>
+    /// <param name="client">The client of the accepted connection</param>
+    /// <param name="next">The message</param>
+    /// <param name="cancellationToken">The token that ends the run</param>
+    /// <returns>The problem that ended the connection, or <see langword="null" /> when the message was acknowledged</returns>
+    private async Task<ReplaySendProblemKind?> SendBufferedAsync(IngestClient client, LiveBufferEntry next, CancellationToken cancellationToken)
+    {
+        var acknowledgement = await client.SendAsync(next.Utf8Json, next.Id, cancellationToken).ConfigureAwait(false);
+
+        if (acknowledgement is null)
+        {
+            return client.Failure ?? ReplaySendProblemKind.ConnectionLost;
+        }
+
+        _buffer.Acknowledge(next.Id);
+
+        if (acknowledgement.Refusal is { } refusal)
+        {
+            CompanionLog.LiveMessageRefused(_logger, refusal);
+        }
+
+        LogDropped();
+
+        return null;
+    }
+
+    /// <summary>
+    /// Uploads a catalog and the icons its acknowledgement lists, one message at a time.
+    /// </summary>
+    /// <param name="client">The client of the accepted connection</param>
+    /// <param name="live">The catalog</param>
+    /// <param name="cancellationToken">The token that ends the run</param>
+    /// <returns>The problem that ended the connection, or the identity the server holds now, or neither when the upload was refused</returns>
+    private async Task<(ReplaySendProblemKind? Problem, string? Identity)> UploadCatalogAsync(IngestClient client, LiveCatalog live, CancellationToken cancellationToken)
+    {
+        var sent = await SendCatalogAsync(client, live, cancellationToken).ConfigureAwait(false);
+
+        if (sent.IsWritten == false)
+        {
+            return (null, null);
+        }
+
+        if (sent.Acknowledgement is not { } acknowledgement)
+        {
+            return (CatalogFailure(client, live), null);
+        }
+
+        if (acknowledgement.Refusal is { } refusal)
+        {
+            CompanionLog.CatalogRefusedByServer(_logger, refusal);
+            CloseCatalog(live);
+
+            return (null, null);
+        }
+
+        var accepted = 0;
+        var refused = 0;
+
+        foreach (var reference in acknowledgement.MissingIcons)
+        {
+            if (IsCurrentCatalog(live) == false)
+            {
+                return (null, live.Identity);
+            }
+
+            var icon = live.WriteIcon(reference);
+
+            if (icon is null)
+            {
+                refused++;
+
+                continue;
+            }
+
+            var iconAcknowledgement = await client.SendAsync(icon.Value.Utf8Json, icon.Value.Id, cancellationToken).ConfigureAwait(false);
+
+            if (iconAcknowledgement is null)
+            {
+                return (CatalogFailure(client, live), null);
+            }
+
+            if (iconAcknowledgement.Refusal is null)
+            {
+                accepted++;
+            }
+            else
+            {
+                refused++;
+            }
+        }
+
+        CompanionLog.CatalogSentToServer(_logger, accepted, refused);
+        CompleteCatalog(live);
+
+        return (null, live.Identity);
+    }
+
+    /// <summary>
+    /// Writes the catalog upload and sends it, so that nothing of the written message outlives its acknowledgement.
+    /// </summary>
+    /// <param name="client">The client of the accepted connection</param>
+    /// <param name="live">The catalog</param>
+    /// <param name="cancellationToken">The token that ends the run</param>
+    /// <returns>Whether the upload was written, and its acknowledgement, which is <see langword="null" /> when the connection failed</returns>
+    private async Task<(bool IsWritten, ContractAcknowledgement? Acknowledgement)> SendCatalogAsync(IngestClient client, LiveCatalog live, CancellationToken cancellationToken)
+    {
+        var upload = live.WriteUpload();
+
+        if (upload is null)
+        {
+            CloseCatalog(live);
+            CompanionLog.CatalogUploadNotWritten(_logger);
+
+            return (false, null);
+        }
+
+        return (true, await client.SendCatalogUploadAsync(upload.Value.Utf8Json, upload.Value.Id, cancellationToken).ConfigureAwait(false));
+    }
+
+    /// <summary>
+    /// Counts the failure of a connection during the upload of a catalog and gives its problem.
+    /// </summary>
+    /// <param name="client">The client of the connection</param>
+    /// <param name="live">The catalog</param>
+    /// <returns>The problem</returns>
+    private ReplaySendProblemKind CatalogFailure(IngestClient client, LiveCatalog live)
+    {
+        CountCatalogFailure(live);
+
+        return client.Failure ?? ReplaySendProblemKind.ConnectionLost;
+    }
+
+    /// <summary>
+    /// Waits for the next message of the buffer, the failure of the connection or a change of the offered catalog.
     /// </summary>
     /// <param name="failed">The completion that the failure of the client sets</param>
+    /// <param name="changed">The completion that the next change of the offered catalog sets</param>
     /// <param name="cancellationToken">The token that ends the run</param>
-    /// <returns>The message, or <see langword="null" /> when the connection failed first</returns>
-    private async Task<LiveBufferEntry?> NextOrFailureAsync(TaskCompletionSource<ReplaySendProblemKind> failed, CancellationToken cancellationToken)
+    /// <returns>The message, or <see langword="null" /> when the connection failed or the catalog changed first</returns>
+    private async Task<LiveBufferEntry?> NextOrFailureAsync(TaskCompletionSource<ReplaySendProblemKind> failed, Task changed, CancellationToken cancellationToken)
     {
         using var waitCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
         var next = _buffer.NextAsync(waitCancellation.Token);
 
-        await Task.WhenAny(next, failed.Task).ConfigureAwait(false);
+        await Task.WhenAny(next, failed.Task, changed).ConfigureAwait(false);
 
         if (next.IsCompletedSuccessfully)
         {
@@ -667,7 +1011,7 @@ public sealed class LiveSender : IAsyncDisposable
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested == false)
         {
-            // The wait ended because the connection failed.
+            // The wait ended because the connection failed or the catalog changed.
         }
 
         _buffer.ReleaseInFlight();

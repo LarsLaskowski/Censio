@@ -341,8 +341,30 @@ public sealed partial class App : Application, IDisposable
         _liveSender = sender;
         _liveBuffer = buffer;
 
+        OfferCatalog(sender);
+
         Run(buffer.RunAsync);
         Run(sender.RunAsync);
+    }
+
+    /// <summary>
+    /// Offers the catalog of the loader to the live sender: on every status of the loader, and once for a catalog that was
+    /// ready before the sender existed. The status is read before the catalog, the icons and the build, since the loader
+    /// publishes every final status after its values.
+    /// </summary>
+    /// <param name="sender">The live sender</param>
+    private void OfferCatalog(LiveSender sender)
+    {
+        if (_catalogLoader is not { } loader)
+        {
+            return;
+        }
+
+        loader.StatusChanged += (_, status) => sender.SetCatalog(status, loader.Catalog, loader.Icons, loader.Build);
+
+        var current = loader.Status;
+
+        sender.SetCatalog(current, loader.Catalog, loader.Icons, loader.Build);
     }
 
     /// <summary>

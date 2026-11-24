@@ -70,6 +70,11 @@ public sealed class GameCatalogLoader
     private volatile GameInstallationStatus? _lastInstallation;
 
     /// <summary>
+    /// The build of the published catalog, set together with it, or <c>null</c> when none is published or the build is unknown.
+    /// </summary>
+    private volatile string? _catalogBuild;
+
+    /// <summary>
     /// Whether a start run or a check is running: 1 from construction until the start run ends, and during each later check.
     /// </summary>
     private int _isBusy = 1;
@@ -143,9 +148,7 @@ public sealed class GameCatalogLoader
     /// <summary>
     /// Gets the build of the published catalog, or <c>null</c> if none is published or the build is unknown.
     /// </summary>
-#pragma warning disable S2325, CA1822 // Skeleton: removed with the implementation
-    public string? Build => null;
-#pragma warning restore S2325, CA1822
+    public string? Build => _catalogBuild;
 
     #endregion // Properties
 
@@ -328,6 +331,7 @@ public sealed class GameCatalogLoader
                          EntryCount = catalog.Count
                      };
 
+        _catalogBuild = _lastInstallation?.Build;
         _catalog = catalog;
         CatalogChanged?.Invoke(this, catalog);
         _icons = icons;
@@ -384,6 +388,8 @@ public sealed class GameCatalogLoader
         {
             CompanionLog.CatalogArchivesUnchecked(_logger, result.UncheckedArchiveCount);
         }
+
+        _catalogBuild = _lastInstallation?.Build;
 
         Publish(new GameCatalogStatus
                 {
@@ -492,6 +498,11 @@ public sealed class GameCatalogLoader
         if (clearIcons)
         {
             _icons = null;
+        }
+
+        if (catalog is null)
+        {
+            _catalogBuild = null;
         }
 
         _catalog = catalog;
