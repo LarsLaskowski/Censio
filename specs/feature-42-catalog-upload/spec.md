@@ -1,7 +1,7 @@
 # Spec: Catalog upload on connect and after re-extraction
 
 Source: Issue #42
-Status: Draft
+Status: Approved by Lead
 
 ## Problem
 
@@ -180,8 +180,8 @@ catalog document's bytes, which the server names the same way ([`contract.md`](.
 - `docs/areas/live-sending.md`: a new section *Catalog* (sending, skip, order, deferral, refusals, not buffered);
   *What is sent*, *Privacy*, *Log* and *Not here* follow. The plan measures it against `AREA_MAX_WORDS` and splits if
   needed.
-- `docs/areas/companion-log.md`: the five lines. `replay-sending.md`: the reply bound's exception, if the shared rule
-  lives there.
+- `docs/areas/companion-log.md`: the five lines. The reply bound's exception lives in
+  `live-sending.md`, *Limits and errors* (a replay never uploads).
 - The "(#42)" and "not yet" pointers of `local-mode.md`, `game-catalog-format.md` (also its *Scope*),
   `game-catalog-cache.md`, `contract.md`, `ingest.md` and `docs/ARCHITECTURE.md` name live sending.
 
