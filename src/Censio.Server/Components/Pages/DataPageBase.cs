@@ -208,12 +208,12 @@ public abstract class DataPageBase : ComponentBase, IDisposable
     /// Checks that a read of a ready view reads the details.
     /// </summary>
     /// <param name="readsDetails"><see langword="true" /> when the read reads them whatever the shown view</param>
-    /// <param name="shownAsOf">The latest tick of the view shown before the read, or <see langword="null" /> for none</param>
+    /// <param name="shownAsOf">The latest tick of the view shown before the read, or <see langword="null" /> for none, which counts as different from any tick</param>
     /// <param name="ready">The view the read shows</param>
     /// <returns><see langword="true" /> when the details are read</returns>
     private static bool IsDetailsRead(bool readsDetails, DateTimeOffset? shownAsOf, ProfileView ready)
     {
-        return readsDetails || shownAsOf is null || ready.AsOf != shownAsOf;
+        return readsDetails || ready.AsOf != shownAsOf;
     }
 
     /// <summary>
