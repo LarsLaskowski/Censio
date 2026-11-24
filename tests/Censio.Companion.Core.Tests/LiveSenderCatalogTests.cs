@@ -697,7 +697,7 @@ public sealed class LiveSenderCatalogTests : IDisposable
 
         Assert.AreSequenceEqual(Expected("hello", "catalog A", "icon A1", "icon A2", "icon A3", "tick 1"), Labels(served.Received), "The icon after a refused one should follow");
         Assert.HasCount(1, sentLines, "The upload should be logged once");
-        Assert.EndsWith(", 1 refused", sentLines[0], "The line should count the refused icon");
+        Assert.AreEqual("Catalog sent to the server: 2 icons sent, 1 refused", sentLines[0], "The line should count the accepted and the refused icons");
         Assert.IsEmpty(Lines().Where(line => line.StartsWith("Server refused", StringComparison.Ordinal)).ToList(), "No line should be logged per icon");
     }
 

@@ -1373,13 +1373,15 @@ public sealed class GameCatalogLoaderTests
         await Check(rig, "3");
 
         var afterFailure = rig.Loader.Build;
+        var catalogAfterFailure = rig.Loader.Catalog;
 
         // Assert
         Assert.IsNull(beforeRun, "Without a published catalog the build should be unknown");
         Assert.AreEqual("1", afterRun, "The extracted catalog should carry the build of the installation");
         Assert.AreEqual("1", buildDuringNames, "While the names of a changed game are extracted the old catalog and its build should stay");
         Assert.AreEqual("2", afterReextraction, "The re-extracted catalog should carry the new build");
-        Assert.AreNotEqual("3", afterFailure, "A failed extraction should not publish the build of its check");
+        Assert.IsNull(afterFailure, "A failed extraction should leave no build");
+        Assert.IsNull(catalogAfterFailure, "A failed extraction should leave no catalog");
     }
 
     /// <summary>
