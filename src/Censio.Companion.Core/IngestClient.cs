@@ -16,6 +16,11 @@ public sealed class IngestClient : IAsyncDisposable
     /// </summary>
     public const int MaxReplyBytes = 65536;
 
+    /// <summary>
+    /// The largest size of the acknowledgement of a catalog upload in bytes.
+    /// </summary>
+    public const int MaxCatalogReplyBytes = 1179648;
+
     #endregion // Constants
 
     #region Fields
@@ -86,6 +91,11 @@ public sealed class IngestClient : IAsyncDisposable
     private ReplaySendProblemKind? _failure;
 
     /// <summary>
+    /// Whether the acknowledgement that is awaited is the one of a catalog upload; set and cleared with <see cref="_awaited" />.
+    /// </summary>
+    private bool _isCatalogAwaited;
+
+    /// <summary>
     /// Whether the client closes the connection.
     /// </summary>
     private bool _isClosing;
@@ -132,6 +142,11 @@ public sealed class IngestClient : IAsyncDisposable
     /// Gets the problem that ended the connection, or <see langword="null" /> when it did not fail.
     /// </summary>
     public ReplaySendProblemKind? Failure => GetFailure();
+
+    /// <summary>
+    /// Gets the identity of the catalog the server holds, as its hello reply named it, or <see langword="null" />.
+    /// </summary>
+    public string? ServerCatalogIdentity { get; private set; }
 
     #endregion // Properties
 
@@ -184,43 +199,27 @@ public sealed class IngestClient : IAsyncDisposable
     }
 
     /// <summary>
+    /// Sends a catalog upload and waits for its acknowledgement, which may be larger than other replies.
+    /// </summary>
+    /// <param name="utf8Json">The bytes of the message</param>
+    /// <param name="id">The identity of the message</param>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>The acknowledgement, or <c>null</c> if the connection failed, see <see cref="Failure" /></returns>
+    public Task<ContractAcknowledgement?> SendCatalogUploadAsync(ReadOnlyMemory<byte> utf8Json, Guid id, CancellationToken cancellationToken)
+    {
+        return SendMessageAsync(utf8Json, id, true, cancellationToken);
+    }
+
+    /// <summary>
     /// Sends a message and waits for its acknowledgement.
     /// </summary>
     /// <param name="utf8Json">The bytes of the message</param>
     /// <param name="id">The identity of the message</param>
     /// <param name="cancellationToken">The cancellation token</param>
     /// <returns>The acknowledgement, or <c>null</c> if the connection failed, see <see cref="Failure" /></returns>
-    public async Task<ContractAcknowledgement?> SendAsync(ReadOnlyMemory<byte> utf8Json, Guid id, CancellationToken cancellationToken)
+    public Task<ContractAcknowledgement?> SendAsync(ReadOnlyMemory<byte> utf8Json, Guid id, CancellationToken cancellationToken)
     {
-        try
-        {
-            return await SendCoreAsync(utf8Json, id, cancellationToken).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            AbortSocket();
-
-            throw;
-        }
-        catch (TimeoutException)
-        {
-            Fail(ReplaySendProblemKind.NoAnswer);
-
-            return null;
-        }
-        catch (Exception)
-        {
-            Fail(ReplaySendProblemKind.ConnectionLost);
-
-            return null;
-        }
-        finally
-        {
-            lock (_stateLock)
-            {
-                _awaited = null;
-            }
-        }
+        return SendMessageAsync(utf8Json, id, false, cancellationToken);
     }
 
     /// <summary>
@@ -288,6 +287,7 @@ public sealed class IngestClient : IAsyncDisposable
             socket = _socket;
             awaited = _awaited;
             _awaited = null;
+            _isCatalogAwaited = false;
         }
 
         if (isFirst)
@@ -299,55 +299,6 @@ public sealed class IngestClient : IAsyncDisposable
         awaited?.TrySetResult(null);
 
         return GetFailure() ?? problem;
-    }
-
-    /// <summary>
-    /// Reads one message of the server, at most <see cref="MaxReplyBytes" /> bytes long; it never throws.
-    /// </summary>
-    /// <param name="socket">The socket</param>
-    /// <param name="buffer">The buffer of <see cref="MaxReplyBytes" /> plus one byte</param>
-    /// <param name="cancellationToken">The cancellation token</param>
-    /// <returns>The message or the problem</returns>
-    private static async Task<(ContractMessage? Message, ReplaySendProblemKind? Problem)> ReadMessageAsync(WebSocket socket, byte[] buffer, CancellationToken cancellationToken)
-    {
-        try
-        {
-            var length = 0;
-            WebSocketReceiveResult result;
-
-            do
-            {
-                result = await socket.ReceiveAsync(new ArraySegment<byte>(buffer, length, buffer.Length - length), cancellationToken).ConfigureAwait(false);
-
-                if (result.MessageType == WebSocketMessageType.Close)
-                {
-                    return (null, ReplaySendProblemKind.ConnectionLost);
-                }
-
-                if (result.MessageType != WebSocketMessageType.Text || (result.EndOfMessage == false && length + result.Count >= MaxReplyBytes))
-                {
-                    return (null, ReplaySendProblemKind.InvalidReply);
-                }
-
-                length += result.Count;
-            }
-            while (result.EndOfMessage == false);
-
-            if (length > MaxReplyBytes)
-            {
-                return (null, ReplaySendProblemKind.InvalidReply);
-            }
-
-            var read = ContractReader.Read(buffer.AsSpan(0, length));
-
-            return read.Message is null
-                       ? (null, ReplaySendProblemKind.InvalidReply)
-                       : (read.Message, null);
-        }
-        catch (Exception)
-        {
-            return (null, ReplaySendProblemKind.ConnectionLost);
-        }
     }
 
     /// <summary>
@@ -371,6 +322,113 @@ public sealed class IngestClient : IAsyncDisposable
         catch (Exception)
         {
             // The read ended with the abort of the socket; the problem is the one of the caller.
+        }
+    }
+
+    /// <summary>
+    /// Reads one message of the server, at most <see cref="MaxReplyBytes" /> bytes long, or <see cref="MaxCatalogReplyBytes" />
+    /// while the acknowledgement of a catalog upload is awaited and <paramref name="canGrow" /> is set; it never throws.
+    /// </summary>
+    /// <param name="socket">The socket</param>
+    /// <param name="buffer">The buffer of <see cref="MaxReplyBytes" /> plus one byte</param>
+    /// <param name="canGrow">Whether the message may use a larger buffer when a catalog acknowledgement is awaited</param>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>The message or the problem</returns>
+    private async Task<(ContractMessage? Message, ReplaySendProblemKind? Problem)> ReadMessageAsync(WebSocket socket, byte[] buffer, bool canGrow, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var length = 0;
+            var limit = MaxReplyBytes;
+            var current = buffer;
+            WebSocketReceiveResult result;
+
+            do
+            {
+                result = await socket.ReceiveAsync(new ArraySegment<byte>(current, length, current.Length - length), cancellationToken).ConfigureAwait(false);
+
+                if (result.MessageType == WebSocketMessageType.Close)
+                {
+                    return (null, ReplaySendProblemKind.ConnectionLost);
+                }
+
+                if (result.MessageType != WebSocketMessageType.Text)
+                {
+                    return (null, ReplaySendProblemKind.InvalidReply);
+                }
+
+                if (result.EndOfMessage == false && length + result.Count >= limit)
+                {
+                    if (limit != MaxReplyBytes || canGrow == false || IsCatalogAwaited() == false)
+                    {
+                        return (null, ReplaySendProblemKind.InvalidReply);
+                    }
+
+                    limit = MaxCatalogReplyBytes;
+                    current = new byte[MaxCatalogReplyBytes + 1];
+                    buffer.AsSpan(0, length + result.Count).CopyTo(current);
+                }
+
+                length += result.Count;
+            }
+            while (result.EndOfMessage == false);
+
+            if (length > limit)
+            {
+                return (null, ReplaySendProblemKind.InvalidReply);
+            }
+
+            var read = ContractReader.Read(current.AsSpan(0, length));
+
+            return read.Message is null
+                       ? (null, ReplaySendProblemKind.InvalidReply)
+                       : (read.Message, null);
+        }
+        catch (Exception)
+        {
+            return (null, ReplaySendProblemKind.ConnectionLost);
+        }
+    }
+
+    /// <summary>
+    /// Sends a message and waits for its acknowledgement.
+    /// </summary>
+    /// <param name="utf8Json">The bytes of the message</param>
+    /// <param name="id">The identity of the message</param>
+    /// <param name="isCatalog">Whether the message is a catalog upload, whose acknowledgement may be larger</param>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>The acknowledgement, or <c>null</c> if the connection failed, see <see cref="Failure" /></returns>
+    private async Task<ContractAcknowledgement?> SendMessageAsync(ReadOnlyMemory<byte> utf8Json, Guid id, bool isCatalog, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await SendCoreAsync(utf8Json, id, isCatalog, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            AbortSocket();
+
+            throw;
+        }
+        catch (TimeoutException)
+        {
+            Fail(ReplaySendProblemKind.NoAnswer);
+
+            return null;
+        }
+        catch (Exception)
+        {
+            Fail(ReplaySendProblemKind.ConnectionLost);
+
+            return null;
+        }
+        finally
+        {
+            lock (_stateLock)
+            {
+                _awaited = null;
+                _isCatalogAwaited = false;
+            }
         }
     }
 
@@ -404,7 +462,7 @@ public sealed class IngestClient : IAsyncDisposable
 
         await socket.SendAsync(written.Utf8Json, WebSocketMessageType.Text, true, cancellationToken).ConfigureAwait(false);
 
-        var receiving = ReadMessageAsync(socket, new byte[MaxReplyBytes + 1], _lifetime.Token);
+        var receiving = ReadMessageAsync(socket, new byte[MaxReplyBytes + 1], false, _lifetime.Token);
         (ContractMessage? Message, ReplaySendProblemKind? Problem) outcome;
 
         try
@@ -438,8 +496,9 @@ public sealed class IngestClient : IAsyncDisposable
 
         switch (outcome.Message)
         {
-            case ContractHelloAccepted:
+            case ContractHelloAccepted accepted:
                 {
+                    ServerCatalogIdentity = accepted.CatalogIdentity;
                     _receiveLoop = Task.Run(() => ReceiveLoopAsync(socket, _lifetime.Token), CancellationToken.None);
 
                     return null;
@@ -485,9 +544,10 @@ public sealed class IngestClient : IAsyncDisposable
     /// </summary>
     /// <param name="data">The bytes of the message</param>
     /// <param name="id">The identity of the message</param>
+    /// <param name="isCatalog">Whether the message is a catalog upload</param>
     /// <param name="cancellationToken">The cancellation token</param>
     /// <returns>The acknowledgement, or <c>null</c> if the run failed</returns>
-    private async Task<ContractAcknowledgement?> SendCoreAsync(ReadOnlyMemory<byte> data, Guid id, CancellationToken cancellationToken)
+    private async Task<ContractAcknowledgement?> SendCoreAsync(ReadOnlyMemory<byte> data, Guid id, bool isCatalog, CancellationToken cancellationToken)
     {
         var awaited = new TaskCompletionSource<ContractAcknowledgement?>(TaskCreationOptions.RunContinuationsAsynchronously);
         WebSocket socket;
@@ -502,6 +562,7 @@ public sealed class IngestClient : IAsyncDisposable
             socket = _socket;
             _awaitedId = id;
             _awaited = awaited;
+            _isCatalogAwaited = isCatalog;
         }
 
         // A frame of the server that arrived before this send is read by the receive loop first.
@@ -596,7 +657,7 @@ public sealed class IngestClient : IAsyncDisposable
 
         while (cancellationToken.IsCancellationRequested == false)
         {
-            var outcome = await ReadMessageAsync(socket, buffer, cancellationToken).ConfigureAwait(false);
+            var outcome = await ReadMessageAsync(socket, buffer, true, cancellationToken).ConfigureAwait(false);
 
             if (cancellationToken.IsCancellationRequested || IsClosing())
             {
@@ -631,6 +692,7 @@ public sealed class IngestClient : IAsyncDisposable
             var awaited = _awaited;
 
             _awaited = null;
+            _isCatalogAwaited = false;
             awaited.TrySetResult(acknowledgement);
 
             return null;
@@ -646,6 +708,18 @@ public sealed class IngestClient : IAsyncDisposable
         lock (_stateLock)
         {
             return _failure;
+        }
+    }
+
+    /// <summary>
+    /// Checks whether the acknowledgement that is awaited is the one of a catalog upload.
+    /// </summary>
+    /// <returns><c>true</c> if a catalog acknowledgement is awaited</returns>
+    private bool IsCatalogAwaited()
+    {
+        lock (_stateLock)
+        {
+            return _awaited is not null && _isCatalogAwaited;
         }
     }
 

@@ -4,7 +4,7 @@
 
 The server's database: its file, the setting that names it and the in-memory case, what happens at start and the start
 failures, what is stored and the rules of storing and reading it, file modes, privacy, one server per file and the
-measurements. Operators who run the server, the data pages ([`web-pages.md`](web-pages.md)), the history that folds and deletes stored ticks ([`history.md`](history.md)) and the later feature that sends catalogs (#42) rely on it.
+measurements. Operators who run the server, the data pages ([`web-pages.md`](web-pages.md)), the history that folds and deletes stored ticks ([`history.md`](history.md)) and live sending, which uploads the catalog ([`live-sending.md`](live-sending.md), *Catalog*), rely on it.
 The ingest writes into the store ([`ingest.md`](ingest.md)): it stores a tick, a catalog or an icon before it
 acknowledges it, and the server reads its state back from the store at start ([`server-state.md`](server-state.md)).
 

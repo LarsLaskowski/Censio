@@ -278,7 +278,7 @@ input.
 ## Not here
 
 - The server's endpoint and what it answers to each message: [`ingest.md`](ingest.md); its token: [`ingest-token.md`](ingest-token.md).
-- The Companion's sending of a replay: [`replay-sending.md`](replay-sending.md); live sending: [`live-sending.md`](live-sending.md); the persistent buffer ([`live-sending.md`](live-sending.md), *Buffer*); uploading the catalog and the icons (#42).
+- The Companion's sending of a replay: [`replay-sending.md`](replay-sending.md); live sending: [`live-sending.md`](live-sending.md); the persistent buffer ([`live-sending.md`](live-sending.md), *Buffer*); uploading the catalog and the icons ([`live-sending.md`](live-sending.md), *Catalog*).
 - The catalog document itself: [`game-catalog-format.md`](game-catalog-format.md).
 - The pipe's frames and ticks: [`pipe.md`](pipe.md).
 - The code: `ContractReader`, `ContractWriter` and the message types in `src/Censio.Contracts`, the conversion of pipe

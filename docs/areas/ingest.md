@@ -289,7 +289,7 @@ catalog, not only its size, decides the peak.
 - The catalog document inside an upload: [`game-catalog-format.md`](game-catalog-format.md).
 - The state kept from what arrives: [`server-state.md`](server-state.md); the database: [`server-data.md`](server-data.md).
 - Showing what arrives: [`web-pages.md`](web-pages.md). The Companion's replay sending: [`replay-sending.md`](replay-sending.md); live sending ([`live-sending.md`](live-sending.md)), the persistent buffer ([`live-sending.md`](live-sending.md), *Buffer*), the catalog and
-  icons it uploads (#42).
+  icons it uploads ([`live-sending.md`](live-sending.md), *Catalog*).
 - The ingest token, its file and switch, and the start failures: [`ingest-token.md`](ingest-token.md).
 - The server's HTTP surface, the data directory and the Docker image: [`server.md`](server.md).
 - The code: `IngestConnections`, `IngestHosts`, `IngestHost`, `IngestAdmission`, `IngestSession` and `IngestEndpoint` in

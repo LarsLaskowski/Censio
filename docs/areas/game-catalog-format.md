@@ -3,11 +3,11 @@
 ## Scope
 
 The versioned catalog document: the JSON form of the game catalog ([`game-catalog.md`](game-catalog.md)) and of the
-references to its icons ([`game-catalog-icons.md`](game-catalog-icons.md)) that the Companion will give the server, which
+references to its icons ([`game-catalog-icons.md`](game-catalog-icons.md)) that the Companion gives the server, which
 cannot read game files ([`0023`](../decisions/0023-game-names-and-icons-extracted-locally.md)). It states the properties,
 the value rules, the order of the reader's checks, the bounds, the refusal kinds and their texts, the compatibility rules
-and the privacy of the document. The reader runs on input from outside and is strict. This feature only converts, writes
-and reads the document in memory: it sends, stores and shows nothing, and the conversion has no caller yet.
+and the privacy of the document. The reader runs on input from outside and is strict. The conversion, the writer and the reader work in memory; live sending uploads the document
+([`live-sending.md`](live-sending.md), *Catalog*) and the server stores and shows it.
 
 ## Behavior
 
@@ -144,6 +144,6 @@ No refusal text and no log line holds its content.
 
 - Building the catalog: [`game-catalog.md`](game-catalog.md); the icons: [`game-catalog-icons.md`](game-catalog-icons.md);
   the cache: [`game-catalog-cache.md`](game-catalog-cache.md).
-- The messages that carry the catalog and the images: [`contract.md`](contract.md); sending, storing and showing them (#42).
+- The messages that carry the catalog and the images: [`contract.md`](contract.md); sending them: [`live-sending.md`](live-sending.md), *Catalog*; storing and showing them: [`ingest.md`](ingest.md), [`web-pages.md`](web-pages.md).
 - The code: `CatalogDocumentReader` and `CatalogDocumentWriter` in `src/Censio.Contracts`, the conversion in
   `src/Censio.Companion.Core`.

@@ -55,9 +55,9 @@ conversion) hold the reasoning.
 | Duplicate archive number | two patch archives have the same number (`zz_patchfiles_300.rda` and `zz_patchfiles_0300.rda`); the second is named |
 | Icon set too large | the PNG files kept would together take more than 256 MiB; the archive being read is named |
 
-- **Kept and sent nowhere:** the icons are held in memory with the catalog, as PNG data, until the next build or the end of
+- **Kept, and sent only by live sending:** the icons are held in memory with the catalog, as PNG data, until the next build or the end of
   the Companion. They are written only to the cache file ([`game-catalog-cache.md`](game-catalog-cache.md)) in the player's own local app data, after a
-  complete extraction; nothing is written into the installation, and nothing is sent. The PNG data of an icon enters no log,
+  complete extraction; nothing is written into the installation, and only live sending sends them, to the player's own server ([`live-sending.md`](live-sending.md), *Catalog*). The PNG data of an icon enters no log,
   repository, fixture or release.
 
 ## Limits and errors

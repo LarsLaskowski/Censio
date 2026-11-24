@@ -3,8 +3,8 @@
 ## Scope
 
 Live sending from the Companion to a server: forward mode's settings `serverAddress` and `serverToken`, the fixed
-profile `Live`, the start and the hello, what is sent, the buffer of the waiting messages and its bounds, the reconnect delays and
-the final refusals, the bound on finding a dead connection, the `Server:` texts of forward mode, live sending in local
+profile `Live`, the start and the hello, what is sent, the buffer of the waiting messages and its bounds, the upload of
+the game catalog and its icons, the reconnect delays and the final refusals, the bound on finding a dead connection, the `Server:` texts of forward mode, live sending in local
 mode, the log lines, privacy and the accepted risks. A player whose server runs elsewhere (Docker on a NAS or a home
 server) and an operator who reads the log rely on it. The connection rules shared with the replay are in
 [`replay-sending.md`](replay-sending.md).
@@ -68,8 +68,9 @@ server) and an operator who reads the log rely on it. The connection rules share
 - A `status` message with the pipe connection's state follows `helloAccepted` and each change of that state, also while
   the game is not running; it gets no reply, waits for nothing and is not kept across a reconnect: the current state is
   sent again after the next `helloAccepted`.
-- No catalog, icon or figure name is sent (record 0041). Island names, the economy and trade routes go to the configured
-  server, over `ws://` unencrypted.
+- The game catalog and its icons are sent as well, outside the order above (*Catalog*). No figure name is sent (record
+  0041). Island names, the economy, trade routes, the catalog and the icons go to the configured server, over `ws://`
+  unencrypted.
 
 ### Buffer
 
@@ -128,6 +129,51 @@ server) and an operator who reads the log rely on it. The connection rules share
   and a `.tmp` file left behind is deleted at the next start. An unacknowledged message may or may not be stored.
 - **Another server.** The buffer is sent to the server of the start that sends it; see *Privacy*.
 
+### Catalog
+
+- **When it is ready.** A catalog is ready when the start's cache load or extraction, or a later re-extraction after a
+  game update, has ended with names: the menu lines `Catalog: <n> entries`, `Catalog: <n> entries, not cached` and
+  `Catalog: <n> entries, icons failed` ([`game-catalog.md`](game-catalog.md)). The statuses before them change nothing;
+  with no game or a failed catalog nothing is sent and no line is logged. This holds in forward and in local mode.
+- **Identity.** The Companion's catalog identity is the SHA-256 of its catalog document's bytes
+  ([`game-catalog-format.md`](game-catalog-format.md)); the server names the same kind of identity in `helloAccepted`
+  when it stores a complete catalog ([`ingest.md`](ingest.md), *Messages after the hello*).
+- **Upload.** After `helloAccepted`, before the waiting messages, a ready catalog whose identity differs from the one
+  the hello names (`null`, or the catalog of another installation) is sent as one `catalogUpload`. For each reference
+  in the `missingIcons` of its acknowledgement the Companion then sends one `iconImage` with that icon's PNG, one message
+  in flight, in the order the acknowledgement lists them (the server sorts them, [`contract.md`](contract.md)). A
+  reference the Companion holds no icon for is counted as refused and not sent. After the last icon it logs `Catalog sent
+  to the server: <i> icons sent, <r> refused`, with `0 icons` too: `<i>` counts the icons the server accepted, `<r>` those
+  it refused and those the contract writer refused. The waiting messages follow. The server replaces a catalog it holds.
+- **Skip.** A catalog whose identity equals the server's is not sent, nor are icons; `Catalog already on the server` is
+  logged once per connection and catalog.
+- **A catalog that becomes ready while connected** (the first extraction of a start, or a re-extraction) is compared with
+  the identity the server holds for this connection (named at the hello, or of the last catalog it accepted here): a
+  different one is uploaded after the message in flight and before the next, an equal one sends nothing. A newer catalog
+  stops the icons of an older one: the older one's remaining icons are not sent and no `Catalog sent` line is logged for
+  it.
+- **No icons.** A catalog whose icons failed is uploaded with every icon reference `null` and no icon follows; the pages
+  show names without icons.
+- **Refusals.** An acknowledgement of the catalog with a refusal sends no icon, logs `Server refused the catalog: <kind>`
+  and closes this catalog for the run, also across a reconnect, until a newer catalog or a restart. A catalog the contract
+  writer refuses sends nothing, logs `Catalog not sent: the contract writer refused it` and is closed the same way. Live
+  messages go on in both cases.
+- **Failed connections.** A connection that ends while the catalog or one of its icons is in flight (no acknowledgement
+  within 30 seconds, a close, a lost connection) counts one failure and defers the catalog: after the next accepted hello
+  the messages that wait at that hello are sent first, and the catalog follows once they are acknowledged or the buffer is
+  empty. After the third failure it is not sent again in this run and `Catalog not sent: the connection failed 3 times
+  during its upload` is logged. A connection that fails before the deferred catalog's turn neither counts nor resets the
+  count; a completed upload or a newer catalog starts it again (record 0107). At the next hello after a failure during the
+  icons the server names `null`, so the catalog is sent again and only the icons its acknowledgement lists.
+- **Not buffered.** Catalog and icon messages are never written to the buffer folder, are not counted in the `Buffer:`
+  line and are not limited by `bufferHours` or `bufferMegabytes`. No menu or tooltip text reports the upload.
+- **Memory.** While the upload message is written the document's bytes (at most 16 MiB) and the message (at most 24 MiB)
+  exist together; the document model and its bytes are released before the send, the message alone is held until its
+  acknowledgement, then the list of missing references and one written icon message at a time.
+- **Replay.** A replay sends no catalog, with or without `--server`, also into the local server; it shows the catalog a
+  live connection stored in that server earlier.
+- **Exit.** `Exit` during an upload keeps the bounds of *Exit*; the next start continues as after a lost connection.
+
 ### Reconnect
 
 - A failed attempt is retried after 1, 2, 4, 8 and 16 seconds, then every 30 seconds, as long as the Companion runs. The
@@ -140,7 +186,7 @@ server) and an operator who reads the log rely on it. The connection rules share
 | `Server: unreachable, retrying` | No WebSocket at the address, also a TLS failure such as an untrusted `wss://` certificate, or no upgrade within 30 seconds |
 | `Server: not answering, retrying` | No answer to the hello, no acceptance of a message or no acknowledgement within 30 seconds |
 | `Server: connection lost, retrying` | The connection ended after the hello (a close frame, a failed send or receive, a server that stops), also a fault the Companion did not expect |
-| `Server: invalid reply, retrying` | A reply that breaks the rules of [`replay-sending.md`](replay-sending.md) (*Limits and errors*) |
+| `Server: invalid reply, retrying` | A reply that breaks the rules of [`replay-sending.md`](replay-sending.md) (*Limits and errors*), except that the acknowledgement of a catalog upload may be larger (*Limits and errors* below) |
 | `Server: another Companion is connected, retrying` | `helloRefused` `companionConnected`: the server still holds a vanished connection, for up to about 56 seconds ([`ingest.md`](ingest.md), *One Companion and silent connections*) |
 | `Server: token refused` | `helloRefused` `tokenRefused`; not retried |
 | `Server: does not support contract version 2` | `helloRefused` `unsupportedVersion`; not retried |
@@ -169,7 +215,7 @@ server) and an operator who reads the log rely on it. The connection rules share
 
 ### Log
 
-Ten lines ([`companion-log.md`](companion-log.md)); a line is written when the state changes, not per retry:
+Fifteen lines ([`companion-log.md`](companion-log.md)); a line is written when the state changes, not per retry:
 
 | Line | Level | When |
 | ---- | ----- | ---- |
@@ -183,6 +229,11 @@ Ten lines ([`companion-log.md`](companion-log.md)); a line is written when the s
 | `Live buffer holds <n> messages from an earlier run` | Information | At the start, when the buffer holds stored messages after the age limit was applied |
 | `Live buffer cannot be written; waiting messages are kept in memory until Exit` | Warning | Once, when the buffer turns memory only |
 | `Live buffer entries unreadable: <n>; discarded` | Warning | As in *Buffer*, *Unreadable files* |
+| `Catalog sent to the server: <i> icons sent, <r> refused` | Information | After the last icon of an upload, also with 0 icons |
+| `Catalog already on the server` | Information | At most once per accepted hello and ready catalog |
+| `Server refused the catalog: <kind>` | Warning | At a refusal of the catalog, the kind by its name |
+| `Catalog not sent: the contract writer refused it` | Warning | Once per catalog the writer refuses |
+| `Catalog not sent: the connection failed 3 times during its upload` | Warning | Once, when the catalog is given up |
 
 The `<reason>` is a text of [`replay-sending.md`](replay-sending.md) (*Limits and errors*). A hosted server that is not
 running ends local mode's live sending without a line of its own, except the count of dropped messages.
@@ -194,12 +245,18 @@ running ends local mode's live sending without a line of its own, except the cou
 - The buffer holds the messages as sent (island names, the economy, trade routes), never the token, in files readable for
   whoever can read the player's folder. No log line holds a message's content or a path.
 - Waiting messages go to the server of the start that sends them: after `serverAddress` changed, island names, the economy and trade routes taken for the old server go to the new one. Delete `%LOCALAPPDATA%\Censio\Buffer` before switching to a server that should not receive them.
+- The catalog and the icons go only to the server live sending connects to, unencrypted with `ws://`, under TLS with
+  `wss://` (record 0023); the cache file is never sent. No catalog line holds a name, an icon reference or a path.
 - No log line holds the address, a name or an exception text. Every failure of the connection ends as one of the reasons
   above, and the sender lets no exception text reach the log.
 
 ## Limits and errors
 
-- Replies are read as in [`replay-sending.md`](replay-sending.md) (*Limits and errors*): up to 65,536 bytes, never further.
+- Replies are read as in [`replay-sending.md`](replay-sending.md) (*Limits and errors*): up to 65,536 bytes, never further,
+  with one exception: while the acknowledgement of a catalog upload is awaited, a reply may be up to 1,179,648 bytes (the
+  contract's 16,384 `missingIcons`). The bound counts the received bytes before parsing and ends with that wait, so the
+  replies to the icons after it keep 65,536 bytes; a reply above the bound is `Server: invalid reply, retrying`
+  (record 0108).
 - A server of release 0.3.0 reads contract version 1 and refuses the hello: `Server: does not support contract version 2`.
 
 ### Accepted risks
@@ -233,6 +290,8 @@ is the reason for the bound of 60 seconds rather than 45.
 - [`decisions/0031-bounded-local-tick-buffer-gaps-accepted.md`](../decisions/0031-bounded-local-tick-buffer-gaps-accepted.md) — a bounded buffer, gaps accepted.
 - [`decisions/0105-unsent-live-messages-kept-one-file-each-in-a-fixed-buffer-folder.md`](../decisions/0105-unsent-live-messages-kept-one-file-each-in-a-fixed-buffer-folder.md) — one file per message in a fixed folder.
 - [`decisions/0106-buffer-limits-are-settings-keys-in-hours-and-megabytes.md`](../decisions/0106-buffer-limits-are-settings-keys-in-hours-and-megabytes.md) — the limits are settings keys in hours and megabytes.
+- [`decisions/0107-catalog-uploaded-first-on-each-live-connection-deferred-after-a-failure.md`](../decisions/0107-catalog-uploaded-first-on-each-live-connection-deferred-after-a-failure.md) — the catalog goes first, is deferred after a failed upload and given up after three.
+- [`decisions/0108-companion-reads-a-larger-reply-only-for-a-catalog-acknowledgement.md`](../decisions/0108-companion-reads-a-larger-reply-only-for-a-catalog-acknowledgement.md) — a larger reply only for a catalog acknowledgement.
 
 ## Not here
 
@@ -240,5 +299,5 @@ is the reason for the bound of 60 seconds rather than 45.
 - The messages, their reader and writer and the refusal texts: [`contract.md`](contract.md).
 - The server's endpoint and answers: [`ingest.md`](ingest.md); the token: [`ingest-token.md`](ingest-token.md).
 - The settings file and the menu in general: [`companion.md`](companion.md); the hosted server: [`local-mode.md`](local-mode.md); the log file: [`companion-log.md`](companion-log.md).
-- The catalog (#42), the choice of a profile (#43).
-- The code: `LiveSender`, `LiveBuffer`, `LiveBufferFile`, `IngestClient`, `ForwardServerSetting` and `ClientWebSocketConnector` in `src/Censio.Companion.Core`.
+- Building the catalog and its document: [`game-catalog.md`](game-catalog.md), [`game-catalog-format.md`](game-catalog-format.md); storing and showing it: [`ingest.md`](ingest.md), [`web-pages.md`](web-pages.md); the choice of a profile (#43).
+- The code: `LiveSender`, `LiveCatalog`, `LiveBuffer`, `LiveBufferFile`, `IngestClient`, `ForwardServerSetting` and `ClientWebSocketConnector` in `src/Censio.Companion.Core`.

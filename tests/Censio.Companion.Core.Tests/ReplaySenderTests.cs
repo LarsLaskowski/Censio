@@ -753,7 +753,7 @@ public sealed class ReplaySenderTests
         // Act
         var sending = sender.SendTickAsync(CreateTick(1), TestContext.CancellationToken);
         var tick = await server.ReceiveAsync(TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
-        var oversized = SendIgnoringFailureAsync(server, CreatePaddedAcknowledgement(tick, 200000));
+        var oversized = server.SendRawIgnoringFailureAsync(CreatePaddedAcknowledgement(tick, 200000), WebSocketMessageType.Text, TestContext.CancellationToken);
         var problem = await sending.WaitAsync(_guard, TestContext.CancellationToken);
 
         await sender.DisposeAsync();
@@ -1629,7 +1629,7 @@ public sealed class ReplaySenderTests
         var sending = sender.SendTickAsync(CreateTick(1), TestContext.CancellationToken);
         var tick = await server.ReceiveAsync(TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
         var acknowledgementSize = ScriptedIngestServer.Write(ScriptedIngestServer.CreateAcknowledgement(ScriptedIngestServer.IdOf(tick), null)).Length;
-        var replying = SendIgnoringFailureAsync(server, CreatePaddedAcknowledgement(tick, size - acknowledgementSize));
+        var replying = server.SendRawIgnoringFailureAsync(CreatePaddedAcknowledgement(tick, size - acknowledgementSize), WebSocketMessageType.Text, TestContext.CancellationToken);
         var problem = await sending.WaitAsync(_guard, TestContext.CancellationToken);
 
         await replying.WaitAsync(_guard, TestContext.CancellationToken);
@@ -1910,24 +1910,6 @@ public sealed class ReplaySenderTests
         await ExpireReplyTimeoutAsync(timeProvider, sending, replyTimers);
 
         return await sending.WaitAsync(_guard, TestContext.CancellationToken);
-    }
-
-    /// <summary>
-    /// Sends a reply that the sender may stop reading, ignoring the failure of the ended connection.
-    /// </summary>
-    /// <param name="server">The server</param>
-    /// <param name="data">The reply</param>
-    /// <returns>A task that completes when the reply is sent or the connection ended</returns>
-    private async Task SendIgnoringFailureAsync(ScriptedIngestServer server, byte[] data)
-    {
-        try
-        {
-            await server.SendRawAsync(data, WebSocketMessageType.Text, TestContext.CancellationToken);
-        }
-        catch (Exception exception) when (exception is WebSocketException or IOException or OperationCanceledException)
-        {
-            // The sender ended the connection while the reply was sent.
-        }
     }
 
     #endregion // Methods

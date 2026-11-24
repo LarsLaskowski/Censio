@@ -5,7 +5,7 @@
 Sending a replayed recording to a server: the Companion's switches `--server` and `--token-file`, the token file, the
 connection and its rules, the hello and the profile a run creates, what is sent and in which order, one message in
 flight, the keep-alive, the timeouts, the status texts and counts, the log lines, and what never leaves the machine.
-A tester who runs the server without the game relies on it. In local mode a replay without `--server` sends to the server the Companion hosts (*Local mode*). It is no live sending ([`live-sending.md`](live-sending.md)); the persistent buffer is part of live sending ([`live-sending.md`](live-sending.md), *Buffer*) and the catalog and icons are #42. The messages themselves are in [`contract.md`](contract.md),
+A tester who runs the server without the game relies on it. In local mode a replay without `--server` sends to the server the Companion hosts (*Local mode*). It is no live sending ([`live-sending.md`](live-sending.md)); the persistent buffer is part of live sending ([`live-sending.md`](live-sending.md), *Buffer*) and so is the upload of the catalog and icons (*Catalog*). The messages themselves are in [`contract.md`](contract.md),
 what the server does with them in [`ingest.md`](ingest.md).
 
 ## Behavior
@@ -104,7 +104,7 @@ what the server does with them in [`ingest.md`](ingest.md).
   receive time; a repeated session end ([`pipe.md`](pipe.md)) carries no new information and is not sent.
 - A `status` message with the replayed pipe state after `helloAccepted` and at each change of that state; it gets no
   reply and is not counted. Statuses are sent without waiting, also while an acknowledgement is awaited.
-- No catalog, icon or figure name is sent. A raw recording holds the figure name, island names and the economy as the
+- No catalog, icon or figure name is sent: a replay never uploads a catalog, also into the local server, and shows the one a live connection stored there earlier. A raw recording holds the figure name, island names and the economy as the
   game sent them, so a recording is replayed only into one's own server.
 
 ### One message in flight
@@ -166,9 +166,9 @@ below are done by the Companion at once.
 | server does not answer | No `helloAccepted` or `helloRefused` within 30 seconds of the hello, a message the server does not take within 30 seconds, or no acknowledgement within 30 seconds of a message |
 | server connection lost | The connection ends after the hello (a close frame, a failed send or receive, a server that stops) |
 | local server not running | Local mode only: the hosted server did not start (its port is in use, it failed, or the settings are invalid) |
-| invalid server reply | A frame that is not a readable contract message, is binary, is larger than 65,536 bytes, is of a type the server does not send at that point, or acknowledges another message than the awaited one, also one that arrives while nothing is awaited |
+| invalid server reply | A frame that is not a readable contract message, is binary, is larger than 65,536 bytes (the acknowledgement of a live catalog upload may be larger, [`live-sending.md`](live-sending.md), *Limits and errors*), is of a type the server does not send at that point, or acknowledges another message than the awaited one, also one that arrives while nothing is awaited |
 
-- A reply is read up to 65,536 bytes and never further.
+- A reply is read up to 65,536 bytes and never further; only live sending reads a larger acknowledgement, of a catalog upload ([`live-sending.md`](live-sending.md), *Limits and errors*).
 - Every failure of the connection, whatever its exception, ends as one of the reasons above; no exception text reaches
   the status or the log.
 - The replay's own reasons ([`pipe-recording.md`](pipe-recording.md)) are unchanged and checked before the server is
@@ -241,5 +241,5 @@ shell's encoding is confirmed. Not tried: `docker cp` for the token file, a toke
 - The messages, their reader and writer and the refusal texts: [`contract.md`](contract.md).
 - The server's endpoint and answers: [`ingest.md`](ingest.md); token rules: [`ingest-token.md`](ingest-token.md); what it keeps: [`server-state.md`](server-state.md).
 - The recording file and the replay's pacing: [`pipe-recording.md`](pipe-recording.md); the tray and the command line: [`companion.md`](companion.md); the hosted server: [`local-mode.md`](local-mode.md).
-- Live sending, which shares this connection's rules: [`live-sending.md`](live-sending.md); the persistent buffer ([`live-sending.md`](live-sending.md), *Buffer*); the catalog and the icons (#42).
+- Live sending, which shares this connection's rules: [`live-sending.md`](live-sending.md); the persistent buffer ([`live-sending.md`](live-sending.md), *Buffer*); the catalog and the icons ([`live-sending.md`](live-sending.md), *Catalog*).
 - The code: `ReplaySender`, `ClientWebSocketConnector`, `ReplayTokenFile` and `PipeReplayRunner` in `src/Censio.Companion.Core`.

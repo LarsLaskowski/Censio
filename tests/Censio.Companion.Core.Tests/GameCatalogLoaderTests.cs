@@ -1339,6 +1339,71 @@ public sealed class GameCatalogLoaderTests
         Assert.AreSame(rig.Loader.Catalog, rig.CatalogEvents[0].Catalog, "The announced catalog should be the published one");
     }
 
+    /// <summary>
+    /// The build names the build of the published catalog: the extraction's build once its names are published, the old build
+    /// while a changed game's names are extracted, and not the build of a check whose extraction failed.
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    [TestCategory("AC1")]
+    public async Task GameCatalogLoaderBuildIsBuildOfPublishedCatalog()
+    {
+        // Arrange
+        using var rig = new CatalogLoaderRig();
+        string? buildDuringNames = null;
+
+        // Act
+        var beforeRun = rig.Loader.Build;
+
+        rig.Loader.Run(CatalogLoaderRig.Found("1"));
+
+        var afterRun = rig.Loader.Build;
+
+        rig.CurrentKey = CatalogLoaderRig.Key("2");
+        rig.OnBuild = () => buildDuringNames = rig.Loader.Build;
+
+        await Check(rig, "2");
+
+        var afterReextraction = rig.Loader.Build;
+
+        rig.OnBuild = null;
+        rig.CatalogFails = true;
+        rig.CurrentKey = CatalogLoaderRig.Key("3");
+
+        await Check(rig, "3");
+
+        var afterFailure = rig.Loader.Build;
+        var catalogAfterFailure = rig.Loader.Catalog;
+
+        // Assert
+        Assert.IsNull(beforeRun, "Without a published catalog the build should be unknown");
+        Assert.AreEqual("1", afterRun, "The extracted catalog should carry the build of the installation");
+        Assert.AreEqual("1", buildDuringNames, "While the names of a changed game are extracted the old catalog and its build should stay");
+        Assert.AreEqual("2", afterReextraction, "The re-extracted catalog should carry the new build");
+        Assert.IsNull(afterFailure, "A failed extraction should leave no build");
+        Assert.IsNull(catalogAfterFailure, "A failed extraction should leave no catalog");
+    }
+
+    /// <summary>
+    /// A catalog loaded from the cache carries the build of the installation.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC1")]
+    public void GameCatalogLoaderBuildIsBuildOfCachedCatalog()
+    {
+        // Arrange
+        using var rig = new CatalogLoaderRig();
+
+        rig.Prime(CatalogLoaderRig.Key());
+
+        // Act
+        rig.Loader.Run(CatalogLoaderRig.Found("1"));
+
+        // Assert
+        Assert.AreEqual(0, rig.BuildCalls, "The catalog should come from the cache");
+        Assert.AreEqual("1", rig.Loader.Build, "The cached catalog should carry the build of the installation");
+    }
+
     #endregion // Cache and checks
 
     /// <summary>

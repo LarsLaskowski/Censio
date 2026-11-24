@@ -51,6 +51,7 @@ each: the double, where it lives and what it stands in for; how it behaves is re
 - `RecordingHostingStartup` (`tests/Censio.Server.Tests/RecordingHostingStartup.cs`) — an `IHostingStartup` counting its runs.
 - `RegExportUbisoftInstallRecords` (`tests/Censio.Companion.Core.Tests/RegExportUbisoftInstallRecords.cs`) — an `IUbisoftInstallRecords` over the `reg export` sample in `Fixtures/GameInstallation/`.
 - `ScriptedIngestServer`, `DuplexReplayConnector`, `ThrowingWebSocket`, `SendFailingWebSocket`, `LoopbackWebSocketHost`, `LoopbackWebProxy`, `QueuedIngestConnector` (`tests/Censio.Companion.Core.Tests/`), `TestServerReplayConnector` (`tests/Censio.Server.Tests/`) — doubles of the replay and live senders' tests.
+- `CatalogTestData` (`tests/Censio.Companion.Core.Tests/CatalogTestData.cs`) — test catalogs with icons, their documents, identities and icon references, for the catalog upload tests.
 - `ForeignContractMessage` (`tests/Censio.Contracts.Tests/ForeignContractMessage.cs`) — a `ContractMessage` of no contract type.
 
 ## Where tests live
