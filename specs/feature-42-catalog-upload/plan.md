@@ -20,7 +20,7 @@ See [spec.md](spec.md), *Problem*: the server side exists; the Companion never s
 | 6 | Nothing calls `GameCatalogDocumentConverter.ToDocument` in production | `grep -rn ToDocument src` gives only its definition | confirmed |
 | 7 | The loader publishes the new catalog before its icons (`ExtractingIcons`), so `CatalogChanged` is no ready signal; the final statuses are `Ready`, `NotCached`, `IconsFailed` | `GameCatalogLoader.cs:381-409`, :434-440 | confirmed |
 | 8 | Under `IconsFailed` the published icons are `null` (cleared at `ExtractingIcons`, not set) | `GameCatalogLoader.cs:381-406`, :480-488 | confirmed |
-| 9 | The build of the published catalog is known only inside the loader (`_lastInstallation`) | `GameCatalogLoader.cs:70`, :225, :294 | confirmed |
+| 9 | The loader keeps no build of the published catalog: `_lastInstallation` is the checked installation, set by `Check` before `Extract` runs and kept after a failed extraction; the catalog is published in `PublishCached` and `Publish` | `GameCatalogLoader.cs:70`, :225, :294, :324-326, :480-490 | confirmed |
 | 10 | The document writer is deterministic, so cache load and extraction of the same catalog give the same identity | `game-catalog-format.md`, *Writing*; the cache stores every field the converter reads (`game-catalog-cache.md`, *Layout*) | confirmed |
 | 11 | A document within its 16 MiB bound always fits the message bound (Base64 of 16 MiB is 22,369,624 characters, under 23,767,724), so only the document writer can refuse | `contract.md`, *Bounds*; arithmetic | confirmed |
 | 12 | Live sending in local mode uses the same `LiveSender` | `App.xaml.cs:333-335` | confirmed |
@@ -31,19 +31,19 @@ See [spec.md](spec.md), *Problem*: the server side exists; the Companion never s
 
 | AC | Test(s) | Test file |
 | -- | ------- | --------- |
-| AC1 | `LiveSenderCatalogTests.LiveSenderUploadsCatalogBeforeWaitingMessages`, `LiveSenderSendsMissingIconsInListedOrder`, `LiveSenderUploadsWhenServerNamesAnotherIdentity`, `LiveSenderUploadsToLocalServer`; `GameCatalogLoaderTests.GameCatalogLoaderBuildIsBuildOfPublishedCatalog` | `LiveSenderCatalogTests.cs`, `GameCatalogLoaderTests.cs` |
+| AC1 | `LiveSenderCatalogTests.LiveSenderUploadsCatalogBeforeWaitingMessages`, `LiveSenderSendsMissingIconsInListedOrder`, `LiveSenderUploadsWhenServerNamesAnotherIdentity`, `LiveSenderUploadsToLocalServer`; `GameCatalogLoaderTests.GameCatalogLoaderBuildIsBuildOfPublishedCatalog` (also: during `ExtractingNames` of a re-extraction and after a failed one, `Build` names the old build) | `LiveSenderCatalogTests.cs`, `GameCatalogLoaderTests.cs` |
 | AC2 | `LiveSenderCatalogTests.LiveSenderSkipsUploadWhenServerNamesIdentity` | `LiveSenderCatalogTests.cs` |
 | AC3 | `LiveSenderCatalogTests.LiveSenderUploadsCatalogReadyAfterHelloAfterMessageInFlight`, `LiveSenderSkipsReextractedCatalogWithSameIdentity`, `LiveSenderNewerCatalogStopsIconsOfOlder`, `LiveSenderIgnoresCatalogBeforeItsFinalStatus` | `LiveSenderCatalogTests.cs` |
 | AC4 | `LiveSenderCatalogTests.LiveSenderResendsCatalogAndListedIconsAfterLostConnection`, `LiveSenderRetriesCatalogAfterAcknowledgementTimeout` | `LiveSenderCatalogTests.cs` |
 | AC5 | `LiveCatalogTests.LiveCatalogWithoutIconsWritesNullIconReferences`; `LiveSenderCatalogTests.LiveSenderSendsNoCatalogWithoutGame`, `LiveSenderClearsCatalogAfterFailedExtraction` | `LiveCatalogTests.cs`, `LiveSenderCatalogTests.cs` |
 | AC6 | `LiveSenderCatalogTests.LiveSenderDoesNotUploadRefusedCatalogAgain`, `LiveSenderCountsRefusedIcon`, `LiveSenderLogsUnwritableCatalogAndSendsNothing` | `LiveSenderCatalogTests.cs` |
-| AC7 | `IngestClientTests.IngestClientReadsCatalogAcknowledgementWithMaximalMissingIcons`, `IngestClientRefusesLargeReplyToOtherMessage`, `IngestClientRefusesCatalogReplyAboveCatalogBound`, `IngestClientKeepsCatalogIdentityOfHello` | `IngestClientTests.cs` |
+| AC7 | `IngestClientTests.IngestClientReadsCatalogAcknowledgementWithMaximalMissingIcons`, `IngestClientRefusesLargeReplyToOtherMessage`, `IngestClientRefusesLargeIconReplyAfterCatalogUpload` (a reply of 65,537 bytes to an `iconImage` sent after an acknowledged catalog upload on the same connection is `InvalidReply`), `IngestClientRefusesCatalogReplyAboveCatalogBound`, `IngestClientKeepsCatalogIdentityOfHello` | `IngestClientTests.cs` |
 | AC8 | `LiveSenderCatalogTests.LiveSenderNeverBuffersCatalogMessages`, `LiveSenderDisposeDuringUploadEndsRun` | `LiveSenderCatalogTests.cs` |
 | AC9 | `LiveSenderCatalogTests.LiveSenderCatalogLogLinesHaveTextAndLevel` (the five lines, each asserted free of names, references and paths of the test catalog) | `LiveSenderCatalogTests.cs` |
 | AC10 | manual: the Product Manager, on an image and a Companion built from the stamped head (*Approach*, *Manual check*) | — |
 | AC11 | check: the Reviewer reads `README.md` and `docs/USER_GUIDE.md` (both languages) against AC11 in step 8 | — |
 | AC12 | `LiveCatalogTests.LiveCatalogHoldsNoDocumentOrMessageBytes` (reflection over its instance fields: no `CatalogDocument`, `byte[]`, `ReadOnlyMemory<byte>`, `ContractMessage`), `LiveCatalogWriteIconWritesOneIconPerCall`; check: the Reviewer reads `WriteUpload` and the send loop against N2 | `LiveCatalogTests.cs` |
-| AC13 | `LiveSenderCatalogTests.LiveSenderSendsLiveMessagesWhileCatalogKeepsFailing`, `LiveSenderAbandonsCatalogAfterThreeFailedConnections`, `LiveSenderResetsFailuresAfterCompletedUpload` | `LiveSenderCatalogTests.cs` |
+| AC13 | `LiveSenderCatalogTests.LiveSenderSendsLiveMessagesWhileCatalogKeepsFailing`, `LiveSenderAbandonsCatalogAfterThreeFailedConnections`, `LiveSenderResetsFailuresAfterCompletedUpload`, `LiveSenderKeepsFailureCountWhenConnectionFailsBeforeDeferredCatalog` (failure, then a connection that fails during the waiting messages, then two failures with the catalog in flight: abandoned after the fourth connection) | `LiveSenderCatalogTests.cs` |
 
 ## Approach
 
@@ -57,8 +57,10 @@ document model and bytes are out of scope before it returns (N2, AC12). `WriteIc
 reference and returns `null` for an unknown reference or a writer refusal.
 
 **Offering a catalog (`LiveSender.SetCatalog`).** App subscribes to `catalogLoader.StatusChanged` and passes the status,
-`Catalog`, `Icons` and the new `GameCatalogLoader.Build`. It calls once more right after `StartLiveSending` for a
-catalog that was ready before the sender existed. Final statuses (`Ready`, `NotCached`, `IconsFailed`; `IconsFailed`
+`Catalog`, `Icons` and the new `GameCatalogLoader.Build`, a field of its own set together with `_catalog` in
+`PublishCached` and `Publish` (not `_lastInstallation`, fact 9). App subscribes first, then calls once more right after
+`StartLiveSending` for a catalog that was ready before the sender existed, reading `Status` before `Catalog`, `Icons`
+and `Build`: every final status is published after its values. Final statuses (`Ready`, `NotCached`, `IconsFailed`; `IconsFailed`
 with icons `null`) create a `LiveCatalog`, unless the current one has the same identity, which keeps it and its state.
 `NoGame` and `Failed` clear it. Every other status changes nothing. A new catalog resets the failure count and the
 closed mark. A writer refusal logs `CatalogUploadNotWritten` once and closes the catalog. Each change wakes the send
@@ -76,13 +78,15 @@ identities are equal, it logs `CatalogAlreadyOnServer` once per connection and c
   one (E6).
 - After the last icon it logs `CatalogSentToServer(i, r)` and resets the failure count.
 - A connection that fails while the upload or an icon is in flight counts one failure and defers the catalog. The
-  third failure closes it and logs `CatalogUploadAbandoned(3)` (E11).
+  third failure closes it and logs `CatalogUploadAbandoned(3)` (E11). A connection that fails before the deferred
+  catalog's turn neither counts nor resets; only a completed upload or a newer catalog resets the count.
 - The wait for the next buffer message (`NextOrFailureAsync`) also ends on the catalog signal, releasing the buffer's
   in-flight entry as on a failure.
 - Catalog and icon bytes never reach `LiveBuffer` (AC8).
 
 **Reply bound.** `HandleHelloReply` stores `ContractHelloAccepted.CatalogIdentity`. `SendCatalogUploadAsync` marks the
-awaited acknowledgement as a catalog one. When the receive loop's message passes `MaxReplyBytes` and that mark is set
+awaited acknowledgement as a catalog one: the mark is set with `_awaited` under `_stateLock` and cleared wherever
+`_awaited` is cleared (`SendAsync`'s `finally`, `Deliver`, `Fail`), so the icon replies after it keep 65,536 bytes. When the receive loop's message passes `MaxReplyBytes` and that mark is set
 (read under `_stateLock`), it copies into a buffer of `MaxCatalogReplyBytes` + 1 bytes for that message only, then
 returns to the 65,537-byte buffer. Every other case stays `InvalidReply`. The bound counts raw received bytes, before
 parsing.
@@ -136,8 +140,8 @@ Early draft PR: no — the manual check uses local builds, and no criterion need
 - `IngestClient`: the constant `IngestClient.MaxCatalogReplyBytes` (int, 1179648), the get-only nullable string
   property `IngestClient.ServerCatalogIdentity`, and
   `public Task<ContractAcknowledgement?> SendCatalogUploadAsync(ReadOnlyMemory<byte> utf8Json, Guid id, CancellationToken cancellationToken)`.
-- `GameCatalogLoader`: the get-only nullable string property `GameCatalogLoader.Build` (the build of the installation of
-  the published catalog).
+- `GameCatalogLoader`: the get-only nullable string property `GameCatalogLoader.Build` (the build of the published
+  catalog, from a field of its own set together with the catalog field).
 - `GameCatalogDocumentConverter`: `public static string ToIconReference(GameIcon icon)`.
 - `CompanionLog`: `public static partial void CatalogSentToServer(ILogger logger, int iconCount, int refusedCount);`,
   `public static partial void CatalogAlreadyOnServer(ILogger logger);`,
@@ -167,7 +171,10 @@ Files no unit test can cover: none new; `App.xaml.cs` is the untested shell (`do
 - `docs/areas/companion-log.md (+70 words)`: the five lines in the list of what is logged.
 - `docs/areas/local-mode.md (+5 words)`, `docs/areas/game-catalog-format.md (+10 words)` (also *Scope*),
   `docs/areas/game-catalog-cache.md (+3 words)`, `docs/areas/contract.md (+3 words)`, `docs/areas/ingest.md (+3
-  words)`, `docs/areas/replay-sending.md (+3 words)`: the "(#42)" and "not yet" pointers name live sending.
+  words)`, `docs/areas/replay-sending.md (+15 words)`: the "(#42)" and "not yet" pointers name live sending.
+- The shared reply rule: in `live-sending.md`, the `Server: invalid reply, retrying` row (:143) and *Limits and errors*
+  (:202) name the catalog acknowledgement exception; in `replay-sending.md` the 65,536-byte rules (:169, :171) point to
+  `live-sending.md` for it.
 - `docs/areas/README.md`: the *Not here* cells of live-sending and game-catalog-format lose "(#42)".
 
 ## Documentation updates
@@ -204,56 +211,35 @@ All by the Dev, after the code is green:
 - `docs/decisions/0107-catalog-uploaded-first-on-each-live-connection-deferred-after-a-failure.md` (Proposed)
 - `docs/decisions/0108-companion-reads-a-larger-reply-only-for-a-catalog-acknowledgement.md` (Proposed)
 
+## Challenge
+
+Plan challenge: no major objections, five minor ones, all accepted.
+
+1. Fact 13 cited record 0103, which is not in v0.4.0 — accepted: the evidence names 0070 (v0.3.0) and 0096 (v0.4.0)
+   and the server diff since v0.4.0.
+2. `Build` from `_lastInstallation` names the checked build, not the published one — accepted: fact 9 corrected;
+   *Offering a catalog* and *Signatures* give `Build` its own field set with `_catalog` in `PublishCached` and
+   `Publish`; the AC1 loader test checks the old build during a re-extraction and after a failed one.
+3. Read order of the extra `SetCatalog` call — accepted: App subscribes to `StatusChanged` first and reads `Status`
+   before `Catalog`, `Icons` and `Build` (*Offering a catalog*).
+4. The shared reply rule in `live-sending.md`:143 and `replay-sending.md`:169/171 — accepted: a line under *Areas*,
+   `replay-sending.md` now +15 words.
+5. E11 "in a row" for a deferred catalog — accepted: a connection that fails before the deferred catalog's turn
+   neither counts nor resets (*Send loop*, record 0107), tested by
+   `LiveSenderKeepsFailureCountWhenConnectionFailsBeforeDeferredCatalog` (AC13).
+
+## Security review
+
+Security: `APPROVED`, one non-blocking finding with the recommendation *fix now*.
+
+1. When the catalog-reply mark is cleared, and no test of the fallback to 65,536 bytes — fixed now, as recommended:
+   *Reply bound* sets the mark with `_awaited` under `_stateLock` and clears it wherever `_awaited` is cleared
+   (`SendAsync`'s `finally`, `Deliver`, `Fail`); record 0108 says the larger bound ends with that wait. AC7 gains
+   `IngestClientRefusesLargeIconReplyAfterCatalogUpload` (an `iconImage` reply of 65,537 bytes after an acknowledged
+   catalog upload on the same connection is `InvalidReply`); `IngestClientRefusesLargeReplyToOtherMessage` stays as
+   the case without a catalog upload. A separate issue was not chosen: the fix is one sentence and one test inside this
+   change's own bound.
+
 ## Out of scope / follow-ups
 
 Replay uploads (spec, *Out of scope*); a menu line for the upload.
-
-## Challenge notes
-
-Plan challenge, feature 42 (specs/feature-42-catalog-upload/plan.md). I found no major objections. I checked facts 1–12 against the code and they hold: IngestClient.cs:17, :327-339 and :441-446; GameCatalogLoader.cs:225, :294, :381-409 and :480-505; GameCatalogDocumentConverter.cs (the only callers of `ToDocument` are tests); App.xaml.cs:333-335 and :629-640, where the loader starts before `StartLiveSending`, so the extra `SetCatalog` call is needed; the server's `CompleteCatalogIdentity` (ServerState.cs:121) and `StoreCatalogAsync` (:396). The cache keeps every entry, the ambiguous GUIDs and byte-identical PNGs (GameCatalogCacheFile.cs:191-223), so a cache load and an extraction give the same identity. Fact 13 is the one exception (minor 1).
-
-Minor objections, each written as an instruction:
-
-1. **Fact 13 cites a wrong record (minor: the conclusion holds, the cited evidence does not).** `git tag --contains` on the commit that added record 0103 (08ff907) returns no tag, so 0103 is not in v0.4.0. 0070 is in v0.3.0 and 0096 is in v0.4.0. Correct the evidence to: "0070 (v0.3.0) and 0096 (v0.4.0) are in v0.4.0; since v0.4.0 the only server changes are `LocalServerStart`, `Program`, `ServerParts` (466fdcb, local hosting), none in ingest or contracts (`git diff v0.4.0..HEAD --stat -- src/Censio.Server src/Censio.Contracts src/Censio.Server.Data`)". The 0.4.0 image fallback for AC10 stays valid.
-
-2. **`GameCatalogLoader.Build` (minor: a detail the Dev can follow).** Do not derive `Build` from `_lastInstallation`. `Check` sets that field at GameCatalogLoader.cs:294, before `Extract` runs, so during a re-extraction it already names the new build while the old catalog is still published. It also keeps the new build after a failed extraction. Store the build in its own field, set together with `_catalog` in `PublishCached` and `Publish`, so `GameCatalogLoaderBuildIsBuildOfPublishedCatalog` can check that during `ExtractingNames` of a re-extraction `Build` still names the old build.
-
-3. **App wiring: read order of the extra `SetCatalog` call (minor: a race the Dev can avoid without a plan change).** The extra call after `StartLiveSending` runs on the UI thread while `catalogLoader.Run` may still be publishing on another thread. `PublishCached` (GameCatalogLoader.cs:324-329) sets `_catalog` before `_icons`, and `Extract` sets the catalog at ExtractingIcons before `BuildIcons` sets the icons. If the call reads `Catalog` before `Status`, it can get a new catalog with `Icons` still null and status `Ready`. That uploads a catalog without icons, which a second upload then replaces. Read `Status` first, then `Catalog`, `Icons` and `Build`: every final status is published after its values. Subscribe to `StatusChanged` before the extra call.
-
-4. **Documentation: the shared reply rule (minor: wording the Dev can follow).** Besides *Limits and errors* (live-sending.md:202, "up to 65,536 bytes, never further"), the log table row at live-sending.md:143 sends `Server: invalid reply, retrying` to replay-sending.md's rules. Those rules state "larger than 65,536 bytes" (replay-sending.md:169) and "A reply is read up to 65,536 bytes and never further" (:171), and the file says live sending shares them (:244). Name the catalog acknowledgement exception in live-sending.md:143 as well. In replay-sending.md, scope :169/:171 to the replay, or point to live-sending.md for the exception, not only the "(#42)" pointers.
-
-5. **E11 "in a row" is undefined for a deferred catalog (minor: one sentence in the send loop rule).** The plan does not say what a connection that fails while it sends the waiting live messages, before the deferred catalog's turn, does to the count. State that such a connection neither counts nor resets it: only a failure with the catalog or one of its icons in flight counts, and only a completed upload or a newer catalog resets it. Cover it in `LiveSenderAbandonsCatalogAfterThreeFailedConnections` or a sibling test.
-
-Relevant files: /home/user/Censio/specs/feature-42-catalog-upload/plan.md, /home/user/Censio/src/Censio.Companion.Core/GameCatalogLoader.cs, /home/user/Censio/src/Censio.Companion.Core/IngestClient.cs, /home/user/Censio/src/Censio.Companion/App.xaml.cs, /home/user/Censio/docs/areas/live-sending.md, /home/user/Censio/docs/areas/replay-sending.md
-
-## Security notes
-
-Security plan review (mode `plan`) of `/home/user/Censio/specs/feature-42-catalog-upload/spec.md` and `plan.md` at 7e4f83a, with records 0107 and 0108.
-
-I found no blocking findings and one non-blocking one. I ran nothing: no claim here needs a fresh measurement. The one size claim is the 1,097,872-byte acknowledgement, and it was already measured in `docs/areas/ingest.md` (*Memory of a catalog upload*). Everything below comes from reading the code.
-
-**Tier.** `standard` is correct. The larger reply bound is a size check on malformed or oversized input, which the `security` row of `.squad/routing.md` (line 100) counts as input handling. No authentication, token, listener or guard changes. The catalog goes only to the server live sending already connects to, over the same connection, with the hello unchanged.
-
-**Security areas touched** is complete: outbound calls, parsing of external input, and logging and showing external data.
-- `LiveBuffer` and the other file-path types are not changed, because catalog and icon messages never enter the buffer.
-- `GameCatalogLoader` (listed under logging) only gains a `Build` property and no log call.
-- The plan reports the `.squad/project.md` *Outbound calls* text for the orchestrator to write.
-
-**What I checked and found sound:**
-- **Hostile or broken server's `missingIcons`.** `ContractRules.CheckMissingIcons` (`src/Censio.Contracts/ContractRules.cs:374-383`) requires at most 16,384 entries (`ContractReader.MaxMissingIcons`), each 64 lowercase hex digits, strictly ascending. A refusal must carry an empty list (:360). So a server cannot list the same icon twice to make the Companion send it again and again. The total is capped at one send per catalog icon, at most 16,384.
-- **What a server can request.** `WriteIcon` only looks up the Companion's own reference-to-icon map and returns `null` for an unknown reference, so a server can only get icons from the catalog itself.
-- **Hello `catalogIdentity`.** It is checked as hex or `null` (`ContractRules.cs:122`) and only compared, never logged. A server that names a false identity can only suppress its own upload.
-- **Reply bound.** The 1.18 MB buffer is allocated only after a message passes 65,536 bytes while a catalog acknowledgement is awaited. The bound counts raw bytes before parsing, and `ReplaySender` never calls `SendCatalogUploadAsync`, so the replay keeps 65,536 bytes. The headroom over the measured 1,097,872 bytes is about 7 %. Record 0108 notes that the bound must rise with the contract's `missingIcons` bound.
-- **Log lines.** The five lines (N7, `CompanionLog` signatures) carry only counts, the attempt count, and `ContractAcknowledgementRefusal`, an enum the contract already validated (`Enum.IsDefined`, :360). No server string, name, reference or path reaches the log. AC9's test asserts this.
-- **Catalog content.** The document holds `SchemaVersion`, `GameVersion` (the build), and per entry the GUIDs, kind, names, region and icon reference (`src/Censio.Contracts/CatalogDocument.cs`, `CatalogDocumentEntry.cs`). There is no installation path, figure name or profile data. N4 states the `ws://`/`wss://` exposure, and record 0023 accepts it.
-- **Buffer order (record 0031).** In the current loop (`src/Censio.Companion.Core/LiveSender.cs:589-656`), ending `NextOrFailureAsync` early and calling `ReleaseInFlight` releases a message that was never sent. The next wait yields it again, so ending the wait on the catalog signal keeps order and loses nothing.
-
-**Findings**
-
-1. [NON-BLOCKING] The plan does not say when the catalog-reply mark is cleared, and no test checks that the bound falls back to 65,536 bytes.
-   - *Reply bound* in plan.md says `SendCatalogUploadAsync` "marks the awaited acknowledgement as a catalog one", and record 0108 says "every other reply keeps 65,536 bytes".
-   - Today the awaited state is cleared in three places: `SendAsync`'s `finally` (`src/Censio.Companion.Core/IngestClient.cs:217-223`), `Deliver` (:633) and `Fail` (:290).
-   - If the new mark is a separate field that is not cleared in the same places, it outlives the catalog acknowledgement. The icon acknowledgements that follow on that connection would then also be read up to 1,179,648 bytes, against record 0108.
-   - The AC7 test `IngestClientRefusesLargeReplyToOtherMessage` does not say it runs after a catalog upload on the same connection, so it would not catch this.
-   - Smallest fix: in *Reply bound*, add "the mark is set with `_awaited` under `_stateLock` and cleared wherever `_awaited` is cleared". In the AC7 row, have `IngestClientRefusesLargeReplyToOtherMessage` (or a new case) send a reply above 65,536 bytes to an `iconImage` that follows an acknowledged catalog upload on the same connection, and expect `InvalidReply`.
-   - Recommendation: fix now

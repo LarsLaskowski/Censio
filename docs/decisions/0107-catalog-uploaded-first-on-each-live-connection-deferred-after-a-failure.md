@@ -30,7 +30,8 @@ went first, so no tick would be sent.
 
 Option 6: after `helloAccepted` the ready catalog whose identity the server does not name goes before the waiting
 messages, then its missing icons. A connection that fails during the upload defers it behind the messages waiting at
-the next hello, and the third such failure in a row ends its upload for the run. The rules are in
+the next hello, and the third such failure in a row ends its upload for the run. A connection that fails before the
+deferred catalog's turn neither counts nor resets; a completed upload or a newer catalog resets. The rules are in
 [`live-sending.md`](../areas/live-sending.md), *Catalog*.
 
 ## Consequences

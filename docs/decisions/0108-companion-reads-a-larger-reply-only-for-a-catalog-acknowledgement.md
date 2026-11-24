@@ -23,7 +23,8 @@ The Companion reads every server reply up to 65,536 bytes ([`replay-sending.md`]
 ## Decision
 
 Option 3: while the acknowledgement of a catalog upload is awaited, a reply may be up to 1,179,648 bytes, read into a
-buffer allocated for that message only; every other reply keeps 65,536 bytes. The rule is in
+buffer allocated for that message only; the larger bound ends with that wait, and every other reply, the icon replies
+that follow included, keeps 65,536 bytes. The rule is in
 [`live-sending.md`](../areas/live-sending.md), *Limits and errors*.
 
 ## Consequences
