@@ -140,6 +140,13 @@ public sealed class GameCatalogLoader
     /// </summary>
     public GameIconSet? Icons => _icons;
 
+    /// <summary>
+    /// Gets the build of the published catalog, or <c>null</c> if none is published or the build is unknown.
+    /// </summary>
+#pragma warning disable S2325, CA1822 // Skeleton: removed with the implementation
+    public string? Build => null;
+#pragma warning restore S2325, CA1822
+
     #endregion // Properties
 
     #region Methods

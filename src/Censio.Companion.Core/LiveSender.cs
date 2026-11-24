@@ -1,6 +1,7 @@
 using System.Globalization;
 
 using Censio.Contracts;
+using Censio.GameData;
 using Censio.Pipe;
 
 using Microsoft.Extensions.Logging;
@@ -18,6 +19,11 @@ public sealed class LiveSender : IAsyncDisposable
     /// The name of the profile live data goes to.
     /// </summary>
     public const string ProfileName = "Live";
+
+    /// <summary>
+    /// The number of connections that may fail during the upload of a catalog before it is given up.
+    /// </summary>
+    public const int MaxCatalogAttempts = 3;
 
     #endregion // Constants
 
@@ -237,6 +243,20 @@ public sealed class LiveSender : IAsyncDisposable
                               timeProvider,
                               logger);
     }
+
+    /// <summary>
+    /// Offers the state of the game catalog; a ready catalog is uploaded on the next connection.
+    /// </summary>
+    /// <param name="status">The status of the catalog loader</param>
+    /// <param name="catalog">The published catalog, or <c>null</c> if none is built</param>
+    /// <param name="icons">The published icons, or <c>null</c> if none are built</param>
+    /// <param name="build">The build of the published catalog, or <c>null</c> when unknown</param>
+#pragma warning disable S2325, RH2003 // Skeleton: removed with the implementation
+    public void SetCatalog(GameCatalogStatus status, GameCatalog? catalog, GameIconSet? icons, string? build)
+    {
+        throw new NotImplementedException();
+    }
+#pragma warning restore S2325, RH2003
 
     /// <summary>
     /// Puts an item of the pipe connection into the buffer for sending; it never waits.

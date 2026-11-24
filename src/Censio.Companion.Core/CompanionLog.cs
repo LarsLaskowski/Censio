@@ -471,5 +471,44 @@ public static partial class CompanionLog
     [LoggerMessage(Level = LogLevel.Warning, Message = "Live buffer entries unreadable: {Count}; discarded")]
     public static partial void LiveBufferUnreadable(ILogger logger, int count);
 
+    /// <summary>
+    /// Logs that the catalog was sent to the server.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    /// <param name="iconCount">The number of icons sent</param>
+    /// <param name="refusedCount">The number of icons the server refused</param>
+    [LoggerMessage(Level = LogLevel.Information, Message = "Catalog sent to the server: {IconCount} icons sent, {RefusedCount} refused")]
+    public static partial void CatalogSentToServer(ILogger logger, int iconCount, int refusedCount);
+
+    /// <summary>
+    /// Logs that the server already holds the catalog.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    [LoggerMessage(Level = LogLevel.Information, Message = "Catalog already on the server")]
+    public static partial void CatalogAlreadyOnServer(ILogger logger);
+
+    /// <summary>
+    /// Logs that the server refused the catalog.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    /// <param name="refusal">The refusal</param>
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Server refused the catalog: {Refusal}")]
+    public static partial void CatalogRefusedByServer(ILogger logger, ContractAcknowledgementRefusal refusal);
+
+    /// <summary>
+    /// Logs that the catalog was not sent because the contract writer refused it.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Catalog not sent: the contract writer refused it")]
+    public static partial void CatalogUploadNotWritten(ILogger logger);
+
+    /// <summary>
+    /// Logs that the catalog was given up after failed connections during its upload.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    /// <param name="attempts">The number of failed connections</param>
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Catalog not sent: the connection failed {Attempts} times during its upload")]
+    public static partial void CatalogUploadAbandoned(ILogger logger, int attempts);
+
     #endregion // Methods
 }

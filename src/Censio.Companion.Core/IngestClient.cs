@@ -16,6 +16,11 @@ public sealed class IngestClient : IAsyncDisposable
     /// </summary>
     public const int MaxReplyBytes = 65536;
 
+    /// <summary>
+    /// The largest size of the acknowledgement of a catalog upload in bytes.
+    /// </summary>
+    public const int MaxCatalogReplyBytes = 1179648;
+
     #endregion // Constants
 
     #region Fields
@@ -133,6 +138,11 @@ public sealed class IngestClient : IAsyncDisposable
     /// </summary>
     public ReplaySendProblemKind? Failure => GetFailure();
 
+    /// <summary>
+    /// Gets the identity of the catalog the server holds, as its hello reply named it, or <see langword="null" />.
+    /// </summary>
+    public string? ServerCatalogIdentity { get; }
+
     #endregion // Properties
 
     #region Methods
@@ -182,6 +192,20 @@ public sealed class IngestClient : IAsyncDisposable
             _statusSend = Task.Run(() => SendStatusAsync(previous, state), CancellationToken.None);
         }
     }
+
+    /// <summary>
+    /// Sends a catalog upload and waits for its acknowledgement, which may be larger than other replies.
+    /// </summary>
+    /// <param name="utf8Json">The bytes of the message</param>
+    /// <param name="id">The identity of the message</param>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>The acknowledgement, or <c>null</c> if the connection failed, see <see cref="Failure" /></returns>
+#pragma warning disable S2325, RH2003 // Skeleton: removed with the implementation
+    public Task<ContractAcknowledgement?> SendCatalogUploadAsync(ReadOnlyMemory<byte> utf8Json, Guid id, CancellationToken cancellationToken)
+    {
+        throw new NotImplementedException();
+    }
+#pragma warning restore S2325, RH2003
 
     /// <summary>
     /// Sends a message and waits for its acknowledgement.

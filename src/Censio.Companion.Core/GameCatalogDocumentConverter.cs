@@ -35,6 +35,16 @@ public static class GameCatalogDocumentConverter
     }
 
     /// <summary>
+    /// Computes the reference of an icon.
+    /// </summary>
+    /// <param name="icon">The icon</param>
+    /// <returns>The lowercase SHA-256 hex of the PNG data</returns>
+    public static string ToIconReference(GameIcon icon)
+    {
+        return Convert.ToHexStringLower(SHA256.HashData(icon.Png.Span));
+    }
+
+    /// <summary>
     /// Converts one catalog entry.
     /// </summary>
     /// <param name="entry">The entry</param>
@@ -98,7 +108,7 @@ public static class GameCatalogDocumentConverter
 
         if (references.TryGetValue(icon, out var reference) == false)
         {
-            reference = Convert.ToHexStringLower(SHA256.HashData(icon.Png.Span));
+            reference = ToIconReference(icon);
             references[icon] = reference;
         }
 
