@@ -42,7 +42,7 @@ runs the reveal animation (`docs/areas/web-charts.md`, *Animation*). One icon pe
   chart nor the row trends, and keeps the overview chart's `ReadNumber` and its `MudChart` component instance.
 - AC3: On an open good page, a stored icon reads neither chart and keeps both charts' `ReadNumber` and `MudChart`
   instances.
-- AC4: A tick of the page's profile stored while the read of an `Icons` notice runs still reads the charts and the row
+- AC4: A catalog stored while the read of an `Icons` notice runs still reads the charts and the row
   trends once that read ends (the path: `LoadAsync`'s pending loop with the details flag ORed, *Approach*).
 - AC5: An `Icons` notice whose read shows a view with another latest tick (`ProfileView.AsOf`) than the one shown
   before, or after no view was shown, reads the charts and row trends as any notice does.
@@ -56,14 +56,14 @@ runs the reveal animation (`docs/areas/web-charts.md`, *Animation*). One icon pe
 | AC1 | `ServerStateStoreIconAsyncTellsFollowersIconsChanged`, `ServerStateStoreIconAsyncWithoutCatalogTellsFollowersIconsChanged` (the two existing `…CatalogChanged` tests renamed and adapted); the existing `Catalog` assertion of the catalog store (`ServerStateTests.cs:584`) stays | `tests/Censio.Server.Tests/ServerStateTests.cs` |
 | AC2 | `IslandDetailStoredIconReadsNoTrendsAndKeepsChart` | `tests/Censio.Server.Tests/IslandDetailTests.cs` |
 | AC3 | `GoodTrendStoredIconReadsNoTrendsAndKeepsCharts` | `tests/Censio.Server.Tests/GoodTrendTests.cs` |
-| AC4 | `IslandDetailTickDuringIconReadReadsTrends` (passes on today's code, which reads on every notice: deferred to step 6) | `tests/Censio.Server.Tests/IslandDetailTests.cs` |
+| AC4 | `IslandDetailCatalogDuringIconReadReadsTrends` (passes on today's code, which reads on every notice: deferred to step 6) | `tests/Censio.Server.Tests/IslandDetailTests.cs` |
 | AC5 | `IslandDetailIconNoticeWithNewTickReadsTrends` (passes on today's code: deferred to step 6) | `tests/Censio.Server.Tests/IslandDetailTests.cs` |
 | AC6 | `IslandDetailStoredCatalogReadsOverviewAgain` (passes on today's code: deferred to step 6) | `tests/Censio.Server.Tests/IslandDetailTests.cs` |
 
 Cases for the Tester: AC2/AC3 wait until the icon (AC2) or a re-render (AC3) is shown, then assert
 `FakeHistoryTrends.FiguresQueries` / `GoodQueries` and `RowTrendCallCount` unchanged, `FindComponent<TrendChart>()`
 `ReadNumber` unchanged and `FindComponent<MudChart<double>>().Instance` reference-equal to the one before. AC4 holds the
-fake source's read of a profile that is not held (`FakeProfileStateSource(true)`), stores the icon, then a tick on
+fake source's read of a profile that is not held (`FakeProfileStateSource(true)`), stores the icon, then a catalog on
 `host.State`, releases, and waits for a second figures read. AC5 lets the fake source answer the `Icons` notice's read
 with a state of a later tick while only the icon is stored on `host.State`.
 
@@ -198,3 +198,9 @@ The approach holds up. I found no major objection.
 
 3. **The early return in `ReadOnceAsync` loses the pass's details flag.** When the target changes during the read, the pass returns early (`DataPageBase.cs:272-277`) and the `readsDetails` it took is gone. Today the next pass rescues this: it nulls out a view of another profile or island, so "none shown" counts as different, or an address change brings its own `LoadAsync(true)`. That rescue depends on two separate rules.
    - Instruction for the Dev: at that early return, set `_isDetailsDue |= readsDetails` together with `_isPending = true`, so a pass that was due to read its details hands that on to the next one.
+
+## Amendments
+
+| Criterion | Change | Reason | Step | Decided by |
+| --------- | ------ | ------ | ---- | ---------- |
+| AC4 | "A tick of the page's profile" became "A catalog"; test renamed `IslandDetailCatalogDuringIconReadReadsTrends` | Challenge note 1: a tick moves `ProfileView.AsOf` and passes through the AC5 path, so only a catalog checks the ORed details flag; the criterion's wording was not brought in line when the note was folded in | 8 | Lead |
