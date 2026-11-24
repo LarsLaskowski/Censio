@@ -1,6 +1,6 @@
 # 0107: The catalog is uploaded first on each live connection, deferred after a failed upload and given up after three
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-24
 - **Area:** live-sending
 - **Source:** Issue #42

@@ -168,6 +168,6 @@ once in the [area document](../areas/README.md) of the record's area, and the re
 | [0104](0104-live-sending-reconnects-holds-messages-in-memory-and-pings.md) | Live sending reconnects with growing delays, holds waiting messages in memory and finds a dead connection by its own pings | Accepted | 2026-11-22 |
 | [0105](0105-unsent-live-messages-kept-one-file-each-in-a-fixed-buffer-folder.md) | Unsent live messages are kept one file each in a fixed buffer folder | Accepted | 2026-11-23 |
 | [0106](0106-buffer-limits-are-settings-keys-in-hours-and-megabytes.md) | The buffer's limits are keys of the settings file, in whole hours and megabytes | Accepted | 2026-11-23 |
-| [0107](0107-catalog-uploaded-first-on-each-live-connection-deferred-after-a-failure.md) | The catalog is uploaded first on each live connection, deferred after a failed upload and given up after three | Proposed | 2026-11-24 |
-| [0108](0108-companion-reads-a-larger-reply-only-for-a-catalog-acknowledgement.md) | The Companion reads a larger reply only for the acknowledgement of a catalog upload | Proposed | 2026-11-24 |
+| [0107](0107-catalog-uploaded-first-on-each-live-connection-deferred-after-a-failure.md) | The catalog is uploaded first on each live connection, deferred after a failed upload and given up after three | Accepted | 2026-11-24 |
+| [0108](0108-companion-reads-a-larger-reply-only-for-a-catalog-acknowledgement.md) | The Companion reads a larger reply only for the acknowledgement of a catalog upload | Accepted | 2026-11-24 |
 <!-- project:end index -->

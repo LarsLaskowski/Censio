@@ -1,6 +1,6 @@
 # 0108: The Companion reads a larger reply only for the acknowledgement of a catalog upload
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-24
 - **Area:** live-sending
 - **Source:** Issue #42
