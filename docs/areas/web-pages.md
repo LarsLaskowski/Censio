@@ -183,8 +183,8 @@ text and is not retried until the page is loaded again: a notice of the server s
 - A page follows the server state ([`server-state.md`](server-state.md), *Followers and notices*) and shows a stored
   tick of its profile, a stored catalog or icon and a hello that renames the profile without a reload. A tick of another
   profile leaves a page unchanged. A stored trade-routes message is told as a notice of its own (`TradeRoutes`): only the
-  trade-routes page of its profile reads again; every other page ignores it, so the messages that arrive about every two
-  minutes cause no read of their trends. A stored icon is told as `Icons`: the
+  trade-routes page of its profile reads again and shows the new set; every other page ignores it, so the messages that arrive about every
+  two minutes cause no read of their trends. A stored icon is told as `Icons`: the
   page rebuilds its view and reads no trends unless the latest tick moved ([`web-charts.md`](web-charts.md)).
 - The region overview without a picked profile shows the profile with the newest latest tick and follows it: when a tick
   makes another profile the newest, it shows that one.
