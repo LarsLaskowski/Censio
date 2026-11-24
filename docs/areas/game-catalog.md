@@ -198,7 +198,7 @@ Rules apply in this order to every defining asset; the first that fits decides.
 
 ## Privacy
 
-- Names and texts stay on the machine of the user: none enters the repository, a fixture, a release, a log or test
+- Names and texts stay on the machine of the user, except that live sending uploads them to the player's own server ([`live-sending.md`](live-sending.md), *Catalog*): none enters the repository, a fixture, a release, a log or test
   output (records [0023](../decisions/0023-game-names-and-icons-extracted-locally.md) and
   [0029](../decisions/0029-anonymised-test-fixtures-only.md)). The test fixture has the structure of the game's files
   and invented GUIDs, identifiers, names and paths; a test asserts that none of its GUIDs occurs in the pipe fixture.
