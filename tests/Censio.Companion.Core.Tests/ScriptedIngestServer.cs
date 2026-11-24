@@ -352,6 +352,25 @@ public sealed class ScriptedIngestServer : IAsyncDisposable
     }
 
     /// <summary>
+    /// Sends bytes as one message that the client may stop reading, ignoring the failure of the ended connection.
+    /// </summary>
+    /// <param name="data">The bytes</param>
+    /// <param name="messageType">The type of the message</param>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>A task that completes when the message is sent or the connection ended</returns>
+    public async Task SendRawIgnoringFailureAsync(byte[] data, WebSocketMessageType messageType, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await SendRawAsync(data, messageType, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is WebSocketException or IOException or OperationCanceledException)
+        {
+            // The client ended the connection while the message was sent.
+        }
+    }
+
+    /// <summary>
     /// Sends a close frame without waiting for the client's.
     /// </summary>
     /// <param name="cancellationToken">The cancellation token</param>

@@ -30,7 +30,10 @@ internal static class CatalogTestData
     /// <param name="name">The name; catalogs of different names differ in names, icons and identity</param>
     /// <param name="iconCount">The number of goods, each with an icon</param>
     /// <param name="hasIcons">Whether the catalog has an icon set; without one it has none, as after failed icons</param>
-    /// <returns>The catalog, its icons or <c>null</c>, the build, the identity, the references and the PNG data of the icons</returns>
+    /// <returns>
+    /// The catalog, its icons or <c>null</c>, the build, the identity, the references in ascending ordinal order, as the contract
+    /// writer lists missing icons, and the PNG data of the icons, <c>Pngs[i]</c> being that of <c>References[i]</c>
+    /// </returns>
     public static CatalogData Create(string name, int iconCount, bool hasIcons = true)
     {
         var entries = new List<GameCatalogEntry>
@@ -67,9 +70,12 @@ internal static class CatalogTestData
 
         var catalog = new GameCatalog(entries, [], 0, 0);
         var iconSet = hasIcons ? new GameIconSet(icons, new Dictionary<int, GameIconProblem>(), iconCount, 0) : null;
-        var references = hasIcons ? pngs.Select(png => Convert.ToHexStringLower(SHA256.HashData(png))).ToArray() : [];
+        var ordered = pngs.Select(png => (Reference: Convert.ToHexStringLower(SHA256.HashData(png)), Png: png))
+                          .OrderBy(pair => pair.Reference, StringComparer.Ordinal)
+                          .ToArray();
+        var references = hasIcons ? ordered.Select(pair => pair.Reference).ToArray() : [];
 
-        return (catalog, iconSet, Build, IdentityOf(catalog, iconSet, Build), references, pngs);
+        return (catalog, iconSet, Build, IdentityOf(catalog, iconSet, Build), references, ordered.Select(pair => pair.Png).ToArray());
     }
 
     /// <summary>

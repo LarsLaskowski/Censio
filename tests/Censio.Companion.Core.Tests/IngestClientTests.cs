@@ -156,9 +156,11 @@ public sealed class IngestClientTests
         var sending = client.SendAsync(iconBytes.ToArray(), icon.Id, TestContext.CancellationToken);
 
         await server.ReceiveAsync(TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
-        await server.SendRawAsync(reply, WebSocketMessageType.Text, TestContext.CancellationToken);
 
+        var replying = server.SendRawIgnoringFailureAsync(reply, WebSocketMessageType.Text, TestContext.CancellationToken);
         var acknowledgement = await sending.WaitAsync(_guard, TestContext.CancellationToken);
+
+        await replying.WaitAsync(_guard, TestContext.CancellationToken);
 
         // Assert
         Assert.IsNotNull(uploaded, "The catalog upload should be acknowledged");
@@ -187,12 +189,52 @@ public sealed class IngestClientTests
         var sending = client.SendCatalogUploadAsync(CreateUpload(id), id, TestContext.CancellationToken);
 
         await server.ReceiveAsync(TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
-        await server.SendRawAsync(reply, WebSocketMessageType.Text, TestContext.CancellationToken);
 
+        var replying = server.SendRawIgnoringFailureAsync(reply, WebSocketMessageType.Text, TestContext.CancellationToken);
         var acknowledgement = await sending.WaitAsync(_guard, TestContext.CancellationToken);
+
+        await replying.WaitAsync(_guard, TestContext.CancellationToken);
 
         // Assert
         Assert.IsNull(acknowledgement, "A reply above the catalog bound should not be handed to the caller");
+        Assert.AreEqual(ReplaySendProblemKind.InvalidReply, client.Failure, "The connection should end as an invalid reply");
+    }
+
+    /// <summary>
+    /// An acknowledgement larger than 65,536 bytes to a message other than a catalog upload ends the connection as an invalid
+    /// reply, with no catalog upload on the connection (N3).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public async Task IngestClientRefusesLargeReplyToOtherMessage()
+    {
+        // Arrange
+        var (client, server) = await OpenAsync(null);
+
+        var data = CatalogTestData.Create("A", 1);
+        var icon = new ContractIconImage
+                   {
+                       Id = Guid.NewGuid(),
+                       Reference = data.References[0],
+                       Png = data.Pngs[0]
+                   };
+        var reply = PadTo(ScriptedIngestServer.Write(ScriptedIngestServer.CreateAcknowledgement(icon.Id, null)), IngestClient.MaxReplyBytes + 1);
+
+        Assert.IsInstanceOfType<ContractAcknowledgement>(ContractReader.Read(reply).Message, "Apart from its size the reply should be a valid acknowledgement");
+
+        // Act
+        var sending = client.SendAsync(ContractWriter.Write(icon).Utf8Json.ToArray(), icon.Id, TestContext.CancellationToken);
+
+        await server.ReceiveAsync(TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+
+        var replying = server.SendRawIgnoringFailureAsync(reply, WebSocketMessageType.Text, TestContext.CancellationToken);
+        var acknowledgement = await sending.WaitAsync(_guard, TestContext.CancellationToken);
+
+        await replying.WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        Assert.IsNull(acknowledgement, "A reply of 65,537 bytes to a message other than a catalog upload should not be handed to the caller");
         Assert.AreEqual(ReplaySendProblemKind.InvalidReply, client.Failure, "The connection should end as an invalid reply");
     }
 

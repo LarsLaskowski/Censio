@@ -280,7 +280,7 @@ public sealed class LiveSenderCatalogTests : IDisposable
     {
         // Arrange
         var catalogA = AddCatalog("A", 3);
-        var served = AddServer(null, Accepting(catalogA.References[2], catalogA.References[0]));
+        var served = AddServer(null, Accepting(catalogA.References[0], catalogA.References[2]));
         var sender = CreateSender();
 
         Offer(sender, catalogA);
@@ -292,7 +292,7 @@ public sealed class LiveSenderCatalogTests : IDisposable
         await WaitForMessagesAsync(served.Received, 5);
 
         // Assert
-        Assert.AreSequenceEqual(Expected("hello", "catalog A", "icon A3", "icon A1", "tick 1"), Labels(served.Received), "Only the listed icons should be sent, in the listed order");
+        Assert.AreSequenceEqual(Expected("hello", "catalog A", "icon A1", "icon A3", "tick 1"), Labels(served.Received), "Only the listed icons should be sent, in the listed order");
     }
 
     /// <summary>
@@ -641,7 +641,7 @@ public sealed class LiveSenderCatalogTests : IDisposable
         var first = AddServer(null,
                               (server, message) => message switch
                                                    {
-                                                       ContractCatalogUpload => Reply(message, ContractAcknowledgementRefusal.CatalogInvalid, catalogA.References),
+                                                       ContractCatalogUpload => Reply(message, ContractAcknowledgementRefusal.CatalogInvalid, []),
                                                        ContractTick { GameTime: 2 } => Abort(server),
                                                        _ => Ack(message)
                                                    });
