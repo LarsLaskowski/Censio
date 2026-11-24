@@ -5,23 +5,15 @@ Status: Draft
 
 ## Problem
 
-A player who runs the server in Docker (or the server the Companion hosts in local mode) sees bare numbers on its pages:
-`Region <GUID>` and `Good <GUID>`, and no good icons ([`web-pages.md`](../../docs/areas/web-pages.md), names and
-fallbacks). The server cannot read game files ([record 0023](../../docs/decisions/0023-game-names-and-icons-extracted-locally.md));
-only the Companion builds the catalog of names and icons from the player's installation
-([`game-catalog.md`](../../docs/areas/game-catalog.md), [`game-catalog-cache.md`](../../docs/areas/game-catalog-cache.md)).
-Everything else already exists: the catalog converts into the catalog document
-([`game-catalog-format.md`](../../docs/areas/game-catalog-format.md)) and the contract's `catalogUpload` and `iconImage`
-messages, which the server stores and shows ([`ingest.md`](../../docs/areas/ingest.md), *Messages after the hello*;
-[`server-state.md`](../../docs/areas/server-state.md), *Catalog*). But nothing sends them: live sending says "No catalog,
-icon or figure name is sent" ([`live-sending.md`](../../docs/areas/live-sending.md), *What is sent*). So no one
-testing with Docker can see the pages as intended.
+A player whose server runs in Docker or in local mode sees `Region <GUID>`, `Good <GUID>` and no good icons on its
+pages ([`web-pages.md`](../../docs/areas/web-pages.md)). The server cannot read game files (record 0023); the Companion
+builds the catalog, the server already stores and shows `catalogUpload` and `iconImage`
+([`ingest.md`](../../docs/areas/ingest.md), [`server-state.md`](../../docs/areas/server-state.md), *Catalog*), but
+nothing sends them ([`live-sending.md`](../../docs/areas/live-sending.md), *What is sent*).
 
-Checked against the code: `IngestClient` reads `helloAccepted` but passes nothing from it to its caller, so the
-catalog identity the server names there is not seen yet. Its reply bound is 65,536 bytes, but an acknowledgement of a
-catalog upload may list up to 16,384 `missingIcons`, about 1.1 MB ([`ingest.md`](../../docs/areas/ingest.md), *Memory
-of a catalog upload*). The real catalog measured for #23 has 1,040 entries, and only goods and regions have icons, so a
-fresh server's list is probably far shorter, but no measurement says by how much.
+Checked against the code: `IngestClient` passes nothing of `helloAccepted` to its caller, and its reply bound of
+65,536 bytes is below the largest catalog acknowledgement (16,384 `missingIcons`, about 1.1 MB, `ingest.md`). The
+real catalog's icon count is not measured.
 
 ## Scenarios
 
@@ -76,36 +68,48 @@ catalog document's bytes, which the server names the same way ([`contract.md`](.
   are not sent, and the newer one follows the message in flight. No `Catalog sent` line is written for the older one.
 - E7: An acknowledgement of a catalog upload with up to 16,384 `missingIcons` is read and acted on. It is not
   `Server: invalid reply, retrying`.
-- E8: A catalog or icon not acknowledged within 30 seconds (a slow link, a large catalog) is `Server: not answering,
-  retrying`, as for any message. The upload is retried after the reconnect, so on a link too slow for the catalog this
-  repeats (accepted risk, *Non-functional requirements* N6).
-- E9: The server's catalog came from another installation (another PC, another game build): the identities differ, so
-  the upload replaces it ([`ingest.md`](../../docs/areas/ingest.md): a later upload replaces the earlier one).
+- E8: A catalog or icon not written, or not acknowledged, within 30 seconds each (a slow link, a large catalog, a slow
+  store) is `Server: not answering, retrying`, as for any message. The upload is retried after the reconnect under the
+  rule of E11 (N6).
+- E9: The server's catalog came from another installation: the identities differ, so the upload replaces it.
 - E10: `Exit` during an upload keeps its bounds (2 seconds, 5 in local mode; `live-sending.md`, *Exit*). The rest is S5
   at the next start.
+- E11: A connection that ends while a catalog or one of its icons is in flight (no acknowledgement in time, a close
+  such as 1011 after a failed store, a lost connection) defers that catalog: after the next accepted hello the live
+  messages that wait at that hello are sent first, and the catalog follows once they are acknowledged. After the third
+  such connection in a row for the same catalog it is not tried again in this run, and `Catalog not sent: the
+  connection failed 3 times during its upload` is logged. A completed upload or a newer catalog starts the count again.
 
 ## Non-functional requirements
 
 - N1: Order: one message in flight on the live connection as today. After `helloAccepted` the catalog and its icons
-  come before the waiting live messages. A catalog that becomes ready later follows the message in flight. Ticks taken
+  come before the waiting live messages, except for a deferred catalog (E11), which follows them. A catalog that
+  becomes ready later follows the message in flight. Ticks taken
   meanwhile wait in the buffer within its limits.
-- N2: Memory: besides the catalog it holds, the Companion holds at most the written catalog message (at most the
-  contract's 24 MiB), one written icon message and the acknowledgement's list of missing references at a time.
+- N2: Memory: besides the catalog and icons it holds, an upload holds at its peak, while the message is written, the
+  document's bytes (at most 16 MiB) and the written catalog message (at most the contract's 24 MiB). From the send on
+  it holds only the written message, until its acknowledgement; the document model and its bytes are released before
+  the send. Afterwards it holds the acknowledgement's list of missing references and one written icon message at a
+  time.
 - N3: Replies: an acknowledgement of a catalog upload is read up to the size the contract allows (16,384 references,
   about 1.1 MB). Every other reply keeps the bound of 65,536 bytes
   ([`replay-sending.md`](../../docs/areas/replay-sending.md), *Limits and errors*).
-- N4: Privacy: the catalog and the icons go only to the server live sending connects to, in forward mode over `ws://`
-  unencrypted (record 0023: only to the player's own server). No log line holds a name, an icon reference, a path or
+- N4: Privacy: the catalog and the icons go only to the server live sending connects to, over the connection
+  configured for it: unencrypted with a `ws://` `serverAddress`, under TLS with `wss://` (record 0023: only to the
+  player's own server). No log line holds a name, an icon reference, a path or
   any content. The figure name is still never sent (record 0041), and the cache file is still never sent.
 - N5: Compatibility: contract version 2 and the server are unchanged. No new setting, menu line or tooltip text. A
   server of release 0.3.0 refuses the hello as before.
-- N6: Accepted risk: a link that cannot carry the catalog message within 30 seconds retries the upload at every
-  reconnect (E8).
+- N6: Accepted risk: a link or a server that cannot take the catalog within 30 seconds costs up to three reconnects
+  per catalog and run (E8, E11); the live messages that wait meanwhile are sent between them, so the buffer drops only
+  what an outage beyond its limits would drop anyway. Without E11's deferral and count the upload would be retried
+  first at every reconnect, no tick would be sent, and the buffer would drop the oldest messages at `bufferHours` or
+  `bufferMegabytes`; that is why the rule exists.
 - N7: Log lines, Information unless named, each written once per occasion: `Catalog sent to the server: <i> icons sent,
   <r> refused` (after the last icon's acknowledgement, also with `0 icons`), `Catalog already on the server` (at most
   once per accepted hello and per ready catalog), `Server refused the catalog: <kind>` (Warning, the kind by its name as
-  in `Server refused a live message: <kind>`), `Catalog not sent: the contract writer refused it` (Warning)
-  ([`companion-log.md`](../../docs/areas/companion-log.md)).
+  in `Server refused a live message: <kind>`), `Catalog not sent: the contract writer refused it` (Warning), `Catalog not sent: the connection failed 3 times
+  during its upload` (Warning) ([`companion-log.md`](../../docs/areas/companion-log.md)).
 
 ## Acceptance criteria
 
@@ -132,15 +136,22 @@ catalog document's bytes, which the server names the same way ([`contract.md`](.
   above 65,536 bytes still ends the connection as `Server: invalid reply, retrying` (E7, N3).
 - AC8: No catalog or icon message is written to the buffer folder or counted in the `Buffer:` line, and `Exit` during
   an upload ends within the bounds of `live-sending.md`, *Exit* (E5, E10).
-- AC9: The four log lines of N7 are written with exactly that text and level, and none holds a name, reference or
+- AC9: The five log lines of N7 are written with exactly that text and level, and none holds a name, reference or
   path (N4, N7).
 - AC10: A Docker server started with an empty `/config` shows, after the first connection of a forward-mode Companion
   with the real game installed, region and good names and good icons on its pages. Checked by hand by the Product
   Manager on a build of the branch (the issue's criterion).
 - AC11: `README.md` and `docs/USER_GUIDE.md`, English and then German, describe the upload, the skip, the log lines and
-  what the pages show, so that an external tester can try it with Docker (the issue's *Documentation*).
-- AC12: While it uploads, the Companion holds at most the written catalog message, one written icon message and the
-  list of missing references besides its catalog; the plan names the seam that observes it (N2).
+  what the pages show, so that an external tester can try it with Docker (the issue's *Documentation*). Both also say
+  that a replay sends no catalog: names and icons reach a server only from a live connection of a Companion with the
+  game installed, and a replay into a server shows them only when such a connection stored them there before.
+- AC12: An upload holds the document's bytes and the written catalog message together only while the message is
+  written, then the written message alone until its acknowledgement, then the list of missing references and one
+  written icon message at a time; the plan names the seam that observes it (N2).
+- AC13: With a server that never acknowledges the catalog (or closes with 1011 on it), the live messages that wait and
+  those taken later are acknowledged on the following connections. After the third failed connection during its
+  upload the catalog is not sent again in this run and `Catalog not sent: the connection failed 3 times during its
+  upload` is logged once (E11, N6).
 
 ## Out of scope
 
@@ -157,22 +168,32 @@ catalog document's bytes, which the server names the same way ([`contract.md`](.
   checks*). A replay sends what a recording holds. The Product Manager may extend this at the spec's approval.
 - What is "the same version" the server already has? Answered: (code, record 0070) the `catalogIdentity` of
   `helloAccepted`, the SHA-256 of the stored document, named only while all its icons are stored
-  (`ServerState.CompleteCatalogIdentity`, `ContractCatalogUpload.ComputeIdentity`).
-- Catalog before or after the buffered messages? Answered: (Lead) before. Names appear soonest, and the catalog of a
-  real installation is small next to a day of buffered ticks.
+  (`ServerState.CompleteCatalogIdentity`).
+- Catalog before or after the buffered messages? Answered: (Lead) before, unless the previous connection ended
+  during its upload: then after the messages that wait (E11). Names appear soonest, and the catalog of a real
+  installation is small next to a day of buffered ticks.
 - A catalog without icons? Answered: (code) the converter writes `icon` `null` without an icon set, so names travel
   alone (S7).
 
 ## Area documents
 
-- `docs/areas/live-sending.md`: a new section *Catalog* (when it is sent, the skip, the order, re-extraction,
-  interruption, refusals, what the buffer never holds); *What is sent* and *Privacy* lose "No catalog, icon"; the *Log*
-  table gains the four lines; *Not here* loses "the catalog (#42)". The plan measures the document against
-  `AREA_MAX_WORDS` and splits it into its own area if needed.
-- `docs/areas/replay-sending.md`: the reply bound's exception for catalog acknowledgements, if the shared rule changes
-  there; *Scope* and *Not here* point to live sending for the catalog.
-- `docs/areas/local-mode.md`: "The catalog's names and icons are not in local mode yet" is replaced by a pointer.
-- `docs/areas/companion-log.md`: the four lines.
-- `docs/areas/game-catalog-format.md`, `game-catalog-cache.md`, `contract.md`, `ingest.md`: the "(#42)" pointers name
-  live sending. `game-catalog-format.md` *Scope* no longer says that nothing sends the document.
-- `docs/ARCHITECTURE.md`: "which nothing sends yet (#42)" names live sending.
+- `docs/areas/live-sending.md`: a new section *Catalog* (sending, skip, order, deferral, refusals, not buffered);
+  *What is sent*, *Privacy*, *Log* and *Not here* follow. The plan measures it against `AREA_MAX_WORDS` and splits if
+  needed.
+- `docs/areas/companion-log.md`: the five lines. `replay-sending.md`: the reply bound's exception, if the shared rule
+  lives there.
+- The "(#42)" and "not yet" pointers of `local-mode.md`, `game-catalog-format.md` (also its *Scope*),
+  `game-catalog-cache.md`, `contract.md`, `ingest.md` and `docs/ARCHITECTURE.md` name live sending.
+
+## Challenge
+
+- MAJOR 1 (a catalog that keeps failing blocks live sending): accepted. New E11: a connection that ends while a catalog
+  or icon is in flight defers the catalog behind the messages waiting at the next hello, and after three such
+  connections in a row the catalog is not tried again in this run, with a log line. N1, N6, N7, the third open
+  question and AC9 follow; AC13 requires that a catalog failing every time does not stop ticks. E8 now points to E11.
+- MINOR 1 (memory peak during the write): accepted. N2 names the document's bytes beside the written message as the
+  peak while writing, and requires the document model and bytes released before the send; AC12 checks that wording.
+- MINOR 2 (E8 wording): accepted; E8 reads "not written, or not acknowledged, within 30 seconds each".
+- MINOR 3 (`wss://`): accepted; N4 says the catalog goes over the configured connection, unencrypted only with `ws://`.
+- MINOR 4 (replay in the documentation): accepted; AC11 requires README and user guide to say that a replay sends no
+  catalog and that names and icons come only from a live connection of a Companion with the game installed.
