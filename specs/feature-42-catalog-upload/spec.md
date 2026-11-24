@@ -130,7 +130,7 @@ catalog document's bytes, which the server names the same way ([`contract.md`](.
 - AC5: A catalog whose icons failed is uploaded with every `icon` `null` and no `iconImage`. Without a ready catalog
   (no game, catalog failed) nothing is sent (S7, E1).
 - AC6: A refused catalog sends no icon, logs `Server refused the catalog: <kind>` and is not uploaded again in this
-  run, also after a reconnect. A refused icon is counted as `<r>`. A catalog the writer refuses logs `Catalog not sent:
+  run, also after a reconnect. A refused icon is counted as `<r>`, not as `<i>`. A catalog the writer refuses logs `Catalog not sent:
   the contract writer refused it` and sends nothing. Live messages are sent afterwards in all three cases (E2, E3, E4).
 - AC7: An acknowledgement of a catalog upload with 16,384 `missingIcons` is read and its icons sent. Any other reply
   above 65,536 bytes still ends the connection as `Server: invalid reply, retrying` (E7, N3).
@@ -197,3 +197,9 @@ catalog document's bytes, which the server names the same way ([`contract.md`](.
 - MINOR 3 (`wss://`): accepted; N4 says the catalog goes over the configured connection, unencrypted only with `ws://`.
 - MINOR 4 (replay in the documentation): accepted; AC11 requires README and user guide to say that a replay sends no
   catalog and that names and icons come only from a live connection of a Companion with the game installed.
+
+## Amendments
+
+| Criterion | Change | Reason | Step | Decided by |
+| --------- | ------ | ------ | ---- | ---------- |
+| AC6 | `<i>` counts only accepted icons | E4's writer-refused icon is never sent | 5 | Lead (decide) |

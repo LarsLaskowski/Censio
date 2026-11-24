@@ -31,7 +31,7 @@ See [spec.md](spec.md), *Problem*: the server side exists; the Companion never s
 
 | AC | Test(s) | Test file |
 | -- | ------- | --------- |
-| AC1 | `LiveSenderCatalogTests.LiveSenderUploadsCatalogBeforeWaitingMessages`, `LiveSenderSendsMissingIconsInListedOrder`, `LiveSenderUploadsWhenServerNamesAnotherIdentity`, `LiveSenderUploadsToLocalServer`; `GameCatalogLoaderTests.GameCatalogLoaderBuildIsBuildOfPublishedCatalog` (also: during `ExtractingNames` of a re-extraction and after a failed one, `Build` names the old build) | `LiveSenderCatalogTests.cs`, `GameCatalogLoaderTests.cs` |
+| AC1 | `LiveSenderCatalogTests.LiveSenderUploadsCatalogBeforeWaitingMessages`, `LiveSenderSendsMissingIconsInListedOrder`, `LiveSenderUploadsWhenServerNamesAnotherIdentity`, `LiveSenderUploadsToLocalServer`; `GameCatalogLoaderTests.GameCatalogLoaderBuildIsBuildOfPublishedCatalog` (also: during `ExtractingNames` of a re-extraction `Build` names the old build; after a failed one `Catalog` and `Build` are `null`) | `LiveSenderCatalogTests.cs`, `GameCatalogLoaderTests.cs` |
 | AC2 | `LiveSenderCatalogTests.LiveSenderSkipsUploadWhenServerNamesIdentity` | `LiveSenderCatalogTests.cs` |
 | AC3 | `LiveSenderCatalogTests.LiveSenderUploadsCatalogReadyAfterHelloAfterMessageInFlight`, `LiveSenderSkipsReextractedCatalogWithSameIdentity`, `LiveSenderNewerCatalogStopsIconsOfOlder`, `LiveSenderIgnoresCatalogBeforeItsFinalStatus` | `LiveSenderCatalogTests.cs` |
 | AC4 | `LiveSenderCatalogTests.LiveSenderResendsCatalogAndListedIconsAfterLostConnection`, `LiveSenderRetriesCatalogAfterAcknowledgementTimeout` | `LiveSenderCatalogTests.cs` |
@@ -74,7 +74,7 @@ identities are equal, it logs `CatalogAlreadyOnServer` once per connection and c
 - An upload goes through `IngestClient.SendCatalogUploadAsync`. A refusal logs `CatalogRefusedByServer` and closes the
   catalog for the run (E2).
 - Otherwise each listed reference goes out through `WriteIcon` and `SendAsync`, one at a time; a refusal or `null`
-  counts in `<r>`. Before each icon the loop checks for a newer catalog and drops the remaining icons when there is
+  counts in `<r>`, every other acknowledged icon in `<i>`. Before each icon the loop checks for a newer catalog and drops the remaining icons when there is
   one (E6).
 - After the last icon it logs `CatalogSentToServer(i, r)` and resets the failure count.
 - A connection that fails while the upload or an icon is in flight counts one failure and defers the catalog. The
@@ -141,7 +141,7 @@ Early draft PR: no — the manual check uses local builds, and no criterion need
   property `IngestClient.ServerCatalogIdentity`, and
   `public Task<ContractAcknowledgement?> SendCatalogUploadAsync(ReadOnlyMemory<byte> utf8Json, Guid id, CancellationToken cancellationToken)`.
 - `GameCatalogLoader`: the get-only nullable string property `GameCatalogLoader.Build` (the build of the published
-  catalog, from a field of its own set together with the catalog field).
+  catalog, from a field of its own set together with the catalog field; none when the catalog is cleared, as after a failed extraction).
 - `GameCatalogDocumentConverter`: `public static string ToIconReference(GameIcon icon)`.
 - `CompanionLog`: `public static partial void CatalogSentToServer(ILogger logger, int iconCount, int refusedCount);`,
   `public static partial void CatalogAlreadyOnServer(ILogger logger);`,
