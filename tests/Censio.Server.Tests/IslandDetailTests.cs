@@ -640,13 +640,13 @@ public sealed class IslandDetailTests
     }
 
     /// <summary>
-    /// A tick of the page's profile stored while the read of an icon notice runs still reads the overview chart and the
-    /// row trends once that read ends: the pending read keeps the details of the notice that arrived during the read.
+    /// A catalog stored while the read of an icon notice runs still reads the overview chart and the row trends once that
+    /// read ends: the pending read keeps the details of the notice that arrived during the read.
     /// </summary>
     /// <returns>A task that represents the asynchronous test</returns>
     [TestMethod]
     [TestCategory("AC4")]
-    public async Task IslandDetailTickDuringIconReadReadsTrends()
+    public async Task IslandDetailCatalogDuringIconReadReadsTrends()
     {
         // Arrange
         using var source = new FakeProfileStateSource(true);
