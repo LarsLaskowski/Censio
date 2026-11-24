@@ -169,3 +169,32 @@ nothing but the view (`DataPageBase` summary); the ingest's acknowledgement does
 
 - A page whose profile is not held still reads its state from the database once per merged `Icons` notice; bounded by
   the `PageReader` gate and the pending-read merge, recorded in record 0109's *Consequences*.
+
+## Challenge notes
+
+Devil's Advocate, plan mode, issue #247 (`/home/user/Censio/specs/issue-247/plan.md`, record `/home/user/Censio/docs/decisions/0109-a-stored-icon-tells-a-notice-of-its-own-that-reads-no-trends.md`)
+
+The approach holds up. I found no major objection.
+
+**What I checked in the code:**
+- `ServerState.StoreIconAsync` and `SwapCatalog` (`src/Censio.Server/ServerState.cs:503-536, 813-822`) tell the same `Catalog` notice as a stored catalog.
+- The `concerns` rule and the call to `LoadAsync` are at `DataPageBase.cs:379-386`.
+- `OnParametersSetAsync` (`DataPageBase.cs:403-418`) is the only other caller of `LoadAsync`. A range change goes through it, because `AddressKey` includes `ChartChoice.Range` (`IslandDetail.razor.cs:215`, `GoodTrend.razor.cs:140`). So it gets `LoadAsync(true)` and keeps its re-read.
+- `TrendChart` (`TrendChart.razor:23`, `TrendChart.razor.cs:409-466`) builds a new `DrawnTrend` only when it gets a new `Read` reference, the `Texts` change or the `Axis` changes. A view-only re-render passes the same `_overviewRead`, `_islandRead` and `_regionRead`, so fact 9 holds.
+- Only three pages override `ReadDetailsAsync`: IslandDetail, GoodTrend and RegionIslands. RegionIslands only asks for sparklines, which `SparklineLoader` already skips for the same `asOf`, so skipping its details loses nothing.
+- Apart from the two tests the plan names, no follower in `src/` or `tests/` relies on an icon telling `Catalog`.
+
+**Minor objections (each written as an instruction):**
+
+1. **AC4's test does not check the ORed flag.** As planned, `IslandDetailTickDuringIconReadReadsTrends` stores a tick during the `Icons` read. That tick moves `ProfileView.AsOf`, so step 3's AsOf rule (the AC5 path) already starts the second figures read. A build that drops or overwrites `_isDetailsDue` while a read runs would still pass.
+   - Instruction for the Tester: in AC4, while the `Icons` read is held by `FakeProfileStateSource(true)`, store a **catalog** on `host.State` (a `Catalog` notice with the same latest tick), not a tick.
+   - Release the read with a state of the same `AsOf`, then wait for a second figures read.
+   - A tick test may be kept as well, but it does not stand in for this one.
+
+2. **AC3's wait point is undefined, so the test can pass on today's code without checking anything.** `GoodTrend.razor` shows no row icon (no `IconReference` in `GoodTrend.razor*`), so "wait until a re-render is shown" has nothing visible to wait for. Also, on both pages `Show()` renders before `ReadDetailsAsync` starts (`DataPageBase.cs:278-283`). An assertion made right after the render could therefore run before today's code has recorded its chart read.
+   - Instruction for the Tester: wait until the page's render count has grown after `StoreIconAsync` (AC3) or until the icon appears (AC2).
+   - Then compare the query counts and `ReadNumber` with the values from before.
+   - In the red run, confirm that AC2 and AC3 fail on the query count or `ReadNumber` assertion, not on a timeout and not intermittently.
+
+3. **The early return in `ReadOnceAsync` loses the pass's details flag.** When the target changes during the read, the pass returns early (`DataPageBase.cs:272-277`) and the `readsDetails` it took is gone. Today the next pass rescues this: it nulls out a view of another profile or island, so "none shown" counts as different, or an address change brings its own `LoadAsync(true)`. That rescue depends on two separate rules.
+   - Instruction for the Dev: at that early return, set `_isDetailsDue |= readsDetails` together with `_isPending = true`, so a pass that was due to read its details hands that on to the next one.
