@@ -23,5 +23,10 @@ public enum ServerStateChangeKind
     /// <summary>
     /// The trade routes of a profile changed.
     /// </summary>
-    TradeRoutes
+    TradeRoutes,
+
+    /// <summary>
+    /// The icons of the catalog changed.
+    /// </summary>
+    Icons
 }
