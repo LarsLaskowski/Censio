@@ -150,6 +150,9 @@ English and German. The sparklines and trend arrows of the tables are in [`web-t
   point the chart holds and replaces that hour and the ones after it, keeping the older hours (and dropping those before the
   range start); a tick that arrives late for an older hour shows only when the charts are next read whole (page opened,
   choice made).
+- A stored icon reads no chart: the page keeps each chart's read and element, so no reveal runs once per icon of an upload.
+  Only a view with another latest tick than the one shown before reads the charts, as a tick does. A stored catalog reads
+  them again.
 - **A choice** of a range re-reads every chart of the page with that range without a reload: each chart shows `Loading…`
   until its points for the new choice are there, the page keeps the profile's view, and a read of an earlier choice is
   cancelled (it stops at its next part and frees the trend gate) and never shown. Of several quick choices only the last is

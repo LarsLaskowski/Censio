@@ -48,6 +48,11 @@ public abstract class DataPageBase : ComponentBase, IDisposable
     private bool _isPending;
 
     /// <summary>
+    /// A value that indicates whether the next read has to read the details, whatever the shown view.
+    /// </summary>
+    private bool _isDetailsDue;
+
+    /// <summary>
     /// The address the page last read, or <see langword="null" /> before the first.
     /// </summary>
     private object? _addressKey;
@@ -200,11 +205,26 @@ public abstract class DataPageBase : ComponentBase, IDisposable
     }
 
     /// <summary>
+    /// Checks that a read of a ready view reads the details.
+    /// </summary>
+    /// <param name="readsDetails"><see langword="true" /> when the read reads them whatever the shown view</param>
+    /// <param name="shownAsOf">The latest tick of the view shown before the read, or <see langword="null" /> for none</param>
+    /// <param name="ready">The view the read shows</param>
+    /// <returns><see langword="true" /> when the details are read</returns>
+    private static bool IsDetailsRead(bool readsDetails, DateTimeOffset? shownAsOf, ProfileView ready)
+    {
+        return readsDetails || shownAsOf is null || ready.AsOf != shownAsOf;
+    }
+
+    /// <summary>
     /// Reads, then reads again while notices arrived during the read.
     /// </summary>
+    /// <param name="readsDetails"><see langword="true" /> when the read has to read the details, <see langword="false" /> when it reads them only for a view of another latest tick</param>
     /// <returns>A task that completes when the page shows the newest state</returns>
-    private async Task LoadAsync()
+    private async Task LoadAsync(bool readsDetails)
     {
+        _isDetailsDue |= readsDetails;
+
         if (_isReading)
         {
             _isPending = true;
@@ -218,9 +238,12 @@ public abstract class DataPageBase : ComponentBase, IDisposable
         {
             do
             {
+                var details = _isDetailsDue;
+
+                _isDetailsDue = false;
                 _isPending = false;
 
-                await ReadOnceAsync().ConfigureAwait(true);
+                await ReadOnceAsync(details).ConfigureAwait(true);
             }
             while (_isPending && _cancellationToken.IsCancellationRequested == false);
         }
@@ -237,8 +260,9 @@ public abstract class DataPageBase : ComponentBase, IDisposable
     /// <summary>
     /// Reads the profile of the address once and shows the result.
     /// </summary>
+    /// <param name="readsDetails"><see langword="true" /> when the details are read whatever the shown view</param>
     /// <returns>A task that completes when the result is shown</returns>
-    private async Task ReadOnceAsync()
+    private async Task ReadOnceAsync(bool readsDetails)
     {
         var target = ResolveTarget(out var profileId, out var island);
 
@@ -256,6 +280,8 @@ public abstract class DataPageBase : ComponentBase, IDisposable
             View = null;
         }
 
+        var shownAsOf = Mode == PageMode.Ready ? View?.AsOf : null;
+
         if (View is null)
         {
             Show(PageMode.Loading, null);
@@ -272,11 +298,12 @@ public abstract class DataPageBase : ComponentBase, IDisposable
         if (ResolveTarget(out var profileAgain, out var islandAgain) != target || profileAgain != profileId || islandAgain != island)
         {
             _isPending = true;
+            _isDetailsDue |= readsDetails;
 
             return;
         }
 
-        if (ShowRead(read) is { } ready && RendererInfo.IsInteractive)
+        if (ShowRead(read) is { } ready && RendererInfo.IsInteractive && IsDetailsRead(readsDetails, shownAsOf, ready))
         {
             try
             {
@@ -383,7 +410,7 @@ public abstract class DataPageBase : ComponentBase, IDisposable
 
         if (concerns)
         {
-            await LoadAsync().ConfigureAwait(true);
+            await LoadAsync(arguments.Kind != ServerStateChangeKind.Icons).ConfigureAwait(true);
         }
     }
 
@@ -415,7 +442,7 @@ public abstract class DataPageBase : ComponentBase, IDisposable
         ReplaceDetailsCancellation();
         ClearDetails();
 
-        return LoadAsync();
+        return LoadAsync(true);
     }
 
     #endregion // ComponentBase

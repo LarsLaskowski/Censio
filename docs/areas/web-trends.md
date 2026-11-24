@@ -51,8 +51,8 @@ history and the other trend reads in [`history.md`](history.md).
   and the trends of that address are not read again until the page is reloaded or its address changes. A cancelled read
   shows and logs nothing. A good or island the held read lacks (new since it was read) has an empty cell until the next read.
 - **Live updates.** A stored tick of the page's profile reads the trends again without a reload and the sparklines and
-  arrows follow; until it answers the cells show the held ones, by good or island. A tick of another profile, a range choice
-  and an axis choice read none, and a range choice neither cancels a running trend read nor repeats it. A theme or language
+  arrows follow; until it answers the cells show the held ones, by good or island. A tick of another profile, a stored icon, a range
+  choice and an axis choice read none, and a range choice neither cancels a running trend read nor repeats it. A theme or language
   switch redraws the sparklines and arrows from the read the page holds, without a read.
 - **Reads and their order.** A table's trends are one read for all its rows (the shown goods of the island; the islands of the
   region), not one a row: a times transaction and parts of at most 240 island points under the trend gate
