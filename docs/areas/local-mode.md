@@ -74,7 +74,8 @@ without Docker rely on it.
   The exe is about 232 MB in a measured build (record 0098).
 - The pages fill from the live data the Companion sends to the hosted server ([`live-sending.md`](live-sending.md),
   *Local mode*) and from a replay ([`replay-sending.md`](replay-sending.md), *Local mode*). The catalog's names and icons
-  are not in local mode yet.
+  come from the live connection, which uploads the catalog to the hosted server as to any server
+  ([`live-sending.md`](live-sending.md), *Catalog*); a replay sends none.
 
 ### Start
 

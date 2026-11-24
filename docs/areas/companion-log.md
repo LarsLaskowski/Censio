@@ -66,7 +66,11 @@ background writer with its bounds. A user who checks a log before sharing it, an
   accepted hello), `Live sending refused by the server: <reason>; not retried` (Warning), `Server refused a live message:
   <kind>` (Warning), `Live message not sent: the contract writer refused it` (Warning), `Live messages dropped: <n>`
   (Warning), `Live buffer holds <n> messages from an earlier run` (Information), `Live buffer cannot be written; waiting
-  messages are kept in memory until Exit` (Warning) and `Live buffer entries unreadable: <n>; discarded` (Warning); no
+  messages are kept in memory until Exit` (Warning) `Live buffer entries unreadable: <n>; discarded` (Warning) and the five catalog lines `Catalog sent to the server: <i> icons
+  sent, <r> refused` (Information; `<i>` the icons the server accepted, `<r>` those it or the contract writer refused),
+  `Catalog already on the server` (Information), `Server refused the catalog: <kind>` (Warning), `Catalog not sent: the
+  contract writer refused it` (Warning) and `Catalog not sent: the connection failed 3 times during its upload` (Warning),
+  none with a name, an icon reference or a path; no
   line holds a path or a message's content; the reasons are those of [`replay-sending.md`](replay-sending.md) (*Limits and errors*).
 - The log holds no pipe content (figure name, island names, values): recording files and folders are logged by name only.
 - Text that came from outside (a replay file name, exception texts) is sanitized: each control character, format
