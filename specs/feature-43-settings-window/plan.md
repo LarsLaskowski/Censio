@@ -341,7 +341,7 @@ on the port is covered by the port-retry tests, the order itself by the Product 
 - New `docs/areas/companion-texts.md` (+1,200 words): the language choice and the English/German table.
 - `docs/areas/companion.md` (+250 words): the menu entry, *Command line* (`--restarted`), *Settings file* (written by
   the window, `language`), *Folders* (`profiles.json`), *Limits and errors*.
-- `docs/areas/live-sending.md` (+180 words): *Start and hello* and *Local mode* per profile, *Reconnect* (the profile
+- `docs/areas/live-sending.md` (+0 words still to add; written: 4,446 on the base, 4,827 now, below the 5,000 limit): *Start and hello* and *Local mode* per profile, *Reconnect* (the profile
   switch, its close and refusal window), *Accepted risks* without *One profile*, *Related decisions* 0111 instead of
   0102.
 - `docs/areas/local-mode.md` (+50 words): *Menu*, and *Limits and errors* (`nothing is retried` except after a restart,
