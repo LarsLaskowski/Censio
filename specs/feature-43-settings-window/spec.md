@@ -25,8 +25,9 @@ Every Companion text is English today.
   and exits as `Exit` does, ending its single instance only after its hosted server stopped. The new Companion waits up
   to 10 seconds for that, in local mode also for the port; one started by hand meanwhile still ends at once. A save without such a change restarts
   nothing.
-- S4: `Start with Windows` ticked or cleared and saved switches the autostart as the menu entry does
-  ([`companion.md`](../../docs/areas/companion.md), *Start with Windows*), at once.
+- S4: `Start with Windows` ticked or cleared and saved switches the autostart at once
+  ([`companion.md`](../../docs/areas/companion.md), *Start with Windows*); the box shows the state read when the window
+  opens, also one changed outside the Companion. The window is its only switch: the tray menu no longer holds the entry.
 - S5: Given `Live` selected (its history continues), when the player clicks `New profile…`, types a name and saves,
   then the new profile is selected, messages taken from then on carry it and the pages list it under that name;
   waiting messages keep their profile and reach the server under its name.
@@ -82,7 +83,7 @@ A message stands below its field, the typed values stay, and `Save` writes nothi
   `Saving ends the running recording.`, and while the buffer is memory only
   ([`live-sending.md`](../../docs/areas/live-sending.md), *Buffer*) `Messages that could not be saved to disk are lost.`
 - E13: `Cancel` or closing the window changes nothing.
-- E14: The autostart cannot be written: logged as by the menu, the window shows `Start with Windows could not be
+- E14: The autostart cannot be written: logged as before, the window shows `Start with Windows could not be
   changed.`; the other values are saved.
 - E15: The exe cannot be started (moved, deleted): the old Companion keeps running with the old values and shows `The
   Companion could not restart. Exit and start it again to apply the changes.`; the file holds the saved values. A new
@@ -137,6 +138,8 @@ A message stands below its field, the typed values stay, and `Save` writes nothi
   are written (N2, N5).
 - AC10: README and the user guide describe window, profiles, restart and language in English, then German, with the
   German form of each menu and tooltip text (N6).
+- AC11: The tray menu holds no `Start with Windows` entry in any mode; the window's box shows the autostart state read
+  at each opening, a change made outside the Companion included (S4).
 
 ## Out of scope
 
@@ -190,3 +193,9 @@ A message stands below its field, the typed values stay, and `Save` writes nothi
 7. (minor) E3 wording — accepted: visible ASCII (! to ~), non-ASCII case in AC3.
 8. (minor) German tooltip and dynamic texts — accepted: S9 lists them, 127 characters, AC5.
 9. (minor) Memory-only buffer at restart — accepted: E12 warns, AC4.
+
+## Amendments
+
+| Criterion | Change | Reason | Step | Decided by |
+| --------- | ------ | ------ | ---- | ---------- |
+| AC11 | added: no `Start with Windows` entry in the tray menu, the window's box its only switch (S4, E14 reworded) | the Product Manager's manual test found the option twice; the window is enough (record 0114) | 11 | Product Manager |

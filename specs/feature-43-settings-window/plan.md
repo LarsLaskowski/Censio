@@ -61,6 +61,7 @@ In `tests/Censio.Companion.Core.Tests/` unless a file names another project; eac
 | AC8 | `CompanionSettingsDocumentLoadUnparseableGivesDefaultsAndReason` (rows: over 1 MiB, not JSON, not an object, invalid UTF-8 in an unknown value, `"\uD800"` in an unknown key's value and in a known key, in a nested name), `…SaveReplacesUnparseableFile`, `…SaveChangedOutsideWritesNothing`, `…SaveFailureKeepsOldFile` (rows: `IOException`, `InvalidOperationException` from the writer), `…SaveLeavesNoTmpFile`; `CompanionProfilesInvalidFileUsesLiveAndLinksNothing` (rows per E16 form of *Approach* G3), `…LoadAcceptsUppercaseIds`, `…InvalidFileReplacedOnlyByProfileSave`, `…WorstCaseFileReadsBackValid`, `…RunAsyncWritesLatestStateOnCancel` | `CompanionSettingsDocumentTests.cs`, `CompanionProfilesTests.cs` |
 | AC9 | `CompanionProfilesFileAboveBoundIsInvalid`, `CompanionProfilesFileHoldsNoFigureName`, `CompanionLogTests` rows for each new line (text, level, no value), `SettingsWindowSessionSaveLogsNoTokenOrName`, `LiveSenderProfileTests.FigureNameNeverLogged`, `CompanionSettingsValuesToStringHoldsNoToken`, `CompanionProfileToStringHoldsNoName`, `ProfileNoticeToStringHoldsNoName`, `SettingsViewToStringHoldsNoTokenOrName` | `CompanionProfilesTests.cs`, `CompanionLogTests.cs`, `SettingsWindowSessionTests.cs`, `LiveSenderProfileTests.cs`, `CompanionSettingsValuesTests.cs`, `CompanionProfileTests.cs`, `ProfileNoticeTests.cs`, `SettingsViewTests.cs` |
 | AC10 | check: Reviewer reads README and the user guide against the spec (step 8); manual: Product Manager reads the German texts (step 7) | — |
+| AC11 | `TrayMenuCreateListsEntriesInOrder` (adapted: no autostart entry, one separator fewer, no `IsChecked`), `TrayMenuCreateHasNoAutostartEntryInEveryMode` (rows: live, recording, replay, invalid, local, forward; replaces the three autostart entry tests), `SettingsWindowSessionOpenReadsAutostartChangedOutside`; manual: Product Manager (step 7 delta) | `TrayMenuTests.cs`, `SettingsWindowSessionTests.cs` |
 
 ## Approach
 
@@ -256,7 +257,7 @@ All in `Censio.Companion.Core` unless marked shell; properties of the records an
 G1:
 - `public enum CompanionLanguage { English, German }`
 - `public sealed class CompanionTexts`: `public static CompanionTexts English { get; }`, `public static CompanionTexts German { get; }`, `public static CompanionTexts For(CompanionLanguage language)`, `public static CompanionLanguage LanguageOf(CultureInfo culture)`, `public required CompanionLanguage Language { get; init; }`, `public required string OpenSettingsText { get; init; }`, `public string FormatProblem(SettingsProblemKind kind)`, `public string FormatNotice(ProfileNotice notice)`, `public string FormatOutcome(SettingsSaveOutcome outcome)`; besides these, one required text or format property per moved TrayMenu constant or format, named as the constant (data, read by tests only through the formatters)
-- `public sealed record TrayMenuState`: `public required string Version`, `public required TraySnapshot Snapshot`, `public required GameInstallationStatus Game`, `public required GameCatalogStatus Catalog`, `public TrayServerStatus? Server`, `public bool IsAutostartEnabled`, `public required TimeProvider Clock`
+- `public sealed record TrayMenuState`: `public required string Version`, `public required TraySnapshot Snapshot`, `public required GameInstallationStatus Game`, `public required GameCatalogStatus Catalog`, `public TrayServerStatus? Server`, `public required TimeProvider Clock` (the autostart flag left with amendment AC11)
 - `public static IReadOnlyList<TrayMenuEntry> Create(CompanionTexts texts, TrayMenuState state)` replaces the seven-parameter one; every public TrayMenu formatter gains `CompanionTexts texts` as its first parameter
 - `public static TraySnapshot ForConnection(CompanionTexts texts, PipeConnectionStatus status, PipeRecordingState recording, PipeTickSummary? lastTick)`, `public static TraySnapshot ForReplay(CompanionTexts texts, PipeReplayStatus status, PipeTickSummary? lastTick)`, `public static TraySnapshot ForInvalidCommandLine(CompanionTexts texts)`
 - `TrayMenuEntryKind.OpenSettings`
@@ -405,6 +406,7 @@ the Companion writing its settings) is written into `docs/ARCHITECTURE.md` by th
 - `docs/decisions/0111-profiles-kept-by-the-companion-each-hello-names-the-next-messages-profile.md` (Proposed)
 - `docs/decisions/0112-connection-settings-applied-by-a-restart-that-waits-for-the-old-companion.md` (Proposed)
 - `docs/decisions/0113-companion-texts-in-english-and-german-from-one-table.md` (Proposed)
+- `docs/decisions/0114-start-with-windows-switched-only-in-the-settings-window.md` (Proposed, amends 0017; amendment AC11)
 - Deleted: `0102` (unreleased, replaced by 0111); its links in `live-sending.md` and `ARCHITECTURE.md` go in the Dev's
   documentation updates.
 
@@ -456,6 +458,36 @@ wording deviation in N4 (below).
   figures linked to them" and "the figures you played them with" name the hash instead, because B1's fix keeps the
   names out of the file — Security confirms the wording.
 - N5 (fixed): numbers written with `WriteNumber` of the parsed `int`; `…SaveWritesParsedNumber` (`05` → `5`).
+
+## Amendment AC11
+
+The Product Manager's manual test (step 11): `Start with Windows` leaves the tray menu; the window's box is its only
+switch (spec S4, AC11, record 0114).
+- Goes: `TrayMenuEntryKind.ToggleAutostart`; `TrayMenuState.IsAutostartEnabled`; in `TrayMenu.Create` the entry and
+  the separator below it (`Open log folder`, separator, `Version`); `TrayMenuEntry.IsChecked` and the four-parameter
+  constructor (no entry is checked any more); shell: `TrayIconSources.IsAutostartEnabled`, its `App.xaml.cs`
+  initializer, `Checked = entry.IsChecked` and `ToggleAutostart` in `TrayIcon`'s click filter, the `Dispatch` case.
+- Stays: `CompanionAutostart` and its log lines, `SettingsWindowContext.Autostart`, `SettingsView`/`SettingsInput`
+  `.IsAutostartEnabled`, `SettingsWindowSession` (reads `Refresh()` at each opening, toggles on `Save`),
+  `CompanionTexts.StartWithWindowsText` (the box label; its XML doc names the box, not a menu entry, English and
+  German unchanged), `OutcomeAutostartFailed`. `CompanionTextsTests` unchanged.
+- Tests (Tester): *Tests per criterion* AC11; the 16-entry arrays of `TrayMenuCreateListsEntriesInOrder` and the kind
+  lists near lines 1602 and 1786 lose `ToggleAutostart` and a separator; every `IsAutostartEnabled =` initializer and
+  `Assert.IsFalse(….IsChecked, …)` goes; `CreateFullState` loses "the autostart on"; the `StartWithWindowsText` value
+  assert moves to the new menu test as "no entry reads it".
+- Documentation (Dev; sweep `Start with Windows`, `Mit Windows starten`, `autostart`, `check mark`, `checked`,
+  `menu opens`): `README.md` and `docs/USER_GUIDE.md`, English and German: the menu lists (README lines 120, 383, 421;
+  user guide 192, 611, 851, 1332), the *Start with Windows* / *Start mit Windows* sections (switched in the settings
+  window, `Save`; leftover entry removed by ticking and saving, then clearing and saving; the box, not the menu, keeps
+  a value switched off in Windows' list ticked), the settings table rows `The same switch as the menu entry` (220, 879)
+  and the failure notes `as for the menu entry` (241, 900), the user guide's German menu table row (938);
+  `docs/areas/companion.md`: the menu list (line 35) and German menu forms (68–69), *Start with Windows* (box and
+  `Save` for entry and click, read at each window opening), *Limits and errors* (read failure: box cleared; a failed
+  change shows E14's message), *Related decisions* + 0114; `companion-settings.md` lines 43 and 129 (no menu);
+  `companion-texts.md`: the menu table loses its row, the window table keeps it; `companion-log.md` line 27 (`window
+  opening` for `menu opening`); `docs/areas/README.md` row of `companion` (start with Windows out of the menu list).
+  `local-mode.md` and `docs/ARCHITECTURE.md` name no menu entry: unchanged. `.squad/project.md`, text reported by the
+  Dev: *Windows autostart* `also toggled by SettingsWindowSession` → `toggled only by SettingsWindowSession` (+1 word).
 
 ## Out of scope / follow-ups
 
