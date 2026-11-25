@@ -34,5 +34,10 @@ internal sealed class TrayIconSources
     /// </summary>
     public required Func<bool> IsAutostartEnabled { get; init; }
 
+    /// <summary>
+    /// Gets the reader of the texts in the current language.
+    /// </summary>
+    public required Func<CompanionTexts> Texts { get; init; }
+
     #endregion // Properties
 }

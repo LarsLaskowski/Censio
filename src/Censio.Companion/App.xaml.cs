@@ -470,7 +470,8 @@ public sealed partial class App : Application, IDisposable
                                      Game = () => _gameSearch?.Status ?? GameInstallationStatus.Searching,
                                      Catalog = () => _catalogLoader?.Status ?? GameCatalogStatus.Reading,
                                      Server = GetServerStatus,
-                                     IsAutostartEnabled = () => _autostart?.Refresh() ?? false
+                                     IsAutostartEnabled = () => _autostart?.Refresh() ?? false,
+                                     Texts = () => CompanionTexts.English
                                  },
                                  Dispatch);
 

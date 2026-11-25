@@ -48,6 +48,19 @@ internal sealed class TrayIcon : IDisposable
 
     #endregion // Fields
 
+#pragma warning disable CS0067, S3264 // Skeleton: removed with the implementation
+
+    #region Events
+
+    /// <summary>
+    /// Occurs when the user clicked a notification.
+    /// </summary>
+    public event EventHandler? NoticeClicked;
+
+    #endregion // Events
+
+#pragma warning restore CS0067, S3264
+
     #region Constructors
 
     /// <summary>
@@ -99,6 +112,18 @@ internal sealed class TrayIcon : IDisposable
 
         _notifyIcon.Text = text.Length > TrayMenu.MaxToolTipLength ? text[..TrayMenu.MaxToolTipLength] : text;
     }
+
+#pragma warning disable S2325, RH2003 // Skeleton: removed with the implementation
+    /// <summary>
+    /// Shows a notification; does nothing once the icon is disposed.
+    /// </summary>
+    /// <param name="title">The title</param>
+    /// <param name="text">The text</param>
+    public void ShowNotice(string title, string text)
+    {
+        throw new NotImplementedException();
+    }
+#pragma warning restore S2325, RH2003
 
     /// <summary>
     /// Sets the look of the icon; does nothing once the icon is disposed.
