@@ -26,6 +26,8 @@ keep the profile they were taken for.
 4. **A contract message that names a profile** — a contract version bump for both sides, for what a reconnect does.
 5. **Figure links by the figure's name, the file bound raised to 4 MiB** — the file would hold the figure name, and its
    size would follow the pipe's strings (up to about 2 MB escaped); a hash of the name has a fixed length.
+6. **The notice as a Windows notification only, or also in the settings window's banner** — Windows may hold a
+   notification back while a game runs full screen, and a banner is seen only once the window is opened.
 
 ## Decision
 
@@ -45,4 +47,7 @@ the old session, is retried as part of the switch; the rules are in [companion-p
 - A message whose profile the list no longer knows (a lost profiles file) is sent on the current connection; the server
   creates that profile without a name.
 - Profiles are neither renamed nor deleted in the Companion; history is deleted on the pages.
+- The tray menu names the active profile on every `Server:` line of a live run, and a notice also stays a menu entry
+  above `Settings…` until a switch or the session's end or next start (option 6 lost); the log records each notice's
+  kind, never a name, when it is raised and when it was passed to Windows.
 - Record 0102 (the fixed profile until #43) is deleted: unreleased, it no longer applies.

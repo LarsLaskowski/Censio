@@ -44,6 +44,10 @@ See [spec.md](spec.md), *Problem*.
 | 22 | The readers match keys ordinal ignoring case on the unescaped name; `serverToken` is read only in forward mode | `CompanionSettings.FindProperties` `:381-387`; `ReadLocalServer` `:226-229` → `ReadForward` | confirmed |
 | 23 | A local start whose port is in use is never retried | `LocalServerSession.ReportFailedStart` `:313-321`; `local-mode.md` *Limits and errors* | confirmed |
 | 24 | The server refuses a hello text that is not well-formed UTF-16 | `ContractRules.CheckText` `:229-251` (strict encoding) | confirmed |
+| 25 | The menu is rebuilt from its sources at every opening; the tooltip holds no `Server:` line | `TrayIcon.cs:98-102` (`Opening` → `BuildItems`), `TrayMenu.FormatSnapshotToolTip` `:194-201` | confirmed |
+| 26 | A live sender exists exactly when `LiveSender.IsSending` (not in `Off`, a replay or with invalid settings); a local replay and invalid settings still show a `Server:` line | `App.StartLiveSending` `:516`, `LocalServerSession.IsHosted` `:150`, `App.GetServerStatus` `:681-702` | confirmed |
+| 27 | The notice path raises for the PM's sequence (new profile with one figure, another figure) | `CompanionProfiles.ObserveSessionStart` `:358-396`, `LiveSender.Enqueue` `:381-413`, `App.ShowNotice` `:297-302` | confirmed |
+| 28 | A `ToolStripMenuItem` text shows `&` as a mnemonic prefix, `&&` as `&`; Windows holds balloon notifications back while a game runs full screen | to verify: Product Manager's manual test of amendment AC12–AC13 (a profile named `R&D`, a notice while the game runs full screen) | unverified |
 
 ## Tests per criterion
 
@@ -62,6 +66,8 @@ In `tests/Censio.Companion.Core.Tests/` unless a file names another project; eac
 | AC9 | `CompanionProfilesFileAboveBoundIsInvalid`, `CompanionProfilesFileHoldsNoFigureName`, `CompanionLogTests` rows for each new line (text, level, no value), `SettingsWindowSessionSaveLogsNoTokenOrName`, `LiveSenderProfileTests.FigureNameNeverLogged`, `CompanionSettingsValuesToStringHoldsNoToken`, `CompanionProfileToStringHoldsNoName`, `ProfileNoticeToStringHoldsNoName`, `SettingsViewToStringHoldsNoTokenOrName` | `CompanionProfilesTests.cs`, `CompanionLogTests.cs`, `SettingsWindowSessionTests.cs`, `LiveSenderProfileTests.cs`, `CompanionSettingsValuesTests.cs`, `CompanionProfileTests.cs`, `ProfileNoticeTests.cs`, `SettingsViewTests.cs` |
 | AC10 | check: Reviewer reads README and the user guide against the spec (step 8); manual: Product Manager reads the German texts (step 7) | — |
 | AC11 | `TrayMenuCreateListsEntriesInOrder` (adapted: no autostart entry, one separator fewer, no `IsChecked`), `TrayMenuCreateHasNoAutostartEntryInEveryMode` (rows: live, recording, replay, invalid, local, forward; replaces the three autostart entry tests), `SettingsWindowSessionOpenReadsAutostartChangedOutside`; manual: Product Manager (step 7 delta) | `TrayMenuTests.cs`, `SettingsWindowSessionTests.cs` |
+| AC12 | `TrayMenuCreateServerLineEndsWithProfile` (rows: every `LiveSendState`/problem row of `TrayMenuFormatLiveSendFormatsEveryState` and every `LocalServerState`, English and German), `TrayMenuCreateWithoutProfileNameKeepsServerLine` (rows: local replay, invalid setting, forward), `TrayMenuFormatServerProfileKeepsLongestNameWhole` (64 characters, a surrogate pair at the end), `TrayMenuFormatServerProfileKeepsBracesAndAmpersand` (`{0}`, `R&D`); `CompanionTextsTests` new `_texts` entry for `ServerProfileFormat`; manual: Product Manager (switch, then reopen the menu; `R&D`) | `TrayMenuTests.cs`, `CompanionTextsTests.cs` |
+| AC13 | `LiveSenderProfileTests`: `…NoticeLoggedWithKindBeforeRaised` (rows: both kinds; the line precedes the subscriber's call; no figure or profile name in it), `…NoNoticeLogsNothing`; `CompanionProfilesTests`: `…PendingNoticeSetBySessionStart`, `…PendingNoticeReplacedByNextSessionStart` (a start without notice clears it), `…PendingNoticeClearedBySessionEnd`, `…PendingNoticeClearedBySelectAndCreate`; `TrayMenuCreateNoticeEntryAboveSettings` (rows: both kinds, local and forward; enabled, kind `ProfileNotice`, text of `FormatNotice`, English and German), `TrayMenuCreateWithoutNoticeHasNoNoticeEntry`; `CompanionLogTests` rows for both lines; manual: Product Manager (notice while full screen, then the menu entry and its click) | `LiveSenderProfileTests.cs`, `CompanionProfilesTests.cs`, `TrayMenuTests.cs`, `CompanionLogTests.cs` |
 
 ## Approach
 
@@ -257,7 +263,7 @@ All in `Censio.Companion.Core` unless marked shell; properties of the records an
 G1:
 - `public enum CompanionLanguage { English, German }`
 - `public sealed class CompanionTexts`: `public static CompanionTexts English { get; }`, `public static CompanionTexts German { get; }`, `public static CompanionTexts For(CompanionLanguage language)`, `public static CompanionLanguage LanguageOf(CultureInfo culture)`, `public required CompanionLanguage Language { get; init; }`, `public required string OpenSettingsText { get; init; }`, `public string FormatProblem(SettingsProblemKind kind)`, `public string FormatNotice(ProfileNotice notice)`, `public string FormatOutcome(SettingsSaveOutcome outcome)`; besides these, one required text or format property per moved TrayMenu constant or format, named as the constant (data, read by tests only through the formatters)
-- `public sealed record TrayMenuState`: `public required string Version`, `public required TraySnapshot Snapshot`, `public required GameInstallationStatus Game`, `public required GameCatalogStatus Catalog`, `public TrayServerStatus? Server`, `public required TimeProvider Clock` (the autostart flag left with amendment AC11)
+- `public sealed class TrayMenuState` (a class since amendment AC12: it holds a profile name, so no generated string form): `public required string Version`, `public required TraySnapshot Snapshot`, `public required GameInstallationStatus Game`, `public required GameCatalogStatus Catalog`, `public TrayServerStatus? Server`, `public required TimeProvider Clock`, `public string? ProfileName`, `public ProfileNotice? Notice` (the autostart flag left with amendment AC11; the last two added by amendment AC12–AC13)
 - `public static IReadOnlyList<TrayMenuEntry> Create(CompanionTexts texts, TrayMenuState state)` replaces the seven-parameter one; every public TrayMenu formatter gains `CompanionTexts texts` as its first parameter
 - `public static TraySnapshot ForConnection(CompanionTexts texts, PipeConnectionStatus status, PipeRecordingState recording, PipeTickSummary? lastTick)`, `public static TraySnapshot ForReplay(CompanionTexts texts, PipeReplayStatus status, PipeTickSummary? lastTick)`, `public static TraySnapshot ForInvalidCommandLine(CompanionTexts texts)`
 - `TrayMenuEntryKind.OpenSettings`
@@ -488,6 +494,52 @@ switch (spec S4, AC11, record 0114).
   opening` for `menu opening`); `docs/areas/README.md` row of `companion` (start with Windows out of the menu list).
   `local-mode.md` and `docs/ARCHITECTURE.md` name no menu entry: unchanged. `.squad/project.md`, text reported by the
   Dev: *Windows autostart* `also toggled by SettingsWindowSession` → `toggled only by SettingsWindowSession` (+1 word).
+
+## Amendment AC12–AC13
+
+The Product Manager's manual test (step 11): the active profile on the `Server:` line (S11, AC12); no notification was
+seen and the log could not tell why (S12, AC13; facts 25–28; record 0111 extended).
+
+- Server line: `TrayMenu.Create` passes each `Server:` text (`FormatLiveSend`, `FormatLocalServer`, unchanged) through
+  `FormatServerProfile(texts, server, state.ProfileName)`: the text unchanged when the name is `null`, else
+  `ServerProfileFormat` (`{0} (profile {1})`, German `{0} (Profil {1})`) with the whole name — at most 64 code units
+  (`CheckName`), so the longest line is 124 characters (German `…anderer Companion verbunden, neuer Versuch`); no
+  truncation, which could split a surrogate pair or make two names alike; the tooltip has no `Server:` line (fact 25).
+  The shell decides the name: `TrayIconSources.Profiles` returns `_profiles` only while `_liveSender` is set, else
+  `null` (fact 26); `BuildItems` sets `ProfileName = profiles?.Active.Name` and `Notice = profiles?.PendingNotice`.
+  The menu is rebuilt at every opening (fact 25), so a switch shows at the next opening without an event.
+- Notice entry: `CompanionProfiles.PendingNotice` (under the lock) is set to each `ObserveSessionStart` result, `null`
+  included (an invalid file too), and cleared by `ObserveSessionEnd`, `Select` and `Create`. `Create` adds, after
+  the separator and `Open Censio`, `TrayMenuEntryKind.ProfileNotice` with `texts.FormatNotice(notice)`, enabled,
+  directly above `Settings…`; the shell's click filter and `Dispatch` open the settings window for it.
+- Logs: `LiveSender.RaiseNotice` logs `ProfileNoticeRaised(kind)` before it invokes the event; the shell's
+  `ShowNotice` logs `ProfileNoticePassedToWindows(kind)` when `TrayIcon.ShowNotice` returned `true` (icon not
+  disposed). Kinds only: no figure, profile name or text (AC9 holds).
+- Shell: every menu text goes through `Replace("&", "&&", StringComparison.Ordinal)` in `BuildItems`, so a profile
+  name (or a game folder) with `&` reads as typed (fact 28).
+- Security: profile names are the player's own, shown only in the local menu and the notice, never logged; both new
+  holders are classes without `ToString` (`TrayMenuState` turns from record into class). A name with a format
+  character (U+202E) can reorder its own menu line — local, self-typed, accepted (E6 refuses only Cc).
+
+Signatures (Core unless shell):
+- `public required CompositeFormat ServerProfileFormat { get; init; }` on CompanionTexts
+- `public static string FormatServerProfile(CompanionTexts texts, string server, string? profileName)` on TrayMenu
+- `TrayMenuEntryKind.ProfileNotice`; `public ProfileNotice? PendingNotice { get; }` on CompanionProfiles
+- `[LoggerMessage(Level = LogLevel.Information, Message = "Profile notice raised: {Kind}")] public static partial void ProfileNoticeRaised(ILogger logger, ProfileNoticeKind kind);`, `[LoggerMessage(Level = LogLevel.Information, Message = "Profile notice passed to Windows: {Kind}")] public static partial void ProfileNoticePassedToWindows(ILogger logger, ProfileNoticeKind kind);` on CompanionLog
+- Shell: `public required Func<CompanionProfiles?> Profiles { get; init; }` on TrayIconSources; `public bool ShowNotice(string title, string text)` on TrayIcon (`false` once disposed)
+
+Tests (Tester): *Tests per criterion* AC12, AC13; the existing `Server:` rows stay (no `ProfileName`); the kind lists
+and arrays of the order tests stay (no `Notice`).
+
+Documentation (Dev; sweep `Server:`, `notification`, `Benachrichtigung`, `notice`): `README.md` and
+`docs/USER_GUIDE.md`, English and German — below the `Server:` tables of local and forward mode one sentence on the
+` (profile <name>)` / ` (Profil <name>)` ending in a live run; the user guide's *Profiles* / *Profile*: the notice
+entry above `Settings…` and that Windows may hold notifications back while a game runs full screen (Focus assist /
+*Do not disturb*); its German menu table: the pattern row. `docs/areas/companion.md` (menu list, German forms),
+`companion-texts.md` (menu table: the pattern row; the notice texts also as a menu entry), `companion-profiles.md`
+(*notices*: the pending entry and when it goes, the two log lines), `local-mode.md` and `live-sending.md` (*Menu*,
+the line `Server: <state>` with the profile ending), `companion-log.md` (the two lines). The Dev measures each area
+document's words before and after (`plan-check.py`).
 
 ## Out of scope / follow-ups
 
