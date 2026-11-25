@@ -56,9 +56,26 @@ public static class CompanionSettings
     /// </summary>
     public const int DefaultLocalPort = 5000;
 
+    /// <summary>
+    /// The key of the language of the Companion's texts.
+    /// </summary>
+    public const string LanguageKey = "language";
+
     #endregion // Constants
 
     #region Methods
+
+    /// <summary>
+    /// Reads the language of the settings file.
+    /// </summary>
+    /// <param name="path">The path of the settings file</param>
+    /// <returns>The language, or <see langword="null" /> when the file names none or an invalid one</returns>
+#pragma warning disable RH2003 // Skeleton: removed with the implementation
+    public static CompanionLanguage? ReadLanguage(string path)
+    {
+        throw new NotImplementedException();
+    }
+#pragma warning restore RH2003 // Skeleton: removed with the implementation
 
     /// <summary>
     /// Reads the local server setting of the settings file.

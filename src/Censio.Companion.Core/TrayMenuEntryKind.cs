@@ -83,5 +83,10 @@ public enum TrayMenuEntryKind
     /// <summary>
     /// The entry that shows the live buffer.
     /// </summary>
-    LiveBuffer
+    LiveBuffer,
+
+    /// <summary>
+    /// The entry that opens the settings window.
+    /// </summary>
+    OpenSettings
 }

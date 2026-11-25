@@ -98,7 +98,17 @@ public sealed class TrayMenuTests
         var expectedChecked = new bool[15];
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, null, false, CreateClock(1));
+        var entries = TrayMenu.Create(CompanionTexts.English,
+                                      new TrayMenuState
+                                      {
+                                          Version = "1.2.3",
+                                          Snapshot = snapshot,
+                                          Game = GameInstallationStatus.Searching,
+                                          Catalog = GameCatalogStatus.Reading,
+                                          Server = null,
+                                          IsAutostartEnabled = false,
+                                          Clock = CreateClock(1)
+                                      });
 
         // Assert
         Assert.AreSequenceEqual(expectedKinds, entries.Select(entry => entry.Kind).ToArray(), "The entries should be in the order of the menu");
@@ -123,7 +133,17 @@ public sealed class TrayMenuTests
         var snapshot = CreateSnapshotForMode(mode);
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, null, false, CreateClock(1));
+        var entries = TrayMenu.Create(CompanionTexts.English,
+                                      new TrayMenuState
+                                      {
+                                          Version = "1.2.3",
+                                          Snapshot = snapshot,
+                                          Game = GameInstallationStatus.Searching,
+                                          Catalog = GameCatalogStatus.Reading,
+                                          Server = null,
+                                          IsAutostartEnabled = false,
+                                          Clock = CreateClock(1)
+                                      });
 
         // Assert
         var autostart = entries.SingleOrDefault(entry => entry.Kind == TrayMenuEntryKind.ToggleAutostart);
@@ -144,7 +164,17 @@ public sealed class TrayMenuTests
         var snapshot = CreateSnapshot("Receiving", canRecord: true, isRecording: false);
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, null, true, CreateClock(1));
+        var entries = TrayMenu.Create(CompanionTexts.English,
+                                      new TrayMenuState
+                                      {
+                                          Version = "1.2.3",
+                                          Snapshot = snapshot,
+                                          Game = GameInstallationStatus.Searching,
+                                          Catalog = GameCatalogStatus.Reading,
+                                          Server = null,
+                                          IsAutostartEnabled = true,
+                                          Clock = CreateClock(1)
+                                      });
 
         // Assert
         var checkedKinds = entries.Where(entry => entry.IsChecked).Select(entry => entry.Kind).ToArray();
@@ -163,7 +193,17 @@ public sealed class TrayMenuTests
         var snapshot = CreateSnapshot("Receiving", canRecord: true, isRecording: false);
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, null, false, CreateClock(1));
+        var entries = TrayMenu.Create(CompanionTexts.English,
+                                      new TrayMenuState
+                                      {
+                                          Version = "1.2.3",
+                                          Snapshot = snapshot,
+                                          Game = GameInstallationStatus.Searching,
+                                          Catalog = GameCatalogStatus.Reading,
+                                          Server = null,
+                                          IsAutostartEnabled = false,
+                                          Clock = CreateClock(1)
+                                      });
 
         // Assert
         var autostart = entries.SingleOrDefault(entry => entry.Kind == TrayMenuEntryKind.ToggleAutostart);
@@ -189,7 +229,17 @@ public sealed class TrayMenuTests
         var snapshot = CreateSnapshotForMode(mode);
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, null, false, CreateClock(1));
+        var entries = TrayMenu.Create(CompanionTexts.English,
+                                      new TrayMenuState
+                                      {
+                                          Version = "1.2.3",
+                                          Snapshot = snapshot,
+                                          Game = GameInstallationStatus.Searching,
+                                          Catalog = GameCatalogStatus.Reading,
+                                          Server = null,
+                                          IsAutostartEnabled = false,
+                                          Clock = CreateClock(1)
+                                      });
 
         // Assert
         var kinds = entries.Select(entry => entry.Kind).ToList();
@@ -210,7 +260,17 @@ public sealed class TrayMenuTests
         var snapshot = CreateSnapshot("Receiving (recording)", canRecord: true, isRecording: true);
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, null, false, CreateClock(1));
+        var entries = TrayMenu.Create(CompanionTexts.English,
+                                      new TrayMenuState
+                                      {
+                                          Version = "1.2.3",
+                                          Snapshot = snapshot,
+                                          Game = GameInstallationStatus.Searching,
+                                          Catalog = GameCatalogStatus.Reading,
+                                          Server = null,
+                                          IsAutostartEnabled = false,
+                                          Clock = CreateClock(1)
+                                      });
 
         // Assert
         var toggle = entries.Single(entry => entry.Kind == TrayMenuEntryKind.ToggleRecording);
@@ -229,7 +289,17 @@ public sealed class TrayMenuTests
         var snapshot = CreateSnapshot("Replay: Receiving", canRecord: false, isRecording: false);
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, null, false, CreateClock(1));
+        var entries = TrayMenu.Create(CompanionTexts.English,
+                                      new TrayMenuState
+                                      {
+                                          Version = "1.2.3",
+                                          Snapshot = snapshot,
+                                          Game = GameInstallationStatus.Searching,
+                                          Catalog = GameCatalogStatus.Reading,
+                                          Server = null,
+                                          IsAutostartEnabled = false,
+                                          Clock = CreateClock(1)
+                                      });
 
         // Assert
         var toggle = entries.Single(entry => entry.Kind == TrayMenuEntryKind.ToggleRecording);
@@ -249,10 +319,20 @@ public sealed class TrayMenuTests
     public void TrayMenuCreateInvalidGreysToggle()
     {
         // Arrange
-        var snapshot = TraySnapshot.ForInvalidCommandLine();
+        var snapshot = TraySnapshot.ForInvalidCommandLine(CompanionTexts.English);
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, null, false, CreateClock(1));
+        var entries = TrayMenu.Create(CompanionTexts.English,
+                                      new TrayMenuState
+                                      {
+                                          Version = "1.2.3",
+                                          Snapshot = snapshot,
+                                          Game = GameInstallationStatus.Searching,
+                                          Catalog = GameCatalogStatus.Reading,
+                                          Server = null,
+                                          IsAutostartEnabled = false,
+                                          Clock = CreateClock(1)
+                                      });
 
         // Assert
         var toggle = entries.Single(entry => entry.Kind == TrayMenuEntryKind.ToggleRecording);
@@ -281,7 +361,17 @@ public sealed class TrayMenuTests
         var snapshot = CreateSnapshot(statusText, canRecord: true, isRecording: false);
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, null, false, CreateClock(1));
+        var entries = TrayMenu.Create(CompanionTexts.English,
+                                      new TrayMenuState
+                                      {
+                                          Version = "1.2.3",
+                                          Snapshot = snapshot,
+                                          Game = GameInstallationStatus.Searching,
+                                          Catalog = GameCatalogStatus.Reading,
+                                          Server = null,
+                                          IsAutostartEnabled = false,
+                                          Clock = CreateClock(1)
+                                      });
 
         // Assert
         var status = entries.Single(entry => entry.Kind == TrayMenuEntryKind.Status);
@@ -300,7 +390,17 @@ public sealed class TrayMenuTests
         const string version = "1.2.3";
 
         // Act
-        var entries = TrayMenu.Create(version, CreateSnapshot("Receiving", canRecord: true, isRecording: false), GameInstallationStatus.Searching, GameCatalogStatus.Reading, null, false, CreateClock(1));
+        var entries = TrayMenu.Create(CompanionTexts.English,
+                                      new TrayMenuState
+                                      {
+                                          Version = version,
+                                          Snapshot = CreateSnapshot("Receiving", canRecord: true, isRecording: false),
+                                          Game = GameInstallationStatus.Searching,
+                                          Catalog = GameCatalogStatus.Reading,
+                                          Server = null,
+                                          IsAutostartEnabled = false,
+                                          Clock = CreateClock(1)
+                                      });
 
         // Assert
         Assert.IsFalse(entries.Single(entry => entry.Kind == TrayMenuEntryKind.Version).IsEnabled, "The version entry should be greyed out");
@@ -316,7 +416,17 @@ public sealed class TrayMenuTests
         const string version = "1.2.3";
 
         // Act
-        var entries = TrayMenu.Create(version, CreateSnapshot("Receiving", canRecord: true, isRecording: false), GameInstallationStatus.Searching, GameCatalogStatus.Reading, null, false, CreateClock(1));
+        var entries = TrayMenu.Create(CompanionTexts.English,
+                                      new TrayMenuState
+                                      {
+                                          Version = version,
+                                          Snapshot = CreateSnapshot("Receiving", canRecord: true, isRecording: false),
+                                          Game = GameInstallationStatus.Searching,
+                                          Catalog = GameCatalogStatus.Reading,
+                                          Server = null,
+                                          IsAutostartEnabled = false,
+                                          Clock = CreateClock(1)
+                                      });
 
         // Assert
         Assert.IsTrue(entries.Single(entry => entry.Kind == TrayMenuEntryKind.Exit).IsEnabled, "The exit entry should be enabled");
@@ -332,7 +442,17 @@ public sealed class TrayMenuTests
         var version = ProductVersion.Read(typeof(TrayMenu).Assembly);
 
         // Act
-        var entries = TrayMenu.Create(version, CreateSnapshot("Receiving", canRecord: true, isRecording: false), GameInstallationStatus.Searching, GameCatalogStatus.Reading, null, false, CreateClock(1));
+        var entries = TrayMenu.Create(CompanionTexts.English,
+                                      new TrayMenuState
+                                      {
+                                          Version = version,
+                                          Snapshot = CreateSnapshot("Receiving", canRecord: true, isRecording: false),
+                                          Game = GameInstallationStatus.Searching,
+                                          Catalog = GameCatalogStatus.Reading,
+                                          Server = null,
+                                          IsAutostartEnabled = false,
+                                          Clock = CreateClock(1)
+                                      });
 
         // Assert
         Assert.AreEqual("Version " + version, entries.Single(entry => entry.Kind == TrayMenuEntryKind.Version).Text, "The version entry should read Version followed by the product version");
@@ -354,7 +474,7 @@ public sealed class TrayMenuTests
         CultureInfo.CurrentCulture = CreateOddCulture();
 
         // Act
-        var text = TrayMenu.FormatLastTick(tick, CreateClock(1));
+        var text = TrayMenu.FormatLastTick(CompanionTexts.English, tick, CreateClock(1));
 
         // Assert
         Assert.AreEqual(expected, text, "A tick of today should show the local time as HH:mm:ss under any culture");
@@ -377,7 +497,7 @@ public sealed class TrayMenuTests
         CultureInfo.CurrentCulture = CreateOddCulture();
 
         // Act
-        var text = TrayMenu.FormatLastTick(tick, CreateClock(1));
+        var text = TrayMenu.FormatLastTick(CompanionTexts.English, tick, CreateClock(1));
 
         // Assert
         Assert.AreEqual(expected, text, "A tick of another day should show the local time as yyyy-MM-dd HH:mm:ss under any culture");
@@ -402,7 +522,7 @@ public sealed class TrayMenuTests
                    };
 
         // Act
-        var text = TrayMenu.FormatLastTick(tick, CreateClock(-1));
+        var text = TrayMenu.FormatLastTick(CompanionTexts.English, tick, CreateClock(-1));
 
         // Assert
         Assert.AreEqual(expected, text, "A time within one day after the earliest time should show in UTC, a later one in local time");
@@ -427,7 +547,7 @@ public sealed class TrayMenuTests
                    };
 
         // Act
-        var text = TrayMenu.FormatLastTick(tick, CreateClock(1));
+        var text = TrayMenu.FormatLastTick(CompanionTexts.English, tick, CreateClock(1));
 
         // Assert
         Assert.AreEqual(expected, text, "A time within one day before the latest time should show in UTC, an earlier one in local time");
@@ -452,7 +572,7 @@ public sealed class TrayMenuTests
                               };
 
         // Act
-        var text = TrayMenu.FormatLastTick(tick, CreateClock(1));
+        var text = TrayMenu.FormatLastTick(CompanionTexts.English, tick, CreateClock(1));
 
         // Assert
         Assert.AreEqual(expected, text, "The island count should read 1 island in the singular and n islands otherwise");
@@ -468,7 +588,7 @@ public sealed class TrayMenuTests
         PipeTickSummary? tick = null;
 
         // Act
-        var text = TrayMenu.FormatLastTick(tick, CreateClock(1));
+        var text = TrayMenu.FormatLastTick(CompanionTexts.English, tick, CreateClock(1));
 
         // Assert
         Assert.AreEqual("Last tick: none", text, "Without a tick the text should read Last tick: none");
@@ -489,7 +609,7 @@ public sealed class TrayMenuTests
                        };
 
         // Act
-        var toolTip = TrayMenu.FormatSnapshotToolTip(snapshot, CreateClock(1));
+        var toolTip = TrayMenu.FormatSnapshotToolTip(CompanionTexts.English, snapshot, CreateClock(1));
 
         // Assert
         Assert.AreEqual("Censio Companion: Receiving", toolTip, "Without a tick the tooltip should be the one status line");
@@ -505,7 +625,7 @@ public sealed class TrayMenuTests
         var snapshot = CreateSnapshot("Receiving (recording)", canRecord: true, isRecording: true);
 
         // Act
-        var toolTip = TrayMenu.FormatSnapshotToolTip(snapshot, CreateClock(1));
+        var toolTip = TrayMenu.FormatSnapshotToolTip(CompanionTexts.English, snapshot, CreateClock(1));
 
         // Assert
         Assert.AreEqual("Censio Companion: Receiving (recording)\nLast tick: 00:30:00, 3 islands", toolTip, "With a tick the tooltip should hold the status line, a line feed and the last-tick line");
@@ -534,10 +654,10 @@ public sealed class TrayMenuTests
                        ReceiveTime = DateTimeOffset.MinValue,
                        IslandCount = 256
                    };
-        var snapshot = TraySnapshot.ForReplay(status, tick);
+        var snapshot = TraySnapshot.ForReplay(CompanionTexts.English, status, tick);
 
         // Act
-        var toolTip = TrayMenu.FormatSnapshotToolTip(snapshot, CreateClock(-1));
+        var toolTip = TrayMenu.FormatSnapshotToolTip(CompanionTexts.English, snapshot, CreateClock(-1));
 
         // Assert
         Assert.AreEqual("Censio Companion: Replay error: invalid line 9223372036854775807\nLast tick: 0001-01-01 00:00:00Z, 256 islands", toolTip, "The longest tooltip should hold the replay error and the last tick in UTC");
@@ -647,7 +767,7 @@ public sealed class TrayMenuTests
         // (state and expected come from the data row)
 
         // Act
-        var toolTip = TrayMenu.FormatToolTip(state);
+        var toolTip = TrayMenu.FormatToolTip(CompanionTexts.English, state);
 
         // Assert
         Assert.AreEqual(expected, toolTip, "The tooltip should be the application name, a colon and the state text");
@@ -663,7 +783,7 @@ public sealed class TrayMenuTests
         var state = (PipeConnectionState)99;
 
         // Act
-        var exception = Assert.Throws<ArgumentOutOfRangeException>(() => TrayMenu.FormatToolTip(state), "An undefined state should be rejected");
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(() => TrayMenu.FormatToolTip(CompanionTexts.English, state), "An undefined state should be rejected");
 
         // Assert
         Assert.AreEqual("state", exception.ParamName, "The exception should name the parameter");
@@ -693,7 +813,7 @@ public sealed class TrayMenuTests
         // (state, recording and expected come from the data row)
 
         // Act
-        var toolTip = TrayMenu.FormatToolTip(state, recording);
+        var toolTip = TrayMenu.FormatToolTip(CompanionTexts.English, state, recording);
 
         // Assert
         Assert.AreEqual(expected, toolTip, "The tooltip should carry the suffix of the recording state");
@@ -722,7 +842,7 @@ public sealed class TrayMenuTests
                      };
 
         // Act
-        var toolTip = TrayMenu.FormatReplayToolTip(status);
+        var toolTip = TrayMenu.FormatReplayToolTip(CompanionTexts.English, status);
 
         // Assert
         Assert.AreEqual(expected, toolTip, "The replay tooltip should name the state, or the end of the replay");
@@ -759,7 +879,7 @@ public sealed class TrayMenuTests
                      };
 
         // Act
-        var toolTip = TrayMenu.FormatReplayToolTip(status);
+        var toolTip = TrayMenu.FormatReplayToolTip(CompanionTexts.English, status);
 
         // Assert
         Assert.AreEqual(expected, toolTip, "The replay tooltip should name the reason of the problem");
@@ -786,7 +906,7 @@ public sealed class TrayMenuTests
         CultureInfo.CurrentCulture = new CultureInfo("de-DE");
 
         // Act
-        var toolTip = TrayMenu.FormatReplayToolTip(status);
+        var toolTip = TrayMenu.FormatReplayToolTip(CompanionTexts.English, status);
 
         // Assert
         Assert.AreEqual("Censio Companion: Replay error: invalid line 1234567", toolTip, "The line number should be written without grouping");
@@ -820,11 +940,11 @@ public sealed class TrayMenuTests
                      };
 
         // Act
-        var toolTip = TrayMenu.FormatReplayToolTip(status);
+        var toolTip = TrayMenu.FormatReplayToolTip(CompanionTexts.English, status);
 
         // Assert
         Assert.AreEqual("Censio Companion: Replay error: " + reason, toolTip, $"The tooltip should name the reason of {kind}");
-        Assert.AreEqual(reason, TrayMenu.FormatReplaySendReason(kind), $"The reason of {kind} should be its text");
+        Assert.AreEqual(reason, TrayMenu.FormatReplaySendReason(CompanionTexts.English, kind), $"The reason of {kind} should be its text");
     }
 
     /// <summary>
@@ -844,11 +964,11 @@ public sealed class TrayMenuTests
                      };
 
         // Act
-        var toolTip = TrayMenu.FormatReplayToolTip(status);
+        var toolTip = TrayMenu.FormatReplayToolTip(CompanionTexts.English, status);
 
         // Assert
         Assert.AreEqual("Censio Companion: Replay error: server does not support contract version 2", toolTip, "The tooltip should name contract version 2");
-        Assert.AreEqual("server does not support contract version 2", TrayMenu.FormatReplaySendReason(ReplaySendProblemKind.VersionNotSupported), "The reason should name contract version 2");
+        Assert.AreEqual("server does not support contract version 2", TrayMenu.FormatReplaySendReason(CompanionTexts.English, ReplaySendProblemKind.VersionNotSupported), "The reason should name contract version 2");
     }
 
     /// <summary>
@@ -877,7 +997,7 @@ public sealed class TrayMenuTests
                      };
 
         // Act
-        var toolTip = TrayMenu.FormatReplayToolTip(status);
+        var toolTip = TrayMenu.FormatReplayToolTip(CompanionTexts.English, status);
 
         // Assert
         Assert.AreEqual("Censio Companion: Replay error: server connection lost", toolTip, "The send problem should be shown first");
@@ -898,7 +1018,7 @@ public sealed class TrayMenuTests
                      };
 
         // Act
-        var toolTip = TrayMenu.FormatReplayToolTip(status);
+        var toolTip = TrayMenu.FormatReplayToolTip(CompanionTexts.English, status);
 
         // Assert
         Assert.AreEqual("Censio Companion: Replay: Connecting to server", toolTip, "The tooltip should say that the replay connects to the server");
@@ -932,7 +1052,7 @@ public sealed class TrayMenuTests
                      };
 
         // Act
-        var toolTip = TrayMenu.FormatReplayToolTip(status);
+        var toolTip = TrayMenu.FormatReplayToolTip(CompanionTexts.English, status);
 
         // Assert
         Assert.AreEqual(expected, toolTip, "The tooltip should name the sent ticks and the refused messages");
@@ -961,7 +1081,7 @@ public sealed class TrayMenuTests
     public void TrayMenuFormatToolTipUndefinedRecordingStateThrows()
     {
         // Act
-        var exception = Assert.Throws<ArgumentOutOfRangeException>(() => TrayMenu.FormatToolTip(PipeConnectionState.Connected, (PipeRecordingState)99), "An undefined recording state should be rejected");
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(() => TrayMenu.FormatToolTip(CompanionTexts.English, PipeConnectionState.Connected, (PipeRecordingState)99), "An undefined recording state should be rejected");
 
         // Assert
         Assert.AreEqual("recording", exception.ParamName, "The exception should name the parameter");
@@ -984,7 +1104,7 @@ public sealed class TrayMenuTests
                      };
 
         // Act
-        var exception = Assert.Throws<ArgumentOutOfRangeException>(() => TrayMenu.FormatReplayToolTip(status), "An undefined problem kind should be rejected");
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(() => TrayMenu.FormatReplayToolTip(CompanionTexts.English, status), "An undefined problem kind should be rejected");
 
         // Assert
         Assert.AreEqual("status", exception.ParamName, "The exception should name the parameter");
@@ -1006,11 +1126,11 @@ public sealed class TrayMenuTests
                      };
 
         // Act
-        var exception = Assert.Throws<ArgumentOutOfRangeException>(() => TrayMenu.FormatReplayToolTip(status), "An undefined send problem kind should be rejected");
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(() => TrayMenu.FormatReplayToolTip(CompanionTexts.English, status), "An undefined send problem kind should be rejected");
 
         // Assert
         Assert.AreEqual("status", exception.ParamName, "The exception should name the parameter");
-        Assert.IsNull(TrayMenu.FormatReplaySendReason((ReplaySendProblemKind)99), "An undefined send problem kind should have no reason text");
+        Assert.IsNull(TrayMenu.FormatReplaySendReason(CompanionTexts.English, (ReplaySendProblemKind)99), "An undefined send problem kind should have no reason text");
     }
 
     /// <summary>
@@ -1030,7 +1150,7 @@ public sealed class TrayMenuTests
                      };
 
         // Act
-        var exception = Assert.Throws<ArgumentOutOfRangeException>(() => TrayMenu.FormatReplayToolTip(status), "A state a replay cannot reach should be rejected");
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(() => TrayMenu.FormatReplayToolTip(CompanionTexts.English, status), "A state a replay cannot reach should be rejected");
 
         // Assert
         Assert.AreEqual("status", exception.ParamName, "The exception should name the parameter");
@@ -1084,7 +1204,17 @@ public sealed class TrayMenuTests
         var game = CreateGameStatus(kind, source, build);
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, game, GameCatalogStatus.Reading, null, false, CreateClock(1));
+        var entries = TrayMenu.Create(CompanionTexts.English,
+                                      new TrayMenuState
+                                      {
+                                          Version = "1.2.3",
+                                          Snapshot = snapshot,
+                                          Game = game,
+                                          Catalog = GameCatalogStatus.Reading,
+                                          Server = null,
+                                          IsAutostartEnabled = false,
+                                          Clock = CreateClock(1)
+                                      });
 
         // Assert
         var kinds = entries.Select(entry => entry.Kind).ToList();
@@ -1127,7 +1257,7 @@ public sealed class TrayMenuTests
                      };
 
         // Act
-        var text = TrayMenu.FormatCatalog(status);
+        var text = TrayMenu.FormatCatalog(CompanionTexts.English, status);
 
         // Assert
         Assert.AreEqual(expected, text, "The catalog text should follow the state of the build, whatever the culture");
@@ -1163,7 +1293,7 @@ public sealed class TrayMenuTests
                      };
 
         // Act
-        var text = TrayMenu.FormatCatalog(status);
+        var text = TrayMenu.FormatCatalog(CompanionTexts.English, status);
 
         // Assert
         Assert.AreEqual(expected, text, "The catalog text should be the one of the state, whatever the culture");
@@ -1183,7 +1313,7 @@ public sealed class TrayMenuTests
                      };
 
         // Act
-        var exception = Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => TrayMenu.FormatCatalog(status), "An undefined kind should throw");
+        var exception = Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => TrayMenu.FormatCatalog(CompanionTexts.English, status), "An undefined kind should throw");
 
         // Assert
         Assert.AreEqual("status", exception.ParamName, "The exception should name the status");
@@ -1212,7 +1342,17 @@ public sealed class TrayMenuTests
                       };
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, catalog, null, false, CreateClock(1));
+        var entries = TrayMenu.Create(CompanionTexts.English,
+                                      new TrayMenuState
+                                      {
+                                          Version = "1.2.3",
+                                          Snapshot = snapshot,
+                                          Game = GameInstallationStatus.Searching,
+                                          Catalog = catalog,
+                                          Server = null,
+                                          IsAutostartEnabled = false,
+                                          Clock = CreateClock(1)
+                                      });
 
         // Assert
         var kinds = entries.Select(entry => entry.Kind).ToList();
@@ -1250,7 +1390,7 @@ public sealed class TrayMenuTests
         var status = CreateLocalServerStatus(state, port);
 
         // Act
-        var text = TrayMenu.FormatLocalServer(status);
+        var text = TrayMenu.FormatLocalServer(CompanionTexts.English, status);
 
         // Assert
         Assert.AreEqual(expected, text, $"The server line of {state} at port {port} should be its text");
@@ -1269,16 +1409,20 @@ public sealed class TrayMenuTests
         var localServer = CreateLocalServerStatus(LocalServerState.Running, 5117);
 
         // Act
-        var entries = TrayMenu.Create("1.2.3",
-                                      snapshot,
-                                      GameInstallationStatus.Searching,
-                                      GameCatalogStatus.Reading,
-                                      new TrayServerStatus
+        var entries = TrayMenu.Create(CompanionTexts.English,
+                                      new TrayMenuState
                                       {
-                                          Local = localServer
-                                      },
-                                      false,
-                                      CreateClock(1));
+                                          Version = "1.2.3",
+                                          Snapshot = snapshot,
+                                          Game = GameInstallationStatus.Searching,
+                                          Catalog = GameCatalogStatus.Reading,
+                                          Server = new TrayServerStatus
+                                                   {
+                                                       Local = localServer
+                                                   },
+                                          IsAutostartEnabled = false,
+                                          Clock = CreateClock(1)
+                                      });
 
         // Assert
         var kinds = entries.Select(entry => entry.Kind).ToList();
@@ -1308,7 +1452,17 @@ public sealed class TrayMenuTests
         var snapshot = CreateSnapshotForMode(mode);
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, null, false, CreateClock(1));
+        var entries = TrayMenu.Create(CompanionTexts.English,
+                                      new TrayMenuState
+                                      {
+                                          Version = "1.2.3",
+                                          Snapshot = snapshot,
+                                          Game = GameInstallationStatus.Searching,
+                                          Catalog = GameCatalogStatus.Reading,
+                                          Server = null,
+                                          IsAutostartEnabled = false,
+                                          Clock = CreateClock(1)
+                                      });
 
         // Assert
         var kinds = entries.Select(entry => entry.Kind).ToList();
@@ -1351,16 +1505,20 @@ public sealed class TrayMenuTests
                             };
 
         // Act
-        var entries = TrayMenu.Create("1.2.3",
-                                      snapshot,
-                                      GameInstallationStatus.Searching,
-                                      GameCatalogStatus.Reading,
-                                      new TrayServerStatus
+        var entries = TrayMenu.Create(CompanionTexts.English,
+                                      new TrayMenuState
                                       {
-                                          Local = localServer
-                                      },
-                                      false,
-                                      CreateClock(1));
+                                          Version = "1.2.3",
+                                          Snapshot = snapshot,
+                                          Game = GameInstallationStatus.Searching,
+                                          Catalog = GameCatalogStatus.Reading,
+                                          Server = new TrayServerStatus
+                                                   {
+                                                       Local = localServer
+                                                   },
+                                          IsAutostartEnabled = false,
+                                          Clock = CreateClock(1)
+                                      });
 
         // Assert
         var openCensio = entries.Single(entry => entry.Kind == TrayMenuEntryKind.OpenCensio);
@@ -1390,16 +1548,20 @@ public sealed class TrayMenuTests
         var localServer = CreateLocalServerStatus(state, 5000);
 
         // Act
-        var entries = TrayMenu.Create("1.2.3",
-                                      snapshot,
-                                      GameInstallationStatus.Searching,
-                                      GameCatalogStatus.Reading,
-                                      new TrayServerStatus
+        var entries = TrayMenu.Create(CompanionTexts.English,
+                                      new TrayMenuState
                                       {
-                                          Local = localServer
-                                      },
-                                      false,
-                                      CreateClock(1));
+                                          Version = "1.2.3",
+                                          Snapshot = snapshot,
+                                          Game = GameInstallationStatus.Searching,
+                                          Catalog = GameCatalogStatus.Reading,
+                                          Server = new TrayServerStatus
+                                                   {
+                                                       Local = localServer
+                                                   },
+                                          IsAutostartEnabled = false,
+                                          Clock = CreateClock(1)
+                                      });
 
         // Assert
         var openCensio = entries.Single(entry => entry.Kind == TrayMenuEntryKind.OpenCensio);
@@ -1423,7 +1585,17 @@ public sealed class TrayMenuTests
                      };
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, server, false, CreateClock(1));
+        var entries = TrayMenu.Create(CompanionTexts.English,
+                                      new TrayMenuState
+                                      {
+                                          Version = "1.2.3",
+                                          Snapshot = snapshot,
+                                          Game = GameInstallationStatus.Searching,
+                                          Catalog = GameCatalogStatus.Reading,
+                                          Server = server,
+                                          IsAutostartEnabled = false,
+                                          Clock = CreateClock(1)
+                                      });
 
         // Assert
         var kinds = entries.Select(entry => entry.Kind).ToList();
@@ -1471,7 +1643,7 @@ public sealed class TrayMenuTests
                      };
 
         // Act
-        var text = TrayMenu.FormatLiveSend(status);
+        var text = TrayMenu.FormatLiveSend(CompanionTexts.English, status);
 
         // Assert
         Assert.AreEqual(expected, text, $"The server line of {state} with {problem} should be its text");
@@ -1515,7 +1687,17 @@ public sealed class TrayMenuTests
                             };
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, server, false, CreateClock(1));
+        var entries = TrayMenu.Create(CompanionTexts.English,
+                                      new TrayMenuState
+                                      {
+                                          Version = "1.2.3",
+                                          Snapshot = snapshot,
+                                          Game = GameInstallationStatus.Searching,
+                                          Catalog = GameCatalogStatus.Reading,
+                                          Server = server,
+                                          IsAutostartEnabled = false,
+                                          Clock = CreateClock(1)
+                                      });
 
         // Assert
         var serverLine = entries.Single(entry => entry.Kind == TrayMenuEntryKind.ServerConnection);
@@ -1553,7 +1735,17 @@ public sealed class TrayMenuTests
                      };
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, server, false, CreateClock(1));
+        var entries = TrayMenu.Create(CompanionTexts.English,
+                                      new TrayMenuState
+                                      {
+                                          Version = "1.2.3",
+                                          Snapshot = snapshot,
+                                          Game = GameInstallationStatus.Searching,
+                                          Catalog = GameCatalogStatus.Reading,
+                                          Server = server,
+                                          IsAutostartEnabled = false,
+                                          Clock = CreateClock(1)
+                                      });
 
         // Assert
         var kinds = entries.Select(entry => entry.Kind).ToList();
@@ -1594,7 +1786,7 @@ public sealed class TrayMenuTests
                      };
 
         // Act
-        var text = TrayMenu.FormatLiveBuffer(status);
+        var text = TrayMenu.FormatLiveBuffer(CompanionTexts.English, status);
 
         // Assert
         Assert.AreEqual(expected, text, $"The buffer line of {waiting} waiting, {dropped} dropped, memory only {isMemoryOnly} should be its text");
@@ -1625,7 +1817,17 @@ public sealed class TrayMenuTests
                                               };
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, server, false, CreateClock(1));
+        var entries = TrayMenu.Create(CompanionTexts.English,
+                                      new TrayMenuState
+                                      {
+                                          Version = "1.2.3",
+                                          Snapshot = snapshot,
+                                          Game = GameInstallationStatus.Searching,
+                                          Catalog = GameCatalogStatus.Reading,
+                                          Server = server,
+                                          IsAutostartEnabled = false,
+                                          Clock = CreateClock(1)
+                                      });
 
         // Assert
         var kinds = entries.Select(entry => entry.Kind).ToList();
@@ -1656,7 +1858,17 @@ public sealed class TrayMenuTests
         TrayServerStatus? server = mode == "none" ? null : CreateServerStatus(mode);
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, server, false, CreateClock(1));
+        var entries = TrayMenu.Create(CompanionTexts.English,
+                                      new TrayMenuState
+                                      {
+                                          Version = "1.2.3",
+                                          Snapshot = snapshot,
+                                          Game = GameInstallationStatus.Searching,
+                                          Catalog = GameCatalogStatus.Reading,
+                                          Server = server,
+                                          IsAutostartEnabled = false,
+                                          Clock = CreateClock(1)
+                                      });
 
         // Assert
         var kinds = entries.Select(entry => entry.Kind).ToList();
@@ -1681,11 +1893,11 @@ public sealed class TrayMenuTests
                      };
 
         // Act
-        var reason = TrayMenu.FormatReplaySendReason(ReplaySendProblemKind.LocalServerNotRunning);
+        var reason = TrayMenu.FormatReplaySendReason(CompanionTexts.English, ReplaySendProblemKind.LocalServerNotRunning);
 
         // Assert
         Assert.AreEqual("local server not running", reason, "The reason should read local server not running");
-        Assert.AreEqual("Censio Companion: Replay error: local server not running", TrayMenu.FormatReplayToolTip(status), "The tooltip should name the reason");
+        Assert.AreEqual("Censio Companion: Replay error: local server not running", TrayMenu.FormatReplayToolTip(CompanionTexts.English, status), "The tooltip should name the reason");
     }
 
     /// <summary>
@@ -1704,7 +1916,7 @@ public sealed class TrayMenuTests
         var status = CreateGameStatus(GameInstallationStatusKind.Found, source, "26.29905.4.51797");
 
         // Act
-        var text = TrayMenu.FormatGame(status);
+        var text = TrayMenu.FormatGame(CompanionTexts.English, status);
 
         // Assert
         Assert.AreEqual(expected, text, "A found installation should show its build and source, not its folder");
@@ -1727,7 +1939,7 @@ public sealed class TrayMenuTests
         var status = CreateGameStatus(kind, null, null);
 
         // Act
-        var text = TrayMenu.FormatGame(status);
+        var text = TrayMenu.FormatGame(CompanionTexts.English, status);
 
         // Assert
         Assert.AreEqual(expected, text, "The problem should show the fixed text of its case");
@@ -1744,7 +1956,7 @@ public sealed class TrayMenuTests
         var status = CreateGameStatus(GameInstallationStatusKind.NotFound, null, null);
 
         // Act
-        var text = TrayMenu.FormatGame(status);
+        var text = TrayMenu.FormatGame(CompanionTexts.English, status);
 
         // Assert
         Assert.AreEqual("Game: not found", text, "Nothing found should show not found");
@@ -1765,7 +1977,7 @@ public sealed class TrayMenuTests
         var status = CreateGameStatus(GameInstallationStatusKind.Found, source, null);
 
         // Act
-        var text = TrayMenu.FormatGame(status);
+        var text = TrayMenu.FormatGame(CompanionTexts.English, status);
 
         // Assert
         Assert.AreEqual(expected, text, "A found installation without a build should show the build as unknown");
@@ -1779,7 +1991,7 @@ public sealed class TrayMenuTests
     public void TrayMenuFormatGameSearchingShowsText()
     {
         // Act
-        var text = TrayMenu.FormatGame(GameInstallationStatus.Searching);
+        var text = TrayMenu.FormatGame(CompanionTexts.English, GameInstallationStatus.Searching);
 
         // Assert
         Assert.AreEqual("Game: searching", text, "A running search should show searching");
@@ -1871,24 +2083,27 @@ public sealed class TrayMenuTests
     {
         return mode switch
                {
-                   "live" => TraySnapshot.ForConnection(new PipeConnectionStatus
+                   "live" => TraySnapshot.ForConnection(CompanionTexts.English,
+                                                        new PipeConnectionStatus
                                                         {
                                                             State = PipeConnectionState.Receiving
                                                         },
                                                         PipeRecordingState.Off,
                                                         _todayTick),
-                   "recording" => TraySnapshot.ForConnection(new PipeConnectionStatus
+                   "recording" => TraySnapshot.ForConnection(CompanionTexts.English,
+                                                             new PipeConnectionStatus
                                                              {
                                                                  State = PipeConnectionState.Receiving
                                                              },
                                                              PipeRecordingState.Recording,
                                                              _todayTick),
-                   "replay" => TraySnapshot.ForReplay(new PipeReplayStatus
+                   "replay" => TraySnapshot.ForReplay(CompanionTexts.English,
+                                                      new PipeReplayStatus
                                                       {
                                                           State = PipeConnectionState.Receiving
                                                       },
                                                       _todayTick),
-                   _ => TraySnapshot.ForInvalidCommandLine()
+                   _ => TraySnapshot.ForInvalidCommandLine(CompanionTexts.English)
                };
     }
 

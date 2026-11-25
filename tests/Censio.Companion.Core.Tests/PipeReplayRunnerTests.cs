@@ -903,7 +903,7 @@ public sealed class PipeReplayRunnerTests
 
         Assert.AreEqual(_start.AddSeconds(7), routes.ReceiveTime, "The trade routes should carry their frame's recorded stamp");
         Assert.AreSequenceEqual(_tradeRouteNames, routes.Routes.Select(route => route.Name), "The routes should be sent in their order");
-        Assert.AreEqual("Censio Companion: Replay finished: 2 ticks sent, 0 refused", TrayMenu.FormatReplayToolTip(runner.Status), "The finished status should count only the ticks as sent");
+        Assert.AreEqual("Censio Companion: Replay finished: 2 ticks sent, 0 refused", TrayMenu.FormatReplayToolTip(CompanionTexts.English, runner.Status), "The finished status should count only the ticks as sent");
     }
 
     /// <summary>

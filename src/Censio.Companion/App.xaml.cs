@@ -124,7 +124,7 @@ public sealed partial class App : Application, IDisposable
     /// <summary>
     /// Gets the snapshot of the tray
     /// </summary>
-    private Func<TraySnapshot> _snapshot = TraySnapshot.ForInvalidCommandLine;
+    private Func<TraySnapshot> _snapshot = () => TraySnapshot.ForInvalidCommandLine(CompanionTexts.English);
 
     /// <summary>
     /// The session of the diagnostics window
@@ -204,7 +204,7 @@ public sealed partial class App : Application, IDisposable
                                                           action => Dispatcher.BeginInvoke(DispatcherPriority.Background, action),
                                                           snapshot =>
                                                           {
-                                                              trayIcon.SetToolTip(TrayMenu.FormatSnapshotToolTip(snapshot, TimeProvider.System));
+                                                              trayIcon.SetToolTip(TrayMenu.FormatSnapshotToolTip(CompanionTexts.English, snapshot, TimeProvider.System));
                                                               trayIcon.SetLook(snapshot.Look);
                                                           });
 
@@ -293,7 +293,7 @@ public sealed partial class App : Application, IDisposable
 
         var connection = new PipeConnection(new NamedPipeConnector(), TimeProvider.System, recording, _logger);
 
-        _snapshot = () => TraySnapshot.ForConnection(connection.Status, recording.State, connection.LastTick);
+        _snapshot = () => TraySnapshot.ForConnection(CompanionTexts.English, connection.Status, recording.State, connection.LastTick);
 
         CreateDiagnostics(() => connection.LatestTick);
         _readLatestTick = () => connection.LatestTick;
@@ -382,7 +382,7 @@ public sealed partial class App : Application, IDisposable
 
         CompanionLog.ReplayStarted(_logger, fileName);
 
-        _snapshot = () => TraySnapshot.ForReplay(runner.Status, runner.LastTick);
+        _snapshot = () => TraySnapshot.ForReplay(CompanionTexts.English, runner.Status, runner.LastTick);
 
         CreateDiagnostics(() => runner.LatestTick);
         _readLatestTick = () => runner.LatestTick;

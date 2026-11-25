@@ -169,7 +169,7 @@ public sealed class DiagnosticsView : IReadOnlyList<DiagnosticsRow>, IList
         var lines = new List<string>(3)
                     {
                         $"Status: {statusText}",
-                        TrayMenu.FormatLastTick(tick is null ? null : PipeTickSummary.From(tick), clock)
+                        TrayMenu.FormatLastTick(CompanionTexts.English, tick is null ? null : PipeTickSummary.From(tick), clock)
                     };
 
         if (tick is not null)

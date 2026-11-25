@@ -57,7 +57,7 @@ public sealed class TraySnapshotTests
                        };
 
         // Act
-        var snapshot = TraySnapshot.ForConnection(status, recording, _lastTick);
+        var snapshot = TraySnapshot.ForConnection(CompanionTexts.English, status, recording, _lastTick);
 
         // Assert
         Assert.AreEqual(expectedLook, snapshot.Look, "The look should follow the connection state");
@@ -105,7 +105,7 @@ public sealed class TraySnapshotTests
                        };
 
         // Act
-        var snapshot = TraySnapshot.ForReplay(status, _lastTick);
+        var snapshot = TraySnapshot.ForReplay(CompanionTexts.English, status, _lastTick);
 
         // Assert
         Assert.AreEqual(expectedLook, snapshot.Look, "The look should follow the replayed state");
@@ -145,7 +145,7 @@ public sealed class TraySnapshotTests
                      };
 
         // Act
-        var snapshot = TraySnapshot.ForReplay(status, _lastTick);
+        var snapshot = TraySnapshot.ForReplay(CompanionTexts.English, status, _lastTick);
 
         // Assert
         Assert.AreEqual(expectedLook, snapshot.Look, "The look should follow the sending");
@@ -169,7 +169,7 @@ public sealed class TraySnapshotTests
                        };
 
         // Act
-        var snapshot = TraySnapshot.ForInvalidCommandLine();
+        var snapshot = TraySnapshot.ForInvalidCommandLine(CompanionTexts.English);
 
         // Assert
         Assert.AreEqual(expected, snapshot, "The snapshot should show the problem look, the status text, no last tick and no recording");

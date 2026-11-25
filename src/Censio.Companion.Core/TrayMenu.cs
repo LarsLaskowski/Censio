@@ -78,9 +78,10 @@ public static class TrayMenu
     /// <summary>
     /// Formats the text of the version entry.
     /// </summary>
+    /// <param name="texts">The texts</param>
     /// <param name="version">The product version</param>
     /// <returns>The text of the version entry</returns>
-    public static string FormatVersion(string version)
+    public static string FormatVersion(CompanionTexts texts, string version)
     {
         return "Version " + version;
     }
@@ -88,10 +89,11 @@ public static class TrayMenu
     /// <summary>
     /// Formats the tooltip of the tray icon for a connection state.
     /// </summary>
+    /// <param name="texts">The texts</param>
     /// <param name="state">The connection state</param>
     /// <returns>The tooltip text</returns>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="state" /> is not a defined value</exception>
-    public static string FormatToolTip(PipeConnectionState state)
+    public static string FormatToolTip(CompanionTexts texts, PipeConnectionState state)
     {
         var text = state switch
                    {
@@ -110,11 +112,12 @@ public static class TrayMenu
     /// <summary>
     /// Formats the tooltip of the tray icon for a connection state and a recording state.
     /// </summary>
+    /// <param name="texts">The texts</param>
     /// <param name="state">The connection state</param>
     /// <param name="recording">The recording state</param>
     /// <returns>The tooltip text</returns>
     /// <exception cref="ArgumentOutOfRangeException">A state is not a defined value</exception>
-    public static string FormatToolTip(PipeConnectionState state, PipeRecordingState recording)
+    public static string FormatToolTip(CompanionTexts texts, PipeConnectionState state, PipeRecordingState recording)
     {
         var suffix = recording switch
                      {
@@ -124,27 +127,28 @@ public static class TrayMenu
                          _ => throw new ArgumentOutOfRangeException(nameof(recording), recording, "The recording state is not defined")
                      };
 
-        return FormatToolTip(state) + suffix;
+        return FormatToolTip(texts, state) + suffix;
     }
 
     /// <summary>
     /// Formats the tooltip of the tray icon for a replay status.
     /// </summary>
+    /// <param name="texts">The texts</param>
     /// <param name="status">The replay status</param>
     /// <returns>The tooltip text</returns>
     /// <exception cref="ArgumentOutOfRangeException">The state or the problem kind is not a defined value</exception>
-    public static string FormatReplayToolTip(PipeReplayStatus status)
+    public static string FormatReplayToolTip(CompanionTexts texts, PipeReplayStatus status)
     {
         if (status.SendProblem is { } sendProblem)
         {
-            var sendReason = FormatReplaySendReason(sendProblem) ?? throw new ArgumentOutOfRangeException(nameof(status), sendProblem, "The send problem kind is not defined");
+            var sendReason = FormatReplaySendReason(texts, sendProblem) ?? throw new ArgumentOutOfRangeException(nameof(status), sendProblem, "The send problem kind is not defined");
 
             return $"{ToolTip}: Replay error: {sendReason}";
         }
 
         if (status.Problem is { } problem)
         {
-            var reason = FormatReplayReason(problem) ?? throw new ArgumentOutOfRangeException(nameof(status), problem.Kind, "The problem kind is not defined");
+            var reason = FormatReplayReason(texts, problem) ?? throw new ArgumentOutOfRangeException(nameof(status), problem.Kind, "The problem kind is not defined");
 
             return $"{ToolTip}: Replay error: {reason}";
         }
@@ -178,31 +182,34 @@ public static class TrayMenu
     /// <summary>
     /// Formats the status text for a connection state and a recording state.
     /// </summary>
+    /// <param name="texts">The texts</param>
     /// <param name="state">The connection state</param>
     /// <param name="recording">The recording state</param>
     /// <returns>The status text</returns>
-    public static string FormatStatusText(PipeConnectionState state, PipeRecordingState recording)
+    public static string FormatStatusText(CompanionTexts texts, PipeConnectionState state, PipeRecordingState recording)
     {
-        return WithoutToolTipPrefix(FormatToolTip(state, recording));
+        return WithoutToolTipPrefix(FormatToolTip(texts, state, recording));
     }
 
     /// <summary>
     /// Formats the status text for a replay status.
     /// </summary>
+    /// <param name="texts">The texts</param>
     /// <param name="status">The replay status</param>
     /// <returns>The status text</returns>
-    public static string FormatReplayStatusText(PipeReplayStatus status)
+    public static string FormatReplayStatusText(CompanionTexts texts, PipeReplayStatus status)
     {
-        return WithoutToolTipPrefix(FormatReplayToolTip(status));
+        return WithoutToolTipPrefix(FormatReplayToolTip(texts, status));
     }
 
     /// <summary>
     /// Formats the text of the last tick.
     /// </summary>
+    /// <param name="texts">The texts</param>
     /// <param name="tick">The summary of the last tick, or <c>null</c> if none was received</param>
     /// <param name="clock">The clock</param>
     /// <returns>The text</returns>
-    public static string FormatLastTick(PipeTickSummary? tick, TimeProvider clock)
+    public static string FormatLastTick(CompanionTexts texts, PipeTickSummary? tick, TimeProvider clock)
     {
         if (tick is not { } summary)
         {
@@ -235,16 +242,17 @@ public static class TrayMenu
     /// <summary>
     /// Formats the tooltip of a snapshot.
     /// </summary>
+    /// <param name="texts">The texts</param>
     /// <param name="snapshot">The snapshot</param>
     /// <param name="clock">The clock</param>
     /// <returns>The tooltip text</returns>
-    public static string FormatSnapshotToolTip(TraySnapshot snapshot, TimeProvider clock)
+    public static string FormatSnapshotToolTip(CompanionTexts texts, TraySnapshot snapshot, TimeProvider clock)
     {
         var text = $"{ToolTip}: {snapshot.StatusText}";
 
         return snapshot.LastTick is null
                    ? text
-                   : $"{text}\n{FormatLastTick(snapshot.LastTick, clock)}";
+                   : $"{text}\n{FormatLastTick(texts, snapshot.LastTick, clock)}";
     }
 
     /// <summary>
@@ -271,36 +279,38 @@ public static class TrayMenu
     /// <summary>
     /// Creates the entries of the tray menu.
     /// </summary>
-    /// <param name="version">The product version</param>
-    /// <param name="snapshot">The snapshot</param>
-    /// <param name="game">The status of the game installation search</param>
-    /// <param name="catalog">The status of the game catalog</param>
-    /// <param name="server">The status of the server, or <see langword="null" /> when none is hosted or forwarded to</param>
-    /// <param name="isAutostartEnabled">Whether the Companion starts with Windows</param>
-    /// <param name="clock">The clock</param>
+    /// <param name="texts">The texts</param>
+    /// <param name="state">What the menu is built from</param>
     /// <returns>The entries in display order</returns>
-    public static IReadOnlyList<TrayMenuEntry> Create(string version, TraySnapshot snapshot, GameInstallationStatus game, GameCatalogStatus catalog, TrayServerStatus? server, bool isAutostartEnabled, TimeProvider clock)
+    public static IReadOnlyList<TrayMenuEntry> Create(CompanionTexts texts, TrayMenuState state)
     {
+        var version = state.Version;
+        var snapshot = state.Snapshot;
+        var game = state.Game;
+        var catalog = state.Catalog;
+        var server = state.Server;
+        var isAutostartEnabled = state.IsAutostartEnabled;
+        var clock = state.Clock;
         var entries = new List<TrayMenuEntry>
                       {
                           new(TrayMenuEntryKind.Status, $"Status: {snapshot.StatusText}", false),
-                          new(TrayMenuEntryKind.LastTick, FormatLastTick(snapshot.LastTick, clock), false),
-                          new(TrayMenuEntryKind.Game, FormatGame(game), false),
-                          new(TrayMenuEntryKind.Catalog, FormatCatalog(catalog), false)
+                          new(TrayMenuEntryKind.LastTick, FormatLastTick(texts, snapshot.LastTick, clock), false),
+                          new(TrayMenuEntryKind.Game, FormatGame(texts, game), false),
+                          new(TrayMenuEntryKind.Catalog, FormatCatalog(texts, catalog), false)
                       };
 
         if (server?.Local is { } local)
         {
-            entries.Add(new TrayMenuEntry(TrayMenuEntryKind.LocalServer, FormatLocalServer(local), false));
+            entries.Add(new TrayMenuEntry(TrayMenuEntryKind.LocalServer, FormatLocalServer(texts, local), false));
         }
         else if (server?.Live is { } live)
         {
-            entries.Add(new TrayMenuEntry(TrayMenuEntryKind.ServerConnection, FormatLiveSend(live), false));
+            entries.Add(new TrayMenuEntry(TrayMenuEntryKind.ServerConnection, FormatLiveSend(texts, live), false));
         }
 
         if (server?.Buffer is { } buffer)
         {
-            entries.Add(new TrayMenuEntry(TrayMenuEntryKind.LiveBuffer, FormatLiveBuffer(buffer), false));
+            entries.Add(new TrayMenuEntry(TrayMenuEntryKind.LiveBuffer, FormatLiveBuffer(texts, buffer), false));
         }
 
         entries.Add(new TrayMenuEntry(TrayMenuEntryKind.Separator, string.Empty, false));
@@ -318,7 +328,7 @@ public static class TrayMenu
                              new TrayMenuEntry(TrayMenuEntryKind.Separator, string.Empty, false),
                              new TrayMenuEntry(TrayMenuEntryKind.ToggleAutostart, StartWithWindowsText, true, isAutostartEnabled),
                              new TrayMenuEntry(TrayMenuEntryKind.Separator, string.Empty, false),
-                             new TrayMenuEntry(TrayMenuEntryKind.Version, FormatVersion(version), false),
+                             new TrayMenuEntry(TrayMenuEntryKind.Version, FormatVersion(texts, version), false),
                              new TrayMenuEntry(TrayMenuEntryKind.Separator, string.Empty, false),
                              new TrayMenuEntry(TrayMenuEntryKind.Exit, ExitText, true)
                          ]);
@@ -329,9 +339,10 @@ public static class TrayMenu
     /// <summary>
     /// Formats the text of the local server entry.
     /// </summary>
+    /// <param name="texts">The texts</param>
     /// <param name="status">The status of the local server</param>
     /// <returns>The text</returns>
-    public static string FormatLocalServer(LocalServerStatus status)
+    public static string FormatLocalServer(CompanionTexts texts, LocalServerStatus status)
     {
         return status.State switch
                {
@@ -346,9 +357,10 @@ public static class TrayMenu
     /// <summary>
     /// Formats the text of the live buffer entry.
     /// </summary>
+    /// <param name="texts">The texts</param>
     /// <param name="status">The status of the live buffer</param>
     /// <returns>The text</returns>
-    public static string FormatLiveBuffer(LiveBufferStatus status)
+    public static string FormatLiveBuffer(CompanionTexts texts, LiveBufferStatus status)
     {
         var text = string.Create(CultureInfo.InvariantCulture, $"Buffer: {status.Waiting} waiting");
 
@@ -363,9 +375,10 @@ public static class TrayMenu
     /// <summary>
     /// Formats the text of the server connection entry of forward mode.
     /// </summary>
+    /// <param name="texts">The texts</param>
     /// <param name="status">The status of live sending</param>
     /// <returns>The text</returns>
-    public static string FormatLiveSend(LiveSendStatus status)
+    public static string FormatLiveSend(CompanionTexts texts, LiveSendStatus status)
     {
         return status.State switch
                {
@@ -393,9 +406,10 @@ public static class TrayMenu
     /// <summary>
     /// Formats the text of the catalog entry.
     /// </summary>
+    /// <param name="texts">The texts</param>
     /// <param name="status">The status of the game catalog</param>
     /// <returns>The text</returns>
-    public static string FormatCatalog(GameCatalogStatus status)
+    public static string FormatCatalog(CompanionTexts texts, GameCatalogStatus status)
     {
         return status.Kind switch
                {
@@ -415,9 +429,10 @@ public static class TrayMenu
     /// <summary>
     /// Formats the text of the game entry.
     /// </summary>
+    /// <param name="texts">The texts</param>
     /// <param name="status">The status of the game installation search</param>
     /// <returns>The text</returns>
-    public static string FormatGame(GameInstallationStatus status)
+    public static string FormatGame(CompanionTexts texts, GameInstallationStatus status)
     {
         var source = status.Source == GameInstallationSource.UbisoftConnect ? "Ubisoft Connect" : "settings file";
 
@@ -437,9 +452,10 @@ public static class TrayMenu
     /// <summary>
     /// Formats the reason of a replay problem.
     /// </summary>
+    /// <param name="texts">The texts</param>
     /// <param name="problem">The problem</param>
     /// <returns>The reason, or <see langword="null" /> if the problem kind is not a defined value</returns>
-    public static string? FormatReplayReason(PipeReplayProblem problem)
+    public static string? FormatReplayReason(CompanionTexts texts, PipeReplayProblem problem)
     {
         return problem.Kind switch
                {
@@ -455,9 +471,10 @@ public static class TrayMenu
     /// <summary>
     /// Formats the reason of a problem of sending a replay to a server.
     /// </summary>
+    /// <param name="texts">The texts</param>
     /// <param name="kind">The problem kind</param>
     /// <returns>The reason, or <see langword="null" /> if the problem kind is not a defined value</returns>
-    public static string? FormatReplaySendReason(ReplaySendProblemKind kind)
+    public static string? FormatReplaySendReason(CompanionTexts texts, ReplaySendProblemKind kind)
     {
         return kind switch
                {

@@ -41,15 +41,16 @@ public sealed record TraySnapshot
     /// <summary>
     /// Creates the snapshot of a live connection.
     /// </summary>
+    /// <param name="texts">The texts</param>
     /// <param name="status">The connection status</param>
     /// <param name="recording">The recording state</param>
     /// <param name="lastTick">The last tick</param>
     /// <returns>The snapshot</returns>
-    public static TraySnapshot ForConnection(PipeConnectionStatus status, PipeRecordingState recording, PipeTickSummary? lastTick)
+    public static TraySnapshot ForConnection(CompanionTexts texts, PipeConnectionStatus status, PipeRecordingState recording, PipeTickSummary? lastTick)
     {
         return new TraySnapshot
                {
-                   StatusText = TrayMenu.FormatStatusText(status.State, recording),
+                   StatusText = TrayMenu.FormatStatusText(texts, status.State, recording),
                    Look = LookOf(status.State),
                    LastTick = lastTick,
                    CanRecord = true,
@@ -60,10 +61,11 @@ public sealed record TraySnapshot
     /// <summary>
     /// Creates the snapshot of a replay.
     /// </summary>
+    /// <param name="texts">The texts</param>
     /// <param name="status">The replay status</param>
     /// <param name="lastTick">The last tick</param>
     /// <returns>The snapshot</returns>
-    public static TraySnapshot ForReplay(PipeReplayStatus status, PipeTickSummary? lastTick)
+    public static TraySnapshot ForReplay(CompanionTexts texts, PipeReplayStatus status, PipeTickSummary? lastTick)
     {
         TrayIconLook look;
 
@@ -82,7 +84,7 @@ public sealed record TraySnapshot
 
         return new TraySnapshot
                {
-                   StatusText = TrayMenu.FormatReplayStatusText(status),
+                   StatusText = TrayMenu.FormatReplayStatusText(texts, status),
                    Look = look,
                    LastTick = lastTick,
                    CanRecord = false,
@@ -93,8 +95,9 @@ public sealed record TraySnapshot
     /// <summary>
     /// Creates the snapshot of an invalid command line.
     /// </summary>
+    /// <param name="texts">The texts</param>
     /// <returns>The snapshot</returns>
-    public static TraySnapshot ForInvalidCommandLine()
+    public static TraySnapshot ForInvalidCommandLine(CompanionTexts texts)
     {
         return new TraySnapshot
                {

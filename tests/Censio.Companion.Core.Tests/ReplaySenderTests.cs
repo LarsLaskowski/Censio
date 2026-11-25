@@ -633,7 +633,8 @@ public sealed class ReplaySenderTests
         Assert.IsNull(problem, "The close should give no problem");
         Assert.AreSequenceEqual(_connectedAndEndLines, logger.Entries.Select(entry => entry.Message), "The end line should count the tick as sent and the refused trade routes as refused");
         Assert.AreEqual("Censio Companion: Replay finished: 1 tick sent, 1 refused",
-                        TrayMenu.FormatReplayToolTip(new PipeReplayStatus
+                        TrayMenu.FormatReplayToolTip(CompanionTexts.English,
+                                                     new PipeReplayStatus
                                                      {
                                                          State = PipeConnectionState.Receiving,
                                                          IsFinished = true,

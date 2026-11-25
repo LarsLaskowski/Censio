@@ -420,7 +420,7 @@ public sealed class LiveSender : IAsyncDisposable
     /// <returns>The reason</returns>
     private static string Reason(ReplaySendProblemKind problem)
     {
-        return TrayMenu.FormatReplaySendReason(problem) ?? problem.ToString();
+        return TrayMenu.FormatReplaySendReason(CompanionTexts.English, problem) ?? problem.ToString();
     }
 
     /// <summary>

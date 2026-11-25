@@ -123,7 +123,17 @@ internal sealed class TrayIcon : IDisposable
 
         _menu.Items.Clear();
 
-        foreach (var entry in TrayMenu.Create(_version, _sources.Snapshot(), _sources.Game(), _sources.Catalog(), _sources.Server(), _sources.IsAutostartEnabled(), TimeProvider.System))
+        foreach (var entry in TrayMenu.Create(CompanionTexts.English,
+                                              new TrayMenuState
+                                              {
+                                                  Version = _version,
+                                                  Snapshot = _sources.Snapshot(),
+                                                  Game = _sources.Game(),
+                                                  Catalog = _sources.Catalog(),
+                                                  Server = _sources.Server(),
+                                                  IsAutostartEnabled = _sources.IsAutostartEnabled(),
+                                                  Clock = TimeProvider.System
+                                              }))
         {
             if (entry.Kind == TrayMenuEntryKind.Separator)
             {
