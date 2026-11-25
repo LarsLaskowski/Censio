@@ -88,7 +88,7 @@ public sealed class CompanionRestartTests
 
     /// <summary>
     /// An executable path that is unknown or not a full path launches nothing, returns false and logs that the restart
-    /// did not start (E15).
+    /// did not start with the type ArgumentException (E15).
     /// </summary>
     /// <param name="exePath">The path of the executable</param>
     [TestMethod]
@@ -108,7 +108,7 @@ public sealed class CompanionRestartTests
         // Assert
         Assert.IsFalse(started, $"The path '{exePath}' should not count as started");
         Assert.IsEmpty(_launches, $"The path '{exePath}' should launch nothing");
-        Assert.ContainsSingle(entry => entry.Level == LogLevel.Warning && entry.Message.StartsWith(NotStartedLine, StringComparison.Ordinal) && entry.Exception is null, _logger.Entries, "The restart that did not start should be logged once as a warning");
+        Assert.AreSequenceEqual([(LogLevel.Warning, $"{NotStartedLine}: {nameof(ArgumentException)}", (Exception?)null)], _logger.Entries.ToArray(), "The restart that did not start should be logged once as a warning naming ArgumentException, without an exception");
     }
 
     /// <summary>

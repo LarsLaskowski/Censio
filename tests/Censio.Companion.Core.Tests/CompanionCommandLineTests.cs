@@ -209,6 +209,54 @@ public sealed class CompanionCommandLineTests
     }
 
     /// <summary>
+    /// The switch --restarted is matched ignoring case, as the other switches are (S3).
+    /// </summary>
+    /// <param name="text">The arguments</param>
+    [TestMethod]
+    [TestCategory("AC4")]
+    [DataRow("--RESTARTED")]
+    [DataRow("--Restarted")]
+    public void CompanionCommandLineRestartedSwitchIgnoresCase(string text)
+    {
+        // Arrange
+        var args = Args(text);
+
+        // Act
+        var commandLine = CompanionCommandLine.Parse(args);
+
+        // Assert
+        Assert.AreEqual(CompanionMode.Normal, commandLine.Mode, $"The switch '{text}' should select the normal mode");
+        Assert.IsTrue(commandLine.IsRestart, $"The switch '{text}' should mark the run as a restart");
+    }
+
+    /// <summary>
+    /// The switch --restarted combines with nothing: given twice, with a value or beside another switch, the command line
+    /// is invalid and no restart (S3).
+    /// </summary>
+    /// <param name="text">The arguments</param>
+    [TestMethod]
+    [TestCategory("AC4")]
+    [DataRow("--restarted --restarted")]
+    [DataRow("--restarted --record")]
+    [DataRow("--record --restarted")]
+    [DataRow("--restarted --replay f")]
+    [DataRow("--replay f --restarted")]
+    [DataRow("--restarted extra")]
+    [DataRow("--restarted --server ws://a/ingest")]
+    public void CompanionCommandLineRestartedWithOtherSwitchIsInvalid(string text)
+    {
+        // Arrange
+        var args = Args(text);
+
+        // Act
+        var commandLine = CompanionCommandLine.Parse(args);
+
+        // Assert
+        Assert.AreEqual(CompanionMode.Invalid, commandLine.Mode, $"The command line '{text}' should be invalid");
+        Assert.IsFalse(commandLine.IsRestart, $"The command line '{text}' should not be a restart");
+    }
+
+    /// <summary>
     /// An empty replay path is invalid.
     /// </summary>
     [TestMethod]

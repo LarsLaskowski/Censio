@@ -390,6 +390,56 @@ public sealed class LocalServerSessionTests
     }
 
     /// <summary>
+    /// A session without a retry time, as every start but a restart's, shows and logs a port in use after its first start
+    /// and waits for nothing (E1, S3).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC4")]
+    public async Task LocalServerSessionWithoutRetryTimeShowsPortInUseAtOnce()
+    {
+        // Arrange
+        var timeProvider = new RecordingTimeProvider(_start);
+        var session = CreateRetrySession(timeProvider, TimeSpan.Zero, Script(PortInUse()));
+
+        // Act
+        await session.RunAsync(TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreSequenceEqual([TimeSpan.Zero], _startTimes.ToArray(), "The start should be tried once, without a retry");
+        Assert.IsEmpty(timeProvider.Delays, "The session should wait for nothing without a retry time");
+        Assert.AreEqual(Status(LocalServerState.PortInUse), session.Status, "The session should show the port in use at once");
+        Assert.ContainsSingle(entry => entry.Level == LogLevel.Warning && entry.Message == "Local server port 5117 in use", _logger.Entries, "The taken port should be logged once as a warning");
+    }
+
+    /// <summary>
+    /// A stop while a restarted Companion's session waits to retry a port in use ends the run without a further start and
+    /// without showing or logging the port in use (S3).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC4")]
+    public async Task LocalServerSessionStopDuringPortRetryEndsRunWithoutPortInUse()
+    {
+        // Arrange
+        var timeProvider = new RecordingTimeProvider(_start);
+        var session = CreateRetrySession(timeProvider, SingleInstanceGuard.RestartWait, Script(PortInUse()));
+        var run = session.RunAsync(TestContext.CancellationToken);
+
+        await timeProvider.WaitForDelayAsync(_retryStep, TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Act
+        await session.StopAsync(_stopTimeout).WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        Assert.IsTrue(run.IsCompletedSuccessfully, "The stop should end the run while it waits to retry");
+        Assert.AreSequenceEqual([TimeSpan.Zero], _startTimes.ToArray(), "The stop should prevent a further start");
+        Assert.AreEqual(Status(LocalServerState.Starting), session.Status, "The session should still show starting after the stop");
+        Assert.DoesNotContain(Status(LocalServerState.PortInUse), _statuses.ToArray(), "The session should not show the port in use after a stop");
+        Assert.DoesNotContain(entry => entry.Message == "Local server port 5117 in use", _logger.Entries, "The session should not log the port in use after a stop");
+    }
+
+    /// <summary>
     /// The port of a previous Companion whose server stop ran into its timeout stays taken; the restarted Companion's
     /// retry runs its server once that server stopped (S3).
     /// </summary>
