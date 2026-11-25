@@ -522,7 +522,7 @@ public static partial class CompanionLog
     /// </summary>
     /// <param name="logger">The logger</param>
     /// <param name="exceptionType">The type of the exception</param>
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Settings not saved: {ExceptionType}")]
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Could not save the settings: {ExceptionType}")]
     public static partial void SettingsNotSaved(ILogger logger, string exceptionType);
 
     /// <summary>
@@ -544,7 +544,7 @@ public static partial class CompanionLog
     /// Logs that the language setting is invalid.
     /// </summary>
     /// <param name="logger">The logger</param>
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Language setting invalid")]
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Language setting invalid; the Windows display language is used")]
     public static partial void LanguageSettingInvalid(ILogger logger);
 
     #endregion // Methods

@@ -134,6 +134,46 @@ public sealed class LiveSender : IAsyncDisposable
     /// </summary>
     private TaskCompletionSource _catalogChanged = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
+    /// <summary>
+    /// The profiles the sender sends under, or <see langword="null" /> when it sends under <c>Live</c>.
+    /// </summary>
+    private CompanionProfiles? _profiles;
+
+    /// <summary>
+    /// The number of changes of the active profile.
+    /// </summary>
+    private int _activeVersion;
+
+    /// <summary>
+    /// The completion that the next change of the active profile sets.
+    /// </summary>
+    private TaskCompletionSource _activeChanged = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    /// <summary>
+    /// The profile the next hello names instead of the active one, or <see langword="null" /> when it names the active one; only the run reads and writes it.
+    /// </summary>
+    private CompanionProfile? _helloProfile;
+
+    /// <summary>
+    /// The profile the hello of the current connection named; only the run reads and writes it.
+    /// </summary>
+    private Guid _connectionProfile = ProfileId;
+
+    /// <summary>
+    /// The number of changes of the active profile the current connection has seen; only the run reads and writes it.
+    /// </summary>
+    private int _seenActiveVersion;
+
+    /// <summary>
+    /// Whether the attempt ends with a profile switch; only the run reads and writes it.
+    /// </summary>
+    private bool _isSwitching;
+
+    /// <summary>
+    /// The time of the last profile switch, until a connection is accepted; only the run reads and writes it.
+    /// </summary>
+    private DateTimeOffset? _switchedAt;
+
     #endregion // Fields
 
     #region Constructor
@@ -169,9 +209,7 @@ public sealed class LiveSender : IAsyncDisposable
     /// <summary>
     /// Occurs when a notice about the active profile is to be shown.
     /// </summary>
-#pragma warning disable CS0067, S3264 // Skeleton: removed with the implementation
     public event EventHandler<ProfileNotice>? ProfileNoticeRaised;
-#pragma warning restore CS0067, S3264 // Skeleton: removed with the implementation
 
     #endregion // Events
 
@@ -300,12 +338,15 @@ public sealed class LiveSender : IAsyncDisposable
     /// Makes the sender send under the active profile of the profiles.
     /// </summary>
     /// <param name="profiles">The profiles</param>
-#pragma warning disable RH2003, S2325 // Skeleton: removed with the implementation
     public void UseProfiles(CompanionProfiles profiles)
     {
-        throw new NotImplementedException();
+        lock (_lock)
+        {
+            _profiles = profiles;
+        }
+
+        profiles.ActiveChanged += (_, _) => OnActiveChanged();
     }
-#pragma warning restore RH2003, S2325 // Skeleton: removed with the implementation
 
     /// <summary>
     /// Offers the state of the game catalog; a ready catalog is uploaded on the next connection.
@@ -340,8 +381,13 @@ public sealed class LiveSender : IAsyncDisposable
     /// <param name="item">The item</param>
     public void Enqueue(PipeConnectionItem item)
     {
-        if (Convert(item) is not var (id, message))
+        var profiles = GetProfiles();
+        var notice = ObserveSession(profiles, item.Result);
+
+        if (Convert(item, profiles?.Active.Id ?? ProfileId) is not var (id, message))
         {
+            RaiseNotice(notice);
+
             return;
         }
 
@@ -350,6 +396,7 @@ public sealed class LiveSender : IAsyncDisposable
         if (written.Error is not null)
         {
             CompanionLog.LiveMessageNotWritten(_logger);
+            RaiseNotice(notice);
 
             return;
         }
@@ -363,6 +410,8 @@ public sealed class LiveSender : IAsyncDisposable
 
             _buffer.Add(id, written.Utf8Json);
         }
+
+        RaiseNotice(notice);
     }
 
     /// <summary>
@@ -399,8 +448,9 @@ public sealed class LiveSender : IAsyncDisposable
     /// Converts an item of the pipe connection into a message.
     /// </summary>
     /// <param name="item">The item</param>
+    /// <param name="profileId">The identity of the profile the message belongs to</param>
     /// <returns>The message, or <see langword="null" /> when the item has none</returns>
-    private static (Guid Id, ContractMessage Message)? Convert(PipeConnectionItem item)
+    private static (Guid Id, ContractMessage Message)? Convert(PipeConnectionItem item, Guid profileId)
     {
         var result = item.Result;
 
@@ -408,28 +458,28 @@ public sealed class LiveSender : IAsyncDisposable
         {
             case PipeTickResultKind.Tick when result.Tick is { Islands.Count: > 0 } tick:
                 {
-                    var message = ContractMessageConverter.ToTick(tick, ProfileId);
+                    var message = ContractMessageConverter.ToTick(tick, profileId);
 
                     return (message.Id, message);
                 }
 
             case PipeTickResultKind.TradeRoutes when result.TradeRoutes is { } routes:
                 {
-                    var message = ContractMessageConverter.ToTradeRoutes(routes, ProfileId, item.ReadStamp);
+                    var message = ContractMessageConverter.ToTradeRoutes(routes, profileId, item.ReadStamp);
 
                     return (message.Id, message);
                 }
 
             case PipeTickResultKind.SessionStart:
                 {
-                    var message = ContractMessageConverter.ToSessionStart(ProfileId, item.ReadStamp);
+                    var message = ContractMessageConverter.ToSessionStart(profileId, item.ReadStamp);
 
                     return (message.Id, message);
                 }
 
             case PipeTickResultKind.SessionEnd:
                 {
-                    var message = ContractMessageConverter.ToSessionEnd(ProfileId, item.ReadStamp);
+                    var message = ContractMessageConverter.ToSessionEnd(profileId, item.ReadStamp);
 
                     return (message.Id, message);
                 }
@@ -442,6 +492,49 @@ public sealed class LiveSender : IAsyncDisposable
     }
 
     /// <summary>
+    /// Reads the identity of the profile a message belongs to.
+    /// </summary>
+    /// <param name="utf8Json">The message as the buffer holds it</param>
+    /// <returns>The identity, or <see langword="null" /> when the message cannot be read or has none</returns>
+    private static Guid? ProfileOf(ReadOnlyMemory<byte> utf8Json)
+    {
+        return ContractReader.Read(utf8Json.Span).Message switch
+               {
+                   ContractTick tick => tick.ProfileId,
+                   ContractTradeRoutes routes => routes.ProfileId,
+                   ContractSessionStart start => start.ProfileId,
+                   ContractSessionEnd end => end.ProfileId,
+                   _ => null
+               };
+    }
+
+    /// <summary>
+    /// Observes the session of an item and gives the notice its start raises.
+    /// </summary>
+    /// <param name="profiles">The profiles, or <see langword="null" /> when the sender sends under <c>Live</c></param>
+    /// <param name="result">The result of the item</param>
+    /// <returns>The notice, or <see langword="null" /> when there is none</returns>
+    private static ProfileNotice? ObserveSession(CompanionProfiles? profiles, PipeTickResult result)
+    {
+        if (profiles is null)
+        {
+            return null;
+        }
+
+        if (result.Kind == PipeTickResultKind.SessionStart && result.Headline is { } figure)
+        {
+            return profiles.ObserveSessionStart(figure);
+        }
+
+        if (result.Kind == PipeTickResultKind.SessionEnd)
+        {
+            profiles.ObserveSessionEnd();
+        }
+
+        return null;
+    }
+
+    /// <summary>
     /// Gives the reason of a problem as the tray shows it.
     /// </summary>
     /// <param name="problem">The problem</param>
@@ -449,6 +542,86 @@ public sealed class LiveSender : IAsyncDisposable
     private static string Reason(ReplaySendProblemKind problem)
     {
         return TrayMenu.FormatReplaySendReason(CompanionTexts.English, problem) ?? problem.ToString();
+    }
+
+    /// <summary>
+    /// Closes the connection of a profile switch with the close handshake; a failure of the close is not a problem.
+    /// </summary>
+    /// <param name="client">The client</param>
+    /// <param name="cancellationToken">The token that ends the run</param>
+    /// <returns>A task that completes when the connection is closed</returns>
+    private static async Task CloseAsync(IngestClient client, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await client.CloseAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception)
+        {
+            // The connection is disposed next whether or not the close handshake completed.
+        }
+    }
+
+    /// <summary>
+    /// Gets the profiles the sender sends under.
+    /// </summary>
+    /// <returns>The profiles, or <see langword="null" /> when the sender sends under <c>Live</c></returns>
+    private CompanionProfiles? GetProfiles()
+    {
+        lock (_lock)
+        {
+            return _profiles;
+        }
+    }
+
+    /// <summary>
+    /// Raises <see cref="ProfileNoticeRaised" />.
+    /// </summary>
+    /// <param name="notice">The notice, or <see langword="null" /> for none</param>
+    private void RaiseNotice(ProfileNotice? notice)
+    {
+        if (notice is null)
+        {
+            return;
+        }
+
+        try
+        {
+            ProfileNoticeRaised?.Invoke(this, notice);
+        }
+        catch (Exception)
+        {
+            // A failing subscriber must not stop live sending
+        }
+    }
+
+    /// <summary>
+    /// Notes a change of the active profile and wakes the send loop.
+    /// </summary>
+    private void OnActiveChanged()
+    {
+        TaskCompletionSource changed;
+
+        lock (_lock)
+        {
+            _activeVersion++;
+            changed = _activeChanged;
+            _activeChanged = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        }
+
+        changed.TrySetResult();
+    }
+
+    /// <summary>
+    /// Reads the number of changes of the active profile and the completion of the next one.
+    /// </summary>
+    /// <returns>The number and the completion</returns>
+    private (int Version, Task Changed) GetActiveView()
+    {
+        lock (_lock)
+        {
+            return (_activeVersion, _activeChanged.Task);
+        }
     }
 
     /// <summary>
@@ -665,6 +838,13 @@ public sealed class LiveSender : IAsyncDisposable
                 attempts = 0;
             }
 
+            if (await TryContinueSwitchAsync(outcome.IsSwitch, problem, cancellationToken).ConfigureAwait(false))
+            {
+                continue;
+            }
+
+            _helloProfile = null;
+
             if (problem is ReplaySendProblemKind.TokenRefused or ReplaySendProblemKind.VersionNotSupported)
             {
                 SetStatus(LiveSendState.Stopped, problem);
@@ -699,14 +879,45 @@ public sealed class LiveSender : IAsyncDisposable
     }
 
     /// <summary>
+    /// Handles an attempt that ended with a profile switch or with a refusal that is part of one.
+    /// </summary>
+    /// <param name="isSwitch">Whether the attempt ended with a profile switch</param>
+    /// <param name="problem">The problem that ended the attempt</param>
+    /// <param name="cancellationToken">The token that ends the run</param>
+    /// <returns><see langword="true" /> when the attempt is to be repeated at once, without a delay step</returns>
+    private async Task<bool> TryContinueSwitchAsync(bool isSwitch, ReplaySendProblemKind? problem, CancellationToken cancellationToken)
+    {
+        if (isSwitch)
+        {
+            _switchedAt = _timeProvider.GetUtcNow();
+            SetStatus(LiveSendState.Connecting, null);
+
+            return true;
+        }
+
+        if (problem is not ReplaySendProblemKind.CompanionConnected || _switchedAt is not { } switchedAt || _timeProvider.GetUtcNow() - switchedAt > SwitchRefusalTime)
+        {
+            return false;
+        }
+
+        SetStatus(LiveSendState.Connecting, null);
+
+        await Task.Delay(SwitchRetryDelay, _timeProvider, cancellationToken).ConfigureAwait(false);
+
+        return true;
+    }
+
+    /// <summary>
     /// Makes one connection: reads the token, connects and sends until the connection fails.
     /// </summary>
     /// <param name="cancellationToken">The token that ends the run</param>
     /// <returns>The outcome</returns>
-    private async Task<(ReplaySendProblemKind? Problem, bool IsAccepted, TimeSpan Duration)> AttemptAsync(CancellationToken cancellationToken)
+    private async Task<(ReplaySendProblemKind? Problem, bool IsAccepted, TimeSpan Duration, bool IsSwitch)> AttemptAsync(CancellationToken cancellationToken)
     {
         IngestClient? client = null;
         var accepted = default(DateTimeOffset?);
+
+        _isSwitching = false;
 
         try
         {
@@ -718,7 +929,7 @@ public sealed class LiveSender : IAsyncDisposable
 
                 if (token is null && _target.IsLocal)
                 {
-                    return (ReplaySendProblemKind.LocalServerNotRunning, false, TimeSpan.Zero);
+                    return (ReplaySendProblemKind.LocalServerNotRunning, false, TimeSpan.Zero, false);
                 }
             }
 
@@ -728,21 +939,23 @@ public sealed class LiveSender : IAsyncDisposable
 
             client.Failed += (_, problem) => failed.TrySetResult(problem);
 
+            var profile = ChooseHelloProfile();
             var hello = new ContractHello
                         {
                             Token = token,
                             CompanionVersion = _companionVersion,
-                            ProfileId = ProfileId,
-                            ProfileName = ProfileName
+                            ProfileId = profile.Id,
+                            ProfileName = profile.Name
                         };
             var refusal = await client.OpenAsync(_target.Address, hello, cancellationToken).ConfigureAwait(false);
 
             if (refusal is not null)
             {
-                return (refusal, false, TimeSpan.Zero);
+                return (refusal, false, TimeSpan.Zero, false);
             }
 
             accepted = _timeProvider.GetUtcNow();
+            _switchedAt = null;
 
             lock (_lock)
             {
@@ -759,7 +972,7 @@ public sealed class LiveSender : IAsyncDisposable
 
             var problem = await SendLoopAsync(client, failed, cancellationToken).ConfigureAwait(false);
 
-            return (problem, true, _timeProvider.GetUtcNow() - accepted.Value);
+            return (problem, true, _timeProvider.GetUtcNow() - accepted.Value, _isSwitching);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -768,8 +981,8 @@ public sealed class LiveSender : IAsyncDisposable
         catch (Exception)
         {
             return accepted is { } since
-                       ? (ReplaySendProblemKind.ConnectionLost, true, _timeProvider.GetUtcNow() - since)
-                       : (ReplaySendProblemKind.ConnectionLost, false, TimeSpan.Zero);
+                       ? (ReplaySendProblemKind.ConnectionLost, true, _timeProvider.GetUtcNow() - since, false)
+                       : (ReplaySendProblemKind.ConnectionLost, false, TimeSpan.Zero, false);
         }
         finally
         {
@@ -782,9 +995,60 @@ public sealed class LiveSender : IAsyncDisposable
 
             if (client is not null)
             {
+                if (_isSwitching)
+                {
+                    await CloseAsync(client, cancellationToken).ConfigureAwait(false);
+                }
+
                 await client.DisposeAsync().ConfigureAwait(false);
             }
         }
+    }
+
+    /// <summary>
+    /// Chooses the profile the hello names and notes the changes of the active profile the connection starts with.
+    /// </summary>
+    /// <returns>The profile</returns>
+    private CompanionProfile ChooseHelloProfile()
+    {
+        CompanionProfiles? profiles;
+
+        lock (_lock)
+        {
+            profiles = _profiles;
+            _seenActiveVersion = _activeVersion;
+        }
+
+        var profile = profiles is null ? CompanionProfile.Live : _helloProfile ?? profiles.Active;
+
+        _connectionProfile = profile.Id;
+
+        return profile;
+    }
+
+    /// <summary>
+    /// Decides whether a change of the active profile ends the connection.
+    /// </summary>
+    /// <param name="version">The number of changes of the active profile</param>
+    /// <returns><see langword="true" /> when the connection names another profile than the active one</returns>
+    private bool IsSwitchDue(int version)
+    {
+        if (_profiles is not { } profiles || version == _seenActiveVersion)
+        {
+            return false;
+        }
+
+        _seenActiveVersion = version;
+
+        if (profiles.Active.Id == _connectionProfile)
+        {
+            return false;
+        }
+
+        _helloProfile = null;
+        _isSwitching = true;
+
+        return true;
     }
 
     /// <summary>
@@ -809,6 +1073,13 @@ public sealed class LiveSender : IAsyncDisposable
                 return failed.Task.Result;
             }
 
+            var (activeVersion, activeChanged) = GetActiveView();
+
+            if (IsSwitchDue(activeVersion))
+            {
+                return ReplaySendProblemKind.ConnectionLost;
+            }
+
             var view = GetCatalogView();
             var step = await UploadDueCatalogAsync(client, view, acknowledged >= waitingAtHello, cancellationToken).ConfigureAwait(false);
 
@@ -822,11 +1093,16 @@ public sealed class LiveSender : IAsyncDisposable
                 continue;
             }
 
-            var next = await NextOrFailureAsync(failed, view.Changed, cancellationToken).ConfigureAwait(false);
+            var next = await NextOrFailureAsync(failed, view.Changed, activeChanged, cancellationToken).ConfigureAwait(false);
 
             if (next is null)
             {
                 continue;
+            }
+
+            if (IsOfOtherProfile(next))
+            {
+                return ReplaySendProblemKind.ConnectionLost;
             }
 
             if (await SendBufferedAsync(client, next, cancellationToken).ConfigureAwait(false) is { } sendProblem)
@@ -836,6 +1112,31 @@ public sealed class LiveSender : IAsyncDisposable
 
             acknowledged++;
         }
+    }
+
+    /// <summary>
+    /// Checks whether a message belongs to a known profile other than the one the connection names; if so, releases it and
+    /// prepares the switch to its profile.
+    /// </summary>
+    /// <param name="entry">The message</param>
+    /// <returns><see langword="true" /> when the connection is to be switched</returns>
+    private bool IsOfOtherProfile(LiveBufferEntry entry)
+    {
+        if (_profiles is not { } profiles || ProfileOf(entry.Utf8Json) is not { } id || id == _connectionProfile || profiles.NameOf(id) is not { } name)
+        {
+            return false;
+        }
+
+        _buffer.ReleaseInFlight();
+
+        _helloProfile = new CompanionProfile
+                        {
+                            Id = id,
+                            Name = name
+                        };
+        _isSwitching = true;
+
+        return true;
     }
 
     /// <summary>
@@ -1016,15 +1317,16 @@ public sealed class LiveSender : IAsyncDisposable
     /// </summary>
     /// <param name="failed">The completion that the failure of the client sets</param>
     /// <param name="changed">The completion that the next change of the offered catalog sets</param>
+    /// <param name="activeChanged">The completion that the next change of the active profile sets</param>
     /// <param name="cancellationToken">The token that ends the run</param>
-    /// <returns>The message, or <see langword="null" /> when the connection failed or the catalog changed first</returns>
-    private async Task<LiveBufferEntry?> NextOrFailureAsync(TaskCompletionSource<ReplaySendProblemKind> failed, Task changed, CancellationToken cancellationToken)
+    /// <returns>The message, or <see langword="null" /> when the connection failed or the catalog or the active profile changed first</returns>
+    private async Task<LiveBufferEntry?> NextOrFailureAsync(TaskCompletionSource<ReplaySendProblemKind> failed, Task changed, Task activeChanged, CancellationToken cancellationToken)
     {
         using var waitCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
         var next = _buffer.NextAsync(waitCancellation.Token);
 
-        await Task.WhenAny(next, failed.Task, changed).ConfigureAwait(false);
+        await Task.WhenAny(next, failed.Task, changed, activeChanged).ConfigureAwait(false);
 
         if (next.IsCompletedSuccessfully)
         {
