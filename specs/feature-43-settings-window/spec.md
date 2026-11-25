@@ -18,9 +18,6 @@ Companion text is English today.
 
 ## Scenarios
 
-The scenarios marked *(Q1)*, *(Q2)* or *(Q3)* follow the Lead's recommendation to the open question of that number and
-change with the Product Manager's answer.
-
 - S1: Given the Companion runs, when the player chooses `Settings…` in the tray menu (directly above `Open
   diagnostics`, enabled in every mode), then the window `Censio Companion settings` opens showing the values the
   settings file holds now, the default where a key is missing (mode `Off`, port 5000, 24 hours, 100 megabytes, an empty
@@ -30,29 +27,30 @@ change with the Product Manager's answer.
   and clicks `Save`, then the file holds `"mode": "forward"` with the address and the token and still holds `localPort`,
   the buffer limits and `gameFolder`; switching back to `Local` later keeps `serverAddress` and `serverToken`. No
   reinstall is needed and no other setting is lost.
-- S3: *(Q1)* Given the player saved a change of mode, port, server address, token, buffer limits or game folder, then
+- S3: Given the player saved a change of mode, port, server address, token, buffer limits or game folder, then
   the window says `Saved. The Companion restarts to apply the changes.`, the Companion exits as `Exit` does and starts
   again from the same exe, and the menu then shows the new `Server:` and `Game:` lines. A save that changed none of these
   restarts nothing.
 - S4: Given the window, when the player ticks or clears `Start with Windows` and clicks `Save`, then the autostart is
   switched as the menu entry switches it ([`companion.md`](../../docs/areas/companion.md), *Start with Windows*), at
   once and without a restart.
-- S5: *(Q3)* Given the profile list shows `Live` selected (the existing profile, so its history continues), when the
+- S5: Given the profile list shows `Live` selected (the existing profile, so its history continues), when the
   player clicks `New profile…`, types a name and clicks `Save`, then the new profile is selected, the messages taken
   from then on carry it, and the server's pages list it under that name once the Companion has sent it; the messages
   already waiting in the buffer keep the profile they were taken for.
-- S6: *(Q3)* Given two profiles, when the player selects the other one and clicks `Save`, then the messages taken from
+- S6: Given two profiles, when the player selects the other one and clicks `Save`, then the messages taken from
   then on go to it, at once and without a restart, in forward and local mode alike.
-- S7: *(Q3)* Given the active profile is `B` and the figure loaded in the game was last used with profile `A`, when its
+- S7: Given the active profile is `B` and the figure loaded in the game was last used with profile `A`, when its
   session starts, then a Windows notification of the tray icon reads `This figure was last played with profile A.
   Click to open the settings and switch.`; ticks keep going to `B` meanwhile, a click opens the window, and a notice
   left alone links the figure to `B` (record 0041). A figure seen for the first time while the active profile has no
   figure is linked to it silently.
-- S8: *(Q3)* Given the active profile already has a figure and a figure never seen before starts a session, then the
+- S8: Given the active profile already has a figure and a figure never seen before starts a session, then the
   notification reads `This figure is new to profile B. Click to open the settings to switch or create a profile.`
-- S9: *(Q2)* Given the window, when the player picks `Deutsch` under `Language` and clicks `Save`, then the window,
-  the tray menu and the tooltip show their German texts at once; `English` switches back. Without a saved choice the
-  Companion shows German when the Windows display language is German and English otherwise.
+- S9: Given the window, when the player picks `Deutsch` under `Language` and clicks `Save`, then the settings window,
+  every tray menu entry, the tooltip and the notifications of S7 and S8 show their German texts at once, without a
+  restart; `English` switches back. Without a saved choice the Companion shows German when the Windows display language
+  is German and English otherwise. The diagnostics window, the log lines and the web pages keep their own language.
 - S10: Given the game folder field, when the player clicks `Browse…` and picks a folder, then the field shows its full
   path; clearing the field means `Find automatically`.
 
@@ -107,8 +105,9 @@ Each message stands below its field in the window, `Save` writes nothing while o
   exception's type (Warning), a profile switch `Profile switched` (Information), without values, names or paths
   ([`companion-log.md`](../../docs/areas/companion-log.md)).
 - N6: Documentation: `README.md` and `docs/USER_GUIDE.md` (English first, then German) describe the window, the
-  profile choice with the notice and the restart, so an external tester can try them; the hand-edited file stays
-  documented as an alternative.
+  profile choice with the notice, the restart and the language choice, so an external tester can try them; the
+  hand-edited file stays documented as an alternative. The menu list of `README.md` and the tooltip table of the user
+  guide give each text in English and, in the German part, its German form.
 
 ## Acceptance criteria
 
@@ -131,7 +130,8 @@ Each message stands below its field in the window, `Save` writes nothing while o
   window leaves the file as it was and is reported (E7, E9, E10).
 - AC9: The token and the figure name appear in no log line; the profile and figure file is read with a bound and fails
   closed; the logged lines of N5 are written (N2, N5).
-- AC10: README and the user guide describe the window, profiles and restart in English, then German (N6).
+- AC10: README and the user guide describe the window, profiles, restart and language in English, then German, the
+  menu list and the tooltip table with each text's German form (N6).
 
 ## Out of scope
 
@@ -141,18 +141,16 @@ Each message stands below its field in the window, `Save` writes nothing while o
 
 ## Open questions
 
-- Q1 (apply): Do mode, port, server address, token, buffer limits and game folder apply by an automatic restart of
-  the Companion on `Save` (recommended: the start-time wiring stays as it is), at once without any restart, or at the
-  player's next own restart with a note in the window? Profile and autostart apply at once in every option.
-  Not answered: escalated to the Product Manager.
-- Q2 (language): Does `Language` switch the Companion's own texts (window, tray menu, tooltip) between English and
-  German, defaulting to the Windows display language — or is the language split into a follow-up issue (recommended,
-  since every tray text and its user-guide table would gain a German form)? The web pages keep their own language
-  switch ([`web-ui.md`](../../docs/areas/web-ui.md)) either way. Not answered: escalated to the Product Manager.
-- Q3 (profiles): Is the profile list kept by the Companion alone (recommended: names and identities in a local file,
-  `Live` its first entry, create and select only), and is the notice a Windows notification of the tray icon that opens
-  the window on click (recommended) rather than only a line in the window? Not answered: escalated to the Product
-  Manager.
+- Q1 (apply): How do mode, port, server address, token, buffer limits and game folder take effect?
+  Answered: by the Product Manager, `Save` restarts the Companion automatically, a running replay or recording warned
+  about first (S3, E12); profile, autostart and language apply at once.
+- Q2 (language): What does `Language` switch?
+  Answered: by the Product Manager, the Companion's own texts (settings window, tray menu, tooltip) between English
+  and German, default the Windows display language (S9); the web pages keep their own switch
+  ([`web-ui.md`](../../docs/areas/web-ui.md)).
+- Q3 (profiles): Where is the profile list kept and how is the notice shown?
+  Answered: by the Product Manager, the Companion keeps the list locally, `Live` its first entry, create and select
+  only; the notice is a Windows notification of the tray icon whose click opens the window (S5–S8).
 - Q4: Who writes the file? Answered: the window writes `settings.json`; record 0045 (released in v0.4.0) is superseded
   by a new record, and record 0102 by the profile choice, as 0102's own consequences ask.
 - Q5: Is an invalid file overwritten? Answered: only on `Save` after the warning of E7, since the Companion ignores
@@ -166,7 +164,8 @@ Each message stands below its field in the window, `Save` writes nothing while o
 - New `docs/areas/companion-profiles.md`: the profile list and its file, creating and selecting, the figure links and
   the notice, privacy of the figure name.
 - `docs/areas/companion.md`: the `Settings…` entry in the menu list; *Settings file* no longer says "never written";
-  the restart; the language if Q2 keeps it.
+  the restart; the language choice, its default and which texts follow it, with the German form of each menu and
+  tooltip text.
 - `docs/areas/live-sending.md` and `local-mode.md`: the selected profile instead of `Live`, the sentences "read once
   per start, never written" and "a change counts after a restart"; the accepted risk *One profile* removed.
 - `docs/areas/companion-log.md`: the new lines of N5.
