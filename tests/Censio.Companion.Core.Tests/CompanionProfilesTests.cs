@@ -966,6 +966,7 @@ public sealed class CompanionProfilesTests
     {
         // Arrange
         var (profiles, apply) = PrepareNoticeChange(change);
+
         var before = profiles.PendingNotice;
         var read = new List<ProfileNotice?>();
 
