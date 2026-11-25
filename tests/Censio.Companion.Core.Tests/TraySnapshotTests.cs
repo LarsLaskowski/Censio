@@ -175,5 +175,31 @@ public sealed class TraySnapshotTests
         Assert.AreEqual(expected, snapshot, "The snapshot should show the problem look, the status text, no last tick and no recording");
     }
 
+    /// <summary>
+    /// The snapshot of a live connection takes its status text, with the recording suffix, from the texts it is given, so
+    /// a language change shows at once in the next snapshot (S9).
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC5")]
+    public void TraySnapshotForConnectionUsesGivenTexts()
+    {
+        // Arrange
+        var status = new PipeConnectionStatus
+                     {
+                         State = PipeConnectionState.Receiving
+                     };
+        var english = TraySnapshot.ForConnection(CompanionTexts.English, status, PipeRecordingState.Recording, _lastTick);
+        var expectedText = TrayMenu.FormatStatusText(CompanionTexts.German, PipeConnectionState.Receiving, PipeRecordingState.Recording);
+
+        // Act
+        var snapshot = TraySnapshot.ForConnection(CompanionTexts.German, status, PipeRecordingState.Recording, _lastTick);
+
+        // Assert
+        Assert.AreEqual(expectedText, snapshot.StatusText, "The status text should be the one of the given German texts");
+        Assert.AreNotEqual(english.StatusText, snapshot.StatusText, "The German status text should differ from the English one");
+        Assert.AreEqual(english.Look, snapshot.Look, "The language should not change the look");
+        Assert.AreEqual(english.IsRecording, snapshot.IsRecording, "The language should not change the recording flag");
+    }
+
     #endregion // Methods
 }

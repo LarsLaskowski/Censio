@@ -49,11 +49,12 @@ public sealed class TrayMenuTests
     }
 
     /// <summary>
-    /// The menu lists status, last tick, game, separator, open diagnostics, toggle, both folder entries, separator, start with
-    /// Windows, separator, version, separator and exit, in this order, with the status and last-tick entries greyed out and
-    /// no entry checked while the autostart is off.
+    /// The menu lists status, last tick, game, separator, settings, open diagnostics, toggle, both folder entries,
+    /// separator, start with Windows, separator, version, separator and exit, in this order, with the status and last-tick
+    /// entries greyed out and no entry checked while the autostart is off.
     /// </summary>
     [TestMethod]
+    [TestCategory("AC1")]
     public void TrayMenuCreateListsEntriesInOrder()
     {
         // Arrange
@@ -65,6 +66,7 @@ public sealed class TrayMenuTests
                                 TrayMenuEntryKind.Game,
                                 TrayMenuEntryKind.Catalog,
                                 TrayMenuEntryKind.Separator,
+                                TrayMenuEntryKind.OpenSettings,
                                 TrayMenuEntryKind.OpenDiagnostics,
                                 TrayMenuEntryKind.ToggleRecording,
                                 TrayMenuEntryKind.OpenRecordingsFolder,
@@ -83,6 +85,7 @@ public sealed class TrayMenuTests
                                 "Game: searching",
                                 "Catalog: reading",
                                 string.Empty,
+                                "Settings…",
                                 "Open diagnostics",
                                 "Start recording",
                                 "Open recordings folder",
@@ -94,8 +97,8 @@ public sealed class TrayMenuTests
                                 string.Empty,
                                 "Exit"
                             };
-        var expectedEnabled = new[] { false, false, false, false, false, true, true, true, true, false, true, false, false, false, true };
-        var expectedChecked = new bool[15];
+        var expectedEnabled = new[] { false, false, false, false, false, true, true, true, true, true, false, true, false, false, false, true };
+        var expectedChecked = new bool[16];
 
         // Act
         var entries = TrayMenu.Create(CompanionTexts.English,
@@ -112,7 +115,7 @@ public sealed class TrayMenuTests
 
         // Assert
         Assert.AreSequenceEqual(expectedKinds, entries.Select(entry => entry.Kind).ToArray(), "The entries should be in the order of the menu");
-        Assert.AreSequenceEqual(expectedTexts, entries.Select(entry => entry.Text).ToArray(), "The entries should carry the status, the last tick, the game, the catalog, open diagnostics, the toggle, the folders, the version and Exit");
+        Assert.AreSequenceEqual(expectedTexts, entries.Select(entry => entry.Text).ToArray(), "The entries should carry the status, the last tick, the game, the catalog, settings, open diagnostics, the toggle, the folders, the version and Exit");
         Assert.AreSequenceEqual(expectedEnabled, entries.Select(entry => entry.IsEnabled).ToArray(), "Status, last tick, game, catalog, version and separators should be greyed out, the rest enabled");
         Assert.AreSequenceEqual(expectedChecked, entries.Select(entry => entry.IsChecked).ToArray(), "No entry should be checked while the autostart is off");
     }
@@ -214,11 +217,12 @@ public sealed class TrayMenuTests
     }
 
     /// <summary>
-    /// The open-diagnostics entry is enabled and directly after the first separator live, while recording, in a replay and
-    /// with an invalid command line.
+    /// The open-diagnostics entry is enabled and second after the first separator, below the settings entry, live, while
+    /// recording, in a replay and with an invalid command line.
     /// </summary>
     /// <param name="mode">The mode of the Companion: live, recording, replay or invalid</param>
     [TestMethod]
+    [TestCategory("AC1")]
     [DataRow("live")]
     [DataRow("recording")]
     [DataRow("replay")]
@@ -245,9 +249,78 @@ public sealed class TrayMenuTests
         var kinds = entries.Select(entry => entry.Kind).ToList();
         var diagnostics = entries.Single(entry => entry.Kind == TrayMenuEntryKind.OpenDiagnostics);
 
-        Assert.AreEqual(kinds.IndexOf(TrayMenuEntryKind.Separator) + 1, kinds.IndexOf(TrayMenuEntryKind.OpenDiagnostics), "The entry should be directly after the first separator");
+        Assert.AreEqual(kinds.IndexOf(TrayMenuEntryKind.Separator) + 2, kinds.IndexOf(TrayMenuEntryKind.OpenDiagnostics), "The entry should be second after the first separator, below the settings entry");
         Assert.AreEqual("Open diagnostics", diagnostics.Text, "The entry should read Open diagnostics");
         Assert.IsTrue(diagnostics.IsEnabled, "The entry should be enabled in every mode");
+    }
+
+    /// <summary>
+    /// The entry Settings… is enabled, unchecked and directly above Open diagnostics live, while recording, in a replay,
+    /// with an invalid command line, in local mode and in forward mode (S1).
+    /// </summary>
+    /// <param name="mode">The mode of the Companion: live, recording, replay or invalid</param>
+    /// <param name="serverMode">The server mode: none, local or forward</param>
+    [TestMethod]
+    [TestCategory("AC1")]
+    [DataRow("live", "none")]
+    [DataRow("recording", "none")]
+    [DataRow("replay", "none")]
+    [DataRow("invalid", "none")]
+    [DataRow("live", "local")]
+    [DataRow("live", "forward")]
+    public void TrayMenuCreateHasSettingsAboveOpenDiagnosticsInEveryMode(string mode, string serverMode)
+    {
+        // Arrange
+        var snapshot = CreateSnapshotForMode(mode);
+        var server = CreateServerStatusOrNone(serverMode);
+
+        // Act
+        var entries = TrayMenu.Create(CompanionTexts.English,
+                                      new TrayMenuState
+                                      {
+                                          Version = "1.2.3",
+                                          Snapshot = snapshot,
+                                          Game = GameInstallationStatus.Searching,
+                                          Catalog = GameCatalogStatus.Reading,
+                                          Server = server,
+                                          IsAutostartEnabled = false,
+                                          Clock = CreateClock(1)
+                                      });
+
+        // Assert
+        var kinds = entries.Select(entry => entry.Kind).ToList();
+        var settings = entries.Single(entry => entry.Kind == TrayMenuEntryKind.OpenSettings);
+
+        Assert.AreEqual(kinds.IndexOf(TrayMenuEntryKind.OpenDiagnostics) - 1, kinds.IndexOf(TrayMenuEntryKind.OpenSettings), $"Settings… should be directly above Open diagnostics: {mode}, {serverMode}");
+        Assert.AreEqual("Settings…", settings.Text, $"The entry should read Settings…: {mode}, {serverMode}");
+        Assert.IsTrue(settings.IsEnabled, $"The entry should be enabled in every mode: {mode}, {serverMode}");
+        Assert.IsFalse(settings.IsChecked, $"The entry should not be checked: {mode}, {serverMode}");
+    }
+
+    /// <summary>
+    /// With the German texts every entry of a full menu, from the status to Exit, reads in German, in the same order and
+    /// state as in English; only the version entry reads the same in both languages (S9).
+    /// </summary>
+    /// <param name="serverMode">The server mode: local or forward</param>
+    [TestMethod]
+    [TestCategory("AC5")]
+    [DataRow("local")]
+    [DataRow("forward")]
+    public void TrayMenuCreateGermanShowsGermanEntries(string serverMode)
+    {
+        // Arrange
+        var english = TrayMenu.Create(CompanionTexts.English, CreateFullState(CompanionTexts.English, serverMode));
+        var germanState = CreateFullState(CompanionTexts.German, serverMode);
+
+        // Act
+        var german = TrayMenu.Create(CompanionTexts.German, germanState);
+
+        // Assert
+        Assert.AreSequenceEqual(english.Select(entry => entry.Kind).ToArray(), german.Select(entry => entry.Kind).ToArray(), $"The language should not change the entries or their order: {serverMode}");
+        Assert.AreSequenceEqual(english.Select(entry => entry.IsEnabled).ToArray(), german.Select(entry => entry.IsEnabled).ToArray(), $"The language should not change which entries are enabled: {serverMode}");
+        Assert.AreSequenceEqual(english.Select(entry => entry.IsChecked).ToArray(), german.Select(entry => entry.IsChecked).ToArray(), $"The language should not change which entries are checked: {serverMode}");
+        Assert.Contains(TrayMenuEntryKind.OpenSettings, german.Select(entry => entry.Kind).ToList(), $"The German menu should hold the settings entry: {serverMode}");
+        Assert.IsEmpty(SameTexts(english, german), $"Every German entry but the version should differ from the English one: {serverMode}");
     }
 
     /// <summary>
@@ -1473,10 +1546,11 @@ public sealed class TrayMenuTests
     }
 
     /// <summary>
-    /// In local mode the menu lists the server line below the catalog and Open Censio directly above Open diagnostics,
-    /// the rest of the menu in today's order (S1).
+    /// In local mode the menu lists the server line below the catalog and Open Censio directly after the first separator,
+    /// above Settings… and Open diagnostics, the rest of the menu in today's order (S1).
     /// </summary>
     [TestMethod]
+    [TestCategory("AC1")]
     [TestCategory("AC3")]
     public void TrayMenuCreateInLocalModeShowsOpenCensioAboveDiagnostics()
     {
@@ -1492,6 +1566,7 @@ public sealed class TrayMenuTests
                                 TrayMenuEntryKind.LocalServer,
                                 TrayMenuEntryKind.Separator,
                                 TrayMenuEntryKind.OpenCensio,
+                                TrayMenuEntryKind.OpenSettings,
                                 TrayMenuEntryKind.OpenDiagnostics,
                                 TrayMenuEntryKind.ToggleRecording,
                                 TrayMenuEntryKind.OpenRecordingsFolder,
@@ -1523,7 +1598,7 @@ public sealed class TrayMenuTests
         // Assert
         var openCensio = entries.Single(entry => entry.Kind == TrayMenuEntryKind.OpenCensio);
 
-        Assert.AreSequenceEqual(expectedKinds, entries.Select(entry => entry.Kind).ToArray(), "Open Censio should be directly above Open diagnostics and the server line below the catalog");
+        Assert.AreSequenceEqual(expectedKinds, entries.Select(entry => entry.Kind).ToArray(), "Open Censio should be directly above Settings…, Settings… directly above Open diagnostics and the server line below the catalog");
         Assert.AreEqual("Open Censio", openCensio.Text, "The entry should read Open Censio");
         Assert.AreEqual(TrayMenu.OpenCensioText, openCensio.Text, "The entry should carry the text of the constant");
         Assert.IsFalse(openCensio.IsChecked, "Open Censio should not be checked");
@@ -1604,7 +1679,7 @@ public sealed class TrayMenuTests
 
         Assert.AreEqual("Server: settings invalid", serverLine.Text, "The server line should read settings invalid");
         Assert.IsFalse(openCensio.IsEnabled, "Open Censio should stay greyed out with invalid settings");
-        Assert.AreEqual(kinds.IndexOf(TrayMenuEntryKind.OpenDiagnostics) - 1, kinds.IndexOf(TrayMenuEntryKind.OpenCensio), "Open Censio should stay directly above Open diagnostics");
+        Assert.AreEqual(kinds.IndexOf(TrayMenuEntryKind.OpenSettings) - 1, kinds.IndexOf(TrayMenuEntryKind.OpenCensio), "Open Censio should stay directly above Settings…");
         Assert.DoesNotContain(TrayMenuEntryKind.ServerConnection, kinds, "Invalid settings should show no forward-mode server line");
     }
 
@@ -1654,6 +1729,7 @@ public sealed class TrayMenuTests
     /// status, and the menu holds neither the local server line nor Open Censio (S1).
     /// </summary>
     [TestMethod]
+    [TestCategory("AC1")]
     [TestCategory("AC2")]
     public void TrayMenuCreateWithLiveSendShowsServerLine()
     {
@@ -1674,6 +1750,7 @@ public sealed class TrayMenuTests
                                 TrayMenuEntryKind.Catalog,
                                 TrayMenuEntryKind.ServerConnection,
                                 TrayMenuEntryKind.Separator,
+                                TrayMenuEntryKind.OpenSettings,
                                 TrayMenuEntryKind.OpenDiagnostics,
                                 TrayMenuEntryKind.ToggleRecording,
                                 TrayMenuEntryKind.OpenRecordingsFolder,
@@ -2145,6 +2222,72 @@ public sealed class TrayMenuTests
                      {
                          Live = live
                      };
+    }
+
+    /// <summary>
+    /// Creates the server status of a server mode, or none.
+    /// </summary>
+    /// <param name="mode">The server mode: none, local or forward</param>
+    /// <returns>The server status, or <see langword="null" /> for none</returns>
+    private static TrayServerStatus? CreateServerStatusOrNone(string mode)
+    {
+        return mode == "none" ? null : CreateServerStatus(mode);
+    }
+
+    /// <summary>
+    /// Creates the state of a menu that holds every entry of a server mode: a recording live connection with a tick, a
+    /// found game, a ready catalog, the server line, a buffer line with dropped messages kept in memory only, and the
+    /// autostart on.
+    /// </summary>
+    /// <param name="texts">The texts of the snapshot</param>
+    /// <param name="mode">The server mode: local or forward</param>
+    /// <returns>The state</returns>
+    private static TrayMenuState CreateFullState(CompanionTexts texts, string mode)
+    {
+        var status = new PipeConnectionStatus
+                     {
+                         State = PipeConnectionState.Receiving
+                     };
+        var buffer = new LiveBufferStatus
+                     {
+                         Waiting = 3,
+                         Dropped = 2,
+                         IsMemoryOnly = true
+                     };
+
+        return new TrayMenuState
+               {
+                   Version = "1.2.3",
+                   Snapshot = TraySnapshot.ForConnection(texts, status, PipeRecordingState.Recording, _todayTick),
+                   Game = CreateGameStatus(GameInstallationStatusKind.Found, GameInstallationSource.UbisoftConnect, "12345"),
+                   Catalog = new GameCatalogStatus
+                             {
+                                 Kind = GameCatalogStatusKind.Ready,
+                                 EntryCount = 2
+                             },
+                   Server = CreateServerStatus(mode) with
+                                                     {
+                                                         Buffer = buffer
+                                                     },
+                   IsAutostartEnabled = true,
+                   Clock = CreateClock(1)
+               };
+    }
+
+    /// <summary>
+    /// Gets the texts of the entries that read the same in two menus of the same entries, separators and the version
+    /// entry left out.
+    /// </summary>
+    /// <param name="english">The entries of the English menu</param>
+    /// <param name="german">The entries of the German menu</param>
+    /// <returns>The English texts that the German menu repeats</returns>
+    private static List<string> SameTexts(IReadOnlyList<TrayMenuEntry> english, IReadOnlyList<TrayMenuEntry> german)
+    {
+        return english.Zip(german)
+                      .Where(pair => pair.First.Kind is not (TrayMenuEntryKind.Separator or TrayMenuEntryKind.Version))
+                      .Where(pair => pair.First.Text == pair.Second.Text)
+                      .Select(pair => pair.First.Text)
+                      .ToList();
     }
 
     /// <summary>

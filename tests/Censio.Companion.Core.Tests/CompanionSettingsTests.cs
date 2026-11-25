@@ -1034,7 +1034,34 @@ public sealed class CompanionSettingsTests
     }
 
     /// <summary>
-    /// Turns a test text into the bytes of the file: <see cref="ByteOrderMarkMarker" /> becomes the UTF-8 byte order
+    /// The key <c>language</c> reads <c>en</c> and <c>de</c> ignoring case; without the key, with another value, a value
+    /// that is not a text or a key written twice it gives no language, so the Windows display language decides (S9).
+    /// </summary>
+    /// <param name="text">The settings text</param>
+    /// <param name="expected">The expected language, or <see langword="null" /> for none</param>
+    [TestMethod]
+    [TestCategory("AC5")]
+    [DataRow("""{"language": "en"}""", CompanionLanguage.English, DisplayName = "en")]
+    [DataRow("""{"language": "DE"}""", CompanionLanguage.German, DisplayName = "DE")]
+    [DataRow("""{"Language": "de"}""", CompanionLanguage.German, DisplayName = "Key in other case")]
+    [DataRow("""{"gameFolder": "E:/Anno 117 - Pax Romana/"}""", null, DisplayName = "Missing")]
+    [DataRow("""{"language": "fr"}""", null, DisplayName = "fr")]
+    [DataRow("""{"language": 5}""", null, DisplayName = "Number 5")]
+    [DataRow("""{"language": "de", "language": "de"}""", null, DisplayName = "Twice")]
+    public void CompanionSettingsReadLanguageGivesEnOrDeOnly(string text, CompanionLanguage? expected)
+    {
+        // Arrange
+        var path = WriteSettings(text);
+
+        // Act
+        var language = CompanionSettings.ReadLanguage(path);
+
+        // Assert
+        Assert.AreEqual(expected, language, $"The settings {text} should give the language {expected}");
+    }
+
+    /// <summary>
+    /// Turns a test text into the bytes of the file:<see cref="ByteOrderMarkMarker" /> becomes the UTF-8 byte order
     /// mark and <see cref="InvalidByteMarker" /> the byte <c>0xFF</c>, the rest is encoded as UTF-8.
     /// </summary>
     /// <param name="text">The test text</param>
