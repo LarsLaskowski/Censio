@@ -665,7 +665,8 @@ public sealed partial class App : Application, IDisposable
                                      Game = () => _gameSearch?.Status ?? GameInstallationStatus.Searching,
                                      Catalog = () => _catalogLoader?.Status ?? GameCatalogStatus.Reading,
                                      Server = GetServerStatus,
-                                     Texts = () => _texts
+                                     Texts = () => _texts,
+                                     Profiles = () => _liveSender is null ? null : _profiles
                                  },
                                  Dispatch);
 

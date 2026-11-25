@@ -140,10 +140,12 @@ internal sealed class TrayIcon : IDisposable
     {
         if (_disposed)
         {
-            return;
+            return false;
         }
 
         _notifyIcon.ShowBalloonTip(NoticeTimeout, title.Length > MaxNoticeTitleLength ? title[..MaxNoticeTitleLength] : title, text.Length > MaxNoticeTextLength ? text[..MaxNoticeTextLength] : text, ToolTipIcon.Info);
+
+        return true;
     }
 
     /// <summary>
