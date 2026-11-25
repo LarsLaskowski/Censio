@@ -2421,16 +2421,16 @@ public sealed class TrayMenuTests
     /// <returns>The state</returns>
     private static TrayMenuState CreateStateWithoutProfile(string row)
     {
-        var server = row switch
-                     {
-                         "local replay" => CreateServerStatus("local"),
-                         "invalid setting" => new TrayServerStatus
-                                              {
-                                                  Local = CreateLocalServerStatus(LocalServerState.SettingsInvalid, 5117)
-                                              },
-                         "forward" => CreateServerStatus("forward"),
-                         _ => null
-                     };
+        TrayServerStatus? server = row switch
+                                   {
+                                       "local replay" => CreateServerStatus("local"),
+                                       "invalid setting" => new TrayServerStatus
+                                                            {
+                                                                Local = CreateLocalServerStatus(LocalServerState.SettingsInvalid, 5117)
+                                                            },
+                                       "forward" => CreateServerStatus("forward"),
+                                       _ => null
+                                   };
 
         return new TrayMenuState
                {
