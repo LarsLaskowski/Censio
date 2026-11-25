@@ -56,7 +56,6 @@ wording; the Product Manager reads them in the manual test of the release.
 | `Stop recording` | `Aufnahme beenden` |
 | `Open recordings folder` | `Aufnahmeordner öffnen` |
 | `Open log folder` | `Protokollordner öffnen` |
-| `Start with Windows` | `Mit Windows starten` |
 | `Exit` | `Beenden` |
 
 #### Tooltip and status

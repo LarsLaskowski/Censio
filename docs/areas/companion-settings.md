@@ -40,7 +40,7 @@ address`, `Server token` (a masked box), `Buffer hours`, `Buffer megabytes`, `Ga
 | `Buffer megabytes` | `bufferMegabytes` | 100 | with `Local` and `Forward` |
 | `Game folder` | `gameFolder` | empty: the automatic search ([`game-installation.md`](game-installation.md)) | always |
 | `Profile` | the profiles of [`companion-profiles.md`](companion-profiles.md), the active one selected | `Live` | always |
-| `Start with Windows` | the state the registry shows now ([`companion.md`](companion.md), *Start with Windows*) | off | always |
+| `Start with Windows` | the state the registry shows now, read at each opening; the only switch, the tray menu has none ([`companion.md`](companion.md), *Start with Windows*) | off | always |
 | `Language` | the language of the Companion's texts | the saved choice, else the Windows display language | always |
 
 - A field that has a problem of the file (*Errors from the file*) is enabled in every mode, so that it can be edited
@@ -119,14 +119,14 @@ hours, megabytes, token or game folder is no problem (the default, no token, the
 ### What applies when
 
 - At once, in the running Companion: the profile ([`companion-profiles.md`](companion-profiles.md)), `Start with
-  Windows` (switched as the menu entry does, only when the box differs from the registry's state) and the language
+  Windows` (the only switch, no tray menu entry; written only when the box differs from the registry's state) and the language
   ([`companion-texts.md`](companion-texts.md)), also while the window stays open.
 - By a restart: a changed mode, port, address, token, buffer limit or game folder, compared with the values the running
   Companion started with (not with the file as it was when the window opened), whole numbers and the trimmed token
   compared as the Companion reads them (`05` equals `5`, a blank port equals 5000). A save without such a change restarts nothing.
 - A saved change that needs a restart shows `Saved. The Companion restarts to apply the changes.`; a save that needs none
   closes the window without a text.
-- `Start with Windows` that cannot be written is logged as the menu entry logs it ([`companion-log.md`](companion-log.md))
+- `Start with Windows` that cannot be written is logged as the autostart logs it ([`companion-log.md`](companion-log.md))
   and shows `Start with Windows could not be changed.`; the other values are saved and the window stays open.
 
 ### Warnings
