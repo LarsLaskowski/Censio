@@ -109,6 +109,18 @@ public sealed record TraySnapshot
     }
 
     /// <summary>
+    /// Gets the look of the tray icon while a notice may be pending: a problem stays, else a pending notice shows.
+    /// </summary>
+    /// <param name="notice">The pending notice, or <c>null</c> if none is pending</param>
+    /// <returns>The look</returns>
+#pragma warning disable RH2003, S2325 // Skeleton: removed with the implementation
+    public TrayIconLook LookWith(ProfileNotice? notice)
+    {
+        throw new NotImplementedException();
+    }
+#pragma warning restore RH2003, S2325 // Skeleton: removed with the implementation
+
+    /// <summary>
     /// Gets the look of a connection state.
     /// </summary>
     /// <param name="state">The state</param>

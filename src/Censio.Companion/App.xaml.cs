@@ -672,7 +672,7 @@ public sealed partial class App : Application, IDisposable
                                      Catalog = () => _catalogLoader?.Status ?? GameCatalogStatus.Reading,
                                      Server = GetServerStatus,
                                      Texts = () => _texts,
-                                     Profiles = () => _liveSender is null ? null : _profiles
+                                     Profiles = LiveProfiles
                                  },
                                  Dispatch);
 
@@ -706,6 +706,15 @@ public sealed partial class App : Application, IDisposable
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Gets the profiles while live data is sent.
+    /// </summary>
+    /// <returns>The profiles, or <c>null</c> when no live data is sent</returns>
+    private CompanionProfiles? LiveProfiles()
+    {
+        return _liveSender is null ? null : _profiles;
     }
 
     /// <summary>

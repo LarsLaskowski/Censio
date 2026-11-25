@@ -126,6 +126,13 @@ public sealed class CompanionProfiles
     /// </summary>
     public event EventHandler? ActiveChanged;
 
+    /// <summary>
+    /// Occurs when the pending notice changes.
+    /// </summary>
+#pragma warning disable CS0067, S3264 // Skeleton: removed with the implementation
+    public event EventHandler? PendingNoticeChanged;
+#pragma warning restore CS0067, S3264 // Skeleton: removed with the implementation
+
     #endregion // Events
 
     #region Properties
