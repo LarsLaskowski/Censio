@@ -345,6 +345,37 @@ public sealed class SettingsWindowSessionTests
     }
 
     /// <summary>
+    /// Each opening reads the autostart entry again: an entry changed outside the Companion after the window was closed is
+    /// shown by the box of the next window (S4).
+    /// </summary>
+    /// <param name="isEnabledBefore">Whether the Companion's own entry is in the store at the first opening</param>
+    /// <returns>A task that completes with the test</returns>
+    [TestMethod]
+    [TestCategory("AC11")]
+    [DataRow(true)]
+    [DataRow(false)]
+    public async Task SettingsWindowSessionOpenReadsAutostartChangedOutside(bool isEnabledBefore)
+    {
+        // Arrange
+        SetAutostartEntry(isEnabledBefore);
+
+        var session = CreateSession();
+        var first = await OpenAsync(session);
+
+        first.Close();
+        RunPosted();
+        SetAutostartEntry(isEnabledBefore == false);
+
+        // Act
+        session.Open();
+        await RunPostedUntilAsync(() => _windows.Count > 1 && _windows.ToArray()[1].Views.Count > 0);
+
+        // Assert
+        Assert.AreEqual(isEnabledBefore, first.Views.Single().IsAutostartEnabled, "The first window should show the entry of the first opening");
+        Assert.AreEqual(isEnabledBefore == false, _windows.ToArray()[1].Views[0].IsAutostartEnabled, "The second window should show the entry changed outside the Companion");
+    }
+
+    /// <summary>
     /// Opening checks the file's game folder off the caller: <c>Open</c> returns while the check is held, and the view is shown
     /// only once the check is done and its result was posted back (N3).
     /// </summary>
