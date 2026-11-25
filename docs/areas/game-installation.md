@@ -50,7 +50,7 @@ Steam is not searched. A player with another copy (Steam) names the folder in th
   symlink are still followed. A UNC folder the player writes in the settings file is the player's own choice and is
   probed as written, over the network. With such a folder found, the Companion lists every archive below `maindata` with its size and modification time over the network (SMB) at the start and at each check, and reads `config.rda` and opens the archives over it only when it extracts the catalog ([`game-catalog.md`](game-catalog.md), *Limits and errors*).
 - The Companion only reads: it checks that the two files exist, asks Windows for the file version of the program file,
-  and writes nothing to the installation, the registry or the settings file; the settings file is written only by the settings window. The window probes a typed folder with the same check when it opens and on `Save`, off the tray thread, and a typed UNC folder is probed over the network as written ([`companion-settings.md`](companion-settings.md), *Validation*). It reads no whole drive.
+  and the search writes nothing to the installation, the registry or the settings file (only the settings window writes that file). The window probes a typed folder with the same check when it opens and on `Save`, off the tray thread, and a typed UNC folder is probed over the network as written ([`companion-settings.md`](companion-settings.md), *Validation*). It reads no whole drive.
 
 ### Build
 
