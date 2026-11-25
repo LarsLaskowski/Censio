@@ -1408,10 +1408,7 @@ public sealed class LiveSenderCatalogTests : IDisposable
     /// <returns>A task that completes when the clock was advanced</returns>
     private async Task AdvanceRetryAsync(TimeSpan delay, int occurrence)
     {
-        while (_timeProvider.Delays.Count(due => due == delay) < occurrence)
-        {
-            await _timeProvider.WaitForTimersAsync(_timeProvider.Delays.Count + 1, TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
-        }
+        await _timeProvider.WaitForDelaysAsync(delay, occurrence, TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
 
         _timeProvider.Advance(delay);
     }

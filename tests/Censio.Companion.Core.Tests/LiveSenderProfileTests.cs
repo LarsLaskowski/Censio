@@ -1344,10 +1344,7 @@ public sealed class LiveSenderProfileTests : IDisposable
     /// <returns>A task that completes when the clock was advanced</returns>
     private async Task AdvanceRetryAsync(RecordingTimeProvider timeProvider, TimeSpan delay, int occurrence)
     {
-        while (timeProvider.Delays.Count(due => due == delay) < occurrence)
-        {
-            await timeProvider.WaitForTimersAsync(timeProvider.Delays.Count + 1, TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
-        }
+        await timeProvider.WaitForDelaysAsync(delay, occurrence, TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
 
         timeProvider.Advance(delay);
     }

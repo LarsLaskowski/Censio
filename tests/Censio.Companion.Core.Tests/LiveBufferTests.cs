@@ -206,7 +206,7 @@ public sealed class LiveBufferTests
         Assert.AreSequenceEqual(new[] { Id(1), Id(2), Id(3) }, entries.Select(entry => entry.Id).ToArray(), "The stored messages should be returned in the order of their sequence");
         Assert.AreEqual(_start.AddHours(-3), entries[0].TakenAt, "A stored message should keep its time taken");
         Assert.AreSequenceEqual(Json(SmallJson, 1), entries[0].Utf8Json.ToArray(), "A stored message should keep its JSON");
-        Assert.ContainsSingle(entry => entry is { Level: LogLevel.Information, Message: "Live buffer holds 3 messages from an earlier run" }, _logger.Entries.ToList(), "The number of stored messages should be logged once");
+        await AssertLoggedOnceAsync(LogLevel.Information, "Live buffer holds 3 messages from an earlier run", "The number of stored messages should be logged once");
     }
 
     /// <summary>
@@ -342,7 +342,7 @@ public sealed class LiveBufferTests
         Assert.AreEqual(Id(2), entry.Id, "The stored message within the age limit should be returned");
         Assert.AreEqual(1, buffer.Status.Dropped, "The expired stored message should be counted as dropped");
         Assert.IsTrue(await WaitForAsync(() => File.Exists(StoredPath(1)) == false), "The file of the expired message should be deleted");
-        Assert.ContainsSingle(entry => entry is { Level: LogLevel.Information, Message: "Live buffer holds 1 messages from an earlier run" }, _logger.Entries.ToList(), "The number of stored messages kept should be logged");
+        await AssertLoggedOnceAsync(LogLevel.Information, "Live buffer holds 1 messages from an earlier run", "The number of stored messages kept should be logged");
     }
 
     /// <summary>
@@ -558,7 +558,7 @@ public sealed class LiveBufferTests
         Assert.AreSequenceEqual(new[] { Id(1), Id(3) }, entries.Select(entry => entry.Id).ToArray(), "The readable messages should be returned in order");
         Assert.AreEqual(1, buffer.Status.Dropped, "The unreadable file should be counted as dropped");
         Assert.IsTrue(await WaitForAsync(() => File.Exists(StoredPath(2)) == false), "The unreadable file should be deleted");
-        Assert.ContainsSingle(entry => entry is { Level: LogLevel.Warning, Message: OneUnreadableLine }, _logger.Entries.ToList(), "The unreadable file should be logged once");
+        await AssertLoggedOnceAsync(LogLevel.Warning, OneUnreadableLine, "The unreadable file should be logged once");
     }
 
     /// <summary>
@@ -677,7 +677,7 @@ public sealed class LiveBufferTests
         Assert.IsTrue(File.Exists(Path.Combine(targetFolder, "inside.txt")), "The target folder should keep its file");
         Assert.AreEqual(1, buffer.Status.Waiting, "No link should wait");
         Assert.AreEqual(2, buffer.Status.Dropped, "Both links should be counted as unreadable");
-        Assert.ContainsSingle(entry => entry is { Level: LogLevel.Warning, Message: "Live buffer entries unreadable: 2; discarded" }, _logger.Entries.ToList(), "Both links should be logged as unreadable");
+        await AssertLoggedOnceAsync(LogLevel.Warning, "Live buffer entries unreadable: 2; discarded", "Both links should be logged as unreadable");
     }
 
     /// <summary>
@@ -1215,7 +1215,22 @@ public sealed class LiveBufferTests
     }
 
     /// <summary>
-    /// Polls a file system condition, ten milliseconds apart, until it holds or the polls run out.
+    /// Waits until a line was logged, since the buffer logs what it loaded after it woke the taker, then asserts that it
+    /// was logged exactly once.
+    /// </summary>
+    /// <param name="level">The level of the line</param>
+    /// <param name="message">The text of the line</param>
+    /// <param name="assertMessage">The message of the assertion</param>
+    /// <returns>A task that completes when the line was checked</returns>
+    private async Task AssertLoggedOnceAsync(LogLevel level, string message, string assertMessage)
+    {
+        _ = await WaitForAsync(() => _logger.Entries.Any(entry => entry.Level == level && entry.Message == message));
+
+        Assert.ContainsSingle(entry => entry.Level == level && entry.Message == message, _logger.Entries.ToList(), assertMessage);
+    }
+
+    /// <summary>
+    /// Polls a condition, ten milliseconds apart, until it holds or the polls run out.
     /// </summary>
     /// <param name="condition">The condition</param>
     /// <returns>Whether the condition holds</returns>
