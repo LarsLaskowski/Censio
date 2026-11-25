@@ -117,6 +117,11 @@ public sealed class SettingsWindowSessionTests
     private int _waitingFolderChecks;
 
     /// <summary>
+    /// The number of folder checks started.
+    /// </summary>
+    private int _folderChecks;
+
+    /// <summary>
     /// The texts the session reads.
     /// </summary>
     private CompanionTexts _texts = CompanionTexts.English;
@@ -1006,6 +1011,343 @@ public sealed class SettingsWindowSessionTests
     }
 
     /// <summary>
+    /// A game folder the file holds in a wrong form is shown with the file's problem alone: the folder is not checked as
+    /// well (E8).
+    /// </summary>
+    /// <returns>A task that completes with the test</returns>
+    [TestMethod]
+    [TestCategory("AC3")]
+    public async Task SettingsWindowSessionOpenFolderProblemOfFileSkipsFolderCheck()
+    {
+        // Arrange
+        WriteSettings("""{"gameFolder":5}""");
+
+        var session = CreateSession();
+
+        // Act
+        var window = await OpenAsync(session);
+
+        // Assert
+        Assert.HasCount(1, window.Views.Single().Problems.Where(problem => problem.Field == SettingsField.GameFolder).ToList(), "The game folder should have the file's problem alone");
+        Assert.AreEqual(0, Volatile.Read(ref _folderChecks), "The folder should not be checked");
+    }
+
+    /// <summary>
+    /// A window closed while its first view is being read shows no view, and the session has no window (E13).
+    /// </summary>
+    /// <returns>A task that completes with the test</returns>
+    [TestMethod]
+    [TestCategory("AC1")]
+    public async Task SettingsWindowSessionClosedBeforeFirstViewShowsNothing()
+    {
+        // Arrange
+        WriteGameFolderSettings();
+
+        var session = CreateSession();
+
+        HoldFolderChecks();
+        session.Open();
+        await _folderCheckStarted.Task.WaitAsync(_guard, TestContext.CancellationToken);
+
+        var window = _windows.Single();
+
+        // Act
+        window.Close();
+        _folderGate.TrySetResult();
+        await RunNextPostedAsync();
+
+        // Assert
+        Assert.IsEmpty(window.Views, "A closed window should be shown no view");
+        Assert.IsFalse(session.IsOpen, "The session should have no window");
+    }
+
+    /// <summary>
+    /// Refreshing the texts without a window shows no view.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC5")]
+    public void SettingsWindowSessionRefreshTextsWithoutWindowShowsNothing()
+    {
+        // Arrange
+        var session = CreateSession();
+
+        // Act
+        session.RefreshTexts();
+        RunPosted();
+
+        // Assert
+        Assert.IsEmpty(_windows, "No window should be created");
+        Assert.IsFalse(session.IsOpen, "The session should have no window");
+    }
+
+    /// <summary>
+    /// Refreshing the texts while the first view is being read shows nothing of its own; the first view follows once.
+    /// </summary>
+    /// <returns>A task that completes with the test</returns>
+    [TestMethod]
+    [TestCategory("AC5")]
+    public async Task SettingsWindowSessionRefreshTextsBeforeFirstViewShowsOnlyFirstView()
+    {
+        // Arrange
+        WriteGameFolderSettings();
+
+        var session = CreateSession();
+
+        HoldFolderChecks();
+        session.Open();
+        await _folderCheckStarted.Task.WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Act
+        session.RefreshTexts();
+        RunPosted();
+
+        var viewsBeforeLoad = CountViews();
+
+        _folderGate.TrySetResult();
+        await RunPostedUntilAsync(() => CountViews() > 0);
+        RunPosted();
+
+        // Assert
+        Assert.AreEqual(0, viewsBeforeLoad, "Refreshing before the first view should show nothing");
+        Assert.HasCount(1, _windows.Single().Views, "The first view should be shown once");
+    }
+
+    /// <summary>
+    /// A <c>Save</c> before the first view is shown is ignored; a <c>Save</c> after it is handled.
+    /// </summary>
+    /// <returns>A task that completes with the test</returns>
+    [TestMethod]
+    [TestCategory("AC1")]
+    public async Task SettingsWindowSessionSaveBeforeFirstViewIgnored()
+    {
+        // Arrange
+        WriteGameFolderSettings();
+
+        var old = await File.ReadAllBytesAsync(SettingsPath, TestContext.CancellationToken);
+        var session = CreateSession();
+        var early = new SettingsInput
+                    {
+                        Values = Change(CompanionSettingsDocument.Load(SettingsPath).Values, (SettingsField.LocalPort, "6000")),
+                        SelectedProfile = CompanionProfile.Live.Id,
+                        IsAutostartEnabled = false,
+                        EditedFields = [SettingsField.LocalPort]
+                    };
+
+        HoldFolderChecks();
+        session.Open();
+        await _folderCheckStarted.Task.WaitAsync(_guard, TestContext.CancellationToken);
+
+        var window = _windows.Single();
+
+        // Act
+        window.RequestSave(early);
+        _folderGate.TrySetResult();
+        await RunPostedUntilAsync(() => CountViews() > 0);
+        RunPosted();
+
+        var outcomesAfterEarly = window.Outcomes.Count;
+        var bytesAfterEarly = await File.ReadAllBytesAsync(SettingsPath, TestContext.CancellationToken);
+        var view = window.Views.Single();
+        var outcome = await SaveAsync(window, CreateInput(view, view.Values));
+
+        // Assert
+        Assert.AreEqual(0, outcomesAfterEarly, "The early save should show no outcome");
+        Assert.AreSequenceEqual(old, bytesAfterEarly, "The early save should write nothing");
+        Assert.AreEqual(SettingsSaveKind.Saved, outcome.Kind, "The save after the first view should be handled");
+    }
+
+    /// <summary>
+    /// The session acts only on the events its window raises as their sender: a close or a save of another sender, or of
+    /// none, changes nothing.
+    /// </summary>
+    /// <returns>A task that completes with the test</returns>
+    [TestMethod]
+    [TestCategory("AC1")]
+    public async Task SettingsWindowSessionIgnoresEventsOfOtherSender()
+    {
+        // Arrange
+        WriteSettings(LocalSettings);
+
+        var session = CreateSession();
+        var window = await OpenAsync(session);
+        var view = window.Views.Single();
+        var input = CreateInput(view, Change(view.Values, (SettingsField.LocalPort, "0")), SettingsField.LocalPort);
+        var other = new FakeSettingsWindow();
+
+        // Act
+        window.RaiseWindowClosed(null);
+        window.RaiseWindowClosed(other);
+        window.RaiseSaveRequested(null, input);
+        window.RaiseSaveRequested(other, input);
+        RunPosted();
+
+        var isOpenAfterOthers = session.IsOpen;
+        var outcome = await SaveAsync(window, input);
+
+        // Assert
+        Assert.IsTrue(isOpenAfterOthers, "A close of another sender should keep the window");
+        Assert.AreEqual(SettingsSaveKind.Refused, outcome.Kind, "The window's own save should be handled");
+        Assert.HasCount(1, window.Outcomes, "Only the window's own save should show an outcome");
+        Assert.IsEmpty(other.Outcomes, "The other sender should be shown no outcome");
+    }
+
+    /// <summary>
+    /// A refused save lists its problems in the order of the fields, a blocking problem of the file included (E8).
+    /// </summary>
+    /// <returns>A task that completes with the test</returns>
+    [TestMethod]
+    [TestCategory("AC3")]
+    public async Task SettingsWindowSessionRefusedSaveListsProblemsByField()
+    {
+        // Arrange
+        WriteSettings("""{"mode":"local","localPort":1,"localPort":2}""");
+
+        var session = CreateSession();
+        var window = await OpenAsync(session);
+        var view = window.Views.Single();
+        var input = CreateInput(view, Change(view.Values, (SettingsField.BufferHours, "0")), SettingsField.BufferHours);
+
+        // Act
+        var outcome = await SaveAsync(window, input);
+
+        // Assert
+        Assert.AreEqual(SettingsSaveKind.Refused, outcome.Kind, "The save should be refused");
+        Assert.AreSequenceEqual([CreateProblem(SettingsField.LocalPort, SettingsProblemKind.WrittenTwice), CreateProblem(SettingsField.BufferHours, SettingsProblemKind.HoursRange)], outcome.Problems.ToArray(), "The problems should be listed in the order of the fields");
+    }
+
+    /// <summary>
+    /// A window closed while its save runs is shown nothing of the save: neither a refused outcome nor the saved one with its
+    /// view; a valid save still writes the file (E13).
+    /// </summary>
+    /// <param name="isValid">Whether the values are valid, so the save writes the file and needs no restart</param>
+    /// <returns>A task that completes with the test</returns>
+    [TestMethod]
+    [TestCategory("AC1")]
+    [DataRow(false, DisplayName = "Refused")]
+    [DataRow(true, DisplayName = "Saved")]
+    public async Task SettingsWindowSessionClosedDuringSaveShowsNothing(bool isValid)
+    {
+        // Arrange
+        WriteGameFolderSettings();
+
+        var session = CreateSession();
+        var window = await OpenAsync(session);
+        var view = window.Views.Single();
+        var input = isValid ? CreateInput(view, Change(view.Values, CompanionLanguage.German), SettingsField.Language) : CreateInput(view, Change(view.Values, CompanionLanguage.German, (SettingsField.BufferHours, "0")), SettingsField.Language, SettingsField.BufferHours);
+        CompanionLanguage? expected = isValid ? CompanionLanguage.German : null;
+
+        HoldFolderChecks();
+        window.RequestSave(input);
+        await _folderCheckStarted.Task.WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Act
+        window.Close();
+        _folderGate.TrySetResult();
+        await RunNextPostedAsync();
+
+        // Assert
+        Assert.IsEmpty(window.Outcomes, "A closed window should be shown no outcome");
+        Assert.HasCount(1, window.Views, "A closed window should be shown no view after the save");
+        Assert.AreEqual(expected, CompanionSettings.ReadLanguage(SettingsPath), "Only a valid save should write the file");
+        Assert.IsEmpty(_events, "The save should not restart");
+    }
+
+    /// <summary>
+    /// Saving the language the texts already show writes it and applies no language (S9).
+    /// </summary>
+    /// <returns>A task that completes with the test</returns>
+    [TestMethod]
+    [TestCategory("AC5")]
+    public async Task SettingsWindowSessionSaveLanguageOfTextsAppliesNothing()
+    {
+        // Arrange
+        WriteSettings(LocalSettings);
+
+        var session = CreateSession();
+        var window = await OpenAsync(session);
+        var view = window.Views.Single();
+        var input = CreateInput(view, Change(view.Values, CompanionLanguage.English), SettingsField.Language);
+
+        // Act
+        var outcome = await SaveAsync(window, input);
+
+        // Assert
+        Assert.AreEqual(SettingsSaveKind.Saved, outcome.Kind, "The language should be saved");
+        Assert.AreEqual(CompanionLanguage.English, CompanionSettings.ReadLanguage(SettingsPath), "The file should hold the language");
+        Assert.IsEmpty(_appliedLanguages, "The language the texts show should not be applied again");
+    }
+
+    /// <summary>
+    /// A new profile whose name another profile got after the save checked it is not created a second time: the file is
+    /// saved and the profile of that name stays active (E6).
+    /// </summary>
+    /// <returns>A task that completes with the test</returns>
+    [TestMethod]
+    [TestCategory("AC6")]
+    public async Task SettingsWindowSessionNewProfileNamedMeanwhileNotCreatedAgain()
+    {
+        // Arrange
+        WriteSettings(LocalSettings);
+
+        var session = CreateSession();
+        var window = await OpenAsync(session);
+        var view = window.Views.Single();
+        var input = new SettingsInput
+                    {
+                        Values = view.Values,
+                        SelectedProfile = CompanionProfile.Live.Id,
+                        NewProfileName = ProfileName,
+                        IsAutostartEnabled = view.IsAutostartEnabled,
+                        EditedFields = [SettingsField.ProfileName]
+                    };
+
+        window.RequestSave(input);
+        await WaitForPostedAsync();
+
+        // Act
+        var meanwhile = _profiles.Create(ProfileName);
+
+        await RunPostedUntilAsync(() => window.Outcomes.Count > 0);
+
+        // Assert
+        Assert.AreEqual(SettingsSaveKind.Saved, window.Outcomes.Single().Kind, "The save should succeed");
+        Assert.AreSequenceEqual(["Live", ProfileName], _profiles.Profiles.Select(profile => profile.Name).ToArray(), "The profile should not be created a second time");
+        Assert.AreSame(meanwhile, _profiles.Active, "The profile created meanwhile should stay active");
+    }
+
+    /// <summary>
+    /// A selected profile the profiles do not know is not selected: the file is saved and the active profile is kept, without
+    /// a switch line.
+    /// </summary>
+    /// <returns>A task that completes with the test</returns>
+    [TestMethod]
+    [TestCategory("AC6")]
+    public async Task SettingsWindowSessionUnknownSelectedProfileKeepsActive()
+    {
+        // Arrange
+        WriteSettings(LocalSettings);
+
+        var session = CreateSession();
+        var window = await OpenAsync(session);
+        var view = window.Views.Single();
+        var input = new SettingsInput
+                    {
+                        Values = view.Values,
+                        SelectedProfile = new Guid("7d0e4c1b-2222-4f3a-9b4c-00000000b003"),
+                        IsAutostartEnabled = view.IsAutostartEnabled,
+                        EditedFields = []
+                    };
+
+        // Act
+        var outcome = await SaveAsync(window, input);
+
+        // Assert
+        Assert.AreEqual(SettingsSaveKind.Saved, outcome.Kind, "The save should succeed");
+        Assert.AreSame(CompanionProfile.Live, _profiles.Active, "Live should stay active");
+        Assert.IsEmpty(_logger.Entries.Where(entry => entry.Message == "Profile switched").ToList(), "No profile switch should be logged");
+    }
+
+    /// <summary>
     /// Creates a completed completion.
     /// </summary>
     /// <returns>The completion</returns>
@@ -1251,6 +1593,7 @@ public sealed class SettingsWindowSessionTests
     {
         var gate = _folderGate;
 
+        Interlocked.Increment(ref _folderChecks);
         Interlocked.Increment(ref _waitingFolderChecks);
         _folderCheckStarted.TrySetResult();
 
@@ -1289,6 +1632,39 @@ public sealed class SettingsWindowSessionTests
     private void SetAutostartEntry(bool isEnabled)
     {
         _store.SetCommand(CompanionAutostart.EntryName, isEnabled ? CompanionAutostart.FormatCommand(ExePath) : null);
+    }
+
+    /// <summary>
+    /// Writes a settings file that names the game folder, so every validation checks it.
+    /// </summary>
+    private void WriteGameFolderSettings()
+    {
+        WriteSettings(new JsonObject
+                      {
+                          ["gameFolder"] = GameFolder
+                      }.ToJsonString());
+    }
+
+    /// <summary>
+    /// Waits until an action was posted; fails after <see cref="_guard" />.
+    /// </summary>
+    /// <returns>A task that completes when an action waits to be run</returns>
+    private async Task WaitForPostedAsync()
+    {
+        var isPosted = await _posted.Reader.WaitToReadAsync(TestContext.CancellationToken).AsTask().WaitAsync(_guard, TestContext.CancellationToken);
+
+        Assert.IsTrue(isPosted, "An action should be posted");
+    }
+
+    /// <summary>
+    /// Waits until an action was posted, then runs the actions posted so far.
+    /// </summary>
+    /// <returns>A task that completes when the actions ran</returns>
+    private async Task RunNextPostedAsync()
+    {
+        await WaitForPostedAsync();
+
+        RunPosted();
     }
 
     /// <summary>

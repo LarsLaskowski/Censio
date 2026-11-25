@@ -430,6 +430,7 @@ public sealed class LocalServerSessionTests
 
         // Act
         await session.StopAsync(_stopTimeout).WaitAsync(_guard, TestContext.CancellationToken);
+        await run.WaitAsync(_guard, TestContext.CancellationToken);
 
         // Assert
         Assert.IsTrue(run.IsCompletedSuccessfully, "The stop should end the run while it waits to retry");

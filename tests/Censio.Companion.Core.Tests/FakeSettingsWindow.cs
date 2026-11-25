@@ -95,6 +95,25 @@ public sealed class FakeSettingsWindow : ISettingsWindow
         WindowClosed?.Invoke(this, EventArgs.Empty);
     }
 
+    /// <summary>
+    /// Raises <see cref="WindowClosed" /> with another sender than this window.
+    /// </summary>
+    /// <param name="sender">The sender</param>
+    public void RaiseWindowClosed(object? sender)
+    {
+        WindowClosed?.Invoke(sender, EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// Raises <see cref="SaveRequested" /> with another sender than this window.
+    /// </summary>
+    /// <param name="sender">The sender</param>
+    /// <param name="input">What the user entered</param>
+    public void RaiseSaveRequested(object? sender, SettingsInput input)
+    {
+        SaveRequested?.Invoke(sender, input);
+    }
+
     #endregion // Methods
 
     #region ISettingsWindow

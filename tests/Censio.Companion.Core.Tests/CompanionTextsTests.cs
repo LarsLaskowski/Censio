@@ -203,6 +203,48 @@ public sealed class CompanionTextsTests
     }
 
     /// <summary>
+    /// A restarting outcome gives the restart text, or the autostart failure's text when the autostart could not be
+    /// changed (S4).
+    /// </summary>
+    /// <param name="isAutostartFailed">Whether the autostart could not be changed</param>
+    [TestMethod]
+    [TestCategory("AC4")]
+    [DataRow(false, DisplayName = "Autostart changed")]
+    [DataRow(true, DisplayName = "Autostart failed")]
+    public void CompanionTextsFormatOutcomeRestartingGivesRestartOrAutostartText(bool isAutostartFailed)
+    {
+        // Arrange
+        var texts = CompanionTexts.English;
+        var expected = isAutostartFailed ? texts.OutcomeAutostartFailed : texts.OutcomeRestarting;
+
+        // Act
+        var text = texts.FormatOutcome(CreateOutcome(SettingsSaveKind.Restarting, isAutostartFailed));
+
+        // Assert
+        Assert.IsFalse(string.IsNullOrEmpty(texts.OutcomeRestarting), "The restart text should not be empty");
+        Assert.AreEqual(expected, text, "A restarting outcome should give the restart text unless the autostart failed");
+    }
+
+    /// <summary>
+    /// The banner of an unreadable settings file names the reason the log gives, in each language (E7).
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC8")]
+    public void CompanionTextsFormatFileProblemNamesReason()
+    {
+        // Arrange
+        const string reason = "not JSON";
+
+        // Act
+        var english = CompanionTexts.English.FormatFileProblem(reason);
+        var german = CompanionTexts.German.FormatFileProblem(reason);
+
+        // Assert
+        Assert.AreEqual("The settings file could not be read (not JSON). Saving replaces it with the values shown.", english, "The English banner should name the reason");
+        Assert.AreEqual("Die Einstellungsdatei konnte nicht gelesen werden (not JSON). Beim Speichern wird sie durch die angezeigten Werte ersetzt.", german, "The German banner should name the reason");
+    }
+
+    /// <summary>
     /// Creates the call of a method of the texts with a value outside its enumeration.
     /// </summary>
     /// <param name="method">The method: For, FormatProblem, FormatNotice or FormatOutcome</param>

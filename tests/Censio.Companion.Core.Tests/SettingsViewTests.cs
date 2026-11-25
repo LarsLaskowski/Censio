@@ -53,6 +53,48 @@ public sealed class SettingsViewTests
     }
 
     /// <summary>
+    /// The text of a view is the name of its type alone and never holds the token or a profile name (N5).
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC9")]
+    public void SettingsViewToStringHoldsNoTokenOrName()
+    {
+        // Arrange
+        const string token = "MARKER-Token-0123456789abcdefghijKLMNOP";
+        const string profileName = "MARKER-Profile";
+        var profile = new CompanionProfile
+                      {
+                          Id = new Guid("0f8c2d3e-1111-4a2b-8c3d-00000000a002"),
+                          Name = profileName
+                      };
+        var view = new SettingsView
+                   {
+                       Texts = CompanionTexts.English,
+                       Values = new CompanionSettingsValues
+                                {
+                                    Mode = CompanionSettingsMode.Forward,
+                                    LocalPort = "5000",
+                                    ServerAddress = "ws://nas:8080/ingest",
+                                    ServerToken = token,
+                                    BufferHours = "24",
+                                    BufferMegabytes = "100",
+                                    GameFolder = string.Empty
+                                },
+                       Problems = [],
+                       ProfileList = [CompanionProfile.Live, profile],
+                       ActiveProfile = profile.Id,
+                       Warnings = []
+                   };
+
+        // Act
+        var text = view.ToString() ?? string.Empty;
+
+        // Assert
+        Assert.AreEqual(typeof(SettingsView).FullName, text, "The text of the view should be the name of its type alone");
+        Assert.DoesNotContain("MARKER", text, "The text of the view should hold neither the token nor a profile name");
+    }
+
+    /// <summary>
     /// Creates the problems of a view: one of the field, or none.
     /// </summary>
     /// <param name="field">The field</param>
