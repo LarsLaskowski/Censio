@@ -32,5 +32,8 @@ changed since the window opened, and replaces an unparseable file only after a w
 
 - Comments and key order of a hand-edited file are lost at the first save; the user guide says so.
 - The token is now written by the Companion, as plain text in the player's private folder like before; the file's
-  access rules are neither checked nor changed.
-- Reading stays as 0045 states; a hand-edited file keeps working.
+  access rules are not checked, and the replaced file takes the access rules its folder passes on, so rules set on
+  `settings.json` alone are lost at a save. A crash between writing and replacing leaves `settings.json.tmp`, which
+  holds the token, in the same folder until the next save overwrites it.
+- Reading stays as 0045 states; a hand-edited file keeps working. A file holding a text that is not valid UTF-8 is
+  shown as unreadable and replaced at a save, since its keys cannot be written back unchanged.

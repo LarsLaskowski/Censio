@@ -6,10 +6,9 @@ Status: Approved by Lead
 ## Problem
 
 Every Companion option lives in the hand-edited `%LOCALAPPDATA%\Censio\settings.json`
-([`companion.md`](../../docs/areas/companion.md), *Settings file*), read once per start, never written (record 0045). A tester edits JSON and learns about a mistake only from `Server: settings invalid` and the log. Every playthrough goes to the fixed
-profile `Live` (record 0102); record 0041 moves the profile choice and the figure notice into this window. #39 and #40
-are merged; their keys follow [`local-mode.md`](../../docs/areas/local-mode.md) and
-[`live-sending.md`](../../docs/areas/live-sending.md). Every Companion text is English today.
+([`companion.md`](../../docs/areas/companion.md), *Settings file*), never written (record 0045); a mistake shows only as `Server: settings invalid` and in the log. Every playthrough goes to the fixed
+profile `Live` (record 0102); record 0041 moves the profile choice and the figure notice into this window.
+Every Companion text is English today.
 
 ## Scenarios
 
@@ -22,9 +21,9 @@ are merged; their keys follow [`local-mode.md`](../../docs/areas/local-mode.md) 
   switching back keeps `serverAddress` and `serverToken`. `Off` is saved by removing `mode`; each known key is written
   once in the spelling of [`companion.md`](../../docs/areas/companion.md) (*Settings file*), other-case spellings removed.
 - S3: Given a saved change of mode, port, address, token, buffer limits or game folder, then the window says `Saved.
-  The Companion restarts to apply the changes.`; the Companion starts the same exe (a copy run from the ZIP included)
+  The Companion restarts to apply the changes.`; the Companion starts the same exe
   and exits as `Exit` does, ending its single instance only after its hosted server stopped. The new Companion waits up
-  to 10 seconds for that; one started by hand meanwhile still ends at once. A save without such a change restarts
+  to 10 seconds for that, in local mode also for the port; one started by hand meanwhile still ends at once. A save without such a change restarts
   nothing.
 - S4: `Start with Windows` ticked or cleared and saved switches the autostart as the menu entry does
   ([`companion.md`](../../docs/areas/companion.md), *Start with Windows*), at once.
@@ -33,9 +32,8 @@ are merged; their keys follow [`local-mode.md`](../../docs/areas/local-mode.md) 
   waiting messages keep their profile and reach the server under its name.
 - S6: Selecting another profile and saving sends the messages taken from then on to it, at once, in both modes. Only a
   hello names a profile ([`contract.md`](../../docs/areas/contract.md)) and a second hello is refused
-  ([`ingest.md`](../../docs/areas/ingest.md)), so a switch reconnects with a hello naming the active profile, and a next
-  message of another profile than the connection's hello (taken before a switch, also offline) is sent after a
-  reconnect naming its profile: no failure, no retry delay, `Server: connecting` until accepted.
+  ([`ingest.md`](../../docs/areas/ingest.md)), so a switch reconnects with a hello naming the active profile, and a message of another profile
+  than the hello (taken before a switch, also offline) is sent after a reconnect naming it: no failure, no retry delay, `Server: connecting` until accepted.
 - S7: Only in a run that sends live data (forward or local mode, also with `--record`): given active profile `B` and a
   figure last used with `A`, at its session start a Windows notification of the tray icon reads `This figure was last
   played with profile A. Click to open the settings and switch.`; ticks keep going to `B`, a click opens the window, an
@@ -49,8 +47,7 @@ are merged; their keys follow [`local-mode.md`](../../docs/areas/local-mode.md) 
   and the tooltip, whose longest German text fits the tray's 127 characters; `English` switches back. Without a saved
   choice (the settings key `language`, `en` or `de`) German shows when the Windows display language is German. The diagnostics window, log and web pages keep
   their own language.
-- S10: `Browse…` puts the picked folder's full path in the game folder field; an empty field means `Find
-  automatically`.
+- S10: `Browse…` puts the picked folder's full path in the game folder field.
 
 ## Errors and edge cases
 
@@ -67,8 +64,9 @@ A message stands below its field, the typed values stay, and `Save` writes nothi
   exist.`; failing the search's check ([`game-installation.md`](../../docs/areas/game-installation.md)): `This folder is
   not an Anno 117 installation.`
 - E6: A new profile name blank: `Enter a name.`; over 64 characters: `Use at most 64 characters.`; equal to another
-  ignoring case: `A profile of this name exists.`; a 1,000th profile: `No more profiles can be created.`
-- E7: A file that cannot be parsed (over 1 MiB, not JSON, not an object, unreadable): the window shows the defaults
+  ignoring case: `A profile of this name exists.`; with a control character or a broken surrogate pair: `The name holds
+  characters that cannot be used.`; a 1,000th profile: `No more profiles can be created.`
+- E7: A file that cannot be parsed (over 1 MiB, not JSON, not an object, unreadable, a text in it not valid UTF-8): the window shows the defaults
   under `The settings file could not be read (<reason>). Saving replaces it with the values shown.`, the reason the
   log's; `Save` replaces it.
 - E8: A key with a wrong value or written twice (`"localPort": "abc"`, `"gameFolder": 5`, two `mode`): its field is
@@ -79,7 +77,7 @@ A message stands below its field, the typed values stay, and `Save` writes nothi
 - E10: The file changed after the window opened: `The settings file was changed outside this window. Close the window
   and open it again.`; nothing is written.
 - E11: Unknown keys stay with their values; comments and key order are not kept.
-- E12: The restarted Companion gets none of the run's switches (it neither records nor replays), so before saving the window warns `Saving ends the running replay.` /
+- E12: The restarted Companion neither records nor replays, so before saving the window warns `Saving ends the running replay.` /
   `Saving ends the running recording.`, and while the buffer is memory only
   ([`live-sending.md`](../../docs/areas/live-sending.md), *Buffer*) `Messages that could not be saved to disk are lost.`
 - E13: `Cancel` or closing the window changes nothing.
@@ -97,7 +95,8 @@ A message stands below its field, the typed values stay, and `Save` writes nothi
   working ([`companion.md`](../../docs/areas/companion.md), *Settings file*). The file is written new and then
   replaced, so a crash leaves the old or the new one.
 - N2: Privacy: the token is masked and in no log line; the figure name stays in the Companion's private folder, is
-  never logged or sent, and no notice quotes it (record 0041). The profiles and figure links lie in a fixed file under
+  never logged or sent, and no notice quotes it (record 0041); a figure link stores a hash of the name, not the name. The
+  profiles and figure links lie in a fixed file under
   `%LOCALAPPDATA%\Censio`, read with a size bound and failing closed.
 - N3: The tray, pipe, menu and `Exit` never wait for the window, its write or its folder check.
 - N4: An existing `settings.json` keeps its meaning; without the window nothing changes but the menu entry, and
@@ -158,7 +157,7 @@ A message stands below its field, the typed values stay, and `Save` writes nothi
   only; the notice is a Windows notification of the tray icon whose click opens the window (S5–S8).
 - Q4: Who writes the file? Answered: the window; the plan supersedes record 0045 and replaces record 0102.
 - Q5: Is an invalid file overwritten? Answered: only an unparseable one (E7), from which both readers of
-  `CompanionSettings` take nothing; every other wrong value is a single field (E8).
+  `CompanionSettings` take nothing, or holding text that is not valid UTF-8; every other wrong value is a single field (E8).
 
 ## Area documents
 

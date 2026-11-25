@@ -24,17 +24,24 @@ keep the profile they were taken for.
 3. **Swap only the `profileId` of new messages** — no reconnect; a new profile shows up without a name until the
    next connection, and one fed offline and switched away from stays unnamed.
 4. **A contract message that names a profile** — a contract version bump for both sides, for what a reconnect does.
+5. **Figure links by the figure's name, the file bound raised to 4 MiB** — the file would hold the figure name, and its
+   size would follow the pipe's strings (up to about 2 MB escaped); a hash of the name has a fixed length.
 
 ## Decision
 
 Option 1 (the list kept locally as the Product Manager chose). The Companion keeps its profiles and figure links in a
-fixed file under `%LOCALAPPDATA%\Censio`, `Live` keeping its identity, and opens each live connection with a hello for
-the profile of the next message to send; the rules are in [companion-profiles](../areas/companion-profiles.md) and
+fixed file under `%LOCALAPPDATA%\Censio`, `Live` keeping its identity and each figure kept as the SHA-256 of its name,
+and opens each live connection with a hello for the profile of the next message to send. A switch closes the old
+connection with the close handshake, and a `companionConnected` refusal shortly after it, while the server still ends
+the old session, is retried as part of the switch; the rules are in [companion-profiles](../areas/companion-profiles.md) and
 [live-sending](../areas/live-sending.md).
 
 ## Consequences
 
-- A profile switch costs one reconnect, and the catalog check of every new connection (record 0107).
+- A profile switch costs one reconnect, and the catalog check of every new connection (record 0107); a few refused
+  hellos right after it are expected and neither logged nor counted as failures.
+- The profiles file holds no figure name, only its hash; a hash of a known name can be recomputed, so the file stays
+  private.
 - A message whose profile the list no longer knows (a lost profiles file) is sent on the current connection; the server
   creates that profile without a name.
 - Profiles are neither renamed nor deleted in the Companion; history is deleted on the pages.
