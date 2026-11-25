@@ -1966,6 +1966,59 @@ public sealed class TrayMenuTests
     }
 
     /// <summary>
+    /// Without the name of an active profile — a replay in local mode, an invalid server setting, forward mode outside a
+    /// live run, mode Off — the server line keeps its text without an ending, and mode Off shows none (S11).
+    /// </summary>
+    /// <param name="row">The row: local replay, invalid setting, forward or off</param>
+    /// <param name="expected">The expected server texts of the menu</param>
+    [TestMethod]
+    [TestCategory("AC12")]
+    [DataRow("local replay", new[] { "Server: running at http://localhost:5117/" }, DisplayName = "Replay in local mode")]
+    [DataRow("invalid setting", new[] { "Server: settings invalid" }, DisplayName = "Invalid setting")]
+    [DataRow("forward", new[] { "Server: connected" }, DisplayName = "Forward mode")]
+    [DataRow("off", new string[] { }, DisplayName = "Mode Off")]
+    public void TrayMenuCreateWithoutProfileNameKeepsServerLine(string row, string[] expected)
+    {
+        // Arrange
+        var state = CreateStateWithoutProfile(row);
+
+        // Act
+        var entries = TrayMenu.Create(CompanionTexts.English, state);
+
+        // Assert
+        var servers = entries.Where(entry => entry.Text.StartsWith("Server:", StringComparison.Ordinal)).Select(entry => entry.Text).ToArray();
+
+        Assert.AreSequenceEqual(expected, servers, $"The server line should keep its text without a profile ending: {row}");
+        Assert.IsEmpty(entries.Where(entry => entry.Text.Contains("(profile", StringComparison.Ordinal)).ToList(), $"No entry should name a profile: {row}");
+    }
+
+    /// <summary>
+    /// Without a pending notice the menu holds no notice entry, in forward mode, local mode and without a server, and
+    /// Settings… follows the entry of its mode directly (S12).
+    /// </summary>
+    /// <param name="mode">The server mode: none, local or forward</param>
+    /// <param name="above">The kind of the entry directly above Settings…</param>
+    [TestMethod]
+    [TestCategory("AC13")]
+    [DataRow("none", TrayMenuEntryKind.Separator)]
+    [DataRow("forward", TrayMenuEntryKind.Separator)]
+    [DataRow("local", TrayMenuEntryKind.OpenCensio)]
+    public void TrayMenuCreateWithoutNoticeHasNoNoticeEntry(string mode, TrayMenuEntryKind above)
+    {
+        // Arrange
+        var state = CreateProfileState(CreateServerStatusOrNone(mode), "B", null);
+
+        // Act
+        var entries = TrayMenu.Create(CompanionTexts.English, state);
+
+        // Assert
+        var kinds = entries.Select(entry => entry.Kind).ToList();
+
+        Assert.DoesNotContain(TrayMenuEntryKind.ProfileNotice, kinds, $"Without a notice the menu should hold no notice entry: {mode}");
+        Assert.AreEqual(above, kinds[kinds.IndexOf(TrayMenuEntryKind.OpenSettings) - 1], $"Settings… should follow the entry of its mode directly: {mode}");
+    }
+
+    /// <summary>
     /// The buffer line reads the waiting count, with the dropped count once messages were dropped and the note on memory
     /// only after a failed write, in digits without separators (S1, S3, E2).
     /// </summary>
@@ -2361,13 +2414,44 @@ public sealed class TrayMenuTests
     }
 
     /// <summary>
+    /// Creates the state of a menu without the name of an active profile: a replay in local mode with a running server, an
+    /// invalid server setting, forward mode connected, or mode Off without a server.
+    /// </summary>
+    /// <param name="row">The row: local replay, invalid setting, forward or off</param>
+    /// <returns>The state</returns>
+    private static TrayMenuState CreateStateWithoutProfile(string row)
+    {
+        var server = row switch
+                     {
+                         "local replay" => CreateServerStatus("local"),
+                         "invalid setting" => new TrayServerStatus
+                                              {
+                                                  Local = CreateLocalServerStatus(LocalServerState.SettingsInvalid, 5117)
+                                              },
+                         "forward" => CreateServerStatus("forward"),
+                         _ => null
+                     };
+
+        return new TrayMenuState
+               {
+                   Version = "1.2.3",
+                   Snapshot = CreateSnapshotForMode(row == "local replay" ? "replay" : "live"),
+                   Game = GameInstallationStatus.Searching,
+                   Catalog = GameCatalogStatus.Reading,
+                   Server = server,
+                   Clock = CreateClock(1),
+                   ProfileName = null
+               };
+    }
+
+    /// <summary>
     /// Creates the state of a live menu with a server status, the name of the active profile and a pending notice.
     /// </summary>
-    /// <param name="server">The server status</param>
+    /// <param name="server">The server status, or <see langword="null" /> for none</param>
     /// <param name="profileName">The name of the active profile, or <see langword="null" /> for none</param>
     /// <param name="notice">The pending notice, or <see langword="null" /> for none</param>
     /// <returns>The state</returns>
-    private static TrayMenuState CreateProfileState(TrayServerStatus server, string? profileName, ProfileNotice? notice)
+    private static TrayMenuState CreateProfileState(TrayServerStatus? server, string? profileName, ProfileNotice? notice)
     {
         return new TrayMenuState
                {

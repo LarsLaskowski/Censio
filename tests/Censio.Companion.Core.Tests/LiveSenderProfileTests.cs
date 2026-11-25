@@ -684,6 +684,33 @@ public sealed class LiveSenderProfileTests : IDisposable
     }
 
     /// <summary>
+    /// Session starts that give no notice — a first figure, the same figure on the same profile again — raise nothing and
+    /// log no notice line (S12, N5).
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC13")]
+    public void LiveSenderProfileNoNoticeLogsNothing()
+    {
+        // Arrange
+        var timeProvider = CreateTimeProvider();
+        var buffer = CreateRunningBuffer(timeProvider);
+        var sender = Track(LiveSender.ForServer(new ForwardServerSetting(_address, Token), buffer, CompanionVersion, new QueuedIngestConnector(), timeProvider, _logger));
+        var profiles = LoadProfiles();
+
+        sender.UseProfiles(profiles);
+        sender.Enqueue(Item(PipeTickResult.FromSessionStart(Figure), 1));
+        sender.Enqueue(Item(PipeTickResult.SessionEnd, 2));
+
+        // Act
+        sender.Enqueue(Item(PipeTickResult.FromSessionStart(Figure), 3));
+
+        // Assert
+        Assert.IsEmpty(Notices(), "No session start should raise a notice");
+        Assert.IsEmpty(Lines().Where(line => line.StartsWith("Profile notice", StringComparison.Ordinal)).ToList(), "No notice line should be logged");
+        Assert.IsNull(profiles.PendingNotice, "No notice should be pending");
+    }
+
+    /// <summary>
     /// Neither the figure, its key nor a profile name is in any log line of the sender or the profiles (N2, N5).
     /// </summary>
     /// <returns>A task that completes when the test is done</returns>
