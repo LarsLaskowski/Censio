@@ -19,6 +19,15 @@ public sealed class TraySnapshotTests
                                                             IslandCount = 3
                                                         };
 
+    /// <summary>
+    /// The notice pending in the tests of the look with a notice.
+    /// </summary>
+    private static readonly ProfileNotice _notice = new()
+                                                    {
+                                                        Kind = ProfileNoticeKind.NewFigure,
+                                                        ProfileName = "MARKER-Profile"
+                                                    };
+
     #endregion // Fields
 
     #region Methods
@@ -199,6 +208,127 @@ public sealed class TraySnapshotTests
         Assert.AreNotEqual(english.StatusText, snapshot.StatusText, "The German status text should differ from the English one");
         Assert.AreEqual(english.Look, snapshot.Look, "The language should not change the look");
         Assert.AreEqual(english.IsRecording, snapshot.IsRecording, "The language should not change the recording flag");
+    }
+
+    /// <summary>
+    /// While a notice is pending the look of a waiting or receiving state, a finished replay included, becomes the notice
+    /// look; the snapshot keeps the look of its state (S13).
+    /// </summary>
+    /// <param name="scenario">The scenario of the snapshot</param>
+    /// <param name="expectedStateLook">The look of the state</param>
+    [TestMethod]
+    [TestCategory("AC14")]
+    [DataRow("waiting", TrayIconLook.Waiting, DisplayName = "Waiting")]
+    [DataRow("receiving", TrayIconLook.Receiving, DisplayName = "Receiving")]
+    [DataRow("replay finished", TrayIconLook.Waiting, DisplayName = "Replay finished")]
+    public void TraySnapshotLookWithNoticeShowsNotice(string scenario, TrayIconLook expectedStateLook)
+    {
+        // Arrange
+        var snapshot = SnapshotOf(scenario);
+
+        // Act
+        var look = snapshot.LookWith(_notice);
+
+        // Assert
+        Assert.AreEqual(TrayIconLook.Notice, look, $"A pending notice should show the notice look: {scenario}");
+        Assert.AreEqual(expectedStateLook, snapshot.Look, $"The snapshot should keep the look of its state: {scenario}");
+    }
+
+    /// <summary>
+    /// While a notice is pending a problem keeps the problem look: of the connection, of a replay and of an invalid
+    /// command line (S13).
+    /// </summary>
+    /// <param name="scenario">The scenario of the snapshot</param>
+    [TestMethod]
+    [TestCategory("AC14")]
+    [DataRow("protocol mismatch", DisplayName = "Protocol mismatch")]
+    [DataRow("error", DisplayName = "Error")]
+    [DataRow("replay problem", DisplayName = "Replay problem")]
+    [DataRow("invalid command line", DisplayName = "Invalid command line")]
+    public void TraySnapshotLookWithNoticeKeepsProblem(string scenario)
+    {
+        // Arrange
+        var snapshot = SnapshotOf(scenario);
+
+        // Act
+        var look = snapshot.LookWith(_notice);
+
+        // Assert
+        Assert.AreEqual(TrayIconLook.Problem, snapshot.Look, $"The snapshot should show a problem: {scenario}");
+        Assert.AreEqual(TrayIconLook.Problem, look, $"A problem should win over a pending notice: {scenario}");
+    }
+
+    /// <summary>
+    /// Without a pending notice each of the three looks of a state stays (S13).
+    /// </summary>
+    /// <param name="scenario">The scenario of the snapshot</param>
+    /// <param name="expected">The look of the state</param>
+    [TestMethod]
+    [TestCategory("AC14")]
+    [DataRow("waiting", TrayIconLook.Waiting, DisplayName = "Waiting")]
+    [DataRow("receiving", TrayIconLook.Receiving, DisplayName = "Receiving")]
+    [DataRow("error", TrayIconLook.Problem, DisplayName = "Problem")]
+    public void TraySnapshotLookWithoutNoticeKeepsLook(string scenario, TrayIconLook expected)
+    {
+        // Arrange
+        var snapshot = SnapshotOf(scenario);
+
+        // Act
+        var look = snapshot.LookWith(null);
+
+        // Assert
+        Assert.AreEqual(expected, look, $"Without a notice the look of the state should stay: {scenario}");
+    }
+
+    /// <summary>
+    /// Creates the snapshot of a scenario: a live connection waiting, receiving, with a protocol mismatch or an error, a
+    /// finished replay, a replay with a problem or an invalid command line.
+    /// </summary>
+    /// <param name="scenario">The scenario</param>
+    /// <returns>The snapshot</returns>
+    private static TraySnapshot SnapshotOf(string scenario)
+    {
+        return scenario switch
+               {
+                   "receiving" => Connection(PipeConnectionState.Receiving),
+                   "protocol mismatch" => Connection(PipeConnectionState.ProtocolMismatch),
+                   "error" => Connection(PipeConnectionState.Error),
+                   "replay finished" => TraySnapshot.ForReplay(CompanionTexts.English,
+                                                               new PipeReplayStatus
+                                                               {
+                                                                   State = PipeConnectionState.Receiving,
+                                                                   IsFinished = true
+                                                               },
+                                                               _lastTick),
+                   "replay problem" => TraySnapshot.ForReplay(CompanionTexts.English,
+                                                              new PipeReplayStatus
+                                                              {
+                                                                  State = PipeConnectionState.Receiving,
+                                                                  Problem = new PipeReplayProblem
+                                                                            {
+                                                                                Kind = PipeReplayProblemKind.ReadFailed
+                                                                            }
+                                                              },
+                                                              _lastTick),
+                   "invalid command line" => TraySnapshot.ForInvalidCommandLine(CompanionTexts.English),
+                   _ => Connection(PipeConnectionState.WaitingForGame)
+               };
+    }
+
+    /// <summary>
+    /// Creates the snapshot of a live connection in a state, without a recording.
+    /// </summary>
+    /// <param name="state">The state</param>
+    /// <returns>The snapshot</returns>
+    private static TraySnapshot Connection(PipeConnectionState state)
+    {
+        return TraySnapshot.ForConnection(CompanionTexts.English,
+                                          new PipeConnectionStatus
+                                          {
+                                              State = state
+                                          },
+                                          PipeRecordingState.Off,
+                                          _lastTick);
     }
 
     #endregion // Methods

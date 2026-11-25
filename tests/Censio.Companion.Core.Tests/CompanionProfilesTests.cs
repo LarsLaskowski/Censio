@@ -86,6 +86,15 @@ public sealed class CompanionProfilesTests
     private static readonly TimeSpan _guard = TimeSpan.FromSeconds(10);
 
     /// <summary>
+    /// The value a handler records when it could not read the pending notice from another thread in time.
+    /// </summary>
+    private static readonly ProfileNotice _unread = new()
+                                                    {
+                                                        Kind = ProfileNoticeKind.NewFigure,
+                                                        ProfileName = "MARKER-Unread"
+                                                    };
+
+    /// <summary>
     /// The temporary folder of the test.
     /// </summary>
     private readonly string _root = Path.Combine(Path.GetTempPath(), "censio-profiles-" + Guid.NewGuid().ToString("N"));
@@ -940,6 +949,37 @@ public sealed class CompanionProfilesTests
     }
 
     /// <summary>
+    /// Each change of the pending notice raises <see cref="CompanionProfiles.PendingNoticeChanged" /> once, after the lock
+    /// is left, so a handler on another thread reads the new notice: a session start that sets, replaces or clears it, the
+    /// session end, <c>Select</c> and <c>Create</c> while one is pending (S13).
+    /// </summary>
+    /// <param name="change">The change</param>
+    [TestMethod]
+    [TestCategory("AC14")]
+    [DataRow("start with a notice", DisplayName = "Session start with a notice")]
+    [DataRow("start replacing the notice", DisplayName = "Session start replacing the notice")]
+    [DataRow("start clearing the notice", DisplayName = "Session start without a notice while one is pending")]
+    [DataRow("session end", DisplayName = "Session end")]
+    [DataRow("select", DisplayName = "Select")]
+    [DataRow("create", DisplayName = "Create")]
+    public void CompanionProfilesPendingNoticeChangedRaisedWhenNoticeChanges(string change)
+    {
+        // Arrange
+        var (profiles, apply) = PrepareNoticeChange(change);
+        var before = profiles.PendingNotice;
+        var read = new List<ProfileNotice?>();
+
+        profiles.PendingNoticeChanged += (_, _) => read.Add(ReadOnOtherThread(profiles));
+
+        // Act
+        apply(profiles);
+
+        // Assert
+        Assert.AreNotSame(before, profiles.PendingNotice, $"The change should change the pending notice: {change}");
+        Assert.AreSequenceEqual([profiles.PendingNotice], read.ToArray(), $"The change should raise the event once, its handler reading the new notice: {change}");
+    }
+
+    /// <summary>
     /// Figures are observed only in a run that sends live data: not in a replay, mode Off, an invalid setting or an
     /// invalid command line (S7).
     /// </summary>
@@ -1415,6 +1455,51 @@ public sealed class CompanionProfilesTests
         ObserveSessions(profiles, FigureA);
 
         return (profiles, profiles.ObserveSessionStart(FigureB));
+    }
+
+    /// <summary>
+    /// Prepares the profiles for a change of the pending notice and gives the change: on the profile <c>Other</c> with
+    /// figure A linked, the session start of figure B sets a notice; with that notice pending, the session start of a new
+    /// figure replaces it, the start of figure B again clears it, and so do the session end, <c>Select</c> and
+    /// <c>Create</c>.
+    /// </summary>
+    /// <param name="change">The change</param>
+    /// <returns>The profiles and the change</returns>
+    private (CompanionProfiles Profiles, Action<CompanionProfiles> Apply) PrepareNoticeChange(string change)
+    {
+        if (change == "start with a notice")
+        {
+            var withoutNotice = CompanionProfiles.Load(ProfilesPath, _logger);
+
+            withoutNotice.Create("Other");
+            ObserveSessions(withoutNotice, FigureA);
+
+            return (withoutNotice, candidate => candidate.ObserveSessionStart(FigureB));
+        }
+
+        var (profiles, _) = LoadWithPendingNotice();
+
+        Action<CompanionProfiles> apply = change switch
+                                          {
+                                              "start replacing the notice" => candidate => candidate.ObserveSessionStart("MARKER-Figure-C"),
+                                              "start clearing the notice" => candidate => candidate.ObserveSessionStart(FigureB),
+                                              "session end" => candidate => candidate.ObserveSessionEnd(),
+                                              _ => candidate => Change(candidate, change)
+                                          };
+
+        return (profiles, apply);
+    }
+
+    /// <summary>
+    /// Reads the pending notice on another thread, which blocks while the calling thread holds the lock of the profiles.
+    /// </summary>
+    /// <param name="profiles">The profiles</param>
+    /// <returns>The pending notice, or <see cref="_unread" /> when it could not be read in time</returns>
+    private ProfileNotice? ReadOnOtherThread(CompanionProfiles profiles)
+    {
+        var read = Task.Run(() => profiles.PendingNotice, TestContext.CancellationToken);
+
+        return read.Wait(_guard, TestContext.CancellationToken) ? read.Result : _unread;
     }
 
     /// <summary>
