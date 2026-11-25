@@ -552,14 +552,14 @@ public static partial class CompanionLog
     /// </summary>
     /// <param name="logger">The logger</param>
     /// <param name="exceptionType">The type of the exception</param>
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Restart not started: {ExceptionType}")]
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Restart failed: the Companion could not be started: {ExceptionType}")]
     public static partial void RestartNotStarted(ILogger logger, string exceptionType);
 
     /// <summary>
     /// Logs that a restarted Companion gave up waiting for the previous one.
     /// </summary>
     /// <param name="logger">The logger</param>
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Restart wait timed out")]
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Restart failed: the previous Companion did not end")]
     public static partial void RestartWaitTimedOut(ILogger logger);
 
     #endregion // Methods

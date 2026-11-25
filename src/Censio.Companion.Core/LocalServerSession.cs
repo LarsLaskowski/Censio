@@ -107,6 +107,11 @@ public sealed class LocalServerSession : IAsyncDisposable
     #region Properties
 
     /// <summary>
+    /// Gets the time between two starts that find the port in use.
+    /// </summary>
+    public static TimeSpan PortInUseRetryStep { get; } = TimeSpan.FromMilliseconds(500);
+
+    /// <summary>
     /// Gets the status.
     /// </summary>
     public LocalServerStatus Status
@@ -263,24 +268,8 @@ public sealed class LocalServerSession : IAsyncDisposable
             return;
         }
 
-        var startTask = StartAsync(runToken);
-        LocalServerStart start;
-
-        try
+        if (await StartWithRetryAsync(runToken).ConfigureAwait(false) is not { } start)
         {
-            start = await startTask.WaitAsync(runToken).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) when (runToken.IsCancellationRequested)
-        {
-            await StopLateServerAsync(startTask).ConfigureAwait(false);
-
-            return;
-        }
-        catch (Exception exception)
-        {
-            CompanionLog.LocalServerFailed(_logger, exception);
-            SetStatus(LocalServerState.Failed);
-
             return;
         }
 
@@ -292,6 +281,57 @@ public sealed class LocalServerSession : IAsyncDisposable
         }
 
         await RunServerAsync(start.Server, runToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Starts the server, again every <see cref="PortInUseRetryStep" /> while the port is in use and less than
+    /// <see cref="PortInUseRetry" /> passed since the start began.
+    /// </summary>
+    /// <param name="runToken">The token that ends the run</param>
+    /// <returns>The result of the last start, or <see langword="null" /> when the run was cancelled or the start failed</returns>
+    private async Task<LocalServerStart?> StartWithRetryAsync(CancellationToken runToken)
+    {
+        var began = _timeProvider.GetUtcNow();
+
+        while (true)
+        {
+            var startTask = StartAsync(runToken);
+            LocalServerStart start;
+
+            try
+            {
+                start = await startTask.WaitAsync(runToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (runToken.IsCancellationRequested)
+            {
+                await StopLateServerAsync(startTask).ConfigureAwait(false);
+
+                return null;
+            }
+            catch (Exception exception)
+            {
+                CompanionLog.LocalServerFailed(_logger, exception);
+                SetStatus(LocalServerState.Failed);
+
+                return null;
+            }
+
+            if (start.Kind != LocalServerStartKind.PortInUse || _timeProvider.GetUtcNow() - began >= PortInUseRetry)
+            {
+                return start;
+            }
+
+            SetStatus(LocalServerState.Starting);
+
+            try
+            {
+                await Task.Delay(PortInUseRetryStep, _timeProvider, runToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (runToken.IsCancellationRequested)
+            {
+                return null;
+            }
+        }
     }
 
     /// <summary>

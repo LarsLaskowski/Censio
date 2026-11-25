@@ -74,12 +74,21 @@ public sealed class SingleInstanceGuard : IDisposable
     /// </summary>
     /// <param name="wait">The longest time to wait</param>
     /// <returns><see langword="true" /> when this guard owns the mutex; otherwise <see langword="false" /></returns>
-#pragma warning disable RH2003, S2325 // Skeleton: removed with the implementation
     public bool TryAcquire(TimeSpan wait)
     {
-        throw new NotImplementedException();
+        _mutex = new Mutex(false, _name);
+
+        try
+        {
+            _isOwner = _mutex.WaitOne(wait);
+        }
+        catch (AbandonedMutexException)
+        {
+            _isOwner = true;
+        }
+
+        return _isOwner;
     }
-#pragma warning restore RH2003, S2325 // Skeleton: removed with the implementation
 
     #endregion // Methods
 

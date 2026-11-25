@@ -61,6 +61,58 @@ public sealed class CompanionCommandLine
     /// <returns>The parsed command line</returns>
     public static CompanionCommandLine Parse(IReadOnlyList<string> args)
     {
+        if (args.Count == 1 && string.Equals(args[0], RestartedSwitch, StringComparison.OrdinalIgnoreCase))
+        {
+            return new CompanionCommandLine
+                   {
+                       Mode = CompanionMode.Normal,
+                       IsRestart = true
+                   };
+        }
+
+        return ParseSwitches(args);
+    }
+
+    /// <summary>
+    /// Parses the address of the server.
+    /// </summary>
+    /// <param name="argument">The raw argument</param>
+    /// <param name="address">The address if the argument is valid</param>
+    /// <returns>
+    /// <c>true</c> if the argument is an absolute <c>ws</c> or <c>wss</c> address with a host, without user
+    /// information, fragment, white space or control characters
+    /// </returns>
+    public static bool TryParseServerAddress(string argument, [NotNullWhen(true)] out Uri? address)
+    {
+        address = null;
+
+        if (argument.Length == 0
+            || argument.Contains('#')
+            || argument.Any(character => char.IsWhiteSpace(character) || char.IsControl(character)))
+        {
+            return false;
+        }
+
+        if (Uri.TryCreate(argument, UriKind.Absolute, out var parsed) == false
+            || (parsed.Scheme != Uri.UriSchemeWs && parsed.Scheme != Uri.UriSchemeWss)
+            || parsed.Host.Length == 0
+            || parsed.UserInfo.Length > 0)
+        {
+            return false;
+        }
+
+        address = parsed;
+
+        return true;
+    }
+
+    /// <summary>
+    /// Parses the arguments of a command line that is no restart.
+    /// </summary>
+    /// <param name="args">The arguments</param>
+    /// <returns>The parsed command line</returns>
+    private static CompanionCommandLine ParseSwitches(IReadOnlyList<string> args)
+    {
         var record = false;
         string? replayPath = null;
         string? speedText = null;
@@ -115,39 +167,6 @@ public sealed class CompanionCommandLine
                {
                    Mode = record ? CompanionMode.Record : CompanionMode.Normal
                };
-    }
-
-    /// <summary>
-    /// Parses the address of the server.
-    /// </summary>
-    /// <param name="argument">The raw argument</param>
-    /// <param name="address">The address if the argument is valid</param>
-    /// <returns>
-    /// <c>true</c> if the argument is an absolute <c>ws</c> or <c>wss</c> address with a host, without user
-    /// information, fragment, white space or control characters
-    /// </returns>
-    public static bool TryParseServerAddress(string argument, [NotNullWhen(true)] out Uri? address)
-    {
-        address = null;
-
-        if (argument.Length == 0
-            || argument.Contains('#')
-            || argument.Any(character => char.IsWhiteSpace(character) || char.IsControl(character)))
-        {
-            return false;
-        }
-
-        if (Uri.TryCreate(argument, UriKind.Absolute, out var parsed) == false
-            || (parsed.Scheme != Uri.UriSchemeWs && parsed.Scheme != Uri.UriSchemeWss)
-            || parsed.Host.Length == 0
-            || parsed.UserInfo.Length > 0)
-        {
-            return false;
-        }
-
-        address = parsed;
-
-        return true;
     }
 
     /// <summary>

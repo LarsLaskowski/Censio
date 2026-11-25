@@ -1,3 +1,5 @@
+using System.ComponentModel;
+
 using Microsoft.Extensions.Logging;
 
 namespace Censio.Companion.Core;
@@ -9,7 +11,6 @@ public sealed class CompanionRestart
 {
     #region Fields
 
-#pragma warning disable S4487 // Skeleton: removed with the implementation
     /// <summary>
     /// The delegate that starts a process from a path and an argument
     /// </summary>
@@ -24,8 +25,6 @@ public sealed class CompanionRestart
     /// The logger
     /// </summary>
     private readonly ILogger _logger;
-
-#pragma warning restore S4487 // Skeleton: removed with the implementation
 
     #endregion // Fields
 
@@ -48,17 +47,32 @@ public sealed class CompanionRestart
 
     #region Methods
 
-#pragma warning disable RH2003, S2325 // Skeleton: removed with the implementation
     /// <summary>
-    /// Starts the Companion again.
+    /// Starts the Companion's own executable with the switch of a restart.
     /// </summary>
-    /// <returns><see langword="true" /> when the process was started</returns>
+    /// <returns><see langword="true" /> when the launch did not fail</returns>
     public bool TryStart()
     {
-        throw new NotImplementedException();
-    }
+        if (string.IsNullOrEmpty(_exePath) || Path.IsPathFullyQualified(_exePath) == false)
+        {
+            CompanionLog.RestartNotStarted(_logger, nameof(ArgumentException));
 
-#pragma warning restore RH2003, S2325 // Skeleton: removed with the implementation
+            return false;
+        }
+
+        try
+        {
+            _launch(_exePath, CompanionCommandLine.RestartedSwitch);
+
+            return true;
+        }
+        catch (Exception exception) when (exception is Win32Exception or IOException or InvalidOperationException or UnauthorizedAccessException)
+        {
+            CompanionLog.RestartNotStarted(_logger, exception.GetType().Name);
+
+            return false;
+        }
+    }
 
     #endregion // Methods
 }
