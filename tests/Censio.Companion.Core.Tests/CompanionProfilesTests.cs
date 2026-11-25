@@ -301,6 +301,7 @@ public sealed class CompanionProfilesTests
     [DataRow("""{"id":"{live}",""", """{"id":"live",""", DisplayName = "Profile identity not an identity")]
     [DataRow("""{"id":"{live}",""", """{"id":7,""", DisplayName = "Profile identity a number")]
     [DataRow("""{"id":"{live}","name":"Live"}""", """{"id":"{live}","name":"Live"},{"id":"{liveUpper}","name":"Copy"}""", DisplayName = "Identity twice in other case")]
+    [DataRow("""{"id":"{live}",""", """{"id":"{other}",""", DisplayName = "Live missing")]
     [DataRow(""","name":"Live"}""", ""","name":""}""", DisplayName = "Name empty")]
     [DataRow(""","name":"Live"}""", ""","name":"   "}""", DisplayName = "Name blank")]
     [DataRow(""","name":"Live"}""", ""","name":"{long}"}""", DisplayName = "Name of 65 characters")]
@@ -523,6 +524,58 @@ public sealed class CompanionProfilesTests
 
         // Assert
         Assert.IsNull(name, "An unknown identity should give no name");
+    }
+
+    /// <summary>
+    /// A name <see cref="CompanionProfiles.CheckNewName" /> refuses is not created: <see cref="ArgumentException" /> for the
+    /// name, no new profile, the active profile kept and no <see cref="CompanionProfiles.ActiveChanged" />.
+    /// </summary>
+    /// <param name="name">The refused name</param>
+    [TestMethod]
+    [TestCategory("AC6")]
+    [DataRow("", DisplayName = "Blank")]
+    [DataRow("live", DisplayName = "Exists ignoring case")]
+    [DataRow("Tab\tName", DisplayName = "Control character")]
+    public void CompanionProfilesCreateRefusedNameThrows(string name)
+    {
+        // Arrange
+        var profiles = CompanionProfiles.Load(ProfilesPath, _logger);
+        var changes = 0;
+
+        profiles.ActiveChanged += (_, _) => changes++;
+
+        // Act
+        var exception = Assert.ThrowsExactly<ArgumentException>(() => profiles.Create(name), "A refused name should throw");
+
+        // Assert
+        Assert.AreEqual("name", exception.ParamName, "The exception should name the parameter");
+        Assert.HasCount(1, profiles.Profiles, "No profile should be created");
+        Assert.AreSame(CompanionProfile.Live, profiles.Active, "Live should stay active");
+        Assert.AreEqual(0, changes, "A refused name should raise no ActiveChanged");
+    }
+
+    /// <summary>
+    /// Selecting an identity no profile has throws <see cref="ArgumentException" /> for the identity and keeps the active
+    /// profile, without <see cref="CompanionProfiles.ActiveChanged" />.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC6")]
+    public void CompanionProfilesSelectUnknownThrows()
+    {
+        // Arrange
+        var profiles = CompanionProfiles.Load(ProfilesPath, _logger);
+        var second = profiles.Create(SecondName);
+        var changes = 0;
+
+        profiles.ActiveChanged += (_, _) => changes++;
+
+        // Act
+        var exception = Assert.ThrowsExactly<ArgumentException>(() => profiles.Select(new Guid(OtherId)), "An unknown identity should throw");
+
+        // Assert
+        Assert.AreEqual("id", exception.ParamName, "The exception should name the parameter");
+        Assert.AreSame(second, profiles.Active, "The active profile should be kept");
+        Assert.AreEqual(0, changes, "An unknown identity should raise no ActiveChanged");
     }
 
     /// <summary>
@@ -977,6 +1030,31 @@ public sealed class CompanionProfilesTests
         Assert.IsEmpty(warnings.Where(warning => warning.StartsWith(NotSavedLinePrefix, StringComparison.Ordinal) == false).ToList(), "Every warning should be the failed write");
         Assert.IsEmpty(warnings.Where(warning => warning.Contains(SecondName, StringComparison.Ordinal) || warning.Contains(_root, StringComparison.Ordinal)).ToList(), "The warning should name no profile and no path");
         Assert.AreSame(second, profiles.Active, "The state should be kept in memory");
+    }
+
+    /// <summary>
+    /// A write whose temporary file is written but cannot replace the file logs the failed write and deletes the
+    /// temporary file; the path is left as it was (N5).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC8")]
+    public async Task CompanionProfilesRunAsyncReplaceFailureDeletesTemporaryFile()
+    {
+        // Arrange
+        Directory.CreateDirectory(ProfilesPath);
+
+        var profiles = CompanionProfiles.Load(ProfilesPath, _logger);
+
+        // Act
+        await RunUntilCancelledAsync(profiles, running => running.Create(SecondName));
+
+        // Assert
+        var warnings = _logger.Entries.Where(entry => entry.Level == LogLevel.Warning).Select(entry => entry.Message).ToList();
+
+        Assert.Contains(warning => warning.StartsWith(NotSavedLinePrefix, StringComparison.Ordinal), warnings, "The failed replace should be logged");
+        Assert.IsFalse(File.Exists(ProfilesPath + ".tmp"), "The temporary file should be deleted");
+        Assert.IsTrue(Directory.Exists(ProfilesPath), "The path should be left as it was");
     }
 
     /// <summary>

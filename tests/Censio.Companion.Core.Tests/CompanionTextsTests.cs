@@ -137,6 +137,91 @@ public sealed class CompanionTextsTests
     }
 
     /// <summary>
+    /// Each language gives its own texts (S9).
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC5")]
+    public void CompanionTextsForGivesTextsOfLanguage()
+    {
+        // Act
+        var english = CompanionTexts.For(CompanionLanguage.English);
+        var german = CompanionTexts.For(CompanionLanguage.German);
+
+        // Assert
+        Assert.AreSame(CompanionTexts.English, english, "English should give the English texts");
+        Assert.AreSame(CompanionTexts.German, german, "German should give the German texts");
+    }
+
+    /// <summary>
+    /// A value outside its enumeration throws <see cref="ArgumentOutOfRangeException" /> for the argument that holds it,
+    /// in each method that picks a text by kind.
+    /// </summary>
+    /// <param name="method">The method: For, FormatProblem, FormatNotice or FormatOutcome</param>
+    /// <param name="parameter">The name of the parameter the exception should name</param>
+    [TestMethod]
+    [TestCategory("AC5")]
+    [DataRow("For", "language")]
+    [DataRow("FormatProblem", "kind")]
+    [DataRow("FormatNotice", "notice")]
+    [DataRow("FormatOutcome", "outcome")]
+    public void CompanionTextsUndefinedValueThrows(string method, string parameter)
+    {
+        // Arrange
+        var call = CallWithUndefinedValue(method);
+
+        // Act
+        var exception = Assert.ThrowsExactly<ArgumentOutOfRangeException>(call, $"{method} should refuse an undefined value");
+
+        // Assert
+        Assert.AreEqual(parameter, exception.ParamName, $"{method} should name the parameter {parameter}");
+    }
+
+    /// <summary>
+    /// A saved, restarting or refused outcome has no text of its own: the autostart failure's text when the autostart could
+    /// not be changed, otherwise none.
+    /// </summary>
+    /// <param name="kind">The outcome kind</param>
+    /// <param name="isAutostartFailed">Whether the autostart could not be changed</param>
+    [TestMethod]
+    [TestCategory("AC5")]
+    [DataRow(SettingsSaveKind.Saved, false)]
+    [DataRow(SettingsSaveKind.Saved, true)]
+    [DataRow(SettingsSaveKind.Restarting, false)]
+    [DataRow(SettingsSaveKind.Restarting, true)]
+    [DataRow(SettingsSaveKind.Refused, false)]
+    [DataRow(SettingsSaveKind.Refused, true)]
+    public void CompanionTextsFormatOutcomeWithoutOwnTextGivesAutostartTextOrNone(SettingsSaveKind kind, bool isAutostartFailed)
+    {
+        // Arrange
+        var texts = CompanionTexts.English;
+        var expected = isAutostartFailed ? texts.OutcomeAutostartFailed : string.Empty;
+
+        // Act
+        var text = texts.FormatOutcome(CreateOutcome(kind, isAutostartFailed));
+
+        // Assert
+        Assert.AreEqual(expected, text, $"The outcome {kind} should give the autostart text only when the autostart failed");
+    }
+
+    /// <summary>
+    /// Creates the call of a method of the texts with a value outside its enumeration.
+    /// </summary>
+    /// <param name="method">The method: For, FormatProblem, FormatNotice or FormatOutcome</param>
+    /// <returns>The call</returns>
+    private static Action CallWithUndefinedValue(string method)
+    {
+        var texts = CompanionTexts.English;
+
+        return method switch
+               {
+                   "For" => () => CompanionTexts.For((CompanionLanguage)99),
+                   "FormatProblem" => () => texts.FormatProblem((SettingsProblemKind)99),
+                   "FormatNotice" => () => texts.FormatNotice(CreateNotice((ProfileNoticeKind)99)),
+                   _ => () => texts.FormatOutcome(CreateOutcome((SettingsSaveKind)99, false))
+               };
+    }
+
+    /// <summary>
     /// Creates every text of <see cref="_texts" />.
     /// </summary>
     /// <returns>The texts by name</returns>

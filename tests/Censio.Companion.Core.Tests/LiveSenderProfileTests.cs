@@ -684,6 +684,232 @@ public sealed class LiveSenderProfileTests : IDisposable
     }
 
     /// <summary>
+    /// Trade routes taken carry the active profile and are sent on its connection (S5).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC6")]
+    public async Task LiveSenderProfileTradeRoutesCarryActiveProfile()
+    {
+        // Arrange
+        var connector = new QueuedIngestConnector();
+        var server = AddServer(connector);
+        var profiles = LoadProfiles();
+        var second = profiles.Create(SecondName);
+        var sender = CreateSender(connector, CreateTimeProvider());
+
+        sender.UseProfiles(profiles);
+        StartRun(sender);
+        await AcceptAsync(server);
+
+        // Act
+        sender.Enqueue(TradeRoutesItem(2));
+
+        var sent = await ReceiveAndAcknowledgeAsync(server);
+
+        // Assert
+        Assert.AreEqual(second.Id, Assert.IsInstanceOfType<ContractTradeRoutes>(sent, "The trade routes should be sent").ProfileId, "The trade routes should carry the active profile");
+        Assert.AreEqual(1, connector.AttemptCount, "Trade routes of the connection's profile should not reconnect");
+    }
+
+    /// <summary>
+    /// A waiting entry the contract cannot read names no profile and is sent on the current connection, without a
+    /// reconnect; the connection goes on with the next message (G3).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC6")]
+    public async Task LiveSenderProfileUnreadableEntrySentOnCurrentConnection()
+    {
+        // Arrange
+        var timeProvider = CreateTimeProvider();
+        var connector = new QueuedIngestConnector();
+        var server = AddServer(connector);
+        var buffer = CreateRunningBuffer(timeProvider);
+        var unreadable = new Guid("5f4e3d2c-1b0a-4c99-8d88-000000000d05");
+
+        buffer.Add(unreadable, Encoding.UTF8.GetBytes("""{"type":"no-such-message"}"""));
+
+        var sender = Track(LiveSender.ForServer(new ForwardServerSetting(_address, Token), buffer, CompanionVersion, connector, timeProvider, _logger));
+
+        sender.UseProfiles(LoadProfiles());
+
+        // Act
+        StartRun(sender);
+        await AcceptAsync(server);
+
+        var received = await server.ReceiveAsync(TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+
+        await server.SendAsync(ScriptedIngestServer.CreateAcknowledgement(unreadable, null), TestContext.CancellationToken);
+        sender.Enqueue(TickItem(100, 2));
+
+        var tick = await ReceiveAndAcknowledgeAsync(server);
+
+        // Assert
+        Assert.IsNull(received, "The unreadable entry should reach the server as a message the contract cannot read");
+        Assert.AreEqual(LiveSender.ProfileId, Assert.IsInstanceOfType<ContractTick>(tick, "The next tick should be sent on the same connection").ProfileId, "The next tick should carry the active profile");
+        Assert.AreEqual(1, connector.AttemptCount, "An entry without a profile should not reconnect");
+    }
+
+    /// <summary>
+    /// Changes of the active profile that end on the profile the connection names keep the connection: the messages after
+    /// them are sent on it, without a reconnect (S6).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC6")]
+    public async Task LiveSenderProfileChangeBackToConnectionProfileKeepsConnection()
+    {
+        // Arrange
+        var connector = new QueuedIngestConnector();
+        var server = AddServer(connector);
+        var profiles = LoadProfiles();
+        var sender = CreateSender(connector, CreateTimeProvider());
+
+        profiles.ActiveChanged += (_, _) => SelectLiveAgain(profiles);
+        sender.UseProfiles(profiles);
+        StartRun(sender);
+        await AcceptAsync(server);
+        await WaitForStatusAsync(LiveSendState.Connected, 1);
+
+        // Act
+        profiles.Create(SecondName);
+        sender.Enqueue(TickItem(100, 2));
+
+        var first = await ReceiveAndAcknowledgeAsync(server);
+
+        sender.Enqueue(TickItem(200, 3));
+
+        var second = await ReceiveAndAcknowledgeAsync(server);
+
+        // Assert
+        Assert.AreEqual(LiveSender.ProfileId, profiles.Active.Id, "Live should be active again");
+        Assert.AreEqual(LiveSender.ProfileId, Assert.IsInstanceOfType<ContractTick>(first, "The first tick should be sent").ProfileId, "The first tick should carry Live");
+        Assert.AreEqual(LiveSender.ProfileId, Assert.IsInstanceOfType<ContractTick>(second, "The second tick should be sent").ProfileId, "The second tick should carry Live");
+        Assert.AreEqual(1, connector.AttemptCount, "Changes back to the connection's profile should not reconnect");
+    }
+
+    /// <summary>
+    /// A notice whose subscriber throws, or that has no subscriber, does not stop the messages from being taken (S7).
+    /// </summary>
+    /// <param name="hasThrowingSubscriber">Whether a subscriber that throws is attached; otherwise none is</param>
+    [TestMethod]
+    [TestCategory("AC7")]
+    [DataRow(true, DisplayName = "Subscriber throws")]
+    [DataRow(false, DisplayName = "No subscriber")]
+    public void LiveSenderProfileNoticeWithoutWorkingSubscriberKeepsTaking(bool hasThrowingSubscriber)
+    {
+        // Arrange
+        var timeProvider = CreateTimeProvider();
+        var buffer = CreateRunningBuffer(timeProvider);
+        var sender = Track(LiveSender.ForServer(new ForwardServerSetting(_address, Token), buffer, CompanionVersion, new QueuedIngestConnector(), timeProvider, _logger));
+        var profiles = LoadProfiles();
+        var calls = 0;
+
+        sender.ProfileNoticeRaised -= OnProfileNoticeRaised;
+
+        if (hasThrowingSubscriber)
+        {
+            sender.ProfileNoticeRaised += (_, _) =>
+                                          {
+                                              calls++;
+
+                                              throw new InvalidOperationException("The subscriber failed.");
+                                          };
+        }
+
+        sender.UseProfiles(profiles);
+        sender.Enqueue(Item(PipeTickResult.FromSessionStart(Figure), 1));
+        sender.Enqueue(Item(PipeTickResult.SessionEnd, 2));
+        profiles.Create(SecondName);
+
+        // Act
+        sender.Enqueue(Item(PipeTickResult.FromSessionStart(Figure), 3));
+        sender.Enqueue(TickItem(100, 4));
+
+        // Assert
+        Assert.AreEqual(hasThrowingSubscriber ? 1 : 0, calls, "The notice should reach the subscriber once");
+        Assert.AreEqual(4, buffer.Status.Waiting, "Every message should be taken");
+    }
+
+    /// <summary>
+    /// A run cancelled while the close handshake of a switch waits for the server ends without a new connection and
+    /// without a failure line (S6).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC6")]
+    public async Task LiveSenderProfileCancelDuringSwitchCloseEndsRun()
+    {
+        // Arrange
+        var timeProvider = CreateTimeProvider();
+        var connector = new QueuedIngestConnector();
+        var server = AddServer(connector);
+        var profiles = LoadProfiles();
+        var sender = CreateSender(connector, timeProvider);
+        var closeWait = TimeSpan.FromSeconds(2);
+
+        sender.UseProfiles(profiles);
+        StartRun(sender);
+        await AcceptAsync(server);
+        await WaitForStatusAsync(LiveSendState.Connected, 1);
+
+        var closeWaitsBefore = timeProvider.Delays.Count(delay => delay == closeWait);
+
+        profiles.Create(SecondName);
+
+        var isClosing = await WaitForAsync(() => timeProvider.Delays.Count(delay => delay == closeWait) > closeWaitsBefore);
+
+        // Act
+        await StopRunsAsync();
+
+        // Assert
+        Assert.AreEqual(0, closeWaitsBefore, "No close should wait before the switch");
+        Assert.IsTrue(isClosing, "The switch should wait for the close handshake");
+        Assert.AreEqual(1, connector.AttemptCount, "The cancelled run should make no new connection");
+        Assert.IsEmpty(Lines().Where(line => line.StartsWith(FailedLinePrefix, StringComparison.Ordinal)).ToList(), "The cancelled switch should log no failure");
+    }
+
+    /// <summary>
+    /// Selects <c>Live</c> again whenever another profile is active.
+    /// </summary>
+    /// <param name="profiles">The profiles</param>
+    private static void SelectLiveAgain(CompanionProfiles profiles)
+    {
+        if (profiles.Active.Id != LiveSender.ProfileId)
+        {
+            profiles.Select(LiveSender.ProfileId);
+        }
+    }
+
+    /// <summary>
+    /// Creates the item of trade routes with one route.
+    /// </summary>
+    /// <param name="readSeconds">The read stamp in seconds after the start</param>
+    /// <returns>The item</returns>
+    private static PipeConnectionItem TradeRoutesItem(int readSeconds)
+    {
+        var message = new TradeRoutesMessage
+                      {
+                          Routes = [
+                                       new TradeRoute
+                                       {
+                                           Id = 1,
+                                           Name = "Via Appia",
+                                           Folder = "North",
+                                           MajorProblems = 0,
+                                           MinorProblems = 0,
+                                           Ships = 2,
+                                           LostShips = 0,
+                                           Stations = []
+                                       }
+                                   ]
+                      };
+
+        return Item(PipeTickResult.FromTradeRoutes(message), readSeconds);
+    }
+
+    /// <summary>
     /// Creates a time provider that records its timers.
     /// </summary>
     /// <returns>The time provider</returns>
