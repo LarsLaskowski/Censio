@@ -6,6 +6,7 @@ using AngleSharp.Dom;
 using Bunit;
 
 using Censio.Contracts;
+using Censio.Server.Components;
 using Censio.Server.Components.Layout;
 using Censio.Server.Components.Pages;
 using Censio.Server.Data;
@@ -166,6 +167,48 @@ public sealed partial class GoodTrendTests
         Assert.Contains(range, page.FindAll("p").Select(paragraph => paragraph.TextContent.Trim()).ToList(), $"The page should show the range line '{range}'");
         Assert.AreSequenceEqual(headings.Split('|'), page.FindAll("h2").Select(heading => heading.TextContent.Trim()).ToList(), "The page should show the heading of each chart");
         Assert.AreSequenceEqual(legend.Split('|'), page.FindAll(ChartSelector)[0].ParentElement!.QuerySelectorAll(".mud-chart-legend-item").Select(item => item.TextContent.Trim()).ToList(), "The chart should name its three lines in the language shown");
+    }
+
+    /// <summary>
+    /// A stored icon reads neither chart and keeps both charts' read numbers and chart components.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC3")]
+    public async Task GoodTrendStoredIconReadsNoTrendsAndKeepsCharts()
+    {
+        // Arrange
+        var fake = new FakeHistoryTrends
+                   {
+                       GoodTrend = FakeHistoryTrends.CreateGoodTrend(_pointEnd, 2)
+                   };
+
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken, trends: fake);
+
+        await host.StoreCatalogAsync(PageTestHost.GoodEntry(Good, "Wood", "Holz", IconReference()));
+        await StoreProfileAsync(host);
+
+        var page = RenderGood(host, UiLanguage.English);
+
+        await page.WaitForAssertionAsync(() => Assert.AreEqual("2|2", $"{page.FindAll(ChartSelector).Count}|{fake.GoodQueries.Count}", "Both charts should be drawn from one read each"), PageTestHost.WaitBound);
+
+        var queriesBefore = fake.GoodQueries.Count;
+        var before = ChartsOf(page);
+        var rendersBefore = page.RenderCount;
+
+        // Act
+        await host.StoreIconAsync(IconReference());
+
+        // Assert
+        await page.WaitForStateAsync(() => page.RenderCount > rendersBefore, PageTestHost.WaitBound);
+        await Task.Delay(NegativeWaitMilliseconds, TestContext.CancellationToken);
+
+        var after = ChartsOf(page);
+
+        Assert.HasCount(queriesBefore, fake.GoodQueries, "A stored icon should read neither chart");
+        Assert.AreSequenceEqual(before.Select(chart => chart.ReadNumber).ToList(), after.Select(chart => chart.ReadNumber).ToList(), "Both charts should keep their read numbers");
+        Assert.AreSame(before[0].Chart, after[0].Chart, "The chart of the island should not be created again");
+        Assert.AreSame(before[1].Chart, after[1].Chart, "The chart of the region should not be created again");
     }
 
     /// <summary>
@@ -892,6 +935,28 @@ public sealed partial class GoodTrendTests
         builder.AddComponentParameter(4, nameof(GoodTrend.Area), "0");
         builder.AddComponentParameter(5, nameof(GoodTrend.Good), Good.ToString());
         builder.CloseComponent();
+    }
+
+    /// <summary>
+    /// Gives an icon reference: 64 lowercase hex characters.
+    /// </summary>
+    /// <returns>The reference</returns>
+    private static string IconReference()
+    {
+        return new string('a', 64);
+    }
+
+    /// <summary>
+    /// Gives the read number and the component of each shown chart, the island's first.
+    /// </summary>
+    /// <param name="page">The rendered page</param>
+    /// <returns>The read numbers and chart components</returns>
+    private static List<(int ReadNumber, MudBlazor.MudChart<double> Chart)> ChartsOf(IRenderedComponent<GoodTrend> page)
+    {
+        var numbers = page.FindComponents<TrendChart>().Select(chart => chart.Instance.ReadNumber).ToList();
+        var charts = page.FindComponents<MudBlazor.MudChart<double>>().Select(chart => chart.Instance).ToList();
+
+        return [.. numbers.Select((number, index) => (number, charts[index]))];
     }
 
     /// <summary>

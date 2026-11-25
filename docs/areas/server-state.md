@@ -129,11 +129,12 @@ itself is in [`server-data.md`](server-data.md), what the ingest answers in [`in
 
 - After each stored change the followers of the state are told which profile changed (a stored tick or hello), that the
   trade routes of a profile changed (a stored trade-routes message, kind `TradeRoutes`, with the profile; a message of a
-  profile the server did not know tells the profile as well) or that the catalog or its icons changed (a stored catalog or
-  icon). The trade-routes notice is a kind of its own so that the pages that do not show trade routes ignore it
+  profile the server did not know tells the profile as well), that the catalog changed (a stored catalog, kind `Catalog`)
+  or that an icon changed (a stored icon, kind `Icons`, without a profile). The trade-routes notice is a kind of its own so
+  that the pages that do not show trade routes ignore it, and the icon notice so that the pages read no trends for it
   ([`web-pages.md`](web-pages.md), *Live updates*). A resend that writes nothing tells no one; a hello that only
-  renames tells the profile changed. A change of the Companion's connection or pipe state is told as a third kind of
-  notice, without a profile.
+  renames tells the profile changed. A change of the Companion's connection or pipe state is told as a notice of its
+  own (kind `Companion`), without a profile.
 - Each follower is called on its own thread-pool work item, so a follower that blocks or throws delays neither the
   acknowledgement nor another follower. A follower that throws is logged. There is no order across changes. A follower
   that blocks for good keeps one thread-pool thread per change; the data pages hand a notice to their own work item

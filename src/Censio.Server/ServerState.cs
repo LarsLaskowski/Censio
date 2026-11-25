@@ -425,7 +425,8 @@ public sealed partial class ServerState : IProfileStateSource
                                 Identity = identity,
                                 MissingIcons = [.. missing],
                                 Lookup = PageCatalog.From(document)
-                            });
+                            },
+                            ServerStateChangeKind.Catalog);
 
                 return new CatalogStoreResult
                        {
@@ -435,7 +436,7 @@ public sealed partial class ServerState : IProfileStateSource
             }
             catch (SqliteException exception)
             {
-                SwapCatalog(snapshot, CatalogHold.None);
+                SwapCatalog(snapshot, CatalogHold.None, ServerStateChangeKind.Catalog);
 
                 return new CatalogStoreResult
                        {
@@ -524,7 +525,8 @@ public sealed partial class ServerState : IProfileStateSource
                                   MissingIcons = catalog.MissingIcons!.Remove(icon.Reference),
                                   Lookup = catalog.Lookup
                               }
-                            : catalog);
+                            : catalog,
+                        ServerStateChangeKind.Icons);
 
             return result;
         }
@@ -810,7 +812,8 @@ public sealed partial class ServerState : IProfileStateSource
     /// </summary>
     /// <param name="snapshot">The snapshot the catalog belongs to</param>
     /// <param name="catalog">The new catalog</param>
-    private void SwapCatalog(ServerStateSnapshot snapshot, CatalogHold catalog)
+    /// <param name="kind">The kind of notice to tell</param>
+    private void SwapCatalog(ServerStateSnapshot snapshot, CatalogHold catalog, ServerStateChangeKind kind)
     {
         Swap(new ServerStateSnapshot
              {
@@ -818,7 +821,7 @@ public sealed partial class ServerState : IProfileStateSource
                  Held = snapshot.Held,
                  Catalog = catalog
              });
-        Notify(ServerStateChangeKind.Catalog, null);
+        Notify(kind, null);
     }
 
     /// <summary>

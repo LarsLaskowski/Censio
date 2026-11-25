@@ -7,6 +7,7 @@ using Bunit;
 using Bunit.TestDoubles;
 
 using Censio.Contracts;
+using Censio.Server.Components;
 using Censio.Server.Components.Layout;
 using Censio.Server.Components.Pages;
 using Censio.Server.Data;
@@ -596,6 +597,188 @@ public sealed class IslandDetailTests
         // Assert
         await page.WaitForAssertionAsync(() => Assert.AreEqual($"/icons/{IconReference(1)}", page.Find("tbody td img").GetAttribute("src"), "The stored icon should appear without a reload"), PageTestHost.WaitBound);
         Assert.IsEmpty(host.Context.Services.GetRequiredService<BunitNavigationManager>().History, "The update should not navigate or reload");
+    }
+
+    /// <summary>
+    /// A stored icon shows in its row without a reload, reads neither the overview chart nor the row trends, and keeps the
+    /// overview chart's read number and its chart component.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC2")]
+    public async Task IslandDetailStoredIconReadsNoTrendsAndKeepsChart()
+    {
+        // Arrange
+        var fake = CreateReadyFake();
+
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken, trends: fake);
+
+        await host.StoreCatalogAsync(PageTestHost.GoodEntry(1, "Wood", "Holz", IconReference(1)));
+        await StoreIslandAsync(host, "Isle A", PageTestHost.Entry(1, 1f, 1f, 3f, 1, 100f));
+
+        var page = RenderIsland(host, UiLanguage.English);
+
+        await page.WaitForAssertionAsync(() => Assert.AreEqual("1|1|1", $"{page.FindAll(SparklineSelector).Count}|{page.FindAll(ChartSelector).Count}|{fake.FiguresQueries.Count}", "The sparkline and the overview chart should be drawn from one read each"), PageTestHost.WaitBound);
+
+        var figuresBefore = fake.FiguresQueries.Count;
+        var rowsBefore = fake.RowTrendCallCount;
+        var before = ChartOf(page);
+
+        // Act
+        await host.StoreIconAsync(IconReference(1));
+
+        // Assert
+        await page.WaitForAssertionAsync(() => Assert.AreEqual($"/icons/{IconReference(1)}", page.Find("tbody td img").GetAttribute("src"), "The stored icon should appear without a reload"), PageTestHost.WaitBound);
+        await Task.Delay(NegativeWaitMilliseconds, TestContext.CancellationToken);
+
+        var after = ChartOf(page);
+
+        Assert.HasCount(figuresBefore, fake.FiguresQueries, "A stored icon should not read the overview chart");
+        Assert.AreEqual(rowsBefore, fake.RowTrendCallCount, "A stored icon should not read the row trends");
+        Assert.AreEqual(before.ReadNumber, after.ReadNumber, "The overview chart should keep its read number");
+        Assert.AreSame(before.Chart, after.Chart, "The overview chart component should not be created again");
+    }
+
+    /// <summary>
+    /// A catalog stored while the read of an icon notice runs still reads the overview chart and the row trends once that
+    /// read ends: the pending read keeps the details of the notice that arrived during the read.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC4")]
+    public async Task IslandDetailCatalogDuringIconReadReadsTrends()
+    {
+        // Arrange
+        using var source = new FakeProfileStateSource(true);
+
+        var fake = CreateReadyFake();
+        var state = CreateState(CreateTick(0));
+
+        source.Hold(state);
+        source.Store(_profile, StoredRead(state));
+
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken, source, trends: fake);
+
+        var page = RenderIsland(host, UiLanguage.English);
+
+        await page.WaitForAssertionAsync(() => Assert.AreEqual("1|1", $"{page.FindAll(SparklineSelector).Count}|{fake.FiguresQueries.Count}", "The page should be shown from the held state with one read of the details"), PageTestHost.WaitBound);
+
+        source.EvictOnCheck(_profile);
+
+        await host.StoreIconAsync(IconReference(1));
+        await source.WaitForReadAsync(PageTestHost.WaitBound, TestContext.CancellationToken);
+
+        // Act
+        await host.StoreCatalogAsync(PageTestHost.GoodEntry(1, "Wood", "Holz", null));
+        source.ReleaseReads();
+
+        // Assert
+        await fake.WaitForFiguresCallsAsync(2, PageTestHost.WaitBound, TestContext.CancellationToken);
+        await Task.Delay(NegativeWaitMilliseconds, TestContext.CancellationToken);
+
+        Assert.HasCount(2, fake.FiguresQueries, "The notice during the read should read the overview chart once after the read");
+        Assert.HasCount(2, source.Reads, "The icon notice's read and one pending read should read the state");
+    }
+
+    /// <summary>
+    /// An icon notice whose read shows a later latest tick than the one shown before reads the overview chart and the row
+    /// trends, as any notice does.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC5")]
+    public async Task IslandDetailIconNoticeWithNewTickReadsTrends()
+    {
+        // Arrange
+        using var source = new FakeProfileStateSource(false);
+
+        var fake = CreateReadyFake();
+
+        source.Hold(CreateState(CreateTick(0)));
+        source.Store(_profile, StoredRead(CreateState(CreateTick(120))));
+
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken, source, trends: fake);
+
+        var page = RenderIsland(host, UiLanguage.English);
+
+        await page.WaitForAssertionAsync(() => Assert.AreEqual("1|1", $"{page.FindAll(SparklineSelector).Count}|{fake.RowTrendCallCount}", "The page should be shown from the held state with one read of the trends"), PageTestHost.WaitBound);
+
+        source.EvictOnCheck(_profile);
+
+        // Act
+        await host.StoreIconAsync(IconReference(1));
+
+        // Assert
+        await fake.WaitForFiguresCallsAsync(2, PageTestHost.WaitBound, TestContext.CancellationToken);
+        await fake.WaitForRowTrendCallsAsync(2, PageTestHost.WaitBound, TestContext.CancellationToken);
+
+        Assert.HasCount(2, fake.FiguresQueries, "The new latest tick should read the overview chart once more");
+        Assert.AreEqual(_latestTick.AddMinutes(2).AddTicks(1), fake.GoodsQueries[1].RangeEnd, "The trends should be read up to the new latest tick");
+    }
+
+    /// <summary>
+    /// An icon notice that shows a view after none was shown reads the overview chart and the row trends.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC5")]
+    public async Task IslandDetailIconNoticeAfterNoViewReadsTrends()
+    {
+        // Arrange
+        using var source = new FakeProfileStateSource(false);
+
+        var fake = CreateReadyFake();
+
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken, source, trends: fake);
+
+        var page = RenderIsland(host, UiLanguage.English);
+
+        await page.WaitForAssertionAsync(() => Assert.HasCount(1, source.Reads, "The unknown profile should be read once"), PageTestHost.WaitBound);
+        await Task.Delay(NegativeWaitMilliseconds, TestContext.CancellationToken);
+
+        Assert.AreEqual(0, fake.CallCount, "A page without a view should read no trends");
+
+        source.Store(_profile, StoredRead(CreateState(CreateTick(0))));
+
+        // Act
+        await host.StoreIconAsync(IconReference(1));
+
+        // Assert
+        await fake.WaitForFiguresCallsAsync(1, PageTestHost.WaitBound, TestContext.CancellationToken);
+        await page.WaitForAssertionAsync(() => Assert.HasCount(1, page.FindAll(SparklineSelector), "The page should show the sparkline of its first view"), PageTestHost.WaitBound);
+
+        Assert.HasCount(1, fake.FiguresQueries, "The first view should read the overview chart once");
+        Assert.AreEqual(1, fake.RowTrendCallCount, "The first view should read the trends once");
+    }
+
+    /// <summary>
+    /// A stored catalog still reads the overview chart again and gives it a new read number.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC6")]
+    public async Task IslandDetailStoredCatalogReadsOverviewAgain()
+    {
+        // Arrange
+        var fake = CreateReadyFake();
+
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken, trends: fake);
+
+        await host.StoreCatalogAsync(PageTestHost.GoodEntry(1, "Wood", "Holz", null));
+        await StoreIslandAsync(host, "Isle A", PageTestHost.Entry(1, 1f, 1f, 3f, 1, 100f));
+
+        var page = RenderIsland(host, UiLanguage.English);
+
+        await page.WaitForAssertionAsync(() => Assert.AreEqual("1|1", $"{page.FindAll(ChartSelector).Count}|{fake.FiguresQueries.Count}", "The overview chart should be drawn from one read"), PageTestHost.WaitBound);
+
+        var numberBefore = ChartOf(page).ReadNumber;
+
+        // Act
+        await host.StoreCatalogAsync(PageTestHost.GoodEntry(1, "Timber", "Holz", null));
+
+        // Assert
+        await fake.WaitForFiguresCallsAsync(2, PageTestHost.WaitBound, TestContext.CancellationToken);
+        await page.WaitForAssertionAsync(() => Assert.AreNotEqual(numberBefore, ChartOf(page).ReadNumber, "The overview chart should get a new read number"), PageTestHost.WaitBound);
     }
 
     /// <summary>
@@ -1342,6 +1525,84 @@ public sealed class IslandDetailTests
     private static Task StoreIslandAsync(PageTestHost host, string name, params ContractTickEntry[] entries)
     {
         return host.StoreTicksAsync(PageTestHost.Tick(_profile, 0, PageTestHost.Island(Session, 1, name, entries)));
+    }
+
+    /// <summary>
+    /// Creates trends that read at once: an overview of three points and one good with three deltas.
+    /// </summary>
+    /// <returns>The fake</returns>
+    private static FakeHistoryTrends CreateReadyFake()
+    {
+        return new FakeHistoryTrends
+               {
+                   FiguresTrend = CreateFiguresTrend(3),
+                   GoodsTrend = CreateGoodsTrend(new Dictionary<int, double[]>
+                                                 {
+                                                     [1] = [1, 2, 3]
+                                                 })
+               };
+    }
+
+    /// <summary>
+    /// Creates a tick with the shown island and its good.
+    /// </summary>
+    /// <param name="receiveSeconds">The receive time in seconds</param>
+    /// <returns>The tick</returns>
+    private static ContractTick CreateTick(long receiveSeconds)
+    {
+        return PageTestHost.Tick(_profile, receiveSeconds, PageTestHost.Island(Session, 1, "Isle A", PageTestHost.Entry(1, 1f, 1f, 3f, 1, 100f)));
+    }
+
+    /// <summary>
+    /// Creates the state of the profile of the tests with its latest tick and the shown island.
+    /// </summary>
+    /// <param name="tick">The latest tick</param>
+    /// <returns>The state</returns>
+    private static StoredProfileState CreateState(ContractTick tick)
+    {
+        return new StoredProfileState
+               {
+                   LatestTradeRoutes = null,
+                   Profile = new StoredProfile
+                             {
+                                 Id = _profile,
+                                 Name = "Test profile"
+                             },
+                   LatestTick = tick,
+                   Islands = [
+                                 new StoredIsland
+                                 {
+                                     SessionGuid = Session,
+                                     IslandId = 1,
+                                     AreaIndex = 0,
+                                     Name = "Isle A"
+                                 }
+                             ]
+               };
+    }
+
+    /// <summary>
+    /// Wraps a state as the result of a read.
+    /// </summary>
+    /// <param name="state">The state</param>
+    /// <returns>The result</returns>
+    private static ProfileStateRead StoredRead(StoredProfileState state)
+    {
+        return new ProfileStateRead
+               {
+                   State = state,
+                   Failure = null
+               };
+    }
+
+    /// <summary>
+    /// Gives the read number and the component of the shown overview chart.
+    /// </summary>
+    /// <param name="page">The rendered page</param>
+    /// <returns>The read number and the chart component</returns>
+    private static (int ReadNumber, MudBlazor.MudChart<double> Chart) ChartOf(IRenderedComponent<IslandDetail> page)
+    {
+        return (page.FindComponent<TrendChart>().Instance.ReadNumber, page.FindComponent<MudBlazor.MudChart<double>>().Instance);
     }
 
     /// <summary>

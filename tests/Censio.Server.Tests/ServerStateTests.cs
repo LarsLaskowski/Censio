@@ -634,13 +634,12 @@ public sealed class ServerStateTests
     }
 
     /// <summary>
-    /// A stored icon tells the followers that the catalog changed, and completes the catalog it was missing from.
+    /// A stored icon tells the followers that the icons changed, and completes the catalog it was missing from.
     /// </summary>
     /// <returns>A task that represents the asynchronous test</returns>
     [TestMethod]
-    [TestCategory("AC6")]
-    [TestCategory("AC8")]
-    public async Task ServerStateStoreIconAsyncTellsFollowersCatalogChanged()
+    [TestCategory("AC1")]
+    public async Task ServerStateStoreIconAsyncTellsFollowersIconsChanged()
     {
         // Arrange
         var (_, state) = await OpenRestoredAsync(null);
@@ -659,7 +658,7 @@ public sealed class ServerStateTests
 
         Assert.IsNull(incomplete, "The catalog should not be named while its icon is missing");
         Assert.AreEqual(upload.ComputeIdentity(), state.CompleteCatalogIdentity, "The catalog should be named once its icon is stored");
-        Assert.AreSequenceEqual(new[] { DescribeNotice(ServerStateChangeKind.Catalog, null) }, notices.ToList(), "The followers should be told that the catalog changed");
+        Assert.AreSequenceEqual(new[] { DescribeNotice(ServerStateChangeKind.Icons, null) }, notices.ToList(), "The followers should be told that the icons changed, not the catalog");
     }
 
     /// <summary>
@@ -1243,9 +1242,8 @@ public sealed class ServerStateTests
     /// </summary>
     /// <returns>A task that represents the asynchronous test</returns>
     [TestMethod]
-    [TestCategory("AC6")]
-    [TestCategory("AC8")]
-    public async Task ServerStateStoreIconAsyncWithoutCatalogTellsFollowersCatalogChanged()
+    [TestCategory("AC1")]
+    public async Task ServerStateStoreIconAsyncWithoutCatalogTellsFollowersIconsChanged()
     {
         // Arrange
         var (_, state) = await OpenRestoredAsync(null);
@@ -1259,7 +1257,7 @@ public sealed class ServerStateTests
 
         Assert.AreEqual(ServerStoreOutcome.Stored, result.Outcome, "The icon should be stored");
         Assert.IsNull(state.CompleteCatalogIdentity, "No catalog should be named without a stored catalog");
-        Assert.AreSequenceEqual(new[] { DescribeNotice(ServerStateChangeKind.Catalog, null) }, notices.ToList(), "The followers should be told that the icons changed");
+        Assert.AreSequenceEqual(new[] { DescribeNotice(ServerStateChangeKind.Icons, null) }, notices.ToList(), "The followers should be told that the icons changed, not the catalog");
     }
 
     /// <summary>
