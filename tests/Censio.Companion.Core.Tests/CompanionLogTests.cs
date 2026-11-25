@@ -141,5 +141,30 @@ public sealed class CompanionLogTests
         Assert.AreSequenceEqual(expected, logger.Entries.Select(entry => (entry.Level, entry.Message, entry.Exception)).ToArray(), "Each method should log its level and its text, without an exception");
     }
 
+    /// <summary>
+    /// The lines of a failed restart write their level and their exact text, the exception's type filled in, and no
+    /// exception (E15, N5).
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC4")]
+    [TestCategory("AC9")]
+    public void CompanionLogRestartTemplates()
+    {
+        // Arrange
+        var logger = new RecordingLogger();
+
+        // Act
+        CompanionLog.RestartNotStarted(logger, "Win32Exception");
+        CompanionLog.RestartWaitTimedOut(logger);
+
+        // Assert
+        (LogLevel, string, Exception?)[] expected = [
+                                                        (LogLevel.Warning, "Restart failed: the Companion could not be started: Win32Exception", null),
+                                                        (LogLevel.Warning, "Restart failed: the previous Companion did not end", null),
+                                                    ];
+
+        Assert.AreSequenceEqual(expected, logger.Entries.Select(entry => (entry.Level, entry.Message, entry.Exception)).ToArray(), "Each restart line should log its level and its text, without an exception");
+    }
+
     #endregion // Methods
 }

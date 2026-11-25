@@ -187,6 +187,28 @@ public sealed class CompanionCommandLineTests
     }
 
     /// <summary>
+    /// The switch --restarted alone is a normal run that is marked as a restart (S3).
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC4")]
+    public void CompanionCommandLineRestartedSwitchIsNormalRun()
+    {
+        // Arrange
+        var args = Args(CompanionCommandLine.RestartedSwitch);
+
+        // Act
+        var commandLine = CompanionCommandLine.Parse(args);
+
+        // Assert
+        Assert.AreEqual("--restarted", CompanionCommandLine.RestartedSwitch, "The switch should be spelled --restarted");
+        Assert.AreEqual(CompanionMode.Normal, commandLine.Mode, "The switch --restarted should select the normal mode");
+        Assert.IsTrue(commandLine.IsRestart, "The switch --restarted should mark the run as a restart");
+        Assert.IsNull(commandLine.ReplayPath, "A restart should set no replay path");
+        Assert.IsNull(commandLine.ServerAddress, "A restart should set no server address");
+        Assert.IsNull(commandLine.TokenFilePath, "A restart should set no token file");
+    }
+
+    /// <summary>
     /// An empty replay path is invalid.
     /// </summary>
     [TestMethod]

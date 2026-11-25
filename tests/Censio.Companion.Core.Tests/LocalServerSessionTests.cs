@@ -51,6 +51,11 @@ public sealed class LocalServerSessionTests
     private static readonly TimeSpan _guard = TimeSpan.FromSeconds(10);
 
     /// <summary>
+    /// The time between two starts of a start that found the port in use.
+    /// </summary>
+    private static readonly TimeSpan _retryStep = TimeSpan.FromMilliseconds(500);
+
+    /// <summary>
     /// The ports the start delegate was called with, in order.
     /// </summary>
     private readonly ConcurrentQueue<int> _startPorts = [];
@@ -89,6 +94,11 @@ public sealed class LocalServerSessionTests
     /// The logger of the session.
     /// </summary>
     private readonly RecordingLogger _logger = new();
+
+    /// <summary>
+    /// The times since the start of the clock at which the start delegate of a retrying session was called, in order.
+    /// </summary>
+    private readonly ConcurrentQueue<TimeSpan> _startTimes = [];
 
     #endregion // Fields
 
@@ -327,6 +337,90 @@ public sealed class LocalServerSessionTests
         Assert.AreEqual(Status(LocalServerState.PortInUse), session.Status, "The session should show the port in use");
         Assert.AreEqual(Status(LocalServerState.PortInUse), _statuses.LastOrDefault(), "The session should raise the port in use");
         Assert.ContainsSingle(entry => entry.Level == LogLevel.Warning && entry.Message == "Local server port 5117 in use", _logger.Entries, "The taken port should be logged once as a warning");
+    }
+
+    /// <summary>
+    /// A restarted Companion's start that finds the port in use is started again every 500 ms on the time provider,
+    /// showing starting meanwhile, and runs the server once the port is freed on the third start (S3).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC4")]
+    public async Task LocalServerSessionPortInUseRetriedWithinRetryTime()
+    {
+        // Arrange
+        var timeProvider = new RecordingTimeProvider(_start);
+        var server = CreateServer(false);
+        var session = CreateRetrySession(timeProvider, SingleInstanceGuard.RestartWait, Script(PortInUse(), PortInUse(), Running(server)));
+        var running = WaitForStateAsync(session, LocalServerState.Running);
+        var run = session.RunAsync(TestContext.CancellationToken);
+
+        // Act
+        await timeProvider.RunWaitsAsync(Task.WhenAny(running, run), TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreSequenceEqual([TimeSpan.Zero, _retryStep, _retryStep * 2], _startTimes.ToArray(), "The start should be tried at once and again every 500 ms until the port is free");
+        Assert.AreEqual(Status(LocalServerState.Running), session.Status, "The session should run the server once the port is free");
+        Assert.DoesNotContain(Status(LocalServerState.PortInUse), _statuses.ToArray(), "The session should not show the port in use while it retries");
+        Assert.DoesNotContain(entry => entry.Message == "Local server port 5117 in use", _logger.Entries, "The session should not log the port in use while it retries");
+    }
+
+    /// <summary>
+    /// A restarted Companion's start that still finds the port in use once the retry time passed since the run began shows
+    /// and logs the port in use; the starts lie 500 ms apart and stop at the first one not less than the retry time after
+    /// the run began (S3).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC4")]
+    public async Task LocalServerSessionPortInUseAfterRetryTimeShowsPortInUse()
+    {
+        // Arrange
+        var timeProvider = new RecordingTimeProvider(_start);
+        var session = CreateRetrySession(timeProvider, TimeSpan.FromSeconds(1), Script(PortInUse()));
+        var run = session.RunAsync(TestContext.CancellationToken);
+
+        // Act
+        await timeProvider.RunWaitsAsync(run, TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreSequenceEqual([TimeSpan.Zero, _retryStep, _retryStep * 2], _startTimes.ToArray(), "The start should be tried every 500 ms while less than the retry time passed");
+        Assert.AreEqual(Status(LocalServerState.PortInUse), session.Status, "The session should show the port in use after the retry time");
+        Assert.ContainsSingle(entry => entry.Level == LogLevel.Warning && entry.Message == "Local server port 5117 in use", _logger.Entries, "The taken port should be logged once as a warning after the retry time");
+    }
+
+    /// <summary>
+    /// The port of a previous Companion whose server stop ran into its timeout stays taken; the restarted Companion's
+    /// retry runs its server once that server stopped (S3).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC4")]
+    public async Task LocalServerSessionPortHeldPastPreviousStopTimeoutRunsOnceFreed()
+    {
+        // Arrange
+        var previousServer = await StopPastTimeoutAsync();
+        var isHeldAfterStop = previousServer.Stopped.IsCompleted == false;
+        var timeProvider = new RecordingTimeProvider(_start);
+        var server = CreateServer(false);
+        var session = CreateRetrySession(timeProvider, SingleInstanceGuard.RestartWait, () => previousServer.Stopped.IsCompleted ? Running(server) : PortInUse());
+        var running = WaitForStateAsync(session, LocalServerState.Running);
+        var run = session.RunAsync(TestContext.CancellationToken);
+
+        await Task.WhenAny(timeProvider.WaitForTimersAsync(1, TestContext.CancellationToken), run).WaitAsync(_guard, TestContext.CancellationToken);
+
+        previousServer.ReleaseStop();
+
+        await previousServer.Stopped.WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Act
+        await timeProvider.RunWaitsAsync(Task.WhenAny(running, run), TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        Assert.IsTrue(isHeldAfterStop, "The previous server should still hold the port when its stop ran into the timeout");
+        Assert.AreSequenceEqual([TimeSpan.Zero, _retryStep], _startTimes.ToArray(), "The start should be tried again 500 ms later, once the previous server stopped");
+        Assert.AreEqual(Status(LocalServerState.Running), session.Status, "The session should run the server once the previous one stopped");
+        Assert.DoesNotContain(Status(LocalServerState.PortInUse), _statuses.ToArray(), "The session should not show the port in use while it retries");
     }
 
     /// <summary>
@@ -785,6 +879,30 @@ public sealed class LocalServerSessionTests
     }
 
     /// <summary>
+    /// Creates the result of a start that found the port in use.
+    /// </summary>
+    /// <returns>The result</returns>
+    private static LocalServerStart PortInUse()
+    {
+        return new LocalServerStart
+               {
+                   Kind = LocalServerStartKind.PortInUse
+               };
+    }
+
+    /// <summary>
+    /// Creates a script of start results, one per start, the last one repeated.
+    /// </summary>
+    /// <param name="results">The results, in order</param>
+    /// <returns>The function that gives the result of the next start</returns>
+    private static Func<LocalServerStart> Script(params LocalServerStart[] results)
+    {
+        var queue = new Queue<LocalServerStart>(results);
+
+        return () => queue.Count > 1 ? queue.Dequeue() : queue.Peek();
+    }
+
+    /// <summary>
     /// Returns a task that completes with the first status of a state the session raises.
     /// </summary>
     /// <param name="session">The session</param>
@@ -820,6 +938,63 @@ public sealed class LocalServerSessionTests
         _sessions.Add(session);
 
         return session;
+    }
+
+    /// <summary>
+    /// Creates a session that retries a port in use for the given time, whose start delegate records the time of each
+    /// start and returns the next result, with a handler that records its statuses.
+    /// </summary>
+    /// <param name="timeProvider">The time provider</param>
+    /// <param name="retry">The time a port in use is retried</param>
+    /// <param name="next">Gives the result of the next start</param>
+    /// <returns>The session</returns>
+    private LocalServerSession CreateRetrySession(RecordingTimeProvider timeProvider, TimeSpan retry, Func<LocalServerStart> next)
+    {
+        var session = new LocalServerSession(CreateLocalSetting(),
+                                             (_, _) =>
+                                             {
+                                                 _startTimes.Enqueue(timeProvider.GetUtcNow() - _start);
+
+                                                 return Task.FromResult(next());
+                                             },
+                                             timeProvider,
+                                             _logger)
+                      {
+                          PortInUseRetry = retry
+                      };
+
+        session.StatusChanged += (_, status) => _statuses.Enqueue(status);
+        _sessions.Add(session);
+
+        return session;
+    }
+
+    /// <summary>
+    /// Runs a previous Companion's session whose server stop hangs and stops it until the stop ran into its timeout.
+    /// </summary>
+    /// <returns>The server of the previous session, whose stop is still held</returns>
+    private async Task<FakeLocalServer> StopPastTimeoutAsync()
+    {
+        var timeProvider = new RecordingTimeProvider(_start);
+        var server = CreateServer(true);
+        var session = CreateSession(CreateLocalSetting(), timeProvider);
+        var running = WaitForStateAsync(session, LocalServerState.Running);
+
+        _startResult.SetResult(Running(server));
+        _ = session.RunAsync(TestContext.CancellationToken);
+
+        await running.WaitAsync(_guard, TestContext.CancellationToken);
+
+        var stopping = session.StopAsync(_stopTimeout);
+
+        await server.StopRequested.WaitAsync(_guard, TestContext.CancellationToken);
+        await timeProvider.WaitForDelayAsync(_stopTimeout, TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+
+        timeProvider.Advance(_stopTimeout);
+
+        await stopping.WaitAsync(_guard, TestContext.CancellationToken);
+
+        return server;
     }
 
     /// <summary>
