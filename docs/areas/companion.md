@@ -26,9 +26,9 @@ from the menu, the optional start with Windows, the menu entries for the setting
   and it shows the latest state. The tooltip shows no cause.
 - The status text ends with ` (recording)` while the Companion records and with ` (recording failed)` after the
   recording failed (*Recording*); it shows neither while no recording runs.
-- The icon follows the state with three looks that differ in colour and shape: a grey ring (*waiting*) for `Waiting
+- The icon follows the state with four looks that differ in colour and shape: a grey ring (*waiting*) for `Waiting
   for game`, `Connected` and `Pipe busy`; a green filled circle (*receiving*) for `Receiving`; a red filled triangle
-  (*problem*) for `Protocol mismatch`, `Error` and an invalid command line. In a replay the icon follows the replayed
+  (*problem*) for `Protocol mismatch`, `Error` and an invalid command line; a blue square with a white `i` (*notice*) while a profile notice is pending, which wins over *waiting* and *receiving* but not over *problem* (`TraySnapshot.LookWith`), refreshed on `PendingNoticeChanged`. In a replay the icon follows the replayed
   state, shows *waiting* after `Replay finished` and *problem* after `Replay error`.
 - The context menu holds, top to bottom: `Status: <status text>` (greyed out), `Last tick: <time>, <n> islands` or
   `Last tick: none` (greyed out), `Game: <state>` (greyed out), `Catalog: <state>` (greyed out), in local mode `Server: <state>` (greyed out, [`local-mode.md`](local-mode.md), *Menu*) and in forward mode `Server: <connection state>` (greyed out, [`live-sending.md`](live-sending.md), *Reconnect*), where live data is sent `Buffer: <n> waiting[, <d> dropped][, not saved to disk]` (greyed out, directly below the `Server:` line, [`live-sending.md`](live-sending.md), *Buffer*), a separator, in local mode `Open Censio`, then the pending notice about the profile (enabled, [`companion-profiles.md`](companion-profiles.md), *Notice*; a click opens the settings window), then `Settings…`, `Open diagnostics`, `Start recording` or `Stop recording`, `Open recordings folder`, `Open
