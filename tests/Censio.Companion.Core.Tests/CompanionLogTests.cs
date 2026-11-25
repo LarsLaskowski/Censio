@@ -142,6 +142,36 @@ public sealed class CompanionLogTests
     }
 
     /// <summary>
+    /// The lines of a profile notice write Information and their exact text with the kind filled in, and no exception
+    /// (N5).
+    /// </summary>
+    /// <param name="kind">The kind of the notice</param>
+    /// <param name="raised">The expected line of the raised notice</param>
+    /// <param name="passed">The expected line of the notice passed to Windows</param>
+    [TestMethod]
+    [TestCategory("AC9")]
+    [TestCategory("AC13")]
+    [DataRow(ProfileNoticeKind.LastUsedWithOther, "Profile notice raised: LastUsedWithOther", "Profile notice passed to Windows: LastUsedWithOther", DisplayName = "Last used with another profile")]
+    [DataRow(ProfileNoticeKind.NewFigure, "Profile notice raised: NewFigure", "Profile notice passed to Windows: NewFigure", DisplayName = "New figure")]
+    public void CompanionLogProfileNoticeTemplates(ProfileNoticeKind kind, string raised, string passed)
+    {
+        // Arrange
+        var logger = new RecordingLogger();
+
+        // Act
+        CompanionLog.ProfileNoticeRaised(logger, kind);
+        CompanionLog.ProfileNoticePassedToWindows(logger, kind);
+
+        // Assert
+        (LogLevel, string, Exception?)[] expected = [
+                                                        (LogLevel.Information, raised, null),
+                                                        (LogLevel.Information, passed, null),
+                                                    ];
+
+        Assert.AreSequenceEqual(expected, logger.Entries.Select(entry => (entry.Level, entry.Message, entry.Exception)).ToArray(), $"Each notice line should log Information and its text, without an exception: {kind}");
+    }
+
+    /// <summary>
     /// The lines of a failed restart write their level and their exact text, the exception's type filled in, and no
     /// exception (E15, N5).
     /// </summary>
