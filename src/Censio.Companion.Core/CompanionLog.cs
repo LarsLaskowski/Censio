@@ -510,5 +510,42 @@ public static partial class CompanionLog
     [LoggerMessage(Level = LogLevel.Warning, Message = "Catalog not sent: the connection failed {Attempts} times during its upload")]
     public static partial void CatalogUploadAbandoned(ILogger logger, int attempts);
 
+    /// <summary>
+    /// Logs that the settings were saved.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    [LoggerMessage(Level = LogLevel.Information, Message = "Settings saved")]
+    public static partial void SettingsSaved(ILogger logger);
+
+    /// <summary>
+    /// Logs that the settings could not be saved.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    /// <param name="exceptionType">The type of the exception</param>
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Settings not saved: {ExceptionType}")]
+    public static partial void SettingsNotSaved(ILogger logger, string exceptionType);
+
+    /// <summary>
+    /// Logs that the active profile was switched.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    [LoggerMessage(Level = LogLevel.Information, Message = "Profile switched")]
+    public static partial void ProfileSwitched(ILogger logger);
+
+    /// <summary>
+    /// Logs that the profiles file is invalid.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    /// <param name="problem">The problem</param>
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Profiles file invalid: {Problem}")]
+    public static partial void ProfilesFileInvalid(ILogger logger, string problem);
+
+    /// <summary>
+    /// Logs that the language setting is invalid.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Language setting invalid")]
+    public static partial void LanguageSettingInvalid(ILogger logger);
+
     #endregion // Methods
 }

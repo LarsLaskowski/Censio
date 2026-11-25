@@ -166,6 +166,13 @@ public sealed class LiveSender : IAsyncDisposable
     /// </summary>
     public event EventHandler<LiveSendStatus>? StatusChanged;
 
+    /// <summary>
+    /// Occurs when a notice about the active profile is to be shown.
+    /// </summary>
+#pragma warning disable CS0067, S3264 // Skeleton: removed with the implementation
+    public event EventHandler<ProfileNotice>? ProfileNoticeRaised;
+#pragma warning restore CS0067, S3264 // Skeleton: removed with the implementation
+
     #endregion // Events
 
     #region Properties
@@ -194,6 +201,16 @@ public sealed class LiveSender : IAsyncDisposable
     /// Gets the time the connection waits for the answer to a ping.
     /// </summary>
     public static TimeSpan KeepAliveTimeout { get; } = TimeSpan.FromSeconds(30);
+
+    /// <summary>
+    /// Gets the time after a profile switch in which a refusal because another Companion is connected is not counted.
+    /// </summary>
+    public static TimeSpan SwitchRefusalTime { get; } = TimeSpan.FromSeconds(5);
+
+    /// <summary>
+    /// Gets the delay before the hello after a profile switch.
+    /// </summary>
+    public static TimeSpan SwitchRetryDelay { get; } = TimeSpan.FromMilliseconds(250);
 
     /// <summary>
     /// Gets the current status.
@@ -278,6 +295,17 @@ public sealed class LiveSender : IAsyncDisposable
                               timeProvider,
                               logger);
     }
+
+    /// <summary>
+    /// Makes the sender send under the active profile of the profiles.
+    /// </summary>
+    /// <param name="profiles">The profiles</param>
+#pragma warning disable RH2003, S2325 // Skeleton: removed with the implementation
+    public void UseProfiles(CompanionProfiles profiles)
+    {
+        throw new NotImplementedException();
+    }
+#pragma warning restore RH2003, S2325 // Skeleton: removed with the implementation
 
     /// <summary>
     /// Offers the state of the game catalog; a ready catalog is uploaded on the next connection.
