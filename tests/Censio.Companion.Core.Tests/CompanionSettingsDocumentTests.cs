@@ -145,75 +145,93 @@ public sealed class CompanionSettingsDocumentTests
     /// A known key with a wrong value or written twice, of any mode, empties its field and marks it with its problem; the
     /// other fields show the file's values; a wrong or repeated <c>language</c> only loads as not set (E8).
     /// </summary>
-    /// <param name="keys">The keys added to a local-mode file with 200 megabytes</param>
+    /// <param name="keys">The keys added to a file with 200 megabytes, its mode among them</param>
     /// <param name="field">The field of the problem</param>
     /// <param name="kind">The kind of the problem</param>
     [TestMethod]
     [TestCategory("AC3")]
     [DataRow("""
-             "localPort": "abc"
+             "mode": "local", "localPort": "abc"
              """,
              SettingsField.LocalPort,
              SettingsProblemKind.PortRange,
              DisplayName = "Port as text")]
     [DataRow("""
-             "localPort": 65536
+             "mode": "local", "localPort": 65536
              """,
              SettingsField.LocalPort,
              SettingsProblemKind.PortRange,
              DisplayName = "Port too large")]
     [DataRow("""
-             "localPort": 5.0
+             "mode": "local", "localPort": 5.0
              """,
              SettingsField.LocalPort,
              SettingsProblemKind.PortRange,
              DisplayName = "Port 5.0")]
     [DataRow("""
-             "bufferHours": 169
+             "mode": "local", "bufferHours": 169
              """,
              SettingsField.BufferHours,
              SettingsProblemKind.HoursRange,
              DisplayName = "Hours 169")]
     [DataRow("""
-             "serverAddress": "http://nas/"
+             "mode": "local", "serverAddress": "http://nas/"
              """,
              SettingsField.ServerAddress,
              SettingsProblemKind.AddressInvalid,
              DisplayName = "Address of another mode")]
     [DataRow("""
-             "serverToken": "short"
+             "mode": "local", "serverToken": "short"
              """,
              SettingsField.ServerToken,
              SettingsProblemKind.TokenInvalid,
              DisplayName = "Token of another mode")]
     [DataRow("""
-             "localPort": 5117, "LocalPort": 5118
+             "mode": "local", "localPort": 5117, "LocalPort": 5118
              """,
              SettingsField.LocalPort,
              SettingsProblemKind.WrittenTwice,
              DisplayName = "Port twice")]
     [DataRow("""
-             "gameFolder": "E:/a/", "gameFolder": "E:/b/"
+             "mode": "local", "gameFolder": "E:/a/", "gameFolder": "E:/b/"
              """,
              SettingsField.GameFolder,
              SettingsProblemKind.WrittenTwice,
              DisplayName = "Game folder twice")]
     [DataRow("""
-             "mode": "local"
+             "mode": "local", "mode": "local"
              """,
              SettingsField.Mode,
              SettingsProblemKind.WrittenTwice,
              DisplayName = "Mode twice")]
     [DataRow("""
-             "gameFolder": 5
+             "mode": "local", "gameFolder": 5
              """,
              SettingsField.GameFolder,
              SettingsProblemKind.FolderNotFullPath,
              DisplayName = "Game folder as number")]
+    [DataRow("""
+             "mode": 5
+             """,
+             SettingsField.Mode,
+             SettingsProblemKind.ModeInvalid,
+             DisplayName = "Mode as number")]
+    [DataRow("""
+             "mode": "remote"
+             """,
+             SettingsField.Mode,
+             SettingsProblemKind.ModeInvalid,
+             DisplayName = "Mode remote")]
+    [DataRow("""
+             "mode": null
+             """,
+             SettingsField.Mode,
+             SettingsProblemKind.ModeInvalid,
+             DisplayName = "Mode null")]
     public void CompanionSettingsDocumentLoadMarksInvalidAndDuplicatedKeys(string keys, SettingsField field, SettingsProblemKind kind)
     {
         // Arrange
-        var path = WriteSettings($$"""{"mode": "local", "bufferMegabytes": 200, {{keys}}}""");
+        var path = WriteSettings($$"""{"bufferMegabytes": 200, {{keys}}}""");
         var expected = new SettingsProblem
                        {
                            Field = field,
@@ -228,6 +246,29 @@ public sealed class CompanionSettingsDocumentTests
         Assert.AreEqual(string.Empty, TextOf(document.Values, field), $"The field of {keys} should be empty");
         Assert.AreEqual("200", document.Values.BufferMegabytes, "The other fields should show the file's values");
         Assert.IsNull(document.FileProblem, "A wrong key should be no file problem");
+    }
+
+    /// <summary>
+    /// An empty or blank <c>mode</c> loads as Off without a field problem (E8).
+    /// </summary>
+    /// <param name="text">The settings text</param>
+    [TestMethod]
+    [TestCategory("AC3")]
+    [DataRow("""{"mode": "", "bufferMegabytes": 200}""", DisplayName = "Empty")]
+    [DataRow("""{"mode": "  ", "bufferMegabytes": 200}""", DisplayName = "Spaces")]
+    public void CompanionSettingsDocumentLoadBlankModeIsOff(string text)
+    {
+        // Arrange
+        var path = WriteSettings(text);
+
+        // Act
+        var document = CompanionSettingsDocument.Load(path);
+
+        // Assert
+        Assert.AreEqual(CompanionSettingsMode.Off, document.Values.Mode, $"The settings {text} should load as mode Off");
+        Assert.IsEmpty(document.FieldProblems, $"The settings {text} should give no field problem");
+        Assert.AreEqual("200", document.Values.BufferMegabytes, "The other fields should show the file's values");
+        Assert.IsNull(document.FileProblem, "A blank mode should be no file problem");
     }
 
     /// <summary>
