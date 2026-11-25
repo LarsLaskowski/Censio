@@ -226,7 +226,7 @@ public static class CompanionSettings
     /// </summary>
     /// <param name="path">The path of the settings file</param>
     /// <returns>The bytes read</returns>
-    private static byte[] ReadBytes(string path)
+    internal static byte[] ReadBytes(string path)
     {
         using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, 1, false);
 
@@ -253,7 +253,7 @@ public static class CompanionSettings
     /// </summary>
     /// <param name="bytes">The bytes</param>
     /// <returns>The document</returns>
-    private static JsonDocument ParseDocument(byte[] bytes)
+    internal static JsonDocument ParseDocument(byte[] bytes)
     {
         var start = bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF ? 3 : 0;
         var options = new JsonDocumentOptions
@@ -270,7 +270,7 @@ public static class CompanionSettings
     /// </summary>
     /// <param name="root">The root object</param>
     /// <returns>The language, or <see langword="null" /> when the key is missing, written twice or not <c>en</c> or <c>de</c></returns>
-    private static CompanionLanguage? ReadLanguage(JsonElement root)
+    internal static CompanionLanguage? ReadLanguage(JsonElement root)
     {
         var languages = FindProperties(root, LanguageKey);
 
