@@ -171,6 +171,8 @@ internal sealed class TrayIcon : IDisposable
 
         _menu.Items.Clear();
 
+        var profiles = _sources.Profiles();
+
         foreach (var entry in TrayMenu.Create(_sources.Texts(),
                                               new TrayMenuState
                                               {
@@ -179,7 +181,9 @@ internal sealed class TrayIcon : IDisposable
                                                   Game = _sources.Game(),
                                                   Catalog = _sources.Catalog(),
                                                   Server = _sources.Server(),
-                                                  Clock = TimeProvider.System
+                                                  Clock = TimeProvider.System,
+                                                  ProfileName = profiles?.Active.Name,
+                                                  Notice = profiles?.PendingNotice
                                               }))
         {
             if (entry.Kind == TrayMenuEntryKind.Separator)
@@ -189,13 +193,13 @@ internal sealed class TrayIcon : IDisposable
                 continue;
             }
 
-            var item = new ToolStripMenuItem(entry.Text)
+            var item = new ToolStripMenuItem(entry.Text.Replace("&", "&&", StringComparison.Ordinal))
                        {
                            Enabled = entry.IsEnabled
                        };
             var kind = entry.Kind;
 
-            if (kind is TrayMenuEntryKind.OpenCensio or TrayMenuEntryKind.OpenSettings or TrayMenuEntryKind.OpenDiagnostics or TrayMenuEntryKind.ToggleRecording or TrayMenuEntryKind.OpenRecordingsFolder or TrayMenuEntryKind.OpenLogFolder or TrayMenuEntryKind.Exit)
+            if (kind is TrayMenuEntryKind.OpenCensio or TrayMenuEntryKind.ProfileNotice or TrayMenuEntryKind.OpenSettings or TrayMenuEntryKind.OpenDiagnostics or TrayMenuEntryKind.ToggleRecording or TrayMenuEntryKind.OpenRecordingsFolder or TrayMenuEntryKind.OpenLogFolder or TrayMenuEntryKind.Exit)
             {
                 item.Click += (_, _) => _dispatch(kind);
             }

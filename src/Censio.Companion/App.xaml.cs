@@ -296,7 +296,13 @@ public sealed partial class App : Application, IDisposable
     /// <param name="notice">The notice</param>
     private void ShowNotice(ProfileNotice notice)
     {
-        var show = () => _trayIcon?.ShowNotice(NoticeTitle, _texts.FormatNotice(notice));
+        var show = () =>
+                   {
+                       if (_trayIcon?.ShowNotice(NoticeTitle, _texts.FormatNotice(notice)) == true)
+                       {
+                           CompanionLog.ProfileNoticePassedToWindows(_logger, notice.Kind);
+                       }
+                   };
 
         _ = Dispatcher.BeginInvoke(DispatcherPriority.Background, show);
     }
@@ -716,6 +722,7 @@ public sealed partial class App : Application, IDisposable
                 }
                 break;
 
+            case TrayMenuEntryKind.ProfileNotice:
             case TrayMenuEntryKind.OpenSettings:
                 {
                     _settings?.Open();

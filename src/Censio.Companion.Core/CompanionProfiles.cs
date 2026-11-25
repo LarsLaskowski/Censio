@@ -172,12 +172,27 @@ public sealed class CompanionProfiles
         }
     }
 
-#pragma warning disable S2325, CA1065, RH2003 // Skeleton: removed with the implementation
     /// <summary>
     /// Gets the pending notice about the active profile, or <see langword="null" /> if none.
     /// </summary>
-    public ProfileNotice? PendingNotice => throw new NotImplementedException();
-#pragma warning restore S2325, CA1065, RH2003
+    public ProfileNotice? PendingNotice
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return field;
+            }
+        }
+
+        private set
+        {
+            lock (_lock)
+            {
+                field = value;
+            }
+        }
+    }
 
     #endregion // Properties
 
@@ -304,6 +319,7 @@ public sealed class CompanionProfiles
 
             _profiles.Add(created);
             Activate(created);
+            PendingNotice = null;
             MarkChanged();
         }
 
@@ -331,6 +347,8 @@ public sealed class CompanionProfiles
             {
                 Activate(profile);
             }
+
+            PendingNotice = null;
 
             if (isChanged || _isFileInvalid)
             {
@@ -370,6 +388,8 @@ public sealed class CompanionProfiles
         {
             if (_isFileInvalid)
             {
+                PendingNotice = null;
+
                 return null;
             }
 
@@ -395,6 +415,7 @@ public sealed class CompanionProfiles
             Link(key, _active.Id);
 
             _currentFigure = key;
+            PendingNotice = notice;
 
             MarkChanged();
 
@@ -410,6 +431,7 @@ public sealed class CompanionProfiles
         lock (_lock)
         {
             _currentFigure = null;
+            PendingNotice = null;
         }
     }
 

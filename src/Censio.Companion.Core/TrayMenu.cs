@@ -235,6 +235,7 @@ public static class TrayMenu
         var catalog = state.Catalog;
         var server = state.Server;
         var clock = state.Clock;
+        var profileName = state.ProfileName;
         var entries = new List<TrayMenuEntry>
                       {
                           new(TrayMenuEntryKind.Status, $"Status: {snapshot.StatusText}", false),
@@ -245,11 +246,11 @@ public static class TrayMenu
 
         if (server?.Local is { } local)
         {
-            entries.Add(new TrayMenuEntry(TrayMenuEntryKind.LocalServer, FormatLocalServer(texts, local), false));
+            entries.Add(new TrayMenuEntry(TrayMenuEntryKind.LocalServer, FormatServerProfile(texts, FormatLocalServer(texts, local), profileName), false));
         }
         else if (server?.Live is { } live)
         {
-            entries.Add(new TrayMenuEntry(TrayMenuEntryKind.ServerConnection, FormatLiveSend(texts, live), false));
+            entries.Add(new TrayMenuEntry(TrayMenuEntryKind.ServerConnection, FormatServerProfile(texts, FormatLiveSend(texts, live), profileName), false));
         }
 
         if (server?.Buffer is { } buffer)
@@ -262,6 +263,11 @@ public static class TrayMenu
         if (server?.Local is { } running)
         {
             entries.Add(new TrayMenuEntry(TrayMenuEntryKind.OpenCensio, texts.OpenCensioText, running.State == LocalServerState.Running));
+        }
+
+        if (state.Notice is { } notice)
+        {
+            entries.Add(new TrayMenuEntry(TrayMenuEntryKind.ProfileNotice, texts.FormatNotice(notice), true));
         }
 
         entries.AddRange([
@@ -279,7 +285,6 @@ public static class TrayMenu
         return entries;
     }
 
-#pragma warning disable RH2003 // Skeleton: removed with the implementation
     /// <summary>
     /// Appends the name of the active profile to the text of the server line.
     /// </summary>
@@ -289,9 +294,10 @@ public static class TrayMenu
     /// <returns>The text of the server line, with the profile name if there is one</returns>
     public static string FormatServerProfile(CompanionTexts texts, string server, string? profileName)
     {
-        throw new NotImplementedException();
+        return profileName is null
+                   ? server
+                   : string.Format(CultureInfo.InvariantCulture, texts.ServerProfileFormat, server, profileName);
     }
-#pragma warning restore RH2003
 
     /// <summary>
     /// Formats the text of the local server entry.

@@ -585,6 +585,8 @@ public sealed class LiveSender : IAsyncDisposable
             return;
         }
 
+        CompanionLog.ProfileNoticeRaised(_logger, notice.Kind);
+
         try
         {
             ProfileNoticeRaised?.Invoke(this, notice);
