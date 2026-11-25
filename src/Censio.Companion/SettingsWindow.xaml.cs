@@ -378,7 +378,7 @@ internal sealed partial class SettingsWindow : Window, ISettingsWindow
                          Title = _view?.Texts.GameFolderLabel ?? string.Empty
                      };
 
-        if (System.IO.Path.IsPathFullyQualified(FolderBox.Text) && System.IO.Directory.Exists(FolderBox.Text))
+        if (System.IO.Path.IsPathFullyQualified(FolderBox.Text))
         {
             dialog.InitialDirectory = FolderBox.Text;
         }

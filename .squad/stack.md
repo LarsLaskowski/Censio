@@ -112,6 +112,13 @@ download, for example). The gate itself checks two SonarQube Cloud shell rules s
 local variable first) and `shelldre:S7688` (`[ … ]` instead of `[[ … ]]`). Other `shelldre:*` findings are first
 reported by the *Sonar gate* below.
 
+Sonar-only rules (reported by SonarQube Cloud, not by a local analyzer; the *Sonar gate* below reports them on the
+draft pull request): `roslyn.sonaranalyzer.security.cs:S6549` (filesystem oracle via desktop UI control), which flags a
+file-system probe such as `Directory.Exists` on user-typed text whose result reaches a UI control, as the browse
+button's `InitialDirectory` did in `src/Censio.Companion/SettingsWindow.xaml.cs`. Write the control's value without
+probing the file system first; a check that touches no file system (`Path.IsPathFullyQualified`) stays. The folder
+checks of the Save path run off the caller in `SettingsWindowSession` and are not affected.
+
 *Sonar gate* reads the CI code analysis of the draft pull request (squad step 11, *Draft until green* in
 `.squad/orchestration.md`): `sonar-check.py pr <number>` checks that the analysis belongs to the pushed head and
 fails on a failed quality gate, on every open issue and on every security hotspot to review. The work branch is
