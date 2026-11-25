@@ -6,6 +6,8 @@ using Censio.Pipe;
 using Censio.Pipe.Tests;
 using Censio.Server.Tests;
 
+using Microsoft.Extensions.Logging;
+
 namespace Censio.Companion.Core.Tests;
 
 /// <summary>
@@ -643,6 +645,45 @@ public sealed class LiveSenderProfileTests : IDisposable
     }
 
     /// <summary>
+    /// A raised notice is logged once with its kind, at Information and without a figure or profile name, before the
+    /// subscriber of the notice is called (S12, N5).
+    /// </summary>
+    /// <param name="kind">The kind of the notice</param>
+    /// <param name="expected">The expected log line</param>
+    [TestMethod]
+    [TestCategory("AC13")]
+    [TestCategory("AC9")]
+    [DataRow(ProfileNoticeKind.LastUsedWithOther, "Profile notice raised: LastUsedWithOther", DisplayName = "Last used with another profile")]
+    [DataRow(ProfileNoticeKind.NewFigure, "Profile notice raised: NewFigure", DisplayName = "New figure")]
+    public void LiveSenderProfileNoticeLoggedWithKindBeforeRaised(ProfileNoticeKind kind, string expected)
+    {
+        // Arrange
+        var timeProvider = CreateTimeProvider();
+        var buffer = CreateRunningBuffer(timeProvider);
+        var sender = Track(LiveSender.ForServer(new ForwardServerSetting(_address, Token), buffer, CompanionVersion, new QueuedIngestConnector(), timeProvider, _logger));
+        var profiles = LoadProfiles();
+        string[]? linesAtNotice = null;
+
+        sender.UseProfiles(profiles);
+
+        var figure = PrepareNotice(sender, profiles, kind);
+
+        sender.ProfileNoticeRaised += (_, _) => linesAtNotice = [.. Lines()];
+
+        // Act
+        sender.Enqueue(Item(PipeTickResult.FromSessionStart(figure), 3));
+
+        // Assert
+        var noticeLines = _logger.Entries.Where(entry => entry.Message.StartsWith("Profile notice", StringComparison.Ordinal)).Select(entry => (entry.Level, entry.Message)).ToArray();
+
+        Assert.AreSequenceEqual([(kind, SecondName)], Notices().Select(notice => (notice.Kind, notice.ProfileName)).ToArray(), $"The session start should raise one notice naming the second profile: {kind}");
+        Assert.IsNotNull(linesAtNotice, $"The subscriber should have been called: {kind}");
+        Assert.AreSequenceEqual([expected], linesAtNotice.Where(line => line.StartsWith("Profile notice", StringComparison.Ordinal)).ToArray(), $"The line should be logged before the subscriber is called: {kind}");
+        Assert.AreSequenceEqual([(LogLevel.Information, expected)], noticeLines, $"The notice should be logged once, at Information: {kind}");
+        Assert.IsEmpty(Lines().Where(line => line.Contains("MARKER", StringComparison.Ordinal) || line.Contains("Cæsar", StringComparison.Ordinal)).ToList(), $"No log line should hold the figure or a profile name: {kind}");
+    }
+
+    /// <summary>
     /// Neither the figure, its key nor a profile name is in any log line of the sender or the profiles (N2, N5).
     /// </summary>
     /// <returns>A task that completes when the test is done</returns>
@@ -880,6 +921,31 @@ public sealed class LiveSenderProfileTests : IDisposable
         {
             profiles.Select(LiveSender.ProfileId);
         }
+    }
+
+    /// <summary>
+    /// Takes the session of a figure on the created second profile, whose start and end give no notice, and gives the
+    /// figure whose next session start gives the notice of a kind naming the second profile: the same figure after
+    /// <c>Live</c> was selected, or a new figure on the second profile.
+    /// </summary>
+    /// <param name="sender">The sender, which uses the profiles</param>
+    /// <param name="profiles">The profiles: <c>Live</c> alone</param>
+    /// <param name="kind">The kind of the notice</param>
+    /// <returns>The figure of the session start that gives the notice</returns>
+    private static string PrepareNotice(LiveSender sender, CompanionProfiles profiles, ProfileNoticeKind kind)
+    {
+        profiles.Create(SecondName);
+        sender.Enqueue(Item(PipeTickResult.FromSessionStart(Figure), 1));
+        sender.Enqueue(Item(PipeTickResult.SessionEnd, 2));
+
+        if (kind == ProfileNoticeKind.LastUsedWithOther)
+        {
+            profiles.Select(LiveSender.ProfileId);
+
+            return Figure;
+        }
+
+        return "MARKER-Figure Other";
     }
 
     /// <summary>

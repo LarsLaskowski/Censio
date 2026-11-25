@@ -852,6 +852,94 @@ public sealed class CompanionProfilesTests
     }
 
     /// <summary>
+    /// Each session start sets the pending notice to its own notice: the notice of a new figure or of a figure last used
+    /// with another profile, none for a first figure and none with an unusable profiles file (S12).
+    /// </summary>
+    /// <param name="scenario">The scenario: first figure, new figure, other profile or invalid file</param>
+    /// <param name="expected">The kind of the expected notice, or <see langword="null" /> for none</param>
+    [TestMethod]
+    [TestCategory("AC13")]
+    [DataRow("first figure", null, DisplayName = "First figure")]
+    [DataRow("new figure", ProfileNoticeKind.NewFigure, DisplayName = "New figure")]
+    [DataRow("other profile", ProfileNoticeKind.LastUsedWithOther, DisplayName = "Figure of another profile")]
+    [DataRow("invalid file", null, DisplayName = "Invalid profiles file")]
+    public void CompanionProfilesPendingNoticeSetBySessionStart(string scenario, ProfileNoticeKind? expected)
+    {
+        // Arrange
+        var (profiles, figure) = PrepareSessionStart(scenario);
+
+        // Act
+        var notice = profiles.ObserveSessionStart(figure);
+
+        // Assert
+        Assert.AreEqual(expected, notice?.Kind, $"The session start should give its notice: {scenario}");
+        Assert.AreSame(notice, profiles.PendingNotice, $"The pending notice should be the notice of the session start: {scenario}");
+    }
+
+    /// <summary>
+    /// The next session start replaces the pending notice: with its own notice when it gives one, with none when it gives
+    /// none (S12).
+    /// </summary>
+    /// <param name="figure">The figure of the next session start</param>
+    /// <param name="hasNotice">Whether the next session start gives a notice</param>
+    [TestMethod]
+    [TestCategory("AC13")]
+    [DataRow("MARKER-Figure-C", true, DisplayName = "Next start with a notice")]
+    [DataRow(FigureB, false, DisplayName = "Next start without a notice")]
+    public void CompanionProfilesPendingNoticeReplacedByNextSessionStart(string figure, bool hasNotice)
+    {
+        // Arrange
+        var (profiles, first) = LoadWithPendingNotice();
+
+        // Act
+        var next = profiles.ObserveSessionStart(figure);
+
+        // Assert
+        Assert.AreEqual(hasNotice, next is not null, $"The next session start should give a notice only for a new figure: {figure}");
+        Assert.AreSame(next, profiles.PendingNotice, $"The pending notice should be the notice of the next session start: {figure}");
+        Assert.AreNotSame(first, profiles.PendingNotice, $"The first notice should no longer be pending: {figure}");
+    }
+
+    /// <summary>
+    /// The end of the session clears the pending notice (S12).
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC13")]
+    public void CompanionProfilesPendingNoticeClearedBySessionEnd()
+    {
+        // Arrange
+        var (profiles, first) = LoadWithPendingNotice();
+
+        // Act
+        profiles.ObserveSessionEnd();
+
+        // Assert
+        Assert.IsNotNull(first, "The session start should have given a notice");
+        Assert.IsNull(profiles.PendingNotice, "The session end should clear the pending notice");
+    }
+
+    /// <summary>
+    /// Selecting another profile or creating one clears the pending notice, also while the session still runs (S12).
+    /// </summary>
+    /// <param name="change">The change: select or create</param>
+    [TestMethod]
+    [TestCategory("AC13")]
+    [DataRow("select", DisplayName = "Select")]
+    [DataRow("create", DisplayName = "Create")]
+    public void CompanionProfilesPendingNoticeClearedBySelectAndCreate(string change)
+    {
+        // Arrange
+        var (profiles, first) = LoadWithPendingNotice();
+
+        // Act
+        Change(profiles, change);
+
+        // Assert
+        Assert.IsNotNull(first, "The session start should have given a notice");
+        Assert.IsNull(profiles.PendingNotice, $"The change should clear the pending notice: {change}");
+    }
+
+    /// <summary>
     /// Figures are observed only in a run that sends live data: not in a replay, mode Off, an invalid setting or an
     /// invalid command line (S7).
     /// </summary>
@@ -1281,6 +1369,52 @@ public sealed class CompanionProfilesTests
         var profiles = CompanionProfiles.Load(path, _logger);
 
         return (profiles, [ObserveOnLive(profiles, figure)]);
+    }
+
+    /// <summary>
+    /// Loads the profiles of a scenario and gives the figure of its next session start.
+    /// </summary>
+    /// <param name="scenario">The scenario: first figure, new figure, other profile or invalid file</param>
+    /// <returns>The profiles and the figure</returns>
+    private (CompanionProfiles Profiles, string Figure) PrepareSessionStart(string scenario)
+    {
+        if (scenario == "invalid file")
+        {
+            return (CompanionProfiles.Load(WriteFile("not a profiles file"), _logger), FigureA);
+        }
+
+        var profiles = CompanionProfiles.Load(ProfilesPath, _logger);
+
+        if (scenario == "first figure")
+        {
+            return (profiles, FigureA);
+        }
+
+        ObserveSessions(profiles, FigureA);
+
+        if (scenario == "other profile")
+        {
+            profiles.Create(SecondName);
+
+            return (profiles, FigureA);
+        }
+
+        return (profiles, FigureB);
+    }
+
+    /// <summary>
+    /// Loads the profiles, creates and selects the profile <c>Other</c>, observes a session of figure A on it and the start
+    /// of a session of figure B, which gives the notice of a new figure.
+    /// </summary>
+    /// <returns>The profiles and the notice of the session start of figure B</returns>
+    private (CompanionProfiles Profiles, ProfileNotice? Notice) LoadWithPendingNotice()
+    {
+        var profiles = CompanionProfiles.Load(ProfilesPath, _logger);
+
+        profiles.Create("Other");
+        ObserveSessions(profiles, FigureA);
+
+        return (profiles, profiles.ObserveSessionStart(FigureB));
     }
 
     /// <summary>

@@ -1774,6 +1774,198 @@ public sealed class TrayMenuTests
     }
 
     /// <summary>
+    /// In forward mode with an active profile the server line of every state and problem ends with the profile in the
+    /// language of the menu: <c> (profile B)</c>, German <c> (Profil B)</c> (S11).
+    /// </summary>
+    /// <param name="language">The language of the menu</param>
+    /// <param name="state">The state of live sending</param>
+    /// <param name="problem">The problem, or <see langword="null" /> when there is none</param>
+    /// <param name="expected">The expected text of the server line</param>
+    [TestMethod]
+    [TestCategory("AC12")]
+    [DataRow(CompanionLanguage.English, LiveSendState.Connecting, null, "Server: connecting (profile B)")]
+    [DataRow(CompanionLanguage.English, LiveSendState.Connecting, ReplaySendProblemKind.ConnectionLost, "Server: connecting (profile B)")]
+    [DataRow(CompanionLanguage.English, LiveSendState.Connected, null, "Server: connected (profile B)")]
+    [DataRow(CompanionLanguage.English, (LiveSendState)99, null, "Server: not connected (profile B)")]
+    [DataRow(CompanionLanguage.English, LiveSendState.Retrying, ReplaySendProblemKind.ServerUnreachable, "Server: unreachable, retrying (profile B)")]
+    [DataRow(CompanionLanguage.English, LiveSendState.Retrying, ReplaySendProblemKind.NoAnswer, "Server: not answering, retrying (profile B)")]
+    [DataRow(CompanionLanguage.English, LiveSendState.Retrying, ReplaySendProblemKind.ConnectionLost, "Server: connection lost, retrying (profile B)")]
+    [DataRow(CompanionLanguage.English, LiveSendState.Retrying, ReplaySendProblemKind.InvalidReply, "Server: invalid reply, retrying (profile B)")]
+    [DataRow(CompanionLanguage.English, LiveSendState.Retrying, ReplaySendProblemKind.CompanionConnected, "Server: another Companion is connected, retrying (profile B)")]
+    [DataRow(CompanionLanguage.English, LiveSendState.Stopped, ReplaySendProblemKind.TokenRefused, "Server: token refused (profile B)")]
+    [DataRow(CompanionLanguage.English, LiveSendState.Stopped, ReplaySendProblemKind.VersionNotSupported, "Server: does not support contract version 2 (profile B)")]
+    [DataRow(CompanionLanguage.English, LiveSendState.Stopped, ReplaySendProblemKind.LocalServerNotRunning, "Server: not connected (profile B)")]
+    [DataRow(CompanionLanguage.English, LiveSendState.Stopped, null, "Server: not connected (profile B)")]
+    [DataRow(CompanionLanguage.English, LiveSendState.Retrying, null, "Server: not connected (profile B)")]
+    [DataRow(CompanionLanguage.English, LiveSendState.Retrying, ReplaySendProblemKind.TokenFileHoldsNoValidToken, "Server: not connected (profile B)")]
+    [DataRow(CompanionLanguage.German, LiveSendState.Connecting, null, "Server: verbinde (Profil B)")]
+    [DataRow(CompanionLanguage.German, LiveSendState.Connecting, ReplaySendProblemKind.ConnectionLost, "Server: verbinde (Profil B)")]
+    [DataRow(CompanionLanguage.German, LiveSendState.Connected, null, "Server: verbunden (Profil B)")]
+    [DataRow(CompanionLanguage.German, (LiveSendState)99, null, "Server: nicht verbunden (Profil B)")]
+    [DataRow(CompanionLanguage.German, LiveSendState.Retrying, ReplaySendProblemKind.ServerUnreachable, "Server: nicht erreichbar, neuer Versuch (Profil B)")]
+    [DataRow(CompanionLanguage.German, LiveSendState.Retrying, ReplaySendProblemKind.NoAnswer, "Server: antwortet nicht, neuer Versuch (Profil B)")]
+    [DataRow(CompanionLanguage.German, LiveSendState.Retrying, ReplaySendProblemKind.ConnectionLost, "Server: Verbindung verloren, neuer Versuch (Profil B)")]
+    [DataRow(CompanionLanguage.German, LiveSendState.Retrying, ReplaySendProblemKind.InvalidReply, "Server: ungültige Antwort, neuer Versuch (Profil B)")]
+    [DataRow(CompanionLanguage.German, LiveSendState.Retrying, ReplaySendProblemKind.CompanionConnected, "Server: anderer Companion verbunden, neuer Versuch (Profil B)")]
+    [DataRow(CompanionLanguage.German, LiveSendState.Stopped, ReplaySendProblemKind.TokenRefused, "Server: Token abgelehnt (Profil B)")]
+    [DataRow(CompanionLanguage.German, LiveSendState.Stopped, ReplaySendProblemKind.VersionNotSupported, "Server: unterstützt Vertragsversion 2 nicht (Profil B)")]
+    [DataRow(CompanionLanguage.German, LiveSendState.Stopped, ReplaySendProblemKind.LocalServerNotRunning, "Server: nicht verbunden (Profil B)")]
+    [DataRow(CompanionLanguage.German, LiveSendState.Stopped, null, "Server: nicht verbunden (Profil B)")]
+    [DataRow(CompanionLanguage.German, LiveSendState.Retrying, null, "Server: nicht verbunden (Profil B)")]
+    [DataRow(CompanionLanguage.German, LiveSendState.Retrying, ReplaySendProblemKind.TokenFileHoldsNoValidToken, "Server: nicht verbunden (Profil B)")]
+    public void TrayMenuCreateServerLineEndsWithProfile(CompanionLanguage language, LiveSendState state, ReplaySendProblemKind? problem, string expected)
+    {
+        // Arrange
+        var texts = CompanionTexts.For(language);
+        var server = new TrayServerStatus
+                     {
+                         Live = new LiveSendStatus
+                                {
+                                    State = state,
+                                    Problem = problem
+                                }
+                     };
+
+        // Act
+        var entries = TrayMenu.Create(texts, CreateProfileState(server, "B", null));
+
+        // Assert
+        var serverLine = entries.Single(entry => entry.Kind == TrayMenuEntryKind.ServerConnection);
+
+        Assert.AreEqual(expected, serverLine.Text, $"The server line of {state} with {problem} should end with the profile: {language}");
+        Assert.ContainsSingle(entry => entry.Text.StartsWith("Server:", StringComparison.Ordinal), entries, $"The menu should hold exactly one server text: {language}");
+    }
+
+    /// <summary>
+    /// In local mode with an active profile the local server line of every state ends with the profile in the language of
+    /// the menu: <c> (profile B)</c>, German <c> (Profil B)</c> (S11).
+    /// </summary>
+    /// <param name="language">The language of the menu</param>
+    /// <param name="state">The state of the local server</param>
+    /// <param name="expected">The expected text of the server line</param>
+    [TestMethod]
+    [TestCategory("AC12")]
+    [DataRow(CompanionLanguage.English, LocalServerState.Starting, "Server: starting (profile B)")]
+    [DataRow(CompanionLanguage.English, LocalServerState.Running, "Server: running at http://localhost:5117/ (profile B)")]
+    [DataRow(CompanionLanguage.English, LocalServerState.PortInUse, "Server: port 5117 in use (profile B)")]
+    [DataRow(CompanionLanguage.English, LocalServerState.Failed, "Server: failed (profile B)")]
+    [DataRow(CompanionLanguage.English, LocalServerState.SettingsInvalid, "Server: settings invalid (profile B)")]
+    [DataRow(CompanionLanguage.German, LocalServerState.Starting, "Server: startet (Profil B)")]
+    [DataRow(CompanionLanguage.German, LocalServerState.Running, "Server: läuft unter http://localhost:5117/ (Profil B)")]
+    [DataRow(CompanionLanguage.German, LocalServerState.PortInUse, "Server: Port 5117 belegt (Profil B)")]
+    [DataRow(CompanionLanguage.German, LocalServerState.Failed, "Server: fehlgeschlagen (Profil B)")]
+    [DataRow(CompanionLanguage.German, LocalServerState.SettingsInvalid, "Server: Einstellungen ungültig (Profil B)")]
+    public void TrayMenuCreateLocalServerLineEndsWithProfile(CompanionLanguage language, LocalServerState state, string expected)
+    {
+        // Arrange
+        var texts = CompanionTexts.For(language);
+        var server = CreateServerStatus("local") with
+                                                 {
+                                                     Local = CreateLocalServerStatus(state, 5117)
+                                                 };
+
+        // Act
+        var entries = TrayMenu.Create(texts, CreateProfileState(server, "B", null));
+
+        // Assert
+        var serverLine = entries.Single(entry => entry.Kind == TrayMenuEntryKind.LocalServer);
+
+        Assert.AreEqual(expected, serverLine.Text, $"The local server line of {state} should end with the profile: {language}");
+        Assert.ContainsSingle(entry => entry.Text.StartsWith("Server:", StringComparison.Ordinal), entries, $"The menu should hold exactly one server text: {language}");
+    }
+
+    /// <summary>
+    /// A profile name of the longest allowed length, 64 code units ending in a surrogate pair, is shown whole after the
+    /// longest server text of each language: 123 characters in English, 124 in German (S11, record 0111).
+    /// </summary>
+    /// <param name="language">The language of the menu</param>
+    /// <param name="server">The longest server text of the language</param>
+    /// <param name="prefix">The text before the name</param>
+    /// <param name="length">The expected length of the line</param>
+    [TestMethod]
+    [TestCategory("AC12")]
+    [DataRow(CompanionLanguage.English, "Server: another Companion is connected, retrying", " (profile ", 123)]
+    [DataRow(CompanionLanguage.German, "Server: anderer Companion verbunden, neuer Versuch", " (Profil ", 124)]
+    public void TrayMenuFormatServerProfileKeepsLongestNameWhole(CompanionLanguage language, string server, string prefix, int length)
+    {
+        // Arrange
+        var name = new string('N', CompanionProfiles.MaxNameLength - 2) + char.ConvertFromUtf32(0x1F600);
+
+        // Act
+        var text = TrayMenu.FormatServerProfile(CompanionTexts.For(language), server, name);
+
+        // Assert
+        Assert.AreEqual(CompanionProfiles.MaxNameLength, name.Length, "The name should be of the longest allowed length");
+        Assert.AreEqual(server + prefix + name + ")", text, $"The whole name should follow the server text: {language}");
+        Assert.AreEqual(length, text.Length, $"The line should be as long as the server text, the ending and the whole name: {language}");
+    }
+
+    /// <summary>
+    /// A profile name holding format braces or an ampersand is shown as typed, not read as a format item or cut (S11).
+    /// </summary>
+    /// <param name="language">The language of the menu</param>
+    /// <param name="name">The name of the profile</param>
+    /// <param name="expected">The expected text of the line</param>
+    [TestMethod]
+    [TestCategory("AC12")]
+    [DataRow(CompanionLanguage.English, "{0}", "Server: connected (profile {0})")]
+    [DataRow(CompanionLanguage.English, "{1}", "Server: connected (profile {1})")]
+    [DataRow(CompanionLanguage.English, "R&D", "Server: connected (profile R&D)")]
+    [DataRow(CompanionLanguage.English, "{0} & {", "Server: connected (profile {0} & {)")]
+    [DataRow(CompanionLanguage.German, "{0}", "Server: connected (Profil {0})")]
+    [DataRow(CompanionLanguage.German, "R&D", "Server: connected (Profil R&D)")]
+    public void TrayMenuFormatServerProfileKeepsBracesAndAmpersand(CompanionLanguage language, string name, string expected)
+    {
+        // Act
+        var text = TrayMenu.FormatServerProfile(CompanionTexts.For(language), "Server: connected", name);
+
+        // Assert
+        Assert.AreEqual(expected, text, $"The name should be shown as typed: {name}, {language}");
+    }
+
+    /// <summary>
+    /// A pending notice shows as an enabled entry of its kind with the text of the notice, directly above Settings…: after
+    /// the first separator in forward mode, after Open Censio in local mode, in the language of the menu (S12).
+    /// </summary>
+    /// <param name="language">The language of the menu</param>
+    /// <param name="kind">The kind of the notice</param>
+    /// <param name="mode">The server mode: local or forward</param>
+    /// <param name="above">The kind of the entry directly above the notice entry</param>
+    [TestMethod]
+    [TestCategory("AC13")]
+    [DataRow(CompanionLanguage.English, ProfileNoticeKind.LastUsedWithOther, "forward", TrayMenuEntryKind.Separator)]
+    [DataRow(CompanionLanguage.English, ProfileNoticeKind.NewFigure, "forward", TrayMenuEntryKind.Separator)]
+    [DataRow(CompanionLanguage.English, ProfileNoticeKind.LastUsedWithOther, "local", TrayMenuEntryKind.OpenCensio)]
+    [DataRow(CompanionLanguage.English, ProfileNoticeKind.NewFigure, "local", TrayMenuEntryKind.OpenCensio)]
+    [DataRow(CompanionLanguage.German, ProfileNoticeKind.LastUsedWithOther, "forward", TrayMenuEntryKind.Separator)]
+    [DataRow(CompanionLanguage.German, ProfileNoticeKind.NewFigure, "forward", TrayMenuEntryKind.Separator)]
+    [DataRow(CompanionLanguage.German, ProfileNoticeKind.LastUsedWithOther, "local", TrayMenuEntryKind.OpenCensio)]
+    [DataRow(CompanionLanguage.German, ProfileNoticeKind.NewFigure, "local", TrayMenuEntryKind.OpenCensio)]
+    public void TrayMenuCreateNoticeEntryAboveSettings(CompanionLanguage language, ProfileNoticeKind kind, string mode, TrayMenuEntryKind above)
+    {
+        // Arrange
+        var texts = CompanionTexts.For(language);
+        var notice = new ProfileNotice
+                     {
+                         Kind = kind,
+                         ProfileName = "B"
+                     };
+
+        // Act
+        var entries = TrayMenu.Create(texts, CreateProfileState(CreateServerStatus(mode), "B", notice));
+
+        // Assert
+        var kinds = entries.Select(entry => entry.Kind).ToList();
+        var index = kinds.IndexOf(TrayMenuEntryKind.ProfileNotice);
+
+        Assert.ContainsSingle(entryKind => entryKind == TrayMenuEntryKind.ProfileNotice, kinds, $"The menu should hold exactly one notice entry: {language}, {kind}, {mode}");
+        Assert.AreEqual(kinds.IndexOf(TrayMenuEntryKind.OpenSettings) - 1, index, $"The notice entry should be directly above Settings…: {language}, {kind}, {mode}");
+        Assert.AreEqual(above, kinds[index - 1], $"The notice entry should follow the entry of its mode: {language}, {kind}, {mode}");
+        Assert.AreEqual(texts.FormatNotice(notice), entries[index].Text, $"The notice entry should carry the text of the notice: {language}, {kind}, {mode}");
+        Assert.IsTrue(entries[index].IsEnabled, $"The notice entry should be enabled: {language}, {kind}, {mode}");
+    }
+
+    /// <summary>
     /// The buffer line reads the waiting count, with the dropped count once messages were dropped and the note on memory
     /// only after a failed write, in digits without separators (S1, S3, E2).
     /// </summary>
@@ -2166,6 +2358,28 @@ public sealed class TrayMenuTests
     private static TrayServerStatus? CreateServerStatusOrNone(string mode)
     {
         return mode == "none" ? null : CreateServerStatus(mode);
+    }
+
+    /// <summary>
+    /// Creates the state of a live menu with a server status, the name of the active profile and a pending notice.
+    /// </summary>
+    /// <param name="server">The server status</param>
+    /// <param name="profileName">The name of the active profile, or <see langword="null" /> for none</param>
+    /// <param name="notice">The pending notice, or <see langword="null" /> for none</param>
+    /// <returns>The state</returns>
+    private static TrayMenuState CreateProfileState(TrayServerStatus server, string? profileName, ProfileNotice? notice)
+    {
+        return new TrayMenuState
+               {
+                   Version = "1.2.3",
+                   Snapshot = CreateSnapshot("Receiving", canRecord: true, isRecording: false),
+                   Game = GameInstallationStatus.Searching,
+                   Catalog = GameCatalogStatus.Reading,
+                   Server = server,
+                   Clock = CreateClock(1),
+                   ProfileName = profileName,
+                   Notice = notice
+               };
     }
 
     /// <summary>

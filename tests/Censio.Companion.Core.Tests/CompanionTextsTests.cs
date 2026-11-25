@@ -296,7 +296,7 @@ public sealed class CompanionTextsTests
     }
 
     /// <summary>
-    /// Creates the texts of the local server, the server connection and the buffer.
+    /// Creates the texts of the local server, the server connection, its profile ending and the buffer.
     /// </summary>
     /// <returns>The texts</returns>
     private static IEnumerable<(string Name, Func<CompanionTexts, string?> Format)> CreateServerTexts()
@@ -306,6 +306,7 @@ public sealed class CompanionTextsTests
         var live = _liveSends.Select(status => Text($"Server {status.State} {status.Problem}", texts => TrayMenu.FormatLiveSend(texts, status)));
 
         return local.Concat(live)
+                    .Append(Text("Server profile", texts => After(TrayMenu.FormatServerProfile(texts, texts.LiveSendConnected, "B"), texts.LiveSendConnected)))
                     .Append(Text("Buffer", texts => TrayMenu.FormatLiveBuffer(texts, CreateBuffer(0, false))))
                     .Append(Text("Buffer dropped", texts => After(TrayMenu.FormatLiveBuffer(texts, CreateBuffer(2, false)), TrayMenu.FormatLiveBuffer(texts, CreateBuffer(0, false)))))
                     .Append(Text("Buffer memory only", texts => After(TrayMenu.FormatLiveBuffer(texts, CreateBuffer(0, true)), TrayMenu.FormatLiveBuffer(texts, CreateBuffer(0, false)))));
