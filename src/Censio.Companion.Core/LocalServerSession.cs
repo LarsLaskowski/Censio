@@ -125,6 +125,11 @@ public sealed class LocalServerSession : IAsyncDisposable
     /// </summary>
     public Uri Address => new(string.Create(CultureInfo.InvariantCulture, $"http://localhost:{_setting.Port}/"));
 
+    /// <summary>
+    /// Gets the time a start that finds the port in use is retried, zero for none.
+    /// </summary>
+    public TimeSpan PortInUseRetry { get; init; }
+
     #endregion // Properties
 
     #region Methods

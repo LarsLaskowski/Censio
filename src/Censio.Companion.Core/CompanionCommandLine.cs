@@ -9,6 +9,15 @@ namespace Censio.Companion.Core;
 /// </summary>
 public sealed class CompanionCommandLine
 {
+    #region Constants
+
+    /// <summary>
+    /// The switch a restarted Companion is started with.
+    /// </summary>
+    public const string RestartedSwitch = "--restarted";
+
+    #endregion // Constants
+
     #region Properties
 
     /// <summary>
@@ -35,6 +44,11 @@ public sealed class CompanionCommandLine
     /// Gets the path of the file that holds the token, if any.
     /// </summary>
     public string? TokenFilePath { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether the Companion was started by a restart of itself.
+    /// </summary>
+    public bool IsRestart { get; init; }
 
     #endregion // Properties
 
