@@ -49,6 +49,12 @@ Every Companion text is English today.
   choice (the settings key `language`, `en` or `de`) German shows when the Windows display language is German. The diagnostics window, log and web pages keep
   their own language.
 - S10: `Browse…` puts the picked folder's full path in the game folder field.
+- S11: In a run that sends live data (forward or local mode, also with `--record`), every `Server:` line of the menu
+  ends with the active profile: `Server: connected (profile B)`, German `Server: verbunden (Profil B)`, the name whole;
+  the next opening of the menu after a switch shows the new one. Mode `Off`, a replay and invalid settings show none.
+- S12: A notice of S7 or S8 also stays in the tray menu as an entry with its text, directly above `Settings…`, whose
+  click opens the window, since Windows may hold notifications back while a game runs full screen; it goes when the
+  profile is switched, the session ends or the next session starts.
 
 ## Errors and edge cases
 
@@ -106,10 +112,12 @@ A message stands below its field, the typed values stay, and `Save` writes nothi
 - N5: Logged without values, names or paths ([`companion-log.md`](../../docs/areas/companion-log.md)): `Settings saved`
   (Information), `Could not save the settings` with the exception's type (Warning), `Profile switched` (Information),
   E15's lines (`Restart failed: …`, Warning), `Profiles file invalid: <problem>` and `Language setting invalid; the
-  Windows display language is used` (Warning).
+  Windows display language is used` (Warning), `Profile notice raised: <kind>` and `Profile notice passed to Windows:
+  <kind>` (Information, the kind `LastUsedWithOther` or `NewFigure`, no name).
 - N6: `README.md` and `docs/USER_GUIDE.md` (English, then German) describe the window, profiles with the notice, the
   restart and the language so external testers can try them, the hand-edited file as an alternative; the README menu
-  list and the user guide's tooltip table give each text's German form in the German part.
+  list and the user guide's tooltip table give each text's German form in the German part; the user guide says that
+  Windows may hold notifications back while a game runs full screen and the menu keeps the notice (S12).
 
 ## Acceptance criteria
 
@@ -140,6 +148,11 @@ A message stands below its field, the typed values stay, and `Save` writes nothi
   German form of each menu and tooltip text (N6).
 - AC11: The tray menu holds no `Start with Windows` entry in any mode; the window's box shows the autostart state read
   at each opening, a change made outside the Companion included (S4).
+- AC12: In a live run every `Server:` line ends with ` (profile <name>)` / ` (Profil <name>)` of the active profile, the
+  name untruncated and a `&` in it shown as typed; a replay, mode `Off` and invalid settings add nothing (S11).
+- AC13: A raised notice is logged with its kind before it goes to the tray, and once more when it was passed to
+  Windows; it stays a clickable menu entry above `Settings…` until a profile switch, the session's end or the next
+  session start; the user guide names the full-screen case (S12, N5, N6).
 
 ## Out of scope
 
@@ -199,3 +212,5 @@ A message stands below its field, the typed values stay, and `Save` writes nothi
 | Criterion | Change | Reason | Step | Decided by |
 | --------- | ------ | ------ | ---- | ---------- |
 | AC11 | added: no `Start with Windows` entry in the tray menu, the window's box its only switch (S4, E14 reworded) | the Product Manager's manual test found the option twice; the window is enough (record 0114) | 11 | Product Manager |
+| AC12 | added: the active profile on every `Server:` line of a live run (S11) | the Product Manager's request after the manual test; pattern, scope and no truncation decided by the Lead (record 0111) | 11 | Product Manager, Lead |
+| AC13 | added: notice log lines by kind, the notice kept as a menu entry, the full-screen hint (S12, N5, N6) | the manual test saw no notification, and nothing told a notice not raised from one Windows held back (record 0111) | 11 | Lead |
