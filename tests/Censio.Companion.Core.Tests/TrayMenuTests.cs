@@ -1896,7 +1896,7 @@ public sealed class TrayMenuTests
 
         // Assert
         Assert.AreEqual(CompanionProfiles.MaxNameLength, name.Length, "The name should be of the longest allowed length");
-        Assert.AreEqual(server + prefix + name + ")", text, $"The whole name should follow the server text: {language}");
+        Assert.AreEqual($"{server}{prefix}{name})", text, $"The whole name should follow the server text: {language}");
         Assert.AreEqual(length, text.Length, $"The line should be as long as the server text, the ending and the whole name: {language}");
     }
 
