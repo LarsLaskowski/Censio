@@ -76,6 +76,11 @@ public enum SettingsProblemKind
     ProfilesFull,
 
     /// <summary>
+    /// The mode of the settings file is no text, or a text other than local or forward.
+    /// </summary>
+    ModeInvalid,
+
+    /// <summary>
     /// A known key is written twice in the settings file.
     /// </summary>
     WrittenTwice

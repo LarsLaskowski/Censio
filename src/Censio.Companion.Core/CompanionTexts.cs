@@ -112,6 +112,7 @@ public sealed class CompanionTexts
                                                         ProblemNameInvalidCharacters = "The name holds characters that cannot be used.",
                                                         ProblemNameExists = "A profile of this name exists.",
                                                         ProblemProfilesFull = "No more profiles can be created.",
+                                                        ProblemModeInvalid = "Choose a mode.",
                                                         ProblemWrittenTwice = "This setting is written more than once in the file.",
                                                         NoticeLastUsedWithOtherFormat = CompositeFormat.Parse("This figure was last played with profile {0}. Click to open the settings and switch."),
                                                         NoticeNewFigureFormat = CompositeFormat.Parse("This figure is new to profile {0}. Click to open the settings to switch or create a profile."),
@@ -223,6 +224,7 @@ public sealed class CompanionTexts
                                                        ProblemNameInvalidCharacters = "Der Name enthält Zeichen, die nicht verwendet werden können.",
                                                        ProblemNameExists = "Ein Profil mit diesem Namen existiert bereits.",
                                                        ProblemProfilesFull = "Es können keine weiteren Profile angelegt werden.",
+                                                       ProblemModeInvalid = "Wählen Sie einen Modus.",
                                                        ProblemWrittenTwice = "Diese Einstellung ist mehrfach in der Datei angegeben.",
                                                        NoticeLastUsedWithOtherFormat = CompositeFormat.Parse("Diese Figur wurde zuletzt mit dem Profil {0} gespielt. Klicken Sie, um die Einstellungen zu öffnen und zu wechseln."),
                                                        NoticeNewFigureFormat = CompositeFormat.Parse("Diese Figur ist für das Profil {0} neu. Klicken Sie, um die Einstellungen zu öffnen und zu wechseln oder ein Profil anzulegen."),
@@ -723,6 +725,11 @@ public sealed class CompanionTexts
     public required string ProblemWrittenTwice { get; init; }
 
     /// <summary>
+    /// Gets the message of a mode of the settings file that is no valid mode.
+    /// </summary>
+    public required string ProblemModeInvalid { get; init; }
+
+    /// <summary>
     /// Gets the format of the notice of a figure last played with another profile, with the profile name.
     /// </summary>
     public required CompositeFormat NoticeLastUsedWithOtherFormat { get; init; }
@@ -808,6 +815,7 @@ public sealed class CompanionTexts
                    SettingsProblemKind.NameInvalidCharacters => ProblemNameInvalidCharacters,
                    SettingsProblemKind.NameExists => ProblemNameExists,
                    SettingsProblemKind.ProfilesFull => ProblemProfilesFull,
+                   SettingsProblemKind.ModeInvalid => ProblemModeInvalid,
                    SettingsProblemKind.WrittenTwice => ProblemWrittenTwice,
                    _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "The problem kind is not defined")
                };

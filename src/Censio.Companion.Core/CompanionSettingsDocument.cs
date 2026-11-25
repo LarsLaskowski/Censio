@@ -305,8 +305,8 @@ public sealed class CompanionSettingsDocument
     /// Reads the mode of the root object.
     /// </summary>
     /// <param name="root">The root object</param>
-    /// <param name="problems">The problems, which get one for a mode written twice</param>
-    /// <returns>The mode, Off when the key is missing, written twice or not local or forward</returns>
+    /// <param name="problems">The problems, which get one for a mode written twice or invalid</param>
+    /// <returns>The mode, Off when the key is missing, blank, written twice or invalid</returns>
     private static CompanionSettingsMode ReadMode(JsonElement root, List<SettingsProblem> problems)
     {
         var modes = CompanionSettings.FindProperties(root, CompanionSettings.ModeKey);
@@ -318,21 +318,38 @@ public sealed class CompanionSettingsDocument
             return CompanionSettingsMode.Off;
         }
 
-        if (modes.Count == 0 || modes[0].ValueKind != JsonValueKind.String)
+        if (modes.Count == 0)
         {
             return CompanionSettingsMode.Off;
         }
 
+        if (modes[0].ValueKind != JsonValueKind.String)
+        {
+            problems.Add(CreateProblem(SettingsField.Mode, SettingsProblemKind.ModeInvalid));
+
+            return CompanionSettingsMode.Off;
+        }
+
         var mode = modes[0].GetString();
+
+        if (string.IsNullOrWhiteSpace(mode))
+        {
+            return CompanionSettingsMode.Off;
+        }
 
         if (string.Equals(mode, "forward", StringComparison.OrdinalIgnoreCase))
         {
             return CompanionSettingsMode.Forward;
         }
 
-        return string.Equals(mode, "local", StringComparison.OrdinalIgnoreCase)
-                   ? CompanionSettingsMode.Local
-                   : CompanionSettingsMode.Off;
+        if (string.Equals(mode, "local", StringComparison.OrdinalIgnoreCase))
+        {
+            return CompanionSettingsMode.Local;
+        }
+
+        problems.Add(CreateProblem(SettingsField.Mode, SettingsProblemKind.ModeInvalid));
+
+        return CompanionSettingsMode.Off;
     }
 
     /// <summary>
