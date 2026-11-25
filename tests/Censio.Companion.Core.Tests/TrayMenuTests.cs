@@ -738,6 +738,33 @@ public sealed class TrayMenuTests
     }
 
     /// <summary>
+    /// Every German tooltip — each connection state with each recording state, every replay problem at the largest line
+    /// number, every send problem, the finished counts at their largest values, and the invalid command line — with the
+    /// longest last tick, at the earliest time and 256 islands, fits the limit of the tray icon (S9).
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC5")]
+    public void TrayMenuFormatToolTipLongestGermanFitsLimit()
+    {
+        // Arrange
+        var tick = new PipeTickSummary
+                   {
+                       ReceiveTime = DateTimeOffset.MinValue,
+                       IslandCount = 256
+                   };
+        var snapshots = CreateGermanSnapshots(tick);
+        var clock = CreateClock(-1);
+
+        // Act
+        var longest = snapshots.Select(snapshot => TrayMenu.FormatSnapshotToolTip(CompanionTexts.German, snapshot, clock))
+                               .MaxBy(toolTip => toolTip.Length);
+
+        // Assert
+        Assert.IsNotNull(longest, "The German tooltips should not be empty");
+        Assert.IsLessThanOrEqualTo(TrayMenu.MaxToolTipLength, longest.Length, $"The longest German tooltip should fit the limit of the tray icon: {longest}");
+    }
+
+    /// <summary>
     /// The time until the next local midnight is measured in the local time zone; at midnight the next one is a day away.
     /// </summary>
     /// <param name="utcNow">The current time, in UTC</param>
@@ -2271,6 +2298,93 @@ public sealed class TrayMenuTests
                                                      },
                    IsAutostartEnabled = true,
                    Clock = CreateClock(1)
+               };
+    }
+
+    /// <summary>
+    /// Creates every German snapshot a tooltip can show: each connection state with each recording state, every replay
+    /// problem with the largest line number, every send problem, the replay states, connecting, finished with and without
+    /// counts (one tick and the largest counts), and the invalid command line.
+    /// </summary>
+    /// <param name="tick">The last tick of every snapshot that shows one</param>
+    /// <returns>The snapshots</returns>
+    private static List<TraySnapshot> CreateGermanSnapshots(PipeTickSummary tick)
+    {
+        var texts = CompanionTexts.German;
+        var connections = Enum.GetValues<PipeConnectionState>()
+                              .SelectMany(state => Enum.GetValues<PipeRecordingState>(),
+                                          (state, recording) => TraySnapshot.ForConnection(texts,
+                                                                                           new PipeConnectionStatus
+                                                                                           {
+                                                                                               State = state
+                                                                                           },
+                                                                                           recording,
+                                                                                           tick));
+        var problems = Enum.GetValues<PipeReplayProblemKind>()
+                           .Select(kind => new PipeReplayStatus
+                                           {
+                                               State = PipeConnectionState.Receiving,
+                                               IsFinished = true,
+                                               Problem = new PipeReplayProblem
+                                                         {
+                                                             Kind = kind,
+                                                             LineNumber = long.MaxValue
+                                                         }
+                                           });
+        var sendProblems = Enum.GetValues<ReplaySendProblemKind>()
+                               .Select(kind => new PipeReplayStatus
+                                               {
+                                                   State = PipeConnectionState.Receiving,
+                                                   IsFinished = true,
+                                                   SendProblem = kind
+                                               });
+        PipeConnectionState[] replayStates = [PipeConnectionState.Connected, PipeConnectionState.Receiving, PipeConnectionState.ProtocolMismatch];
+        var states = replayStates.Select(state => new PipeReplayStatus
+                                                  {
+                                                      State = state
+                                                  });
+        var others = new[]
+                     {
+                         new PipeReplayStatus
+                         {
+                             State = PipeConnectionState.Connected,
+                             IsConnecting = true
+                         },
+                         new PipeReplayStatus
+                         {
+                             State = PipeConnectionState.Receiving,
+                             IsFinished = true
+                         },
+                         CreateFinishedStatus(1, 0),
+                         CreateFinishedStatus(int.MaxValue, int.MaxValue)
+                     };
+        var replays = problems.Concat(sendProblems)
+                              .Concat(states)
+                              .Concat(others)
+                              .Select(status => TraySnapshot.ForReplay(texts, status, tick));
+
+        return connections.Concat(replays)
+                          .Append(TraySnapshot.ForInvalidCommandLine(texts))
+                          .ToList();
+    }
+
+    /// <summary>
+    /// Creates the status of a replay that finished sending to a server.
+    /// </summary>
+    /// <param name="ticks">The number of ticks sent</param>
+    /// <param name="refused">The number of ticks refused</param>
+    /// <returns>The status</returns>
+    private static PipeReplayStatus CreateFinishedStatus(int ticks, int refused)
+    {
+        return new PipeReplayStatus
+               {
+                   State = PipeConnectionState.Receiving,
+                   IsFinished = true,
+                   Sent = new ReplaySendCounts
+                          {
+                              Ticks = ticks,
+                              Refused = refused
+                          }
                };
     }
 
