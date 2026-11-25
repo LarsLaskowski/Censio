@@ -72,39 +72,18 @@ public static class CompanionSettings
     /// <returns>The language, or <see langword="null" /> when the file names none or an invalid one</returns>
     public static CompanionLanguage? ReadLanguage(string path)
     {
-        if (Path.IsPathFullyQualified(path) == false)
-        {
-            return null;
-        }
+        return ReadRoot<CompanionLanguage?>(path, ReadLanguage, null);
+    }
 
-        byte[] bytes;
-
-        try
-        {
-            bytes = ReadBytes(path);
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or SecurityException or NotSupportedException)
-        {
-            return null;
-        }
-
-        if (bytes.Length > MaxFileLength)
-        {
-            return null;
-        }
-
-        try
-        {
-            using var document = ParseDocument(bytes);
-
-            return document.RootElement.ValueKind == JsonValueKind.Object
-                       ? ReadLanguage(document.RootElement)
-                       : null;
-        }
-        catch (Exception exception) when (exception is JsonException or InvalidOperationException)
-        {
-            return null;
-        }
+    /// <summary>
+    /// Gets a value indicating whether the settings file names a language that is not valid: the key is there but written
+    /// twice, not a text or not <c>en</c> or <c>de</c>.
+    /// </summary>
+    /// <param name="path">The path of the settings file</param>
+    /// <returns><see langword="true" /> when the file holds an invalid language setting</returns>
+    public static bool IsLanguageInvalid(string path)
+    {
+        return ReadRoot(path, root => FindProperties(root, LanguageKey).Count > 0 && ReadLanguage(root) is null, false);
     }
 
     /// <summary>
@@ -554,6 +533,51 @@ public static class CompanionSettings
         catch (Exception exception) when (exception is JsonException or InvalidOperationException)
         {
             return CompanionSettingsResult.FromProblem("not valid JSON", exception);
+        }
+    }
+
+    /// <summary>
+    /// Reads a value of the root object of the settings file.
+    /// </summary>
+    /// <typeparam name="T">The type of the value</typeparam>
+    /// <param name="path">The path of the settings file</param>
+    /// <param name="read">Reads the value of the root object</param>
+    /// <param name="fallback">The value when the file cannot be used</param>
+    /// <returns>The value, or <paramref name="fallback" /> when the file cannot be read, is too large, is no JSON or no object</returns>
+    private static T ReadRoot<T>(string path, Func<JsonElement, T> read, T fallback)
+    {
+        if (Path.IsPathFullyQualified(path) == false)
+        {
+            return fallback;
+        }
+
+        byte[] bytes;
+
+        try
+        {
+            bytes = ReadBytes(path);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or SecurityException or NotSupportedException)
+        {
+            return fallback;
+        }
+
+        if (bytes.Length > MaxFileLength)
+        {
+            return fallback;
+        }
+
+        try
+        {
+            using var document = ParseDocument(bytes);
+
+            return document.RootElement.ValueKind == JsonValueKind.Object
+                       ? read(document.RootElement)
+                       : fallback;
+        }
+        catch (Exception exception) when (exception is JsonException or InvalidOperationException)
+        {
+            return fallback;
         }
     }
 

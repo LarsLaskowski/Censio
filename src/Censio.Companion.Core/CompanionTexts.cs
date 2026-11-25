@@ -119,7 +119,32 @@ public sealed class CompanionTexts
                                                         OutcomeWriteFailed = "The settings could not be saved. Details are in the log.",
                                                         OutcomeChangedOutside = "The settings file was changed outside this window. Close the window and open it again.",
                                                         OutcomeRestartFailed = "The Companion could not restart. Exit and start it again to apply the changes.",
-                                                        OutcomeAutostartFailed = "Start with Windows could not be changed."
+                                                        OutcomeAutostartFailed = "Start with Windows could not be changed.",
+                                                        SettingsWindowTitle = "Censio Companion settings",
+                                                        ModeLabel = "Mode",
+                                                        ModeOffText = "Off",
+                                                        ModeLocalText = "Local",
+                                                        ModeForwardText = "Forward",
+                                                        LocalPortLabel = "Local port",
+                                                        ServerAddressLabel = "Server address",
+                                                        ServerTokenLabel = "Server token",
+                                                        BufferHoursLabel = "Buffer hours",
+                                                        BufferMegabytesLabel = "Buffer megabytes",
+                                                        GameFolderLabel = "Game folder",
+                                                        BrowseText = "Browse…",
+                                                        GameFolderHint = "Empty: find automatically",
+                                                        ProfileLabel = "Profile",
+                                                        NewProfileText = "New profile…",
+                                                        NewProfileNameLabel = "Name of the new profile",
+                                                        LanguageLabel = "Language",
+                                                        SaveText = "Save",
+                                                        CancelText = "Cancel",
+                                                        FileProblemFormat = CompositeFormat.Parse("The settings file could not be read ({0}). Saving replaces it with the values shown."),
+                                                        ProfilesFileInvalidText = "The profiles file could not be read. Saving a profile replaces it.",
+                                                        WarningReplayRunning = "Saving ends the running replay.",
+                                                        WarningRecordingRunning = "Saving ends the running recording.",
+                                                        WarningBufferMemoryOnly = "Messages that could not be saved to disk are lost.",
+                                                        OutcomeRestarting = "Saved. The Companion restarts to apply the changes."
                                                     };
 
     /// <summary>
@@ -231,7 +256,32 @@ public sealed class CompanionTexts
                                                        OutcomeWriteFailed = "Die Einstellungen konnten nicht gespeichert werden. Details stehen im Protokoll.",
                                                        OutcomeChangedOutside = "Die Einstellungsdatei wurde außerhalb dieses Fensters geändert. Schließen Sie das Fenster und öffnen Sie es erneut.",
                                                        OutcomeRestartFailed = "Der Companion konnte nicht neu starten. Beenden Sie ihn und starten Sie ihn erneut, um die Änderungen zu übernehmen.",
-                                                       OutcomeAutostartFailed = "Der Start mit Windows konnte nicht geändert werden."
+                                                       OutcomeAutostartFailed = "Der Start mit Windows konnte nicht geändert werden.",
+                                                       SettingsWindowTitle = "Censio Companion Einstellungen",
+                                                       ModeLabel = "Modus",
+                                                       ModeOffText = "Aus",
+                                                       ModeLocalText = "Lokal",
+                                                       ModeForwardText = "Weiterleiten",
+                                                       LocalPortLabel = "Lokaler Port",
+                                                       ServerAddressLabel = "Serveradresse",
+                                                       ServerTokenLabel = "Server-Token",
+                                                       BufferHoursLabel = "Pufferdauer in Stunden",
+                                                       BufferMegabytesLabel = "Puffergröße in Megabyte",
+                                                       GameFolderLabel = "Spielordner",
+                                                       BrowseText = "Durchsuchen…",
+                                                       GameFolderHint = "Leer: automatisch suchen",
+                                                       ProfileLabel = "Profil",
+                                                       NewProfileText = "Neues Profil…",
+                                                       NewProfileNameLabel = "Name des neuen Profils",
+                                                       LanguageLabel = "Sprache",
+                                                       SaveText = "Speichern",
+                                                       CancelText = "Abbrechen",
+                                                       FileProblemFormat = CompositeFormat.Parse("Die Einstellungsdatei konnte nicht gelesen werden ({0}). Beim Speichern wird sie durch die angezeigten Werte ersetzt."),
+                                                       ProfilesFileInvalidText = "Die Profildatei konnte nicht gelesen werden. Beim Speichern eines Profils wird sie ersetzt.",
+                                                       WarningReplayRunning = "Das Speichern beendet die laufende Wiedergabe.",
+                                                       WarningRecordingRunning = "Das Speichern beendet die laufende Aufnahme.",
+                                                       WarningBufferMemoryOnly = "Nachrichten, die nicht auf die Festplatte gespeichert werden konnten, gehen verloren.",
+                                                       OutcomeRestarting = "Gespeichert. Der Companion startet neu, um die Änderungen zu übernehmen."
                                                    };
 
     /// <summary>
@@ -759,6 +809,131 @@ public sealed class CompanionTexts
     /// </summary>
     public required string OutcomeAutostartFailed { get; init; }
 
+    /// <summary>
+    /// Gets the title of the settings window.
+    /// </summary>
+    public required string SettingsWindowTitle { get; init; }
+
+    /// <summary>
+    /// Gets the label of the mode of the settings window.
+    /// </summary>
+    public required string ModeLabel { get; init; }
+
+    /// <summary>
+    /// Gets the text of the mode that sends nothing.
+    /// </summary>
+    public required string ModeOffText { get; init; }
+
+    /// <summary>
+    /// Gets the text of the mode that runs the server in the Companion.
+    /// </summary>
+    public required string ModeLocalText { get; init; }
+
+    /// <summary>
+    /// Gets the text of the mode that forwards to a server.
+    /// </summary>
+    public required string ModeForwardText { get; init; }
+
+    /// <summary>
+    /// Gets the label of the local port.
+    /// </summary>
+    public required string LocalPortLabel { get; init; }
+
+    /// <summary>
+    /// Gets the label of the server address.
+    /// </summary>
+    public required string ServerAddressLabel { get; init; }
+
+    /// <summary>
+    /// Gets the label of the server token.
+    /// </summary>
+    public required string ServerTokenLabel { get; init; }
+
+    /// <summary>
+    /// Gets the label of the buffer hours.
+    /// </summary>
+    public required string BufferHoursLabel { get; init; }
+
+    /// <summary>
+    /// Gets the label of the buffer megabytes.
+    /// </summary>
+    public required string BufferMegabytesLabel { get; init; }
+
+    /// <summary>
+    /// Gets the label of the game folder.
+    /// </summary>
+    public required string GameFolderLabel { get; init; }
+
+    /// <summary>
+    /// Gets the text of the button that picks the game folder.
+    /// </summary>
+    public required string BrowseText { get; init; }
+
+    /// <summary>
+    /// Gets the hint of an empty game folder.
+    /// </summary>
+    public required string GameFolderHint { get; init; }
+
+    /// <summary>
+    /// Gets the label of the profile.
+    /// </summary>
+    public required string ProfileLabel { get; init; }
+
+    /// <summary>
+    /// Gets the text of the button that asks for a new profile.
+    /// </summary>
+    public required string NewProfileText { get; init; }
+
+    /// <summary>
+    /// Gets the label of the name of a new profile.
+    /// </summary>
+    public required string NewProfileNameLabel { get; init; }
+
+    /// <summary>
+    /// Gets the label of the language.
+    /// </summary>
+    public required string LanguageLabel { get; init; }
+
+    /// <summary>
+    /// Gets the text of the button that saves the settings.
+    /// </summary>
+    public required string SaveText { get; init; }
+
+    /// <summary>
+    /// Gets the text of the button that closes the settings window.
+    /// </summary>
+    public required string CancelText { get; init; }
+
+    /// <summary>
+    /// Gets the format of the banner of a settings file that could not be read, with the reason.
+    /// </summary>
+    public required CompositeFormat FileProblemFormat { get; init; }
+
+    /// <summary>
+    /// Gets the banner of a profiles file that could not be read.
+    /// </summary>
+    public required string ProfilesFileInvalidText { get; init; }
+
+    /// <summary>
+    /// Gets the warning that saving ends the running replay.
+    /// </summary>
+    public required string WarningReplayRunning { get; init; }
+
+    /// <summary>
+    /// Gets the warning that saving ends the running recording.
+    /// </summary>
+    public required string WarningRecordingRunning { get; init; }
+
+    /// <summary>
+    /// Gets the warning that the buffer is kept in memory only.
+    /// </summary>
+    public required string WarningBufferMemoryOnly { get; init; }
+
+    /// <summary>
+    /// Gets the message of saved settings that restart the Companion.
+    /// </summary>
+    public required string OutcomeRestarting { get; init; }
+
     #endregion // Properties
 
     #region Methods
@@ -840,6 +1015,16 @@ public sealed class CompanionTexts
     }
 
     /// <summary>
+    /// Formats the banner of a settings file that could not be read.
+    /// </summary>
+    /// <param name="reason">The reason the log gives</param>
+    /// <returns>The text</returns>
+    public string FormatFileProblem(string reason)
+    {
+        return string.Format(CultureInfo.InvariantCulture, FileProblemFormat, reason);
+    }
+
+    /// <summary>
     /// Formats the text of the outcome of saving the settings.
     /// </summary>
     /// <param name="outcome">The outcome</param>
@@ -852,7 +1037,8 @@ public sealed class CompanionTexts
                    SettingsSaveKind.WriteFailed => OutcomeWriteFailed,
                    SettingsSaveKind.ChangedOutside => OutcomeChangedOutside,
                    SettingsSaveKind.RestartFailed => OutcomeRestartFailed,
-                   SettingsSaveKind.Saved or SettingsSaveKind.Restarting or SettingsSaveKind.Refused => outcome.IsAutostartFailed ? OutcomeAutostartFailed : string.Empty,
+                   SettingsSaveKind.Restarting => outcome.IsAutostartFailed ? OutcomeAutostartFailed : OutcomeRestarting,
+                   SettingsSaveKind.Saved or SettingsSaveKind.Refused => outcome.IsAutostartFailed ? OutcomeAutostartFailed : string.Empty,
                    _ => throw new ArgumentOutOfRangeException(nameof(outcome), outcome.Kind, "The outcome kind is not defined")
                };
     }

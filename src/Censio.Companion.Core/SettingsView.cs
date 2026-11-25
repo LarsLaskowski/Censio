@@ -54,8 +54,6 @@ public sealed class SettingsView
 
     #endregion // Properties
 
-#pragma warning disable S2325, RH2003 // Skeleton: removed with the implementation
-
     #region Methods
 
     /// <summary>
@@ -66,10 +64,19 @@ public sealed class SettingsView
     /// <returns><c>true</c> if the field is enabled</returns>
     public bool IsFieldEnabled(SettingsField field, CompanionSettingsMode mode)
     {
-        throw new NotImplementedException();
+        if (Problems.Any(problem => problem.Field == field))
+        {
+            return true;
+        }
+
+        return field switch
+               {
+                   SettingsField.LocalPort => mode == CompanionSettingsMode.Local,
+                   SettingsField.ServerAddress or SettingsField.ServerToken => mode == CompanionSettingsMode.Forward,
+                   SettingsField.BufferHours or SettingsField.BufferMegabytes => mode is CompanionSettingsMode.Local or CompanionSettingsMode.Forward,
+                   _ => true
+               };
     }
 
     #endregion // Methods
-
-#pragma warning restore S2325, RH2003
 }

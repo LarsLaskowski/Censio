@@ -177,7 +177,7 @@ public sealed class CompanionTextsTests
     }
 
     /// <summary>
-    /// A saved, restarting or refused outcome has no text of its own: the autostart failure's text when the autostart could
+    /// A saved or refused outcome has no text of its own: the autostart failure's text when the autostart could
     /// not be changed, otherwise none.
     /// </summary>
     /// <param name="kind">The outcome kind</param>
@@ -186,7 +186,6 @@ public sealed class CompanionTextsTests
     [TestCategory("AC5")]
     [DataRow(SettingsSaveKind.Saved, false)]
     [DataRow(SettingsSaveKind.Saved, true)]
-    [DataRow(SettingsSaveKind.Restarting, false)]
     [DataRow(SettingsSaveKind.Restarting, true)]
     [DataRow(SettingsSaveKind.Refused, false)]
     [DataRow(SettingsSaveKind.Refused, true)]
@@ -329,7 +328,7 @@ public sealed class CompanionTextsTests
                            .Select(kind => Text($"Problem {kind}", texts => texts.FormatProblem(kind)));
         var notices = Enum.GetValues<ProfileNoticeKind>()
                           .Select(kind => Text($"Notice {kind}", texts => texts.FormatNotice(CreateNotice(kind))));
-        var outcomes = new[] { SettingsSaveKind.WriteFailed, SettingsSaveKind.ChangedOutside, SettingsSaveKind.RestartFailed }.Select(kind => Text($"Outcome {kind}", texts => texts.FormatOutcome(CreateOutcome(kind, false))));
+        var outcomes = new[] { SettingsSaveKind.WriteFailed, SettingsSaveKind.ChangedOutside, SettingsSaveKind.RestartFailed, SettingsSaveKind.Restarting }.Select(kind => Text($"Outcome {kind}", texts => texts.FormatOutcome(CreateOutcome(kind, false))));
 
         return problems.Concat(notices)
                        .Concat(outcomes)

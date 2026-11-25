@@ -9,6 +9,25 @@ namespace Censio.Companion;
 /// </summary>
 internal sealed class TrayIcon : IDisposable
 {
+    #region Constants
+
+    /// <summary>
+    /// The longest title of a notification in characters
+    /// </summary>
+    private const int MaxNoticeTitleLength = 63;
+
+    /// <summary>
+    /// The longest text of a notification in characters
+    /// </summary>
+    private const int MaxNoticeTextLength = 255;
+
+    /// <summary>
+    /// The time a notification asks to be shown in milliseconds; Windows decides
+    /// </summary>
+    private const int NoticeTimeout = 10000;
+
+    #endregion // Constants
+
     #region Fields
 
     /// <summary>
@@ -48,8 +67,6 @@ internal sealed class TrayIcon : IDisposable
 
     #endregion // Fields
 
-#pragma warning disable CS0067, S3264 // Skeleton: removed with the implementation
-
     #region Events
 
     /// <summary>
@@ -58,8 +75,6 @@ internal sealed class TrayIcon : IDisposable
     public event EventHandler? NoticeClicked;
 
     #endregion // Events
-
-#pragma warning restore CS0067, S3264
 
     #region Constructors
 
@@ -89,10 +104,12 @@ internal sealed class TrayIcon : IDisposable
         _notifyIcon = new NotifyIcon
                       {
                           Icon = images.Get(TrayIconLook.Waiting),
-                          Text = CompanionTexts.English.ToolTip,
+                          Text = sources.Texts().ToolTip,
                           ContextMenuStrip = _menu,
                           Visible = true
                       };
+
+        _notifyIcon.BalloonTipClicked += (_, _) => NoticeClicked?.Invoke(this, EventArgs.Empty);
     }
 
     #endregion // Constructors
@@ -113,7 +130,6 @@ internal sealed class TrayIcon : IDisposable
         _notifyIcon.Text = text.Length > TrayMenu.MaxToolTipLength ? text[..TrayMenu.MaxToolTipLength] : text;
     }
 
-#pragma warning disable S2325, RH2003 // Skeleton: removed with the implementation
     /// <summary>
     /// Shows a notification; does nothing once the icon is disposed.
     /// </summary>
@@ -121,9 +137,13 @@ internal sealed class TrayIcon : IDisposable
     /// <param name="text">The text</param>
     public void ShowNotice(string title, string text)
     {
-        throw new NotImplementedException();
+        if (_disposed)
+        {
+            return;
+        }
+
+        _notifyIcon.ShowBalloonTip(NoticeTimeout, title.Length > MaxNoticeTitleLength ? title[..MaxNoticeTitleLength] : title, text.Length > MaxNoticeTextLength ? text[..MaxNoticeTextLength] : text, ToolTipIcon.Info);
     }
-#pragma warning restore S2325, RH2003
 
     /// <summary>
     /// Sets the look of the icon; does nothing once the icon is disposed.
@@ -148,7 +168,7 @@ internal sealed class TrayIcon : IDisposable
 
         _menu.Items.Clear();
 
-        foreach (var entry in TrayMenu.Create(CompanionTexts.English,
+        foreach (var entry in TrayMenu.Create(_sources.Texts(),
                                               new TrayMenuState
                                               {
                                                   Version = _version,
@@ -174,7 +194,7 @@ internal sealed class TrayIcon : IDisposable
                        };
             var kind = entry.Kind;
 
-            if (kind is TrayMenuEntryKind.OpenCensio or TrayMenuEntryKind.OpenDiagnostics or TrayMenuEntryKind.ToggleRecording or TrayMenuEntryKind.OpenRecordingsFolder or TrayMenuEntryKind.OpenLogFolder or TrayMenuEntryKind.ToggleAutostart or TrayMenuEntryKind.Exit)
+            if (kind is TrayMenuEntryKind.OpenCensio or TrayMenuEntryKind.OpenSettings or TrayMenuEntryKind.OpenDiagnostics or TrayMenuEntryKind.ToggleRecording or TrayMenuEntryKind.OpenRecordingsFolder or TrayMenuEntryKind.OpenLogFolder or TrayMenuEntryKind.ToggleAutostart or TrayMenuEntryKind.Exit)
             {
                 item.Click += (_, _) => _dispatch(kind);
             }
