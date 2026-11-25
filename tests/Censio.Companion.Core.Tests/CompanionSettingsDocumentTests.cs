@@ -204,6 +204,12 @@ public sealed class CompanionSettingsDocumentTests
              SettingsField.Mode,
              SettingsProblemKind.WrittenTwice,
              DisplayName = "Mode twice")]
+    [DataRow("""
+             "gameFolder": 5
+             """,
+             SettingsField.GameFolder,
+             SettingsProblemKind.FolderNotFullPath,
+             DisplayName = "Game folder as number")]
     public void CompanionSettingsDocumentLoadMarksInvalidAndDuplicatedKeys(string keys, SettingsField field, SettingsProblemKind kind)
     {
         // Arrange
@@ -306,7 +312,7 @@ public sealed class CompanionSettingsDocumentTests
         // Assert
         Assert.AreEqual(CompanionSettingsWriteKind.Saved, write.Kind, "The save should succeed");
         Assert.IsNull(write.Exception, "A save should carry no exception");
-        Assert.AreEqual(expected, ReadSavedText(), "The file should hold the new mode, address and token and keep the other keys");
+        Assert.AreEqual(expected.ReplaceLineEndings("\n"), ReadSavedText(), "The file should hold the new mode, address and token and keep the other keys");
     }
 
     /// <summary>
@@ -599,6 +605,179 @@ public sealed class CompanionSettingsDocumentTests
     }
 
     /// <summary>
+    /// A save over a settings file that cannot be read any more fails with the exception, writes nothing and leaves no
+    /// temporary file.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC8")]
+    public void CompanionSettingsDocumentSaveOverUnreadableFileFails()
+    {
+        // Arrange
+        var document = CompanionSettingsDocument.Load(SettingsPath);
+
+        Directory.CreateDirectory(SettingsPath);
+
+        // Act
+        var write = document.Save(CreateValues(CompanionSettingsMode.Local, null));
+
+        // Assert
+        Assert.AreEqual(CompanionSettingsWriteKind.Failed, write.Kind, "A settings file that cannot be read should fail the save");
+        Assert.IsInstanceOfType<UnauthorizedAccessException>(write.Exception, "The failure should carry the exception of the read");
+        Assert.IsTrue(Directory.Exists(SettingsPath), "The folder in place of the file should stay");
+        Assert.IsFalse(File.Exists(TmpPath), "No temporary file should be left");
+    }
+
+    /// <summary>
+    /// A folder in place of the settings file cannot be read: the document holds the defaults and the reason (E7).
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC8")]
+    public void CompanionSettingsDocumentLoadUnreadableGivesDefaultsAndReason()
+    {
+        // Arrange
+        Directory.CreateDirectory(SettingsPath);
+
+        // Act
+        var document = CompanionSettingsDocument.Load(SettingsPath);
+
+        // Assert
+        Assert.AreEqual("cannot be read", document.FileProblem, "A file that cannot be read should give its reason");
+        Assert.IsEmpty(Differences(CreateDefaults(), document.Values), "A file that cannot be read should give the default of every field");
+        Assert.IsEmpty(document.FieldProblems, "A file that cannot be read should give no field problem");
+    }
+
+    /// <summary>
+    /// Empty texts of the address, the token and the game folder load as empty fields without a problem.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC1")]
+    public void CompanionSettingsDocumentLoadEmptyTextsAreNoProblem()
+    {
+        // Arrange
+        var path = WriteSettings("""{"mode": "local", "serverAddress": "", "serverToken": "", "gameFolder": ""}""");
+
+        // Act
+        var document = CompanionSettingsDocument.Load(path);
+
+        // Assert
+        Assert.IsEmpty(Differences(CreateValues(CompanionSettingsMode.Local, null), document.Values), "Empty texts should load as empty fields");
+        Assert.IsEmpty(document.FieldProblems, "Empty texts should give no field problem");
+    }
+
+    /// <summary>
+    /// An empty number field leaves its key out of the file, so the reader takes its default.
+    /// </summary>
+    /// <param name="field">The empty field</param>
+    /// <param name="key">The key of the field</param>
+    [TestMethod]
+    [TestCategory("AC2")]
+    [DataRow(SettingsField.LocalPort, "localPort")]
+    [DataRow(SettingsField.BufferHours, "bufferHours")]
+    [DataRow(SettingsField.BufferMegabytes, "bufferMegabytes")]
+    public void CompanionSettingsDocumentSaveEmptyNumberLeavesKeyAbsent(SettingsField field, string key)
+    {
+        // Arrange
+        var document = CompanionSettingsDocument.Load(SettingsPath);
+        var values = Change(CreateDefaults(), CompanionSettingsMode.Local, null, (field, string.Empty));
+
+        // Act
+        var write = document.Save(values);
+
+        // Assert
+        using var saved = ReadSaved();
+
+        Assert.AreEqual(CompanionSettingsWriteKind.Saved, write.Kind, "The save should succeed");
+        Assert.IsFalse(saved.RootElement.TryGetProperty(key, out _), $"An empty {field} should leave {key} out of the file");
+    }
+
+    /// <summary>
+    /// The language is written as <c>en</c> or <c>de</c> (S9).
+    /// </summary>
+    /// <param name="language">The language</param>
+    /// <param name="expected">The expected value of the key</param>
+    [TestMethod]
+    [TestCategory("AC5")]
+    [DataRow(CompanionLanguage.English, "en")]
+    [DataRow(CompanionLanguage.German, "de")]
+    public void CompanionSettingsDocumentSaveWritesLanguage(CompanionLanguage language, string expected)
+    {
+        // Arrange
+        var document = CompanionSettingsDocument.Load(SettingsPath);
+
+        // Act
+        var write = document.Save(CreateValues(CompanionSettingsMode.Local, language));
+
+        // Assert
+        using var saved = ReadSaved();
+
+        Assert.AreEqual(CompanionSettingsWriteKind.Saved, write.Kind, "The save should succeed");
+        Assert.AreEqual(expected, saved.RootElement.GetProperty("language").GetString(), $"The language {language} should be written as {expected}");
+    }
+
+    /// <summary>
+    /// A changed mode, port, address, token, buffer limit or game folder needs a restart; a number is compared as the
+    /// parsed number and an invalid one as its text (S3).
+    /// </summary>
+    /// <param name="field">The changed field</param>
+    /// <param name="running">The text the running Companion started with</param>
+    /// <param name="saved">The saved text</param>
+    [TestMethod]
+    [TestCategory("AC4")]
+    [DataRow(SettingsField.Mode, "Off", "Local", DisplayName = "Mode")]
+    [DataRow(SettingsField.LocalPort, "5000", "5001", DisplayName = "Port")]
+    [DataRow(SettingsField.LocalPort, "", "5001", DisplayName = "Empty port against another port")]
+    [DataRow(SettingsField.LocalPort, "abc", "abd", DisplayName = "Two invalid ports")]
+    [DataRow(SettingsField.ServerAddress, "", ServerAddress, DisplayName = "Address")]
+    [DataRow(SettingsField.ServerToken, "", ServerToken, DisplayName = "Token")]
+    [DataRow(SettingsField.BufferHours, "24", "48", DisplayName = "Hours")]
+    [DataRow(SettingsField.BufferMegabytes, "100", "200", DisplayName = "Megabytes")]
+    [DataRow(SettingsField.GameFolder, "", GameFolder, DisplayName = "Game folder")]
+    public void CompanionSettingsDocumentNeedsRestartWhenSettingDiffers(SettingsField field, string running, string saved)
+    {
+        // Arrange
+        var runningValues = CreateValuesWith(field, running);
+        var savedValues = CreateValuesWith(field, saved);
+
+        // Act
+        var needsRestart = CompanionSettingsDocument.NeedsRestart(runningValues, savedValues);
+
+        // Assert
+        Assert.IsTrue(needsRestart, $"{field} changed from '{running}' to '{saved}' should need a restart");
+    }
+
+    /// <summary>
+    /// The language, another spelling of the same number, an empty number against its default, a token with spaces
+    /// around it and the same invalid text need no restart (S3, S4).
+    /// </summary>
+    /// <param name="field">The field</param>
+    /// <param name="running">The text the running Companion started with</param>
+    /// <param name="saved">The saved text</param>
+    [TestMethod]
+    [TestCategory("AC4")]
+    [DataRow(SettingsField.Language, "", "German", DisplayName = "Language")]
+    [DataRow(SettingsField.Language, "English", "German", DisplayName = "Language switched")]
+    [DataRow(SettingsField.LocalPort, "5", "05", DisplayName = "Port 05")]
+    [DataRow(SettingsField.LocalPort, "", "5000", DisplayName = "Empty port against the default")]
+    [DataRow(SettingsField.LocalPort, "abc", "abc", DisplayName = "Same invalid port")]
+    [DataRow(SettingsField.BufferHours, "24", "0024", DisplayName = "Hours 0024")]
+    [DataRow(SettingsField.BufferHours, "", "24", DisplayName = "Empty hours against the default")]
+    [DataRow(SettingsField.BufferMegabytes, "100", "0100", DisplayName = "Megabytes 0100")]
+    [DataRow(SettingsField.BufferMegabytes, "", "100", DisplayName = "Empty megabytes against the default")]
+    [DataRow(SettingsField.ServerToken, ServerToken, " \t" + ServerToken + "\r\n", DisplayName = "Token with spaces around")]
+    public void CompanionSettingsDocumentNeedsRestartSameSettingsNeedNoRestart(SettingsField field, string running, string saved)
+    {
+        // Arrange
+        var runningValues = CreateValuesWith(field, running);
+        var savedValues = CreateValuesWith(field, saved);
+
+        // Act
+        var needsRestart = CompanionSettingsDocument.NeedsRestart(runningValues, savedValues);
+
+        // Assert
+        Assert.IsFalse(needsRestart, $"{field} from '{running}' to '{saved}' should need no restart");
+    }
+
+    /// <summary>
     /// Creates the values of the defaults.
     /// </summary>
     /// <returns>The values</returns>
@@ -628,6 +807,23 @@ public sealed class CompanionSettingsDocumentTests
                    BufferMegabytes = map.GetValueOrDefault(SettingsField.BufferMegabytes, "100"),
                    GameFolder = map.GetValueOrDefault(SettingsField.GameFolder, string.Empty),
                    Language = language
+               };
+    }
+
+    /// <summary>
+    /// Creates values of local mode with one field set: the mode or the language by its name (empty for no language), any
+    /// other field by its text.
+    /// </summary>
+    /// <param name="field">The field</param>
+    /// <param name="text">The text of the field</param>
+    /// <returns>The values</returns>
+    private static CompanionSettingsValues CreateValuesWith(SettingsField field, string text)
+    {
+        return field switch
+               {
+                   SettingsField.Mode => CreateValues(Enum.Parse<CompanionSettingsMode>(text), null),
+                   SettingsField.Language => CreateValues(CompanionSettingsMode.Local, text.Length == 0 ? null : Enum.Parse<CompanionLanguage>(text)),
+                   _ => CreateValues(CompanionSettingsMode.Local, null, (field, text))
                };
     }
 

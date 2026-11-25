@@ -1061,6 +1061,30 @@ public sealed class CompanionSettingsTests
     }
 
     /// <summary>
+    /// A settings file naming <c>de</c> gives no language when it is not read: a relative path, a folder in its place, a
+    /// file over 1 MiB, one that is not JSON or whose root is not an object (S9).
+    /// </summary>
+    /// <param name="kind">How the file is not read</param>
+    [TestMethod]
+    [TestCategory("AC5")]
+    [DataRow("relative path")]
+    [DataRow("cannot be read")]
+    [DataRow("over 1 MiB")]
+    [DataRow("not JSON")]
+    [DataRow("array root")]
+    public void CompanionSettingsReadLanguageUnreadFileGivesNone(string kind)
+    {
+        // Arrange
+        var path = WriteUnreadGermanSettings(kind);
+
+        // Act
+        var language = CompanionSettings.ReadLanguage(path);
+
+        // Assert
+        Assert.IsNull(language, $"A settings file that is not read ({kind}) should give no language");
+    }
+
+    /// <summary>
     /// Turns a test text into the bytes of the file:<see cref="ByteOrderMarkMarker" /> becomes the UTF-8 byte order
     /// mark and <see cref="InvalidByteMarker" /> the byte <c>0xFF</c>, the rest is encoded as UTF-8.
     /// </summary>
@@ -1148,6 +1172,25 @@ public sealed class CompanionSettingsTests
                    "not JSON" => WriteSettings("""{"mode": "local" """),
                    "array root" => WriteSettings("""[{"mode": "local"}]"""),
                    "over 1 MiB" => WriteSettings(LocalSettings + new string(' ', CompanionSettings.MaxFileLength + 1 - LocalSettings.Length)),
+                   _ => CreateFolderInPlaceOfSettings()
+               };
+    }
+
+    /// <summary>
+    /// Writes a settings file that names the language <c>de</c> but is not read, or a folder in its place.
+    /// </summary>
+    /// <param name="kind">How the file is not read: relative path, cannot be read, over 1 MiB, not JSON or array root</param>
+    /// <returns>The path of the file</returns>
+    private string WriteUnreadGermanSettings(string kind)
+    {
+        const string german = """{"language": "de"}""";
+
+        return kind switch
+               {
+                   "relative path" => Path.GetRelativePath(Environment.CurrentDirectory, WriteSettings(german)),
+                   "over 1 MiB" => WriteSettings(german + new string(' ', CompanionSettings.MaxFileLength + 1 - german.Length)),
+                   "not JSON" => WriteSettings("""{"language": "de" """),
+                   "array root" => WriteSettings("""[{"language": "de"}]"""),
                    _ => CreateFolderInPlaceOfSettings()
                };
     }
