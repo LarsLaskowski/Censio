@@ -46,7 +46,7 @@ each: the double, where it lives and what it stands in for; how it behaves is re
 - `InMemoryDuplexStream` (`tests/Censio.Server.Tests/InMemoryDuplexStream.cs`, linked into the Companion tests) — a connection end, for real `WebSocket` pairs.
 - `FailingWebSocketFeature` (`tests/Censio.Server.Tests/FailingWebSocketFeature.cs`) — an `IHttpWebSocketFeature` failing every accept.
 - `FakeStartupEntryStore` (`tests/Censio.Companion.Core.Tests/FakeStartupEntryStore.cs`) — models `RegistryStartupEntryStore` (checked against the .NET 11 `RegistryKey` source).
-- `FakeDiagnosticsWindow`, `FakeUbisoftInstallRecords`, `FakeFileVersionReader` (`tests/Censio.Companion.Core.Tests/`) — an `IDiagnosticsWindow`, `IUbisoftInstallRecords` and `IFileVersionReader`.
+- `FakeDiagnosticsWindow`, `FakeSettingsWindow`, `FakeUbisoftInstallRecords`, `FakeFileVersionReader` (`tests/Censio.Companion.Core.Tests/`) — an `IDiagnosticsWindow`, `ISettingsWindow`, `IUbisoftInstallRecords` and `IFileVersionReader`.
 - `FakeLocalServer` (`tests/Censio.Companion.Core.Tests/FakeLocalServer.cs`) — an `ILocalServer` with a held stop.
 - `RecordingHostingStartup` (`tests/Censio.Server.Tests/RecordingHostingStartup.cs`) — an `IHostingStartup` counting its runs.
 - `RegExportUbisoftInstallRecords` (`tests/Censio.Companion.Core.Tests/RegExportUbisoftInstallRecords.cs`) — an `IUbisoftInstallRecords` over the `reg export` sample in `Fixtures/GameInstallation/`.
