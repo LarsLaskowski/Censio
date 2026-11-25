@@ -83,5 +83,10 @@ public enum TrayMenuEntryKind
     /// <summary>
     /// The entry that opens the settings window.
     /// </summary>
-    OpenSettings
+    OpenSettings,
+
+    /// <summary>
+    /// The entry that shows the pending notice about the active profile and opens the settings window.
+    /// </summary>
+    ProfileNotice
 }

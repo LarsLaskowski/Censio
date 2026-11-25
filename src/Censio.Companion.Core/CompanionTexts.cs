@@ -49,6 +49,7 @@ public sealed class CompanionTexts
                                                         LocalServerStarting = "Server: starting",
                                                         LocalServerRunningFormat = CompositeFormat.Parse("Server: running at http://localhost:{0}/"),
                                                         LocalServerPortInUseFormat = CompositeFormat.Parse("Server: port {0} in use"),
+                                                        ServerProfileFormat = CompositeFormat.Parse("{0} (profile {1})"),
                                                         LocalServerFailed = "Server: failed",
                                                         LocalServerSettingsInvalid = "Server: settings invalid",
                                                         BufferFormat = CompositeFormat.Parse("Buffer: {0} waiting"),
@@ -186,6 +187,7 @@ public sealed class CompanionTexts
                                                        LocalServerStarting = "Server: startet",
                                                        LocalServerRunningFormat = CompositeFormat.Parse("Server: läuft unter http://localhost:{0}/"),
                                                        LocalServerPortInUseFormat = CompositeFormat.Parse("Server: Port {0} belegt"),
+                                                       ServerProfileFormat = CompositeFormat.Parse("{0} (Profil {1})"),
                                                        LocalServerFailed = "Server: fehlgeschlagen",
                                                        LocalServerSettingsInvalid = "Server: Einstellungen ungültig",
                                                        BufferFormat = CompositeFormat.Parse("Puffer: {0} wartend"),
@@ -453,6 +455,11 @@ public sealed class CompanionTexts
     /// Gets the format of the text of the local server whose port is in use, with the port.
     /// </summary>
     public required CompositeFormat LocalServerPortInUseFormat { get; init; }
+
+    /// <summary>
+    /// Gets the format of a text of the server line with the name of the active profile, with the text and the name.
+    /// </summary>
+    public required CompositeFormat ServerProfileFormat { get; init; }
 
     /// <summary>
     /// Gets the text of the local server that failed.

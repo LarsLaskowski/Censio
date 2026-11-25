@@ -135,7 +135,8 @@ internal sealed class TrayIcon : IDisposable
     /// </summary>
     /// <param name="title">The title</param>
     /// <param name="text">The text</param>
-    public void ShowNotice(string title, string text)
+    /// <returns><see langword="true" /> if the notification was passed to Windows, <see langword="false" /> once the icon is disposed</returns>
+    public bool ShowNotice(string title, string text)
     {
         if (_disposed)
         {

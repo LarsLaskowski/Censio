@@ -280,6 +280,18 @@ public static class TrayMenu
     }
 
     /// <summary>
+    /// Appends the name of the active profile to the text of the server line.
+    /// </summary>
+    /// <param name="texts">The texts</param>
+    /// <param name="server">The text of the server line</param>
+    /// <param name="profileName">The name of the active profile, or <see langword="null" /> for none</param>
+    /// <returns>The text of the server line, with the profile name if there is one</returns>
+    public static string FormatServerProfile(CompanionTexts texts, string server, string? profileName)
+    {
+        throw new NotImplementedException();
+    }
+
+    /// <summary>
     /// Formats the text of the local server entry.
     /// </summary>
     /// <param name="texts">The texts</param>

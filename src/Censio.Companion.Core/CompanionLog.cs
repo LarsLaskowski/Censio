@@ -562,5 +562,21 @@ public static partial class CompanionLog
     [LoggerMessage(Level = LogLevel.Warning, Message = "Restart failed: the previous Companion did not end")]
     public static partial void RestartWaitTimedOut(ILogger logger);
 
+    /// <summary>
+    /// Logs that a notice about the active profile was raised.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    /// <param name="kind">The kind of the notice</param>
+    [LoggerMessage(Level = LogLevel.Information, Message = "Profile notice raised: {Kind}")]
+    public static partial void ProfileNoticeRaised(ILogger logger, ProfileNoticeKind kind);
+
+    /// <summary>
+    /// Logs that a notice about the active profile was passed to Windows.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    /// <param name="kind">The kind of the notice</param>
+    [LoggerMessage(Level = LogLevel.Information, Message = "Profile notice passed to Windows: {Kind}")]
+    public static partial void ProfileNoticePassedToWindows(ILogger logger, ProfileNoticeKind kind);
+
     #endregion // Methods
 }

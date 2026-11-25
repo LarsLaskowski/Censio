@@ -172,6 +172,11 @@ public sealed class CompanionProfiles
         }
     }
 
+    /// <summary>
+    /// Gets the pending notice about the active profile, or <see langword="null" /> if none.
+    /// </summary>
+    public ProfileNotice? PendingNotice => throw new NotImplementedException();
+
     #endregion // Properties
 
     #region Methods

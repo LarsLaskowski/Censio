@@ -3,7 +3,7 @@ namespace Censio.Companion.Core;
 /// <summary>
 /// What the tray menu is built from.
 /// </summary>
-public sealed record TrayMenuState
+public sealed class TrayMenuState
 {
     #region Properties
 
@@ -36,6 +36,16 @@ public sealed record TrayMenuState
     /// Gets the clock.
     /// </summary>
     public required TimeProvider Clock { get; init; }
+
+    /// <summary>
+    /// Gets the name of the active profile, or <see langword="null" /> when the server line shows none.
+    /// </summary>
+    public string? ProfileName { get; init; }
+
+    /// <summary>
+    /// Gets the pending notice about the active profile, or <see langword="null" /> if none.
+    /// </summary>
+    public ProfileNotice? Notice { get; init; }
 
     #endregion // Properties
 }
