@@ -1,13 +1,12 @@
 # Spec: Companion settings window
 
 Source: Issue #43
-Status: Draft
+Status: Approved by Lead
 
 ## Problem
 
 Every Companion option lives in the hand-edited `%LOCALAPPDATA%\Censio\settings.json`
-([`companion.md`](../../docs/areas/companion.md), *Settings file*), read once per start, never written (record 0045). A tester changes mode, address, token, buffer limits, port or game folder by editing JSON and
-learns about a mistake only from the line `Server: settings invalid` and the log. Every playthrough goes to the fixed
+([`companion.md`](../../docs/areas/companion.md), *Settings file*), read once per start, never written (record 0045). A tester edits JSON and learns about a mistake only from `Server: settings invalid` and the log. Every playthrough goes to the fixed
 profile `Live` (record 0102); record 0041 moves the profile choice and the figure notice into this window. #39 and #40
 are merged; their keys follow [`local-mode.md`](../../docs/areas/local-mode.md) and
 [`live-sending.md`](../../docs/areas/live-sending.md). Every Companion text is English today.
@@ -48,7 +47,7 @@ are merged; their keys follow [`local-mode.md`](../../docs/areas/local-mode.md) 
   lines, the recording suffixes, the replay texts with the reasons of
   [`replay-sending.md`](../../docs/areas/replay-sending.md) and [`pipe-recording.md`](../../docs/areas/pipe-recording.md),
   and the tooltip, whose longest German text fits the tray's 127 characters; `English` switches back. Without a saved
-  choice German shows when the Windows display language is German. The diagnostics window, log and web pages keep
+  choice (the settings key `language`, `en` or `de`) German shows when the Windows display language is German. The diagnostics window, log and web pages keep
   their own language.
 - S10: `Browse…` puts the picked folder's full path in the game folder field; an empty field means `Find
   automatically`.
@@ -68,7 +67,7 @@ A message stands below its field, the typed values stay, and `Save` writes nothi
   exist.`; failing the search's check ([`game-installation.md`](../../docs/areas/game-installation.md)): `This folder is
   not an Anno 117 installation.`
 - E6: A new profile name blank: `Enter a name.`; over 64 characters: `Use at most 64 characters.`; equal to another
-  ignoring case: `A profile of this name exists.`
+  ignoring case: `A profile of this name exists.`; a 1,000th profile: `No more profiles can be created.`
 - E7: A file that cannot be parsed (over 1 MiB, not JSON, not an object, unreadable): the window shows the defaults
   under `The settings file could not be read (<reason>). Saving replaces it with the values shown.`, the reason the
   log's; `Save` replaces it.
@@ -80,7 +79,7 @@ A message stands below its field, the typed values stay, and `Save` writes nothi
 - E10: The file changed after the window opened: `The settings file was changed outside this window. Close the window
   and open it again.`; nothing is written.
 - E11: Unknown keys stay with their values; comments and key order are not kept.
-- E12: The restart starts without arguments, so before saving the window warns `Saving ends the running replay.` /
+- E12: The restarted Companion gets none of the run's switches (it neither records nor replays), so before saving the window warns `Saving ends the running replay.` /
   `Saving ends the running recording.`, and while the buffer is memory only
   ([`live-sending.md`](../../docs/areas/live-sending.md), *Buffer*) `Messages that could not be saved to disk are lost.`
 - E13: `Cancel` or closing the window changes nothing.
@@ -89,6 +88,8 @@ A message stands below its field, the typed values stay, and `Save` writes nothi
 - E15: The exe cannot be started (moved, deleted): the old Companion keeps running with the old values and shows `The
   Companion could not restart. Exit and start it again to apply the changes.`; the file holds the saved values. A new
   Companion whose 10 seconds run out ends without an icon and logs `Restart failed: the previous Companion did not end`.
+- E16: A profiles file that cannot be used (unreadable, too large, not of its format): the run uses `Live` alone and
+  writes no figure link, and the window shows `The profiles file could not be read. Saving a profile replaces it.`
 
 ## Non-functional requirements
 
@@ -103,7 +104,8 @@ A message stands below its field, the typed values stay, and `Save` writes nothi
   `Live`'s history continues.
 - N5: Logged without values, names or paths ([`companion-log.md`](../../docs/areas/companion-log.md)): `Settings saved`
   (Information), `Could not save the settings` with the exception's type (Warning), `Profile switched` (Information),
-  E15's line (Warning).
+  E15's lines (`Restart failed: …`, Warning), `Profiles file invalid: <problem>` and `Language setting invalid; the
+  Windows display language is used` (Warning).
 - N6: `README.md` and `docs/USER_GUIDE.md` (English, then German) describe the window, profiles with the notice, the
   restart and the language so external testers can try them, the hand-edited file as an alternative; the README menu
   list and the user guide's tooltip table give each text's German form in the German part.
@@ -129,7 +131,8 @@ A message stands below its field, the typed values stay, and `Save` writes nothi
   an ignored notice links to the active profile, a first figure links silently; a replay, mode `Off`, an invalid server
   setting and an invalid command line show no notice and write no link (S7, S8).
 - AC8: An unparseable file is replaced only on `Save` after the warning; a write failure or an outside change leaves
-  the file as it was and is reported (E7, E9, E10).
+  the file as it was and is reported; an unusable profiles file leaves `Live` alone, links nothing and is replaced only
+  by a profile save (E7, E9, E10, E16).
 - AC9: Token and figure name are in no log line; the profile file is read with a bound and fails closed; N5's lines
   are written (N2, N5).
 - AC10: README and the user guide describe window, profiles, restart and language in English, then German, with the
@@ -153,11 +156,9 @@ A message stands below its field, the typed values stay, and `Save` writes nothi
 - Q3 (profiles): Where is the profile list kept and how is the notice shown?
   Answered: by the Product Manager, the Companion keeps the list locally, `Live` its first entry, create and select
   only; the notice is a Windows notification of the tray icon whose click opens the window (S5–S8).
-- Q4: Who writes the file? Answered: the window writes `settings.json`; record 0045 (released in v0.4.0) is superseded
-  by a new record, and record 0102 by the profile choice, as 0102's own consequences ask.
-- Q5: Is an invalid file overwritten? Answered: only a file that cannot be parsed at all (E7), on `Save` after the
-  warning: for such a file `CompanionSettings.Read` and `ReadLocalServer` yield no game folder and mode `Off`, so it
-  holds nothing the Companion uses. Every other wrong value is a single field (E8) and the rest of the file is kept.
+- Q4: Who writes the file? Answered: the window; the plan supersedes record 0045 and replaces record 0102.
+- Q5: Is an invalid file overwritten? Answered: only an unparseable one (E7), from which both readers of
+  `CompanionSettings` take nothing; every other wrong value is a single field (E8).
 
 ## Area documents
 
@@ -166,11 +167,12 @@ A message stands below its field, the typed values stay, and `Save` writes nothi
   restart.
 - New `docs/areas/companion-profiles.md`: the profile list and its file, creating and selecting, the figure links and
   the notice, privacy of the figure name.
+- New `docs/areas/companion-texts.md`: the language choice and every Companion text in English and German.
 - `docs/areas/companion.md`: the `Settings…` entry in the menu list; *Settings file* no longer says "never written";
   the restart; the language choice, its default and which texts follow it, with the German form of each menu and
   tooltip text.
-- `docs/areas/live-sending.md` and `local-mode.md`: the selected profile instead of `Live`, the sentences "read once
-  per start, never written" and "a change counts after a restart"; the accepted risk *One profile* removed.
+- `docs/areas/live-sending.md` and `local-mode.md`: the selected profile instead of `Live`; "never written" and the
+  restart; the risk *One profile* removed.
 - `docs/areas/companion-log.md`: the new lines of N5.
 
 ## Challenge

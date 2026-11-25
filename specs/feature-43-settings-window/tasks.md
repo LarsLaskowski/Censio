@@ -1,0 +1,27 @@
+# Tasks: Companion settings window
+
+Plan: [plan.md](plan.md)
+
+Each task names its criteria, the tasks it waits for and its group (steps 4–6 run per group, one agent per member
+and mode; rows consecutive). Documentation rows are in the last group.
+
+| # | Group | Task | Files | Criteria | Depends on | Owner | Done |
+| - | ----- | ---- | ----- | -------- | ---------- | ----- | ---- |
+| 1 | G1 | Skeleton: `CompanionLanguage`, `CompanionTexts`, `TrayMenuState`, `TrayMenu.Create`/`Format*` with texts, `TraySnapshot.For*` with texts, `TrayMenuEntryKind.OpenSettings`, `CompanionSettings.ReadLanguage`/`LanguageKey`; adapt the existing test call sites. Members: For, LanguageOf, FormatProblem, FormatNotice, FormatOutcome, ForConnection, ForReplay, ForInvalidCommandLine, Create, ReadLanguage (types used: bool, string, int, get, required, sealed, event, IReadOnlyList, Exception, TrayServerStatus, LoggerMessage) | `src/Censio.Companion.Core/`, `tests/Censio.Companion.Core.Tests/` | AC5 | — | Dev | [ ] |
+| 2 | G1 | Tests first: German texts, German menu, longest German tooltip, `ReadLanguage`, `LanguageOf`, `Settings…` position | `tests/Censio.Companion.Core.Tests/CompanionTextsTests.cs`, `TrayMenuTests.cs`, `TraySnapshotTests.cs`, `CompanionSettingsTests.cs` | AC1, AC5 | 1 | Tester | [ ] |
+| 3 | G1 | Implement the texts, German wording, the log's English callers, `ReadLanguage` | `src/Censio.Companion.Core/` | AC1, AC5 | 2 | Dev | [ ] |
+| 4 | G2 | Skeleton: `CompanionSettingsMode`, `CompanionSettingsValues`, `SettingsField`, `SettingsProblemKind`, `SettingsProblem`, `CompanionSettingsDocument`, `CompanionSettingsWrite`, `CompanionSettingsWriteKind`, `CompanionSettingsValidator`. Members: Load, NeedsRestart, Save, Validate | `src/Censio.Companion.Core/` | AC2, AC3, AC8 | 3 | Dev | [ ] |
+| 5 | G2 | Tests first: load, save, read-back, unknown keys, other-case keys, E7–E10, validation rows | `tests/Censio.Companion.Core.Tests/CompanionSettingsDocumentTests.cs`, `CompanionSettingsValidatorTests.cs` | AC2, AC3, AC8 | 4 | Tester | [ ] |
+| 6 | G2 | Implement document, write and validator with the shared whole-number helper | `src/Censio.Companion.Core/` | AC2, AC3, AC8 | 5 | Dev | [ ] |
+| 7 | G3 | Skeleton: `CompanionProfile`, `CompanionProfiles`, `ProfileNotice`, `ProfileNoticeKind`, `CompanionFolders.Profiles`, `LiveSender.UseProfiles`, `LiveSender.ProfileNoticeRaised`, the `CompanionLog` lines `ProfileSwitched`, `ProfilesFileInvalid`, `SettingsSaved`, `SettingsNotSaved`, `LanguageSettingInvalid`. Members: Load, CheckNewName, Create, Select, NameOf, ObserveSessionStart, ObserveSessionEnd, RunAsync, IsObserved, UseProfiles | `src/Censio.Companion.Core/` | AC6, AC7, AC8, AC9 | 6 | Dev | [ ] |
+| 8 | G3 | Tests first: profile file rules, notices and links, reconnect per profile, offline profile named, no figure in logs, log lines | `tests/Censio.Companion.Core.Tests/CompanionProfilesTests.cs`, `LiveSenderProfileTests.cs`, `CompanionLogTests.cs` | AC6, AC7, AC8, AC9 | 7 | Tester | [ ] |
+| 9 | G3 | Implement profiles, the background writer and `LiveSender`'s profile path | `src/Censio.Companion.Core/` | AC6, AC7, AC8, AC9 | 8 | Dev | [ ] |
+| 10 | G4 | Skeleton: `CompanionCommandLine.RestartedSwitch`/`IsRestart`, `SingleInstanceGuard.RestartWait`/`TryAcquire(TimeSpan)`, `CompanionRestart`, `CompanionLog.RestartNotStarted`/`RestartWaitTimedOut`. Members: TryAcquire, TryStart | `src/Censio.Companion.Core/` | AC4 | 9 | Dev | [ ] |
+| 11 | G4 | Tests first: switch parsing, guard wait and timeout, restart launch and failure | `tests/Censio.Companion.Core.Tests/CompanionCommandLineTests.cs`, `SingleInstanceGuardTests.cs`, `CompanionRestartTests.cs` | AC4 | 10 | Tester | [ ] |
+| 12 | G4 | Implement the restart pieces | `src/Censio.Companion.Core/` | AC4 | 11 | Dev | [ ] |
+| 13 | G5 | Skeleton: `ISettingsWindow`, `SettingsRunState`, `SettingsWindowContext`, `SettingsView`, `SettingsInput`, `SettingsSaveKind`, `SettingsSaveOutcome`, `SettingsWindowSession`. Members: ShowView, ShowOutcome, BringToFront, Open, IsOpen, RefreshTexts; shell: ShowNotice, NoticeClicked, TrayIconSources.Texts | `src/Censio.Companion.Core/` | AC1, AC3, AC4, AC5, AC9 | 12 | Dev | [ ] |
+| 14 | G5 | Tests first: open, bring to front, save paths, warnings, restart, language at once, autostart failure, no token in log; `FakeSettingsWindow` | `tests/Censio.Companion.Core.Tests/SettingsWindowSessionTests.cs`, `FakeSettingsWindow.cs` | AC1, AC3, AC4, AC5, AC9 | 13 | Tester | [ ] |
+| 15 | G5 | Implement the session; the WPF `SettingsWindow`, `TrayIcon.ShowNotice`/`NoticeClicked`, `TrayIconSources.Texts`, `App.xaml.cs` wiring (profiles, language, restart start-up, notices) | `src/Censio.Companion.Core/`, `src/Censio.Companion/` | AC1, AC4, AC5, AC7 | 14 | Dev | [ ] |
+| 16 | G6 | Documentation, no new API: README, user guide, ARCHITECTURE, the area documents and their index, the `.squad/project.md` text reported for the orchestrator | `README.md`, `docs/USER_GUIDE.md`, `docs/ARCHITECTURE.md`, `docs/areas/` | AC10 | 15 | Dev | [ ] |
+| 17 | G6 | `FakeSettingsWindow` in *Test doubles* | `docs/UNIT_TESTS.md` | AC10 | 15 | Tester | [ ] |
+| 18 | PM | Manual test on the CI-built ZIP of the early draft PR: window, restart (also with the old Companion killed), notification click, German texts, profile names on the pages | — | AC1, AC4, AC5, AC7, AC10 | 16 | Product Manager | [ ] |
