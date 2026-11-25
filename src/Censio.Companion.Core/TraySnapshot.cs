@@ -113,12 +113,10 @@ public sealed record TraySnapshot
     /// </summary>
     /// <param name="notice">The pending notice, or <c>null</c> if none is pending</param>
     /// <returns>The look</returns>
-#pragma warning disable RH2003, S2325 // Skeleton: removed with the implementation
     public TrayIconLook LookWith(ProfileNotice? notice)
     {
-        throw new NotImplementedException();
+        return notice is null || Look == TrayIconLook.Problem ? Look : TrayIconLook.Notice;
     }
-#pragma warning restore RH2003, S2325 // Skeleton: removed with the implementation
 
     /// <summary>
     /// Gets the look of a connection state.

@@ -129,9 +129,7 @@ public sealed class CompanionProfiles
     /// <summary>
     /// Occurs when the pending notice changes.
     /// </summary>
-#pragma warning disable CS0067, S3264 // Skeleton: removed with the implementation
     public event EventHandler? PendingNoticeChanged;
-#pragma warning restore CS0067, S3264 // Skeleton: removed with the implementation
 
     #endregion // Events
 
@@ -310,6 +308,7 @@ public sealed class CompanionProfiles
     public CompanionProfile Create(string name)
     {
         CompanionProfile created;
+        bool isNoticeChanged;
 
         lock (_lock)
         {
@@ -326,11 +325,12 @@ public sealed class CompanionProfiles
 
             _profiles.Add(created);
             Activate(created);
-            PendingNotice = null;
+            isNoticeChanged = ReplaceNotice(null);
             MarkChanged();
         }
 
         ActiveChanged?.Invoke(this, EventArgs.Empty);
+        RaisePendingNoticeChanged(isNoticeChanged);
 
         return created;
     }
@@ -343,6 +343,7 @@ public sealed class CompanionProfiles
     public void Select(Guid id)
     {
         bool isChanged;
+        bool isNoticeChanged;
 
         lock (_lock)
         {
@@ -355,7 +356,7 @@ public sealed class CompanionProfiles
                 Activate(profile);
             }
 
-            PendingNotice = null;
+            isNoticeChanged = ReplaceNotice(null);
 
             if (isChanged || _isFileInvalid)
             {
@@ -367,6 +368,8 @@ public sealed class CompanionProfiles
         {
             ActiveChanged?.Invoke(this, EventArgs.Empty);
         }
+
+        RaisePendingNoticeChanged(isNoticeChanged);
     }
 
     /// <summary>
@@ -391,42 +394,86 @@ public sealed class CompanionProfiles
     {
         var key = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(figure)));
 
+        ProfileNotice? notice;
+        bool isNoticeChanged;
+
         lock (_lock)
         {
-            if (_isFileInvalid)
-            {
-                PendingNotice = null;
+            notice = ObserveSessionStartLocked(key, out isNoticeChanged);
+        }
 
-                return null;
+        RaisePendingNoticeChanged(isNoticeChanged);
+
+        return notice;
+    }
+
+    /// <summary>
+    /// Observes the start of a session while the lock is held.
+    /// </summary>
+    /// <param name="key">The key of the figure</param>
+    /// <param name="isNoticeChanged">Whether the pending notice changed</param>
+    /// <returns>The notice to show, or <see langword="null" /> when there is none</returns>
+    private ProfileNotice? ObserveSessionStartLocked(string key, out bool isNoticeChanged)
+    {
+        if (_isFileInvalid)
+        {
+            isNoticeChanged = ReplaceNotice(null);
+
+            return null;
+        }
+
+        ProfileNotice? notice = null;
+        var index = _figures.FindIndex(link => link.Key == key);
+
+        if (index >= 0)
+        {
+            var linked = _figures[index].Value;
+
+            if (linked != _active.Id && _profiles.Find(candidate => candidate.Id == linked) is { } other)
+            {
+                notice = CreateNotice(ProfileNoticeKind.LastUsedWithOther, other.Name);
             }
 
-            ProfileNotice? notice = null;
-            var index = _figures.FindIndex(link => link.Key == key);
+            _figures.RemoveAt(index);
+        }
+        else if (_figures.Any(link => link.Value == _active.Id))
+        {
+            notice = CreateNotice(ProfileNoticeKind.NewFigure, _active.Name);
+        }
 
-            if (index >= 0)
-            {
-                var linked = _figures[index].Value;
+        Link(key, _active.Id);
 
-                if (linked != _active.Id && _profiles.Find(candidate => candidate.Id == linked) is { } other)
-                {
-                    notice = CreateNotice(ProfileNoticeKind.LastUsedWithOther, other.Name);
-                }
+        _currentFigure = key;
+        isNoticeChanged = ReplaceNotice(notice);
 
-                _figures.RemoveAt(index);
-            }
-            else if (_figures.Any(link => link.Value == _active.Id))
-            {
-                notice = CreateNotice(ProfileNoticeKind.NewFigure, _active.Name);
-            }
+        MarkChanged();
 
-            Link(key, _active.Id);
+        return notice;
+    }
 
-            _currentFigure = key;
-            PendingNotice = notice;
+    /// <summary>
+    /// Replaces the pending notice.
+    /// </summary>
+    /// <param name="notice">The new pending notice, or <see langword="null" /> if none</param>
+    /// <returns>Whether the pending notice is another one than before</returns>
+    private bool ReplaceNotice(ProfileNotice? notice)
+    {
+        var isChanged = ReferenceEquals(PendingNotice, notice) == false;
 
-            MarkChanged();
+        PendingNotice = notice;
 
-            return notice;
+        return isChanged;
+    }
+
+    /// <summary>
+    /// Raises <see cref="PendingNoticeChanged" /> outside the lock.
+    /// </summary>
+    /// <param name="isChanged">Whether the pending notice changed</param>
+    private void RaisePendingNoticeChanged(bool isChanged)
+    {
+        if (isChanged)
+        {
+            PendingNoticeChanged?.Invoke(this, EventArgs.Empty);
         }
     }
 
@@ -435,11 +482,15 @@ public sealed class CompanionProfiles
     /// </summary>
     public void ObserveSessionEnd()
     {
+        bool isNoticeChanged;
+
         lock (_lock)
         {
             _currentFigure = null;
-            PendingNotice = null;
+            isNoticeChanged = ReplaceNotice(null);
         }
+
+        RaisePendingNoticeChanged(isNoticeChanged);
     }
 
     /// <summary>

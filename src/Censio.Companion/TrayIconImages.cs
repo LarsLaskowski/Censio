@@ -61,7 +61,7 @@ internal sealed class TrayIconImages : IDisposable
     }
 
     /// <summary>
-    /// Draws the icon of a look: a grey ring, a green filled circle or a red filled triangle or a blue square.
+    /// Draws the icon of a look: a grey ring, a green filled circle or a red filled triangle or a blue square with a white i.
     /// </summary>
     /// <param name="look">The look</param>
     /// <param name="width">The width in pixels</param>
@@ -103,7 +103,14 @@ internal sealed class TrayIconImages : IDisposable
                     {
                         using var brush = new SolidBrush(Color.FromArgb(0x09, 0x69, 0xDA));
 
+                        using var mark = new SolidBrush(Color.White);
+
+                        var barWidth = Math.Max(2f, width / 8f);
+                        var left = area.Left + ((area.Width - barWidth) / 2f);
+
                         graphics.FillRectangle(brush, area);
+                        graphics.FillRectangle(mark, left, area.Top + (area.Height * 0.45f), barWidth, area.Height * 0.4f);
+                        graphics.FillRectangle(mark, left, area.Top + (area.Height * 0.15f), barWidth, barWidth);
                     }
                     break;
 

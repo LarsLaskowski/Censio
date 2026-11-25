@@ -400,7 +400,7 @@ public sealed partial class App : Application, IDisposable
                                                           snapshot =>
                                                           {
                                                               trayIcon.SetToolTip(TrayMenu.FormatSnapshotToolTip(_texts, snapshot, TimeProvider.System));
-                                                              trayIcon.SetLook(snapshot.Look);
+                                                              trayIcon.SetLook(snapshot.LookWith(LiveProfiles()?.PendingNotice));
                                                           });
 
         _updater = updater;
@@ -538,6 +538,7 @@ public sealed partial class App : Application, IDisposable
         connection.ItemReceived += (_, item) => sender.Enqueue(item);
         connection.StatusChanged += (_, status) => sender.NotifyState(status.State);
         sender.StatusChanged += (_, _) => updater.Notify();
+        _profiles!.PendingNoticeChanged += (_, _) => updater.Notify();
         _liveSender = sender;
         _liveBuffer = buffer;
 
