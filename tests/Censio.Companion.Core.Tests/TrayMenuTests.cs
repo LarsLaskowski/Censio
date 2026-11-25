@@ -49,12 +49,13 @@ public sealed class TrayMenuTests
     }
 
     /// <summary>
-    /// The menu lists status, last tick, game, separator, settings, open diagnostics, toggle, both folder entries,
-    /// separator, start with Windows, separator, version, separator and exit, in this order, with the status and last-tick
-    /// entries greyed out and no entry checked while the autostart is off.
+    /// The menu lists status, last tick, game, catalog, separator, settings, open diagnostics, toggle, both folder
+    /// entries, separator, version, separator and exit, in this order, with the status, last-tick, game, catalog and
+    /// version entries and the separators greyed out, and no start-with-Windows entry (S4).
     /// </summary>
     [TestMethod]
     [TestCategory("AC1")]
+    [TestCategory("AC11")]
     public void TrayMenuCreateListsEntriesInOrder()
     {
         // Arrange
@@ -71,8 +72,6 @@ public sealed class TrayMenuTests
                                 TrayMenuEntryKind.ToggleRecording,
                                 TrayMenuEntryKind.OpenRecordingsFolder,
                                 TrayMenuEntryKind.OpenLogFolder,
-                                TrayMenuEntryKind.Separator,
-                                TrayMenuEntryKind.ToggleAutostart,
                                 TrayMenuEntryKind.Separator,
                                 TrayMenuEntryKind.Version,
                                 TrayMenuEntryKind.Separator,
@@ -91,14 +90,11 @@ public sealed class TrayMenuTests
                                 "Open recordings folder",
                                 "Open log folder",
                                 string.Empty,
-                                "Start with Windows",
-                                string.Empty,
                                 "Version 1.2.3",
                                 string.Empty,
                                 "Exit"
                             };
-        var expectedEnabled = new[] { false, false, false, false, false, true, true, true, true, true, false, true, false, false, false, true };
-        var expectedChecked = new bool[16];
+        var expectedEnabled = new[] { false, false, false, false, false, true, true, true, true, true, false, false, false, true };
 
         // Act
         var entries = TrayMenu.Create(CompanionTexts.English,
@@ -109,7 +105,6 @@ public sealed class TrayMenuTests
                                           Game = GameInstallationStatus.Searching,
                                           Catalog = GameCatalogStatus.Reading,
                                           Server = null,
-                                          IsAutostartEnabled = false,
                                           Clock = CreateClock(1)
                                       });
 
@@ -117,23 +112,27 @@ public sealed class TrayMenuTests
         Assert.AreSequenceEqual(expectedKinds, entries.Select(entry => entry.Kind).ToArray(), "The entries should be in the order of the menu");
         Assert.AreSequenceEqual(expectedTexts, entries.Select(entry => entry.Text).ToArray(), "The entries should carry the status, the last tick, the game, the catalog, settings, open diagnostics, the toggle, the folders, the version and Exit");
         Assert.AreSequenceEqual(expectedEnabled, entries.Select(entry => entry.IsEnabled).ToArray(), "Status, last tick, game, catalog, version and separators should be greyed out, the rest enabled");
-        Assert.AreSequenceEqual(expectedChecked, entries.Select(entry => entry.IsChecked).ToArray(), "No entry should be checked while the autostart is off");
     }
 
     /// <summary>
-    /// The start-with-Windows entry reads Start with Windows and is enabled live, while recording, in a replay and with an
-    /// invalid command line.
+    /// The menu holds no start-with-Windows entry live, while recording, in a replay, with an invalid command line, in
+    /// local mode and in forward mode: no entry is of the autostart kind and none reads Start with Windows (S4).
     /// </summary>
     /// <param name="mode">The mode of the Companion: live, recording, replay or invalid</param>
+    /// <param name="serverMode">The server mode: none, local or forward</param>
     [TestMethod]
-    [DataRow("live")]
-    [DataRow("recording")]
-    [DataRow("replay")]
-    [DataRow("invalid")]
-    public void TrayMenuCreateAutostartEnabledInEveryMode(string mode)
+    [TestCategory("AC11")]
+    [DataRow("live", "none")]
+    [DataRow("recording", "none")]
+    [DataRow("replay", "none")]
+    [DataRow("invalid", "none")]
+    [DataRow("live", "local")]
+    [DataRow("live", "forward")]
+    public void TrayMenuCreateHasNoAutostartEntryInEveryMode(string mode, string serverMode)
     {
         // Arrange
         var snapshot = CreateSnapshotForMode(mode);
+        var server = CreateServerStatusOrNone(serverMode);
 
         // Act
         var entries = TrayMenu.Create(CompanionTexts.English,
@@ -143,77 +142,17 @@ public sealed class TrayMenuTests
                                           Snapshot = snapshot,
                                           Game = GameInstallationStatus.Searching,
                                           Catalog = GameCatalogStatus.Reading,
-                                          Server = null,
-                                          IsAutostartEnabled = false,
+                                          Server = server,
                                           Clock = CreateClock(1)
                                       });
 
         // Assert
-        var autostart = entries.SingleOrDefault(entry => entry.Kind == TrayMenuEntryKind.ToggleAutostart);
+        var kindNames = entries.Select(entry => entry.Kind.ToString()).ToList();
+        var texts = entries.Select(entry => entry.Text).ToList();
 
-        Assert.IsNotNull(autostart, "The menu should hold the start-with-Windows entry in every mode");
-        Assert.AreEqual("Start with Windows", autostart.Text, "The entry should read Start with Windows");
-        Assert.AreEqual("Start with Windows", CompanionTexts.English.StartWithWindowsText, "The constant should read Start with Windows");
-        Assert.IsTrue(autostart.IsEnabled, "The entry should be enabled in every mode");
-    }
-
-    /// <summary>
-    /// The start-with-Windows entry carries a check mark when the autostart is on, and no other entry does.
-    /// </summary>
-    [TestMethod]
-    public void TrayMenuCreateAutostartCheckedWhenEnabled()
-    {
-        // Arrange
-        var snapshot = CreateSnapshot("Receiving", canRecord: true, isRecording: false);
-
-        // Act
-        var entries = TrayMenu.Create(CompanionTexts.English,
-                                      new TrayMenuState
-                                      {
-                                          Version = "1.2.3",
-                                          Snapshot = snapshot,
-                                          Game = GameInstallationStatus.Searching,
-                                          Catalog = GameCatalogStatus.Reading,
-                                          Server = null,
-                                          IsAutostartEnabled = true,
-                                          Clock = CreateClock(1)
-                                      });
-
-        // Assert
-        var checkedKinds = entries.Where(entry => entry.IsChecked).Select(entry => entry.Kind).ToArray();
-
-        Assert.AreSequenceEqual(new[] { TrayMenuEntryKind.ToggleAutostart }, checkedKinds, "Only the start-with-Windows entry should be checked when the autostart is on");
-        Assert.IsTrue(entries.Single(entry => entry.Kind == TrayMenuEntryKind.ToggleAutostart).IsEnabled, "The checked entry should stay enabled");
-    }
-
-    /// <summary>
-    /// The start-with-Windows entry carries no check mark when the autostart is off.
-    /// </summary>
-    [TestMethod]
-    public void TrayMenuCreateAutostartUncheckedWhenDisabled()
-    {
-        // Arrange
-        var snapshot = CreateSnapshot("Receiving", canRecord: true, isRecording: false);
-
-        // Act
-        var entries = TrayMenu.Create(CompanionTexts.English,
-                                      new TrayMenuState
-                                      {
-                                          Version = "1.2.3",
-                                          Snapshot = snapshot,
-                                          Game = GameInstallationStatus.Searching,
-                                          Catalog = GameCatalogStatus.Reading,
-                                          Server = null,
-                                          IsAutostartEnabled = false,
-                                          Clock = CreateClock(1)
-                                      });
-
-        // Assert
-        var autostart = entries.SingleOrDefault(entry => entry.Kind == TrayMenuEntryKind.ToggleAutostart);
-
-        Assert.IsNotNull(autostart, "The menu should hold the start-with-Windows entry");
-        Assert.IsFalse(autostart.IsChecked, "The entry should not be checked when the autostart is off");
-        Assert.IsTrue(autostart.IsEnabled, "The unchecked entry should stay enabled");
+        Assert.AreEqual("Start with Windows", CompanionTexts.English.StartWithWindowsText, "The text of the settings window's box should read Start with Windows");
+        Assert.DoesNotContain("ToggleAutostart", kindNames, $"No entry should be of the autostart kind: {mode}, {serverMode}");
+        Assert.DoesNotContain(CompanionTexts.English.StartWithWindowsText, texts, $"No entry should read Start with Windows: {mode}, {serverMode}");
     }
 
     /// <summary>
@@ -241,7 +180,6 @@ public sealed class TrayMenuTests
                                           Game = GameInstallationStatus.Searching,
                                           Catalog = GameCatalogStatus.Reading,
                                           Server = null,
-                                          IsAutostartEnabled = false,
                                           Clock = CreateClock(1)
                                       });
 
@@ -255,7 +193,7 @@ public sealed class TrayMenuTests
     }
 
     /// <summary>
-    /// The entry Settings… is enabled, unchecked and directly above Open diagnostics live, while recording, in a replay,
+    /// The entry Settings… is enabled and directly above Open diagnostics live, while recording, in a replay,
     /// with an invalid command line, in local mode and in forward mode (S1).
     /// </summary>
     /// <param name="mode">The mode of the Companion: live, recording, replay or invalid</param>
@@ -283,7 +221,6 @@ public sealed class TrayMenuTests
                                           Game = GameInstallationStatus.Searching,
                                           Catalog = GameCatalogStatus.Reading,
                                           Server = server,
-                                          IsAutostartEnabled = false,
                                           Clock = CreateClock(1)
                                       });
 
@@ -294,7 +231,6 @@ public sealed class TrayMenuTests
         Assert.AreEqual(kinds.IndexOf(TrayMenuEntryKind.OpenDiagnostics) - 1, kinds.IndexOf(TrayMenuEntryKind.OpenSettings), $"Settings… should be directly above Open diagnostics: {mode}, {serverMode}");
         Assert.AreEqual("Settings…", settings.Text, $"The entry should read Settings…: {mode}, {serverMode}");
         Assert.IsTrue(settings.IsEnabled, $"The entry should be enabled in every mode: {mode}, {serverMode}");
-        Assert.IsFalse(settings.IsChecked, $"The entry should not be checked: {mode}, {serverMode}");
     }
 
     /// <summary>
@@ -318,7 +254,6 @@ public sealed class TrayMenuTests
         // Assert
         Assert.AreSequenceEqual(english.Select(entry => entry.Kind).ToArray(), german.Select(entry => entry.Kind).ToArray(), $"The language should not change the entries or their order: {serverMode}");
         Assert.AreSequenceEqual(english.Select(entry => entry.IsEnabled).ToArray(), german.Select(entry => entry.IsEnabled).ToArray(), $"The language should not change which entries are enabled: {serverMode}");
-        Assert.AreSequenceEqual(english.Select(entry => entry.IsChecked).ToArray(), german.Select(entry => entry.IsChecked).ToArray(), $"The language should not change which entries are checked: {serverMode}");
         Assert.Contains(TrayMenuEntryKind.OpenSettings, german.Select(entry => entry.Kind).ToList(), $"The German menu should hold the settings entry: {serverMode}");
         Assert.IsEmpty(SameTexts(english, german), $"Every German entry but the version should differ from the English one: {serverMode}");
     }
@@ -341,7 +276,6 @@ public sealed class TrayMenuTests
                                           Game = GameInstallationStatus.Searching,
                                           Catalog = GameCatalogStatus.Reading,
                                           Server = null,
-                                          IsAutostartEnabled = false,
                                           Clock = CreateClock(1)
                                       });
 
@@ -370,7 +304,6 @@ public sealed class TrayMenuTests
                                           Game = GameInstallationStatus.Searching,
                                           Catalog = GameCatalogStatus.Reading,
                                           Server = null,
-                                          IsAutostartEnabled = false,
                                           Clock = CreateClock(1)
                                       });
 
@@ -403,7 +336,6 @@ public sealed class TrayMenuTests
                                           Game = GameInstallationStatus.Searching,
                                           Catalog = GameCatalogStatus.Reading,
                                           Server = null,
-                                          IsAutostartEnabled = false,
                                           Clock = CreateClock(1)
                                       });
 
@@ -442,7 +374,6 @@ public sealed class TrayMenuTests
                                           Game = GameInstallationStatus.Searching,
                                           Catalog = GameCatalogStatus.Reading,
                                           Server = null,
-                                          IsAutostartEnabled = false,
                                           Clock = CreateClock(1)
                                       });
 
@@ -471,7 +402,6 @@ public sealed class TrayMenuTests
                                           Game = GameInstallationStatus.Searching,
                                           Catalog = GameCatalogStatus.Reading,
                                           Server = null,
-                                          IsAutostartEnabled = false,
                                           Clock = CreateClock(1)
                                       });
 
@@ -497,7 +427,6 @@ public sealed class TrayMenuTests
                                           Game = GameInstallationStatus.Searching,
                                           Catalog = GameCatalogStatus.Reading,
                                           Server = null,
-                                          IsAutostartEnabled = false,
                                           Clock = CreateClock(1)
                                       });
 
@@ -523,7 +452,6 @@ public sealed class TrayMenuTests
                                           Game = GameInstallationStatus.Searching,
                                           Catalog = GameCatalogStatus.Reading,
                                           Server = null,
-                                          IsAutostartEnabled = false,
                                           Clock = CreateClock(1)
                                       });
 
@@ -1312,7 +1240,6 @@ public sealed class TrayMenuTests
                                           Game = game,
                                           Catalog = GameCatalogStatus.Reading,
                                           Server = null,
-                                          IsAutostartEnabled = false,
                                           Clock = CreateClock(1)
                                       });
 
@@ -1326,7 +1253,6 @@ public sealed class TrayMenuTests
         Assert.AreEqual(kinds.IndexOf(TrayMenuEntryKind.Separator) - 2, index, "The game entry should be directly above the catalog entry and the first separator");
         Assert.AreEqual(expected, entries[index].Text, "The game entry should show the text of the status");
         Assert.IsFalse(entries[index].IsEnabled, "The game entry should be greyed out like the last-tick entry");
-        Assert.IsFalse(entries[index].IsChecked, "The game entry should not be checked");
     }
 
     /// <summary>
@@ -1450,7 +1376,6 @@ public sealed class TrayMenuTests
                                           Game = GameInstallationStatus.Searching,
                                           Catalog = catalog,
                                           Server = null,
-                                          IsAutostartEnabled = false,
                                           Clock = CreateClock(1)
                                       });
 
@@ -1463,7 +1388,6 @@ public sealed class TrayMenuTests
         Assert.AreEqual(kinds.IndexOf(TrayMenuEntryKind.Separator) - 1, index, "The catalog entry should be directly above the first separator");
         Assert.AreEqual(expected, entries[index].Text, "The catalog entry should show the text of the status");
         Assert.IsFalse(entries[index].IsEnabled, "The catalog entry should be greyed out");
-        Assert.IsFalse(entries[index].IsChecked, "The catalog entry should not be checked");
     }
 
     /// <summary>
@@ -1520,7 +1444,6 @@ public sealed class TrayMenuTests
                                                    {
                                                        Local = localServer
                                                    },
-                                          IsAutostartEnabled = false,
                                           Clock = CreateClock(1)
                                       });
 
@@ -1533,7 +1456,6 @@ public sealed class TrayMenuTests
         Assert.AreEqual(kinds.IndexOf(TrayMenuEntryKind.Separator) - 1, index, "The server line should be directly above the first separator");
         Assert.AreEqual("Server: running at http://localhost:5117/", entries[index].Text, "The server line should show the text of the status");
         Assert.IsFalse(entries[index].IsEnabled, "The server line should be greyed out");
-        Assert.IsFalse(entries[index].IsChecked, "The server line should not be checked");
     }
 
     /// <summary>
@@ -1560,7 +1482,6 @@ public sealed class TrayMenuTests
                                           Game = GameInstallationStatus.Searching,
                                           Catalog = GameCatalogStatus.Reading,
                                           Server = null,
-                                          IsAutostartEnabled = false,
                                           Clock = CreateClock(1)
                                       });
 
@@ -1599,8 +1520,6 @@ public sealed class TrayMenuTests
                                 TrayMenuEntryKind.OpenRecordingsFolder,
                                 TrayMenuEntryKind.OpenLogFolder,
                                 TrayMenuEntryKind.Separator,
-                                TrayMenuEntryKind.ToggleAutostart,
-                                TrayMenuEntryKind.Separator,
                                 TrayMenuEntryKind.Version,
                                 TrayMenuEntryKind.Separator,
                                 TrayMenuEntryKind.Exit
@@ -1618,7 +1537,6 @@ public sealed class TrayMenuTests
                                                    {
                                                        Local = localServer
                                                    },
-                                          IsAutostartEnabled = false,
                                           Clock = CreateClock(1)
                                       });
 
@@ -1628,7 +1546,6 @@ public sealed class TrayMenuTests
         Assert.AreSequenceEqual(expectedKinds, entries.Select(entry => entry.Kind).ToArray(), "Open Censio should be directly above Settings…, Settings… directly above Open diagnostics and the server line below the catalog");
         Assert.AreEqual("Open Censio", openCensio.Text, "The entry should read Open Censio");
         Assert.AreEqual(CompanionTexts.English.OpenCensioText, openCensio.Text, "The entry should carry the text of the constant");
-        Assert.IsFalse(openCensio.IsChecked, "Open Censio should not be checked");
     }
 
     /// <summary>
@@ -1661,7 +1578,6 @@ public sealed class TrayMenuTests
                                                    {
                                                        Local = localServer
                                                    },
-                                          IsAutostartEnabled = false,
                                           Clock = CreateClock(1)
                                       });
 
@@ -1695,7 +1611,6 @@ public sealed class TrayMenuTests
                                           Game = GameInstallationStatus.Searching,
                                           Catalog = GameCatalogStatus.Reading,
                                           Server = server,
-                                          IsAutostartEnabled = false,
                                           Clock = CreateClock(1)
                                       });
 
@@ -1783,8 +1698,6 @@ public sealed class TrayMenuTests
                                 TrayMenuEntryKind.OpenRecordingsFolder,
                                 TrayMenuEntryKind.OpenLogFolder,
                                 TrayMenuEntryKind.Separator,
-                                TrayMenuEntryKind.ToggleAutostart,
-                                TrayMenuEntryKind.Separator,
                                 TrayMenuEntryKind.Version,
                                 TrayMenuEntryKind.Separator,
                                 TrayMenuEntryKind.Exit
@@ -1799,7 +1712,6 @@ public sealed class TrayMenuTests
                                           Game = GameInstallationStatus.Searching,
                                           Catalog = GameCatalogStatus.Reading,
                                           Server = server,
-                                          IsAutostartEnabled = false,
                                           Clock = CreateClock(1)
                                       });
 
@@ -1809,7 +1721,6 @@ public sealed class TrayMenuTests
         Assert.AreSequenceEqual(expectedKinds, entries.Select(entry => entry.Kind).ToArray(), "The server line should be below the catalog, without the local server line or Open Censio");
         Assert.AreEqual("Server: connected", serverLine.Text, "The server line should show the text of the live status");
         Assert.IsFalse(serverLine.IsEnabled, "The server line should be greyed out");
-        Assert.IsFalse(serverLine.IsChecked, "The server line should not be checked");
     }
 
     /// <summary>
@@ -1847,7 +1758,6 @@ public sealed class TrayMenuTests
                                           Game = GameInstallationStatus.Searching,
                                           Catalog = GameCatalogStatus.Reading,
                                           Server = server,
-                                          IsAutostartEnabled = false,
                                           Clock = CreateClock(1)
                                       });
 
@@ -1929,7 +1839,6 @@ public sealed class TrayMenuTests
                                           Game = GameInstallationStatus.Searching,
                                           Catalog = GameCatalogStatus.Reading,
                                           Server = server,
-                                          IsAutostartEnabled = false,
                                           Clock = CreateClock(1)
                                       });
 
@@ -1941,7 +1850,6 @@ public sealed class TrayMenuTests
         Assert.AreEqual(kinds.IndexOf(TrayMenuEntryKind.Separator) - 1, kinds.IndexOf(TrayMenuEntryKind.LiveBuffer), $"The buffer line should be directly above the first separator in {mode} mode");
         Assert.AreEqual("Buffer: 3 waiting, 1 dropped", bufferLine.Text, $"The buffer line should show the text of the buffer's status in {mode} mode");
         Assert.IsFalse(bufferLine.IsEnabled, "The buffer line should be greyed out");
-        Assert.IsFalse(bufferLine.IsChecked, "The buffer line should not be checked");
         Assert.ContainsSingle(entry => entry.Text.StartsWith("Buffer:", StringComparison.Ordinal), entries, "The menu should hold exactly one buffer text");
     }
 
@@ -1970,7 +1878,6 @@ public sealed class TrayMenuTests
                                           Game = GameInstallationStatus.Searching,
                                           Catalog = GameCatalogStatus.Reading,
                                           Server = server,
-                                          IsAutostartEnabled = false,
                                           Clock = CreateClock(1)
                                       });
 
@@ -2263,8 +2170,7 @@ public sealed class TrayMenuTests
 
     /// <summary>
     /// Creates the state of a menu that holds every entry of a server mode: a recording live connection with a tick, a
-    /// found game, a ready catalog, the server line, a buffer line with dropped messages kept in memory only, and the
-    /// autostart on.
+    /// found game, a ready catalog, the server line and a buffer line with dropped messages kept in memory only.
     /// </summary>
     /// <param name="texts">The texts of the snapshot</param>
     /// <param name="mode">The server mode: local or forward</param>
@@ -2296,7 +2202,6 @@ public sealed class TrayMenuTests
                                                      {
                                                          Buffer = buffer
                                                      },
-                   IsAutostartEnabled = true,
                    Clock = CreateClock(1)
                };
     }
