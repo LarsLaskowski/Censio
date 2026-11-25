@@ -172,10 +172,12 @@ public sealed class CompanionProfiles
         }
     }
 
+#pragma warning disable S2325, CA1065, RH2003 // Skeleton: removed with the implementation
     /// <summary>
     /// Gets the pending notice about the active profile, or <see langword="null" /> if none.
     /// </summary>
     public ProfileNotice? PendingNotice => throw new NotImplementedException();
+#pragma warning restore S2325, CA1065, RH2003
 
     #endregion // Properties
 

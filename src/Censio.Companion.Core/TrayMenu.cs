@@ -279,6 +279,7 @@ public static class TrayMenu
         return entries;
     }
 
+#pragma warning disable RH2003 // Skeleton: removed with the implementation
     /// <summary>
     /// Appends the name of the active profile to the text of the server line.
     /// </summary>
@@ -290,6 +291,7 @@ public static class TrayMenu
     {
         throw new NotImplementedException();
     }
+#pragma warning restore RH2003
 
     /// <summary>
     /// Formats the text of the local server entry.
