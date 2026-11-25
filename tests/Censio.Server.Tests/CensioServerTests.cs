@@ -653,6 +653,47 @@ public sealed class CensioServerTests
     }
 
     /// <summary>
+    /// Live data in local mode, sent under one profile and then under another created while connected, reaches the real
+    /// ingest endpoint under both: the switch's hello is accepted once the old session ended, and each profile's page
+    /// shows its name (S5, S6, Challenge 1 of the plan).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC6")]
+    public async Task CensioServerStartLocalLiveProfileSwitchListsBothProfileNames()
+    {
+        // Arrange
+        var directory = CreateTemporaryDirectory();
+        var session = await RunSessionOnFreePortAsync(Path.Combine(directory, "Data"), new FakeTimeProvider(new DateTimeOffset(2026, 11, 21, 12, 0, 0, TimeSpan.Zero)));
+        var profiles = CompanionProfiles.Load(Path.Combine(directory, "profiles.json"), NullLogger.Instance);
+        var first = profiles.Create("MARKER-Alpha");
+
+        await using var buffer = new LiveBuffer(Path.Combine(directory, "Buffer"), LiveBufferLimits.Defaults, TimeProvider.System, NullLogger.Instance);
+        await using var sender = LiveSender.ForLocalServer(session.Status.Port, session.WaitForTokenAsync, buffer, "1.0.0", new ClientWebSocketConnector(TimeProvider.System), TimeProvider.System, NullLogger.Instance);
+
+        _ = buffer.RunAsync(TestContext.CancellationToken);
+        sender.UseProfiles(profiles);
+        _ = sender.RunAsync(TestContext.CancellationToken);
+
+        // Act
+        sender.Enqueue(CreateLiveTickItem(100));
+
+        var isFirstSent = await WaitUntilSentAsync(buffer);
+        var second = profiles.Create("MARKER-Beta");
+
+        sender.Enqueue(CreateLiveTickItem(200));
+
+        var isSecondSent = await WaitUntilSentAsync(buffer);
+
+        // Assert
+        Assert.IsTrue(isFirstSent, "The tick of the first profile should be acknowledged");
+        Assert.IsTrue(isSecondSent, "The tick after the switch should be acknowledged");
+        Assert.AreEqual(LiveSendState.Connected, sender.Status.State, "The sender should be connected after the switch: " + sender.Status.Problem);
+        Assert.Contains("MARKER-Alpha", await ReadRegionsPageAsync(session.Status.Port, first.Id), "The first profile's page should show its name");
+        Assert.Contains("MARKER-Beta", await ReadRegionsPageAsync(session.Status.Port, second.Id), "The second profile's page should show its name");
+    }
+
+    /// <summary>
     /// Creates the options of a local server whose content root is the test's base folder.
     /// </summary>
     /// <param name="port">The port</param>
@@ -810,6 +851,37 @@ public sealed class CensioServerTests
     }
 
     /// <summary>
+    /// Creates the pipe item of a live tick of one island, received now.
+    /// </summary>
+    /// <param name="gameTime">The game time, which identifies the tick</param>
+    /// <returns>The item</returns>
+    private static PipeConnectionItem CreateLiveTickItem(long gameTime)
+    {
+        var now = TimeProvider.System.GetUtcNow();
+        var tick = new PipeTick
+                   {
+                       GameTime = gameTime,
+                       ReceiveTime = now,
+                       Islands = [
+                                     new PipeTickIsland
+                                     {
+                                         Key = new PipeIslandKey(180023, 1, 0),
+                                         SessionId = 1,
+                                         Name = "Isle Of Hidden Names",
+                                         Entries = []
+                                     }
+                                 ],
+                       CloseReason = PipeTickCloseReason.GameTimeChanged
+                   };
+
+        return new PipeConnectionItem
+               {
+                   Result = PipeTickResult.FromTick(tick),
+                   ReadStamp = now
+               };
+    }
+
+    /// <summary>
     /// Creates a runner that replays the fixture at maximum speed into a sender.
     /// </summary>
     /// <param name="sender">The sender</param>
@@ -951,6 +1023,25 @@ public sealed class CensioServerTests
         _sessions.Add(session);
 
         await session.WaitForTokenAsync(TestContext.CancellationToken).WaitAsync(_replayBound, TestContext.CancellationToken);
+    }
+
+    /// <summary>
+    /// Polls the buffer of a live sender, 20 milliseconds apart within the replay bound, until no message waits.
+    /// </summary>
+    /// <param name="buffer">The buffer</param>
+    /// <returns>Whether no message waits</returns>
+    private async Task<bool> WaitUntilSentAsync(LiveBuffer buffer)
+    {
+        var polls = (int)(_replayBound.TotalMilliseconds / 20);
+
+        while (buffer.Status.Waiting > 0 && polls > 0)
+        {
+            await Task.Delay(20, TestContext.CancellationToken);
+
+            polls--;
+        }
+
+        return buffer.Status.Waiting == 0;
     }
 
     /// <summary>

@@ -111,5 +111,35 @@ public sealed class CompanionLogTests
         Assert.AreSequenceEqual([(LogLevel.Information, "Catalog: more than 1000 GUIDs cannot be named; further ones are not logged for this catalog")], logger.Entries.Select(entry => (entry.Level, entry.Message)).ToArray(), "The cap line should name the catalog");
     }
 
+    /// <summary>
+    /// The lines of the settings window and the profiles write their level and their exact text, the exception's type and
+    /// the problem filled in, and no exception (N5).
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC9")]
+    public void CompanionLogSettingsAndProfilesTemplates()
+    {
+        // Arrange
+        var logger = new RecordingLogger();
+
+        // Act
+        CompanionLog.SettingsSaved(logger);
+        CompanionLog.SettingsNotSaved(logger, nameof(IOException));
+        CompanionLog.ProfileSwitched(logger);
+        CompanionLog.ProfilesFileInvalid(logger, "not of its format");
+        CompanionLog.LanguageSettingInvalid(logger);
+
+        // Assert
+        (LogLevel, string, Exception?)[] expected = [
+                                                        (LogLevel.Information, "Settings saved", null),
+                                                        (LogLevel.Warning, "Could not save the settings: IOException", null),
+                                                        (LogLevel.Information, "Profile switched", null),
+                                                        (LogLevel.Warning, "Profiles file invalid: not of its format", null),
+                                                        (LogLevel.Warning, "Language setting invalid; the Windows display language is used", null),
+                                                    ];
+
+        Assert.AreSequenceEqual(expected, logger.Entries.Select(entry => (entry.Level, entry.Message, entry.Exception)).ToArray(), "Each method should log its level and its text, without an exception");
+    }
+
     #endregion // Methods
 }
