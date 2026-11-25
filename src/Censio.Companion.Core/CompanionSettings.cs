@@ -190,6 +190,38 @@ public static class CompanionSettings
     }
 
     /// <summary>
+    /// Finds the properties of an object whose name is a key, ignoring case.
+    /// </summary>
+    /// <param name="root">The object</param>
+    /// <param name="key">The key</param>
+    /// <returns>The values of the properties</returns>
+    internal static List<JsonElement> FindProperties(JsonElement root, string key)
+    {
+        return root.EnumerateObject()
+                   .Where(property => string.Equals(property.Name, key, StringComparison.OrdinalIgnoreCase))
+                   .Select(property => property.Value)
+                   .ToList();
+    }
+
+    /// <summary>
+    /// Reads a whole number from text written as decimal digits only, within a range.
+    /// </summary>
+    /// <param name="text">The text</param>
+    /// <param name="minimum">The smallest number</param>
+    /// <param name="maximum">The largest number</param>
+    /// <param name="number">The number</param>
+    /// <returns><see langword="true" /> when the text is such a number</returns>
+    internal static bool TryParseWholeNumber(ReadOnlySpan<char> text, int minimum, int maximum, out int number)
+    {
+        number = 0;
+
+        return text.IndexOfAnyExceptInRange('0', '9') < 0
+               && int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out number)
+               && number >= minimum
+               && number <= maximum;
+    }
+
+    /// <summary>
     /// Reads at most <see cref="MaxFileLength" /> plus one byte of the file.
     /// </summary>
     /// <param name="path">The path of the settings file</param>
@@ -446,20 +478,6 @@ public static class CompanionSettings
     }
 
     /// <summary>
-    /// Finds the properties of an object whose name is a key, ignoring case.
-    /// </summary>
-    /// <param name="root">The object</param>
-    /// <param name="key">The key</param>
-    /// <returns>The values of the properties</returns>
-    private static List<JsonElement> FindProperties(JsonElement root, string key)
-    {
-        return root.EnumerateObject()
-                   .Where(property => string.Equals(property.Name, key, StringComparison.OrdinalIgnoreCase))
-                   .Select(property => property.Value)
-                   .ToList();
-    }
-
-    /// <summary>
     /// Reads a whole number from a JSON number written as decimal digits only, within a range.
     /// </summary>
     /// <param name="value">The value</param>
@@ -476,12 +494,7 @@ public static class CompanionSettings
             return false;
         }
 
-        var text = value.GetRawText().AsSpan();
-
-        return text.IndexOfAnyExceptInRange('0', '9') < 0
-               && int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out number)
-               && number >= minimum
-               && number <= maximum;
+        return TryParseWholeNumber(value.GetRawText(), minimum, maximum, out number);
     }
 
     /// <summary>
