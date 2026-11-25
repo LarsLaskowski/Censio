@@ -42,3 +42,4 @@ are quoted in full.
 | 2026-11-25 16:50 | 5 Tests first skipped (G6) | Orchestrator | skipped — G6 is documentation only, no production behaviour |
 | 2026-11-25 17:04 | 6 Implement (G6) | Dev | Documentation done: README, USER_GUIDE (EN/DE), ARCHITECTURE, SECURITY (Security texts), three new and five updated area documents, index; checks pass; reported .squad/project.md text for the orchestrator; old wording remains in records 0044, 0080, 0099, 0103 (sonnet/medium · 396,780 tokens · 111 tool uses · 833 s · 218 in · 109,278 out · 27,274,819 cache read · 393,541 cache write · 3,766,016 weighted) |
 | 2026-11-25 17:07 | 6 Coverage (G6) | Tester | FakeSettingsWindow added to Test doubles in docs/UNIT_TESTS.md; config-check PASS (opus/medium · 76,294 tokens · 7 tool uses · 105 s · 12 in · 2,050 out · 367,146 cache read · 75,550 cache write · 246,114 weighted) |
+| 2026-11-25 17:07 | 6 Documentation | Orchestrator | written in 6 Implement (G6) |
