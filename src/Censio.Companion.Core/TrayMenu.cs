@@ -12,64 +12,9 @@ public static class TrayMenu
     #region Constants
 
     /// <summary>
-    /// The tooltip of the tray icon.
-    /// </summary>
-    public const string ToolTip = "Censio Companion";
-
-    /// <summary>
-    /// The text of the exit entry.
-    /// </summary>
-    public const string ExitText = "Exit";
-
-    /// <summary>
-    /// The tooltip of the tray icon when the command line is invalid.
-    /// </summary>
-    public const string InvalidCommandLineToolTip = "Censio Companion: Invalid command line";
-
-    /// <summary>
-    /// The status text when the command line is invalid.
-    /// </summary>
-    public const string InvalidCommandLineStatusText = "Invalid command line";
-
-    /// <summary>
     /// The longest text the tray icon can show as a tooltip.
     /// </summary>
     public const int MaxToolTipLength = 127;
-
-    /// <summary>
-    /// The text of the entry that starts the recording.
-    /// </summary>
-    public const string StartRecordingText = "Start recording";
-
-    /// <summary>
-    /// The text of the entry that stops the recording.
-    /// </summary>
-    public const string StopRecordingText = "Stop recording";
-
-    /// <summary>
-    /// The text of the entry that opens the recordings folder.
-    /// </summary>
-    public const string OpenRecordingsFolderText = "Open recordings folder";
-
-    /// <summary>
-    /// The text of the entry that opens the log folder.
-    /// </summary>
-    public const string OpenLogFolderText = "Open log folder";
-
-    /// <summary>
-    /// The text of the entry that opens the diagnostics window.
-    /// </summary>
-    public const string OpenDiagnosticsText = "Open diagnostics";
-
-    /// <summary>
-    /// The text of the entry that turns the start with Windows on or off.
-    /// </summary>
-    public const string StartWithWindowsText = "Start with Windows";
-
-    /// <summary>
-    /// The text of the entry that opens Censio in the browser.
-    /// </summary>
-    public const string OpenCensioText = "Open Censio";
 
     #endregion // Constants
 
@@ -97,16 +42,16 @@ public static class TrayMenu
     {
         var text = state switch
                    {
-                       PipeConnectionState.WaitingForGame => "Waiting for game",
-                       PipeConnectionState.Connected => "Connected",
-                       PipeConnectionState.Receiving => "Receiving",
-                       PipeConnectionState.PipeBusy => "Pipe busy",
-                       PipeConnectionState.ProtocolMismatch => "Protocol mismatch",
-                       PipeConnectionState.Error => "Error",
+                       PipeConnectionState.WaitingForGame => texts.StateWaitingForGame,
+                       PipeConnectionState.Connected => texts.StateConnected,
+                       PipeConnectionState.Receiving => texts.StateReceiving,
+                       PipeConnectionState.PipeBusy => texts.StatePipeBusy,
+                       PipeConnectionState.ProtocolMismatch => texts.StateProtocolMismatch,
+                       PipeConnectionState.Error => texts.StateError,
                        _ => throw new ArgumentOutOfRangeException(nameof(state), state, "The connection state is not defined")
                    };
 
-        return $"{ToolTip}: {text}";
+        return $"{texts.ToolTip}: {text}";
     }
 
     /// <summary>
@@ -122,8 +67,8 @@ public static class TrayMenu
         var suffix = recording switch
                      {
                          PipeRecordingState.Off => string.Empty,
-                         PipeRecordingState.Recording => " (recording)",
-                         PipeRecordingState.Failed => " (recording failed)",
+                         PipeRecordingState.Recording => texts.RecordingSuffix,
+                         PipeRecordingState.Failed => texts.RecordingFailedSuffix,
                          _ => throw new ArgumentOutOfRangeException(nameof(recording), recording, "The recording state is not defined")
                      };
 
@@ -143,40 +88,40 @@ public static class TrayMenu
         {
             var sendReason = FormatReplaySendReason(texts, sendProblem) ?? throw new ArgumentOutOfRangeException(nameof(status), sendProblem, "The send problem kind is not defined");
 
-            return $"{ToolTip}: Replay error: {sendReason}";
+            return $"{texts.ToolTip}: {string.Format(CultureInfo.InvariantCulture, texts.ReplayErrorFormat, sendReason)}";
         }
 
         if (status.Problem is { } problem)
         {
             var reason = FormatReplayReason(texts, problem) ?? throw new ArgumentOutOfRangeException(nameof(status), problem.Kind, "The problem kind is not defined");
 
-            return $"{ToolTip}: Replay error: {reason}";
+            return $"{texts.ToolTip}: {string.Format(CultureInfo.InvariantCulture, texts.ReplayErrorFormat, reason)}";
         }
 
         if (status.IsConnecting)
         {
-            return $"{ToolTip}: Replay: Connecting to server";
+            return $"{texts.ToolTip}: {texts.ReplayConnecting}";
         }
 
         if (status is { IsFinished: true, Sent: { } sent })
         {
-            return string.Create(CultureInfo.InvariantCulture, $"{ToolTip}: Replay finished: {sent.Ticks} {(sent.Ticks == 1 ? "tick" : "ticks")} sent, {sent.Refused} refused");
+            return $"{texts.ToolTip}: {string.Format(CultureInfo.InvariantCulture, sent.Ticks == 1 ? texts.ReplayFinishedOneTickFormat : texts.ReplayFinishedTicksFormat, sent.Ticks, sent.Refused)}";
         }
 
         if (status.IsFinished)
         {
-            return $"{ToolTip}: Replay finished";
+            return $"{texts.ToolTip}: {texts.ReplayFinished}";
         }
 
         var text = status.State switch
                    {
-                       PipeConnectionState.Connected => "Connected",
-                       PipeConnectionState.Receiving => "Receiving",
-                       PipeConnectionState.ProtocolMismatch => "Protocol mismatch",
+                       PipeConnectionState.Connected => texts.StateConnected,
+                       PipeConnectionState.Receiving => texts.StateReceiving,
+                       PipeConnectionState.ProtocolMismatch => texts.StateProtocolMismatch,
                        _ => throw new ArgumentOutOfRangeException(nameof(status), status.State, "The replay state is not defined")
                    };
 
-        return $"{ToolTip}: Replay: {text}";
+        return $"{texts.ToolTip}: {string.Format(CultureInfo.InvariantCulture, texts.ReplayStateFormat, text)}";
     }
 
     /// <summary>
@@ -188,7 +133,7 @@ public static class TrayMenu
     /// <returns>The status text</returns>
     public static string FormatStatusText(CompanionTexts texts, PipeConnectionState state, PipeRecordingState recording)
     {
-        return WithoutToolTipPrefix(FormatToolTip(texts, state, recording));
+        return WithoutToolTipPrefix(texts, FormatToolTip(texts, state, recording));
     }
 
     /// <summary>
@@ -199,7 +144,7 @@ public static class TrayMenu
     /// <returns>The status text</returns>
     public static string FormatReplayStatusText(CompanionTexts texts, PipeReplayStatus status)
     {
-        return WithoutToolTipPrefix(FormatReplayToolTip(texts, status));
+        return WithoutToolTipPrefix(texts, FormatReplayToolTip(texts, status));
     }
 
     /// <summary>
@@ -213,13 +158,13 @@ public static class TrayMenu
     {
         if (tick is not { } summary)
         {
-            return "Last tick: none";
+            return texts.LastTickNone;
         }
 
         var now = TimeZoneInfo.ConvertTime(clock.GetUtcNow(), clock.LocalTimeZone);
         var count = summary.IslandCount == 1
-                        ? "1 island"
-                        : string.Create(CultureInfo.InvariantCulture, $"{summary.IslandCount} islands");
+                        ? texts.OneIsland
+                        : string.Format(CultureInfo.InvariantCulture, texts.IslandsFormat, summary.IslandCount);
         var time = summary.ReceiveTime;
         string text;
 
@@ -236,7 +181,7 @@ public static class TrayMenu
                        : local.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
         }
 
-        return $"Last tick: {text}, {count}";
+        return string.Format(CultureInfo.InvariantCulture, texts.LastTickFormat, text, count);
     }
 
     /// <summary>
@@ -248,7 +193,7 @@ public static class TrayMenu
     /// <returns>The tooltip text</returns>
     public static string FormatSnapshotToolTip(CompanionTexts texts, TraySnapshot snapshot, TimeProvider clock)
     {
-        var text = $"{ToolTip}: {snapshot.StatusText}";
+        var text = $"{texts.ToolTip}: {snapshot.StatusText}";
 
         return snapshot.LastTick is null
                    ? text
@@ -317,20 +262,21 @@ public static class TrayMenu
 
         if (server?.Local is { } running)
         {
-            entries.Add(new TrayMenuEntry(TrayMenuEntryKind.OpenCensio, OpenCensioText, running.State == LocalServerState.Running));
+            entries.Add(new TrayMenuEntry(TrayMenuEntryKind.OpenCensio, texts.OpenCensioText, running.State == LocalServerState.Running));
         }
 
         entries.AddRange([
-                             new TrayMenuEntry(TrayMenuEntryKind.OpenDiagnostics, OpenDiagnosticsText, true),
-                             new TrayMenuEntry(TrayMenuEntryKind.ToggleRecording, snapshot.IsRecording ? StopRecordingText : StartRecordingText, snapshot.CanRecord),
-                             new TrayMenuEntry(TrayMenuEntryKind.OpenRecordingsFolder, OpenRecordingsFolderText, true),
-                             new TrayMenuEntry(TrayMenuEntryKind.OpenLogFolder, OpenLogFolderText, true),
+                             new TrayMenuEntry(TrayMenuEntryKind.OpenSettings, texts.OpenSettingsText, true),
+                             new TrayMenuEntry(TrayMenuEntryKind.OpenDiagnostics, texts.OpenDiagnosticsText, true),
+                             new TrayMenuEntry(TrayMenuEntryKind.ToggleRecording, snapshot.IsRecording ? texts.StopRecordingText : texts.StartRecordingText, snapshot.CanRecord),
+                             new TrayMenuEntry(TrayMenuEntryKind.OpenRecordingsFolder, texts.OpenRecordingsFolderText, true),
+                             new TrayMenuEntry(TrayMenuEntryKind.OpenLogFolder, texts.OpenLogFolderText, true),
                              new TrayMenuEntry(TrayMenuEntryKind.Separator, string.Empty, false),
-                             new TrayMenuEntry(TrayMenuEntryKind.ToggleAutostart, StartWithWindowsText, true, isAutostartEnabled),
+                             new TrayMenuEntry(TrayMenuEntryKind.ToggleAutostart, texts.StartWithWindowsText, true, isAutostartEnabled),
                              new TrayMenuEntry(TrayMenuEntryKind.Separator, string.Empty, false),
                              new TrayMenuEntry(TrayMenuEntryKind.Version, FormatVersion(texts, version), false),
                              new TrayMenuEntry(TrayMenuEntryKind.Separator, string.Empty, false),
-                             new TrayMenuEntry(TrayMenuEntryKind.Exit, ExitText, true)
+                             new TrayMenuEntry(TrayMenuEntryKind.Exit, texts.ExitText, true)
                          ]);
 
         return entries;
@@ -346,11 +292,11 @@ public static class TrayMenu
     {
         return status.State switch
                {
-                   LocalServerState.Starting => "Server: starting",
-                   LocalServerState.Running => string.Create(CultureInfo.InvariantCulture, $"Server: running at http://localhost:{status.Port}/"),
-                   LocalServerState.PortInUse => string.Create(CultureInfo.InvariantCulture, $"Server: port {status.Port} in use"),
-                   LocalServerState.Failed => "Server: failed",
-                   _ => "Server: settings invalid"
+                   LocalServerState.Starting => texts.LocalServerStarting,
+                   LocalServerState.Running => string.Format(CultureInfo.InvariantCulture, texts.LocalServerRunningFormat, status.Port),
+                   LocalServerState.PortInUse => string.Format(CultureInfo.InvariantCulture, texts.LocalServerPortInUseFormat, status.Port),
+                   LocalServerState.Failed => texts.LocalServerFailed,
+                   _ => texts.LocalServerSettingsInvalid
                };
     }
 
@@ -362,14 +308,14 @@ public static class TrayMenu
     /// <returns>The text</returns>
     public static string FormatLiveBuffer(CompanionTexts texts, LiveBufferStatus status)
     {
-        var text = string.Create(CultureInfo.InvariantCulture, $"Buffer: {status.Waiting} waiting");
+        var text = string.Format(CultureInfo.InvariantCulture, texts.BufferFormat, status.Waiting);
 
         if (status.Dropped > 0)
         {
-            text += string.Create(CultureInfo.InvariantCulture, $", {status.Dropped} dropped");
+            text += string.Format(CultureInfo.InvariantCulture, texts.BufferDroppedFormat, status.Dropped);
         }
 
-        return status.IsMemoryOnly ? text + ", not saved to disk" : text;
+        return status.IsMemoryOnly ? text + texts.BufferMemoryOnly : text;
     }
 
     /// <summary>
@@ -382,24 +328,24 @@ public static class TrayMenu
     {
         return status.State switch
                {
-                   LiveSendState.Connecting => "Server: connecting",
-                   LiveSendState.Connected => "Server: connected",
+                   LiveSendState.Connecting => texts.LiveSendConnecting,
+                   LiveSendState.Connected => texts.LiveSendConnected,
                    LiveSendState.Retrying => status.Problem switch
                                              {
-                                                 ReplaySendProblemKind.ServerUnreachable => "Server: unreachable, retrying",
-                                                 ReplaySendProblemKind.NoAnswer => "Server: not answering, retrying",
-                                                 ReplaySendProblemKind.ConnectionLost => "Server: connection lost, retrying",
-                                                 ReplaySendProblemKind.InvalidReply => "Server: invalid reply, retrying",
-                                                 ReplaySendProblemKind.CompanionConnected => "Server: another Companion is connected, retrying",
-                                                 _ => "Server: not connected"
+                                                 ReplaySendProblemKind.ServerUnreachable => texts.LiveSendUnreachableRetrying,
+                                                 ReplaySendProblemKind.NoAnswer => texts.LiveSendNoAnswerRetrying,
+                                                 ReplaySendProblemKind.ConnectionLost => texts.LiveSendConnectionLostRetrying,
+                                                 ReplaySendProblemKind.InvalidReply => texts.LiveSendInvalidReplyRetrying,
+                                                 ReplaySendProblemKind.CompanionConnected => texts.LiveSendCompanionConnectedRetrying,
+                                                 _ => texts.LiveSendNotConnected
                                              },
                    LiveSendState.Stopped => status.Problem switch
                                             {
-                                                ReplaySendProblemKind.TokenRefused => "Server: token refused",
-                                                ReplaySendProblemKind.VersionNotSupported => "Server: does not support contract version 2",
-                                                _ => "Server: not connected"
+                                                ReplaySendProblemKind.TokenRefused => texts.LiveSendTokenRefused,
+                                                ReplaySendProblemKind.VersionNotSupported => texts.LiveSendVersionNotSupported,
+                                                _ => texts.LiveSendNotConnected
                                             },
-                   _ => "Server: not connected"
+                   _ => texts.LiveSendNotConnected
                };
     }
 
@@ -413,15 +359,15 @@ public static class TrayMenu
     {
         return status.Kind switch
                {
-                   GameCatalogStatusKind.Reading => "Catalog: reading",
-                   GameCatalogStatusKind.Ready => string.Create(CultureInfo.InvariantCulture, $"Catalog: {status.EntryCount} entries"),
-                   GameCatalogStatusKind.NoGame => "Catalog: no game",
-                   GameCatalogStatusKind.Failed => "Catalog: failed",
-                   GameCatalogStatusKind.Checking => "Catalog: checking",
-                   GameCatalogStatusKind.ExtractingNames => "Catalog: extracting names",
-                   GameCatalogStatusKind.ExtractingIcons => string.Create(CultureInfo.InvariantCulture, $"Catalog: extracting icons, {status.EntryCount} entries"),
-                   GameCatalogStatusKind.IconsFailed => string.Create(CultureInfo.InvariantCulture, $"Catalog: {status.EntryCount} entries, icons failed"),
-                   GameCatalogStatusKind.NotCached => string.Create(CultureInfo.InvariantCulture, $"Catalog: {status.EntryCount} entries, not cached"),
+                   GameCatalogStatusKind.Reading => texts.CatalogReading,
+                   GameCatalogStatusKind.Ready => string.Format(CultureInfo.InvariantCulture, texts.CatalogReadyFormat, status.EntryCount),
+                   GameCatalogStatusKind.NoGame => texts.CatalogNoGame,
+                   GameCatalogStatusKind.Failed => texts.CatalogFailed,
+                   GameCatalogStatusKind.Checking => texts.CatalogChecking,
+                   GameCatalogStatusKind.ExtractingNames => texts.CatalogExtractingNames,
+                   GameCatalogStatusKind.ExtractingIcons => string.Format(CultureInfo.InvariantCulture, texts.CatalogExtractingIconsFormat, status.EntryCount),
+                   GameCatalogStatusKind.IconsFailed => string.Format(CultureInfo.InvariantCulture, texts.CatalogIconsFailedFormat, status.EntryCount),
+                   GameCatalogStatusKind.NotCached => string.Format(CultureInfo.InvariantCulture, texts.CatalogNotCachedFormat, status.EntryCount),
                    _ => throw new ArgumentOutOfRangeException(nameof(status), status.Kind, "The status kind is not defined")
                };
     }
@@ -434,17 +380,17 @@ public static class TrayMenu
     /// <returns>The text</returns>
     public static string FormatGame(CompanionTexts texts, GameInstallationStatus status)
     {
-        var source = status.Source == GameInstallationSource.UbisoftConnect ? "Ubisoft Connect" : "settings file";
+        var source = status.Source == GameInstallationSource.UbisoftConnect ? texts.GameSourceUbisoftConnect : texts.GameSourceSettingsFile;
 
         return status.Kind switch
                {
-                   GameInstallationStatusKind.Searching => "Game: searching",
-                   GameInstallationStatusKind.Found => $"Game: build {status.Build ?? "unknown"} ({source})",
-                   GameInstallationStatusKind.NotFound => "Game: not found",
-                   GameInstallationStatusKind.SettingsFolderNotFound => "Game: folder in settings not found",
-                   GameInstallationStatusKind.SettingsFolderNotFullPath => "Game: folder in settings is not a full path",
-                   GameInstallationStatusKind.SettingsFolderNotInstallation => "Game: folder in settings is not an Anno 117 installation",
-                   GameInstallationStatusKind.SettingsFileInvalid => "Game: settings file invalid",
+                   GameInstallationStatusKind.Searching => texts.GameSearching,
+                   GameInstallationStatusKind.Found => string.Format(CultureInfo.InvariantCulture, texts.GameFoundFormat, status.Build ?? texts.GameBuildUnknown, source),
+                   GameInstallationStatusKind.NotFound => texts.GameNotFound,
+                   GameInstallationStatusKind.SettingsFolderNotFound => texts.GameSettingsFolderNotFound,
+                   GameInstallationStatusKind.SettingsFolderNotFullPath => texts.GameSettingsFolderNotFullPath,
+                   GameInstallationStatusKind.SettingsFolderNotInstallation => texts.GameSettingsFolderNotInstallation,
+                   GameInstallationStatusKind.SettingsFileInvalid => texts.GameSettingsFileInvalid,
                    _ => throw new ArgumentOutOfRangeException(nameof(status), status.Kind, "The status kind is not defined")
                };
     }
@@ -459,11 +405,11 @@ public static class TrayMenu
     {
         return problem.Kind switch
                {
-                   PipeReplayProblemKind.FileNotFound => "file not found",
-                   PipeReplayProblemKind.NotARecording => "not a recording",
-                   PipeReplayProblemKind.UnsupportedVersion => "unsupported version",
-                   PipeReplayProblemKind.InvalidLine => string.Create(CultureInfo.InvariantCulture, $"invalid line {problem.LineNumber}").TrimEnd(),
-                   PipeReplayProblemKind.ReadFailed => "read failed",
+                   PipeReplayProblemKind.FileNotFound => texts.ReplayReasonFileNotFound,
+                   PipeReplayProblemKind.NotARecording => texts.ReplayReasonNotARecording,
+                   PipeReplayProblemKind.UnsupportedVersion => texts.ReplayReasonUnsupportedVersion,
+                   PipeReplayProblemKind.InvalidLine => string.Format(CultureInfo.InvariantCulture, texts.ReplayReasonInvalidLineFormat, problem.LineNumber).TrimEnd(),
+                   PipeReplayProblemKind.ReadFailed => texts.ReplayReasonReadFailed,
                    _ => null
                };
     }
@@ -478,16 +424,16 @@ public static class TrayMenu
     {
         return kind switch
                {
-                   ReplaySendProblemKind.TokenFileCannotBeRead => "token file cannot be read",
-                   ReplaySendProblemKind.TokenFileHoldsNoValidToken => "token file holds no valid token",
-                   ReplaySendProblemKind.ServerUnreachable => "server unreachable",
-                   ReplaySendProblemKind.TokenRefused => "token refused",
-                   ReplaySendProblemKind.CompanionConnected => "another Companion is connected",
-                   ReplaySendProblemKind.VersionNotSupported => "server does not support contract version 2",
-                   ReplaySendProblemKind.NoAnswer => "server does not answer",
-                   ReplaySendProblemKind.ConnectionLost => "server connection lost",
-                   ReplaySendProblemKind.InvalidReply => "invalid server reply",
-                   ReplaySendProblemKind.LocalServerNotRunning => "local server not running",
+                   ReplaySendProblemKind.TokenFileCannotBeRead => texts.ReplaySendReasonTokenFileCannotBeRead,
+                   ReplaySendProblemKind.TokenFileHoldsNoValidToken => texts.ReplaySendReasonTokenFileHoldsNoValidToken,
+                   ReplaySendProblemKind.ServerUnreachable => texts.ReplaySendReasonServerUnreachable,
+                   ReplaySendProblemKind.TokenRefused => texts.ReplaySendReasonTokenRefused,
+                   ReplaySendProblemKind.CompanionConnected => texts.ReplaySendReasonCompanionConnected,
+                   ReplaySendProblemKind.VersionNotSupported => texts.ReplaySendReasonVersionNotSupported,
+                   ReplaySendProblemKind.NoAnswer => texts.ReplaySendReasonNoAnswer,
+                   ReplaySendProblemKind.ConnectionLost => texts.ReplaySendReasonConnectionLost,
+                   ReplaySendProblemKind.InvalidReply => texts.ReplaySendReasonInvalidReply,
+                   ReplaySendProblemKind.LocalServerNotRunning => texts.ReplaySendReasonLocalServerNotRunning,
                    _ => null
                };
     }
@@ -495,11 +441,12 @@ public static class TrayMenu
     /// <summary>
     /// Removes the application name and the colon from the start of a tooltip text.
     /// </summary>
+    /// <param name="texts">The texts</param>
     /// <param name="toolTip">The tooltip text</param>
     /// <returns>The status text</returns>
-    private static string WithoutToolTipPrefix(string toolTip)
+    private static string WithoutToolTipPrefix(CompanionTexts texts, string toolTip)
     {
-        return toolTip[(ToolTip.Length + 2)..];
+        return toolTip[(texts.ToolTip.Length + 2)..];
     }
 
     #endregion // Methods

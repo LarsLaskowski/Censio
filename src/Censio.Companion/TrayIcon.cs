@@ -76,7 +76,7 @@ internal sealed class TrayIcon : IDisposable
         _notifyIcon = new NotifyIcon
                       {
                           Icon = images.Get(TrayIconLook.Waiting),
-                          Text = TrayMenu.ToolTip,
+                          Text = CompanionTexts.English.ToolTip,
                           ContextMenuStrip = _menu,
                           Visible = true
                       };

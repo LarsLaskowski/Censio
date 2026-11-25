@@ -70,12 +70,42 @@ public static class CompanionSettings
     /// </summary>
     /// <param name="path">The path of the settings file</param>
     /// <returns>The language, or <see langword="null" /> when the file names none or an invalid one</returns>
-#pragma warning disable RH2003 // Skeleton: removed with the implementation
     public static CompanionLanguage? ReadLanguage(string path)
     {
-        throw new NotImplementedException();
+        if (Path.IsPathFullyQualified(path) == false)
+        {
+            return null;
+        }
+
+        byte[] bytes;
+
+        try
+        {
+            bytes = ReadBytes(path);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or SecurityException or NotSupportedException)
+        {
+            return null;
+        }
+
+        if (bytes.Length > MaxFileLength)
+        {
+            return null;
+        }
+
+        try
+        {
+            using var document = ParseDocument(bytes);
+
+            return document.RootElement.ValueKind == JsonValueKind.Object
+                       ? ReadLanguage(document.RootElement)
+                       : null;
+        }
+        catch (Exception exception) when (exception is JsonException or InvalidOperationException)
+        {
+            return null;
+        }
     }
-#pragma warning restore RH2003 // Skeleton: removed with the implementation
 
     /// <summary>
     /// Reads the local server setting of the settings file.
@@ -201,6 +231,32 @@ public static class CompanionSettings
                       };
 
         return JsonDocument.Parse(bytes.AsMemory(start), options);
+    }
+
+    /// <summary>
+    /// Reads the language of the root object of a settings file.
+    /// </summary>
+    /// <param name="root">The root object</param>
+    /// <returns>The language, or <see langword="null" /> when the key is missing, written twice or not <c>en</c> or <c>de</c></returns>
+    private static CompanionLanguage? ReadLanguage(JsonElement root)
+    {
+        var languages = FindProperties(root, LanguageKey);
+
+        if (languages.Count != 1 || languages[0].ValueKind != JsonValueKind.String)
+        {
+            return null;
+        }
+
+        var language = languages[0].GetString();
+
+        if (string.Equals(language, "en", StringComparison.OrdinalIgnoreCase))
+        {
+            return CompanionLanguage.English;
+        }
+
+        return string.Equals(language, "de", StringComparison.OrdinalIgnoreCase)
+                   ? CompanionLanguage.German
+                   : null;
     }
 
     /// <summary>

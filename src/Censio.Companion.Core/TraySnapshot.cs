@@ -101,7 +101,7 @@ public sealed record TraySnapshot
     {
         return new TraySnapshot
                {
-                   StatusText = TrayMenu.InvalidCommandLineStatusText,
+                   StatusText = texts.InvalidCommandLineStatusText,
                    Look = TrayIconLook.Problem,
                    CanRecord = false,
                    IsRecording = false

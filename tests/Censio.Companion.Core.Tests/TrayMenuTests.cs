@@ -153,7 +153,7 @@ public sealed class TrayMenuTests
 
         Assert.IsNotNull(autostart, "The menu should hold the start-with-Windows entry in every mode");
         Assert.AreEqual("Start with Windows", autostart.Text, "The entry should read Start with Windows");
-        Assert.AreEqual("Start with Windows", TrayMenu.StartWithWindowsText, "The constant should read Start with Windows");
+        Assert.AreEqual("Start with Windows", CompanionTexts.English.StartWithWindowsText, "The constant should read Start with Windows");
         Assert.IsTrue(autostart.IsEnabled, "The entry should be enabled in every mode");
     }
 
@@ -816,7 +816,7 @@ public sealed class TrayMenuTests
         const string expected = "Censio Companion";
 
         // Act
-        var toolTip = TrayMenu.ToolTip;
+        var toolTip = CompanionTexts.English.ToolTip;
 
         // Assert
         Assert.AreEqual(expected, toolTip, "The tooltip of the tray icon should be Censio Companion");
@@ -1141,7 +1141,7 @@ public sealed class TrayMenuTests
         const string expected = "Censio Companion: Invalid command line";
 
         // Act
-        var toolTip = TrayMenu.InvalidCommandLineToolTip;
+        var toolTip = CompanionTexts.English.InvalidCommandLineToolTip;
 
         // Assert
         Assert.AreEqual(expected, toolTip, "The tooltip should name the application and the invalid command line");
@@ -1542,7 +1542,7 @@ public sealed class TrayMenuTests
 
         Assert.DoesNotContain(TrayMenuEntryKind.LocalServer, kinds, $"Without local mode the menu should hold no server line: {mode}");
         Assert.DoesNotContain(TrayMenuEntryKind.OpenCensio, kinds, $"Without local mode the menu should hold no Open Censio: {mode}");
-        Assert.IsEmpty(entries.Where(entry => entry.Text.StartsWith("Server:", StringComparison.Ordinal) || entry.Text == TrayMenu.OpenCensioText).ToList(), $"Without local mode no entry should carry a server text: {mode}");
+        Assert.IsEmpty(entries.Where(entry => entry.Text.StartsWith("Server:", StringComparison.Ordinal) || entry.Text == CompanionTexts.English.OpenCensioText).ToList(), $"Without local mode no entry should carry a server text: {mode}");
     }
 
     /// <summary>
@@ -1600,7 +1600,7 @@ public sealed class TrayMenuTests
 
         Assert.AreSequenceEqual(expectedKinds, entries.Select(entry => entry.Kind).ToArray(), "Open Censio should be directly above Settings…, Settings… directly above Open diagnostics and the server line below the catalog");
         Assert.AreEqual("Open Censio", openCensio.Text, "The entry should read Open Censio");
-        Assert.AreEqual(TrayMenu.OpenCensioText, openCensio.Text, "The entry should carry the text of the constant");
+        Assert.AreEqual(CompanionTexts.English.OpenCensioText, openCensio.Text, "The entry should carry the text of the constant");
         Assert.IsFalse(openCensio.IsChecked, "Open Censio should not be checked");
     }
 
