@@ -52,6 +52,15 @@ background writer with its bounds. A user who checks a log before sharing it, an
   (<archive>)` (Warning; the kinds `ArchiveMissing`, `ArchiveUnreadable`, `DuplicateArchiveNumber` and `IconSetTooLarge`,
   the archive as a path relative to `maindata`, `maindata` itself when the listing failed). One of them is written per extraction, and
   none while the catalog fails, no game is found or the catalog is loaded from the cache.
+- **Settings, profile and restart lines** ([`companion-settings.md`](companion-settings.md), [`companion-profiles.md`](companion-profiles.md)),
+  none with a value, a name, a path or the token: `Settings saved` (Information, after the settings window wrote the
+  file), `Could not save the settings: <exception type>` (Warning, for a failed write of the settings file or of the
+  profiles file; only the type's name), `Profile switched` (Information, when the active profile changed),
+  `Profiles file invalid: <problem>` (Warning; the problem is `cannot be read`, `larger than 1 MiB` or `not of its
+  format`), `Language setting invalid; the Windows display language is used` (Warning, at start) and, for a restart,
+  `Restart failed: the Companion could not be started: <exception type>` and `Restart failed: the previous Companion did
+  not end` (Warnings). The figure name and its hash are never logged. The log stays English when the Companion's texts
+  are German ([`companion-texts.md`](companion-texts.md)).
 - **Local mode lines** ([`local-mode.md`](local-mode.md), *Log*): `Server settings invalid: <problem>` (Warning; the
   problem is one of `mode is not local or forward`, `mode occurs more than once`, `localPort is not a port from 1 to 65535`,
   `localPort occurs more than once`, or a problem of forward mode, [`live-sending.md`](live-sending.md), *Switching on*), `Local server running on port <port>` (Information), `Local server port <port> in
