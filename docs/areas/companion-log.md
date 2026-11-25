@@ -56,6 +56,7 @@ background writer with its bounds. A user who checks a log before sharing it, an
   none with a value, a name, a path or the token: `Settings saved` (Information, after the settings window wrote the
   file), `Could not save the settings: <exception type>` (Warning, for a failed write of the settings file or of the
   profiles file; only the type's name), `Profile switched` (Information, when the active profile changed),
+  `Profile notice raised: <kind>` (Information, when a notice about the profile is raised, before it goes to the tray) and `Profile notice passed to Windows: <kind>` (Information, when the tray icon passed the notification to Windows; a disposed icon logs nothing), the kind `LastUsedWithOther` or `NewFigure` and nothing else,
   `Profiles file invalid: <problem>` (Warning; the problem is `cannot be read`, `larger than 1 MiB` or `not of its
   format`), `Language setting invalid; the Windows display language is used` (Warning, at start) and, for a restart,
   `Restart failed: the Companion could not be started: <exception type>` and `Restart failed: the previous Companion did

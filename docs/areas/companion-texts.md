@@ -106,6 +106,8 @@ wording; the Product Manager reads them in the manual test of the release.
 
 #### Server and buffer lines
 
+The pattern `{0} (profile {1})` ends every `Server:` line of a live run: `{0}` is the line above, `{1}` the whole name of the active profile, never cut; the longest line is 124 characters (German `Server: anderer Companion verbunden, neuer Versuch` with a name of 64).
+
 | English | German |
 | ------- | ------ |
 | `Server: starting` | `Server: startet` |
@@ -123,6 +125,7 @@ wording; the Product Manager reads them in the manual test of the release.
 | `Server: not connected` | `Server: nicht verbunden` |
 | `Server: token refused` | `Server: Token abgelehnt` |
 | `Server: does not support contract version 2` | `Server: unterstützt Vertragsversion 2 nicht` |
+| `{0} (profile {1})` | `{0} (Profil {1})` |
 | `Buffer: {0} waiting` | `Puffer: {0} wartend` |
 | `, {0} dropped` | `, {0} verworfen` |
 | `, not saved to disk` | `, nicht auf Datenträger gespeichert` |
@@ -213,6 +216,8 @@ wording; the Product Manager reads them in the manual test of the release.
 | `Start with Windows could not be changed.` | `Der Start mit Windows konnte nicht geändert werden.` |
 | `This figure was last played with profile {0}. Click to open the settings and switch.` | `Diese Figur wurde zuletzt mit dem Profil {0} gespielt. Klicken Sie, um die Einstellungen zu öffnen und zu wechseln.` |
 | `This figure is new to profile {0}. Click to open the settings to switch or create a profile.` | `Diese Figur ist für das Profil {0} neu. Klicken Sie, um die Einstellungen zu öffnen und zu wechseln oder ein Profil anzulegen.` |
+
+Both notice texts are also the text of the pending notice's entry in the tray menu ([`companion-profiles.md`](companion-profiles.md), *Notice*).
 
 ## Limits and errors
 

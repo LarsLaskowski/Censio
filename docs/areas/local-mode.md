@@ -41,6 +41,7 @@ without Docker rely on it.
   It is shown only in local mode, enabled only while the line reads `Server: running …`, and opens
   `http://localhost:<port>/` in the default browser. The menu does not wait for the browser; if no browser can be
   started a warning is logged and nothing else changes.
+- In a live run the line ends with ` (profile <name>)`, the whole name of the active profile ([`companion-texts.md`](companion-texts.md)); `Server: settings invalid` is no live run and adds nothing.
 - In forward mode ([`live-sending.md`](live-sending.md), *Reconnect*) the same place holds the line of the connection to the
   server, such as `Server: connected`, and there is no `Open Censio`, except greyed for an invalid forward setting.
 - The tooltip and the icon show the pipe connection only.

@@ -31,9 +31,9 @@ from the menu, the optional start with Windows, the menu entries for the setting
   (*problem*) for `Protocol mismatch`, `Error` and an invalid command line. In a replay the icon follows the replayed
   state, shows *waiting* after `Replay finished` and *problem* after `Replay error`.
 - The context menu holds, top to bottom: `Status: <status text>` (greyed out), `Last tick: <time>, <n> islands` or
-  `Last tick: none` (greyed out), `Game: <state>` (greyed out), `Catalog: <state>` (greyed out), in local mode `Server: <state>` (greyed out, [`local-mode.md`](local-mode.md), *Menu*) and in forward mode `Server: <connection state>` (greyed out, [`live-sending.md`](live-sending.md), *Reconnect*), where live data is sent `Buffer: <n> waiting[, <d> dropped][, not saved to disk]` (greyed out, directly below the `Server:` line, [`live-sending.md`](live-sending.md), *Buffer*), a separator, in local mode `Open Censio`, then `Settings…`, `Open diagnostics`, `Start recording` or `Stop recording`, `Open recordings folder`, `Open
+  `Last tick: none` (greyed out), `Game: <state>` (greyed out), `Catalog: <state>` (greyed out), in local mode `Server: <state>` (greyed out, [`local-mode.md`](local-mode.md), *Menu*) and in forward mode `Server: <connection state>` (greyed out, [`live-sending.md`](live-sending.md), *Reconnect*), where live data is sent `Buffer: <n> waiting[, <d> dropped][, not saved to disk]` (greyed out, directly below the `Server:` line, [`live-sending.md`](live-sending.md), *Buffer*), a separator, in local mode `Open Censio`, then the pending notice about the profile (enabled, [`companion-profiles.md`](companion-profiles.md), *Notice*; a click opens the settings window), then `Settings…`, `Open diagnostics`, `Start recording` or `Stop recording`, `Open recordings folder`, `Open
   log folder`, a separator, `Version <version>` (greyed out, nothing happens on click), a separator and `Exit`. The
-  values are current each time the menu opens. `Settings…` and `Open diagnostics` are enabled in every mode (live, `--record`, replay and an invalid command line); `Settings…` opens the settings window ([`companion-settings.md`](companion-settings.md)); `Start recording` is greyed out in a replay and with an invalid command
+  values are current each time the menu opens. In a live run each `Server:` line ends with ` (profile <name>)`, the active profile's name in full ([`companion-texts.md`](companion-texts.md)); an `&` in a menu text is shown as typed. `Settings…` and `Open diagnostics` are enabled in every mode (live, `--record`, replay and an invalid command line); `Settings…` opens the settings window ([`companion-settings.md`](companion-settings.md)); `Start recording` is greyed out in a replay and with an invalid command
   line. The menu is light, also with Windows in dark mode.
 - The `Game:` entry shows the state of the search for the game installation: `Game: searching`, `Game: build <build>
   (Ubisoft Connect)` or `(settings file)`, `Game: not found`, `Game: folder in settings not found`, `Game: folder in
@@ -65,7 +65,7 @@ from the menu, the optional start with Windows, the menu entries for the setting
   `Version <version>`.
 - The German form of each menu entry: `Einstellungen…` (`Settings…`), `Censio öffnen` (`Open Censio`), `Diagnose öffnen`
   (`Open diagnostics`), `Aufnahme starten` and `Aufnahme beenden` (`Start recording`, `Stop recording`),
-  `Aufnahmeordner öffnen` (`Open recordings folder`), `Protokollordner öffnen` (`Open log folder`) and `Beenden` (`Exit`).
+  `Aufnahmeordner öffnen` (`Open recordings folder`), `Protokollordner öffnen` (`Open log folder`) and `Beenden` (`Exit`); the ending of a `Server:` line is ` (Profil <name>)`.
 - The German form of each tooltip and status text: `Warte auf Spiel` (`Waiting for game`), `Verbunden` (`Connected`),
   `Empfange Daten` (`Receiving`), `Pipe belegt` (`Pipe busy`), `Protokollkonflikt` (`Protocol mismatch`), `Fehler`
   (`Error`), the suffixes ` (Aufnahme läuft)` (` (recording)`) and ` (Aufnahme fehlgeschlagen)` (` (recording failed)`),

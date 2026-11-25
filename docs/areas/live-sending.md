@@ -201,7 +201,7 @@ server) and an operator who reads the log rely on it. The connection rules share
 - A failed attempt is retried after 1, 2, 4, 8 and 16 seconds, then every 30 seconds, as long as the Companion runs. The
   first attempt at start has no delay. A connection that stayed accepted for at least 60 seconds starts the delays again
   at 1 second.
-- Each failure sets the menu line until the next accepted hello or another failure:
+- Each failure sets the menu line until the next accepted hello or another failure. In a live run every `Server:` line of this section ends with ` (profile <name>)`, the whole name of the active profile ([`companion-texts.md`](companion-texts.md)), except `Server: settings invalid`, which adds nothing:
 
 | Line | Cause |
 | ---- | ----- |
