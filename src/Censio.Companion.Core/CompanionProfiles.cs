@@ -408,76 +408,6 @@ public sealed class CompanionProfiles
     }
 
     /// <summary>
-    /// Observes the start of a session while the lock is held.
-    /// </summary>
-    /// <param name="key">The key of the figure</param>
-    /// <param name="isNoticeChanged">Whether the pending notice changed</param>
-    /// <returns>The notice to show, or <see langword="null" /> when there is none</returns>
-    private ProfileNotice? ObserveSessionStartLocked(string key, out bool isNoticeChanged)
-    {
-        if (_isFileInvalid)
-        {
-            isNoticeChanged = ReplaceNotice(null);
-
-            return null;
-        }
-
-        ProfileNotice? notice = null;
-        var index = _figures.FindIndex(link => link.Key == key);
-
-        if (index >= 0)
-        {
-            var linked = _figures[index].Value;
-
-            if (linked != _active.Id && _profiles.Find(candidate => candidate.Id == linked) is { } other)
-            {
-                notice = CreateNotice(ProfileNoticeKind.LastUsedWithOther, other.Name);
-            }
-
-            _figures.RemoveAt(index);
-        }
-        else if (_figures.Any(link => link.Value == _active.Id))
-        {
-            notice = CreateNotice(ProfileNoticeKind.NewFigure, _active.Name);
-        }
-
-        Link(key, _active.Id);
-
-        _currentFigure = key;
-        isNoticeChanged = ReplaceNotice(notice);
-
-        MarkChanged();
-
-        return notice;
-    }
-
-    /// <summary>
-    /// Replaces the pending notice.
-    /// </summary>
-    /// <param name="notice">The new pending notice, or <see langword="null" /> if none</param>
-    /// <returns>Whether the pending notice is another one than before</returns>
-    private bool ReplaceNotice(ProfileNotice? notice)
-    {
-        var isChanged = ReferenceEquals(PendingNotice, notice) == false;
-
-        PendingNotice = notice;
-
-        return isChanged;
-    }
-
-    /// <summary>
-    /// Raises <see cref="PendingNoticeChanged" /> outside the lock.
-    /// </summary>
-    /// <param name="isChanged">Whether the pending notice changed</param>
-    private void RaisePendingNoticeChanged(bool isChanged)
-    {
-        if (isChanged)
-        {
-            PendingNoticeChanged?.Invoke(this, EventArgs.Empty);
-        }
-    }
-
-    /// <summary>
     /// Observes the end of the session of a figure.
     /// </summary>
     public void ObserveSessionEnd()
@@ -807,6 +737,76 @@ public sealed class CompanionProfiles
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or SecurityException or NotSupportedException or ArgumentException)
         {
             // The temporary file stays; the next write replaces it.
+        }
+    }
+
+    /// <summary>
+    /// Observes the start of a session while the lock is held.
+    /// </summary>
+    /// <param name="key">The key of the figure</param>
+    /// <param name="isNoticeChanged">Whether the pending notice changed</param>
+    /// <returns>The notice to show, or <see langword="null" /> when there is none</returns>
+    private ProfileNotice? ObserveSessionStartLocked(string key, out bool isNoticeChanged)
+    {
+        if (_isFileInvalid)
+        {
+            isNoticeChanged = ReplaceNotice(null);
+
+            return null;
+        }
+
+        ProfileNotice? notice = null;
+        var index = _figures.FindIndex(link => link.Key == key);
+
+        if (index >= 0)
+        {
+            var linked = _figures[index].Value;
+
+            if (linked != _active.Id && _profiles.Find(candidate => candidate.Id == linked) is { } other)
+            {
+                notice = CreateNotice(ProfileNoticeKind.LastUsedWithOther, other.Name);
+            }
+
+            _figures.RemoveAt(index);
+        }
+        else if (_figures.Any(link => link.Value == _active.Id))
+        {
+            notice = CreateNotice(ProfileNoticeKind.NewFigure, _active.Name);
+        }
+
+        Link(key, _active.Id);
+
+        _currentFigure = key;
+        isNoticeChanged = ReplaceNotice(notice);
+
+        MarkChanged();
+
+        return notice;
+    }
+
+    /// <summary>
+    /// Replaces the pending notice.
+    /// </summary>
+    /// <param name="notice">The new pending notice, or <see langword="null" /> if none</param>
+    /// <returns>Whether the pending notice is another one than before</returns>
+    private bool ReplaceNotice(ProfileNotice? notice)
+    {
+        var isChanged = ReferenceEquals(PendingNotice, notice) == false;
+
+        PendingNotice = notice;
+
+        return isChanged;
+    }
+
+    /// <summary>
+    /// Raises <see cref="PendingNoticeChanged" /> outside the lock.
+    /// </summary>
+    /// <param name="isChanged">Whether the pending notice changed</param>
+    private void RaisePendingNoticeChanged(bool isChanged)
+    {
+        if (isChanged)
+        {
+            PendingNoticeChanged?.Invoke(this, EventArgs.Empty);
         }
     }
 
