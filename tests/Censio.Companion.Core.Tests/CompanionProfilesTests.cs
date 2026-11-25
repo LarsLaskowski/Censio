@@ -981,6 +981,37 @@ public sealed class CompanionProfilesTests
     }
 
     /// <summary>
+    /// A change that leaves the pending notice as it is raises no <see cref="CompanionProfiles.PendingNoticeChanged" />:
+    /// with none pending, a session start without a notice (a first figure, a figure linked to the active profile, an
+    /// unusable profiles file), the session end, <c>Select</c> and <c>Create</c> (S13).
+    /// </summary>
+    /// <param name="change">The change</param>
+    [TestMethod]
+    [TestCategory("AC14")]
+    [DataRow("first figure", DisplayName = "Session start of a first figure")]
+    [DataRow("repeated start", DisplayName = "Session start of a figure linked to the active profile")]
+    [DataRow("invalid file", DisplayName = "Session start with an invalid profiles file")]
+    [DataRow("session end", DisplayName = "Session end")]
+    [DataRow("select", DisplayName = "Select")]
+    [DataRow("create", DisplayName = "Create")]
+    public void CompanionProfilesPendingNoticeChangedNotRaisedWithoutChange(string change)
+    {
+        // Arrange
+        var (profiles, apply) = PrepareUnchangedNotice(change);
+
+        var raised = 0;
+
+        profiles.PendingNoticeChanged += (_, _) => raised++;
+
+        // Act
+        apply(profiles);
+
+        // Assert
+        Assert.IsNull(profiles.PendingNotice, $"No notice should be pending: {change}");
+        Assert.AreEqual(0, raised, $"A change that leaves no notice pending should raise no event: {change}");
+    }
+
+    /// <summary>
     /// Figures are observed only in a run that sends live data: not in a replay, mode Off, an invalid setting or an
     /// invalid command line (S7).
     /// </summary>
@@ -1486,6 +1517,52 @@ public sealed class CompanionProfilesTests
                                               "start clearing the notice" => candidate => candidate.ObserveSessionStart(FigureB),
                                               "session end" => candidate => candidate.ObserveSessionEnd(),
                                               _ => candidate => Change(candidate, change)
+                                          };
+
+        return (profiles, apply);
+    }
+
+    /// <summary>
+    /// Prepares the profiles with no notice pending and gives a change that leaves it so: the session start of a first
+    /// figure, of figure A again after its session on <c>Live</c>, of a figure with an unusable profiles file, the session
+    /// end, selecting <c>Live</c> from the profile <c>Other</c>, and creating a profile.
+    /// </summary>
+    /// <param name="change">The change</param>
+    /// <returns>The profiles and the change</returns>
+    private (CompanionProfiles Profiles, Action<CompanionProfiles> Apply) PrepareUnchangedNotice(string change)
+    {
+        var path = change == "invalid file" ? WriteFile("not a profiles file") : ProfilesPath;
+        var profiles = CompanionProfiles.Load(path, _logger);
+
+        switch (change)
+        {
+            case "repeated start":
+                {
+                    ObserveSessions(profiles, FigureA);
+                }
+
+                break;
+
+            case "select":
+                {
+                    profiles.Create("Other");
+                }
+
+                break;
+
+            default:
+                {
+                    // The loaded profiles have no notice pending.
+                }
+
+                break;
+        }
+
+        Action<CompanionProfiles> apply = change switch
+                                          {
+                                              "session end" => candidate => candidate.ObserveSessionEnd(),
+                                              "select" or "create" => candidate => Change(candidate, change),
+                                              _ => candidate => candidate.ObserveSessionStart(FigureA)
                                           };
 
         return (profiles, apply);
