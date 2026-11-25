@@ -165,6 +165,83 @@ public sealed class ServerDatabaseTests : IDisposable
     }
 
     /// <summary>
+    /// Disposing the database waits for a read or write that still holds the gate, so the connection is not closed under
+    /// it, and closes the connection once the gate is free.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC1")]
+    public async Task ServerDatabaseDisposeWaitsForGateHolderBeforeClosingConnection()
+    {
+        // Arrange
+        var result = await OpenAsync(Path.Combine(CreateTemporaryDirectory(), DatabaseFileName));
+        var database = result.Database!;
+
+        await database.Gate.WaitAsync(TestContext.CancellationToken);
+
+        // Act
+        var dispose = Task.Run(database.Dispose, TestContext.CancellationToken);
+
+        await Task.Delay(TimeSpan.FromMilliseconds(200), TestContext.CancellationToken);
+
+        var isDisposedWhileHeld = dispose.IsCompleted;
+        var stateWhileHeld = database.Connection.State;
+
+        _ = database.Gate.Release();
+
+        await dispose.WaitAsync(_openBound, TestContext.CancellationToken);
+
+        // Assert
+        Assert.IsFalse(isDisposedWhileHeld, "Dispose should wait while a read or write holds the gate");
+        Assert.AreEqual(System.Data.ConnectionState.Open, stateWhileHeld, "The connection should stay open under the gate holder");
+        Assert.AreEqual(System.Data.ConnectionState.Closed, database.Connection.State, "The connection should be closed once the gate is free");
+    }
+
+    /// <summary>
+    /// Disposing the database gives up waiting for a gate holder after the wait bound and still closes the connection.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC1")]
+    public async Task ServerDatabaseDisposeGivesUpWaitingForGateHolderAfterBound()
+    {
+        // Arrange
+        var result = await OpenAsync(Path.Combine(CreateTemporaryDirectory(), DatabaseFileName));
+        var database = result.Database!;
+
+        database.DisposeWait = TimeSpan.FromMilliseconds(50);
+
+        await database.TrendGate.WaitAsync(TestContext.CancellationToken);
+
+        // Act
+        await Task.Run(database.Dispose, TestContext.CancellationToken).WaitAsync(_openBound, TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(System.Data.ConnectionState.Closed, database.Connection.State, "The connection should be closed after the bound although the trend gate is held");
+    }
+
+    /// <summary>
+    /// Disposing the database twice does nothing the second time.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC1")]
+    public async Task ServerDatabaseDisposeTwiceDoesNothingTheSecondTime()
+    {
+        // Arrange
+        var result = await OpenAsync(Path.Combine(CreateTemporaryDirectory(), DatabaseFileName));
+        var database = result.Database!;
+
+        database.Dispose();
+
+        // Act
+        database.Dispose();
+
+        // Assert
+        Assert.AreEqual(System.Data.ConnectionState.Closed, database.Connection.State, "The connection should stay closed");
+    }
+
+    /// <summary>
     /// A start without a database file creates it with every migration of the build applied and the tables of the
     /// current schema.
     /// </summary>

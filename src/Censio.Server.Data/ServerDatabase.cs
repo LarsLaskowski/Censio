@@ -9,6 +9,15 @@ namespace Censio.Server.Data;
 /// </summary>
 public sealed class ServerDatabase : IDisposable
 {
+    #region Fields
+
+    /// <summary>
+    /// Whether <see cref="Dispose"/> has run: 1 after the first call.
+    /// </summary>
+    private int _isDisposed;
+
+    #endregion // Fields
+
     #region Constructors
 
     /// <summary>
@@ -45,6 +54,12 @@ public sealed class ServerDatabase : IDisposable
     /// Gets the gate that lets one trend read run at a time.
     /// </summary>
     internal SemaphoreSlim TrendGate { get; } = new(1, 1);
+
+    /// <summary>
+    /// Gets or sets the longest <see cref="Dispose"/> waits for a read or write that still holds a gate, so that it does not
+    /// close the connection under it.
+    /// </summary>
+    internal TimeSpan DisposeWait { get; set; } = TimeSpan.FromSeconds(5);
 
     #endregion // Properties
 
@@ -87,7 +102,27 @@ public sealed class ServerDatabase : IDisposable
     /// <inheritdoc/>
     public void Dispose()
     {
+        if (Interlocked.Exchange(ref _isDisposed, 1) == 1)
+        {
+            return;
+        }
+
+        // A read or write holds a gate while it uses the connection: wait for it, so the connection is not closed under it.
+        var gateTaken = Gate.Wait(DisposeWait);
+        var trendGateTaken = TrendGate.Wait(DisposeWait);
+
         ServerDatabaseOpener.Release(Connection);
+
+        if (trendGateTaken)
+        {
+            _ = TrendGate.Release();
+        }
+
+        if (gateTaken)
+        {
+            _ = Gate.Release();
+        }
+
         Gate.Dispose();
         TrendGate.Dispose();
     }
