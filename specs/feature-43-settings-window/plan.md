@@ -68,6 +68,7 @@ In `tests/Censio.Companion.Core.Tests/` unless a file names another project; eac
 | AC11 | `TrayMenuCreateListsEntriesInOrder` (adapted: no autostart entry, one separator fewer, no `IsChecked`), `TrayMenuCreateHasNoAutostartEntryInEveryMode` (rows: live, recording, replay, invalid, local, forward; replaces the three autostart entry tests), `SettingsWindowSessionOpenReadsAutostartChangedOutside`; manual: Product Manager (step 7 delta) | `TrayMenuTests.cs`, `SettingsWindowSessionTests.cs` |
 | AC12 | `TrayMenuCreateServerLineEndsWithProfile` (rows: every `LiveSendState`/problem row of `TrayMenuFormatLiveSendFormatsEveryState` and every `LocalServerState`, English and German), `TrayMenuCreateWithoutProfileNameKeepsServerLine` (rows: local replay, invalid setting, forward), `TrayMenuFormatServerProfileKeepsLongestNameWhole` (64 characters, a surrogate pair at the end), `TrayMenuFormatServerProfileKeepsBracesAndAmpersand` (`{0}`, `R&D`); `CompanionTextsTests` new `_texts` entry for `ServerProfileFormat`; manual: Product Manager (switch, then reopen the menu; `R&D`) | `TrayMenuTests.cs`, `CompanionTextsTests.cs` |
 | AC13 | `LiveSenderProfileTests`: `…NoticeLoggedWithKindBeforeRaised` (rows: both kinds; the line precedes the subscriber's call; no figure or profile name in it), `…NoNoticeLogsNothing`; `CompanionProfilesTests`: `…PendingNoticeSetBySessionStart`, `…PendingNoticeReplacedByNextSessionStart` (a start without notice clears it), `…PendingNoticeClearedBySessionEnd`, `…PendingNoticeClearedBySelectAndCreate`; `TrayMenuCreateNoticeEntryAboveSettings` (rows: both kinds, local and forward; enabled, kind `ProfileNotice`, text of `FormatNotice`, English and German), `TrayMenuCreateWithoutNoticeHasNoNoticeEntry`; `CompanionLogTests` rows for both lines; manual: Product Manager (notice while full screen, then the menu entry and its click) | `LiveSenderProfileTests.cs`, `CompanionProfilesTests.cs`, `TrayMenuTests.cs`, `CompanionLogTests.cs` |
+| AC14 | `TraySnapshotLookWithNoticeShowsNotice` (rows: `Waiting`, `Receiving`, replay finished), `TraySnapshotLookWithNoticeKeepsProblem` (rows: `ProtocolMismatch`, `Error`, replay problem, invalid command line), `TraySnapshotLookWithoutNoticeKeepsLook` (rows: the three looks); `CompanionProfilesTests`: `…PendingNoticeChangedRaisedWhenNoticeChanges` (rows: session start with a notice, session end after one, `Select` and `Create` while one is pending; the handler reads the new `PendingNotice`), `…PendingNoticeChangedNotRaisedWithoutChange` (rows: session start without a notice and session end, both with none pending); drawing and refresh: manual, Product Manager (notifications off: blue square while pending, back after `Select`; a pipe problem keeps the red triangle); docs: Reviewer | `TraySnapshotTests.cs`, `CompanionProfilesTests.cs` |
 
 ## Approach
 
@@ -336,10 +337,10 @@ on the port is covered by the port-retry tests, the order itself by the Product 
 
 - New `docs/areas/companion-settings.md` (+1,000 words): scope as the spec's *Area documents*; index row in
   `docs/areas/README.md`.
-- New `docs/areas/companion-profiles.md` (+800 words): profiles, the file, its accepted forms and bounds, figure keys,
+- New `docs/areas/companion-profiles.md` (+25 words still to add for amendment AC14, *Notice*; written: 1,571 now): profiles, the file, its accepted forms and bounds, figure keys,
   notices.
 - New `docs/areas/companion-texts.md` (+1,200 words): the language choice and the English/German table.
-- `docs/areas/companion.md` (+250 words): the menu entry, *Command line* (`--restarted`), *Settings file* (written by
+- `docs/areas/companion.md` (+45 words still to add for amendment AC14, the icon looks; written: 4,620 now): the menu entry, *Command line* (`--restarted`), *Settings file* (written by
   the window, `language`), *Folders* (`profiles.json`), *Limits and errors*.
 - `docs/areas/live-sending.md` (+0 words still to add; written: 4,446 on the base, 4,827 now, below the 5,000 limit): *Start and hello* and *Local mode* per profile, *Reconnect* (the profile
   switch, its close and refusal window), *Accepted risks* without *One profile*, *Related decisions* 0111 instead of
@@ -540,6 +541,47 @@ entry above `Settings…` and that Windows may hold notifications back while a g
 (*notices*: the pending entry and when it goes, the two log lines), `local-mode.md` and `live-sending.md` (*Menu*,
 the line `Server: <state>` with the profile ending), `companion-log.md` (the two lines). The Dev measures each area
 document's words before and after (`plan-check.py`).
+
+## Amendment AC14
+
+The Product Manager's choice after the manual test (step 11): a pending notice gets its own icon look, so it is seen
+with Windows notifications off (spec S13, AC14; record 0111 extended). Security areas touched: none (no input, file
+or setting is added).
+
+- Look: `TrayIconLook.Notice`, fourth member. `TraySnapshot.LookWith(notice)` returns `Look` when `notice` is `null`
+  or `Look` is `Problem`, else `Notice`: *problem* wins (the pipe delivers nothing, while ticks go on during a
+  notice), *notice* wins over *waiting* and *receiving*; the `Status:` line and the tooltip keep the state.
+- Tooltip: unchanged (decided): the state stays readable there, the menu entry carries the text, and the 127-character
+  budget held by the longest German tooltip (AC5) gets no new part.
+- Drawing (`TrayIconImages.Draw`, shell): `case TrayIconLook.Notice` fills `area` as a square with
+  `Color.FromArgb(0x09, 0x69, 0xDA)` and draws a white `i` on it: a bar `Math.Max(2f, width / 8f)` wide, centred, from
+  45 % of the area's height to 85 %, and a square dot of the bar's width with its top at 15 %. Colour and shape both
+  differ from the ring, circle and triangle. The constructor's loop over `Enum.GetValues<TrayIconLook>()` draws it;
+  the class and `Draw` summaries name four looks.
+- Refresh: `CompanionProfiles` raises `PendingNoticeChanged` after leaving the lock whenever `PendingNotice` changed
+  (by reference) in `ObserveSessionStart`, `ObserveSessionEnd`, `Select` or `Create`; never under the lock, never
+  for an unchanged value. `StartLiveSending` subscribes `_profiles!.PendingNoticeChanged += (_, _) => updater.Notify();`
+  (the updater coalesces, any thread). A new private `App.LiveProfiles()` (`_liveSender is null ? null : _profiles`)
+  replaces the initializer of `TrayIconSources.Profiles` and feeds the updater's callback:
+  `trayIcon.SetLook(snapshot.LookWith(LiveProfiles()?.PendingNotice))`, so menu and icon read one condition. AC13's
+  order (log line before the subscriber of `ProfileNoticeRaised`) is untouched: the event is another one.
+
+Signatures (Core unless shell):
+- `Notice` on `TrayIconLook` (summary: a notice about the profile is pending)
+- `public TrayIconLook LookWith(ProfileNotice? notice)` on TraySnapshot
+- `public event EventHandler? PendingNoticeChanged;` on CompanionProfiles, region *Events*
+- Shell: `private CompanionProfiles? LiveProfiles()` on App; `case TrayIconLook.Notice` in `TrayIconImages.Draw`
+
+Tests (Tester): *Tests per criterion* AC14; no existing test enumerates the looks (`TrayMenuTests.cs`,
+`TraySnapshotTests.cs` name `Look` values only), so none changes.
+
+Documentation (Dev; sweep `grey ring`, `red triangle`, `grauer Ring`, `rotes Dreieck`, `three looks`):
+`docs/USER_GUIDE.md` English lines 282 and 614 and German 1006 and 1338 (the blue square with `i` while a profile
+notice is pending, unless the state is a problem), its *The menu entry* bullets (261, German 923: the icon shows the
+look meanwhile); `README.md` *Profiles* (154) and *Profile* (419): one clause on the icon; `docs/areas/companion.md`
+(4,620 words, +45) the icon-looks bullet (four looks, priority, refresh on `PendingNoticeChanged`);
+`docs/areas/companion-profiles.md` (1,571 words, +25) *Notice*: the look while pending, linking `companion.md`.
+`docs/areas/README.md`, `pipe-connection.md` and `companion-texts.md` (no new text) unchanged.
 
 ## Out of scope / follow-ups
 

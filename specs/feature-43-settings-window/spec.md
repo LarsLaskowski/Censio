@@ -55,6 +55,9 @@ Every Companion text is English today.
 - S12: A notice of S7 or S8 also stays in the tray menu as an entry with its text, directly above `Settings…`, whose
   click opens the window, since Windows may hold notifications back while a game runs full screen; it goes when the
   profile is switched, the session ends or the next session starts.
+- S13: While the notice of S12 is pending, the tray icon shows a fourth look, *notice* (a blue square with a white
+  `i`), in place of *waiting* or *receiving*; *problem* still wins. The icon returns to the state's look as soon as
+  the notice goes. Tooltip and menu `Status:` line keep the state.
 
 ## Errors and edge cases
 
@@ -153,6 +156,9 @@ A message stands below its field, the typed values stay, and `Save` writes nothi
 - AC13: A raised notice is logged with its kind before it goes to the tray, and once more when it was passed to
   Windows; it stays a clickable menu entry above `Settings…` until a profile switch, the session's end or the next
   session start; the user guide names the full-screen case (S12, N5, N6).
+- AC14: While a notice is pending in a live run the icon shows *notice* unless the state's look is *problem*; it
+  changes to and from *notice* when the notice is set or goes (session start or end, `Select`, `Create`) without
+  waiting for the next tick; the tooltip is unchanged; README and the user guide name the look (S13).
 
 ## Out of scope
 
@@ -214,3 +220,4 @@ A message stands below its field, the typed values stay, and `Save` writes nothi
 | AC11 | added: no `Start with Windows` entry in the tray menu, the window's box its only switch (S4, E14 reworded) | the Product Manager's manual test found the option twice; the window is enough (record 0114) | 11 | Product Manager |
 | AC12 | added: the active profile on every `Server:` line of a live run (S11) | the Product Manager's request after the manual test; pattern, scope and no truncation decided by the Lead (record 0111) | 11 | Product Manager, Lead |
 | AC13 | added: notice log lines by kind, the notice kept as a menu entry, the full-screen hint (S12, N5, N6) | the manual test saw no notification, and nothing told a notice not raised from one Windows held back (record 0111) | 11 | Lead |
+| AC14 | added: a *notice* icon look while a notice is pending, *problem* winning (S13) | the Product Manager's choice after the manual test, so a notice is seen with Windows notifications off; look, priority and tooltip decided by the Lead (record 0111) | 11 | Product Manager, Lead |

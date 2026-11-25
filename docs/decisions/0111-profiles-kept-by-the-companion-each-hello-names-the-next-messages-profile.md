@@ -28,6 +28,9 @@ keep the profile they were taken for.
    size would follow the pipe's strings (up to about 2 MB escaped); a hash of the name has a fixed length.
 6. **The notice as a Windows notification only, or also in the settings window's banner** — Windows may hold a
    notification back while a game runs full screen, and a banner is seen only once the window is opened.
+7. **A pending notice shown only in the tooltip, as a badge on each state's icon, or over a problem** — the Product
+   Manager chose an icon look; a badge is a few pixels at 16 px, the tooltip is seen only on hover, and a pipe problem
+   stops the data while a notice holds no tick.
 
 ## Decision
 
@@ -50,4 +53,6 @@ the old session, is retried as part of the switch; the rules are in [companion-p
 - The tray menu names the active profile on every `Server:` line of a live run, and a notice also stays a menu entry
   above `Settings…` until a switch or the session's end or next start (option 6 lost); the log records each notice's
   kind, never a name, when it is raised and when it was passed to Windows.
+- While a notice is pending the tray icon shows a fourth look, *notice*, unless the state is a problem (option 7
+  lost); a change of the pending notice refreshes the icon at once, and the tooltip keeps the state.
 - Record 0102 (the fixed profile until #43) is deleted: unreleased, it no longer applies.
