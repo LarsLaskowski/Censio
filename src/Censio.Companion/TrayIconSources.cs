@@ -34,7 +34,6 @@ internal sealed class TrayIconSources
     /// </summary>
     public required Func<CompanionTexts> Texts { get; init; }
 
-
     /// <summary>
     /// Gets the reader of the profiles, <c>null</c> when no live sender runs.
     /// </summary>
