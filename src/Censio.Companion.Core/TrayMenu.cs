@@ -234,7 +234,6 @@ public static class TrayMenu
         var game = state.Game;
         var catalog = state.Catalog;
         var server = state.Server;
-        var isAutostartEnabled = state.IsAutostartEnabled;
         var clock = state.Clock;
         var entries = new List<TrayMenuEntry>
                       {
@@ -271,8 +270,6 @@ public static class TrayMenu
                              new TrayMenuEntry(TrayMenuEntryKind.ToggleRecording, snapshot.IsRecording ? texts.StopRecordingText : texts.StartRecordingText, snapshot.CanRecord),
                              new TrayMenuEntry(TrayMenuEntryKind.OpenRecordingsFolder, texts.OpenRecordingsFolderText, true),
                              new TrayMenuEntry(TrayMenuEntryKind.OpenLogFolder, texts.OpenLogFolderText, true),
-                             new TrayMenuEntry(TrayMenuEntryKind.Separator, string.Empty, false),
-                             new TrayMenuEntry(TrayMenuEntryKind.ToggleAutostart, texts.StartWithWindowsText, true, isAutostartEnabled),
                              new TrayMenuEntry(TrayMenuEntryKind.Separator, string.Empty, false),
                              new TrayMenuEntry(TrayMenuEntryKind.Version, FormatVersion(texts, version), false),
                              new TrayMenuEntry(TrayMenuEntryKind.Separator, string.Empty, false),

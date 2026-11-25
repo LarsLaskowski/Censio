@@ -665,7 +665,6 @@ public sealed partial class App : Application, IDisposable
                                      Game = () => _gameSearch?.Status ?? GameInstallationStatus.Searching,
                                      Catalog = () => _catalogLoader?.Status ?? GameCatalogStatus.Reading,
                                      Server = GetServerStatus,
-                                     IsAutostartEnabled = () => _autostart?.Refresh() ?? false,
                                      Texts = () => _texts
                                  },
                                  Dispatch);
@@ -743,12 +742,6 @@ public sealed partial class App : Application, IDisposable
             case TrayMenuEntryKind.OpenCensio:
                 {
                     OpenCensio();
-                }
-                break;
-
-            case TrayMenuEntryKind.ToggleAutostart:
-                {
-                    _autostart?.Toggle();
                 }
                 break;
 

@@ -51,11 +51,6 @@ public enum TrayMenuEntryKind
     Exit,
 
     /// <summary>
-    /// The entry that turns the start with Windows on or off.
-    /// </summary>
-    ToggleAutostart,
-
-    /// <summary>
     /// The entry that shows the game installation.
     /// </summary>
     Game,

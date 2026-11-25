@@ -176,7 +176,6 @@ internal sealed class TrayIcon : IDisposable
                                                   Game = _sources.Game(),
                                                   Catalog = _sources.Catalog(),
                                                   Server = _sources.Server(),
-                                                  IsAutostartEnabled = _sources.IsAutostartEnabled(),
                                                   Clock = TimeProvider.System
                                               }))
         {
@@ -189,12 +188,11 @@ internal sealed class TrayIcon : IDisposable
 
             var item = new ToolStripMenuItem(entry.Text)
                        {
-                           Enabled = entry.IsEnabled,
-                           Checked = entry.IsChecked
+                           Enabled = entry.IsEnabled
                        };
             var kind = entry.Kind;
 
-            if (kind is TrayMenuEntryKind.OpenCensio or TrayMenuEntryKind.OpenSettings or TrayMenuEntryKind.OpenDiagnostics or TrayMenuEntryKind.ToggleRecording or TrayMenuEntryKind.OpenRecordingsFolder or TrayMenuEntryKind.OpenLogFolder or TrayMenuEntryKind.ToggleAutostart or TrayMenuEntryKind.Exit)
+            if (kind is TrayMenuEntryKind.OpenCensio or TrayMenuEntryKind.OpenSettings or TrayMenuEntryKind.OpenDiagnostics or TrayMenuEntryKind.ToggleRecording or TrayMenuEntryKind.OpenRecordingsFolder or TrayMenuEntryKind.OpenLogFolder or TrayMenuEntryKind.Exit)
             {
                 item.Click += (_, _) => _dispatch(kind);
             }

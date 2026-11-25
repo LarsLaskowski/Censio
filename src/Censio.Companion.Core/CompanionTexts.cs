@@ -335,7 +335,7 @@ public sealed class CompanionTexts
     public required string OpenDiagnosticsText { get; init; }
 
     /// <summary>
-    /// Gets the text of the entry that turns the start with Windows on or off.
+    /// Gets the label of the box in the settings window that turns the start with Windows on or off.
     /// </summary>
     public required string StartWithWindowsText { get; init; }
 

@@ -33,11 +33,6 @@ public sealed record TrayMenuState
     public TrayServerStatus? Server { get; init; }
 
     /// <summary>
-    /// Gets a value indicating whether the Companion starts with Windows.
-    /// </summary>
-    public bool IsAutostartEnabled { get; init; }
-
-    /// <summary>
     /// Gets the clock.
     /// </summary>
     public required TimeProvider Clock { get; init; }
