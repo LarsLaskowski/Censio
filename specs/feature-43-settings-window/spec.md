@@ -69,8 +69,9 @@ A message stands below its field, the typed values stay, and `Save` writes nothi
 - E7: A file that cannot be parsed (over 1 MiB, not JSON, not an object, unreadable, a text in it not valid UTF-8): the window shows the defaults
   under `The settings file could not be read (<reason>). Saving replaces it with the values shown.`, the reason the
   log's; `Save` replaces it.
-- E8: A key with a wrong value or written twice (`"localPort": "abc"`, `"gameFolder": 5`, two `mode`): its field is
-  empty with its E1–E6 message or `This setting is written more than once in the file.` until the player edits it;
+- E8: A key with a wrong value or written twice (`"localPort": "abc"`, `"gameFolder": 5`, `"mode": "remote"`, two
+  `mode`): its field is empty with its E1–E6 message, for `mode` (not a text, or a text other than empty, `local` or
+  `forward`) `Choose a mode.`, or `This setting is written more than once in the file.` until the player edits it;
   `Save` stays blocked until then. The other fields show the file's values.
 - E9: The file cannot be written: `The settings could not be saved. Details are in the log.`; the old file stays whole
   and nothing restarts.

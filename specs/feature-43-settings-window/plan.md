@@ -89,7 +89,9 @@ mark, comments, trailing commas, 1 MiB + 1 read) and finds each known key exactl
 depth: an `InvalidOperationException` (invalid UTF-8, a lone surrogate escape, fact 21) is E7 with the reason `holds
 text that is not valid UTF-8`, so no kept property can make `WriteTo` throw or turn into U+FFFD. It gives the window's
 `Values` (each field's text as found, the default where missing), `FileProblem` (E7 reason, the words
-`CompanionSettings.Read` logs) and `FieldProblems` (E8: a wrong value or a duplicate of a known key, of any mode).
+`CompanionSettings.Read` logs) and `FieldProblems` (E8: a wrong value or a duplicate of a known key, of any mode; a `mode` that is not a string or a text other than
+empty, `local` or `forward` ignoring case is `ModeInvalid`, as `CompanionSettings.ReadLocalServer` calls it invalid, and
+loads as `Off` with no radio button checked while the problem shows).
 `language` is no E8 key: a wrong or repeated value loads as not set (`Values.Language` `null`, the Windows display
 language, as `ReadLanguage` reads it). The document keeps the unknown root properties as written
 (`JsonProperty.WriteTo`) and the SHA-256 of the bytes read (missing file: no hash).
@@ -265,7 +267,7 @@ G2:
 - `public enum CompanionSettingsMode { Off, Local, Forward }`
 - `public sealed class CompanionSettingsValues`: `public required CompanionSettingsMode Mode`, `public required string LocalPort`, `public required string ServerAddress`, `public required string ServerToken`, `public required string BufferHours`, `public required string BufferMegabytes`, `public required string GameFolder`, `public CompanionLanguage? Language`
 - `public enum SettingsField { Mode, LocalPort, ServerAddress, ServerToken, BufferHours, BufferMegabytes, GameFolder, Language, ProfileName }`
-- `public enum SettingsProblemKind { PortRange, AddressMissing, AddressInvalid, TokenInvalid, HoursRange, MegabytesRange, FolderNotFullPath, FolderMissing, FolderNotInstallation, NameBlank, NameTooLong, NameInvalidCharacters, NameExists, ProfilesFull, WrittenTwice }`
+- `public enum SettingsProblemKind { PortRange, AddressMissing, AddressInvalid, TokenInvalid, HoursRange, MegabytesRange, FolderNotFullPath, FolderMissing, FolderNotInstallation, NameBlank, NameTooLong, NameInvalidCharacters, NameExists, ProfilesFull, ModeInvalid, WrittenTwice }`
 - `public readonly record struct SettingsProblem`: `public required SettingsField Field`, `public required SettingsProblemKind Kind`
 - `public sealed class CompanionSettingsDocument`: `public static CompanionSettingsDocument Load(string path)`, `public CompanionSettingsValues Values { get; }`, `public string? FileProblem { get; }`, `public IReadOnlyList<SettingsProblem> FieldProblems { get; }`, `public static bool NeedsRestart(CompanionSettingsValues running, CompanionSettingsValues saved)`, `public CompanionSettingsWrite Save(CompanionSettingsValues values)`
 - `public enum CompanionSettingsWriteKind { Saved, ChangedOutside, Failed }`; `public sealed record CompanionSettingsWrite`: `public required CompanionSettingsWriteKind Kind`, `public Exception? Exception`
