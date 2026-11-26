@@ -52,7 +52,7 @@ from the menu, the optional start with Windows, the menu entries for the setting
 - `<version>` is the informational version the Companion was built with: `0.0.0` without a version, otherwise
   the build property `Version` exactly as passed.
 - `Exit` removes the icon at once and ends the process with exit code 0 within 2 seconds in every connection state, in local mode within 5 seconds so that the server can stop ([`local-mode.md`](local-mode.md), *Stop*);
-  the tray never waits for a pending pipe call, the disk, the log, the server or the browser.
+  the tray never waits for a pending pipe call, the disk, the log, the server or the browser. The recording and the profiles writer share one second to finish.
 - When Windows Explorer restarts, the icon appears again once the notification area is back. Sign-out and
   shutdown end the Companion without a dialog.
 

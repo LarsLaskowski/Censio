@@ -17,7 +17,7 @@ background writer with its bounds. A user who checks a log before sharing it, an
   is created, only the 10 newest log files are kept, newest by the date and then `n` in the name. Only top-level files
   whose whole name is exactly `companion-<yyyyMMdd>.log` or `companion-<yyyyMMdd>-<n>.log` (`n` from 2, no leading
   zero, ASCII digits only, case-insensitive) are ever deleted, other files in the folder never; a symbolic link is
-  deleted as a link, not its target.
+  deleted as a link, not its target. A file that cannot be opened (another Companion holds it, such as the old one during a restart) is continued in the next number once; if that fails too, the line is dropped.
 - A line is `<yyyy-MM-ddTHH:mm:ss.fffzzz> <level> <message>`: local time with UTC offset, the level `INF`, `WRN`, `ERR`
   or `CRT`, and the message; an exception follows on the lines after it, each indented by two spaces.
 - It logs: the start with the version and the mode (`Normal`, `Record`, `Replay`, `Invalid`); each change of the

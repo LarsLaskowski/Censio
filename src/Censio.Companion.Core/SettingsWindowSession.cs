@@ -480,7 +480,7 @@ public sealed class SettingsWindowSession
                 _ = profiles.Create(name);
             }
         }
-        else if (profiles.NameOf(input.SelectedProfile) is not null)
+        else if (input.SelectedProfile != before && profiles.NameOf(input.SelectedProfile) is not null)
         {
             profiles.Select(input.SelectedProfile);
         }

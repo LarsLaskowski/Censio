@@ -826,6 +826,32 @@ public sealed partial class App : Application, IDisposable
             .ContinueWith(task => CompanionLog.BackgroundTaskFailed(_logger, task.Exception!), CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Default);
     }
 
+    /// <summary>
+    /// Stops the recording and waits for it and the profiles writer together for at most one second.
+    /// </summary>
+    /// <returns><c>true</c> when the profiles writer has finished or there is none</returns>
+    private bool StopRecordingAndProfiles()
+    {
+        var tasks = new List<Task>();
+
+        if (_recording is { } recording)
+        {
+            tasks.Add(Task.Run(() => recording.StopAsync(TimeSpan.FromSeconds(1)), CancellationToken.None));
+        }
+
+        if (_profilesTask is { } writer)
+        {
+            tasks.Add(writer);
+        }
+
+        if (tasks.Count > 0)
+        {
+            _ = Task.WaitAll(tasks.ToArray(), TimeSpan.FromSeconds(1));
+        }
+
+        return _profilesTask?.IsCompleted ?? true;
+    }
+
     #endregion // Methods
 
     #region Application
@@ -984,19 +1010,7 @@ public sealed partial class App : Application, IDisposable
         _connectionCancellation?.Cancel();
         _profilesCancellation?.Cancel();
 
-        if (_recording is { } recording)
-        {
-            var stop = Task.Run(() => recording.StopAsync(TimeSpan.FromSeconds(1)), CancellationToken.None);
-
-            stop.Wait(TimeSpan.FromSeconds(1), CancellationToken.None);
-        }
-
-        if (_profilesTask is { } writer)
-        {
-            _ = Task.WaitAny([writer], TimeSpan.FromSeconds(1));
-
-            isProfilesWritten = writer.IsCompleted;
-        }
+        isProfilesWritten = StopRecordingAndProfiles();
 
         if (_logProvider is { } provider)
         {
