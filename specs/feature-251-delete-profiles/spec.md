@@ -15,7 +15,7 @@ when the Companion is offline, is not stated anywhere.
 
 ## Scenarios
 
-The drafted variant is option C of Q1 (a box in the confirmation); Q1 is open.
+The player chooses in the confirmation whether the server deletes the history too (Q1, option C).
 
 - S1: Given the profiles `Live`, `A` (active) and `B`, when the player selects `B` in `Profile`, clicks
   `Delete profile…` and confirms with `Delete` and the box `Also delete its history on the server` cleared, then `B`
@@ -126,8 +126,8 @@ The drafted variant is option C of Q1 (a box in the confirmation); Q1 is open.
 
 - Q1: Does a deletion in the Companion also delete the profile's history on the server? Options: (A) never — the
   Companion's list only, the history deleted on the pages; no contract change and no new security area; (B) always —
-  every deletion sends one; (C) the player chooses with a box in the confirmation, cleared by default (drafted above).
-  Open: escalated to the Product Manager.
+  every deletion sends one; (C) the player chooses with a box in the confirmation, cleared by default.
+  Answered: C, by the Product Manager.
 - Q2: How does a profile deleted on the pages appear in the Companion? Answered: unchanged in the list (S5); the Companion
   does not read the server's list (record 0111).
 - Q3: What happens to a profile only the server has? Answered: S6, by record 0111.
