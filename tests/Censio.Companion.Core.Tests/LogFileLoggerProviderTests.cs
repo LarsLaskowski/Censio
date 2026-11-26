@@ -643,6 +643,33 @@ public sealed class LogFileLoggerProviderTests
     }
 
     /// <summary>
+    /// When the day's file cannot be opened, here because a folder has its name, the line goes to the day's next number,
+    /// opened as a new file (review round 1 of G4: the old Companion still holds the day's file during a restart).
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    [TestCategory("AC4")]
+    public async Task LogFileLoggerProviderOpenFailureContinuesInNextNumber()
+    {
+        // Arrange
+        Directory.CreateDirectory(Path.Combine(Folder, LogFileNames.Format(new DateOnly(2026, 11, 2), 1)));
+
+        using var provider = new LogFileLoggerProvider(Folder, _clock);
+        var logger = provider.CreateLogger("Censio");
+
+        // Act
+        CompanionLog.Exiting(logger);
+
+        await FlushAsync(provider);
+
+        // Assert
+        string[] expected = ["companion-20261102-2.log"];
+
+        Assert.AreSequenceEqual(expected, FileNames(Folder), "The line should go to the day's next number");
+        Assert.AreEqual(ExitLine, ReadShared(Path.Combine(Folder, "companion-20261102-2.log")), "The next number should hold the line alone");
+    }
+
+    /// <summary>
     /// Runs an action and returns the exception it threw.
     /// </summary>
     /// <param name="action">The action</param>

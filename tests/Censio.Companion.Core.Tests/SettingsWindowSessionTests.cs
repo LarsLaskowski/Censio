@@ -1379,6 +1379,70 @@ public sealed class SettingsWindowSessionTests
     }
 
     /// <summary>
+    /// A save that changes only the language or only the autostart and keeps the active profile leaves the pending profile
+    /// notice pending, so the menu entry and the notice look stay (S12; review round 1).
+    /// </summary>
+    /// <param name="change">The change: language or autostart</param>
+    /// <returns>A task that completes with the test</returns>
+    [TestMethod]
+    [TestCategory("AC13")]
+    [DataRow("language", DisplayName = "Only the language changed")]
+    [DataRow("autostart", DisplayName = "Only the autostart changed")]
+    public async Task SettingsWindowSessionSaveKeepingProfileKeepsPendingNotice(string change)
+    {
+        // Arrange
+        WriteSettings(LocalSettings);
+
+        var notice = CreatePendingNotice();
+        var active = _profiles.Active;
+        var session = CreateSession();
+        var window = await OpenAsync(session);
+        var input = CreateKeepingProfileInput(window.Views.Single(), change);
+
+        // Act
+        var outcome = await SaveAsync(window, input);
+
+        // Assert
+        Assert.IsNotNull(notice, "The session start should have given a notice");
+        Assert.AreEqual(SettingsSaveKind.Saved, outcome.Kind, $"The save should succeed: {change}");
+        Assert.AreSame(active, _profiles.Active, $"The active profile should stay: {change}");
+        Assert.AreSame(notice, _profiles.PendingNotice, $"The notice should stay pending: {change}");
+    }
+
+    /// <summary>
+    /// With an unusable profiles file and <c>Live</c> still selected, a save that changes only the language leaves the
+    /// profiles file as it was (E16; review round 1).
+    /// </summary>
+    /// <returns>A task that completes with the test</returns>
+    [TestMethod]
+    [TestCategory("AC8")]
+    public async Task SettingsWindowSessionSaveKeepingLiveLeavesInvalidProfilesFile()
+    {
+        // Arrange
+        WriteSettings(LocalSettings);
+        await File.WriteAllTextAsync(ProfilesPath, "not json", TestContext.CancellationToken);
+
+        var old = await File.ReadAllBytesAsync(ProfilesPath, TestContext.CancellationToken);
+
+        _profiles = CompanionProfiles.Load(ProfilesPath, _logger);
+
+        var session = CreateSession();
+        var window = await OpenAsync(session);
+        var view = window.Views.Single();
+        var input = CreateInput(view, Change(view.Values, CompanionLanguage.German), SettingsField.Language);
+
+        // Act
+        var outcome = await SaveAsync(window, input);
+
+        await _profiles.RunAsync(new CancellationToken(true)).WaitAsync(_guard, TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(SettingsSaveKind.Saved, outcome.Kind, "The save should succeed");
+        Assert.AreSequenceEqual(old, await File.ReadAllBytesAsync(ProfilesPath, TestContext.CancellationToken), "The unusable profiles file should stay as it was");
+        Assert.IsTrue(_profiles.IsFileInvalid, "The profiles file should still be shown as unusable");
+    }
+
+    /// <summary>
     /// Creates a completed completion.
     /// </summary>
     /// <returns>The completion</returns>
@@ -1485,6 +1549,28 @@ public sealed class SettingsWindowSessionTests
     }
 
     /// <summary>
+    /// Creates the input of a save that keeps the view's profile and changes only the language or only the autostart.
+    /// </summary>
+    /// <param name="view">The view shown</param>
+    /// <param name="change">The change: language or autostart</param>
+    /// <returns>The input</returns>
+    private static SettingsInput CreateKeepingProfileInput(SettingsView view, string change)
+    {
+        if (change == "language")
+        {
+            return CreateInput(view, Change(view.Values, CompanionLanguage.German), SettingsField.Language);
+        }
+
+        return new SettingsInput
+               {
+                   Values = view.Values,
+                   SelectedProfile = view.ActiveProfile,
+                   IsAutostartEnabled = view.IsAutostartEnabled == false,
+                   EditedFields = []
+               };
+    }
+
+    /// <summary>
     /// Creates the session under test, whose windows are kept in <see cref="_windows" />.
     /// </summary>
     /// <param name="startupValues">The values the Companion started with, or <see langword="null" /> for the file's</param>
@@ -1508,6 +1594,20 @@ public sealed class SettingsWindowSessionTests
                       };
 
         return new SettingsWindowSession(context, action => _posted.Writer.TryWrite(action), CreateWindow);
+    }
+
+    /// <summary>
+    /// Creates and selects a second profile, observes a session of one figure on it and the start of a session of another,
+    /// which gives the notice of a new figure.
+    /// </summary>
+    /// <returns>The pending notice</returns>
+    private ProfileNotice? CreatePendingNotice()
+    {
+        _ = _profiles.Create(ProfileName);
+        _ = _profiles.ObserveSessionStart("MARKER-Figure-A");
+        _profiles.ObserveSessionEnd();
+
+        return _profiles.ObserveSessionStart("MARKER-Figure-B");
     }
 
     /// <summary>
