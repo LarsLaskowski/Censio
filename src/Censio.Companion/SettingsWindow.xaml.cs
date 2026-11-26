@@ -464,6 +464,21 @@ internal sealed partial class SettingsWindow : Window, ISettingsWindow
     /// <inheritdoc />
     public event EventHandler<SettingsInput>? SaveRequested;
 
+#pragma warning disable CS0067, S3264
+    // Skeleton: removed with the implementation
+    /// <inheritdoc />
+    public event EventHandler<SettingsDeletion>? DeleteRequested;
+#pragma warning restore CS0067, S3264
+
+#pragma warning disable RH2003, S1172, S2325
+    // Skeleton: removed with the implementation
+    /// <inheritdoc />
+    public void ShowProfiles(SettingsView view)
+    {
+        throw new NotImplementedException();
+    }
+#pragma warning restore RH2003, S1172, S2325
+
     /// <inheritdoc />
     public void ShowView(SettingsView view)
     {

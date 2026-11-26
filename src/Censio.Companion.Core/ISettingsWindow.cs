@@ -17,6 +17,11 @@ public interface ISettingsWindow
     /// </summary>
     event EventHandler<SettingsInput>? SaveRequested;
 
+    /// <summary>
+    /// Occurs when the user asks to delete a profile.
+    /// </summary>
+    event EventHandler<SettingsDeletion>? DeleteRequested;
+
     #endregion // Events
 
     #region Methods
@@ -26,6 +31,12 @@ public interface ISettingsWindow
     /// </summary>
     /// <param name="view">The view</param>
     void ShowView(SettingsView view);
+
+    /// <summary>
+    /// Shows the profiles: the drop-down with the active profile selected, the count line and the state of the delete button.
+    /// </summary>
+    /// <param name="view">The view</param>
+    void ShowProfiles(SettingsView view);
 
     /// <summary>
     /// Shows the outcome of a save.

@@ -52,6 +52,16 @@ public sealed class SettingsView
     /// </summary>
     public required IReadOnlyList<string> Warnings { get; init; }
 
+    /// <summary>
+    /// Gets the number of deleted profiles whose history the server has not deleted yet.
+    /// </summary>
+    public int WaitingDeletions { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether as many deletions wait as the Companion keeps.
+    /// </summary>
+    public bool IsDeletionQueueFull { get; init; }
+
     #endregion // Properties
 
     #region Methods
@@ -77,6 +87,19 @@ public sealed class SettingsView
                    _ => true
                };
     }
+
+#pragma warning disable RH2003, S1172, S2325
+    // Skeleton: removed with the implementation
+    /// <summary>
+    /// Gets a value indicating whether a profile can be deleted.
+    /// </summary>
+    /// <param name="selected">The identity of the selected profile</param>
+    /// <returns><c>true</c> if the profile can be deleted</returns>
+    public bool CanDelete(Guid selected)
+    {
+        throw new NotImplementedException();
+    }
+#pragma warning restore RH2003, S1172, S2325
 
     #endregion // Methods
 }
