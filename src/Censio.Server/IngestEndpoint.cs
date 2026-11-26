@@ -78,13 +78,13 @@ public static class IngestEndpoint
     /// </summary>
     /// <param name="endpoints">The endpoint route builder</param>
     /// <param name="access">The access that checks the token</param>
-    /// <param name="state">The server state the messages are stored through</param>
+    /// <param name="stores">The stores the messages are stored through</param>
     /// <returns>The endpoint convention builder</returns>
-    public static IEndpointConventionBuilder MapCensioIngest(this IEndpointRouteBuilder endpoints, IngestAccess access, ServerState state)
+    public static IEndpointConventionBuilder MapCensioIngest(this IEndpointRouteBuilder endpoints, IngestAccess access, IngestStores stores)
     {
         var serverVersion = ProductVersion.Read(typeof(IngestEndpoint).Assembly);
 
-        return endpoints.Map(Path, context => HandleAsync(context, access, state, serverVersion));
+        return endpoints.Map(Path, context => HandleAsync(context, access, stores, serverVersion));
     }
 
     /// <summary>
@@ -92,10 +92,10 @@ public static class IngestEndpoint
     /// </summary>
     /// <param name="context">The HTTP context</param>
     /// <param name="access">The access that checks the token</param>
-    /// <param name="state">The server state the messages are stored through</param>
+    /// <param name="stores">The stores the messages are stored through</param>
     /// <param name="serverVersion">The version of the server</param>
     /// <returns>A task that completes when the request ends</returns>
-    private static async Task HandleAsync(HttpContext context, IngestAccess access, ServerState state, string serverVersion)
+    private static async Task HandleAsync(HttpContext context, IngestAccess access, IngestStores stores, string serverVersion)
     {
         if (context.WebSockets.IsWebSocketRequest == false)
         {
@@ -139,7 +139,7 @@ public static class IngestEndpoint
         try
         {
             using var webSocket = await context.WebSockets.AcceptWebSocketAsync(CreateAcceptContext()).ConfigureAwait(false);
-            using var session = new IngestSession(webSocket, access, admission, state, services.GetRequiredService<TimeProvider>(), services.GetRequiredService<ILoggerFactory>().CreateLogger(LogCategory), serverVersion);
+            using var session = new IngestSession(webSocket, access, admission, stores, services.GetRequiredService<TimeProvider>(), services.GetRequiredService<ILoggerFactory>().CreateLogger(LogCategory), serverVersion);
 
             // From its first line the session owns the pending place.
             sessionStarted = true;

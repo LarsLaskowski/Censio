@@ -12,7 +12,7 @@ public static class ContractReader
     /// <summary>
     /// The only contract version this build reads and writes.
     /// </summary>
-    public const int CurrentVersion = 2;
+    public const int CurrentVersion = 3;
 
     /// <summary>
     /// The largest message in bytes.

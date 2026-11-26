@@ -43,7 +43,7 @@ public static partial class CensioServer
             return 1;
         }
 
-        MapEndpoints(app, setUp.Value.Access, setUp.Value.State);
+        MapEndpoints(app, setUp.Value.Access, setUp.Value.Stores);
 
         await app.RunAsync().ConfigureAwait(false);
 
@@ -82,7 +82,7 @@ public static partial class CensioServer
 
             token = readToken;
 
-            MapEndpoints(app, setUp.Value.Access, setUp.Value.State);
+            MapEndpoints(app, setUp.Value.Access, setUp.Value.Stores);
 
             await app.StartAsync(cancellationToken).ConfigureAwait(false);
         }
@@ -192,8 +192,8 @@ public static partial class CensioServer
     /// <param name="app">The built application.</param>
     /// <param name="parts">The parts the checks create.</param>
     /// <param name="cancellationToken">The token that cancels the checks.</param>
-    /// <returns>The ingest access and the state, or <c>null</c> when a check failed (its line is logged).</returns>
-    private static async Task<(IngestAccess Access, ServerState State)?> TrySetUpAsync(WebApplication app, ServerParts parts, CancellationToken cancellationToken)
+    /// <returns>The ingest access and the stores, or <c>null</c> when a check failed (its line is logged).</returns>
+    private static async Task<(IngestAccess Access, IngestStores Stores)?> TrySetUpAsync(WebApplication app, ServerParts parts, CancellationToken cancellationToken)
     {
         if (DataProtectionSetup.TryCreateKeyRing(app.Services, app.Configuration, app.Logger) == false)
         {
@@ -233,7 +233,11 @@ public static partial class CensioServer
         parts.Retention = history;
         app.Lifetime.ApplicationStarted.Register(() => history.Start(app.Lifetime.ApplicationStopping));
 
-        return (ingestAccess, state);
+        return (ingestAccess, new IngestStores
+                              {
+                                  State = state,
+                                  History = history
+                              });
     }
 
     /// <summary>
@@ -241,15 +245,15 @@ public static partial class CensioServer
     /// </summary>
     /// <param name="app">The application.</param>
     /// <param name="ingestAccess">The ingest access.</param>
-    /// <param name="state">The server state.</param>
-    private static void MapEndpoints(WebApplication app, IngestAccess ingestAccess, ServerState state)
+    /// <param name="stores">The ingest stores.</param>
+    private static void MapEndpoints(WebApplication app, IngestAccess ingestAccess, IngestStores stores)
     {
         app.UseWebSockets();
         app.UseAntiforgery();
         app.MapStaticAssets();
         app.MapHealthChecks("/health");
-        app.MapCensioIngest(ingestAccess, state);
-        app.MapCensioIcons(state);
+        app.MapCensioIngest(ingestAccess, stores);
+        app.MapCensioIcons(stores.State);
         app.MapRazorComponents<Censio.Server.Components.App>()
            .AddInteractiveServerRenderMode();
     }
