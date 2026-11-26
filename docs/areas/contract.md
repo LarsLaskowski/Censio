@@ -179,7 +179,7 @@ Text that is not the UUID or receive time form is *invalid*, not *malformed*.
 | ---- | ---- |
 | Malformed | `Contract message is malformed` |
 | Unsupported version | `Contract version <n> is not supported; supported: 2` |
-| Invalid | `Contract message breaks a rule of contract version 2` |
+| Invalid | `Contract message breaks a rule of contract version 3` |
 | Too large | `Contract message exceeds a size bound` |
 | Catalog refused | the catalog's own text (`Catalog document is malformed`, `Catalog schema version <n> is not supported; supported: 1`, `Catalog document breaks a rule of schema version 1`, `Catalog document exceeds a size bound`) |
 
