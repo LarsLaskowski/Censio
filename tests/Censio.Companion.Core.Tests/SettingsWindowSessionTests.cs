@@ -1145,6 +1145,47 @@ public sealed class SettingsWindowSessionTests
     }
 
     /// <summary>
+    /// A change of the deleted identities while the first view is being read shows no profiles of its own; the first view
+    /// follows once and counts the waiting deletion (S3).
+    /// </summary>
+    /// <returns>A task that completes with the test</returns>
+    [TestMethod]
+    [TestCategory("AC8")]
+    public async Task SettingsWindowSessionDeletionChangeBeforeFirstViewShowsOnlyFirstView()
+    {
+        // Arrange
+        WriteGameFolderSettings();
+
+        var deleted = _profiles.Create(ProfileName);
+
+        _profiles.Select(CompanionProfile.Live.Id);
+
+        var session = CreateSession();
+
+        HoldFolderChecks();
+        session.Open();
+        await _folderCheckStarted.Task.WaitAsync(_guard, TestContext.CancellationToken);
+
+        var window = _windows.Single();
+
+        // Act
+        _profiles.Delete(deleted.Id, true);
+        RunPosted();
+
+        var profileViewsBeforeLoad = window.ProfileViews.Count;
+
+        _folderGate.TrySetResult();
+        await RunPostedUntilAsync(() => CountViews() > 0);
+        RunPosted();
+
+        // Assert
+        Assert.AreEqual(0, profileViewsBeforeLoad, "A deletion change before the first view should show no profiles");
+        Assert.HasCount(1, window.Views, "The first view should be shown once");
+        Assert.IsEmpty(window.ProfileViews, "No profiles should be shown besides the first view");
+        Assert.AreEqual(1, window.Views.Single().WaitingDeletions, "The first view should count the waiting deletion");
+    }
+
+    /// <summary>
     /// A <c>Save</c> before the first view is shown is ignored; a <c>Save</c> after it is handled.
     /// </summary>
     /// <returns>A task that completes with the test</returns>
@@ -1189,8 +1230,8 @@ public sealed class SettingsWindowSessionTests
     }
 
     /// <summary>
-    /// The session acts only on the events its window raises as their sender: a close or a save of another sender, or of
-    /// none, changes nothing.
+    /// The session acts only on the events its window raises as their sender: a close, a save or a deletion of another
+    /// sender, or of none, changes nothing.
     /// </summary>
     /// <returns>A task that completes with the test</returns>
     [TestMethod]
@@ -1200,10 +1241,19 @@ public sealed class SettingsWindowSessionTests
         // Arrange
         WriteSettings(LocalSettings);
 
+        var deletable = _profiles.Create(ProfileName);
+
+        _profiles.Select(CompanionProfile.Live.Id);
+
         var session = CreateSession();
         var window = await OpenAsync(session);
         var view = window.Views.Single();
         var input = CreateInput(view, Change(view.Values, (SettingsField.LocalPort, "0")), SettingsField.LocalPort);
+        var deletion = new SettingsDeletion
+                       {
+                           Profile = deletable.Id,
+                           IsHistoryDeleted = false
+                       };
         var other = new FakeSettingsWindow();
 
         // Act
@@ -1211,16 +1261,27 @@ public sealed class SettingsWindowSessionTests
         window.RaiseWindowClosed(other);
         window.RaiseSaveRequested(null, input);
         window.RaiseSaveRequested(other, input);
+        window.RaiseDeleteRequested(null, deletion);
+        window.RaiseDeleteRequested(other, deletion);
         RunPosted();
 
         var isOpenAfterOthers = session.IsOpen;
+        var profilesAfterOthers = _profiles.Profiles.Select(profile => profile.Id).ToArray();
+        var profileViewsAfterOthers = window.ProfileViews.Count + other.ProfileViews.Count;
         var outcome = await SaveAsync(window, input);
+
+        window.RequestDelete(deletion);
+        RunPosted();
 
         // Assert
         Assert.IsTrue(isOpenAfterOthers, "A close of another sender should keep the window");
+        Assert.AreSequenceEqual([CompanionProfile.Live.Id, deletable.Id], profilesAfterOthers, "A deletion of another sender should keep the profile");
+        Assert.AreEqual(0, profileViewsAfterOthers, "A deletion of another sender should show no profiles");
         Assert.AreEqual(SettingsSaveKind.Refused, outcome.Kind, "The window's own save should be handled");
         Assert.HasCount(1, window.Outcomes, "Only the window's own save should show an outcome");
         Assert.IsEmpty(other.Outcomes, "The other sender should be shown no outcome");
+        Assert.AreSequenceEqual([CompanionProfile.Live.Id], _profiles.Profiles.Select(profile => profile.Id).ToArray(), "The window's own deletion should be handled");
+        Assert.HasCount(1, window.ProfileViews, "The window's own deletion should show the profiles once");
     }
 
     /// <summary>

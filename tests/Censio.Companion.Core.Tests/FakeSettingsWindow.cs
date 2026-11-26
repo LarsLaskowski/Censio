@@ -143,6 +143,16 @@ public sealed class FakeSettingsWindow : ISettingsWindow
         SaveRequested?.Invoke(sender, input);
     }
 
+    /// <summary>
+    /// Raises <see cref="DeleteRequested" /> with another sender than this window.
+    /// </summary>
+    /// <param name="sender">The sender</param>
+    /// <param name="deletion">The deletion</param>
+    public void RaiseDeleteRequested(object? sender, SettingsDeletion deletion)
+    {
+        DeleteRequested?.Invoke(sender, deletion);
+    }
+
     #endregion // Methods
 
     #region ISettingsWindow
