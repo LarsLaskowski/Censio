@@ -135,8 +135,10 @@ internal sealed partial class SettingsWindow : Window, ISettingsWindow
 
         try
         {
+            var chosen = ProfileBox.SelectedValue;
+
             ProfileBox.ItemsSource = view.ProfileList;
-            ProfileBox.SelectedValue = view.ActiveProfile;
+            ProfileBox.SelectedValue = chosen is not null && view.ProfileList.Any(profile => Equals(profile.Id, chosen)) ? chosen : view.ActiveProfile;
         }
         finally
         {

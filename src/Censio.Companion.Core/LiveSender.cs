@@ -1074,7 +1074,7 @@ public sealed class LiveSender : IAsyncDisposable
             _seenActiveVersion = _activeVersion;
         }
 
-        if (profiles is not null && _helloProfile is { } named && profiles.IsDeleted(named.Id))
+        if (profiles is not null && _helloProfile is { } named && (profiles.IsDeleted(named.Id) || profiles.NameOf(named.Id) is null))
         {
             _helloProfile = null;
         }
