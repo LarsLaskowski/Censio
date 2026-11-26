@@ -64,7 +64,7 @@ public sealed class CompanionTexts
                                                         LiveSendCompanionConnectedRetrying = "Server: another Companion is connected, retrying",
                                                         LiveSendNotConnected = "Server: not connected",
                                                         LiveSendTokenRefused = "Server: token refused",
-                                                        LiveSendVersionNotSupported = "Server: does not support contract version 2",
+                                                        LiveSendVersionNotSupported = "Server: does not support contract version 3",
                                                         CatalogReading = "Catalog: reading",
                                                         CatalogReadyFormat = CompositeFormat.Parse("Catalog: {0} entries"),
                                                         CatalogNoGame = "Catalog: no game",
@@ -94,7 +94,7 @@ public sealed class CompanionTexts
                                                         ReplaySendReasonServerUnreachable = "server unreachable",
                                                         ReplaySendReasonTokenRefused = "token refused",
                                                         ReplaySendReasonCompanionConnected = "another Companion is connected",
-                                                        ReplaySendReasonVersionNotSupported = "server does not support contract version 2",
+                                                        ReplaySendReasonVersionNotSupported = "server does not support contract version 3",
                                                         ReplaySendReasonNoAnswer = "server does not answer",
                                                         ReplaySendReasonConnectionLost = "server connection lost",
                                                         ReplaySendReasonInvalidReply = "invalid server reply",
@@ -140,6 +140,14 @@ public sealed class CompanionTexts
                                                         LanguageLabel = "Language",
                                                         SaveText = "Save",
                                                         CancelText = "Cancel",
+                                                        DeleteProfileText = "Delete profile…",
+                                                        DeleteProfileDisabledText = "Live and the active profile cannot be deleted.",
+                                                        DeleteProfileTitle = "Delete profile?",
+                                                        DeleteProfileTextFormat = "The profile {0} is removed from this Companion, with the figures linked to it.",
+                                                        DeleteProfileHistoryText = "Also delete its history on the server",
+                                                        DeleteProfileHistoryFullText = "1,000 deletions already wait for the server.",
+                                                        DeleteProfileConfirmText = "Delete",
+                                                        WaitingDeletionsFormat = "Deleted profiles whose history the server has not deleted yet: {0}",
                                                         FileProblemFormat = CompositeFormat.Parse("The settings file could not be read ({0}). Saving replaces it with the values shown."),
                                                         ProfilesFileInvalidText = "The profiles file could not be read. Saving a profile replaces it.",
                                                         WarningReplayRunning = "Saving ends the running replay.",
@@ -202,7 +210,7 @@ public sealed class CompanionTexts
                                                        LiveSendCompanionConnectedRetrying = "Server: anderer Companion verbunden, neuer Versuch",
                                                        LiveSendNotConnected = "Server: nicht verbunden",
                                                        LiveSendTokenRefused = "Server: Token abgelehnt",
-                                                       LiveSendVersionNotSupported = "Server: unterstützt Vertragsversion 2 nicht",
+                                                       LiveSendVersionNotSupported = "Server: unterstützt Vertragsversion 3 nicht",
                                                        CatalogReading = "Katalog: wird gelesen",
                                                        CatalogReadyFormat = CompositeFormat.Parse("Katalog: {0} Einträge"),
                                                        CatalogNoGame = "Katalog: kein Spiel",
@@ -232,7 +240,7 @@ public sealed class CompanionTexts
                                                        ReplaySendReasonServerUnreachable = "Server nicht erreichbar",
                                                        ReplaySendReasonTokenRefused = "Token abgelehnt",
                                                        ReplaySendReasonCompanionConnected = "anderer Companion verbunden",
-                                                       ReplaySendReasonVersionNotSupported = "Server unterstützt Vertragsversion 2 nicht",
+                                                       ReplaySendReasonVersionNotSupported = "Server unterstützt Vertragsversion 3 nicht",
                                                        ReplaySendReasonNoAnswer = "Server antwortet nicht",
                                                        ReplaySendReasonConnectionLost = "Serververbindung verloren",
                                                        ReplaySendReasonInvalidReply = "ungültige Serverantwort",
@@ -278,6 +286,14 @@ public sealed class CompanionTexts
                                                        LanguageLabel = "Sprache",
                                                        SaveText = "Speichern",
                                                        CancelText = "Abbrechen",
+                                                       DeleteProfileText = "Profil löschen…",
+                                                       DeleteProfileDisabledText = "Live und das aktive Profil können nicht gelöscht werden.",
+                                                       DeleteProfileTitle = "Profil löschen?",
+                                                       DeleteProfileTextFormat = "Das Profil {0} wird aus diesem Companion entfernt, mit den Figuren, die mit ihm verknüpft sind.",
+                                                       DeleteProfileHistoryText = "Auch seinen Verlauf auf dem Server löschen",
+                                                       DeleteProfileHistoryFullText = "Schon 1.000 Löschungen warten auf den Server.",
+                                                       DeleteProfileConfirmText = "Löschen",
+                                                       WaitingDeletionsFormat = "Gelöschte Profile, deren Verlauf der Server noch nicht gelöscht hat: {0}",
                                                        FileProblemFormat = CompositeFormat.Parse("Die Einstellungsdatei konnte nicht gelesen werden ({0}). Beim Speichern wird sie durch die angezeigten Werte ersetzt."),
                                                        ProfilesFileInvalidText = "Die Profildatei konnte nicht gelesen werden. Beim Speichern eines Profils wird sie ersetzt.",
                                                        WarningReplayRunning = "Das Speichern beendet die laufende Wiedergabe.",
@@ -910,6 +926,46 @@ public sealed class CompanionTexts
     /// Gets the text of the button that closes the settings window.
     /// </summary>
     public required string CancelText { get; init; }
+
+    /// <summary>
+    /// Gets the text of the button that deletes a profile.
+    /// </summary>
+    public required string DeleteProfileText { get; init; }
+
+    /// <summary>
+    /// Gets the tooltip of the disabled delete button.
+    /// </summary>
+    public required string DeleteProfileDisabledText { get; init; }
+
+    /// <summary>
+    /// Gets the title of the dialog that deletes a profile.
+    /// </summary>
+    public required string DeleteProfileTitle { get; init; }
+
+    /// <summary>
+    /// Gets the format of the text of the dialog, with the profile name.
+    /// </summary>
+    public required string DeleteProfileTextFormat { get; init; }
+
+    /// <summary>
+    /// Gets the text of the box that also deletes the history on the server.
+    /// </summary>
+    public required string DeleteProfileHistoryText { get; init; }
+
+    /// <summary>
+    /// Gets the text shown below the disabled box when the queue is full.
+    /// </summary>
+    public required string DeleteProfileHistoryFullText { get; init; }
+
+    /// <summary>
+    /// Gets the text of the button that confirms the deletion.
+    /// </summary>
+    public required string DeleteProfileConfirmText { get; init; }
+
+    /// <summary>
+    /// Gets the format of the line that counts the waiting deletions, with the count.
+    /// </summary>
+    public required string WaitingDeletionsFormat { get; init; }
 
     /// <summary>
     /// Gets the format of the banner of a settings file that could not be read, with the reason.

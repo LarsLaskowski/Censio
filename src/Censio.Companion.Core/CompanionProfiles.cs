@@ -31,6 +31,11 @@ public sealed class CompanionProfiles
     public const int MaxFigures = 1000;
 
     /// <summary>
+    /// The largest number of deleted profile identities kept, and of waiting deletions.
+    /// </summary>
+    public const int MaxDeletions = 1000;
+
+    /// <summary>
     /// The longest profile name in characters.
     /// </summary>
     public const int MaxNameLength = 64;
@@ -131,6 +136,14 @@ public sealed class CompanionProfiles
     /// </summary>
     public event EventHandler? PendingNoticeChanged;
 
+#pragma warning disable CS0067, S3264
+    // Skeleton: removed with the implementation
+    /// <summary>
+    /// Occurs when the list of deleted profile identities changed.
+    /// </summary>
+    public event EventHandler? DeletionsChanged;
+#pragma warning restore CS0067, S3264
+
     #endregion // Events
 
     #region Properties
@@ -198,6 +211,22 @@ public sealed class CompanionProfiles
             }
         }
     }
+
+#pragma warning disable CA1822, S2325
+    // Skeleton: removed with the implementation
+    /// <summary>
+    /// Gets the identities of the deleted profiles whose history the server has not confirmed yet, oldest first.
+    /// </summary>
+    public IReadOnlyList<Guid> WaitingDeletions => [];
+#pragma warning restore CA1822, S2325
+
+#pragma warning disable CA1822, S2325
+    // Skeleton: removed with the implementation
+    /// <summary>
+    /// Gets a value indicating whether as many deletions wait as <see cref="MaxDeletions" /> allows.
+    /// </summary>
+    public bool IsDeletionQueueFull => false;
+#pragma warning restore CA1822, S2325
 
     #endregion // Properties
 
@@ -274,6 +303,21 @@ public sealed class CompanionProfiles
         return LiveSender.IsSending(mode, setting);
     }
 
+#pragma warning disable RH2003, S1172
+    // Skeleton: removed with the implementation
+    /// <summary>
+    /// Determines whether a profile can be deleted.
+    /// </summary>
+    /// <param name="id">The identity of the profile</param>
+    /// <param name="active">The identity of the active profile</param>
+    /// <param name="profiles">The profiles</param>
+    /// <returns><see langword="true" /> when the profile is in the list, is not <c>Live</c> and is not active</returns>
+    public static bool IsDeletable(Guid id, Guid active, IReadOnlyList<CompanionProfile> profiles)
+    {
+        throw new NotImplementedException();
+    }
+
+#pragma warning restore RH2003, S1172
     /// <summary>
     /// Checks the name of a profile to create.
     /// </summary>
@@ -372,6 +416,46 @@ public sealed class CompanionProfiles
         RaisePendingNoticeChanged(isNoticeChanged);
     }
 
+#pragma warning disable RH2003, S1172, S2325
+    // Skeleton: removed with the implementation
+    /// <summary>
+    /// Deletes a profile with the figures linked to it, and optionally queues the deletion of its history on the server.
+    /// </summary>
+    /// <param name="id">The identity of the profile</param>
+    /// <param name="isHistoryDeleted">Whether the history on the server is deleted too</param>
+    /// <exception cref="ArgumentException">The profile cannot be deleted</exception>
+    /// <exception cref="InvalidOperationException">The deletion is ticked and the queue is full</exception>
+    public void Delete(Guid id, bool isHistoryDeleted)
+    {
+        throw new NotImplementedException();
+    }
+
+#pragma warning restore RH2003, S1172, S2325
+#pragma warning disable RH2003, S1172, S2325
+    // Skeleton: removed with the implementation
+    /// <summary>
+    /// Determines whether the identity of a profile is among the deleted ones, waiting or confirmed.
+    /// </summary>
+    /// <param name="id">The identity of the profile</param>
+    /// <returns><see langword="true" /> when the profile was deleted with its history</returns>
+    public bool IsDeleted(Guid id)
+    {
+        throw new NotImplementedException();
+    }
+
+#pragma warning restore RH2003, S1172, S2325
+#pragma warning disable RH2003, S1172, S2325
+    // Skeleton: removed with the implementation
+    /// <summary>
+    /// Marks a waiting deletion as confirmed by the server.
+    /// </summary>
+    /// <param name="id">The identity of the profile</param>
+    public void ConfirmDeletion(Guid id)
+    {
+        throw new NotImplementedException();
+    }
+
+#pragma warning restore RH2003, S1172, S2325
     /// <summary>
     /// Gets the name of a profile.
     /// </summary>
