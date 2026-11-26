@@ -1388,6 +1388,60 @@ public sealed class LiveSenderProfileTests : IDisposable
     }
 
     /// <summary>
+    /// A profile deleted with the history box cleared after a waiting message of it began a switch to it is not named by
+    /// the next hello, which names the active profile; its waiting message is still sent on that connection (S1, E9, AC3).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC3")]
+    public async Task LiveSenderProfileDeletionWithoutHistoryHelloNamesActiveProfile()
+    {
+        // Arrange
+        var timeProvider = CreateTimeProvider();
+        var connector = new QueuedIngestConnector();
+        var first = AddServer(connector);
+        var next = AddServer(connector);
+        var buffer = CreateRunningBuffer(timeProvider);
+        var profiles = LoadProfiles();
+        var sender = CreateSender(connector, timeProvider, buffer);
+        var closeWait = TimeSpan.FromSeconds(2);
+
+        sender.UseProfiles(profiles);
+
+        var deleted = profiles.Create(SecondName);
+
+        sender.Enqueue(TickItem(100, 2));
+        profiles.Select(LiveSender.ProfileId);
+        sender.Enqueue(TickItem(300, 4));
+        StartRun(sender);
+
+        var firstHello = await AcceptAsync(first);
+        var isClosing = await WaitForAsync(() => timeProvider.Delays.Contains(closeWait));
+
+        // Act
+        profiles.Delete(deleted.Id, false);
+
+        var closed = await first.ReceiveAsync(TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+        var nextHello = await AcceptAsync(next);
+        var waiting = await ReceiveAndAcknowledgeAsync(next);
+        var tick = await ReceiveAndAcknowledgeAsync(next);
+
+        // Assert
+        var sent = Assert.IsInstanceOfType<ContractTick>(waiting, "The first message of the next connection should be the waiting tick, with no deletion sent");
+
+        Assert.AreEqual(LiveSender.ProfileId, firstHello.ProfileId, "The first hello should name the active profile");
+        Assert.IsTrue(isClosing, "The waiting tick of the other profile should begin a switch to it");
+        Assert.IsNull(closed, "The first connection should send nothing before its close");
+        Assert.AreEqual(LiveSender.ProfileId, nextHello.ProfileId, "The next hello should name the active profile, never the deleted one");
+        Assert.AreEqual(LiveSender.ProfileName, nextHello.ProfileName, "The next hello should carry the active profile's name, not the deleted one's");
+        Assert.AreEqual(100L, sent.GameTime, "The waiting tick of the deleted profile should be sent");
+        Assert.AreEqual(deleted.Id, sent.ProfileId, "The waiting tick should keep the deleted profile's identity");
+        Assert.AreEqual(300L, Assert.IsInstanceOfType<ContractTick>(tick, "The second message should be the tick of Live").GameTime, "The tick of Live should follow");
+        Assert.AreEqual(2, connector.AttemptCount, "The waiting tick should go out on the connection of the next hello");
+        Assert.AreEqual(0, buffer.Status.Dropped, "The waiting tick of the deleted profile should not be dropped");
+    }
+
+    /// <summary>
     /// A profile deleted with the history box cleared sends nothing for the deletion: its waiting messages go out on the
     /// current connection, before the messages of <c>Live</c>, and none is dropped (S1, E9, AC3).
     /// </summary>
