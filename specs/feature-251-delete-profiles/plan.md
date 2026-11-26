@@ -80,6 +80,8 @@ writes `version` 1 with the four properties while the list is empty; otherwise `
 repeated property, an `id` not in `D` form, `confirmed` that is not `true` or `false`, a repeated identity, `Live`'s
 identity or an identity of the list of profiles — the last three compared as parsed `Guid` values, never as strings
 (`Guid.TryParseExact` with `D` accepts either letter case and surrounding white space). A rejection is `not of its format`, as today.
+An empty `deleted` array is accepted (the state of a version-1 file; the Companion itself never writes one) and the
+next write is version 1 (N1); no test pins it.
 
 **Deleting.** `CompanionProfiles.Delete(id, isHistoryDeleted)`, under the lock: refuses (`ArgumentException`) what
 `IsDeletable` refuses; refuses (`InvalidOperationException`) a ticked deletion with 1,000 waiting; removes the profile
