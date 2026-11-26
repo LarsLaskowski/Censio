@@ -425,7 +425,7 @@ public sealed class DiagnosticsWindowSessionTests
         // Act
         var actual = await ReplayAsync(runner =>
                                        {
-                                           var session = OpenStalledSession(() => TrayMenu.FormatReplayStatusText(runner.Status), () => runner.LatestTick);
+                                           var session = OpenStalledSession(() => TrayMenu.FormatReplayStatusText(CompanionTexts.English, runner.Status), () => runner.LatestTick);
 
                                            runner.StatusChanged += (_, _) => session.Notify();
                                            runner.TickReceived += (_, _) => session.Notify();
@@ -456,7 +456,7 @@ public sealed class DiagnosticsWindowSessionTests
         // Act
         var actual = await RunLiveAsync((connection, recording) =>
                                         {
-                                            var session = OpenStalledSession(() => TrayMenu.FormatStatusText(connection.Status.State, recording.State), () => connection.LatestTick);
+                                            var session = OpenStalledSession(() => TrayMenu.FormatStatusText(CompanionTexts.English, connection.Status.State, recording.State), () => connection.LatestTick);
 
                                             connection.StatusChanged += (_, _) => session.Notify();
                                             connection.TickReceived += (_, _) => session.Notify();

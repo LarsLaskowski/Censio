@@ -633,7 +633,8 @@ public sealed class ReplaySenderTests
         Assert.IsNull(problem, "The close should give no problem");
         Assert.AreSequenceEqual(_connectedAndEndLines, logger.Entries.Select(entry => entry.Message), "The end line should count the tick as sent and the refused trade routes as refused");
         Assert.AreEqual("Censio Companion: Replay finished: 1 tick sent, 1 refused",
-                        TrayMenu.FormatReplayToolTip(new PipeReplayStatus
+                        TrayMenu.FormatReplayToolTip(CompanionTexts.English,
+                                                     new PipeReplayStatus
                                                      {
                                                          State = PipeConnectionState.Receiving,
                                                          IsFinished = true,
@@ -1716,10 +1717,7 @@ public sealed class ReplaySenderTests
     /// <returns>Whether the task was completed one tick before the timeout</returns>
     private async Task<bool> ExpireReplyTimeoutAsync(RecordingTimeProvider timeProvider, Task waiting, int replyTimers)
     {
-        while (CountReplyTimers(timeProvider) < replyTimers)
-        {
-            await timeProvider.WaitForTimersAsync(timeProvider.Delays.Count + 1, TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
-        }
+        await timeProvider.WaitForDelaysAsync(ReplaySender.ReplyTimeout, replyTimers, TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
 
         timeProvider.Advance(ReplaySender.ReplyTimeout - TimeSpan.FromTicks(1));
 
@@ -1744,10 +1742,7 @@ public sealed class ReplaySenderTests
 
         try
         {
-            while (CountReplyTimers(timeProvider) < replyTimers)
-            {
-                await timeProvider.WaitForTimersAsync(timeProvider.Delays.Count + 1, limit.Token);
-            }
+            await timeProvider.WaitForDelaysAsync(ReplaySender.ReplyTimeout, replyTimers, limit.Token);
 
             return true;
         }

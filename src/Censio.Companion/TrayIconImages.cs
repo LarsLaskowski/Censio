@@ -9,7 +9,7 @@ using Censio.Companion.Core;
 namespace Censio.Companion;
 
 /// <summary>
-/// Draws the icons of the three looks of the notification area icon.
+/// Draws the icons of the four looks of the notification area icon.
 /// </summary>
 internal sealed class TrayIconImages : IDisposable
 {
@@ -61,7 +61,7 @@ internal sealed class TrayIconImages : IDisposable
     }
 
     /// <summary>
-    /// Draws the icon of a look: a grey ring, a green filled circle or a red filled triangle.
+    /// Draws the icon of a look: a grey ring, a green filled circle or a red filled triangle or a blue square with a white i.
     /// </summary>
     /// <param name="look">The look</param>
     /// <param name="width">The width in pixels</param>
@@ -96,6 +96,21 @@ internal sealed class TrayIconImages : IDisposable
                         PointF[] points = [new PointF(area.Left + (area.Width / 2f), area.Top), new PointF(area.Right, area.Bottom), new PointF(area.Left, area.Bottom)];
 
                         graphics.FillPolygon(brush, points);
+                    }
+                    break;
+
+                case TrayIconLook.Notice:
+                    {
+                        using var brush = new SolidBrush(Color.FromArgb(0x09, 0x69, 0xDA));
+
+                        using var mark = new SolidBrush(Color.White);
+
+                        var barWidth = Math.Max(2f, width / 8f);
+                        var left = area.Left + ((area.Width - barWidth) / 2f);
+
+                        graphics.FillRectangle(brush, area);
+                        graphics.FillRectangle(mark, left, area.Top + (area.Height * 0.45f), barWidth, area.Height * 0.4f);
+                        graphics.FillRectangle(mark, left, area.Top + (area.Height * 0.15f), barWidth, barWidth);
                     }
                     break;
 

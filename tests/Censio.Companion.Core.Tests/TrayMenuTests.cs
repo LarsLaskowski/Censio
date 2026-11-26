@@ -49,11 +49,13 @@ public sealed class TrayMenuTests
     }
 
     /// <summary>
-    /// The menu lists status, last tick, game, separator, open diagnostics, toggle, both folder entries, separator, start with
-    /// Windows, separator, version, separator and exit, in this order, with the status and last-tick entries greyed out and
-    /// no entry checked while the autostart is off.
+    /// The menu lists status, last tick, game, catalog, separator, settings, open diagnostics, toggle, both folder
+    /// entries, separator, version, separator and exit, in this order, with the status, last-tick, game, catalog and
+    /// version entries and the separators greyed out, and no start-with-Windows entry (S4).
     /// </summary>
     [TestMethod]
+    [TestCategory("AC1")]
+    [TestCategory("AC11")]
     public void TrayMenuCreateListsEntriesInOrder()
     {
         // Arrange
@@ -65,12 +67,11 @@ public sealed class TrayMenuTests
                                 TrayMenuEntryKind.Game,
                                 TrayMenuEntryKind.Catalog,
                                 TrayMenuEntryKind.Separator,
+                                TrayMenuEntryKind.OpenSettings,
                                 TrayMenuEntryKind.OpenDiagnostics,
                                 TrayMenuEntryKind.ToggleRecording,
                                 TrayMenuEntryKind.OpenRecordingsFolder,
                                 TrayMenuEntryKind.OpenLogFolder,
-                                TrayMenuEntryKind.Separator,
-                                TrayMenuEntryKind.ToggleAutostart,
                                 TrayMenuEntryKind.Separator,
                                 TrayMenuEntryKind.Version,
                                 TrayMenuEntryKind.Separator,
@@ -83,102 +84,84 @@ public sealed class TrayMenuTests
                                 "Game: searching",
                                 "Catalog: reading",
                                 string.Empty,
+                                "Settings…",
                                 "Open diagnostics",
                                 "Start recording",
                                 "Open recordings folder",
                                 "Open log folder",
                                 string.Empty,
-                                "Start with Windows",
-                                string.Empty,
                                 "Version 1.2.3",
                                 string.Empty,
                                 "Exit"
                             };
-        var expectedEnabled = new[] { false, false, false, false, false, true, true, true, true, false, true, false, false, false, true };
-        var expectedChecked = new bool[15];
+        var expectedEnabled = new[] { false, false, false, false, false, true, true, true, true, true, false, false, false, true };
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, null, false, CreateClock(1));
+        var entries = TrayMenu.Create(CompanionTexts.English,
+                                      new TrayMenuState
+                                      {
+                                          Version = "1.2.3",
+                                          Snapshot = snapshot,
+                                          Game = GameInstallationStatus.Searching,
+                                          Catalog = GameCatalogStatus.Reading,
+                                          Server = null,
+                                          Clock = CreateClock(1)
+                                      });
 
         // Assert
         Assert.AreSequenceEqual(expectedKinds, entries.Select(entry => entry.Kind).ToArray(), "The entries should be in the order of the menu");
-        Assert.AreSequenceEqual(expectedTexts, entries.Select(entry => entry.Text).ToArray(), "The entries should carry the status, the last tick, the game, the catalog, open diagnostics, the toggle, the folders, the version and Exit");
+        Assert.AreSequenceEqual(expectedTexts, entries.Select(entry => entry.Text).ToArray(), "The entries should carry the status, the last tick, the game, the catalog, settings, open diagnostics, the toggle, the folders, the version and Exit");
         Assert.AreSequenceEqual(expectedEnabled, entries.Select(entry => entry.IsEnabled).ToArray(), "Status, last tick, game, catalog, version and separators should be greyed out, the rest enabled");
-        Assert.AreSequenceEqual(expectedChecked, entries.Select(entry => entry.IsChecked).ToArray(), "No entry should be checked while the autostart is off");
     }
 
     /// <summary>
-    /// The start-with-Windows entry reads Start with Windows and is enabled live, while recording, in a replay and with an
-    /// invalid command line.
+    /// The menu holds no start-with-Windows entry live, while recording, in a replay, with an invalid command line, in
+    /// local mode and in forward mode: no entry is of the autostart kind and none reads Start with Windows (S4).
     /// </summary>
     /// <param name="mode">The mode of the Companion: live, recording, replay or invalid</param>
+    /// <param name="serverMode">The server mode: none, local or forward</param>
     [TestMethod]
-    [DataRow("live")]
-    [DataRow("recording")]
-    [DataRow("replay")]
-    [DataRow("invalid")]
-    public void TrayMenuCreateAutostartEnabledInEveryMode(string mode)
+    [TestCategory("AC11")]
+    [DataRow("live", "none")]
+    [DataRow("recording", "none")]
+    [DataRow("replay", "none")]
+    [DataRow("invalid", "none")]
+    [DataRow("live", "local")]
+    [DataRow("live", "forward")]
+    public void TrayMenuCreateHasNoAutostartEntryInEveryMode(string mode, string serverMode)
     {
         // Arrange
         var snapshot = CreateSnapshotForMode(mode);
+        var server = CreateServerStatusOrNone(serverMode);
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, null, false, CreateClock(1));
+        var entries = TrayMenu.Create(CompanionTexts.English,
+                                      new TrayMenuState
+                                      {
+                                          Version = "1.2.3",
+                                          Snapshot = snapshot,
+                                          Game = GameInstallationStatus.Searching,
+                                          Catalog = GameCatalogStatus.Reading,
+                                          Server = server,
+                                          Clock = CreateClock(1)
+                                      });
 
         // Assert
-        var autostart = entries.SingleOrDefault(entry => entry.Kind == TrayMenuEntryKind.ToggleAutostart);
+        var kindNames = entries.Select(entry => entry.Kind.ToString()).ToList();
+        var texts = entries.Select(entry => entry.Text).ToList();
 
-        Assert.IsNotNull(autostart, "The menu should hold the start-with-Windows entry in every mode");
-        Assert.AreEqual("Start with Windows", autostart.Text, "The entry should read Start with Windows");
-        Assert.AreEqual("Start with Windows", TrayMenu.StartWithWindowsText, "The constant should read Start with Windows");
-        Assert.IsTrue(autostart.IsEnabled, "The entry should be enabled in every mode");
+        Assert.AreEqual("Start with Windows", CompanionTexts.English.StartWithWindowsText, "The text of the settings window's box should read Start with Windows");
+        Assert.DoesNotContain("ToggleAutostart", kindNames, $"No entry should be of the autostart kind: {mode}, {serverMode}");
+        Assert.DoesNotContain(CompanionTexts.English.StartWithWindowsText, texts, $"No entry should read Start with Windows: {mode}, {serverMode}");
     }
 
     /// <summary>
-    /// The start-with-Windows entry carries a check mark when the autostart is on, and no other entry does.
-    /// </summary>
-    [TestMethod]
-    public void TrayMenuCreateAutostartCheckedWhenEnabled()
-    {
-        // Arrange
-        var snapshot = CreateSnapshot("Receiving", canRecord: true, isRecording: false);
-
-        // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, null, true, CreateClock(1));
-
-        // Assert
-        var checkedKinds = entries.Where(entry => entry.IsChecked).Select(entry => entry.Kind).ToArray();
-
-        Assert.AreSequenceEqual(new[] { TrayMenuEntryKind.ToggleAutostart }, checkedKinds, "Only the start-with-Windows entry should be checked when the autostart is on");
-        Assert.IsTrue(entries.Single(entry => entry.Kind == TrayMenuEntryKind.ToggleAutostart).IsEnabled, "The checked entry should stay enabled");
-    }
-
-    /// <summary>
-    /// The start-with-Windows entry carries no check mark when the autostart is off.
-    /// </summary>
-    [TestMethod]
-    public void TrayMenuCreateAutostartUncheckedWhenDisabled()
-    {
-        // Arrange
-        var snapshot = CreateSnapshot("Receiving", canRecord: true, isRecording: false);
-
-        // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, null, false, CreateClock(1));
-
-        // Assert
-        var autostart = entries.SingleOrDefault(entry => entry.Kind == TrayMenuEntryKind.ToggleAutostart);
-
-        Assert.IsNotNull(autostart, "The menu should hold the start-with-Windows entry");
-        Assert.IsFalse(autostart.IsChecked, "The entry should not be checked when the autostart is off");
-        Assert.IsTrue(autostart.IsEnabled, "The unchecked entry should stay enabled");
-    }
-
-    /// <summary>
-    /// The open-diagnostics entry is enabled and directly after the first separator live, while recording, in a replay and
-    /// with an invalid command line.
+    /// The open-diagnostics entry is enabled and second after the first separator, below the settings entry, live, while
+    /// recording, in a replay and with an invalid command line.
     /// </summary>
     /// <param name="mode">The mode of the Companion: live, recording, replay or invalid</param>
     [TestMethod]
+    [TestCategory("AC1")]
     [DataRow("live")]
     [DataRow("recording")]
     [DataRow("replay")]
@@ -189,15 +172,90 @@ public sealed class TrayMenuTests
         var snapshot = CreateSnapshotForMode(mode);
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, null, false, CreateClock(1));
+        var entries = TrayMenu.Create(CompanionTexts.English,
+                                      new TrayMenuState
+                                      {
+                                          Version = "1.2.3",
+                                          Snapshot = snapshot,
+                                          Game = GameInstallationStatus.Searching,
+                                          Catalog = GameCatalogStatus.Reading,
+                                          Server = null,
+                                          Clock = CreateClock(1)
+                                      });
 
         // Assert
         var kinds = entries.Select(entry => entry.Kind).ToList();
         var diagnostics = entries.Single(entry => entry.Kind == TrayMenuEntryKind.OpenDiagnostics);
 
-        Assert.AreEqual(kinds.IndexOf(TrayMenuEntryKind.Separator) + 1, kinds.IndexOf(TrayMenuEntryKind.OpenDiagnostics), "The entry should be directly after the first separator");
+        Assert.AreEqual(kinds.IndexOf(TrayMenuEntryKind.Separator) + 2, kinds.IndexOf(TrayMenuEntryKind.OpenDiagnostics), "The entry should be second after the first separator, below the settings entry");
         Assert.AreEqual("Open diagnostics", diagnostics.Text, "The entry should read Open diagnostics");
         Assert.IsTrue(diagnostics.IsEnabled, "The entry should be enabled in every mode");
+    }
+
+    /// <summary>
+    /// The entry Settings… is enabled and directly above Open diagnostics live, while recording, in a replay,
+    /// with an invalid command line, in local mode and in forward mode (S1).
+    /// </summary>
+    /// <param name="mode">The mode of the Companion: live, recording, replay or invalid</param>
+    /// <param name="serverMode">The server mode: none, local or forward</param>
+    [TestMethod]
+    [TestCategory("AC1")]
+    [DataRow("live", "none")]
+    [DataRow("recording", "none")]
+    [DataRow("replay", "none")]
+    [DataRow("invalid", "none")]
+    [DataRow("live", "local")]
+    [DataRow("live", "forward")]
+    public void TrayMenuCreateHasSettingsAboveOpenDiagnosticsInEveryMode(string mode, string serverMode)
+    {
+        // Arrange
+        var snapshot = CreateSnapshotForMode(mode);
+        var server = CreateServerStatusOrNone(serverMode);
+
+        // Act
+        var entries = TrayMenu.Create(CompanionTexts.English,
+                                      new TrayMenuState
+                                      {
+                                          Version = "1.2.3",
+                                          Snapshot = snapshot,
+                                          Game = GameInstallationStatus.Searching,
+                                          Catalog = GameCatalogStatus.Reading,
+                                          Server = server,
+                                          Clock = CreateClock(1)
+                                      });
+
+        // Assert
+        var kinds = entries.Select(entry => entry.Kind).ToList();
+        var settings = entries.Single(entry => entry.Kind == TrayMenuEntryKind.OpenSettings);
+
+        Assert.AreEqual(kinds.IndexOf(TrayMenuEntryKind.OpenDiagnostics) - 1, kinds.IndexOf(TrayMenuEntryKind.OpenSettings), $"Settings… should be directly above Open diagnostics: {mode}, {serverMode}");
+        Assert.AreEqual("Settings…", settings.Text, $"The entry should read Settings…: {mode}, {serverMode}");
+        Assert.IsTrue(settings.IsEnabled, $"The entry should be enabled in every mode: {mode}, {serverMode}");
+    }
+
+    /// <summary>
+    /// With the German texts every entry of a full menu, from the status to Exit, reads in German, in the same order and
+    /// state as in English; only the version entry reads the same in both languages (S9).
+    /// </summary>
+    /// <param name="serverMode">The server mode: local or forward</param>
+    [TestMethod]
+    [TestCategory("AC5")]
+    [DataRow("local")]
+    [DataRow("forward")]
+    public void TrayMenuCreateGermanShowsGermanEntries(string serverMode)
+    {
+        // Arrange
+        var english = TrayMenu.Create(CompanionTexts.English, CreateFullState(CompanionTexts.English, serverMode));
+        var germanState = CreateFullState(CompanionTexts.German, serverMode);
+
+        // Act
+        var german = TrayMenu.Create(CompanionTexts.German, germanState);
+
+        // Assert
+        Assert.AreSequenceEqual(english.Select(entry => entry.Kind).ToArray(), german.Select(entry => entry.Kind).ToArray(), $"The language should not change the entries or their order: {serverMode}");
+        Assert.AreSequenceEqual(english.Select(entry => entry.IsEnabled).ToArray(), german.Select(entry => entry.IsEnabled).ToArray(), $"The language should not change which entries are enabled: {serverMode}");
+        Assert.Contains(TrayMenuEntryKind.OpenSettings, german.Select(entry => entry.Kind).ToList(), $"The German menu should hold the settings entry: {serverMode}");
+        Assert.IsEmpty(SameTexts(english, german), $"Every German entry but the version should differ from the English one: {serverMode}");
     }
 
     /// <summary>
@@ -210,7 +268,16 @@ public sealed class TrayMenuTests
         var snapshot = CreateSnapshot("Receiving (recording)", canRecord: true, isRecording: true);
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, null, false, CreateClock(1));
+        var entries = TrayMenu.Create(CompanionTexts.English,
+                                      new TrayMenuState
+                                      {
+                                          Version = "1.2.3",
+                                          Snapshot = snapshot,
+                                          Game = GameInstallationStatus.Searching,
+                                          Catalog = GameCatalogStatus.Reading,
+                                          Server = null,
+                                          Clock = CreateClock(1)
+                                      });
 
         // Assert
         var toggle = entries.Single(entry => entry.Kind == TrayMenuEntryKind.ToggleRecording);
@@ -229,7 +296,16 @@ public sealed class TrayMenuTests
         var snapshot = CreateSnapshot("Replay: Receiving", canRecord: false, isRecording: false);
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, null, false, CreateClock(1));
+        var entries = TrayMenu.Create(CompanionTexts.English,
+                                      new TrayMenuState
+                                      {
+                                          Version = "1.2.3",
+                                          Snapshot = snapshot,
+                                          Game = GameInstallationStatus.Searching,
+                                          Catalog = GameCatalogStatus.Reading,
+                                          Server = null,
+                                          Clock = CreateClock(1)
+                                      });
 
         // Assert
         var toggle = entries.Single(entry => entry.Kind == TrayMenuEntryKind.ToggleRecording);
@@ -249,10 +325,19 @@ public sealed class TrayMenuTests
     public void TrayMenuCreateInvalidGreysToggle()
     {
         // Arrange
-        var snapshot = TraySnapshot.ForInvalidCommandLine();
+        var snapshot = TraySnapshot.ForInvalidCommandLine(CompanionTexts.English);
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, null, false, CreateClock(1));
+        var entries = TrayMenu.Create(CompanionTexts.English,
+                                      new TrayMenuState
+                                      {
+                                          Version = "1.2.3",
+                                          Snapshot = snapshot,
+                                          Game = GameInstallationStatus.Searching,
+                                          Catalog = GameCatalogStatus.Reading,
+                                          Server = null,
+                                          Clock = CreateClock(1)
+                                      });
 
         // Assert
         var toggle = entries.Single(entry => entry.Kind == TrayMenuEntryKind.ToggleRecording);
@@ -281,7 +366,16 @@ public sealed class TrayMenuTests
         var snapshot = CreateSnapshot(statusText, canRecord: true, isRecording: false);
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, null, false, CreateClock(1));
+        var entries = TrayMenu.Create(CompanionTexts.English,
+                                      new TrayMenuState
+                                      {
+                                          Version = "1.2.3",
+                                          Snapshot = snapshot,
+                                          Game = GameInstallationStatus.Searching,
+                                          Catalog = GameCatalogStatus.Reading,
+                                          Server = null,
+                                          Clock = CreateClock(1)
+                                      });
 
         // Assert
         var status = entries.Single(entry => entry.Kind == TrayMenuEntryKind.Status);
@@ -300,7 +394,16 @@ public sealed class TrayMenuTests
         const string version = "1.2.3";
 
         // Act
-        var entries = TrayMenu.Create(version, CreateSnapshot("Receiving", canRecord: true, isRecording: false), GameInstallationStatus.Searching, GameCatalogStatus.Reading, null, false, CreateClock(1));
+        var entries = TrayMenu.Create(CompanionTexts.English,
+                                      new TrayMenuState
+                                      {
+                                          Version = version,
+                                          Snapshot = CreateSnapshot("Receiving", canRecord: true, isRecording: false),
+                                          Game = GameInstallationStatus.Searching,
+                                          Catalog = GameCatalogStatus.Reading,
+                                          Server = null,
+                                          Clock = CreateClock(1)
+                                      });
 
         // Assert
         Assert.IsFalse(entries.Single(entry => entry.Kind == TrayMenuEntryKind.Version).IsEnabled, "The version entry should be greyed out");
@@ -316,7 +419,16 @@ public sealed class TrayMenuTests
         const string version = "1.2.3";
 
         // Act
-        var entries = TrayMenu.Create(version, CreateSnapshot("Receiving", canRecord: true, isRecording: false), GameInstallationStatus.Searching, GameCatalogStatus.Reading, null, false, CreateClock(1));
+        var entries = TrayMenu.Create(CompanionTexts.English,
+                                      new TrayMenuState
+                                      {
+                                          Version = version,
+                                          Snapshot = CreateSnapshot("Receiving", canRecord: true, isRecording: false),
+                                          Game = GameInstallationStatus.Searching,
+                                          Catalog = GameCatalogStatus.Reading,
+                                          Server = null,
+                                          Clock = CreateClock(1)
+                                      });
 
         // Assert
         Assert.IsTrue(entries.Single(entry => entry.Kind == TrayMenuEntryKind.Exit).IsEnabled, "The exit entry should be enabled");
@@ -332,7 +444,16 @@ public sealed class TrayMenuTests
         var version = ProductVersion.Read(typeof(TrayMenu).Assembly);
 
         // Act
-        var entries = TrayMenu.Create(version, CreateSnapshot("Receiving", canRecord: true, isRecording: false), GameInstallationStatus.Searching, GameCatalogStatus.Reading, null, false, CreateClock(1));
+        var entries = TrayMenu.Create(CompanionTexts.English,
+                                      new TrayMenuState
+                                      {
+                                          Version = version,
+                                          Snapshot = CreateSnapshot("Receiving", canRecord: true, isRecording: false),
+                                          Game = GameInstallationStatus.Searching,
+                                          Catalog = GameCatalogStatus.Reading,
+                                          Server = null,
+                                          Clock = CreateClock(1)
+                                      });
 
         // Assert
         Assert.AreEqual("Version " + version, entries.Single(entry => entry.Kind == TrayMenuEntryKind.Version).Text, "The version entry should read Version followed by the product version");
@@ -354,7 +475,7 @@ public sealed class TrayMenuTests
         CultureInfo.CurrentCulture = CreateOddCulture();
 
         // Act
-        var text = TrayMenu.FormatLastTick(tick, CreateClock(1));
+        var text = TrayMenu.FormatLastTick(CompanionTexts.English, tick, CreateClock(1));
 
         // Assert
         Assert.AreEqual(expected, text, "A tick of today should show the local time as HH:mm:ss under any culture");
@@ -377,7 +498,7 @@ public sealed class TrayMenuTests
         CultureInfo.CurrentCulture = CreateOddCulture();
 
         // Act
-        var text = TrayMenu.FormatLastTick(tick, CreateClock(1));
+        var text = TrayMenu.FormatLastTick(CompanionTexts.English, tick, CreateClock(1));
 
         // Assert
         Assert.AreEqual(expected, text, "A tick of another day should show the local time as yyyy-MM-dd HH:mm:ss under any culture");
@@ -402,7 +523,7 @@ public sealed class TrayMenuTests
                    };
 
         // Act
-        var text = TrayMenu.FormatLastTick(tick, CreateClock(-1));
+        var text = TrayMenu.FormatLastTick(CompanionTexts.English, tick, CreateClock(-1));
 
         // Assert
         Assert.AreEqual(expected, text, "A time within one day after the earliest time should show in UTC, a later one in local time");
@@ -427,7 +548,7 @@ public sealed class TrayMenuTests
                    };
 
         // Act
-        var text = TrayMenu.FormatLastTick(tick, CreateClock(1));
+        var text = TrayMenu.FormatLastTick(CompanionTexts.English, tick, CreateClock(1));
 
         // Assert
         Assert.AreEqual(expected, text, "A time within one day before the latest time should show in UTC, an earlier one in local time");
@@ -452,7 +573,7 @@ public sealed class TrayMenuTests
                               };
 
         // Act
-        var text = TrayMenu.FormatLastTick(tick, CreateClock(1));
+        var text = TrayMenu.FormatLastTick(CompanionTexts.English, tick, CreateClock(1));
 
         // Assert
         Assert.AreEqual(expected, text, "The island count should read 1 island in the singular and n islands otherwise");
@@ -468,7 +589,7 @@ public sealed class TrayMenuTests
         PipeTickSummary? tick = null;
 
         // Act
-        var text = TrayMenu.FormatLastTick(tick, CreateClock(1));
+        var text = TrayMenu.FormatLastTick(CompanionTexts.English, tick, CreateClock(1));
 
         // Assert
         Assert.AreEqual("Last tick: none", text, "Without a tick the text should read Last tick: none");
@@ -489,7 +610,7 @@ public sealed class TrayMenuTests
                        };
 
         // Act
-        var toolTip = TrayMenu.FormatSnapshotToolTip(snapshot, CreateClock(1));
+        var toolTip = TrayMenu.FormatSnapshotToolTip(CompanionTexts.English, snapshot, CreateClock(1));
 
         // Assert
         Assert.AreEqual("Censio Companion: Receiving", toolTip, "Without a tick the tooltip should be the one status line");
@@ -505,7 +626,7 @@ public sealed class TrayMenuTests
         var snapshot = CreateSnapshot("Receiving (recording)", canRecord: true, isRecording: true);
 
         // Act
-        var toolTip = TrayMenu.FormatSnapshotToolTip(snapshot, CreateClock(1));
+        var toolTip = TrayMenu.FormatSnapshotToolTip(CompanionTexts.English, snapshot, CreateClock(1));
 
         // Assert
         Assert.AreEqual("Censio Companion: Receiving (recording)\nLast tick: 00:30:00, 3 islands", toolTip, "With a tick the tooltip should hold the status line, a line feed and the last-tick line");
@@ -534,14 +655,41 @@ public sealed class TrayMenuTests
                        ReceiveTime = DateTimeOffset.MinValue,
                        IslandCount = 256
                    };
-        var snapshot = TraySnapshot.ForReplay(status, tick);
+        var snapshot = TraySnapshot.ForReplay(CompanionTexts.English, status, tick);
 
         // Act
-        var toolTip = TrayMenu.FormatSnapshotToolTip(snapshot, CreateClock(-1));
+        var toolTip = TrayMenu.FormatSnapshotToolTip(CompanionTexts.English, snapshot, CreateClock(-1));
 
         // Assert
         Assert.AreEqual("Censio Companion: Replay error: invalid line 9223372036854775807\nLast tick: 0001-01-01 00:00:00Z, 256 islands", toolTip, "The longest tooltip should hold the replay error and the last tick in UTC");
         Assert.IsLessThanOrEqualTo(TrayMenu.MaxToolTipLength, toolTip.Length, "The longest tooltip should fit the limit of the tray icon");
+    }
+
+    /// <summary>
+    /// Every German tooltip — each connection state with each recording state, every replay problem at the largest line
+    /// number, every send problem, the finished counts at their largest values, and the invalid command line — with the
+    /// longest last tick, at the earliest time and 256 islands, fits the limit of the tray icon (S9).
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC5")]
+    public void TrayMenuFormatToolTipLongestGermanFitsLimit()
+    {
+        // Arrange
+        var tick = new PipeTickSummary
+                   {
+                       ReceiveTime = DateTimeOffset.MinValue,
+                       IslandCount = 256
+                   };
+        var snapshots = CreateGermanSnapshots(tick);
+        var clock = CreateClock(-1);
+
+        // Act
+        var longest = snapshots.Select(snapshot => TrayMenu.FormatSnapshotToolTip(CompanionTexts.German, snapshot, clock))
+                               .MaxBy(toolTip => toolTip.Length);
+
+        // Assert
+        Assert.IsNotNull(longest, "The German tooltips should not be empty");
+        Assert.IsLessThanOrEqualTo(TrayMenu.MaxToolTipLength, longest.Length, $"The longest German tooltip should fit the limit of the tray icon: {longest}");
     }
 
     /// <summary>
@@ -623,7 +771,7 @@ public sealed class TrayMenuTests
         const string expected = "Censio Companion";
 
         // Act
-        var toolTip = TrayMenu.ToolTip;
+        var toolTip = CompanionTexts.English.ToolTip;
 
         // Assert
         Assert.AreEqual(expected, toolTip, "The tooltip of the tray icon should be Censio Companion");
@@ -647,7 +795,7 @@ public sealed class TrayMenuTests
         // (state and expected come from the data row)
 
         // Act
-        var toolTip = TrayMenu.FormatToolTip(state);
+        var toolTip = TrayMenu.FormatToolTip(CompanionTexts.English, state);
 
         // Assert
         Assert.AreEqual(expected, toolTip, "The tooltip should be the application name, a colon and the state text");
@@ -663,7 +811,7 @@ public sealed class TrayMenuTests
         var state = (PipeConnectionState)99;
 
         // Act
-        var exception = Assert.Throws<ArgumentOutOfRangeException>(() => TrayMenu.FormatToolTip(state), "An undefined state should be rejected");
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(() => TrayMenu.FormatToolTip(CompanionTexts.English, state), "An undefined state should be rejected");
 
         // Assert
         Assert.AreEqual("state", exception.ParamName, "The exception should name the parameter");
@@ -693,7 +841,7 @@ public sealed class TrayMenuTests
         // (state, recording and expected come from the data row)
 
         // Act
-        var toolTip = TrayMenu.FormatToolTip(state, recording);
+        var toolTip = TrayMenu.FormatToolTip(CompanionTexts.English, state, recording);
 
         // Assert
         Assert.AreEqual(expected, toolTip, "The tooltip should carry the suffix of the recording state");
@@ -722,7 +870,7 @@ public sealed class TrayMenuTests
                      };
 
         // Act
-        var toolTip = TrayMenu.FormatReplayToolTip(status);
+        var toolTip = TrayMenu.FormatReplayToolTip(CompanionTexts.English, status);
 
         // Assert
         Assert.AreEqual(expected, toolTip, "The replay tooltip should name the state, or the end of the replay");
@@ -759,7 +907,7 @@ public sealed class TrayMenuTests
                      };
 
         // Act
-        var toolTip = TrayMenu.FormatReplayToolTip(status);
+        var toolTip = TrayMenu.FormatReplayToolTip(CompanionTexts.English, status);
 
         // Assert
         Assert.AreEqual(expected, toolTip, "The replay tooltip should name the reason of the problem");
@@ -786,7 +934,7 @@ public sealed class TrayMenuTests
         CultureInfo.CurrentCulture = new CultureInfo("de-DE");
 
         // Act
-        var toolTip = TrayMenu.FormatReplayToolTip(status);
+        var toolTip = TrayMenu.FormatReplayToolTip(CompanionTexts.English, status);
 
         // Assert
         Assert.AreEqual("Censio Companion: Replay error: invalid line 1234567", toolTip, "The line number should be written without grouping");
@@ -820,11 +968,11 @@ public sealed class TrayMenuTests
                      };
 
         // Act
-        var toolTip = TrayMenu.FormatReplayToolTip(status);
+        var toolTip = TrayMenu.FormatReplayToolTip(CompanionTexts.English, status);
 
         // Assert
         Assert.AreEqual("Censio Companion: Replay error: " + reason, toolTip, $"The tooltip should name the reason of {kind}");
-        Assert.AreEqual(reason, TrayMenu.FormatReplaySendReason(kind), $"The reason of {kind} should be its text");
+        Assert.AreEqual(reason, TrayMenu.FormatReplaySendReason(CompanionTexts.English, kind), $"The reason of {kind} should be its text");
     }
 
     /// <summary>
@@ -844,11 +992,11 @@ public sealed class TrayMenuTests
                      };
 
         // Act
-        var toolTip = TrayMenu.FormatReplayToolTip(status);
+        var toolTip = TrayMenu.FormatReplayToolTip(CompanionTexts.English, status);
 
         // Assert
         Assert.AreEqual("Censio Companion: Replay error: server does not support contract version 2", toolTip, "The tooltip should name contract version 2");
-        Assert.AreEqual("server does not support contract version 2", TrayMenu.FormatReplaySendReason(ReplaySendProblemKind.VersionNotSupported), "The reason should name contract version 2");
+        Assert.AreEqual("server does not support contract version 2", TrayMenu.FormatReplaySendReason(CompanionTexts.English, ReplaySendProblemKind.VersionNotSupported), "The reason should name contract version 2");
     }
 
     /// <summary>
@@ -877,7 +1025,7 @@ public sealed class TrayMenuTests
                      };
 
         // Act
-        var toolTip = TrayMenu.FormatReplayToolTip(status);
+        var toolTip = TrayMenu.FormatReplayToolTip(CompanionTexts.English, status);
 
         // Assert
         Assert.AreEqual("Censio Companion: Replay error: server connection lost", toolTip, "The send problem should be shown first");
@@ -898,7 +1046,7 @@ public sealed class TrayMenuTests
                      };
 
         // Act
-        var toolTip = TrayMenu.FormatReplayToolTip(status);
+        var toolTip = TrayMenu.FormatReplayToolTip(CompanionTexts.English, status);
 
         // Assert
         Assert.AreEqual("Censio Companion: Replay: Connecting to server", toolTip, "The tooltip should say that the replay connects to the server");
@@ -932,7 +1080,7 @@ public sealed class TrayMenuTests
                      };
 
         // Act
-        var toolTip = TrayMenu.FormatReplayToolTip(status);
+        var toolTip = TrayMenu.FormatReplayToolTip(CompanionTexts.English, status);
 
         // Assert
         Assert.AreEqual(expected, toolTip, "The tooltip should name the sent ticks and the refused messages");
@@ -948,7 +1096,7 @@ public sealed class TrayMenuTests
         const string expected = "Censio Companion: Invalid command line";
 
         // Act
-        var toolTip = TrayMenu.InvalidCommandLineToolTip;
+        var toolTip = CompanionTexts.English.InvalidCommandLineToolTip;
 
         // Assert
         Assert.AreEqual(expected, toolTip, "The tooltip should name the application and the invalid command line");
@@ -961,7 +1109,7 @@ public sealed class TrayMenuTests
     public void TrayMenuFormatToolTipUndefinedRecordingStateThrows()
     {
         // Act
-        var exception = Assert.Throws<ArgumentOutOfRangeException>(() => TrayMenu.FormatToolTip(PipeConnectionState.Connected, (PipeRecordingState)99), "An undefined recording state should be rejected");
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(() => TrayMenu.FormatToolTip(CompanionTexts.English, PipeConnectionState.Connected, (PipeRecordingState)99), "An undefined recording state should be rejected");
 
         // Assert
         Assert.AreEqual("recording", exception.ParamName, "The exception should name the parameter");
@@ -984,7 +1132,7 @@ public sealed class TrayMenuTests
                      };
 
         // Act
-        var exception = Assert.Throws<ArgumentOutOfRangeException>(() => TrayMenu.FormatReplayToolTip(status), "An undefined problem kind should be rejected");
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(() => TrayMenu.FormatReplayToolTip(CompanionTexts.English, status), "An undefined problem kind should be rejected");
 
         // Assert
         Assert.AreEqual("status", exception.ParamName, "The exception should name the parameter");
@@ -1006,11 +1154,11 @@ public sealed class TrayMenuTests
                      };
 
         // Act
-        var exception = Assert.Throws<ArgumentOutOfRangeException>(() => TrayMenu.FormatReplayToolTip(status), "An undefined send problem kind should be rejected");
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(() => TrayMenu.FormatReplayToolTip(CompanionTexts.English, status), "An undefined send problem kind should be rejected");
 
         // Assert
         Assert.AreEqual("status", exception.ParamName, "The exception should name the parameter");
-        Assert.IsNull(TrayMenu.FormatReplaySendReason((ReplaySendProblemKind)99), "An undefined send problem kind should have no reason text");
+        Assert.IsNull(TrayMenu.FormatReplaySendReason(CompanionTexts.English, (ReplaySendProblemKind)99), "An undefined send problem kind should have no reason text");
     }
 
     /// <summary>
@@ -1030,7 +1178,7 @@ public sealed class TrayMenuTests
                      };
 
         // Act
-        var exception = Assert.Throws<ArgumentOutOfRangeException>(() => TrayMenu.FormatReplayToolTip(status), "A state a replay cannot reach should be rejected");
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(() => TrayMenu.FormatReplayToolTip(CompanionTexts.English, status), "A state a replay cannot reach should be rejected");
 
         // Assert
         Assert.AreEqual("status", exception.ParamName, "The exception should name the parameter");
@@ -1084,7 +1232,16 @@ public sealed class TrayMenuTests
         var game = CreateGameStatus(kind, source, build);
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, game, GameCatalogStatus.Reading, null, false, CreateClock(1));
+        var entries = TrayMenu.Create(CompanionTexts.English,
+                                      new TrayMenuState
+                                      {
+                                          Version = "1.2.3",
+                                          Snapshot = snapshot,
+                                          Game = game,
+                                          Catalog = GameCatalogStatus.Reading,
+                                          Server = null,
+                                          Clock = CreateClock(1)
+                                      });
 
         // Assert
         var kinds = entries.Select(entry => entry.Kind).ToList();
@@ -1096,7 +1253,6 @@ public sealed class TrayMenuTests
         Assert.AreEqual(kinds.IndexOf(TrayMenuEntryKind.Separator) - 2, index, "The game entry should be directly above the catalog entry and the first separator");
         Assert.AreEqual(expected, entries[index].Text, "The game entry should show the text of the status");
         Assert.IsFalse(entries[index].IsEnabled, "The game entry should be greyed out like the last-tick entry");
-        Assert.IsFalse(entries[index].IsChecked, "The game entry should not be checked");
     }
 
     /// <summary>
@@ -1127,7 +1283,7 @@ public sealed class TrayMenuTests
                      };
 
         // Act
-        var text = TrayMenu.FormatCatalog(status);
+        var text = TrayMenu.FormatCatalog(CompanionTexts.English, status);
 
         // Assert
         Assert.AreEqual(expected, text, "The catalog text should follow the state of the build, whatever the culture");
@@ -1163,7 +1319,7 @@ public sealed class TrayMenuTests
                      };
 
         // Act
-        var text = TrayMenu.FormatCatalog(status);
+        var text = TrayMenu.FormatCatalog(CompanionTexts.English, status);
 
         // Assert
         Assert.AreEqual(expected, text, "The catalog text should be the one of the state, whatever the culture");
@@ -1183,7 +1339,7 @@ public sealed class TrayMenuTests
                      };
 
         // Act
-        var exception = Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => TrayMenu.FormatCatalog(status), "An undefined kind should throw");
+        var exception = Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => TrayMenu.FormatCatalog(CompanionTexts.English, status), "An undefined kind should throw");
 
         // Assert
         Assert.AreEqual("status", exception.ParamName, "The exception should name the status");
@@ -1212,7 +1368,16 @@ public sealed class TrayMenuTests
                       };
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, catalog, null, false, CreateClock(1));
+        var entries = TrayMenu.Create(CompanionTexts.English,
+                                      new TrayMenuState
+                                      {
+                                          Version = "1.2.3",
+                                          Snapshot = snapshot,
+                                          Game = GameInstallationStatus.Searching,
+                                          Catalog = catalog,
+                                          Server = null,
+                                          Clock = CreateClock(1)
+                                      });
 
         // Assert
         var kinds = entries.Select(entry => entry.Kind).ToList();
@@ -1223,7 +1388,6 @@ public sealed class TrayMenuTests
         Assert.AreEqual(kinds.IndexOf(TrayMenuEntryKind.Separator) - 1, index, "The catalog entry should be directly above the first separator");
         Assert.AreEqual(expected, entries[index].Text, "The catalog entry should show the text of the status");
         Assert.IsFalse(entries[index].IsEnabled, "The catalog entry should be greyed out");
-        Assert.IsFalse(entries[index].IsChecked, "The catalog entry should not be checked");
     }
 
     /// <summary>
@@ -1250,7 +1414,7 @@ public sealed class TrayMenuTests
         var status = CreateLocalServerStatus(state, port);
 
         // Act
-        var text = TrayMenu.FormatLocalServer(status);
+        var text = TrayMenu.FormatLocalServer(CompanionTexts.English, status);
 
         // Assert
         Assert.AreEqual(expected, text, $"The server line of {state} at port {port} should be its text");
@@ -1269,16 +1433,19 @@ public sealed class TrayMenuTests
         var localServer = CreateLocalServerStatus(LocalServerState.Running, 5117);
 
         // Act
-        var entries = TrayMenu.Create("1.2.3",
-                                      snapshot,
-                                      GameInstallationStatus.Searching,
-                                      GameCatalogStatus.Reading,
-                                      new TrayServerStatus
+        var entries = TrayMenu.Create(CompanionTexts.English,
+                                      new TrayMenuState
                                       {
-                                          Local = localServer
-                                      },
-                                      false,
-                                      CreateClock(1));
+                                          Version = "1.2.3",
+                                          Snapshot = snapshot,
+                                          Game = GameInstallationStatus.Searching,
+                                          Catalog = GameCatalogStatus.Reading,
+                                          Server = new TrayServerStatus
+                                                   {
+                                                       Local = localServer
+                                                   },
+                                          Clock = CreateClock(1)
+                                      });
 
         // Assert
         var kinds = entries.Select(entry => entry.Kind).ToList();
@@ -1289,7 +1456,6 @@ public sealed class TrayMenuTests
         Assert.AreEqual(kinds.IndexOf(TrayMenuEntryKind.Separator) - 1, index, "The server line should be directly above the first separator");
         Assert.AreEqual("Server: running at http://localhost:5117/", entries[index].Text, "The server line should show the text of the status");
         Assert.IsFalse(entries[index].IsEnabled, "The server line should be greyed out");
-        Assert.IsFalse(entries[index].IsChecked, "The server line should not be checked");
     }
 
     /// <summary>
@@ -1308,21 +1474,31 @@ public sealed class TrayMenuTests
         var snapshot = CreateSnapshotForMode(mode);
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, null, false, CreateClock(1));
+        var entries = TrayMenu.Create(CompanionTexts.English,
+                                      new TrayMenuState
+                                      {
+                                          Version = "1.2.3",
+                                          Snapshot = snapshot,
+                                          Game = GameInstallationStatus.Searching,
+                                          Catalog = GameCatalogStatus.Reading,
+                                          Server = null,
+                                          Clock = CreateClock(1)
+                                      });
 
         // Assert
         var kinds = entries.Select(entry => entry.Kind).ToList();
 
         Assert.DoesNotContain(TrayMenuEntryKind.LocalServer, kinds, $"Without local mode the menu should hold no server line: {mode}");
         Assert.DoesNotContain(TrayMenuEntryKind.OpenCensio, kinds, $"Without local mode the menu should hold no Open Censio: {mode}");
-        Assert.IsEmpty(entries.Where(entry => entry.Text.StartsWith("Server:", StringComparison.Ordinal) || entry.Text == TrayMenu.OpenCensioText).ToList(), $"Without local mode no entry should carry a server text: {mode}");
+        Assert.IsEmpty(entries.Where(entry => entry.Text.StartsWith("Server:", StringComparison.Ordinal) || entry.Text == CompanionTexts.English.OpenCensioText).ToList(), $"Without local mode no entry should carry a server text: {mode}");
     }
 
     /// <summary>
-    /// In local mode the menu lists the server line below the catalog and Open Censio directly above Open diagnostics,
-    /// the rest of the menu in today's order (S1).
+    /// In local mode the menu lists the server line below the catalog and Open Censio directly after the first separator,
+    /// above Settings… and Open diagnostics, the rest of the menu in today's order (S1).
     /// </summary>
     [TestMethod]
+    [TestCategory("AC1")]
     [TestCategory("AC3")]
     public void TrayMenuCreateInLocalModeShowsOpenCensioAboveDiagnostics()
     {
@@ -1338,12 +1514,11 @@ public sealed class TrayMenuTests
                                 TrayMenuEntryKind.LocalServer,
                                 TrayMenuEntryKind.Separator,
                                 TrayMenuEntryKind.OpenCensio,
+                                TrayMenuEntryKind.OpenSettings,
                                 TrayMenuEntryKind.OpenDiagnostics,
                                 TrayMenuEntryKind.ToggleRecording,
                                 TrayMenuEntryKind.OpenRecordingsFolder,
                                 TrayMenuEntryKind.OpenLogFolder,
-                                TrayMenuEntryKind.Separator,
-                                TrayMenuEntryKind.ToggleAutostart,
                                 TrayMenuEntryKind.Separator,
                                 TrayMenuEntryKind.Version,
                                 TrayMenuEntryKind.Separator,
@@ -1351,24 +1526,26 @@ public sealed class TrayMenuTests
                             };
 
         // Act
-        var entries = TrayMenu.Create("1.2.3",
-                                      snapshot,
-                                      GameInstallationStatus.Searching,
-                                      GameCatalogStatus.Reading,
-                                      new TrayServerStatus
+        var entries = TrayMenu.Create(CompanionTexts.English,
+                                      new TrayMenuState
                                       {
-                                          Local = localServer
-                                      },
-                                      false,
-                                      CreateClock(1));
+                                          Version = "1.2.3",
+                                          Snapshot = snapshot,
+                                          Game = GameInstallationStatus.Searching,
+                                          Catalog = GameCatalogStatus.Reading,
+                                          Server = new TrayServerStatus
+                                                   {
+                                                       Local = localServer
+                                                   },
+                                          Clock = CreateClock(1)
+                                      });
 
         // Assert
         var openCensio = entries.Single(entry => entry.Kind == TrayMenuEntryKind.OpenCensio);
 
-        Assert.AreSequenceEqual(expectedKinds, entries.Select(entry => entry.Kind).ToArray(), "Open Censio should be directly above Open diagnostics and the server line below the catalog");
+        Assert.AreSequenceEqual(expectedKinds, entries.Select(entry => entry.Kind).ToArray(), "Open Censio should be directly above Settings…, Settings… directly above Open diagnostics and the server line below the catalog");
         Assert.AreEqual("Open Censio", openCensio.Text, "The entry should read Open Censio");
-        Assert.AreEqual(TrayMenu.OpenCensioText, openCensio.Text, "The entry should carry the text of the constant");
-        Assert.IsFalse(openCensio.IsChecked, "Open Censio should not be checked");
+        Assert.AreEqual(CompanionTexts.English.OpenCensioText, openCensio.Text, "The entry should carry the text of the constant");
     }
 
     /// <summary>
@@ -1390,16 +1567,19 @@ public sealed class TrayMenuTests
         var localServer = CreateLocalServerStatus(state, 5000);
 
         // Act
-        var entries = TrayMenu.Create("1.2.3",
-                                      snapshot,
-                                      GameInstallationStatus.Searching,
-                                      GameCatalogStatus.Reading,
-                                      new TrayServerStatus
+        var entries = TrayMenu.Create(CompanionTexts.English,
+                                      new TrayMenuState
                                       {
-                                          Local = localServer
-                                      },
-                                      false,
-                                      CreateClock(1));
+                                          Version = "1.2.3",
+                                          Snapshot = snapshot,
+                                          Game = GameInstallationStatus.Searching,
+                                          Catalog = GameCatalogStatus.Reading,
+                                          Server = new TrayServerStatus
+                                                   {
+                                                       Local = localServer
+                                                   },
+                                          Clock = CreateClock(1)
+                                      });
 
         // Assert
         var openCensio = entries.Single(entry => entry.Kind == TrayMenuEntryKind.OpenCensio);
@@ -1423,7 +1603,16 @@ public sealed class TrayMenuTests
                      };
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, server, false, CreateClock(1));
+        var entries = TrayMenu.Create(CompanionTexts.English,
+                                      new TrayMenuState
+                                      {
+                                          Version = "1.2.3",
+                                          Snapshot = snapshot,
+                                          Game = GameInstallationStatus.Searching,
+                                          Catalog = GameCatalogStatus.Reading,
+                                          Server = server,
+                                          Clock = CreateClock(1)
+                                      });
 
         // Assert
         var kinds = entries.Select(entry => entry.Kind).ToList();
@@ -1432,7 +1621,7 @@ public sealed class TrayMenuTests
 
         Assert.AreEqual("Server: settings invalid", serverLine.Text, "The server line should read settings invalid");
         Assert.IsFalse(openCensio.IsEnabled, "Open Censio should stay greyed out with invalid settings");
-        Assert.AreEqual(kinds.IndexOf(TrayMenuEntryKind.OpenDiagnostics) - 1, kinds.IndexOf(TrayMenuEntryKind.OpenCensio), "Open Censio should stay directly above Open diagnostics");
+        Assert.AreEqual(kinds.IndexOf(TrayMenuEntryKind.OpenSettings) - 1, kinds.IndexOf(TrayMenuEntryKind.OpenCensio), "Open Censio should stay directly above Settings…");
         Assert.DoesNotContain(TrayMenuEntryKind.ServerConnection, kinds, "Invalid settings should show no forward-mode server line");
     }
 
@@ -1471,7 +1660,7 @@ public sealed class TrayMenuTests
                      };
 
         // Act
-        var text = TrayMenu.FormatLiveSend(status);
+        var text = TrayMenu.FormatLiveSend(CompanionTexts.English, status);
 
         // Assert
         Assert.AreEqual(expected, text, $"The server line of {state} with {problem} should be its text");
@@ -1482,6 +1671,7 @@ public sealed class TrayMenuTests
     /// status, and the menu holds neither the local server line nor Open Censio (S1).
     /// </summary>
     [TestMethod]
+    [TestCategory("AC1")]
     [TestCategory("AC2")]
     public void TrayMenuCreateWithLiveSendShowsServerLine()
     {
@@ -1502,12 +1692,11 @@ public sealed class TrayMenuTests
                                 TrayMenuEntryKind.Catalog,
                                 TrayMenuEntryKind.ServerConnection,
                                 TrayMenuEntryKind.Separator,
+                                TrayMenuEntryKind.OpenSettings,
                                 TrayMenuEntryKind.OpenDiagnostics,
                                 TrayMenuEntryKind.ToggleRecording,
                                 TrayMenuEntryKind.OpenRecordingsFolder,
                                 TrayMenuEntryKind.OpenLogFolder,
-                                TrayMenuEntryKind.Separator,
-                                TrayMenuEntryKind.ToggleAutostart,
                                 TrayMenuEntryKind.Separator,
                                 TrayMenuEntryKind.Version,
                                 TrayMenuEntryKind.Separator,
@@ -1515,7 +1704,16 @@ public sealed class TrayMenuTests
                             };
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, server, false, CreateClock(1));
+        var entries = TrayMenu.Create(CompanionTexts.English,
+                                      new TrayMenuState
+                                      {
+                                          Version = "1.2.3",
+                                          Snapshot = snapshot,
+                                          Game = GameInstallationStatus.Searching,
+                                          Catalog = GameCatalogStatus.Reading,
+                                          Server = server,
+                                          Clock = CreateClock(1)
+                                      });
 
         // Assert
         var serverLine = entries.Single(entry => entry.Kind == TrayMenuEntryKind.ServerConnection);
@@ -1523,7 +1721,6 @@ public sealed class TrayMenuTests
         Assert.AreSequenceEqual(expectedKinds, entries.Select(entry => entry.Kind).ToArray(), "The server line should be below the catalog, without the local server line or Open Censio");
         Assert.AreEqual("Server: connected", serverLine.Text, "The server line should show the text of the live status");
         Assert.IsFalse(serverLine.IsEnabled, "The server line should be greyed out");
-        Assert.IsFalse(serverLine.IsChecked, "The server line should not be checked");
     }
 
     /// <summary>
@@ -1553,7 +1750,16 @@ public sealed class TrayMenuTests
                      };
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, server, false, CreateClock(1));
+        var entries = TrayMenu.Create(CompanionTexts.English,
+                                      new TrayMenuState
+                                      {
+                                          Version = "1.2.3",
+                                          Snapshot = snapshot,
+                                          Game = GameInstallationStatus.Searching,
+                                          Catalog = GameCatalogStatus.Reading,
+                                          Server = server,
+                                          Clock = CreateClock(1)
+                                      });
 
         // Assert
         var kinds = entries.Select(entry => entry.Kind).ToList();
@@ -1565,6 +1771,251 @@ public sealed class TrayMenuTests
         Assert.IsTrue(openCensio.IsEnabled, "Open Censio should stay enabled while the hosted server runs");
         Assert.DoesNotContain(TrayMenuEntryKind.ServerConnection, kinds, "Local mode should show no server line of forward mode");
         Assert.ContainsSingle(entry => entry.Text.StartsWith("Server:", StringComparison.Ordinal), entries, "The menu should hold exactly one server text");
+    }
+
+    /// <summary>
+    /// In forward mode with an active profile the server line of every state and problem ends with the profile in the
+    /// language of the menu: <c> (profile B)</c>, German <c> (Profil B)</c> (S11).
+    /// </summary>
+    /// <param name="language">The language of the menu</param>
+    /// <param name="state">The state of live sending</param>
+    /// <param name="problem">The problem, or <see langword="null" /> when there is none</param>
+    /// <param name="expected">The expected text of the server line</param>
+    [TestMethod]
+    [TestCategory("AC12")]
+    [DataRow(CompanionLanguage.English, LiveSendState.Connecting, null, "Server: connecting (profile B)")]
+    [DataRow(CompanionLanguage.English, LiveSendState.Connecting, ReplaySendProblemKind.ConnectionLost, "Server: connecting (profile B)")]
+    [DataRow(CompanionLanguage.English, LiveSendState.Connected, null, "Server: connected (profile B)")]
+    [DataRow(CompanionLanguage.English, (LiveSendState)99, null, "Server: not connected (profile B)")]
+    [DataRow(CompanionLanguage.English, LiveSendState.Retrying, ReplaySendProblemKind.ServerUnreachable, "Server: unreachable, retrying (profile B)")]
+    [DataRow(CompanionLanguage.English, LiveSendState.Retrying, ReplaySendProblemKind.NoAnswer, "Server: not answering, retrying (profile B)")]
+    [DataRow(CompanionLanguage.English, LiveSendState.Retrying, ReplaySendProblemKind.ConnectionLost, "Server: connection lost, retrying (profile B)")]
+    [DataRow(CompanionLanguage.English, LiveSendState.Retrying, ReplaySendProblemKind.InvalidReply, "Server: invalid reply, retrying (profile B)")]
+    [DataRow(CompanionLanguage.English, LiveSendState.Retrying, ReplaySendProblemKind.CompanionConnected, "Server: another Companion is connected, retrying (profile B)")]
+    [DataRow(CompanionLanguage.English, LiveSendState.Stopped, ReplaySendProblemKind.TokenRefused, "Server: token refused (profile B)")]
+    [DataRow(CompanionLanguage.English, LiveSendState.Stopped, ReplaySendProblemKind.VersionNotSupported, "Server: does not support contract version 2 (profile B)")]
+    [DataRow(CompanionLanguage.English, LiveSendState.Stopped, ReplaySendProblemKind.LocalServerNotRunning, "Server: not connected (profile B)")]
+    [DataRow(CompanionLanguage.English, LiveSendState.Stopped, null, "Server: not connected (profile B)")]
+    [DataRow(CompanionLanguage.English, LiveSendState.Retrying, null, "Server: not connected (profile B)")]
+    [DataRow(CompanionLanguage.English, LiveSendState.Retrying, ReplaySendProblemKind.TokenFileHoldsNoValidToken, "Server: not connected (profile B)")]
+    [DataRow(CompanionLanguage.German, LiveSendState.Connecting, null, "Server: verbinde (Profil B)")]
+    [DataRow(CompanionLanguage.German, LiveSendState.Connecting, ReplaySendProblemKind.ConnectionLost, "Server: verbinde (Profil B)")]
+    [DataRow(CompanionLanguage.German, LiveSendState.Connected, null, "Server: verbunden (Profil B)")]
+    [DataRow(CompanionLanguage.German, (LiveSendState)99, null, "Server: nicht verbunden (Profil B)")]
+    [DataRow(CompanionLanguage.German, LiveSendState.Retrying, ReplaySendProblemKind.ServerUnreachable, "Server: nicht erreichbar, neuer Versuch (Profil B)")]
+    [DataRow(CompanionLanguage.German, LiveSendState.Retrying, ReplaySendProblemKind.NoAnswer, "Server: antwortet nicht, neuer Versuch (Profil B)")]
+    [DataRow(CompanionLanguage.German, LiveSendState.Retrying, ReplaySendProblemKind.ConnectionLost, "Server: Verbindung verloren, neuer Versuch (Profil B)")]
+    [DataRow(CompanionLanguage.German, LiveSendState.Retrying, ReplaySendProblemKind.InvalidReply, "Server: ungültige Antwort, neuer Versuch (Profil B)")]
+    [DataRow(CompanionLanguage.German, LiveSendState.Retrying, ReplaySendProblemKind.CompanionConnected, "Server: anderer Companion verbunden, neuer Versuch (Profil B)")]
+    [DataRow(CompanionLanguage.German, LiveSendState.Stopped, ReplaySendProblemKind.TokenRefused, "Server: Token abgelehnt (Profil B)")]
+    [DataRow(CompanionLanguage.German, LiveSendState.Stopped, ReplaySendProblemKind.VersionNotSupported, "Server: unterstützt Vertragsversion 2 nicht (Profil B)")]
+    [DataRow(CompanionLanguage.German, LiveSendState.Stopped, ReplaySendProblemKind.LocalServerNotRunning, "Server: nicht verbunden (Profil B)")]
+    [DataRow(CompanionLanguage.German, LiveSendState.Stopped, null, "Server: nicht verbunden (Profil B)")]
+    [DataRow(CompanionLanguage.German, LiveSendState.Retrying, null, "Server: nicht verbunden (Profil B)")]
+    [DataRow(CompanionLanguage.German, LiveSendState.Retrying, ReplaySendProblemKind.TokenFileHoldsNoValidToken, "Server: nicht verbunden (Profil B)")]
+    public void TrayMenuCreateServerLineEndsWithProfile(CompanionLanguage language, LiveSendState state, ReplaySendProblemKind? problem, string expected)
+    {
+        // Arrange
+        var texts = CompanionTexts.For(language);
+        var server = new TrayServerStatus
+                     {
+                         Live = new LiveSendStatus
+                                {
+                                    State = state,
+                                    Problem = problem
+                                }
+                     };
+
+        // Act
+        var entries = TrayMenu.Create(texts, CreateProfileState(server, "B", null));
+
+        // Assert
+        var serverLine = entries.Single(entry => entry.Kind == TrayMenuEntryKind.ServerConnection);
+
+        Assert.AreEqual(expected, serverLine.Text, $"The server line of {state} with {problem} should end with the profile: {language}");
+        Assert.ContainsSingle(entry => entry.Text.StartsWith("Server:", StringComparison.Ordinal), entries, $"The menu should hold exactly one server text: {language}");
+    }
+
+    /// <summary>
+    /// In local mode with an active profile the local server line of every state ends with the profile in the language of
+    /// the menu: <c> (profile B)</c>, German <c> (Profil B)</c> (S11).
+    /// </summary>
+    /// <param name="language">The language of the menu</param>
+    /// <param name="state">The state of the local server</param>
+    /// <param name="expected">The expected text of the server line</param>
+    [TestMethod]
+    [TestCategory("AC12")]
+    [DataRow(CompanionLanguage.English, LocalServerState.Starting, "Server: starting (profile B)")]
+    [DataRow(CompanionLanguage.English, LocalServerState.Running, "Server: running at http://localhost:5117/ (profile B)")]
+    [DataRow(CompanionLanguage.English, LocalServerState.PortInUse, "Server: port 5117 in use (profile B)")]
+    [DataRow(CompanionLanguage.English, LocalServerState.Failed, "Server: failed (profile B)")]
+    [DataRow(CompanionLanguage.English, LocalServerState.SettingsInvalid, "Server: settings invalid (profile B)")]
+    [DataRow(CompanionLanguage.German, LocalServerState.Starting, "Server: startet (Profil B)")]
+    [DataRow(CompanionLanguage.German, LocalServerState.Running, "Server: läuft unter http://localhost:5117/ (Profil B)")]
+    [DataRow(CompanionLanguage.German, LocalServerState.PortInUse, "Server: Port 5117 belegt (Profil B)")]
+    [DataRow(CompanionLanguage.German, LocalServerState.Failed, "Server: fehlgeschlagen (Profil B)")]
+    [DataRow(CompanionLanguage.German, LocalServerState.SettingsInvalid, "Server: Einstellungen ungültig (Profil B)")]
+    public void TrayMenuCreateLocalServerLineEndsWithProfile(CompanionLanguage language, LocalServerState state, string expected)
+    {
+        // Arrange
+        var texts = CompanionTexts.For(language);
+        var server = CreateServerStatus("local") with
+                                                 {
+                                                     Local = CreateLocalServerStatus(state, 5117)
+                                                 };
+
+        // Act
+        var entries = TrayMenu.Create(texts, CreateProfileState(server, "B", null));
+
+        // Assert
+        var serverLine = entries.Single(entry => entry.Kind == TrayMenuEntryKind.LocalServer);
+
+        Assert.AreEqual(expected, serverLine.Text, $"The local server line of {state} should end with the profile: {language}");
+        Assert.ContainsSingle(entry => entry.Text.StartsWith("Server:", StringComparison.Ordinal), entries, $"The menu should hold exactly one server text: {language}");
+    }
+
+    /// <summary>
+    /// A profile name of the longest allowed length, 64 code units ending in a surrogate pair, is shown whole after the
+    /// longest server text of each language: 123 characters in English, 124 in German (S11, record 0111).
+    /// </summary>
+    /// <param name="language">The language of the menu</param>
+    /// <param name="server">The longest server text of the language</param>
+    /// <param name="prefix">The text before the name</param>
+    /// <param name="length">The expected length of the line</param>
+    [TestMethod]
+    [TestCategory("AC12")]
+    [DataRow(CompanionLanguage.English, "Server: another Companion is connected, retrying", " (profile ", 123)]
+    [DataRow(CompanionLanguage.German, "Server: anderer Companion verbunden, neuer Versuch", " (Profil ", 124)]
+    public void TrayMenuFormatServerProfileKeepsLongestNameWhole(CompanionLanguage language, string server, string prefix, int length)
+    {
+        // Arrange
+        var name = new string('N', CompanionProfiles.MaxNameLength - 2) + char.ConvertFromUtf32(0x1F600);
+
+        // Act
+        var text = TrayMenu.FormatServerProfile(CompanionTexts.For(language), server, name);
+
+        // Assert
+        Assert.AreEqual(CompanionProfiles.MaxNameLength, name.Length, "The name should be of the longest allowed length");
+        Assert.AreEqual($"{server}{prefix}{name})", text, $"The whole name should follow the server text: {language}");
+        Assert.AreEqual(length, text.Length, $"The line should be as long as the server text, the ending and the whole name: {language}");
+    }
+
+    /// <summary>
+    /// A profile name holding format braces or an ampersand is shown as typed, not read as a format item or cut (S11).
+    /// </summary>
+    /// <param name="language">The language of the menu</param>
+    /// <param name="name">The name of the profile</param>
+    /// <param name="expected">The expected text of the line</param>
+    [TestMethod]
+    [TestCategory("AC12")]
+    [DataRow(CompanionLanguage.English, "{0}", "Server: connected (profile {0})")]
+    [DataRow(CompanionLanguage.English, "{1}", "Server: connected (profile {1})")]
+    [DataRow(CompanionLanguage.English, "R&D", "Server: connected (profile R&D)")]
+    [DataRow(CompanionLanguage.English, "{0} & {", "Server: connected (profile {0} & {)")]
+    [DataRow(CompanionLanguage.German, "{0}", "Server: connected (Profil {0})")]
+    [DataRow(CompanionLanguage.German, "R&D", "Server: connected (Profil R&D)")]
+    public void TrayMenuFormatServerProfileKeepsBracesAndAmpersand(CompanionLanguage language, string name, string expected)
+    {
+        // Act
+        var text = TrayMenu.FormatServerProfile(CompanionTexts.For(language), "Server: connected", name);
+
+        // Assert
+        Assert.AreEqual(expected, text, $"The name should be shown as typed: {name}, {language}");
+    }
+
+    /// <summary>
+    /// A pending notice shows as an enabled entry of its kind with the text of the notice, directly above Settings…: after
+    /// the first separator in forward mode, after Open Censio in local mode, in the language of the menu (S12).
+    /// </summary>
+    /// <param name="language">The language of the menu</param>
+    /// <param name="kind">The kind of the notice</param>
+    /// <param name="mode">The server mode: local or forward</param>
+    /// <param name="above">The kind of the entry directly above the notice entry</param>
+    [TestMethod]
+    [TestCategory("AC13")]
+    [DataRow(CompanionLanguage.English, ProfileNoticeKind.LastUsedWithOther, "forward", TrayMenuEntryKind.Separator)]
+    [DataRow(CompanionLanguage.English, ProfileNoticeKind.NewFigure, "forward", TrayMenuEntryKind.Separator)]
+    [DataRow(CompanionLanguage.English, ProfileNoticeKind.LastUsedWithOther, "local", TrayMenuEntryKind.OpenCensio)]
+    [DataRow(CompanionLanguage.English, ProfileNoticeKind.NewFigure, "local", TrayMenuEntryKind.OpenCensio)]
+    [DataRow(CompanionLanguage.German, ProfileNoticeKind.LastUsedWithOther, "forward", TrayMenuEntryKind.Separator)]
+    [DataRow(CompanionLanguage.German, ProfileNoticeKind.NewFigure, "forward", TrayMenuEntryKind.Separator)]
+    [DataRow(CompanionLanguage.German, ProfileNoticeKind.LastUsedWithOther, "local", TrayMenuEntryKind.OpenCensio)]
+    [DataRow(CompanionLanguage.German, ProfileNoticeKind.NewFigure, "local", TrayMenuEntryKind.OpenCensio)]
+    public void TrayMenuCreateNoticeEntryAboveSettings(CompanionLanguage language, ProfileNoticeKind kind, string mode, TrayMenuEntryKind above)
+    {
+        // Arrange
+        var texts = CompanionTexts.For(language);
+        var notice = new ProfileNotice
+                     {
+                         Kind = kind,
+                         ProfileName = "B"
+                     };
+
+        // Act
+        var entries = TrayMenu.Create(texts, CreateProfileState(CreateServerStatus(mode), "B", notice));
+
+        // Assert
+        var kinds = entries.Select(entry => entry.Kind).ToList();
+        var index = kinds.IndexOf(TrayMenuEntryKind.ProfileNotice);
+
+        Assert.ContainsSingle(entryKind => entryKind == TrayMenuEntryKind.ProfileNotice, kinds, $"The menu should hold exactly one notice entry: {language}, {kind}, {mode}");
+        Assert.AreEqual(kinds.IndexOf(TrayMenuEntryKind.OpenSettings) - 1, index, $"The notice entry should be directly above Settings…: {language}, {kind}, {mode}");
+        Assert.AreEqual(above, kinds[index - 1], $"The notice entry should follow the entry of its mode: {language}, {kind}, {mode}");
+        Assert.AreEqual(texts.FormatNotice(notice), entries[index].Text, $"The notice entry should carry the text of the notice: {language}, {kind}, {mode}");
+        Assert.IsTrue(entries[index].IsEnabled, $"The notice entry should be enabled: {language}, {kind}, {mode}");
+    }
+
+    /// <summary>
+    /// Without the name of an active profile — a replay in local mode, an invalid server setting, forward mode outside a
+    /// live run, mode Off — the server line keeps its text without an ending, and mode Off shows none (S11).
+    /// </summary>
+    /// <param name="row">The row: local replay, invalid setting, forward or off</param>
+    /// <param name="expected">The expected server texts of the menu</param>
+    [TestMethod]
+    [TestCategory("AC12")]
+    [DataRow("local replay", new[] { "Server: running at http://localhost:5117/" }, DisplayName = "Replay in local mode")]
+    [DataRow("invalid setting", new[] { "Server: settings invalid" }, DisplayName = "Invalid setting")]
+    [DataRow("forward", new[] { "Server: connected" }, DisplayName = "Forward mode")]
+    [DataRow("off", new string[] { }, DisplayName = "Mode Off")]
+    public void TrayMenuCreateWithoutProfileNameKeepsServerLine(string row, string[] expected)
+    {
+        // Arrange
+        var state = CreateStateWithoutProfile(row);
+
+        // Act
+        var entries = TrayMenu.Create(CompanionTexts.English, state);
+
+        // Assert
+        var servers = entries.Where(entry => entry.Text.StartsWith("Server:", StringComparison.Ordinal)).Select(entry => entry.Text).ToArray();
+
+        Assert.AreSequenceEqual(expected, servers, $"The server line should keep its text without a profile ending: {row}");
+        Assert.IsEmpty(entries.Where(entry => entry.Text.Contains("(profile", StringComparison.Ordinal)).ToList(), $"No entry should name a profile: {row}");
+    }
+
+    /// <summary>
+    /// Without a pending notice the menu holds no notice entry, in forward mode, local mode and without a server, and
+    /// Settings… follows the entry of its mode directly (S12).
+    /// </summary>
+    /// <param name="mode">The server mode: none, local or forward</param>
+    /// <param name="above">The kind of the entry directly above Settings…</param>
+    [TestMethod]
+    [TestCategory("AC13")]
+    [DataRow("none", TrayMenuEntryKind.Separator)]
+    [DataRow("forward", TrayMenuEntryKind.Separator)]
+    [DataRow("local", TrayMenuEntryKind.OpenCensio)]
+    public void TrayMenuCreateWithoutNoticeHasNoNoticeEntry(string mode, TrayMenuEntryKind above)
+    {
+        // Arrange
+        var state = CreateProfileState(CreateServerStatusOrNone(mode), "B", null);
+
+        // Act
+        var entries = TrayMenu.Create(CompanionTexts.English, state);
+
+        // Assert
+        var kinds = entries.Select(entry => entry.Kind).ToList();
+
+        Assert.DoesNotContain(TrayMenuEntryKind.ProfileNotice, kinds, $"Without a notice the menu should hold no notice entry: {mode}");
+        Assert.AreEqual(above, kinds[kinds.IndexOf(TrayMenuEntryKind.OpenSettings) - 1], $"Settings… should follow the entry of its mode directly: {mode}");
     }
 
     /// <summary>
@@ -1594,7 +2045,7 @@ public sealed class TrayMenuTests
                      };
 
         // Act
-        var text = TrayMenu.FormatLiveBuffer(status);
+        var text = TrayMenu.FormatLiveBuffer(CompanionTexts.English, status);
 
         // Assert
         Assert.AreEqual(expected, text, $"The buffer line of {waiting} waiting, {dropped} dropped, memory only {isMemoryOnly} should be its text");
@@ -1625,7 +2076,16 @@ public sealed class TrayMenuTests
                                               };
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, server, false, CreateClock(1));
+        var entries = TrayMenu.Create(CompanionTexts.English,
+                                      new TrayMenuState
+                                      {
+                                          Version = "1.2.3",
+                                          Snapshot = snapshot,
+                                          Game = GameInstallationStatus.Searching,
+                                          Catalog = GameCatalogStatus.Reading,
+                                          Server = server,
+                                          Clock = CreateClock(1)
+                                      });
 
         // Assert
         var kinds = entries.Select(entry => entry.Kind).ToList();
@@ -1635,7 +2095,6 @@ public sealed class TrayMenuTests
         Assert.AreEqual(kinds.IndexOf(TrayMenuEntryKind.Separator) - 1, kinds.IndexOf(TrayMenuEntryKind.LiveBuffer), $"The buffer line should be directly above the first separator in {mode} mode");
         Assert.AreEqual("Buffer: 3 waiting, 1 dropped", bufferLine.Text, $"The buffer line should show the text of the buffer's status in {mode} mode");
         Assert.IsFalse(bufferLine.IsEnabled, "The buffer line should be greyed out");
-        Assert.IsFalse(bufferLine.IsChecked, "The buffer line should not be checked");
         Assert.ContainsSingle(entry => entry.Text.StartsWith("Buffer:", StringComparison.Ordinal), entries, "The menu should hold exactly one buffer text");
     }
 
@@ -1656,7 +2115,16 @@ public sealed class TrayMenuTests
         TrayServerStatus? server = mode == "none" ? null : CreateServerStatus(mode);
 
         // Act
-        var entries = TrayMenu.Create("1.2.3", snapshot, GameInstallationStatus.Searching, GameCatalogStatus.Reading, server, false, CreateClock(1));
+        var entries = TrayMenu.Create(CompanionTexts.English,
+                                      new TrayMenuState
+                                      {
+                                          Version = "1.2.3",
+                                          Snapshot = snapshot,
+                                          Game = GameInstallationStatus.Searching,
+                                          Catalog = GameCatalogStatus.Reading,
+                                          Server = server,
+                                          Clock = CreateClock(1)
+                                      });
 
         // Assert
         var kinds = entries.Select(entry => entry.Kind).ToList();
@@ -1681,11 +2149,11 @@ public sealed class TrayMenuTests
                      };
 
         // Act
-        var reason = TrayMenu.FormatReplaySendReason(ReplaySendProblemKind.LocalServerNotRunning);
+        var reason = TrayMenu.FormatReplaySendReason(CompanionTexts.English, ReplaySendProblemKind.LocalServerNotRunning);
 
         // Assert
         Assert.AreEqual("local server not running", reason, "The reason should read local server not running");
-        Assert.AreEqual("Censio Companion: Replay error: local server not running", TrayMenu.FormatReplayToolTip(status), "The tooltip should name the reason");
+        Assert.AreEqual("Censio Companion: Replay error: local server not running", TrayMenu.FormatReplayToolTip(CompanionTexts.English, status), "The tooltip should name the reason");
     }
 
     /// <summary>
@@ -1704,7 +2172,7 @@ public sealed class TrayMenuTests
         var status = CreateGameStatus(GameInstallationStatusKind.Found, source, "26.29905.4.51797");
 
         // Act
-        var text = TrayMenu.FormatGame(status);
+        var text = TrayMenu.FormatGame(CompanionTexts.English, status);
 
         // Assert
         Assert.AreEqual(expected, text, "A found installation should show its build and source, not its folder");
@@ -1727,7 +2195,7 @@ public sealed class TrayMenuTests
         var status = CreateGameStatus(kind, null, null);
 
         // Act
-        var text = TrayMenu.FormatGame(status);
+        var text = TrayMenu.FormatGame(CompanionTexts.English, status);
 
         // Assert
         Assert.AreEqual(expected, text, "The problem should show the fixed text of its case");
@@ -1744,7 +2212,7 @@ public sealed class TrayMenuTests
         var status = CreateGameStatus(GameInstallationStatusKind.NotFound, null, null);
 
         // Act
-        var text = TrayMenu.FormatGame(status);
+        var text = TrayMenu.FormatGame(CompanionTexts.English, status);
 
         // Assert
         Assert.AreEqual("Game: not found", text, "Nothing found should show not found");
@@ -1765,7 +2233,7 @@ public sealed class TrayMenuTests
         var status = CreateGameStatus(GameInstallationStatusKind.Found, source, null);
 
         // Act
-        var text = TrayMenu.FormatGame(status);
+        var text = TrayMenu.FormatGame(CompanionTexts.English, status);
 
         // Assert
         Assert.AreEqual(expected, text, "A found installation without a build should show the build as unknown");
@@ -1779,7 +2247,7 @@ public sealed class TrayMenuTests
     public void TrayMenuFormatGameSearchingShowsText()
     {
         // Act
-        var text = TrayMenu.FormatGame(GameInstallationStatus.Searching);
+        var text = TrayMenu.FormatGame(CompanionTexts.English, GameInstallationStatus.Searching);
 
         // Assert
         Assert.AreEqual("Game: searching", text, "A running search should show searching");
@@ -1871,24 +2339,27 @@ public sealed class TrayMenuTests
     {
         return mode switch
                {
-                   "live" => TraySnapshot.ForConnection(new PipeConnectionStatus
+                   "live" => TraySnapshot.ForConnection(CompanionTexts.English,
+                                                        new PipeConnectionStatus
                                                         {
                                                             State = PipeConnectionState.Receiving
                                                         },
                                                         PipeRecordingState.Off,
                                                         _todayTick),
-                   "recording" => TraySnapshot.ForConnection(new PipeConnectionStatus
+                   "recording" => TraySnapshot.ForConnection(CompanionTexts.English,
+                                                             new PipeConnectionStatus
                                                              {
                                                                  State = PipeConnectionState.Receiving
                                                              },
                                                              PipeRecordingState.Recording,
                                                              _todayTick),
-                   "replay" => TraySnapshot.ForReplay(new PipeReplayStatus
+                   "replay" => TraySnapshot.ForReplay(CompanionTexts.English,
+                                                      new PipeReplayStatus
                                                       {
                                                           State = PipeConnectionState.Receiving
                                                       },
                                                       _todayTick),
-                   _ => TraySnapshot.ForInvalidCommandLine()
+                   _ => TraySnapshot.ForInvalidCommandLine(CompanionTexts.English)
                };
     }
 
@@ -1930,6 +2401,210 @@ public sealed class TrayMenuTests
                      {
                          Live = live
                      };
+    }
+
+    /// <summary>
+    /// Creates the server status of a server mode, or none.
+    /// </summary>
+    /// <param name="mode">The server mode: none, local or forward</param>
+    /// <returns>The server status, or <see langword="null" /> for none</returns>
+    private static TrayServerStatus? CreateServerStatusOrNone(string mode)
+    {
+        return mode == "none" ? null : CreateServerStatus(mode);
+    }
+
+    /// <summary>
+    /// Creates the state of a menu without the name of an active profile: a replay in local mode with a running server, an
+    /// invalid server setting, forward mode connected, or mode Off without a server.
+    /// </summary>
+    /// <param name="row">The row: local replay, invalid setting, forward or off</param>
+    /// <returns>The state</returns>
+    private static TrayMenuState CreateStateWithoutProfile(string row)
+    {
+        TrayServerStatus? server = row switch
+                                   {
+                                       "local replay" => CreateServerStatus("local"),
+                                       "invalid setting" => new TrayServerStatus
+                                                            {
+                                                                Local = CreateLocalServerStatus(LocalServerState.SettingsInvalid, 5117)
+                                                            },
+                                       "forward" => CreateServerStatus("forward"),
+                                       _ => null
+                                   };
+
+        return new TrayMenuState
+               {
+                   Version = "1.2.3",
+                   Snapshot = CreateSnapshotForMode(row == "local replay" ? "replay" : "live"),
+                   Game = GameInstallationStatus.Searching,
+                   Catalog = GameCatalogStatus.Reading,
+                   Server = server,
+                   Clock = CreateClock(1),
+                   ProfileName = null
+               };
+    }
+
+    /// <summary>
+    /// Creates the state of a live menu with a server status, the name of the active profile and a pending notice.
+    /// </summary>
+    /// <param name="server">The server status, or <see langword="null" /> for none</param>
+    /// <param name="profileName">The name of the active profile, or <see langword="null" /> for none</param>
+    /// <param name="notice">The pending notice, or <see langword="null" /> for none</param>
+    /// <returns>The state</returns>
+    private static TrayMenuState CreateProfileState(TrayServerStatus? server, string? profileName, ProfileNotice? notice)
+    {
+        return new TrayMenuState
+               {
+                   Version = "1.2.3",
+                   Snapshot = CreateSnapshot("Receiving", canRecord: true, isRecording: false),
+                   Game = GameInstallationStatus.Searching,
+                   Catalog = GameCatalogStatus.Reading,
+                   Server = server,
+                   Clock = CreateClock(1),
+                   ProfileName = profileName,
+                   Notice = notice
+               };
+    }
+
+    /// <summary>
+    /// Creates the state of a menu that holds every entry of a server mode: a recording live connection with a tick, a
+    /// found game, a ready catalog, the server line and a buffer line with dropped messages kept in memory only.
+    /// </summary>
+    /// <param name="texts">The texts of the snapshot</param>
+    /// <param name="mode">The server mode: local or forward</param>
+    /// <returns>The state</returns>
+    private static TrayMenuState CreateFullState(CompanionTexts texts, string mode)
+    {
+        var status = new PipeConnectionStatus
+                     {
+                         State = PipeConnectionState.Receiving
+                     };
+        var buffer = new LiveBufferStatus
+                     {
+                         Waiting = 3,
+                         Dropped = 2,
+                         IsMemoryOnly = true
+                     };
+
+        return new TrayMenuState
+               {
+                   Version = "1.2.3",
+                   Snapshot = TraySnapshot.ForConnection(texts, status, PipeRecordingState.Recording, _todayTick),
+                   Game = CreateGameStatus(GameInstallationStatusKind.Found, GameInstallationSource.UbisoftConnect, "12345"),
+                   Catalog = new GameCatalogStatus
+                             {
+                                 Kind = GameCatalogStatusKind.Ready,
+                                 EntryCount = 2
+                             },
+                   Server = CreateServerStatus(mode) with
+                                                     {
+                                                         Buffer = buffer
+                                                     },
+                   Clock = CreateClock(1)
+               };
+    }
+
+    /// <summary>
+    /// Creates every German snapshot a tooltip can show: each connection state with each recording state, every replay
+    /// problem with the largest line number, every send problem, the replay states, connecting, finished with and without
+    /// counts (one tick and the largest counts), and the invalid command line.
+    /// </summary>
+    /// <param name="tick">The last tick of every snapshot that shows one</param>
+    /// <returns>The snapshots</returns>
+    private static List<TraySnapshot> CreateGermanSnapshots(PipeTickSummary tick)
+    {
+        var texts = CompanionTexts.German;
+        var connections = Enum.GetValues<PipeConnectionState>()
+                              .SelectMany(state => Enum.GetValues<PipeRecordingState>(),
+                                          (state, recording) => TraySnapshot.ForConnection(texts,
+                                                                                           new PipeConnectionStatus
+                                                                                           {
+                                                                                               State = state
+                                                                                           },
+                                                                                           recording,
+                                                                                           tick));
+        var problems = Enum.GetValues<PipeReplayProblemKind>()
+                           .Select(kind => new PipeReplayStatus
+                                           {
+                                               State = PipeConnectionState.Receiving,
+                                               IsFinished = true,
+                                               Problem = new PipeReplayProblem
+                                                         {
+                                                             Kind = kind,
+                                                             LineNumber = long.MaxValue
+                                                         }
+                                           });
+        var sendProblems = Enum.GetValues<ReplaySendProblemKind>()
+                               .Select(kind => new PipeReplayStatus
+                                               {
+                                                   State = PipeConnectionState.Receiving,
+                                                   IsFinished = true,
+                                                   SendProblem = kind
+                                               });
+        PipeConnectionState[] replayStates = [PipeConnectionState.Connected, PipeConnectionState.Receiving, PipeConnectionState.ProtocolMismatch];
+        var states = replayStates.Select(state => new PipeReplayStatus
+                                                  {
+                                                      State = state
+                                                  });
+        var others = new[]
+                     {
+                         new PipeReplayStatus
+                         {
+                             State = PipeConnectionState.Connected,
+                             IsConnecting = true
+                         },
+                         new PipeReplayStatus
+                         {
+                             State = PipeConnectionState.Receiving,
+                             IsFinished = true
+                         },
+                         CreateFinishedStatus(1, 0),
+                         CreateFinishedStatus(int.MaxValue, int.MaxValue)
+                     };
+        var replays = problems.Concat(sendProblems)
+                              .Concat(states)
+                              .Concat(others)
+                              .Select(status => TraySnapshot.ForReplay(texts, status, tick));
+
+        return connections.Concat(replays)
+                          .Append(TraySnapshot.ForInvalidCommandLine(texts))
+                          .ToList();
+    }
+
+    /// <summary>
+    /// Creates the status of a replay that finished sending to a server.
+    /// </summary>
+    /// <param name="ticks">The number of ticks sent</param>
+    /// <param name="refused">The number of ticks refused</param>
+    /// <returns>The status</returns>
+    private static PipeReplayStatus CreateFinishedStatus(int ticks, int refused)
+    {
+        return new PipeReplayStatus
+               {
+                   State = PipeConnectionState.Receiving,
+                   IsFinished = true,
+                   Sent = new ReplaySendCounts
+                          {
+                              Ticks = ticks,
+                              Refused = refused
+                          }
+               };
+    }
+
+    /// <summary>
+    /// Gets the texts of the entries that read the same in two menus of the same entries, separators and the version
+    /// entry left out.
+    /// </summary>
+    /// <param name="english">The entries of the English menu</param>
+    /// <param name="german">The entries of the German menu</param>
+    /// <returns>The English texts that the German menu repeats</returns>
+    private static List<string> SameTexts(IReadOnlyList<TrayMenuEntry> english, IReadOnlyList<TrayMenuEntry> german)
+    {
+        return english.Zip(german)
+                      .Where(pair => pair.First.Kind is not (TrayMenuEntryKind.Separator or TrayMenuEntryKind.Version))
+                      .Where(pair => pair.First.Text == pair.Second.Text)
+                      .Select(pair => pair.First.Text)
+                      .ToList();
     }
 
     /// <summary>

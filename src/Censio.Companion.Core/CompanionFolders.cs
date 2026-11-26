@@ -66,5 +66,15 @@ public static class CompanionFolders
         return Path.Combine(localApplicationData, ApplicationFolderName, "Server");
     }
 
+    /// <summary>
+    /// Gets the path of the profiles file.
+    /// </summary>
+    /// <param name="localApplicationData">The local application data folder</param>
+    /// <returns>The path of the profiles file</returns>
+    public static string Profiles(string localApplicationData)
+    {
+        return Path.Combine(localApplicationData, ApplicationFolderName, "profiles.json");
+    }
+
     #endregion // Methods
 }

@@ -41,15 +41,16 @@ public sealed record TraySnapshot
     /// <summary>
     /// Creates the snapshot of a live connection.
     /// </summary>
+    /// <param name="texts">The texts</param>
     /// <param name="status">The connection status</param>
     /// <param name="recording">The recording state</param>
     /// <param name="lastTick">The last tick</param>
     /// <returns>The snapshot</returns>
-    public static TraySnapshot ForConnection(PipeConnectionStatus status, PipeRecordingState recording, PipeTickSummary? lastTick)
+    public static TraySnapshot ForConnection(CompanionTexts texts, PipeConnectionStatus status, PipeRecordingState recording, PipeTickSummary? lastTick)
     {
         return new TraySnapshot
                {
-                   StatusText = TrayMenu.FormatStatusText(status.State, recording),
+                   StatusText = TrayMenu.FormatStatusText(texts, status.State, recording),
                    Look = LookOf(status.State),
                    LastTick = lastTick,
                    CanRecord = true,
@@ -60,10 +61,11 @@ public sealed record TraySnapshot
     /// <summary>
     /// Creates the snapshot of a replay.
     /// </summary>
+    /// <param name="texts">The texts</param>
     /// <param name="status">The replay status</param>
     /// <param name="lastTick">The last tick</param>
     /// <returns>The snapshot</returns>
-    public static TraySnapshot ForReplay(PipeReplayStatus status, PipeTickSummary? lastTick)
+    public static TraySnapshot ForReplay(CompanionTexts texts, PipeReplayStatus status, PipeTickSummary? lastTick)
     {
         TrayIconLook look;
 
@@ -82,7 +84,7 @@ public sealed record TraySnapshot
 
         return new TraySnapshot
                {
-                   StatusText = TrayMenu.FormatReplayStatusText(status),
+                   StatusText = TrayMenu.FormatReplayStatusText(texts, status),
                    Look = look,
                    LastTick = lastTick,
                    CanRecord = false,
@@ -93,16 +95,27 @@ public sealed record TraySnapshot
     /// <summary>
     /// Creates the snapshot of an invalid command line.
     /// </summary>
+    /// <param name="texts">The texts</param>
     /// <returns>The snapshot</returns>
-    public static TraySnapshot ForInvalidCommandLine()
+    public static TraySnapshot ForInvalidCommandLine(CompanionTexts texts)
     {
         return new TraySnapshot
                {
-                   StatusText = TrayMenu.InvalidCommandLineStatusText,
+                   StatusText = texts.InvalidCommandLineStatusText,
                    Look = TrayIconLook.Problem,
                    CanRecord = false,
                    IsRecording = false
                };
+    }
+
+    /// <summary>
+    /// Gets the look of the tray icon while a notice may be pending: a problem stays, else a pending notice shows.
+    /// </summary>
+    /// <param name="notice">The pending notice, or <c>null</c> if none is pending</param>
+    /// <returns>The look</returns>
+    public TrayIconLook LookWith(ProfileNotice? notice)
+    {
+        return notice is null || Look == TrayIconLook.Problem ? Look : TrayIconLook.Notice;
     }
 
     /// <summary>

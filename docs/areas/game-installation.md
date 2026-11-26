@@ -18,7 +18,7 @@ of that name does not count. A trailing separator and forward slashes in the fol
 
 The search runs once per start, in every mode (the invalid command line included), in the background; the tray, the
 pipe connection and `Exit` do not wait for it. Until it ends the menu line reads `Game: searching`. A change while the
-Companion runs counts only after a restart, except the build (*Build*).
+Companion runs counts only after a restart, except the build (*Build*); a game folder saved in the settings window restarts the Companion ([`companion-settings.md`](companion-settings.md)).
 
 1. **The settings file.** A `gameFolder` that is a text (not blank) is used and nothing else is searched:
    - not a full path (relative, a bare drive letter, a variable such as `%USERPROFILE%`; variables are never
@@ -50,7 +50,7 @@ Steam is not searched. A player with another copy (Steam) names the folder in th
   symlink are still followed. A UNC folder the player writes in the settings file is the player's own choice and is
   probed as written, over the network. With such a folder found, the Companion lists every archive below `maindata` with its size and modification time over the network (SMB) at the start and at each check, and reads `config.rda` and opens the archives over it only when it extracts the catalog ([`game-catalog.md`](game-catalog.md), *Limits and errors*).
 - The Companion only reads: it checks that the two files exist, asks Windows for the file version of the program file,
-  and writes nothing to the installation, the registry or the settings file. It reads no whole drive.
+  and the search writes nothing to the installation, the registry or the settings file (only the settings window writes that file). The window probes a typed folder with the same check when it opens and on `Save`, off the tray thread, and a typed UNC folder is probed over the network as written ([`companion-settings.md`](companion-settings.md), *Validation*). It reads no whole drive.
 
 ### Build
 
@@ -102,7 +102,7 @@ line ([`companion-log.md`](companion-log.md)); no game content is logged.
 ## Related decisions
 
 - [`decisions/0044-game-installation-found-through-ubisoft-connect-or-the-settings-file.md`](../decisions/0044-game-installation-found-through-ubisoft-connect-or-the-settings-file.md) — Ubisoft Connect's records and default folder, the settings file overrides, Steam not searched.
-- [`decisions/0045-companion-settings-in-a-json-file-under-local-app-data.md`](../decisions/0045-companion-settings-in-a-json-file-under-local-app-data.md) — the override is a hand-edited JSON file.
+- [`decisions/0045-companion-settings-in-a-json-file-under-local-app-data.md`](../decisions/0045-companion-settings-in-a-json-file-under-local-app-data.md) — the override is a JSON file the Companion reads at start (writing superseded by 0110).
 - [`decisions/0046-game-build-is-the-program-files-version.md`](../decisions/0046-game-build-is-the-program-files-version.md) — the build is the program file's version.
 
 ## Not here

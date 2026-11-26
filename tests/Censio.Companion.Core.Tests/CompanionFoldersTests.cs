@@ -92,5 +92,22 @@ public sealed class CompanionFoldersTests
         Assert.AreEqual(Path.Combine(data, "Censio", "Server"), folder, "The server folder should be Censio\\Server below the local application data");
     }
 
+    /// <summary>
+    /// The profiles file is Censio\profiles.json below the local application data (G3).
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC6")]
+    public void CompanionFoldersProfilesIsUnderCensio()
+    {
+        // Arrange
+        var data = Path.Combine(Path.GetTempPath(), "Local");
+
+        // Act
+        var file = CompanionFolders.Profiles(data);
+
+        // Assert
+        Assert.AreEqual(Path.Combine(data, "Censio", "profiles.json"), file, "The profiles file should be Censio\\profiles.json below the local application data");
+    }
+
     #endregion // Methods
 }

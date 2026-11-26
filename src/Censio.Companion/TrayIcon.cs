@@ -9,6 +9,25 @@ namespace Censio.Companion;
 /// </summary>
 internal sealed class TrayIcon : IDisposable
 {
+    #region Constants
+
+    /// <summary>
+    /// The longest title of a notification in characters
+    /// </summary>
+    private const int MaxNoticeTitleLength = 63;
+
+    /// <summary>
+    /// The longest text of a notification in characters
+    /// </summary>
+    private const int MaxNoticeTextLength = 255;
+
+    /// <summary>
+    /// The time a notification asks to be shown in milliseconds; Windows decides
+    /// </summary>
+    private const int NoticeTimeout = 10000;
+
+    #endregion // Constants
+
     #region Fields
 
     /// <summary>
@@ -48,6 +67,15 @@ internal sealed class TrayIcon : IDisposable
 
     #endregion // Fields
 
+    #region Events
+
+    /// <summary>
+    /// Occurs when the user clicked a notification.
+    /// </summary>
+    public event EventHandler? NoticeClicked;
+
+    #endregion // Events
+
     #region Constructors
 
     /// <summary>
@@ -76,10 +104,12 @@ internal sealed class TrayIcon : IDisposable
         _notifyIcon = new NotifyIcon
                       {
                           Icon = images.Get(TrayIconLook.Waiting),
-                          Text = TrayMenu.ToolTip,
+                          Text = sources.Texts().ToolTip,
                           ContextMenuStrip = _menu,
                           Visible = true
                       };
+
+        _notifyIcon.BalloonTipClicked += (_, _) => NoticeClicked?.Invoke(this, EventArgs.Empty);
     }
 
     #endregion // Constructors
@@ -98,6 +128,24 @@ internal sealed class TrayIcon : IDisposable
         }
 
         _notifyIcon.Text = text.Length > TrayMenu.MaxToolTipLength ? text[..TrayMenu.MaxToolTipLength] : text;
+    }
+
+    /// <summary>
+    /// Shows a notification; does nothing once the icon is disposed.
+    /// </summary>
+    /// <param name="title">The title</param>
+    /// <param name="text">The text</param>
+    /// <returns><see langword="true" /> if the notification was passed to Windows, <see langword="false" /> once the icon is disposed</returns>
+    public bool ShowNotice(string title, string text)
+    {
+        if (_disposed)
+        {
+            return false;
+        }
+
+        _notifyIcon.ShowBalloonTip(NoticeTimeout, title.Length > MaxNoticeTitleLength ? title[..MaxNoticeTitleLength] : title, text.Length > MaxNoticeTextLength ? text[..MaxNoticeTextLength] : text, ToolTipIcon.Info);
+
+        return true;
     }
 
     /// <summary>
@@ -123,7 +171,20 @@ internal sealed class TrayIcon : IDisposable
 
         _menu.Items.Clear();
 
-        foreach (var entry in TrayMenu.Create(_version, _sources.Snapshot(), _sources.Game(), _sources.Catalog(), _sources.Server(), _sources.IsAutostartEnabled(), TimeProvider.System))
+        var profiles = _sources.Profiles();
+
+        foreach (var entry in TrayMenu.Create(_sources.Texts(),
+                                              new TrayMenuState
+                                              {
+                                                  Version = _version,
+                                                  Snapshot = _sources.Snapshot(),
+                                                  Game = _sources.Game(),
+                                                  Catalog = _sources.Catalog(),
+                                                  Server = _sources.Server(),
+                                                  Clock = TimeProvider.System,
+                                                  ProfileName = profiles?.Active.Name,
+                                                  Notice = profiles?.PendingNotice
+                                              }))
         {
             if (entry.Kind == TrayMenuEntryKind.Separator)
             {
@@ -132,14 +193,13 @@ internal sealed class TrayIcon : IDisposable
                 continue;
             }
 
-            var item = new ToolStripMenuItem(entry.Text)
+            var item = new ToolStripMenuItem(entry.Text.Replace("&", "&&", StringComparison.Ordinal))
                        {
-                           Enabled = entry.IsEnabled,
-                           Checked = entry.IsChecked
+                           Enabled = entry.IsEnabled
                        };
             var kind = entry.Kind;
 
-            if (kind is TrayMenuEntryKind.OpenCensio or TrayMenuEntryKind.OpenDiagnostics or TrayMenuEntryKind.ToggleRecording or TrayMenuEntryKind.OpenRecordingsFolder or TrayMenuEntryKind.OpenLogFolder or TrayMenuEntryKind.ToggleAutostart or TrayMenuEntryKind.Exit)
+            if (kind is TrayMenuEntryKind.OpenCensio or TrayMenuEntryKind.ProfileNotice or TrayMenuEntryKind.OpenSettings or TrayMenuEntryKind.OpenDiagnostics or TrayMenuEntryKind.ToggleRecording or TrayMenuEntryKind.OpenRecordingsFolder or TrayMenuEntryKind.OpenLogFolder or TrayMenuEntryKind.Exit)
             {
                 item.Click += (_, _) => _dispatch(kind);
             }

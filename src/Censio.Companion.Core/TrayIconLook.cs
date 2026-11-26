@@ -18,5 +18,10 @@ public enum TrayIconLook
     /// <summary>
     /// The Companion has a problem.
     /// </summary>
-    Problem
+    Problem,
+
+    /// <summary>
+    /// A notice about the profile is pending.
+    /// </summary>
+    Notice
 }

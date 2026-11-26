@@ -1,0 +1,58 @@
+# 0111: Profiles are a list the Companion keeps; each live connection's hello names the profile of its messages
+
+- **Status:** Accepted
+- **Date:** 2026-11-25
+- **Area:** live-sending
+- **Source:** Issue #43
+- **Supersedes:** —
+
+## Context
+
+Record [0041](0041-profile-selected-in-the-companion-figure-name-only-a-hint.md) has the player select the profile in
+the Companion and links figure names to profiles locally; #40 sent everything to one fixed profile `Live` until #43.
+Only a hello names a profile, a second hello on a connection is refused, and a message of an identity no hello named
+creates the profile without a name ([contract](../areas/contract.md), [ingest](../areas/ingest.md)). Buffered messages
+keep the profile they were taken for.
+
+## Options considered
+
+1. **A local list (`profiles.json`), `Live` first; a connection is reopened whenever the next message belongs to
+   another named profile than its hello** — every profile reaches the server with its name, also one fed offline;
+   one reconnect per switch.
+2. **Read the server's profile list** — needs a new contract message and a server; local mode before its start and
+   an unreachable server would leave the window without a list.
+3. **Swap only the `profileId` of new messages** — no reconnect; a new profile shows up without a name until the
+   next connection, and one fed offline and switched away from stays unnamed.
+4. **A contract message that names a profile** — a contract version bump for both sides, for what a reconnect does.
+5. **Figure links by the figure's name, the file bound raised to 4 MiB** — the file would hold the figure name, and its
+   size would follow the pipe's strings (up to about 2 MB escaped); a hash of the name has a fixed length.
+6. **The notice as a Windows notification only, or also in the settings window's banner** — Windows may hold a
+   notification back while a game runs full screen, and a banner is seen only once the window is opened.
+7. **A pending notice shown only in the tooltip, as a badge on each state's icon, or over a problem** — the Product
+   Manager chose an icon look; a badge is a few pixels at 16 px, the tooltip is seen only on hover, and a pipe problem
+   stops the data while a notice holds no tick.
+
+## Decision
+
+Option 1 (the list kept locally as the Product Manager chose). The Companion keeps its profiles and figure links in a
+fixed file under `%LOCALAPPDATA%\Censio`, `Live` keeping its identity and each figure kept as the SHA-256 of its name,
+and opens each live connection with a hello for the profile of the next message to send. A switch closes the old
+connection with the close handshake, and a `companionConnected` refusal shortly after it, while the server still ends
+the old session, is retried as part of the switch; the rules are in [companion-profiles](../areas/companion-profiles.md) and
+[live-sending](../areas/live-sending.md).
+
+## Consequences
+
+- A profile switch costs one reconnect, and the catalog check of every new connection (record 0107); a few refused
+  hellos right after it are expected and neither logged nor counted as failures.
+- The profiles file holds no figure name, only its hash; a hash of a known name can be recomputed, so the file stays
+  private.
+- A message whose profile the list no longer knows (a lost profiles file) is sent on the current connection; the server
+  creates that profile without a name.
+- Profiles are neither renamed nor deleted in the Companion; history is deleted on the pages.
+- The tray menu names the active profile on every `Server:` line of a live run, and a notice also stays a menu entry
+  above `Settings…` until a switch or the session's end or next start (option 6 lost); the log records each notice's
+  kind, never a name, when it is raised and when it was passed to Windows.
+- While a notice is pending the tray icon shows a fourth look, *notice*, unless the state is a problem (option 7
+  lost); a change of the pending notice refreshes the icon at once, and the tooltip keeps the state.
+- Record 0102 (the fixed profile until #43) is deleted: unreleased, it no longer applies.

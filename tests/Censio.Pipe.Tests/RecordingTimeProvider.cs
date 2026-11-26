@@ -94,6 +94,19 @@ public sealed class RecordingTimeProvider : FakeTimeProvider
     }
 
     /// <summary>
+    /// Waits until the given number of timers with the given due time were created; the count is checked under the lock
+    /// that records the timers, so a timer created while the wait starts is counted.
+    /// </summary>
+    /// <param name="dueTime">The due time of the timers</param>
+    /// <param name="count">The number of timers</param>
+    /// <param name="cancellationToken">The token that ends the wait</param>
+    /// <returns>The task that completes when the timers exist</returns>
+    public Task WaitForDelaysAsync(TimeSpan dueTime, int count, CancellationToken cancellationToken)
+    {
+        return WaitAsync(delays => delays.Count(delay => delay == dueTime) >= count, cancellationToken);
+    }
+
+    /// <summary>
     /// Advances the clock by the due time of each timer the task creates, until the task is completed.
     /// </summary>
     /// <param name="task">The task that waits on this provider</param>

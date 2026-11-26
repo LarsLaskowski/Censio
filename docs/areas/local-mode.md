@@ -13,8 +13,9 @@ without Docker rely on it.
 ### Switching on
 
 - Local mode is off by default. It runs only when the settings file `%LOCALAPPDATA%\Censio\settings.json`
-  ([`companion.md`](companion.md), *Settings file*) holds `"mode": "local"`. The file is read once per start, never
-  written, and a change counts after a restart. Without the key the Companion behaves as without local mode: no
+  ([`companion.md`](companion.md), *Settings file*) holds `"mode": "local"`. The file is read once per start; the
+  settings window writes it and restarts the Companion for a change of these keys
+  ([`companion-settings.md`](companion-settings.md)), a change made by hand counts after a restart. Without the key the Companion behaves as without local mode: no
   listener, no `Server:` line, no `Open Censio` entry.
 - `localPort` is read only with `mode` `local`: an integer literal from 1 to 65535, default 5000. `5117.0`, `5.117e3`,
   `"5117"`, `null`, a negative number, 0 and 65536 are refused.
@@ -36,10 +37,11 @@ without Docker rely on it.
 
 - Below `Catalog: …` the menu shows the greyed line `Server: <state>`: `Server: starting`, `Server: running at
   http://localhost:<port>/`, `Server: port <port> in use`, `Server: failed` or `Server: settings invalid`; the port is
-  written in decimal digits. Directly above `Open diagnostics` (after the first separator) is the entry `Open Censio`.
+  written in decimal digits. After the first separator comes the entry `Open Censio`, directly above `Settings…` and `Open diagnostics`.
   It is shown only in local mode, enabled only while the line reads `Server: running …`, and opens
   `http://localhost:<port>/` in the default browser. The menu does not wait for the browser; if no browser can be
   started a warning is logged and nothing else changes.
+- In a live run the line ends with ` (profile <name>)`, the whole name of the active profile ([`companion-texts.md`](companion-texts.md)); `Server: settings invalid` is no live run and adds nothing.
 - In forward mode ([`live-sending.md`](live-sending.md), *Reconnect*) the same place holds the line of the connection to the
   server, such as `Server: connected`, and there is no `Open Censio`, except greyed for an invalid forward setting.
 - The tooltip and the icon show the pipe connection only.
@@ -98,7 +100,7 @@ without Docker rely on it.
 | Menu line | Cause | What else |
 | --------- | ----- | --------- |
 | `Server: settings invalid` | A value of `mode`, `localPort`, `bufferHours` or `bufferMegabytes`, or in forward mode of `serverAddress` or `serverToken`, breaks *Switching on* | No server; warning logged |
-| `Server: port <port> in use` | Another program, a standalone server or the Companion of another signed-in Windows user holds the port on `127.0.0.1` or on `[::1]` | `Open Censio` greyed; warning logged; nothing is retried |
+| `Server: port <port> in use` | Another program, a standalone server or the Companion of another signed-in Windows user holds the port on `127.0.0.1` or on `[::1]` | `Open Censio` greyed; warning logged; nothing is retried, except by a Companion the settings window restarted, which retries a port in use every 500 ms for up to 10 seconds and shows `Server: starting` meanwhile ([`companion-settings.md`](companion-settings.md), *Restart*) |
 | `Server: failed` | Any other start failure: the folder cannot be created or written, the database was written by a newer Censio, is not a Censio database or cannot be updated, the key ring or the token file cannot be written or read back, an address that cannot be bound for another reason; also a server that stops on its own while the Companion runs. A port that Windows reserves is expected to end here (not yet verified) | `Open Censio` greyed; the reason is logged; the Companion does not restart the server; a restart of the Companion tries again |
 
 - A failed start leaves pipe, recording, catalog and replay working as without local mode, releases everything it

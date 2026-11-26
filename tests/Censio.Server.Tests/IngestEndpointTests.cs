@@ -642,7 +642,7 @@ public sealed class IngestEndpointTests
                         },
                         runner.Status.Sent,
                         "Every tick with islands should be sent and none refused");
-        Assert.AreEqual($"Censio Companion: Replay finished: {expected} ticks sent, 0 refused", TrayMenu.FormatReplayToolTip(runner.Status), "The Companion should end with the counts");
+        Assert.AreEqual($"Censio Companion: Replay finished: {expected} ticks sent, 0 refused", TrayMenu.FormatReplayToolTip(CompanionTexts.English, runner.Status), "The Companion should end with the counts");
     }
 
     /// <summary>
@@ -776,7 +776,7 @@ public sealed class IngestEndpointTests
 
         // Assert
         Assert.IsGreaterThan(0, expected, "The fixture should have ticks with islands, or the test would prove less");
-        Assert.AreEqual($"Censio Companion: Replay finished: {expected} ticks sent, 0 refused", TrayMenu.FormatReplayToolTip(runner.Status), "Only the ticks should be counted as sent, and the acknowledged trade routes not as refused");
+        Assert.AreEqual($"Censio Companion: Replay finished: {expected} ticks sent, 0 refused", TrayMenu.FormatReplayToolTip(CompanionTexts.English, runner.Status), "Only the ticks should be counted as sent, and the acknowledged trade routes not as refused");
     }
 
     /// <summary>

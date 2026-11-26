@@ -643,6 +643,90 @@ public sealed class LogFileLoggerProviderTests
     }
 
     /// <summary>
+    /// When the day's file cannot be opened, here because a folder has its name, the line goes to the day's next number,
+    /// opened as a new file (review round 1 of G4: the old Companion still holds the day's file during a restart).
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    [TestCategory("AC4")]
+    public async Task LogFileLoggerProviderOpenFailureContinuesInNextNumber()
+    {
+        // Arrange
+        Directory.CreateDirectory(Path.Combine(Folder, LogFileNames.Format(new DateOnly(2026, 11, 2), 1)));
+
+        using var provider = new LogFileLoggerProvider(Folder, _clock);
+        var logger = provider.CreateLogger("Censio");
+
+        // Act
+        CompanionLog.Exiting(logger);
+
+        await FlushAsync(provider);
+
+        // Assert
+        string[] expected = ["companion-20261102-2.log"];
+
+        Assert.AreSequenceEqual(expected, FileNames(Folder), "The line should go to the day's next number");
+        Assert.AreEqual(ExitLine, ReadShared(Path.Combine(Folder, "companion-20261102-2.log")), "The next number should hold the line alone");
+    }
+
+    /// <summary>
+    /// When the day's file and its next number both cannot be opened, here because folders have their names, the line is
+    /// dropped without an exception and no further number is tried (review round 1 of G4).
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    [TestCategory("AC4")]
+    public async Task LogFileLoggerProviderSecondOpenFailureDropsLine()
+    {
+        // Arrange
+        var date = new DateOnly(2026, 11, 2);
+
+        Directory.CreateDirectory(Path.Combine(Folder, LogFileNames.Format(date, 1)));
+        Directory.CreateDirectory(Path.Combine(Folder, LogFileNames.Format(date, 2)));
+
+        using var provider = new LogFileLoggerProvider(Folder, _clock);
+        var logger = provider.CreateLogger("Censio");
+
+        // Act
+        var exception = Record(() => CompanionLog.Exiting(logger));
+
+        await FlushAsync(provider);
+
+        // Assert
+        Assert.IsNull(exception, "A failing open should not escape the logger");
+        Assert.IsEmpty(FileNames(Folder), "No file should be written after the second failing open");
+    }
+
+    /// <summary>
+    /// When the file with the highest number allowed cannot be opened, the line is dropped without trying a number beyond
+    /// it (review round 1 of G4).
+    /// </summary>
+    /// <returns>The task</returns>
+    [TestMethod]
+    [TestCategory("AC4")]
+    public async Task LogFileLoggerProviderOpenFailureAtLastNumberDropsLine()
+    {
+        // Arrange
+        CreateFile("companion-20261102-9998.log", LogFileLoggerProvider.MaxFileBytes - 10);
+        Directory.CreateDirectory(Path.Combine(Folder, "companion-20261102-9999.log"));
+
+        using var provider = new LogFileLoggerProvider(Folder, _clock);
+        var logger = provider.CreateLogger("Censio");
+
+        // Act
+        var exception = Record(() => CompanionLog.Exiting(logger));
+
+        await FlushAsync(provider);
+
+        // Assert
+        string[] expected = ["companion-20261102-9998.log"];
+
+        Assert.IsNull(exception, "A failing open should not escape the logger");
+        Assert.AreSequenceEqual(expected, FileNames(Folder), "No file beyond number 9999 should be created");
+        Assert.AreEqual(LogFileLoggerProvider.MaxFileBytes - 10, TotalBytes(Folder), "The line should be dropped");
+    }
+
+    /// <summary>
     /// Runs an action and returns the exception it threw.
     /// </summary>
     /// <param name="action">The action</param>

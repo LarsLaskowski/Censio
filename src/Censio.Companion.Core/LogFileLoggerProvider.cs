@@ -270,7 +270,19 @@ public sealed class LogFileLoggerProvider : ILoggerProvider
         var fullPath = Path.Combine(_folder, name);
         var isNew = File.Exists(fullPath) == false;
 
-        _stream = new FileStream(fullPath, FileMode.Append, FileAccess.Write, FileShare.Read);
+        try
+        {
+            _stream = new FileStream(fullPath, FileMode.Append, FileAccess.Write, FileShare.Read);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException && number + 1 <= MaxSequence)
+        {
+            number++;
+            name = LogFileNames.Format(date, number);
+            fullPath = Path.Combine(_folder, name);
+            isNew = File.Exists(fullPath) == false;
+            _stream = new FileStream(fullPath, FileMode.Append, FileAccess.Write, FileShare.Read);
+        }
+
         _streamLength = isNew ? 0 : new FileInfo(fullPath).Length;
         _streamDate = date;
 

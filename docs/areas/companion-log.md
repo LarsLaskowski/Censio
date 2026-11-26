@@ -17,14 +17,14 @@ background writer with its bounds. A user who checks a log before sharing it, an
   is created, only the 10 newest log files are kept, newest by the date and then `n` in the name. Only top-level files
   whose whole name is exactly `companion-<yyyyMMdd>.log` or `companion-<yyyyMMdd>-<n>.log` (`n` from 2, no leading
   zero, ASCII digits only, case-insensitive) are ever deleted, other files in the folder never; a symbolic link is
-  deleted as a link, not its target.
+  deleted as a link, not its target. A file that cannot be opened (another Companion holds it, such as the old one during a restart) is continued in the next number once; if that fails too, the line is dropped.
 - A line is `<yyyy-MM-ddTHH:mm:ss.fffzzz> <level> <message>`: local time with UTC offset, the level `INF`, `WRN`, `ERR`
   or `CRT`, and the message; an exception follows on the lines after it, each indented by two spaces.
 - It logs: the start with the version and the mode (`Normal`, `Record`, `Replay`, `Invalid`); each change of the
   connection state with the error kind, the Windows error code and the received version (only changes, never a line
   per skipped frame); recording started and stopped at the click, its file name (the name only) when the file is
   created, a recording failure and the failure of a stopped recording; the result of the game installation search at every start (found with its source, build and folder, or the warning of its failure; [`game-installation.md`](game-installation.md), *Log*), where the folder and the settings file path are logged as written and may hold the Windows user name; the catalog (below); a replay's start (the file name only), its
-  end and its problem reason; for a replay sent to a server the four lines of [`replay-sending.md`](replay-sending.md) (*Log*): `Replay connected to the server`, `Replay refused by the server: <reason>`, `Replay sending failed: <reason>` and `Replay sent <n> ticks, <r> refused`, never with the token, the address, a name or an exception text; a folder that could not be opened; the lines of local mode and of live sending (below); the autostart turned on (`Autostart enabled`) or off (`Autostart disabled`) and, as warnings, `Could not read the autostart setting` (once until a read succeeds again, so a blocked registry does not log at every menu opening) and `Could not change the autostart setting`, with the exception where there is one and never the exe path; an unexpected error of a background task; and `Exit`.
+  end and its problem reason; for a replay sent to a server the four lines of [`replay-sending.md`](replay-sending.md) (*Log*): `Replay connected to the server`, `Replay refused by the server: <reason>`, `Replay sending failed: <reason>` and `Replay sent <n> ticks, <r> refused`, never with the token, the address, a name or an exception text; a folder that could not be opened; the lines of local mode and of live sending (below); the autostart turned on (`Autostart enabled`) or off (`Autostart disabled`) and, as warnings, `Could not read the autostart setting` (once until a read succeeds again, so a blocked registry does not log at every window opening) and `Could not change the autostart setting`, with the exception where there is one and never the exe path; an unexpected error of a background task; and `Exit`.
 - **Catalog lines** ([`game-catalog.md`](game-catalog.md)), none with a name or text, only GUIDs, kinds, archive paths and
   counts: `Catalog built: <n> entries; <i> inherited assets left out; <d> unknown region types dropped`
   (Information); `Catalog failed: <kind>` (Warning; the kinds `ArchiveUnreadable`, `FileMissing`, `FileUnreadable`,
@@ -52,6 +52,16 @@ background writer with its bounds. A user who checks a log before sharing it, an
   (<archive>)` (Warning; the kinds `ArchiveMissing`, `ArchiveUnreadable`, `DuplicateArchiveNumber` and `IconSetTooLarge`,
   the archive as a path relative to `maindata`, `maindata` itself when the listing failed). One of them is written per extraction, and
   none while the catalog fails, no game is found or the catalog is loaded from the cache.
+- **Settings, profile and restart lines** ([`companion-settings.md`](companion-settings.md), [`companion-profiles.md`](companion-profiles.md)),
+  none with a value, a name, a path or the token: `Settings saved` (Information, after the settings window wrote the
+  file), `Could not save the settings: <exception type>` (Warning, for a failed write of the settings file or of the
+  profiles file; only the type's name), `Profile switched` (Information, when the active profile changed),
+  `Profile notice raised: <kind>` (Information, when a notice about the profile is raised, before it goes to the tray) and `Profile notice passed to Windows: <kind>` (Information, when the tray icon passed the notification to Windows; a disposed icon logs nothing), the kind `LastUsedWithOther` or `NewFigure` and nothing else,
+  `Profiles file invalid: <problem>` (Warning; the problem is `cannot be read`, `larger than 1 MiB` or `not of its
+  format`), `Language setting invalid; the Windows display language is used` (Warning, at start) and, for a restart,
+  `Restart failed: the Companion could not be started: <exception type>` and `Restart failed: the previous Companion did
+  not end` (Warnings). The figure name and its hash are never logged. The log stays English when the Companion's texts
+  are German ([`companion-texts.md`](companion-texts.md)).
 - **Local mode lines** ([`local-mode.md`](local-mode.md), *Log*): `Server settings invalid: <problem>` (Warning; the
   problem is one of `mode is not local or forward`, `mode occurs more than once`, `localPort is not a port from 1 to 65535`,
   `localPort occurs more than once`, or a problem of forward mode, [`live-sending.md`](live-sending.md), *Switching on*), `Local server running on port <port>` (Information), `Local server port <port> in

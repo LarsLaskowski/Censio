@@ -1034,7 +1034,108 @@ public sealed class CompanionSettingsTests
     }
 
     /// <summary>
-    /// Turns a test text into the bytes of the file: <see cref="ByteOrderMarkMarker" /> becomes the UTF-8 byte order
+    /// The key <c>language</c> reads <c>en</c> and <c>de</c> ignoring case; without the key, with another value, a value
+    /// that is not a text or a key written twice it gives no language, so the Windows display language decides (S9).
+    /// </summary>
+    /// <param name="text">The settings text</param>
+    /// <param name="expected">The expected language, or <see langword="null" /> for none</param>
+    [TestMethod]
+    [TestCategory("AC5")]
+    [DataRow("""{"language": "en"}""", CompanionLanguage.English, DisplayName = "en")]
+    [DataRow("""{"language": "DE"}""", CompanionLanguage.German, DisplayName = "DE")]
+    [DataRow("""{"Language": "de"}""", CompanionLanguage.German, DisplayName = "Key in other case")]
+    [DataRow("""{"gameFolder": "E:/Anno 117 - Pax Romana/"}""", null, DisplayName = "Missing")]
+    [DataRow("""{"language": "fr"}""", null, DisplayName = "fr")]
+    [DataRow("""{"language": 5}""", null, DisplayName = "Number 5")]
+    [DataRow("""{"language": "de", "language": "de"}""", null, DisplayName = "Twice")]
+    public void CompanionSettingsReadLanguageGivesEnOrDeOnly(string text, CompanionLanguage? expected)
+    {
+        // Arrange
+        var path = WriteSettings(text);
+
+        // Act
+        var language = CompanionSettings.ReadLanguage(path);
+
+        // Assert
+        Assert.AreEqual(expected, language, $"The settings {text} should give the language {expected}");
+    }
+
+    /// <summary>
+    /// A settings file naming <c>de</c> gives no language when it is not read: a relative path, a folder in its place, a
+    /// file over 1 MiB, one that is not JSON or whose root is not an object (S9).
+    /// </summary>
+    /// <param name="kind">How the file is not read</param>
+    [TestMethod]
+    [TestCategory("AC5")]
+    [DataRow("relative path")]
+    [DataRow("cannot be read")]
+    [DataRow("over 1 MiB")]
+    [DataRow("not JSON")]
+    [DataRow("array root")]
+    public void CompanionSettingsReadLanguageUnreadFileGivesNone(string kind)
+    {
+        // Arrange
+        var path = WriteUnreadGermanSettings(kind);
+
+        // Act
+        var language = CompanionSettings.ReadLanguage(path);
+
+        // Assert
+        Assert.IsNull(language, $"A settings file that is not read ({kind}) should give no language");
+    }
+
+    /// <summary>
+    /// The language setting is invalid only when the key is there and gives no language: a value other than <c>en</c> or
+    /// <c>de</c>, a value that is not a text or the key written twice; a missing key or a valid value is not invalid (S9).
+    /// </summary>
+    /// <param name="text">The settings text</param>
+    /// <param name="expected">Whether the setting should be invalid</param>
+    [TestMethod]
+    [TestCategory("AC5")]
+    [DataRow("""{"gameFolder": "E:/Anno 117 - Pax Romana/"}""", false, DisplayName = "Missing")]
+    [DataRow("""{"language": "en"}""", false, DisplayName = "en")]
+    [DataRow("""{"language": "DE"}""", false, DisplayName = "DE")]
+    [DataRow("""{"language": "fr"}""", true, DisplayName = "fr")]
+    [DataRow("""{"language": 5}""", true, DisplayName = "Number 5")]
+    [DataRow("""{"language": "de", "language": "de"}""", true, DisplayName = "Twice")]
+    [DataRow("""{"Language": "fr"}""", true, DisplayName = "Key in other case")]
+    public void CompanionSettingsIsLanguageInvalidOnlyForPresentKeyWithoutLanguage(string text, bool expected)
+    {
+        // Arrange
+        var path = WriteSettings(text);
+
+        // Act
+        var isInvalid = CompanionSettings.IsLanguageInvalid(path);
+
+        // Assert
+        Assert.AreEqual(expected, isInvalid, $"The settings {text} should be invalid: {expected}");
+    }
+
+    /// <summary>
+    /// A settings file that is not read holds no invalid language setting, even when its text names <c>fr</c>: a missing
+    /// file, a file over 1 MiB, one that is not JSON or whose root is not an object (S9).
+    /// </summary>
+    /// <param name="kind">How the file is not read</param>
+    [TestMethod]
+    [TestCategory("AC5")]
+    [DataRow("missing file")]
+    [DataRow("over 1 MiB")]
+    [DataRow("not JSON")]
+    [DataRow("array root")]
+    public void CompanionSettingsIsLanguageInvalidUnreadFileIsNotInvalid(string kind)
+    {
+        // Arrange
+        var path = WriteUnreadFrenchSettings(kind);
+
+        // Act
+        var isInvalid = CompanionSettings.IsLanguageInvalid(path);
+
+        // Assert
+        Assert.IsFalse(isInvalid, $"A settings file that is not read ({kind}) should hold no invalid language setting");
+    }
+
+    /// <summary>
+    /// Turns a test text into the bytes of the file:<see cref="ByteOrderMarkMarker" /> becomes the UTF-8 byte order
     /// mark and <see cref="InvalidByteMarker" /> the byte <c>0xFF</c>, the rest is encoded as UTF-8.
     /// </summary>
     /// <param name="text">The test text</param>
@@ -1122,6 +1223,43 @@ public sealed class CompanionSettingsTests
                    "array root" => WriteSettings("""[{"mode": "local"}]"""),
                    "over 1 MiB" => WriteSettings(LocalSettings + new string(' ', CompanionSettings.MaxFileLength + 1 - LocalSettings.Length)),
                    _ => CreateFolderInPlaceOfSettings()
+               };
+    }
+
+    /// <summary>
+    /// Writes a settings file that names the language <c>de</c> but is not read, or a folder in its place.
+    /// </summary>
+    /// <param name="kind">How the file is not read: relative path, cannot be read, over 1 MiB, not JSON or array root</param>
+    /// <returns>The path of the file</returns>
+    private string WriteUnreadGermanSettings(string kind)
+    {
+        const string german = """{"language": "de"}""";
+
+        return kind switch
+               {
+                   "relative path" => Path.GetRelativePath(Environment.CurrentDirectory, WriteSettings(german)),
+                   "over 1 MiB" => WriteSettings(german + new string(' ', CompanionSettings.MaxFileLength + 1 - german.Length)),
+                   "not JSON" => WriteSettings("""{"language": "de" """),
+                   "array root" => WriteSettings("""[{"language": "de"}]"""),
+                   _ => CreateFolderInPlaceOfSettings()
+               };
+    }
+
+    /// <summary>
+    /// Gets the path of a settings file naming <c>fr</c> that is not read.
+    /// </summary>
+    /// <param name="kind">How the file is not read: missing file, over 1 MiB, not JSON or array root</param>
+    /// <returns>The path</returns>
+    private string WriteUnreadFrenchSettings(string kind)
+    {
+        const string french = """{"language": "fr"}""";
+
+        return kind switch
+               {
+                   "missing file" => Path.Combine(_root, "missing", "settings.json"),
+                   "over 1 MiB" => WriteSettings(french + new string(' ', CompanionSettings.MaxFileLength + 1 - french.Length)),
+                   "not JSON" => WriteSettings("""{"language": "fr" """),
+                   _ => WriteSettings("""[{"language": "fr"}]""")
                };
     }
 

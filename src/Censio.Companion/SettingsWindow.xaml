@@ -1,0 +1,92 @@
+<Window x:Class="Censio.Companion.SettingsWindow"
+        x:ClassModifier="internal"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Width="560"
+        SizeToContent="Height"
+        ResizeMode="NoResize"
+        ShowInTaskbar="True"
+        WindowStartupLocation="CenterScreen">
+    <Window.Resources>
+        <Style x:Key="LabelStyle" TargetType="TextBlock">
+            <Setter Property="Margin" Value="0,10,0,2" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style x:Key="MessageStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="Firebrick" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Visibility" Value="Collapsed" />
+        </Style>
+        <Style x:Key="BannerStyle" TargetType="TextBlock">
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Margin" Value="0,0,0,4" />
+        </Style>
+    </Window.Resources>
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+    <StackPanel Margin="16">
+        <StackPanel x:Name="BannerPanel" />
+
+        <TextBlock x:Name="ModeLabel" Style="{StaticResource LabelStyle}" />
+        <StackPanel Orientation="Horizontal">
+            <RadioButton x:Name="OffRadio" GroupName="Mode" Margin="0,0,16,0" Checked="OnModeChecked" />
+            <RadioButton x:Name="LocalRadio" GroupName="Mode" Margin="0,0,16,0" Checked="OnModeChecked" />
+            <RadioButton x:Name="ForwardRadio" GroupName="Mode" Checked="OnModeChecked" />
+        </StackPanel>
+        <TextBlock x:Name="ModeMessage" Style="{StaticResource MessageStyle}" />
+
+        <TextBlock x:Name="PortLabel" Style="{StaticResource LabelStyle}" />
+        <TextBox x:Name="PortBox" TextChanged="OnPortChanged" />
+        <TextBlock x:Name="PortMessage" Style="{StaticResource MessageStyle}" />
+
+        <TextBlock x:Name="AddressLabel" Style="{StaticResource LabelStyle}" />
+        <TextBox x:Name="AddressBox" TextChanged="OnAddressChanged" />
+        <TextBlock x:Name="AddressMessage" Style="{StaticResource MessageStyle}" />
+
+        <TextBlock x:Name="TokenLabel" Style="{StaticResource LabelStyle}" />
+        <PasswordBox x:Name="TokenBox" PasswordChanged="OnTokenChanged" />
+        <TextBlock x:Name="TokenMessage" Style="{StaticResource MessageStyle}" />
+
+        <TextBlock x:Name="HoursLabel" Style="{StaticResource LabelStyle}" />
+        <TextBox x:Name="HoursBox" TextChanged="OnHoursChanged" />
+        <TextBlock x:Name="HoursMessage" Style="{StaticResource MessageStyle}" />
+
+        <TextBlock x:Name="MegabytesLabel" Style="{StaticResource LabelStyle}" />
+        <TextBox x:Name="MegabytesBox" TextChanged="OnMegabytesChanged" />
+        <TextBlock x:Name="MegabytesMessage" Style="{StaticResource MessageStyle}" />
+
+        <TextBlock x:Name="FolderLabel" Style="{StaticResource LabelStyle}" />
+        <DockPanel LastChildFill="True">
+            <Button x:Name="BrowseButton" DockPanel.Dock="Right" Margin="8,0,0,0" Padding="12,2" Click="OnBrowseClick" />
+            <TextBox x:Name="FolderBox" TextChanged="OnFolderChanged" />
+        </DockPanel>
+        <TextBlock x:Name="FolderHint" Foreground="Gray" />
+        <TextBlock x:Name="FolderMessage" Style="{StaticResource MessageStyle}" />
+
+        <TextBlock x:Name="ProfileLabel" Style="{StaticResource LabelStyle}" />
+        <DockPanel LastChildFill="True">
+            <Button x:Name="NewProfileButton" DockPanel.Dock="Right" Margin="8,0,0,0" Padding="12,2" Click="OnNewProfileClick" />
+            <ComboBox x:Name="ProfileBox" DisplayMemberPath="Name" SelectedValuePath="Id" />
+        </DockPanel>
+        <StackPanel x:Name="NewProfilePanel" Visibility="Collapsed">
+            <TextBlock x:Name="NewProfileLabel" Style="{StaticResource LabelStyle}" />
+            <TextBox x:Name="NewProfileBox" TextChanged="OnNewProfileChanged" />
+            <TextBlock x:Name="NewProfileMessage" Style="{StaticResource MessageStyle}" />
+        </StackPanel>
+
+        <CheckBox x:Name="AutostartBox" Margin="0,14,0,0" />
+
+        <TextBlock x:Name="LanguageLabel" Style="{StaticResource LabelStyle}" />
+        <ComboBox x:Name="LanguageBox" SelectionChanged="OnLanguageChanged">
+            <ComboBoxItem Content="English" />
+            <ComboBoxItem Content="Deutsch" />
+        </ComboBox>
+
+        <TextBlock x:Name="OutcomeText" Margin="0,14,0,0" TextWrapping="Wrap" />
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+            <Button x:Name="SaveButton" IsDefault="True" MinWidth="88" Margin="0,0,8,0" Padding="12,3" Click="OnSaveClick" />
+            <Button x:Name="CancelButton" IsCancel="True" MinWidth="88" Padding="12,3" Click="OnCancelClick" />
+        </StackPanel>
+    </StackPanel>
+    </ScrollViewer>
+</Window>

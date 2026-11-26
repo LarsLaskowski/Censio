@@ -22,7 +22,7 @@ public sealed class SingleInstanceGuard : IDisposable
     private readonly string _name;
 
     /// <summary>
-    /// The mutex, once <see cref="TryAcquire" /> has run
+    /// The mutex, once <see cref="TryAcquire()" /> has run
     /// </summary>
     private Mutex? _mutex;
 
@@ -32,6 +32,15 @@ public sealed class SingleInstanceGuard : IDisposable
     private bool _isOwner;
 
     #endregion // Fields
+
+    #region Properties
+
+    /// <summary>
+    /// Gets the time a restarted Companion waits for the previous one to release the mutex.
+    /// </summary>
+    public static TimeSpan RestartWait { get; } = TimeSpan.FromSeconds(10);
+
+    #endregion // Properties
 
     #region Constructors
 
@@ -58,6 +67,27 @@ public sealed class SingleInstanceGuard : IDisposable
         _isOwner = createdNew;
 
         return createdNew;
+    }
+
+    /// <summary>
+    /// Tries to become the only running instance, waiting for a running one to release it.
+    /// </summary>
+    /// <param name="wait">The longest time to wait</param>
+    /// <returns><see langword="true" /> when this guard owns the mutex; otherwise <see langword="false" /></returns>
+    public bool TryAcquire(TimeSpan wait)
+    {
+        _mutex = new Mutex(false, _name);
+
+        try
+        {
+            _isOwner = _mutex.WaitOne(wait);
+        }
+        catch (AbandonedMutexException)
+        {
+            _isOwner = true;
+        }
+
+        return _isOwner;
     }
 
     #endregion // Methods

@@ -2,8 +2,8 @@
 
 ## Scope
 
-Live sending from the Companion to a server: forward mode's settings `serverAddress` and `serverToken`, the fixed
-profile `Live`, the start and the hello, what is sent, the buffer of the waiting messages and its bounds, the upload of
+Live sending from the Companion to a server: forward mode's settings `serverAddress` and `serverToken`, the profile
+each connection's hello names and the switch between profiles, the start and the hello, what is sent, the buffer of the waiting messages and its bounds, the upload of
 the game catalog and its icons, the reconnect delays and the final refusals, the bound on finding a dead connection, the `Server:` texts of forward mode, live sending in local
 mode, the log lines, privacy and the accepted risks. A player whose server runs elsewhere (Docker on a NAS or a home
 server) and an operator who reads the log rely on it. The connection rules shared with the replay are in
@@ -15,7 +15,8 @@ server) and an operator who reads the log rely on it. The connection rules share
 
 - Forward mode is off by default. The Companion sends live data to a configured server only when the settings file
   `%LOCALAPPDATA%\Censio\settings.json` ([`companion.md`](companion.md), *Settings file*) holds `"mode": "forward"`
-  (matched ignoring case). The file is read once per start, never written, and a change counts after a restart.
+  (matched ignoring case). The file is read once per start; the settings window writes it and restarts the Companion for a
+  change of these keys ([`companion-settings.md`](companion-settings.md)), a change made by hand counts after a restart.
 - `serverAddress`, `serverToken`, `bufferHours` and `bufferMegabytes` are matched ignoring case and read with `mode` `forward`, the two buffer keys also with `local`; `localPort` is ignored
   in forward mode. Without `mode`, or with `local`, nothing is sent to an address of the file.
 - `serverAddress` is required and follows the rules of the replay's `--server` address
@@ -45,19 +46,40 @@ server) and an operator who reads the log rely on it. The connection rules share
 ### Start and hello
 
 - At start, without waiting for the game, the Companion connects and sends one hello per connection with the contract
-  version 2, the Companion's version, the token of the setting (none without `serverToken`), the profile identity and the
-  profile name `Live` ([`contract.md`](contract.md), *Versions and the frozen form*). The connection obeys the rules of
+  version 2, the Companion's version, the token of the setting (none without `serverToken`), and the identity and the name
+  of a profile ([`contract.md`](contract.md), *Versions and the frozen form*), the profile of *Profiles on the connection*. The connection obeys the rules of
   [`replay-sending.md`](replay-sending.md) (*Connection*): direct, never through a system proxy, no redirect, no `Origin`,
   the system's certificate checks for `wss://`, 30 seconds for the upgrade and for the hello's answer.
 - The menu line reads `Server: connecting` from the start until the first attempt ends, then `Server: connected` after
   `helloAccepted`.
-- The profile identity is one built into the Companion, `b6a1f3e2-7c4d-4e8a-9f21-5d3c0a7e1b94`, the same on every
-  start and for every server, so the history continues across restarts and updates without a file the Companion writes
-  (record 0102). One Companion per server keeps it unique ([`ingest.md`](ingest.md)).
-- Until the player can choose a profile, every playthrough goes to `Live`: loading another savegame puts its ticks there.
-  Islands with the same key (session GUID, island ID, area index; [`pipe.md`](pipe.md)) continue and rename each other's
-  history, and the other savegame's islands stay listed without new values. No warning is shown; the remedy is deleting
-  `Live`'s history on the pages ([`history-deletion.md`](history-deletion.md)).
+- The profiles are the Companion's own ([`companion-profiles.md`](companion-profiles.md)): `Live` with the built-in
+  identity `b6a1f3e2-7c4d-4e8a-9f21-5d3c0a7e1b94`, the same on every start and for every server, and the profiles the
+  player created, each with an identity the Companion made. The player selects the active profile in the settings window
+  ([`companion-settings.md`](companion-settings.md)); until then, and without a `profiles.json`, it is `Live`. One Companion per
+  server keeps an identity unique ([`ingest.md`](ingest.md)).
+- Every playthrough goes to the active profile: loading another savegame of the same figure, or another figure, puts its
+  ticks there, and islands with the same key (session GUID, island ID, area index; [`pipe.md`](pipe.md)) continue and
+  rename each other's history. The notification of [`companion-profiles.md`](companion-profiles.md) (*Notice*) hints at a
+  figure played with another profile and never moves the ticks; the remedy for a mixed history is deleting it on the pages
+  ([`history-deletion.md`](history-deletion.md)).
+
+### Profiles on the connection
+
+- Only a hello names a profile and a second hello is refused ([`contract.md`](contract.md), [`ingest.md`](ingest.md)), so a
+  connection belongs to one profile: its hello names the profile of the next message to send (the one resent first after
+  a lost connection, else the active profile), and each message carries its own profile identity.
+- A message of another named profile than the connection's (taken before a switch, also offline, or after a switch)
+  ends the connection before that message is sent, and a new connection follows with a hello naming that profile; the
+  message is resent first there. The messages the player took offline under a profile and switched away from reach the server under
+  that profile's name, in the order they were taken. A message whose profile the list does not know is sent on the current
+  connection and the server makes the profile without a name.
+- A switch in the window while a connection idles reconnects at once. The old connection ends with the close handshake
+  (at most 2 seconds) before the new hello, `Server: connecting` shows until the new hello is accepted, no `Live sending
+  failed` line is logged and no delay is waited. The server frees the Companion's place only when it ends the old session, so
+  a `companionConnected` refusal within 5 seconds of the switch is retried after 250 ms, as part of the switch, with no line
+  and no step of the reconnect delays; after those 5 seconds the refusal is handled as in *Reconnect*.
+- A switch costs one reconnect and the catalog check of the new connection (*Catalog*; record 0111). No tick is held for it:
+  the messages taken meanwhile wait in the buffer.
 
 ### What is sent
 
@@ -179,7 +201,7 @@ server) and an operator who reads the log rely on it. The connection rules share
 - A failed attempt is retried after 1, 2, 4, 8 and 16 seconds, then every 30 seconds, as long as the Companion runs. The
   first attempt at start has no delay. A connection that stayed accepted for at least 60 seconds starts the delays again
   at 1 second.
-- Each failure sets the menu line until the next accepted hello or another failure:
+- Each failure sets the menu line until the next accepted hello or another failure. In a live run every `Server:` line of this section ends with ` (profile <name>)`, the whole name of the active profile ([`companion-texts.md`](companion-texts.md)), except `Server: settings invalid`, which adds nothing:
 
 | Line | Cause |
 | ---- | ----- |
@@ -203,7 +225,7 @@ server) and an operator who reads the log rely on it. The connection rules share
 
 - In local mode ([`local-mode.md`](local-mode.md)) the Companion sends live data in a normal run and with `--record` to
   the server it hosts: once that server runs, to `ws://127.0.0.1:<port>/ingest` with the token the process holds, under
-  the same profile `Live`. Messages wait in the buffer until then.
+  the active profile (*Profiles on the connection*). Messages wait in the buffer until then.
 - The `Server:` line keeps local mode's texts; a lost connection is retried as above without a menu text. A hosted server
   that does not start, or that stopped, is not retried and gets no live-sending line of its own, except the `Buffer:` line and the count of dropped messages;
   a connection that its stop ended is logged once as `Live sending failed: server connection lost; retrying`.
@@ -265,13 +287,13 @@ running ends local mode's live sending without a line of its own, except the cou
   host answers `serverAddress`; a name without a domain (such as `nas`) may be answered by any device of the network the PC
   is on, so use `wss://`, or an address on a network you trust, when the PC leaves your home network.
 - **The token in `settings.json`.** The file holds the ingest token in plain text, readable for whoever can read the
-  player's folder; the Companion neither checks nor changes its access rules.
+  player's folder; the Companion neither checks nor sets its access rules, and the settings window's replacement takes
+  those of the folder ([`companion-settings.md`](companion-settings.md), *Writing the file*).
 - **The buffer.** A power cut may tear the file being written, which is then discarded and counted; a clock change moves
   the age limit (*Buffer*); a writer of the player's folder can change or delete files, which ends as an unreadable file; an
   outage beyond the limits and a message still waiting for its write at `Exit` lose messages. Two Windows sessions of one
   user run two Companions with one folder and may disturb each other's writes, which then ends as a buffer that cannot be
   written or an unreadable file.
-- **One profile.** Playthroughs mix in `Live` until the player can choose a profile (*Start and hello*).
 
 ## Measurements
 
@@ -283,7 +305,7 @@ is the reason for the bound of 60 seconds rather than 45.
 
 ## Related decisions
 
-- [`decisions/0102-live-data-goes-to-one-fixed-profile-live-until-profiles-are-chosen.md`](../decisions/0102-live-data-goes-to-one-fixed-profile-live-until-profiles-are-chosen.md) — live data goes to the fixed profile `Live` until the player can choose.
+- [`decisions/0111-profiles-kept-by-the-companion-each-hello-names-the-next-messages-profile.md`](../decisions/0111-profiles-kept-by-the-companion-each-hello-names-the-next-messages-profile.md) — profiles are kept by the Companion and each hello names the next message's profile.
 - [`decisions/0103-forward-server-address-and-token-are-keys-of-the-settings-file.md`](../decisions/0103-forward-server-address-and-token-are-keys-of-the-settings-file.md) — the address and the token are keys of the settings file.
 - [`decisions/0104-live-sending-reconnects-holds-messages-in-memory-and-pings.md`](../decisions/0104-live-sending-reconnects-holds-messages-in-memory-and-pings.md) — reconnect delays, the memory bound of waiting messages (now the bound of memory-only mode) and own pings.
 - [`decisions/0099-local-mode-switched-on-in-the-settings-file-off-by-default.md`](../decisions/0099-local-mode-switched-on-in-the-settings-file-off-by-default.md) — `mode` in the settings file, extended by `forward`.

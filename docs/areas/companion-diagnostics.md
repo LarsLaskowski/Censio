@@ -13,7 +13,8 @@ follows the ticks, its single window, its read path, memory and privacy. The use
 sent it: GUIDs are raw numbers where the catalog has no name for them; icons are shown where the game's files give one.
 
 - **Header**, top to bottom: `Status: <status text>`; `Last tick: <time>, <n> islands` or `Last tick: none`, exactly the
-  text of the menu entry of the same name ([`companion.md`](companion.md), *Tray icon and menu*); and, once a tick exists, `Game time: <game time>`, with
+  text of the menu entry of the same name in English ([`companion.md`](companion.md), *Tray icon and menu*; the window
+  stays English when the Companion's texts are German, [`companion-texts.md`](companion-texts.md)); and, once a tick exists, `Game time: <game time>`, with
   ` (no data yet)` appended when every island of the tick has no entries. Before the first tick, and with an invalid
   command line, the header holds `Status:` and `Last tick: none` only, and the table is empty.
 - **Table**, 17 columns left to right: `Region` (session GUID), `Island` (island ID), `Area` (area index), `Session ID`,

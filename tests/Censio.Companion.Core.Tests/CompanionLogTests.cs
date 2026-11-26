@@ -111,5 +111,90 @@ public sealed class CompanionLogTests
         Assert.AreSequenceEqual([(LogLevel.Information, "Catalog: more than 1000 GUIDs cannot be named; further ones are not logged for this catalog")], logger.Entries.Select(entry => (entry.Level, entry.Message)).ToArray(), "The cap line should name the catalog");
     }
 
+    /// <summary>
+    /// The lines of the settings window and the profiles write their level and their exact text, the exception's type and
+    /// the problem filled in, and no exception (N5).
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC9")]
+    public void CompanionLogSettingsAndProfilesTemplates()
+    {
+        // Arrange
+        var logger = new RecordingLogger();
+
+        // Act
+        CompanionLog.SettingsSaved(logger);
+        CompanionLog.SettingsNotSaved(logger, nameof(IOException));
+        CompanionLog.ProfileSwitched(logger);
+        CompanionLog.ProfilesFileInvalid(logger, "not of its format");
+        CompanionLog.LanguageSettingInvalid(logger);
+
+        // Assert
+        (LogLevel, string, Exception?)[] expected = [
+                                                        (LogLevel.Information, "Settings saved", null),
+                                                        (LogLevel.Warning, "Could not save the settings: IOException", null),
+                                                        (LogLevel.Information, "Profile switched", null),
+                                                        (LogLevel.Warning, "Profiles file invalid: not of its format", null),
+                                                        (LogLevel.Warning, "Language setting invalid; the Windows display language is used", null),
+                                                    ];
+
+        Assert.AreSequenceEqual(expected, logger.Entries.Select(entry => (entry.Level, entry.Message, entry.Exception)).ToArray(), "Each method should log its level and its text, without an exception");
+    }
+
+    /// <summary>
+    /// The lines of a profile notice write Information and their exact text with the kind filled in, and no exception
+    /// (N5).
+    /// </summary>
+    /// <param name="kind">The kind of the notice</param>
+    /// <param name="raised">The expected line of the raised notice</param>
+    /// <param name="passed">The expected line of the notice passed to Windows</param>
+    [TestMethod]
+    [TestCategory("AC9")]
+    [TestCategory("AC13")]
+    [DataRow(ProfileNoticeKind.LastUsedWithOther, "Profile notice raised: LastUsedWithOther", "Profile notice passed to Windows: LastUsedWithOther", DisplayName = "Last used with another profile")]
+    [DataRow(ProfileNoticeKind.NewFigure, "Profile notice raised: NewFigure", "Profile notice passed to Windows: NewFigure", DisplayName = "New figure")]
+    public void CompanionLogProfileNoticeTemplates(ProfileNoticeKind kind, string raised, string passed)
+    {
+        // Arrange
+        var logger = new RecordingLogger();
+
+        // Act
+        CompanionLog.ProfileNoticeRaised(logger, kind);
+        CompanionLog.ProfileNoticePassedToWindows(logger, kind);
+
+        // Assert
+        (LogLevel, string, Exception?)[] expected = [
+                                                        (LogLevel.Information, raised, null),
+                                                        (LogLevel.Information, passed, null),
+                                                    ];
+
+        Assert.AreSequenceEqual(expected, logger.Entries.Select(entry => (entry.Level, entry.Message, entry.Exception)).ToArray(), $"Each notice line should log Information and its text, without an exception: {kind}");
+    }
+
+    /// <summary>
+    /// The lines of a failed restart write their level and their exact text, the exception's type filled in, and no
+    /// exception (E15, N5).
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC4")]
+    [TestCategory("AC9")]
+    public void CompanionLogRestartTemplates()
+    {
+        // Arrange
+        var logger = new RecordingLogger();
+
+        // Act
+        CompanionLog.RestartNotStarted(logger, "Win32Exception");
+        CompanionLog.RestartWaitTimedOut(logger);
+
+        // Assert
+        (LogLevel, string, Exception?)[] expected = [
+                                                        (LogLevel.Warning, "Restart failed: the Companion could not be started: Win32Exception", null),
+                                                        (LogLevel.Warning, "Restart failed: the previous Companion did not end", null),
+                                                    ];
+
+        Assert.AreSequenceEqual(expected, logger.Entries.Select(entry => (entry.Level, entry.Message, entry.Exception)).ToArray(), "Each restart line should log its level and its text, without an exception");
+    }
+
     #endregion // Methods
 }

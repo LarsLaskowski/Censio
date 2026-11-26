@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Net.Sockets;
 using System.Windows;
 using System.Windows.Threading;
@@ -19,6 +20,15 @@ namespace Censio.Companion;
 /// </summary>
 public sealed partial class App : Application, IDisposable
 {
+    #region Constants
+
+    /// <summary>
+    /// The title of a notification
+    /// </summary>
+    private const string NoticeTitle = "Censio Companion";
+
+    #endregion // Constants
+
     #region Fields
 
     /// <summary>
@@ -122,9 +132,44 @@ public sealed partial class App : Application, IDisposable
     private ITimer? _midnightTimer;
 
     /// <summary>
-    /// Gets the snapshot of the tray
+    /// Creates the snapshot of the tray in a language
     /// </summary>
-    private Func<TraySnapshot> _snapshot = TraySnapshot.ForInvalidCommandLine;
+    private Func<CompanionTexts, TraySnapshot> _createSnapshot = TraySnapshot.ForInvalidCommandLine;
+
+    /// <summary>
+    /// The texts of the current language
+    /// </summary>
+    private volatile CompanionTexts _texts = CompanionTexts.English;
+
+    /// <summary>
+    /// The profiles
+    /// </summary>
+    private CompanionProfiles? _profiles;
+
+    /// <summary>
+    /// Cancels the writer of the profiles when the application exits
+    /// </summary>
+    private CancellationTokenSource? _profilesCancellation;
+
+    /// <summary>
+    /// The writer of the profiles, <c>null</c> until it runs
+    /// </summary>
+    private Task? _profilesTask;
+
+    /// <summary>
+    /// The session of the settings window
+    /// </summary>
+    private SettingsWindowSession? _settings;
+
+    /// <summary>
+    /// The runner of the replay, <c>null</c> when none runs
+    /// </summary>
+    private PipeReplayRunner? _replay;
+
+    /// <summary>
+    /// Whether the application exits to restart
+    /// </summary>
+    private volatile bool _isRestarting;
 
     /// <summary>
     /// The session of the diagnostics window
@@ -179,12 +224,162 @@ public sealed partial class App : Application, IDisposable
     }
 
     /// <summary>
+    /// Logs that a restarted Companion gave up waiting for the previous one.
+    /// </summary>
+    /// <param name="localAppData">The local application data folder</param>
+    private static void LogRestartWaitTimedOut(string localAppData)
+    {
+        using var provider = new LogFileLoggerProvider(CompanionFolders.Logs(localAppData), TimeProvider.System);
+
+        CompanionLog.RestartWaitTimedOut(provider.CreateLogger("Censio.Companion"));
+
+        Task.Run(() => provider.FlushAsync(TimeSpan.FromMilliseconds(500)), CancellationToken.None).Wait(TimeSpan.FromMilliseconds(500), CancellationToken.None);
+    }
+
+    /// <summary>
+    /// Starts the Companion's own executable with one argument; the path and the argument are no shell command line.
+    /// </summary>
+    /// <param name="path">The full path of the executable</param>
+    /// <param name="argument">The argument</param>
+    private static void LaunchRestart(string path, string argument)
+    {
+        var start = new ProcessStartInfo(path)
+                    {
+                        UseShellExecute = false
+                    };
+
+        start.ArgumentList.Add(argument);
+
+        using var process = Process.Start(start);
+    }
+
+    /// <summary>
+    /// Reads the language of the texts: the settings file's, else the Windows display language.
+    /// </summary>
+    /// <param name="settingsFile">The path of the settings file</param>
+    /// <returns>The texts</returns>
+    private CompanionTexts ReadTexts(string settingsFile)
+    {
+        var language = CompanionSettings.ReadLanguage(settingsFile);
+
+        if (language is null && CompanionSettings.IsLanguageInvalid(settingsFile))
+        {
+            CompanionLog.LanguageSettingInvalid(_logger);
+        }
+
+        return CompanionTexts.For(language ?? CompanionTexts.LanguageOf(CultureInfo.CurrentUICulture));
+    }
+
+    /// <summary>
+    /// Gets the snapshot of the tray in the current language.
+    /// </summary>
+    /// <returns>The snapshot</returns>
+    private TraySnapshot GetSnapshot()
+    {
+        return _createSnapshot(_texts);
+    }
+
+    /// <summary>
+    /// Switches every text of the Companion to a language.
+    /// </summary>
+    /// <param name="language">The language</param>
+    private void ApplyLanguage(CompanionLanguage language)
+    {
+        _texts = CompanionTexts.For(language);
+        _updater?.Notify();
+        _settings?.RefreshTexts();
+    }
+
+    /// <summary>
+    /// Shows a notice of a profile as a notification of the tray icon, on the UI thread.
+    /// </summary>
+    /// <param name="notice">The notice</param>
+    private void ShowNotice(ProfileNotice notice)
+    {
+        var show = () =>
+                   {
+                       if (_trayIcon?.ShowNotice(NoticeTitle, _texts.FormatNotice(notice)) == true)
+                       {
+                           CompanionLog.ProfileNoticePassedToWindows(_logger, notice.Kind);
+                       }
+                   };
+
+        _ = Dispatcher.BeginInvoke(DispatcherPriority.Background, show);
+    }
+
+    /// <summary>
+    /// Reads what the running Companion does that the settings window warns about.
+    /// </summary>
+    /// <returns>The run state</returns>
+    private SettingsRunState ReadRunState()
+    {
+        return new SettingsRunState
+               {
+                   IsReplay = _replay is { } runner && runner.Status.IsFinished == false,
+                   IsRecording = _recording?.State == PipeRecordingState.Recording,
+                   IsBufferMemoryOnly = _liveBuffer?.Status.IsMemoryOnly == true
+               };
+    }
+
+    /// <summary>
+    /// Creates the session of the settings window.
+    /// </summary>
+    /// <param name="settingsFile">The path of the settings file</param>
+    /// <param name="startupValues">The values the Companion started with</param>
+    private void CreateSettings(string settingsFile, CompanionSettingsValues startupValues)
+    {
+        var context = new SettingsWindowContext
+                      {
+                          SettingsPath = settingsFile,
+                          StartupValues = startupValues,
+                          Profiles = _profiles!,
+                          Autostart = _autostart!,
+                          Restart = new CompanionRestart(LaunchRestart, Environment.ProcessPath, _logger),
+                          Texts = () => _texts,
+                          ApplyLanguage = ApplyLanguage,
+                          RunState = ReadRunState,
+                          Exit = ExitForRestart,
+                          DirectoryExists = System.IO.Directory.Exists,
+                          IsInstallation = GameInstallation.IsInstallation,
+                          Logger = _logger
+                      };
+
+        _settings = new SettingsWindowSession(context, action => Dispatcher.BeginInvoke(DispatcherPriority.Background, action), () => new SettingsWindow());
+    }
+
+    /// <summary>
+    /// Exits the application so that the new Companion takes over.
+    /// </summary>
+    private void ExitForRestart()
+    {
+        _isRestarting = true;
+
+        Shutdown(0);
+    }
+
+    /// <summary>
+    /// Starts the writer of the profiles.
+    /// </summary>
+    /// <param name="profiles">The profiles</param>
+    private void StartProfiles(CompanionProfiles profiles)
+    {
+        var cancellation = new CancellationTokenSource();
+        var writer = Task.Run(() => profiles.RunAsync(cancellation.Token), CancellationToken.None);
+
+        _ = writer.ContinueWith(task => CompanionLog.BackgroundTaskFailed(_logger, task.Exception!), CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Default);
+
+        _profiles = profiles;
+        _profilesCancellation = cancellation;
+        _profilesTask = writer;
+    }
+
+    /// <summary>
     /// Creates the session of the diagnostics window.
     /// </summary>
     /// <param name="readTick">Reads the latest closed tick</param>
     private void CreateDiagnostics(Func<PipeTick?> readTick)
     {
-        _diagnostics = new DiagnosticsWindowSession(() => _snapshot().StatusText,
+        _diagnostics = new DiagnosticsWindowSession(() => _createSnapshot(CompanionTexts.English).StatusText,
                                                     readTick,
                                                     () => _catalogLoader?.Catalog,
                                                     () => _catalogLoader?.Icons,
@@ -200,12 +395,12 @@ public sealed partial class App : Application, IDisposable
     /// <returns>The updater</returns>
     private TrayStatusUpdater<TraySnapshot> CreateUpdater(TrayIcon trayIcon)
     {
-        var updater = new TrayStatusUpdater<TraySnapshot>(() => _snapshot(),
+        var updater = new TrayStatusUpdater<TraySnapshot>(GetSnapshot,
                                                           action => Dispatcher.BeginInvoke(DispatcherPriority.Background, action),
                                                           snapshot =>
                                                           {
-                                                              trayIcon.SetToolTip(TrayMenu.FormatSnapshotToolTip(snapshot, TimeProvider.System));
-                                                              trayIcon.SetLook(snapshot.Look);
+                                                              trayIcon.SetToolTip(TrayMenu.FormatSnapshotToolTip(_texts, snapshot, TimeProvider.System));
+                                                              trayIcon.SetLook(snapshot.LookWith(LiveProfiles()?.PendingNotice));
                                                           });
 
         _updater = updater;
@@ -268,7 +463,10 @@ public sealed partial class App : Application, IDisposable
                                                                                            },
                                                                                            token),
                                              TimeProvider.System,
-                                             _logger);
+                                             _logger)
+                      {
+                          PortInUseRetry = commandLine.IsRestart ? SingleInstanceGuard.RestartWait : TimeSpan.Zero
+                      };
 
         session.StatusChanged += (_, _) => _updater?.Notify();
         _localServer = session;
@@ -293,7 +491,7 @@ public sealed partial class App : Application, IDisposable
 
         var connection = new PipeConnection(new NamedPipeConnector(), TimeProvider.System, recording, _logger);
 
-        _snapshot = () => TraySnapshot.ForConnection(connection.Status, recording.State, connection.LastTick);
+        _createSnapshot = texts => TraySnapshot.ForConnection(texts, connection.Status, recording.State, connection.LastTick);
 
         CreateDiagnostics(() => connection.LatestTick);
         _readLatestTick = () => connection.LatestTick;
@@ -334,10 +532,13 @@ public sealed partial class App : Application, IDisposable
                          ? LiveSender.ForServer(setting.Forward!, buffer, version, connector, TimeProvider.System, _logger)
                          : LiveSender.ForLocalServer(setting.Port, _localServer!.WaitForLiveTokenAsync, buffer, version, connector, TimeProvider.System, _logger);
 
+        sender.UseProfiles(_profiles!);
+        sender.ProfileNoticeRaised += (_, notice) => ShowNotice(notice);
         sender.NotifyState(connection.Status.State);
         connection.ItemReceived += (_, item) => sender.Enqueue(item);
         connection.StatusChanged += (_, status) => sender.NotifyState(status.State);
         sender.StatusChanged += (_, _) => updater.Notify();
+        _profiles!.PendingNoticeChanged += (_, _) => updater.Notify();
         _liveSender = sender;
         _liveBuffer = buffer;
 
@@ -382,7 +583,8 @@ public sealed partial class App : Application, IDisposable
 
         CompanionLog.ReplayStarted(_logger, fileName);
 
-        _snapshot = () => TraySnapshot.ForReplay(runner.Status, runner.LastTick);
+        _createSnapshot = texts => TraySnapshot.ForReplay(texts, runner.Status, runner.LastTick);
+        _replay = runner;
 
         CreateDiagnostics(() => runner.LatestTick);
         _readLatestTick = () => runner.LatestTick;
@@ -466,13 +668,16 @@ public sealed partial class App : Application, IDisposable
                                  _images,
                                  new TrayIconSources
                                  {
-                                     Snapshot = () => _snapshot(),
+                                     Snapshot = GetSnapshot,
                                      Game = () => _gameSearch?.Status ?? GameInstallationStatus.Searching,
                                      Catalog = () => _catalogLoader?.Status ?? GameCatalogStatus.Reading,
                                      Server = GetServerStatus,
-                                     IsAutostartEnabled = () => _autostart?.Refresh() ?? false
+                                     Texts = () => _texts,
+                                     Profiles = LiveProfiles
                                  },
                                  Dispatch);
+
+        _trayIcon.NoticeClicked += (_, _) => _settings?.Open();
 
         return _trayIcon;
     }
@@ -505,6 +710,15 @@ public sealed partial class App : Application, IDisposable
     }
 
     /// <summary>
+    /// Gets the profiles while live data is sent.
+    /// </summary>
+    /// <returns>The profiles, or <c>null</c> when no live data is sent</returns>
+    private CompanionProfiles? LiveProfiles()
+    {
+        return _liveSender is null ? null : _profiles;
+    }
+
+    /// <summary>
     /// Runs the action of a menu entry.
     /// </summary>
     /// <param name="kind">The kind of the entry</param>
@@ -515,6 +729,13 @@ public sealed partial class App : Application, IDisposable
             case TrayMenuEntryKind.OpenDiagnostics:
                 {
                     _diagnostics?.Open();
+                }
+                break;
+
+            case TrayMenuEntryKind.ProfileNotice:
+            case TrayMenuEntryKind.OpenSettings:
+                {
+                    _settings?.Open();
                 }
                 break;
 
@@ -539,12 +760,6 @@ public sealed partial class App : Application, IDisposable
             case TrayMenuEntryKind.OpenCensio:
                 {
                     OpenCensio();
-                }
-                break;
-
-            case TrayMenuEntryKind.ToggleAutostart:
-                {
-                    _autostart?.Toggle();
                 }
                 break;
 
@@ -611,6 +826,39 @@ public sealed partial class App : Application, IDisposable
             .ContinueWith(task => CompanionLog.BackgroundTaskFailed(_logger, task.Exception!), CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Default);
     }
 
+    /// <summary>
+    /// Stops the recording and waits for it and the profiles writer together for at most one second.
+    /// </summary>
+    /// <returns><c>true</c> when the profiles writer has ended (completed, faulted or cancelled) or there is none</returns>
+    private bool StopRecordingAndProfiles()
+    {
+        var tasks = new List<Task>();
+
+        if (_recording is { } recording)
+        {
+            tasks.Add(Task.Run(() => recording.StopAsync(TimeSpan.FromSeconds(1)), CancellationToken.None));
+        }
+
+        if (_profilesTask is { } writer)
+        {
+            tasks.Add(writer);
+        }
+
+        if (tasks.Count > 0)
+        {
+            try
+            {
+                _ = Task.WaitAll(tasks.ToArray(), TimeSpan.FromSeconds(1));
+            }
+            catch (AggregateException)
+            {
+                // A faulted task has ended, the writer has already logged it, and its file handle is closed.
+            }
+        }
+
+        return _profilesTask?.IsCompleted ?? true;
+    }
+
     #endregion // Methods
 
     #region Application
@@ -620,13 +868,13 @@ public sealed partial class App : Application, IDisposable
     {
         base.OnStartup(e);
 
+        var commandLine = CompanionCommandLine.Parse(e.Args);
+        var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+
         _guard = new SingleInstanceGuard(SingleInstanceGuard.DefaultName);
 
-        if (_guard.TryAcquire())
+        if (commandLine.IsRestart ? _guard.TryAcquire(SingleInstanceGuard.RestartWait) : _guard.TryAcquire())
         {
-            var commandLine = CompanionCommandLine.Parse(e.Args);
-            var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-
             _recordingsFolder = PipeRecordingFiles.DefaultFolder(localAppData);
             _logFolder = CompanionFolders.Logs(localAppData);
             _logProvider = new LogFileLoggerProvider(_logFolder, TimeProvider.System);
@@ -644,7 +892,12 @@ public sealed partial class App : Application, IDisposable
             _browserOpener = new BrowserOpener(LaunchBrowser, _logger);
 
             var serverSetting = CompanionSettings.ReadLocalServer(settingsFile);
+            var startupValues = CompanionSettingsDocument.Load(settingsFile).Values;
 
+            _texts = ReadTexts(settingsFile);
+
+            StartProfiles(CompanionProfiles.Load(CompanionFolders.Profiles(localAppData), _logger));
+            CreateSettings(settingsFile, startupValues);
             StartLocalServer(commandLine, serverSetting, localAppData);
 
             var gameSearch = new GameInstallationSearch(new RegistryUbisoftInstallRecords(), new WindowsFileVersionReader(), GameInstallation.DefaultUbisoftGamesFolder(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86)), _logger);
@@ -694,6 +947,11 @@ public sealed partial class App : Application, IDisposable
         }
         else
         {
+            if (commandLine.IsRestart)
+            {
+                LogRestartWaitTimedOut(localAppData);
+            }
+
             Shutdown(0);
         }
     }
@@ -728,6 +986,11 @@ public sealed partial class App : Application, IDisposable
         _trayIcon?.Dispose();
         _midnightTimer?.Dispose();
 
+        var isLiveStopped = true;
+        var isServerStopped = true;
+        var isServerDisposed = true;
+        var isProfilesWritten = true;
+
         if (_liveSender is { } liveSender)
         {
             var stopLive = Task.Run(async () =>
@@ -741,24 +1004,20 @@ public sealed partial class App : Application, IDisposable
                                     },
                                     CancellationToken.None);
 
-            stopLive.Wait(TimeSpan.FromMilliseconds(250), CancellationToken.None);
+            isLiveStopped = stopLive.Wait(TimeSpan.FromMilliseconds(250), CancellationToken.None);
         }
 
         if (_localServer is { } localServer)
         {
             var stopServer = Task.Run(() => localServer.StopAsync(TimeSpan.FromSeconds(3)), CancellationToken.None);
 
-            stopServer.Wait(TimeSpan.FromSeconds(3), CancellationToken.None);
+            isServerStopped = stopServer.Wait(TimeSpan.FromSeconds(3), CancellationToken.None);
         }
 
         _connectionCancellation?.Cancel();
+        _profilesCancellation?.Cancel();
 
-        if (_recording is { } recording)
-        {
-            var stop = Task.Run(() => recording.StopAsync(TimeSpan.FromSeconds(1)), CancellationToken.None);
-
-            stop.Wait(TimeSpan.FromSeconds(1), CancellationToken.None);
-        }
+        isProfilesWritten = StopRecordingAndProfiles();
 
         if (_logProvider is { } provider)
         {
@@ -769,12 +1028,22 @@ public sealed partial class App : Application, IDisposable
 
         _logProvider?.Dispose();
 
-        _liveSender?.DisposeAsync().AsTask().Wait(TimeSpan.FromMilliseconds(100), CancellationToken.None);
-        _liveBuffer?.DisposeAsync().AsTask().Wait(TimeSpan.FromMilliseconds(100), CancellationToken.None);
-        _localServer?.DisposeAsync().AsTask().Wait(TimeSpan.FromMilliseconds(500), CancellationToken.None);
+        var isLiveDisposed = _liveSender?.DisposeAsync().AsTask().Wait(TimeSpan.FromMilliseconds(100), CancellationToken.None) ?? true;
+        var isBufferDisposed = _liveBuffer?.DisposeAsync().AsTask().Wait(TimeSpan.FromMilliseconds(100), CancellationToken.None) ?? true;
+
+        isServerDisposed = _localServer?.DisposeAsync().AsTask().Wait(TimeSpan.FromMilliseconds(500), CancellationToken.None) ?? true;
+
         _images?.Dispose();
         _connectionCancellation?.Dispose();
-        _guard?.Dispose();
+        _profilesCancellation?.Dispose();
+
+        // On the exit of a restart the new Companion waits for this mutex: it is released only after everything that holds a
+        // resource of the new one (the live connection, the server's port, the profiles file) has ended; otherwise the
+        // process exit abandons it and the new Companion retries a busy port meanwhile.
+        if (_isRestarting == false || ((isLiveStopped || (isLiveDisposed && isBufferDisposed)) && isServerStopped && isServerDisposed && isProfilesWritten))
+        {
+            _guard?.Dispose();
+        }
     }
 
     #endregion // IDisposable

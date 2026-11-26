@@ -530,7 +530,7 @@ public sealed class PipeReplayRunner
             }
             else if (problem is not null)
             {
-                CompanionLog.ReplayProblem(_logger, TrayMenu.FormatReplayReason(problem) ?? problem.Kind.ToString());
+                CompanionLog.ReplayProblem(_logger, TrayMenu.FormatReplayReason(CompanionTexts.English, problem) ?? problem.Kind.ToString());
             }
         }
 

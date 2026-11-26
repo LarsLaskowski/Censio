@@ -30,9 +30,14 @@ internal sealed class TrayIconSources
     public required Func<TrayServerStatus?> Server { get; init; }
 
     /// <summary>
-    /// Gets the reader of whether the Companion starts with Windows.
+    /// Gets the reader of the texts in the current language.
     /// </summary>
-    public required Func<bool> IsAutostartEnabled { get; init; }
+    public required Func<CompanionTexts> Texts { get; init; }
+
+    /// <summary>
+    /// Gets the reader of the profiles, <c>null</c> when no live sender runs.
+    /// </summary>
+    public required Func<CompanionProfiles?> Profiles { get; init; }
 
     #endregion // Properties
 }

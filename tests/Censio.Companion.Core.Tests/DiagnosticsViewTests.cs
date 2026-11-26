@@ -370,7 +370,7 @@ public sealed class DiagnosticsViewTests
     public void DiagnosticsViewCreateInvalidCommandLineShowsStatus()
     {
         // Arrange
-        var statusText = TraySnapshot.ForInvalidCommandLine().StatusText;
+        var statusText = TraySnapshot.ForInvalidCommandLine(CompanionTexts.English).StatusText;
 
         // Act
         var view = DiagnosticsView.Create(statusText, null, CreateClock());

@@ -51,11 +51,6 @@ public enum TrayMenuEntryKind
     Exit,
 
     /// <summary>
-    /// The entry that turns the start with Windows on or off.
-    /// </summary>
-    ToggleAutostart,
-
-    /// <summary>
     /// The entry that shows the game installation.
     /// </summary>
     Game,
@@ -83,5 +78,15 @@ public enum TrayMenuEntryKind
     /// <summary>
     /// The entry that shows the live buffer.
     /// </summary>
-    LiveBuffer
+    LiveBuffer,
+
+    /// <summary>
+    /// The entry that opens the settings window.
+    /// </summary>
+    OpenSettings,
+
+    /// <summary>
+    /// The entry that shows the pending notice about the active profile and opens the settings window.
+    /// </summary>
+    ProfileNotice
 }

@@ -56,9 +56,35 @@ public static class CompanionSettings
     /// </summary>
     public const int DefaultLocalPort = 5000;
 
+    /// <summary>
+    /// The key of the language of the Companion's texts.
+    /// </summary>
+    public const string LanguageKey = "language";
+
     #endregion // Constants
 
     #region Methods
+
+    /// <summary>
+    /// Reads the language of the settings file.
+    /// </summary>
+    /// <param name="path">The path of the settings file</param>
+    /// <returns>The language, or <see langword="null" /> when the file names none or an invalid one</returns>
+    public static CompanionLanguage? ReadLanguage(string path)
+    {
+        return ReadRoot<CompanionLanguage?>(path, ReadLanguage, null);
+    }
+
+    /// <summary>
+    /// Gets a value indicating whether the settings file names a language that is not valid: the key is there but written
+    /// twice, not a text or not <c>en</c> or <c>de</c>.
+    /// </summary>
+    /// <param name="path">The path of the settings file</param>
+    /// <returns><see langword="true" /> when the file holds an invalid language setting</returns>
+    public static bool IsLanguageInvalid(string path)
+    {
+        return ReadRoot(path, root => FindProperties(root, LanguageKey).Count > 0 && ReadLanguage(root) is null, false);
+    }
 
     /// <summary>
     /// Reads the local server setting of the settings file.
@@ -143,11 +169,43 @@ public static class CompanionSettings
     }
 
     /// <summary>
+    /// Finds the properties of an object whose name is a key, ignoring case.
+    /// </summary>
+    /// <param name="root">The object</param>
+    /// <param name="key">The key</param>
+    /// <returns>The values of the properties</returns>
+    internal static List<JsonElement> FindProperties(JsonElement root, string key)
+    {
+        return root.EnumerateObject()
+                   .Where(property => string.Equals(property.Name, key, StringComparison.OrdinalIgnoreCase))
+                   .Select(property => property.Value)
+                   .ToList();
+    }
+
+    /// <summary>
+    /// Reads a whole number from text written as decimal digits only, within a range.
+    /// </summary>
+    /// <param name="text">The text</param>
+    /// <param name="minimum">The smallest number</param>
+    /// <param name="maximum">The largest number</param>
+    /// <param name="number">The number</param>
+    /// <returns><see langword="true" /> when the text is such a number</returns>
+    internal static bool TryParseWholeNumber(ReadOnlySpan<char> text, int minimum, int maximum, out int number)
+    {
+        number = 0;
+
+        return text.IndexOfAnyExceptInRange('0', '9') < 0
+               && int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out number)
+               && number >= minimum
+               && number <= maximum;
+    }
+
+    /// <summary>
     /// Reads at most <see cref="MaxFileLength" /> plus one byte of the file.
     /// </summary>
     /// <param name="path">The path of the settings file</param>
     /// <returns>The bytes read</returns>
-    private static byte[] ReadBytes(string path)
+    internal static byte[] ReadBytes(string path)
     {
         using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, 1, false);
 
@@ -174,7 +232,7 @@ public static class CompanionSettings
     /// </summary>
     /// <param name="bytes">The bytes</param>
     /// <returns>The document</returns>
-    private static JsonDocument ParseDocument(byte[] bytes)
+    internal static JsonDocument ParseDocument(byte[] bytes)
     {
         var start = bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF ? 3 : 0;
         var options = new JsonDocumentOptions
@@ -184,6 +242,32 @@ public static class CompanionSettings
                       };
 
         return JsonDocument.Parse(bytes.AsMemory(start), options);
+    }
+
+    /// <summary>
+    /// Reads the language of the root object of a settings file.
+    /// </summary>
+    /// <param name="root">The root object</param>
+    /// <returns>The language, or <see langword="null" /> when the key is missing, written twice or not <c>en</c> or <c>de</c></returns>
+    internal static CompanionLanguage? ReadLanguage(JsonElement root)
+    {
+        var languages = FindProperties(root, LanguageKey);
+
+        if (languages.Count != 1 || languages[0].ValueKind != JsonValueKind.String)
+        {
+            return null;
+        }
+
+        var language = languages[0].GetString();
+
+        if (string.Equals(language, "en", StringComparison.OrdinalIgnoreCase))
+        {
+            return CompanionLanguage.English;
+        }
+
+        return string.Equals(language, "de", StringComparison.OrdinalIgnoreCase)
+                   ? CompanionLanguage.German
+                   : null;
     }
 
     /// <summary>
@@ -373,20 +457,6 @@ public static class CompanionSettings
     }
 
     /// <summary>
-    /// Finds the properties of an object whose name is a key, ignoring case.
-    /// </summary>
-    /// <param name="root">The object</param>
-    /// <param name="key">The key</param>
-    /// <returns>The values of the properties</returns>
-    private static List<JsonElement> FindProperties(JsonElement root, string key)
-    {
-        return root.EnumerateObject()
-                   .Where(property => string.Equals(property.Name, key, StringComparison.OrdinalIgnoreCase))
-                   .Select(property => property.Value)
-                   .ToList();
-    }
-
-    /// <summary>
     /// Reads a whole number from a JSON number written as decimal digits only, within a range.
     /// </summary>
     /// <param name="value">The value</param>
@@ -403,12 +473,7 @@ public static class CompanionSettings
             return false;
         }
 
-        var text = value.GetRawText().AsSpan();
-
-        return text.IndexOfAnyExceptInRange('0', '9') < 0
-               && int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out number)
-               && number >= minimum
-               && number <= maximum;
+        return TryParseWholeNumber(value.GetRawText(), minimum, maximum, out number);
     }
 
     /// <summary>
@@ -468,6 +533,51 @@ public static class CompanionSettings
         catch (Exception exception) when (exception is JsonException or InvalidOperationException)
         {
             return CompanionSettingsResult.FromProblem("not valid JSON", exception);
+        }
+    }
+
+    /// <summary>
+    /// Reads a value of the root object of the settings file.
+    /// </summary>
+    /// <typeparam name="T">The type of the value</typeparam>
+    /// <param name="path">The path of the settings file</param>
+    /// <param name="read">Reads the value of the root object</param>
+    /// <param name="fallback">The value when the file cannot be used</param>
+    /// <returns>The value, or <paramref name="fallback" /> when the file cannot be read, is too large, is no JSON or no object</returns>
+    private static T ReadRoot<T>(string path, Func<JsonElement, T> read, T fallback)
+    {
+        if (Path.IsPathFullyQualified(path) == false)
+        {
+            return fallback;
+        }
+
+        byte[] bytes;
+
+        try
+        {
+            bytes = ReadBytes(path);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or SecurityException or NotSupportedException)
+        {
+            return fallback;
+        }
+
+        if (bytes.Length > MaxFileLength)
+        {
+            return fallback;
+        }
+
+        try
+        {
+            using var document = ParseDocument(bytes);
+
+            return document.RootElement.ValueKind == JsonValueKind.Object
+                       ? read(document.RootElement)
+                       : fallback;
+        }
+        catch (Exception exception) when (exception is JsonException or InvalidOperationException)
+        {
+            return fallback;
         }
     }
 

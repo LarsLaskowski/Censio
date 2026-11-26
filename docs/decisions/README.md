@@ -106,7 +106,7 @@ once in the [area document](../areas/README.md) of the record's area, and the re
 | [0042](0042-recordings-anonymised-by-a-contributor-tool-rewriting-frames.md) | Recordings are anonymised by a contributor console tool that rewrites each frame at wire level, with fresh randomness per run | Accepted | 2026-11-07 |
 | [0043](0043-rda-archives-read-by-an-own-bounded-reader.md) | RDA archives are read by an own bounded reader for format V2.2 | Accepted | 2026-11-08 |
 | [0044](0044-game-installation-found-through-ubisoft-connect-or-the-settings-file.md) | The game installation is found through Ubisoft Connect's records or the settings file; Steam is not searched | Accepted | 2026-11-09 |
-| [0045](0045-companion-settings-in-a-json-file-under-local-app-data.md) | The Companion's settings are a hand-edited JSON file under the local app data folder | Accepted | 2026-11-09 |
+| [0045](0045-companion-settings-in-a-json-file-under-local-app-data.md) | The Companion's settings are a hand-edited JSON file under the local app data folder | Superseded by [0110](0110-settings-window-writes-the-settings-file-keeping-unknown-keys.md) | 2026-11-09 |
 | [0046](0046-game-build-is-the-program-files-version.md) | The game build is identified by the program file's version, not the main-menu version | Accepted | 2026-11-09 |
 | [0047](0047-game-catalog-read-forward-only-from-config-rda-kinds-and-regions-from-the-data.md) | The game catalog is read forward-only from `config.rda`; kinds and regions come from the data, and the reader fails closed | Accepted | 2026-11-09 |
 | [0048](0048-catalog-names-shown-in-the-diagnostics-window-unresolved-guids-logged-once.md) | Catalog names are shown in the diagnostics window; GUIDs the catalog cannot name are logged once per run | Accepted | 2026-11-09 |
@@ -163,7 +163,6 @@ once in the [area document](../areas/README.md) of the record's area, and the re
 | [0099](0099-local-mode-switched-on-in-the-settings-file-off-by-default.md) | Local mode is switched on in the settings file and is off by default; its port defaults to 5000 | Accepted | 2026-11-21 |
 | [0100](0100-local-server-on-loopback-only-with-host-filtering.md) | The local server listens on the loopback addresses only and answers only loopback host names | Accepted | 2026-11-21 |
 | [0101](0101-local-replay-sent-to-the-hosted-server-with-the-token-in-memory.md) | In local mode a replay without `--server` waits for the hosted server and sends to it with the token held in the process | Accepted | 2026-11-21 |
-| [0102](0102-live-data-goes-to-one-fixed-profile-live-until-profiles-are-chosen.md) | Until the player can choose a profile, live data goes to one fixed profile `Live` | Accepted | 2026-11-22 |
 | [0103](0103-forward-server-address-and-token-are-keys-of-the-settings-file.md) | Forward mode's server address and ingest token are keys of the settings file | Accepted | 2026-11-22 |
 | [0104](0104-live-sending-reconnects-holds-messages-in-memory-and-pings.md) | Live sending reconnects with growing delays, holds waiting messages in memory and finds a dead connection by its own pings | Accepted | 2026-11-22 |
 | [0105](0105-unsent-live-messages-kept-one-file-each-in-a-fixed-buffer-folder.md) | Unsent live messages are kept one file each in a fixed buffer folder | Accepted | 2026-11-23 |
@@ -171,4 +170,9 @@ once in the [area document](../areas/README.md) of the record's area, and the re
 | [0107](0107-catalog-uploaded-first-on-each-live-connection-deferred-after-a-failure.md) | The catalog is uploaded first on each live connection, deferred after a failed upload and given up after three | Accepted | 2026-11-24 |
 | [0108](0108-companion-reads-a-larger-reply-only-for-a-catalog-acknowledgement.md) | The Companion reads a larger reply only for the acknowledgement of a catalog upload | Accepted | 2026-11-24 |
 | [0109](0109-a-stored-icon-tells-a-notice-of-its-own-that-reads-no-trends.md) | A stored icon tells a notice of its own, which re-renders the pages without reading their trends | Accepted | 2026-11-24 |
+| [0110](0110-settings-window-writes-the-settings-file-keeping-unknown-keys.md) | The settings window writes the settings file, keeping unknown keys and dropping comments | Accepted | 2026-11-25 |
+| [0111](0111-profiles-kept-by-the-companion-each-hello-names-the-next-messages-profile.md) | Profiles are a list the Companion keeps; each live connection's hello names the profile of its messages | Accepted | 2026-11-25 |
+| [0112](0112-connection-settings-applied-by-a-restart-that-waits-for-the-old-companion.md) | Connection and game settings are applied by a restart that waits for the old Companion | Accepted | 2026-11-25 |
+| [0113](0113-companion-texts-in-english-and-german-from-one-table.md) | The Companion's own texts come in English and German from one table, chosen by the key `language` | Accepted | 2026-11-25 |
+| [0114](0114-start-with-windows-switched-only-in-the-settings-window.md) | Start with Windows is switched only in the settings window | Accepted | 2026-11-25 |
 <!-- project:end index -->
