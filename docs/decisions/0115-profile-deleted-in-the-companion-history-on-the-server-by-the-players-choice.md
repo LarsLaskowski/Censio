@@ -1,6 +1,6 @@
 # 0115: A profile is deleted in the Companion, its history on the server only by the player's choice, and its identity filters the buffer
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-26
 - **Area:** companion-profiles
 - **Source:** Issue #251

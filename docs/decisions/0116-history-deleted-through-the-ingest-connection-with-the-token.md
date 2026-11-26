@@ -1,6 +1,6 @@
 # 0116: A profile's history is also deleted through the ingest connection, after a hello with the token
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-26
 - **Area:** history-deletion
 - **Source:** Issue #251
