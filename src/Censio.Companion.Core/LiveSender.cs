@@ -150,6 +150,11 @@ public sealed class LiveSender : IAsyncDisposable
     private TaskCompletionSource _activeChanged = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     /// <summary>
+    /// The completion that the next change of the deleted identities sets.
+    /// </summary>
+    private TaskCompletionSource _deletionsChanged = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    /// <summary>
     /// The profile the next hello names instead of the active one, or <see langword="null" /> when it names the active one; only the run reads and writes it.
     /// </summary>
     private CompanionProfile? _helloProfile;
@@ -346,6 +351,7 @@ public sealed class LiveSender : IAsyncDisposable
         }
 
         profiles.ActiveChanged += (_, _) => OnActiveChanged();
+        profiles.DeletionsChanged += (_, _) => OnDeletionsChanged();
     }
 
     /// <summary>
@@ -492,6 +498,25 @@ public sealed class LiveSender : IAsyncDisposable
     }
 
     /// <summary>
+    /// Finds the oldest waiting deletion not tried yet.
+    /// </summary>
+    /// <param name="profiles">The profiles</param>
+    /// <param name="tried">The identities tried on this connection</param>
+    /// <returns>The identity, or <see langword="null" /> when none is left</returns>
+    private static Guid? FirstUntried(CompanionProfiles profiles, HashSet<Guid> tried)
+    {
+        foreach (var id in profiles.WaitingDeletions)
+        {
+            if (tried.Contains(id) == false)
+            {
+                return id;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
     /// Reads the identity of the profile a message belongs to.
     /// </summary>
     /// <param name="utf8Json">The message as the buffer holds it</param>
@@ -612,6 +637,34 @@ public sealed class LiveSender : IAsyncDisposable
         }
 
         changed.TrySetResult();
+    }
+
+    /// <summary>
+    /// Notes a change of the deleted identities and wakes the send loop.
+    /// </summary>
+    private void OnDeletionsChanged()
+    {
+        TaskCompletionSource changed;
+
+        lock (_lock)
+        {
+            changed = _deletionsChanged;
+            _deletionsChanged = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        }
+
+        changed.TrySetResult();
+    }
+
+    /// <summary>
+    /// Reads the completion of the next change of the deleted identities.
+    /// </summary>
+    /// <returns>The completion</returns>
+    private Task GetDeletionsView()
+    {
+        lock (_lock)
+        {
+            return _deletionsChanged.Task;
+        }
     }
 
     /// <summary>
@@ -1021,6 +1074,11 @@ public sealed class LiveSender : IAsyncDisposable
             _seenActiveVersion = _activeVersion;
         }
 
+        if (profiles is not null && _helloProfile is { } named && profiles.IsDeleted(named.Id))
+        {
+            _helloProfile = null;
+        }
+
         var profile = profiles is null ? CompanionProfile.Live : _helloProfile ?? profiles.Active;
 
         _connectionProfile = profile.Id;
@@ -1064,22 +1122,18 @@ public sealed class LiveSender : IAsyncDisposable
     {
         var waitingAtHello = _buffer.Status.Waiting;
         var acknowledged = 0;
+        var tried = new HashSet<Guid>();
 
         _serverIdentity = client.ServerCatalogIdentity;
         _settledCatalog = null;
 
         while (true)
         {
-            if (failed.Task.IsCompleted)
-            {
-                return failed.Task.Result;
-            }
+            var turn = await StartTurnAsync(client, failed, tried, cancellationToken).ConfigureAwait(false);
 
-            var (activeVersion, activeChanged) = GetActiveView();
-
-            if (IsSwitchDue(activeVersion))
+            if (turn.Problem is { } turnProblem)
             {
-                return ReplaySendProblemKind.ConnectionLost;
+                return turnProblem;
             }
 
             var view = GetCatalogView();
@@ -1095,14 +1149,23 @@ public sealed class LiveSender : IAsyncDisposable
                 continue;
             }
 
-            var next = await NextOrFailureAsync(failed, view.Changed, activeChanged, cancellationToken).ConfigureAwait(false);
+            var next = await NextOrFailureAsync(failed, view.Changed, turn.ActiveChanged, turn.DeletionsChanged, cancellationToken).ConfigureAwait(false);
 
             if (next is null)
             {
                 continue;
             }
 
-            if (IsOfOtherProfile(next))
+            var profile = ProfileOf(next.Utf8Json);
+
+            if (DropIfDeleted(next, profile))
+            {
+                acknowledged++;
+
+                continue;
+            }
+
+            if (IsOfOtherProfile(profile))
             {
                 return ReplaySendProblemKind.ConnectionLost;
             }
@@ -1117,14 +1180,60 @@ public sealed class LiveSender : IAsyncDisposable
     }
 
     /// <summary>
+    /// Starts a turn of the send loop: checks the failure of the connection and a due switch, then sends the waiting deletions.
+    /// </summary>
+    /// <param name="client">The client of the accepted connection</param>
+    /// <param name="failed">The completion that the failure of the client sets</param>
+    /// <param name="tried">The deletions tried on this connection</param>
+    /// <param name="cancellationToken">The token that ends the run</param>
+    /// <returns>The problem that ended the connection, and the completions of the next change of the active profile and of the deleted identities</returns>
+    private async Task<(ReplaySendProblemKind? Problem, Task ActiveChanged, Task DeletionsChanged)> StartTurnAsync(IngestClient client, TaskCompletionSource<ReplaySendProblemKind> failed, HashSet<Guid> tried, CancellationToken cancellationToken)
+    {
+        var (activeVersion, activeChanged) = GetActiveView();
+
+        var deletionsChanged = GetDeletionsView();
+
+        if (failed.Task.IsCompleted)
+        {
+            return (failed.Task.Result, activeChanged, deletionsChanged);
+        }
+
+        if (IsSwitchDue(activeVersion))
+        {
+            return (ReplaySendProblemKind.ConnectionLost, activeChanged, deletionsChanged);
+        }
+
+        return (await SendDeletionsAsync(client, tried, cancellationToken).ConfigureAwait(false), activeChanged, deletionsChanged);
+    }
+
+    /// <summary>
+    /// Drops the message in flight when its profile was deleted with its history.
+    /// </summary>
+    /// <param name="entry">The message</param>
+    /// <param name="profile">The profile of the message, or <see langword="null" /> when it names none</param>
+    /// <returns><see langword="true" /> when the message was dropped</returns>
+    private bool DropIfDeleted(LiveBufferEntry entry, Guid? profile)
+    {
+        if (_profiles is not { } profiles || profile is not { } id || profiles.IsDeleted(id) == false)
+        {
+            return false;
+        }
+
+        _buffer.DropInFlight(entry.Id);
+        LogDropped();
+
+        return true;
+    }
+
+    /// <summary>
     /// Checks whether a message belongs to a known profile other than the one the connection names; if so, releases it and
     /// prepares the switch to its profile.
     /// </summary>
-    /// <param name="entry">The message</param>
+    /// <param name="profile">The profile of the message, or <see langword="null" /> when it names none</param>
     /// <returns><see langword="true" /> when the connection is to be switched</returns>
-    private bool IsOfOtherProfile(LiveBufferEntry entry)
+    private bool IsOfOtherProfile(Guid? profile)
     {
-        if (_profiles is not { } profiles || ProfileOf(entry.Utf8Json) is not { } id || id == _connectionProfile || profiles.NameOf(id) is not { } name)
+        if (_profiles is not { } profiles || profile is not { } id || id == _connectionProfile || profiles.NameOf(id) is not { } name)
         {
             return false;
         }
@@ -1178,6 +1287,60 @@ public sealed class LiveSender : IAsyncDisposable
         }
 
         return (upload.Problem, true);
+    }
+
+    /// <summary>
+    /// Sends the waiting deletions of profile histories not yet tried on this connection, one at a time.
+    /// </summary>
+    /// <param name="client">The client of the accepted connection</param>
+    /// <param name="tried">The identities tried on this connection</param>
+    /// <param name="cancellationToken">The token that ends the run</param>
+    /// <returns>The problem that ended the connection, or <see langword="null" /> when none</returns>
+    private async Task<ReplaySendProblemKind?> SendDeletionsAsync(IngestClient client, HashSet<Guid> tried, CancellationToken cancellationToken)
+    {
+        if (_profiles is not { } profiles)
+        {
+            return null;
+        }
+
+        while (FirstUntried(profiles, tried) is { } id)
+        {
+            tried.Add(id);
+
+            var message = new ContractProfileDeletion
+                          {
+                              Id = Guid.NewGuid(),
+                              ProfileId = id
+                          };
+            var written = ContractWriter.Write(message);
+
+            if (written.Error is not null)
+            {
+                CompanionLog.LiveMessageNotWritten(_logger);
+
+                continue;
+            }
+
+            var acknowledgement = await client.SendAsync(written.Utf8Json, message.Id, cancellationToken).ConfigureAwait(false);
+
+            if (acknowledgement is null)
+            {
+                return client.Failure ?? ReplaySendProblemKind.ConnectionLost;
+            }
+
+            profiles.ConfirmDeletion(id);
+
+            if (acknowledgement.Refusal is { } refusal)
+            {
+                CompanionLog.ProfileDeletionRefused(_logger, refusal);
+            }
+            else
+            {
+                CompanionLog.ProfileDeletionConfirmed(_logger);
+            }
+        }
+
+        return null;
     }
 
     /// <summary>
@@ -1320,15 +1483,16 @@ public sealed class LiveSender : IAsyncDisposable
     /// <param name="failed">The completion that the failure of the client sets</param>
     /// <param name="changed">The completion that the next change of the offered catalog sets</param>
     /// <param name="activeChanged">The completion that the next change of the active profile sets</param>
+    /// <param name="deletionsChanged">The completion that the next change of the deleted identities sets</param>
     /// <param name="cancellationToken">The token that ends the run</param>
     /// <returns>The message, or <see langword="null" /> when the connection failed or the catalog or the active profile changed first</returns>
-    private async Task<LiveBufferEntry?> NextOrFailureAsync(TaskCompletionSource<ReplaySendProblemKind> failed, Task changed, Task activeChanged, CancellationToken cancellationToken)
+    private async Task<LiveBufferEntry?> NextOrFailureAsync(TaskCompletionSource<ReplaySendProblemKind> failed, Task changed, Task activeChanged, Task deletionsChanged, CancellationToken cancellationToken)
     {
         using var waitCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
         var next = _buffer.NextAsync(waitCancellation.Token);
 
-        await Task.WhenAny(next, failed.Task, changed, activeChanged).ConfigureAwait(false);
+        await Task.WhenAny(next, failed.Task, changed, activeChanged, deletionsChanged).ConfigureAwait(false);
 
         if (next.IsCompletedSuccessfully)
         {
