@@ -2,7 +2,7 @@
 
 Source: Issue #251 | [spec.md](spec.md)
 Tier: security — the server gains a second way to delete a profile's history, authorized by the ingest token instead of the pages' trusted-host rule (record 0085), and the contract changes.
-Security areas touched: Ingest token and Companion authentication (`IngestSession` with the new message type, `IngestEndpoint`); Server database (its history: `HistoryRetention.DeleteProfileAsync` from a new caller); Parsing of external input (`ContractReader` and the contract types, `CompanionProfiles` reading `profiles.json` version 2); File paths the Companion writes (`CompanionProfiles`, `profiles.json`; `LiveBuffer` deleting buffer files); Outbound calls (live sending sends the new message); Logging and showing external data (`SettingsWindow` with profile names in the new dialog)
+Security areas touched: Ingest token and Companion authentication (`IngestSession` with the new message type, `IngestEndpoint`); Network exposure (the history deletion, now also through `/ingest`); Server database (its history: `HistoryRetention.DeleteProfileAsync` from a new caller); Parsing of external input (`ContractReader` and the contract types, `CompanionProfiles` reading `profiles.json` version 2); File paths the Companion writes (`CompanionProfiles`, `profiles.json`; `LiveBuffer` deleting buffer files); Outbound calls (live sending sends the new message); Logging and showing external data (`SettingsWindow` with profile names in the new dialog)
 Plan size: four projects, a contract version, a file format version and a second deletion path, each with its own rules.
 
 ## Problem / root cause
@@ -42,13 +42,13 @@ Feature: [spec.md](spec.md), *Problem*.
 | AC1 | `CompanionProfilesDeleteRemovesProfileAndFigureLinks`, `CompanionProfilesDeleteClearsPendingNotice`, `CompanionProfilesDeleteWritesFileWithoutProfile`; `SettingsWindowSessionDeleteKeepsOtherEditsAndShowsProfiles`, `SettingsWindowSessionDeleteCancelledChangesNothing` | `CompanionProfilesTests.cs`; `SettingsWindowSessionTests.cs` |
 | AC2 | `SettingsViewCanDeleteRefusesLiveAndActive`, `CompanionProfilesDeleteOfLiveOrActiveThrows` | `SettingsViewTests.cs`; `CompanionProfilesTests.cs` |
 | AC3 | `LiveSenderProfileDeletionWithoutHistorySendsWaitingMessages` | `LiveSenderProfileTests.cs` |
-| AC4 | `LiveSenderProfileDeletionDropsWaitingMessages`, `LiveSenderProfileDeletionDropsResentInFlightMessage`, `LiveSenderProfileDeletionDropsAfterConfirmation`, `LiveSenderProfileDeletionHelloNeverNamesDeletedProfile`; `LiveBufferDropInFlightDeletesFileAndCounts` | `LiveSenderProfileTests.cs`; `LiveBufferTests.cs` |
+| AC4 | `LiveSenderProfileDeletionDropsWaitingMessages`, `LiveSenderProfileDeletionDropReleasesDeferredCatalog`, `LiveSenderProfileDeletionDropsResentInFlightMessage`, `LiveSenderProfileDeletionDropsAfterConfirmation`, `LiveSenderProfileDeletionHelloNeverNamesDeletedProfile`; `LiveBufferDropInFlightDeletesFileAndCounts` | `LiveSenderProfileTests.cs`; `LiveBufferTests.cs` |
 | AC5 | `CompanionProfilesDeletionWaitsAcrossLoad`, `CompanionProfilesDeletionKeptInMemoryWhenWriteFails`; `LiveSenderProfileDeletionSentAfterHello` | `CompanionProfilesTests.cs`; `LiveSenderProfileTests.cs` |
 | AC6 | `IngestSessionProfileDeletionDeletesAndAcknowledges`, `IngestSessionProfileDeletionOfUnknownProfileAcknowledges`, `IngestSessionProfileDeletionFailedCloses1011` | `IngestSessionTests.cs` |
 | AC7 | `LiveSenderProfileDeletionConfirmedOnAcknowledgement`, `LiveSenderProfileDeletionRefusedLogsAndConfirms`, `LiveSenderProfileDeletionKeptWaitingWhenConnectionLost`; `CompanionProfilesConfirmedDeletionForgottenOldestFirst` | `LiveSenderProfileTests.cs`; `CompanionProfilesTests.cs` |
 | AC8 | `SettingsWindowSessionShowsWaitingDeletionCount` | `SettingsWindowSessionTests.cs` |
 | AC9 | `CompanionProfilesDeleteWithHistoryWhenFullThrows`, `SettingsWindowSessionViewMarksDeletionQueueFull` | `CompanionProfilesTests.cs`; `SettingsWindowSessionTests.cs` |
-| AC10 | `CompanionProfilesWritesVersionOneWithoutDeletions`, `CompanionProfilesReadsVersionTwo`, `CompanionProfilesRejectsInvalidDeletedList` (data rows), `CompanionProfilesLargestFileUnderBound`; `CompanionTextsDeletionTextsInBothLanguages`; `CompanionLogDeletionLinesHoldNoValue` | `CompanionProfilesTests.cs`; `CompanionTextsTests.cs`; `CompanionLogTests.cs` |
+| AC10 | `CompanionProfilesWritesVersionOneWithoutDeletions`, `CompanionProfilesReadsVersionTwo`, `CompanionProfilesRejectsInvalidDeletedList` (data rows, among them an upper-case `Live` identity, a white-space-padded listed profile's identity and an upper-case repeat within `deleted`), `CompanionProfilesLargestFileUnderBound`; `CompanionTextsDeletionTextsInBothLanguages`; `CompanionLogDeletionLinesHoldNoValue` | `CompanionProfilesTests.cs`; `CompanionTextsTests.cs`; `CompanionLogTests.cs` |
 | AC11 | `ContractReaderReadsProfileDeletion`, `ContractReaderRefusesProfileDeletionBreakingRules` (data rows), `ContractWriterWritesProfileDeletion` | `ContractReaderTests.cs`; `ContractWriterTests.cs` |
 | AC12 | `check: the Reviewer reads README.md and docs/USER_GUIDE.md (English, then German) for deletion, the box, waiting deletions, S5 and S6` | — |
 | AC13 | `CensioServerProfileDeletionInModeOffDropsBufferedMessages` (a buffer filled under `B`, `B` deleted with the box ticked while no sender runs, then a sender against the real server: no message of `B` stored, the profile list without `B`) | `CensioServerTests.cs` |
@@ -62,11 +62,12 @@ Early draft PR: no
 **Contract (version 3).** `ContractMessageType.ProfileDeletion` is appended; `ContractProfileDeletion` carries `id` and
 `profileId`, Companion to server. `ContractRules` checks both identities (`CheckIdentity`), `GetRefusedId` returns its
 `id` so a refused one is acknowledged, `Deserialize`, `ContractWriter` and `ContractJsonContext` get their case.
-`CurrentVersion` becomes 3; the two texts `server does not support contract version 2` (English and German, in
-`CompanionTexts`) become `3`. Bounds: the generic ones of the scanner (no string field).
+`CurrentVersion` becomes 3; the four version texts of `CompanionTexts` (`LiveSendVersionNotSupported` and
+`ReplaySendReasonVersionNotSupported`, English and German) name 3. Bounds: the generic ones of the scanner (no string field).
 
 **Server.** A new type `IngestStores` holds `ServerState` and `HistoryRetention`; `IngestSession` takes it instead of
-`ServerState`, so the constructor stays at seven parameters. `StoreMessageAsync` handles `ContractProfileDeletion` by
+`ServerState`, so the constructor stays at seven parameters. `GetId` gets the case `ContractProfileDeletion deletion => deletion.Id`
+(without it `HandleMessageAsync` closes with 1008 before storing). `StoreMessageAsync` handles `ContractProfileDeletion` by
 `_stores.History.DeleteProfileAsync(profileId, _stoppingToken)`: `Done` and `NothingToDo` are stored (acknowledged,
 counted accepted); `Failed` and any other outcome return not stored, so the session closes with 1011 — without
 `LogStoreFailed`, since the retention job already logged its warning. `TrySetUpAsync` returns `IngestStores` and
@@ -77,7 +78,8 @@ writes `version` 1 with the four properties while the list is empty; otherwise `
 `"deleted":[{"id":"<id>","confirmed":false}]`. The reader accepts version 1 with exactly the four properties and version
 2 with exactly five; it rejects in `deleted`: a non-array, more than 1,000 entries, an entry with a missing, unknown or
 repeated property, an `id` not in `D` form, `confirmed` that is not `true` or `false`, a repeated identity, `Live`'s
-identity or an identity of the list of profiles. A rejection is `not of its format`, as today.
+identity or an identity of the list of profiles — the last three compared as parsed `Guid` values, never as strings
+(`Guid.TryParseExact` with `D` accepts either letter case and surrounding white space). A rejection is `not of its format`, as today.
 
 **Deleting.** `CompanionProfiles.Delete(id, isHistoryDeleted)`, under the lock: refuses (`ArgumentException`) what
 `IsDeletable` refuses; refuses (`InvalidOperationException`) a ticked deletion with 1,000 waiting; removes the profile
@@ -97,7 +99,9 @@ acknowledgement → the connection's problem is returned and the identity stays 
 refused by the server: <refusal>` (Warning); a write the writer refuses → the existing `Live message not sent: the
 contract writer refused it`, the identity stays waiting and is tried again on the next connection. After
 `NextOrFailureAsync` returns a message, its profile is read once (`ProfileOf`); when `profiles.IsDeleted` holds for it,
-`_buffer.DropInFlight(id)` and `LogDropped()` run and the loop continues, before `IsOfOtherProfile`, which takes the
+`_buffer.DropInFlight(id)` and `LogDropped()` run, the drop counts toward the messages that waited at the hello (as
+`acknowledged++` does, so a deferred catalog is released once they are sent or dropped, `live-sending.md` *Catalog*),
+and the loop continues, before `IsOfOtherProfile`, which takes the
 profile read. `ChooseHelloProfile` ignores a `_helloProfile` whose identity is deleted and names the active profile.
 A replay and a start without live sending have no `LiveSender`, so they send nothing and drop nothing.
 
@@ -219,7 +223,9 @@ Existing test code that calls a changed signature or literal, adapted by the Tes
 - Contract version 2 in literals: `ContractReaderTests.cs`, `ContractWriterTests.cs`, `IngestSessionTests.cs` and the
   server tests' `IngestClient.cs` (`"contractVersion":2`, `InvalidText`, `supportedVersions`); a test that pins the
   release `0.3.0` refusal (`receivedVersion` 2 against version 1) keeps its numbers where they describe another release.
-- `CompanionTextsTests` cases that pin `contract version 2`.
+- `CompanionTextsTests` cases that pin `contract version 2`; `LiveSenderTests.cs` (l. 113, l. 267 `Assert.AreEqual(2, ContractReader.CurrentVersion…)`,
+  l. 1039) and `ReplaySenderTests.cs` (l. 260, 283, the data row at l. 809; the reply at l. 271 becomes `receivedVersion`
+  3 against an older supported version, or stays a pinned older-release case).
 
 Files no unit test can cover: `src/Censio.Companion/SettingsWindow.xaml(.cs)` and `ProfileDeletionDialog.xaml(.cs)` —
 the WPF shell, excluded from coverage (`.squad/stack.md`, *Coverage gate*); their logic sits in `SettingsView` and
@@ -227,7 +233,9 @@ the WPF shell, excluded from coverage (`.squad/stack.md`, *Coverage gate*); thei
 
 ## Areas
 
-- `docs/areas/companion-profiles.md` (+650 words): a section *Deleting* (rules, dialog, figure links, notice,
+- `docs/areas/companion-profiles.md` (+690 words): in *Limits and errors* also "A file the reader rejects also forgets
+  the deleted identities: their waiting deletions are not sent, and buffered messages of those profiles are sent again
+  and recreate the profiles on the server, unnamed."; a section *Deleting* (rules, dialog, figure links, notice,
   deleted identities and their states, the bound, when deletions are sent, the buffer filter, confirmation, refusal,
   the relation to the pages' deletion and to a profile only the server has); *Writing* with the version-2 format and
   the largest file; *Limits and errors* with the reader's new rules and the downgrade; "neither renamed nor deleted"
@@ -236,8 +244,11 @@ the WPF shell, excluded from coverage (`.squad/stack.md`, *Coverage gate*); thei
 - `docs/areas/companion-texts.md` (+130 words): the new rows, the version texts.
 - `docs/areas/companion-log.md` (+50 words): the three lines.
 - `docs/areas/contract.md` (+90 words): version 3, the twelfth message, its rules and refusals, the version texts.
-- `docs/areas/ingest.md` (+90 words): *Messages after the hello* with the deletion; *Accepted risks* with a token holder
-  deleting any profile.
+- `docs/areas/ingest.md` (+140 words): *Messages after the hello* with the deletion; *Accepted risks* gets the bullet
+  "**Deletion by a token holder.** A Companion with the token (or anyone, with the token off) can delete the history of
+  any profile by its identity, and each deletion of a stored profile writes one log line, re-reads the profile list and
+  asks for a sweep, so a tick of a new profile followed by its deletion grows the log by one line per pair without a
+  bound."
 - `docs/areas/history-deletion.md` (+60 words): the second entry point and its access rule (record 0116).
 - `docs/areas/live-sending.md` (+45 words): one sentence in *Profiles on the connection* pointing to
   `companion-profiles.md` (deletions first after the hello, deleted identities dropped); version texts.
@@ -257,10 +268,19 @@ All by the Dev once the code is green:
 - `docs/ARCHITECTURE.md`: l. 12 (the server deletes a profile's history from the pages or on a Companion's request),
   l. 61-62 (contract version 3), l. 105 (the pages' one state-changing action, and the Companion's deletion through
   `/ingest`, linking record 0116).
+- `SECURITY.md` (l. 34): "…requires the token by default and refuses browser upgrades." becomes "…refuses browser
+  upgrades; a Companion with the token can also delete the history of any profile by its identity, as the settings
+  window does when a profile is deleted with its history (`docs/areas/history-deletion.md`)."; "…send data, which the
+  server stores, and fill its database file, so switch it off…" becomes "…send data, which the server stores, fill its
+  database file and delete the history of any profile, so switch it off…"; l. 51: append ", and through `/ingest` with
+  the token" after "its host rule (`AllowedHosts`)".
 - The area documents of *Areas*.
-- `.squad/project.md` (+12 words), exact text for the orchestrator: in *Ingest token and Companion authentication*
+- `.squad/project.md` (+30 words), exact text for the orchestrator: in *Ingest token and Companion authentication*
   after `ContractTradeRoutes included` insert `, ContractProfileDeletion`, and after `IngestSession` insert
-  ` (and IngestStores)`; in *Server database* after `DeleteProfileAsync` insert ` (also from IngestSession)`.
+  ` (and IngestStores)`; in *Server database* after `DeleteProfileAsync` insert ` (also from IngestSession)`; in
+  *Network exposure* replace "the history deletion (`DeletionHostRule`);" with "the history deletion (`DeletionHostRule`
+  on the pages, the token through `/ingest`);"; in *Guarantees*, the line "History in SQLite … deletable per profile",
+  after the link to record 0085 append `, [0116](../docs/decisions/0116-history-deleted-through-the-ingest-connection-with-the-token.md)`.
 - `docs/UNIT_TESTS.md`: none (the doubles keep their description).
 - The changelog entry the PR template asks for, if it asks for one.
 
@@ -292,6 +312,26 @@ All by the Dev once the code is green:
 - `docs/decisions/0115-profile-deleted-in-the-companion-history-on-the-server-by-the-players-choice.md` (Proposed)
 - `docs/decisions/0116-history-deleted-through-the-ingest-connection-with-the-token.md` (Proposed; amends 0085)
 - `docs/decisions/0111-…` (unreleased) edited in place: its consequence about deletion points to 0115.
+
+## Challenge
+
+- Note 1 (`GetId` has no case for the deletion, so it would close with 1008): accepted; *Approach* (Server) adds the
+  case.
+- Note 2 (a dropped message holds back a deferred catalog): accepted; the drop counts toward the messages that waited
+  at the hello, test `LiveSenderProfileDeletionDropReleasesDeferredCatalog` (AC4).
+- Note 3 (four version texts and more test call sites): accepted; *Approach* names the four texts, *Test files* the
+  call sites in `LiveSenderTests.cs` and `ReplaySenderTests.cs`.
+
+## Security review
+
+- A (Network exposure not listed): accepted; added to *Security areas touched*, and the `.squad/project.md` text now
+  changes *Network exposure* and links record 0116 from *Guarantees*.
+- B (`SECURITY.md` not updated): accepted; its three edits are in *Documentation updates*.
+- Note (i) (identities compared as strings): accepted; the reader compares parsed `Guid` values, and three data rows
+  test it.
+- Note (ii) (a rejected file forgets the deleted identities): accepted; the sentence goes into `companion-profiles.md`
+  (*Areas*), as record 0115 already states.
+- Note (iii) (deletion by a token holder as an accepted risk): accepted; the bullet goes into `ingest.md` (*Areas*).
 
 ## Out of scope / follow-ups
 
