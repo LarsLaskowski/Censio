@@ -1,7 +1,7 @@
 # Spec: Delete profiles in the Companion, and how the server's copy follows
 
 Source: Issue #251
-Status: Draft
+Status: Approved by Lead
 
 ## Problem
 
@@ -84,6 +84,8 @@ first, only to make room for a new ticked deletion; a waiting one is never forgo
   the profile can still be deleted from the Companion alone.
 - E13: A figure linked to the deleted profile counts as not linked at its next session start (*Notice* as for a new
   figure).
+- E14: A pending notice (*Notice* of [`companion-profiles.md`](../../docs/areas/companion-profiles.md)) is cleared by a
+  deletion, as by a selection or a creation, so no notice names a deleted profile.
 
 ## Non-functional requirements
 
@@ -110,7 +112,7 @@ first, only to make room for a new ticked deletion; a waiting one is never forgo
 ## Acceptance criteria
 
 - AC1: `Delete profile…` with `Delete` removes the selected profile and its figure links from the list and from
-  `profiles.json` without `Save`; other unsaved edits stay; `Cancel` or closing changes nothing (S1, S7, E2, E13).
+  `profiles.json` without `Save`; other unsaved edits stay; `Cancel` or closing changes nothing; a deletion clears a pending notice (S1, S7, E2, E13, E14).
 - AC2: `Delete profile…` is disabled with E1's tooltip while `Live` or the active profile is selected (E1).
 - AC3: With the box cleared nothing is sent to the server for the deletion, and the profile's waiting messages are still
   sent (S1, E9).

@@ -49,7 +49,8 @@ the old session, is retried as part of the switch; the rules are in [companion-p
   private.
 - A message whose profile the list no longer knows (a lost profiles file) is sent on the current connection; the server
   creates that profile without a name.
-- Profiles are neither renamed nor deleted in the Companion; history is deleted on the pages.
+- Profiles are not renamed in the Companion; deleting one, and with it optionally its history on the server, is record
+  [0115](0115-profile-deleted-in-the-companion-history-on-the-server-by-the-players-choice.md).
 - The tray menu names the active profile on every `Server:` line of a live run, and a notice also stays a menu entry
   above `Settings…` until a switch or the session's end or next start (option 6 lost); the log records each notice's
   kind, never a name, when it is raised and when it was passed to Windows.
