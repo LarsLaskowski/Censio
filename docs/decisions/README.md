@@ -170,9 +170,9 @@ once in the [area document](../areas/README.md) of the record's area, and the re
 | [0107](0107-catalog-uploaded-first-on-each-live-connection-deferred-after-a-failure.md) | The catalog is uploaded first on each live connection, deferred after a failed upload and given up after three | Accepted | 2026-11-24 |
 | [0108](0108-companion-reads-a-larger-reply-only-for-a-catalog-acknowledgement.md) | The Companion reads a larger reply only for the acknowledgement of a catalog upload | Accepted | 2026-11-24 |
 | [0109](0109-a-stored-icon-tells-a-notice-of-its-own-that-reads-no-trends.md) | A stored icon tells a notice of its own, which re-renders the pages without reading their trends | Accepted | 2026-11-24 |
-| [0110](0110-settings-window-writes-the-settings-file-keeping-unknown-keys.md) | The settings window writes the settings file, keeping unknown keys and dropping comments | Proposed | 2026-11-25 |
-| [0111](0111-profiles-kept-by-the-companion-each-hello-names-the-next-messages-profile.md) | Profiles are a list the Companion keeps; each live connection's hello names the profile of its messages | Proposed | 2026-11-25 |
-| [0112](0112-connection-settings-applied-by-a-restart-that-waits-for-the-old-companion.md) | Connection and game settings are applied by a restart that waits for the old Companion | Proposed | 2026-11-25 |
-| [0113](0113-companion-texts-in-english-and-german-from-one-table.md) | The Companion's own texts come in English and German from one table, chosen by the key `language` | Proposed | 2026-11-25 |
-| [0114](0114-start-with-windows-switched-only-in-the-settings-window.md) | Start with Windows is switched only in the settings window | Proposed | 2026-11-25 |
+| [0110](0110-settings-window-writes-the-settings-file-keeping-unknown-keys.md) | The settings window writes the settings file, keeping unknown keys and dropping comments | Accepted | 2026-11-25 |
+| [0111](0111-profiles-kept-by-the-companion-each-hello-names-the-next-messages-profile.md) | Profiles are a list the Companion keeps; each live connection's hello names the profile of its messages | Accepted | 2026-11-25 |
+| [0112](0112-connection-settings-applied-by-a-restart-that-waits-for-the-old-companion.md) | Connection and game settings are applied by a restart that waits for the old Companion | Accepted | 2026-11-25 |
+| [0113](0113-companion-texts-in-english-and-german-from-one-table.md) | The Companion's own texts come in English and German from one table, chosen by the key `language` | Accepted | 2026-11-25 |
+| [0114](0114-start-with-windows-switched-only-in-the-settings-window.md) | Start with Windows is switched only in the settings window | Accepted | 2026-11-25 |
 <!-- project:end index -->

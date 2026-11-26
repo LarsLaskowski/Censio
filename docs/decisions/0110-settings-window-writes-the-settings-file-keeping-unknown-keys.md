@@ -1,6 +1,6 @@
 # 0110: The settings window writes the settings file, keeping unknown keys and dropping comments
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-25
 - **Area:** companion
 - **Source:** Issue #43

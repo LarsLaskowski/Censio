@@ -1,6 +1,6 @@
 # 0111: Profiles are a list the Companion keeps; each live connection's hello names the profile of its messages
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-25
 - **Area:** live-sending
 - **Source:** Issue #43

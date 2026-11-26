@@ -1,6 +1,6 @@
 # 0112: Connection and game settings are applied by a restart that waits for the old Companion
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-25
 - **Area:** companion
 - **Source:** Issue #43

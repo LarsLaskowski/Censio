@@ -1,6 +1,6 @@
 # 0113: The Companion's own texts come in English and German from one table, chosen by the key `language`
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-25
 - **Area:** companion
 - **Source:** Issue #43

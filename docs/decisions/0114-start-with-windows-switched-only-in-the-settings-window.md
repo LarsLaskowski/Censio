@@ -1,6 +1,6 @@
 # 0114: Start with Windows is switched only in the settings window
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-25
 - **Area:** companion
 - **Source:** Issue #43
