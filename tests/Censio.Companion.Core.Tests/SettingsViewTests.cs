@@ -6,6 +6,30 @@ namespace Censio.Companion.Core.Tests;
 [TestClass]
 public sealed class SettingsViewTests
 {
+    #region Constants
+
+    /// <summary>
+    /// The identity of <c>Live</c>.
+    /// </summary>
+    private const string LiveId = "b6a1f3e2-7c4d-4e8a-9f21-5d3c0a7e1b94";
+
+    /// <summary>
+    /// The identity of the active profile.
+    /// </summary>
+    private const string ActiveId = "0f8c2d3e-1111-4a2b-8c3d-00000000a101";
+
+    /// <summary>
+    /// The identity of another listed profile.
+    /// </summary>
+    private const string OtherId = "0f8c2d3e-1111-4a2b-8c3d-00000000a102";
+
+    /// <summary>
+    /// An identity the list does not hold.
+    /// </summary>
+    private const string UnlistedId = "0f8c2d3e-1111-4a2b-8c3d-00000000a103";
+
+    #endregion // Constants
+
     #region Methods
 
     /// <summary>
@@ -92,6 +116,66 @@ public sealed class SettingsViewTests
         // Assert
         Assert.AreEqual(typeof(SettingsView).FullName, text, "The text of the view should be the name of its type alone");
         Assert.DoesNotContain("MARKER", text, "The text of the view should hold neither the token nor a profile name");
+    }
+
+    /// <summary>
+    /// <c>Delete profile…</c> is refused for <c>Live</c>, for the active profile and for an identity the list does not hold,
+    /// and allowed for another listed profile (E1).
+    /// </summary>
+    /// <param name="selected">The identity selected in the drop-down</param>
+    /// <param name="expected">Whether the profile can be deleted</param>
+    [TestMethod]
+    [TestCategory("AC2")]
+    [DataRow(LiveId, false, DisplayName = "Live")]
+    [DataRow(ActiveId, false, DisplayName = "Active profile")]
+    [DataRow(OtherId, true, DisplayName = "Other listed profile")]
+    [DataRow(UnlistedId, false, DisplayName = "Identity not listed")]
+    public void SettingsViewCanDeleteRefusesLiveAndActive(string selected, bool expected)
+    {
+        // Arrange
+        var view = CreateProfilesView([CompanionProfile.Live, CreateProfile(ActiveId, "Active"), CreateProfile(OtherId, "Other")], new Guid(ActiveId));
+
+        // Act
+        var canDelete = view.CanDelete(new Guid(selected));
+
+        // Assert
+        Assert.AreEqual(expected, canDelete, $"Deleting {selected} should be allowed only for a listed profile that is neither Live nor active");
+    }
+
+    /// <summary>
+    /// Creates a profile.
+    /// </summary>
+    /// <param name="id">The identity in the form D</param>
+    /// <param name="name">The name</param>
+    /// <returns>The profile</returns>
+    private static CompanionProfile CreateProfile(string id, string name)
+    {
+        return new CompanionProfile
+               {
+                   Id = new Guid(id),
+                   Name = name
+               };
+    }
+
+    /// <summary>
+    /// Creates a view of the default values with the given profiles.
+    /// </summary>
+    /// <param name="profiles">The profiles</param>
+    /// <param name="active">The identity of the active profile</param>
+    /// <returns>The view</returns>
+    private static SettingsView CreateProfilesView(IReadOnlyList<CompanionProfile> profiles, Guid active)
+    {
+        var view = CreateView([]);
+
+        return new SettingsView
+               {
+                   Texts = view.Texts,
+                   Values = view.Values,
+                   Problems = view.Problems,
+                   ProfileList = profiles,
+                   ActiveProfile = active,
+                   Warnings = view.Warnings
+               };
     }
 
     /// <summary>
