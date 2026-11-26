@@ -829,7 +829,7 @@ public sealed partial class App : Application, IDisposable
     /// <summary>
     /// Stops the recording and waits for it and the profiles writer together for at most one second.
     /// </summary>
-    /// <returns><c>true</c> when the profiles writer has finished or there is none</returns>
+    /// <returns><c>true</c> when the profiles writer has ended (completed, faulted or cancelled) or there is none</returns>
     private bool StopRecordingAndProfiles()
     {
         var tasks = new List<Task>();
@@ -846,7 +846,14 @@ public sealed partial class App : Application, IDisposable
 
         if (tasks.Count > 0)
         {
-            _ = Task.WaitAll(tasks.ToArray(), TimeSpan.FromSeconds(1));
+            try
+            {
+                _ = Task.WaitAll(tasks.ToArray(), TimeSpan.FromSeconds(1));
+            }
+            catch (AggregateException)
+            {
+                // A faulted task has ended, the writer has already logged it, and its file handle is closed.
+            }
         }
 
         return _profilesTask?.IsCompleted ?? true;
