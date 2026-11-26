@@ -976,6 +976,43 @@ public sealed class LiveBufferTests
     }
 
     /// <summary>
+    /// Dropping a message that is not in flight, with nothing in flight or with another message in flight, drops nothing:
+    /// both files are kept, both messages wait and no drop is counted (feature 251, Deleted identities).
+    /// </summary>
+    /// <param name="isFirstInFlight">Whether the first message is taken, so it is in flight</param>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC4")]
+    [DataRow(false, DisplayName = "Nothing in flight")]
+    [DataRow(true, DisplayName = "Another message in flight")]
+    public async Task LiveBufferDropInFlightOfMessageNotInFlightKeepsIt(bool isFirstInFlight)
+    {
+        // Arrange
+        var buffer = CreateBuffer(LiveBufferLimits.Defaults);
+
+        Start(buffer);
+        buffer.Add(Id(1), Json(SmallJson, 1));
+        buffer.Add(Id(2), Json(SmallJson, 2));
+
+        var written = await WaitForAsync(() => MessageFiles().Count == 2);
+
+        if (isFirstInFlight)
+        {
+            await NextAsync(buffer);
+        }
+
+        // Act
+        buffer.DropInFlight(Id(2));
+
+        // Assert
+        Assert.IsTrue(written, $"Both messages should be written: {isFirstInFlight}");
+        Assert.AreSequenceEqual(new[] { Id(1), Id(2) }, StoredIds().ToArray(), $"Both files should be kept: {isFirstInFlight}");
+        Assert.AreEqual(0, buffer.Status.Dropped, $"No message should be counted as dropped: {isFirstInFlight}");
+        Assert.AreEqual(2, buffer.Status.Waiting, $"Both messages should wait: {isFirstInFlight}");
+        Assert.AreEqual(0, buffer.TakeUnloggedDropped(), $"No drop should be reported for the log: {isFirstInFlight}");
+    }
+
+    /// <summary>
     /// In memory only, the message in flight and the newest message are kept even when together they exceed 16 MiB: the
     /// bound drops neither (E2).
     /// </summary>

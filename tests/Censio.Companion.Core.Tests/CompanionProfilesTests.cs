@@ -1323,11 +1323,12 @@ public sealed class CompanionProfilesTests
 
         // Assert
         var reloaded = CompanionProfiles.Load(ProfilesPath, new RecordingLogger());
+        var active = reloaded.Active.Id;
         var notice = ObserveOnLive(reloaded, FigureA);
 
         Assert.IsFalse(reloaded.IsFileInvalid, "The written file should be valid");
         Assert.AreSequenceEqual(["Live", "Third"], reloaded.Profiles.Select(profile => profile.Name).ToArray(), "The file should no longer hold the deleted profile");
-        Assert.AreEqual(third!.Id, reloaded.Active.Id, "The file should keep the active profile");
+        Assert.AreEqual(third!.Id, active, "The file should keep the active profile");
         Assert.IsNull(notice, "The file should no longer link the figure to the deleted profile");
     }
 
@@ -1636,6 +1637,114 @@ public sealed class CompanionProfilesTests
         Assert.IsNull(profiles.CheckNewName(SecondName), "The deleted profile's name should be accepted");
         Assert.IsNull(profiles.CheckNewName(SecondName.ToLowerInvariant()), "The deleted profile's name should be accepted in another case");
         Assert.AreEqual(SettingsProblemKind.NameExists, profiles.CheckNewName("Live"), "A listed name should still be refused");
+    }
+
+    /// <summary>
+    /// A deletion with the history raises <see cref="CompanionProfiles.DeletionsChanged" /> once, its handler reading the
+    /// new waiting deletion; a deletion without the history changes no deleted identity and raises nothing (plan,
+    /// Deleting).
+    /// </summary>
+    /// <param name="isHistoryDeleted">Whether the history is deleted too</param>
+    /// <param name="expectedRaised">How often the event should be raised</param>
+    [TestMethod]
+    [TestCategory("AC5")]
+    [DataRow(true, 1, DisplayName = "With the history")]
+    [DataRow(false, 0, DisplayName = "Without the history")]
+    public void CompanionProfilesDeleteRaisesDeletionsChangedOnlyWithHistory(bool isHistoryDeleted, int expectedRaised)
+    {
+        // Arrange
+        var profiles = CompanionProfiles.Load(WriteFile(Expand(ValidFile)), _logger);
+        var read = new List<int>();
+
+        profiles.Select(CompanionProfile.Live.Id);
+        profiles.DeletionsChanged += (_, _) => read.Add(profiles.WaitingDeletions.Count);
+
+        // Act
+        profiles.Delete(new Guid(SecondId), isHistoryDeleted);
+
+        // Assert
+        Assert.AreSequenceEqual(Enumerable.Repeat(1, expectedRaised).ToArray(), read.ToArray(), $"The deletion should raise the event once per change of the deleted identities, its handler reading the new state: {isHistoryDeleted}");
+    }
+
+    /// <summary>
+    /// Confirming a waiting deletion raises <see cref="CompanionProfiles.DeletionsChanged" /> once, its handler reading
+    /// no deletion waiting, and the identity stays deleted (plan, Deleting).
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public void CompanionProfilesConfirmDeletionRaisesDeletionsChanged()
+    {
+        // Arrange
+        var profiles = CompanionProfiles.Load(WriteFile(Expand(VersionTwoFile)), _logger);
+        var read = new List<int>();
+
+        profiles.DeletionsChanged += (_, _) => read.Add(profiles.WaitingDeletions.Count);
+
+        // Act
+        profiles.ConfirmDeletion(new Guid(OtherId));
+
+        // Assert
+        Assert.AreSequenceEqual([0], read.ToArray(), "The confirmation should raise the event once, its handler reading no deletion waiting");
+        Assert.IsTrue(profiles.IsDeleted(new Guid(OtherId)), "The confirmed identity should stay deleted");
+    }
+
+    /// <summary>
+    /// Confirming an identity that does not wait, an already confirmed one, a listed profile's or an unknown one, changes
+    /// nothing: no event, the deleted identities as before, and the file is not written again (plan, Deleting).
+    /// </summary>
+    /// <param name="id">The identity, a placeholder of the test files or a literal one</param>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC7")]
+    [DataRow("{third}", DisplayName = "Already confirmed")]
+    [DataRow("{second}", DisplayName = "Listed profile")]
+    [DataRow("9e3b5a10-4444-4c6d-8e7f-00000000d005", DisplayName = "Unknown identity")]
+    public async Task CompanionProfilesConfirmDeletionWithoutWaitingIdentityChangesNothing(string id)
+    {
+        // Arrange
+        var path = WriteFile(Expand(VersionTwoFile));
+        var profiles = CompanionProfiles.Load(path, _logger);
+        var identity = new Guid(Expand(id));
+        var raised = 0;
+
+        profiles.DeletionsChanged += (_, _) => raised++;
+
+        // Act
+        await RunUntilCancelledAsync(profiles, running => running.ConfirmDeletion(identity));
+
+        // Assert
+        Assert.AreEqual(0, raised, $"The confirmation should raise no event: {id}");
+        Assert.AreSequenceEqual([new Guid(OtherId)], profiles.WaitingDeletions.ToArray(), $"The waiting deletion should stay waiting: {id}");
+        Assert.IsTrue(profiles.IsDeleted(new Guid(ThirdId)), $"The confirmed identity should stay deleted: {id}");
+        Assert.AreEqual(Expand(VersionTwoFile), await File.ReadAllTextAsync(path, TestContext.CancellationToken), $"The file should not be written again: {id}");
+    }
+
+    /// <summary>
+    /// A version-2 file with an empty deleted list is read as valid, with no identity deleted, and the next write is
+    /// version 1 with its four properties (spec N1, plan Approach).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC10")]
+    public async Task CompanionProfilesEmptyDeletedListWrittenAsVersionOne()
+    {
+        // Arrange
+        var path = WriteFile(Mutate(VersionTwoFile, DeletedList, ""","deleted":[]"""));
+        var profiles = CompanionProfiles.Load(path, _logger);
+        var isFileInvalid = profiles.IsFileInvalid;
+        var waiting = profiles.WaitingDeletions.Count;
+
+        // Act
+        await RunUntilCancelledAsync(profiles, running => running.Select(CompanionProfile.Live.Id));
+
+        // Assert
+        var expected = Expand(ValidFile.Replace("""{"version":1,"active":"{second}",""", """{"version":1,"active":"{live}",""", StringComparison.Ordinal));
+
+        Assert.IsFalse(isFileInvalid, "The version-2 file with an empty deleted list should be valid");
+        Assert.AreEqual(0, waiting, "No deletion should wait");
+        Assert.IsFalse(profiles.IsDeleted(new Guid(OtherId)), "No identity should be deleted");
+        Assert.IsEmpty(_logger.Entries, "A valid file should log nothing");
+        Assert.AreEqual(expected, await File.ReadAllTextAsync(path, TestContext.CancellationToken), "The next write should be version 1 with the four properties");
     }
 
     /// <summary>
