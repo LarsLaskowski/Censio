@@ -57,7 +57,7 @@ public static class IngestClient
     /// <param name="token">The token, or <c>null</c> for <c>token</c> <c>null</c></param>
     /// <param name="version">The contract version</param>
     /// <returns>The hello in single-quote notation</returns>
-    public static string Hello(string? token, int version = 2)
+    public static string Hello(string? token, int version = 3)
     {
         var tokenValue = token is null ? "null" : $"'{token}'";
 
@@ -71,7 +71,7 @@ public static class IngestClient
     /// <returns>The tick in single-quote notation</returns>
     public static string Tick(string id)
     {
-        return $"{{'type':'tick','contractVersion':2,'id':'{id}','profileId':'{Profile}','receiveTime':'{Time}','gameTime':42,'islands':[{{'sessionGuid':180023,'islandId':1,'areaIndex':0,'sessionId':2,'name':'MARKERISLAND','entries':[]}}]}}";
+        return $"{{'type':'tick','contractVersion':3,'id':'{id}','profileId':'{Profile}','receiveTime':'{Time}','gameTime':42,'islands':[{{'sessionGuid':180023,'islandId':1,'areaIndex':0,'sessionId':2,'name':'MARKERISLAND','entries':[]}}]}}";
     }
 
     /// <summary>
@@ -81,7 +81,7 @@ public static class IngestClient
     /// <returns>The trade-routes message in single-quote notation</returns>
     public static string TradeRoutes(string id)
     {
-        return $"{{'type':'tradeRoutes','contractVersion':2,'id':'{id}','profileId':'{Profile}','receiveTime':'{Time}','routes':[{{'id':7,'name':'MARKERROUTE','folder':'MARKERFOLDER','majorProblems':1,'minorProblems':2,'ships':3,'lostShips':4,'stations':[{{'sessionGuid':180023,'islandId':1,'areaIndex':0}},{{'sessionGuid':180024,'islandId':2,'areaIndex':1}}]}}]}}";
+        return $"{{'type':'tradeRoutes','contractVersion':3,'id':'{id}','profileId':'{Profile}','receiveTime':'{Time}','routes':[{{'id':7,'name':'MARKERROUTE','folder':'MARKERFOLDER','majorProblems':1,'minorProblems':2,'ships':3,'lostShips':4,'stations':[{{'sessionGuid':180023,'islandId':1,'areaIndex':0}},{{'sessionGuid':180024,'islandId':2,'areaIndex':1}}]}}]}}";
     }
 
     /// <summary>
@@ -91,7 +91,7 @@ public static class IngestClient
     /// <returns>The session start in single-quote notation</returns>
     public static string SessionStart(string id)
     {
-        return $"{{'type':'sessionStart','contractVersion':2,'id':'{id}','profileId':'{Profile}','receiveTime':'{Time}'}}";
+        return $"{{'type':'sessionStart','contractVersion':3,'id':'{id}','profileId':'{Profile}','receiveTime':'{Time}'}}";
     }
 
     /// <summary>
@@ -101,7 +101,7 @@ public static class IngestClient
     /// <returns>The session end in single-quote notation</returns>
     public static string SessionEnd(string id)
     {
-        return $"{{'type':'sessionEnd','contractVersion':2,'id':'{id}','profileId':'{Profile}','receiveTime':'{Time}'}}";
+        return $"{{'type':'sessionEnd','contractVersion':3,'id':'{id}','profileId':'{Profile}','receiveTime':'{Time}'}}";
     }
 
     /// <summary>
@@ -111,7 +111,7 @@ public static class IngestClient
     /// <returns>The icon image in single-quote notation</returns>
     public static string IconImage(string id)
     {
-        return $"{{'type':'iconImage','contractVersion':2,'id':'{id}','reference':'{PngReference}','png':'{PngBase64}'}}";
+        return $"{{'type':'iconImage','contractVersion':3,'id':'{id}','reference':'{PngReference}','png':'{PngBase64}'}}";
     }
 
     /// <summary>
@@ -122,7 +122,7 @@ public static class IngestClient
     /// <returns>The catalog upload in single-quote notation</returns>
     public static string CatalogUpload(string id, byte[] document)
     {
-        return $"{{'type':'catalogUpload','contractVersion':2,'id':'{id}','document':'{Convert.ToBase64String(document)}'}}";
+        return $"{{'type':'catalogUpload','contractVersion':3,'id':'{id}','document':'{Convert.ToBase64String(document)}'}}";
     }
 
     /// <summary>
@@ -131,7 +131,7 @@ public static class IngestClient
     /// <returns>The status message in single-quote notation</returns>
     public static string Status()
     {
-        return "{'type':'status','contractVersion':2,'pipeState':'receiving'}";
+        return "{'type':'status','contractVersion':3,'pipeState':'receiving'}";
     }
 
     /// <summary>

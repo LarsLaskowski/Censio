@@ -268,7 +268,7 @@ public sealed class ReplaySenderTests
         await using var server = ScriptedIngestServer.Create();
         var logger = new RecordingLogger();
         await using var sender = CreateSender(new DuplexReplayConnector(server.ClientSocket), CreateTimeProvider(), logger, null);
-        var reply = """{"type":"helloRefused","contractVersion":1,"reason":"unsupportedVersion","receivedVersion":2,"supportedVersions":[1]}""";
+        var reply = """{"type":"helloRefused","contractVersion":1,"reason":"unsupportedVersion","receivedVersion":3,"supportedVersions":[1]}""";
 
         // Act
         var connecting = sender.ConnectServerAsync(TestContext.CancellationToken);

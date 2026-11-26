@@ -136,7 +136,7 @@ public sealed class IngestSessionTests : IDisposable
     /// <summary>
     /// A server-to-Companion message, which a Companion may not send.
     /// </summary>
-    private const string HelloAcceptedNotation = "{'type':'helloAccepted','contractVersion':2,'serverVersion':'0.3.0','catalogIdentity':null}";
+    private const string HelloAcceptedNotation = "{'type':'helloAccepted','contractVersion':3,'serverVersion':'0.3.0','catalogIdentity':null}";
 
     /// <summary>
     /// The bound of the first message in bytes.
@@ -160,7 +160,7 @@ public sealed class IngestSessionTests : IDisposable
     /// <summary>
     /// The versions a refused hello names as supported.
     /// </summary>
-    private static readonly int[] _supportedVersions = [2];
+    private static readonly int[] _supportedVersions = [3];
 
     /// <summary>
     /// The time the session has for its hello.
@@ -200,11 +200,11 @@ public sealed class IngestSessionTests : IDisposable
     /// </summary>
     private static readonly Dictionary<string, string> _unreadableMessages = new()
                                                                              {
-                                                                                 ["malformed"] = "{'type':'tick','contractVersion':2",
-                                                                                 ["version 1"] = IngestClient.Tick(Id1).Replace("'contractVersion':2", "'contractVersion':1", StringComparison.Ordinal),
+                                                                                 ["malformed"] = "{'type':'tick','contractVersion':3",
+                                                                                 ["version 1"] = IngestClient.Tick(Id1).Replace("'contractVersion':3", "'contractVersion':1", StringComparison.Ordinal),
                                                                                  ["invalid id"] = IngestClient.Tick(ZeroId),
                                                                                  ["helloAccepted"] = HelloAcceptedNotation,
-                                                                                 ["acknowledgement with a valid id"] = $"{{'type':'acknowledgement','contractVersion':2,'id':'{Id1}','refusal':null,'refusedVersion':null,'missingIcons':[]}}",
+                                                                                 ["acknowledgement with a valid id"] = $"{{'type':'acknowledgement','contractVersion':3,'id':'{Id1}','refusal':null,'refusedVersion':null,'missingIcons':[]}}",
                                                                                  ["second hello"] = IngestClient.Hello(Token)
                                                                              };
 
@@ -272,6 +272,11 @@ public sealed class IngestSessionTests : IDisposable
     /// </summary>
     private ServerState _state = null!;
 
+    /// <summary>
+    /// The history retention every session of the test deletes a profile's history through.
+    /// </summary>
+    private HistoryRetention _history = null!;
+
     #endregion // Fields
 
     #region Constructors
@@ -334,7 +339,7 @@ public sealed class IngestSessionTests : IDisposable
     }
 
     /// <summary>
-    /// A version-2 hello with the stored token is answered helloAccepted with the server's version and no catalog identity,
+    /// A version-3 hello with the stored token is answered helloAccepted with the server's version and no catalog identity,
     /// and the connection is logged.
     /// </summary>
     /// <returns>A task that completes when the test is done</returns>
@@ -361,7 +366,7 @@ public sealed class IngestSessionTests : IDisposable
 
     /// <summary>
     /// A hello with a wrong token, one differing only in its last character, or none is refused as tokenRefused with version
-    /// 2 and supported versions [2], closed with 1000 and an empty reason, and warned about without the token.
+    /// 3 and supported versions [3], closed with 1000 and an empty reason, and warned about without the token.
     /// </summary>
     /// <param name="presented">The presented token</param>
     /// <returns>A task that completes when the test is done</returns>
@@ -384,7 +389,7 @@ public sealed class IngestSessionTests : IDisposable
 
         // Assert
         Assert.HasCount(1, messages, "Exactly one reply should be sent");
-        AssertHelloRefused(messages[0], ContractHelloRefusal.TokenRefused, 2);
+        AssertHelloRefused(messages[0], ContractHelloRefusal.TokenRefused, 3);
         Assert.AreEqual(WebSocketCloseStatus.NormalClosure, closeStatus, "The connection should be closed with 1000");
         Assert.AreEqual(string.Empty, closeDescription, "The close should carry an empty reason");
         Assert.Contains((LogLevel.Warning, "Companion refused: token refused."), LogEntries(), "The refusal should be warned about");
@@ -416,7 +421,7 @@ public sealed class IngestSessionTests : IDisposable
 
         // Assert
         Assert.HasCount(1, messages, "Only the refusal should be sent");
-        AssertHelloRefused(messages[0], ContractHelloRefusal.TokenRefused, 2);
+        AssertHelloRefused(messages[0], ContractHelloRefusal.TokenRefused, 3);
         Assert.AreEqual(WebSocketCloseStatus.NormalClosure, closeStatus, "The connection should be closed with 1000");
         Assert.DoesNotContain("Companion connected.", LogMessages(), "The second hello should not be read");
         Assert.IsTrue(_connections.TryTakeCompanion(), "The Companion's place should stay free");
@@ -450,7 +455,7 @@ public sealed class IngestSessionTests : IDisposable
 
     /// <summary>
     /// A first message of contract version 1, the released one, is refused as unsupportedVersion with version 1 and
-    /// supported versions [2], with the right or a wrong token, and the refusal is warned about naming version 1.
+    /// supported versions [3], with the right or a wrong token, and the refusal is warned about naming version 1.
     /// </summary>
     /// <param name="presented">The presented token</param>
     /// <returns>A task that completes when the test is done</returns>
@@ -505,7 +510,7 @@ public sealed class IngestSessionTests : IDisposable
 
         // Assert
         Assert.HasCount(1, messages, "Exactly one reply should be sent to the second Companion");
-        AssertHelloRefused(messages[0], ContractHelloRefusal.CompanionConnected, 2);
+        AssertHelloRefused(messages[0], ContractHelloRefusal.CompanionConnected, 3);
         Assert.AreEqual(WebSocketCloseStatus.NormalClosure, closeStatus, "The second connection should be closed with 1000");
         Assert.Contains((LogLevel.Warning, "Companion refused: another Companion is connected."), LogEntries(), "The refusal should be warned about");
         AssertAcknowledgement(firstReply, Id1, null, null, []);
@@ -1389,7 +1394,7 @@ public sealed class IngestSessionTests : IDisposable
         var (run, client, _) = await StartAcceptedSessionAsync();
 
         var message = label == "malformed"
-                          ? "{'type':'tradeRoutes','contractVersion':2"
+                          ? "{'type':'tradeRoutes','contractVersion':3"
                           : IngestClient.TradeRoutes(Id1).Replace("'MARKERROUTE'", $"'{new string('a', 766)}'", StringComparison.Ordinal);
 
         // Act
@@ -1478,7 +1483,7 @@ public sealed class IngestSessionTests : IDisposable
         await FinishAsync(secondClient, secondRun);
 
         // Assert
-        AssertHelloRefused(messages[0], ContractHelloRefusal.CompanionConnected, 2);
+        AssertHelloRefused(messages[0], ContractHelloRefusal.CompanionConnected, 3);
         Assert.AreSequenceEqual(new[] { $"{IngestClient.Profile} {HelloProfileName}" }, DescribeProfiles(await _store.ListProfilesAsync(TestContext.CancellationToken), null), "The refused hello should not rename the connected profile");
     }
 
@@ -1508,7 +1513,7 @@ public sealed class IngestSessionTests : IDisposable
         await FinishAsync(versionClient, versionRun);
 
         // Assert
-        AssertHelloRefused(tokenMessages[0], ContractHelloRefusal.TokenRefused, 2);
+        AssertHelloRefused(tokenMessages[0], ContractHelloRefusal.TokenRefused, 3);
         AssertHelloRefused(versionMessages[0], ContractHelloRefusal.UnsupportedVersion, 1);
         Assert.IsEmpty(await _store.ListProfilesAsync(TestContext.CancellationToken), "No refused hello should store a profile");
         Assert.IsEmpty(_state.Profiles, "No refused hello should add a profile to the state");
@@ -1649,7 +1654,7 @@ public sealed class IngestSessionTests : IDisposable
         Assert.AreEqual(WebSocketCloseStatus.InternalServerError, closeStatus, "The connection should be closed with 1011");
         Assert.AreEqual(string.Empty, closeDescription, "The close should carry an empty reason");
         Assert.IsInstanceOfType<ContractHelloAccepted>(secondReply, "A second Companion should be accepted while the failed connection waits for its close");
-        AssertHelloRefused(thirdMessages[0], ContractHelloRefusal.CompanionConnected, 2);
+        AssertHelloRefused(thirdMessages[0], ContractHelloRefusal.CompanionConnected, 3);
         AssertOneStoreFailureLogged();
         Assert.ContainsSingle(message => message == "Companion connected.", LogMessages(), "Only the second Companion should be logged as connected");
         Assert.DoesNotContain(message => message.StartsWith("Companion disconnected", StringComparison.Ordinal), LogMessages(), "The failed hello should log no disconnect line");
@@ -1806,7 +1811,7 @@ public sealed class IngestSessionTests : IDisposable
         await FinishAsync(secondClient, secondRun);
 
         // Assert
-        AssertHelloRefused(messages[0], ContractHelloRefusal.CompanionConnected, 2);
+        AssertHelloRefused(messages[0], ContractHelloRefusal.CompanionConnected, 3);
         Assert.AreEqual(DescribeCompanion(true, ContractPipeState.WaitingForGame), DescribeCompanion(_state.CompanionState), "The refused session should leave the connected Companion's state");
     }
 
@@ -1964,7 +1969,7 @@ public sealed class IngestSessionTests : IDisposable
         await FinishAsync(client, run);
 
         // Assert
-        AssertHelloRefused(messages[0], ContractHelloRefusal.CompanionConnected, 2);
+        AssertHelloRefused(messages[0], ContractHelloRefusal.CompanionConnected, 3);
         AssertHostNotCounted("a companionConnected refusal");
     }
 
@@ -2151,7 +2156,7 @@ public sealed class IngestSessionTests : IDisposable
         var png = Encoding.UTF8.GetBytes(content);
         var reference = Convert.ToHexStringLower(SHA256.HashData(png));
 
-        return (reference, $"{{'type':'iconImage','contractVersion':2,'id':'{id}','reference':'{reference}','png':'{Convert.ToBase64String(png)}'}}");
+        return (reference, $"{{'type':'iconImage','contractVersion':3,'id':'{id}','reference':'{reference}','png':'{Convert.ToBase64String(png)}'}}");
     }
 
     /// <summary>
@@ -2220,7 +2225,7 @@ public sealed class IngestSessionTests : IDisposable
     }
 
     /// <summary>
-    /// Asserts that a reply is a refused hello of a reason with the received version and supported versions [2].
+    /// Asserts that a reply is a refused hello of a reason with the received version and supported versions [3].
     /// </summary>
     /// <param name="message">The reply</param>
     /// <param name="reason">The expected reason</param>
@@ -2231,7 +2236,7 @@ public sealed class IngestSessionTests : IDisposable
 
         Assert.AreEqual(reason, refused.Reason, "The refusal should carry its reason");
         Assert.AreEqual(receivedVersion, refused.ReceivedVersion, "The refusal should carry the received version");
-        Assert.AreSequenceEqual(_supportedVersions, refused.SupportedVersions.ToArray(), "The refusal should name version 2 as the only supported one");
+        Assert.AreSequenceEqual(_supportedVersions, refused.SupportedVersions.ToArray(), "The refusal should name version 3 as the only supported one");
     }
 
     /// <summary>
@@ -2346,9 +2351,22 @@ public sealed class IngestSessionTests : IDisposable
         _disposables.AddRange([client, server, clientStream, serverStream]);
         _connections.TryEnterPendingHello();
 
-        var session = new IngestSession(server, access, new IngestAdmission(_connections, _hosts, _hosts.TryEnterPendingHello(null)!, null), _state, _timeProvider, _logger, serverVersion);
+        var session = new IngestSession(server, access, new IngestAdmission(_connections, _hosts, _hosts.TryEnterPendingHello(null)!, null), CreateStores(), _timeProvider, _logger, serverVersion);
 
         return (session.RunAsync(_stopping.Token), client, serverStream);
+    }
+
+    /// <summary>
+    /// Gives the stores of the state and the history retention of the test, as the server passes them to a session.
+    /// </summary>
+    /// <returns>The stores</returns>
+    private IngestStores CreateStores()
+    {
+        return new IngestStores
+               {
+                   State = _state,
+                   History = _history
+               };
     }
 
     /// <summary>
@@ -2560,6 +2578,8 @@ public sealed class IngestSessionTests : IDisposable
         _databaseFile = databaseFile;
         _store = new ServerStore(database);
         _state = new ServerState(_store, _stateLogger);
+        _history = new HistoryRetention(_state, new HistoryStore(database), _timeProvider, _stateLogger);
+        _disposables.Add(_history);
 
         await _state.RestoreAsync(TestContext.CancellationToken).ConfigureAwait(false);
     }
@@ -2643,6 +2663,9 @@ public sealed class IngestSessionTests : IDisposable
         {
             disposable.Dispose();
         }
+
+        // Also in the list, so a retention replaced by UseDatabaseFileAsync is disposed too; a second dispose does nothing
+        _history.Dispose();
 
         SqliteConnection.ClearAllPools();
 

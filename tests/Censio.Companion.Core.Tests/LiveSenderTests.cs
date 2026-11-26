@@ -264,7 +264,7 @@ public sealed class LiveSenderTests : IDisposable
         Assert.AreEqual(LiveSender.ProfileId, hello.ProfileId, "The hello should carry the fixed profile identity");
         Assert.AreEqual("Live", hello.ProfileName, "The hello should carry the profile name Live");
         Assert.AreEqual(CompanionVersion, hello.CompanionVersion, "The hello should carry the Companion's version");
-        Assert.AreEqual(2, ContractReader.CurrentVersion, "The server double reads only contract version 2, so the hello it read was written in version 2");
+        Assert.AreEqual(3, ContractReader.CurrentVersion, "The server double reads only contract version 3, so the hello it read was written in version 3");
         Assert.AreSequenceEqual([_address], connector.Addresses, "The connector should be asked once for the address of the setting");
     }
 
