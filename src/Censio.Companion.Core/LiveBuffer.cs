@@ -286,18 +286,31 @@ public sealed class LiveBuffer : IAsyncDisposable
         }
     }
 
-#pragma warning disable RH2003, S1172, S2325
-    // Skeleton: removed with the implementation
     /// <summary>
     /// Removes the message in flight, without an acknowledgement, when it is the one with the identity.
     /// </summary>
     /// <param name="id">The identity of the message</param>
     public void DropInFlight(Guid id)
     {
-        throw new NotImplementedException();
-    }
+        lock (_gate)
+        {
+            if (_inFlight is not { } item || item.Id != id)
+            {
+                return;
+            }
 
-#pragma warning restore RH2003, S1172, S2325
+            _items.Remove(item);
+            _inFlight = null;
+
+            if (item.Json is null)
+            {
+                _deletes.Add(PathOf(item.Sequence));
+            }
+
+            CountDropped(1);
+            Notify();
+        }
+    }
 
     /// <summary>
     /// Takes the number of dropped messages that were not logged yet.

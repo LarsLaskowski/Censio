@@ -75,6 +75,11 @@ public sealed class CompanionProfiles
     private readonly List<KeyValuePair<string, Guid>> _figures;
 
     /// <summary>
+    /// The identities of the profiles deleted with their history, the oldest first, each with whether the server confirmed it.
+    /// </summary>
+    private readonly List<KeyValuePair<Guid, bool>> _deleted;
+
+    /// <summary>
     /// The active profile.
     /// </summary>
     private CompanionProfile _active;
@@ -111,14 +116,16 @@ public sealed class CompanionProfiles
     /// <param name="profiles">The profiles</param>
     /// <param name="active">The active profile</param>
     /// <param name="figures">The figure links, the oldest first</param>
+    /// <param name="deleted">The deleted identities, the oldest first, each with whether it is confirmed</param>
     /// <param name="isFileInvalid">Whether the file could not be used</param>
-    private CompanionProfiles(string path, ILogger logger, List<CompanionProfile> profiles, CompanionProfile active, List<KeyValuePair<string, Guid>> figures, bool isFileInvalid)
+    private CompanionProfiles(string path, ILogger logger, List<CompanionProfile> profiles, CompanionProfile active, List<KeyValuePair<string, Guid>> figures, List<KeyValuePair<Guid, bool>> deleted, bool isFileInvalid)
     {
         _path = path;
         _logger = logger;
         _profiles = profiles;
         _active = active;
         _figures = figures;
+        _deleted = deleted;
         _isFileInvalid = isFileInvalid;
     }
 
@@ -136,13 +143,10 @@ public sealed class CompanionProfiles
     /// </summary>
     public event EventHandler? PendingNoticeChanged;
 
-#pragma warning disable CS0067, S3264
-    // Skeleton: removed with the implementation
     /// <summary>
     /// Occurs when the list of deleted profile identities changed.
     /// </summary>
     public event EventHandler? DeletionsChanged;
-#pragma warning restore CS0067, S3264
 
     #endregion // Events
 
@@ -212,21 +216,33 @@ public sealed class CompanionProfiles
         }
     }
 
-#pragma warning disable CA1822, S2325
-    // Skeleton: removed with the implementation
     /// <summary>
     /// Gets the identities of the deleted profiles whose history the server has not confirmed yet, oldest first.
     /// </summary>
-    public IReadOnlyList<Guid> WaitingDeletions => [];
-#pragma warning restore CA1822, S2325
+    public IReadOnlyList<Guid> WaitingDeletions
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return [.. _deleted.Where(entry => entry.Value == false).Select(entry => entry.Key)];
+            }
+        }
+    }
 
-#pragma warning disable CA1822, S2325
-    // Skeleton: removed with the implementation
     /// <summary>
     /// Gets a value indicating whether as many deletions wait as <see cref="MaxDeletions" /> allows.
     /// </summary>
-    public bool IsDeletionQueueFull => false;
-#pragma warning restore CA1822, S2325
+    public bool IsDeletionQueueFull
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return CountWaiting() >= MaxDeletions;
+            }
+        }
+    }
 
     #endregion // Properties
 
@@ -303,8 +319,6 @@ public sealed class CompanionProfiles
         return LiveSender.IsSending(mode, setting);
     }
 
-#pragma warning disable RH2003, S1172
-    // Skeleton: removed with the implementation
     /// <summary>
     /// Determines whether a profile can be deleted.
     /// </summary>
@@ -314,10 +328,9 @@ public sealed class CompanionProfiles
     /// <returns><see langword="true" /> when the profile is in the list, is not <c>Live</c> and is not active</returns>
     public static bool IsDeletable(Guid id, Guid active, IReadOnlyList<CompanionProfile> profiles)
     {
-        throw new NotImplementedException();
+        return id != LiveSender.ProfileId && id != active && profiles.Any(profile => profile.Id == id);
     }
 
-#pragma warning restore RH2003, S1172
     /// <summary>
     /// Checks the name of a profile to create.
     /// </summary>
@@ -416,8 +429,6 @@ public sealed class CompanionProfiles
         RaisePendingNoticeChanged(isNoticeChanged);
     }
 
-#pragma warning disable RH2003, S1172, S2325
-    // Skeleton: removed with the implementation
     /// <summary>
     /// Deletes a profile with the figures linked to it, and optionally queues the deletion of its history on the server.
     /// </summary>
@@ -427,12 +438,46 @@ public sealed class CompanionProfiles
     /// <exception cref="InvalidOperationException">The deletion is ticked and the queue is full</exception>
     public void Delete(Guid id, bool isHistoryDeleted)
     {
-        throw new NotImplementedException();
+        bool isNoticeChanged;
+
+        lock (_lock)
+        {
+            if (IsDeletable(id, _active.Id, _profiles) == false)
+            {
+                throw new ArgumentException("The profile cannot be deleted", nameof(id));
+            }
+
+            if (isHistoryDeleted && CountWaiting() >= MaxDeletions)
+            {
+                throw new InvalidOperationException("The queue of deletions is full");
+            }
+
+            _profiles.RemoveAll(profile => profile.Id == id);
+            _figures.RemoveAll(link => link.Value == id);
+            isNoticeChanged = ReplaceNotice(null);
+
+            if (isHistoryDeleted)
+            {
+                if (_deleted.Count >= MaxDeletions)
+                {
+                    _deleted.RemoveAt(_deleted.FindIndex(entry => entry.Value));
+                }
+
+                _deleted.Add(new KeyValuePair<Guid, bool>(id, false));
+            }
+
+            MarkChanged();
+        }
+
+        CompanionLog.ProfileDeleted(_logger);
+        RaisePendingNoticeChanged(isNoticeChanged);
+
+        if (isHistoryDeleted)
+        {
+            DeletionsChanged?.Invoke(this, EventArgs.Empty);
+        }
     }
 
-#pragma warning restore RH2003, S1172, S2325
-#pragma warning disable RH2003, S1172, S2325
-    // Skeleton: removed with the implementation
     /// <summary>
     /// Determines whether the identity of a profile is among the deleted ones, waiting or confirmed.
     /// </summary>
@@ -440,22 +485,34 @@ public sealed class CompanionProfiles
     /// <returns><see langword="true" /> when the profile was deleted with its history</returns>
     public bool IsDeleted(Guid id)
     {
-        throw new NotImplementedException();
+        lock (_lock)
+        {
+            return _deleted.Any(entry => entry.Key == id);
+        }
     }
 
-#pragma warning restore RH2003, S1172, S2325
-#pragma warning disable RH2003, S1172, S2325
-    // Skeleton: removed with the implementation
     /// <summary>
     /// Marks a waiting deletion as confirmed by the server.
     /// </summary>
     /// <param name="id">The identity of the profile</param>
     public void ConfirmDeletion(Guid id)
     {
-        throw new NotImplementedException();
+        lock (_lock)
+        {
+            var index = _deleted.FindIndex(entry => entry.Key == id && entry.Value == false);
+
+            if (index < 0)
+            {
+                return;
+            }
+
+            _deleted[index] = new KeyValuePair<Guid, bool>(id, true);
+            MarkChanged();
+        }
+
+        DeletionsChanged?.Invoke(this, EventArgs.Empty);
     }
 
-#pragma warning restore RH2003, S1172, S2325
     /// <summary>
     /// Gets the name of a profile.
     /// </summary>
@@ -566,7 +623,7 @@ public sealed class CompanionProfiles
     /// <returns>The profiles</returns>
     private static CompanionProfiles CreateLiveAlone(string path, ILogger logger, bool isFileInvalid)
     {
-        return new CompanionProfiles(path, logger, [CompanionProfile.Live], CompanionProfile.Live, [], isFileInvalid);
+        return new CompanionProfiles(path, logger, [CompanionProfile.Live], CompanionProfile.Live, [], [], isFileInvalid);
     }
 
     /// <summary>
@@ -592,12 +649,12 @@ public sealed class CompanionProfiles
     /// <returns>The profiles, or <see langword="null" /> when the file is outside the rules</returns>
     private static CompanionProfiles? Read(string path, ILogger logger, JsonElement root)
     {
-        if (root.ValueKind != JsonValueKind.Object || TryReadRoot(root, out var version, out var active, out var profilesElement, out var figuresElement) == false)
+        if (root.ValueKind != JsonValueKind.Object || TryReadRoot(root, out var version, out var active, out var profilesElement, out var figuresElement, out var deletedElement) == false)
         {
             return null;
         }
 
-        if (version.ValueKind != JsonValueKind.Number || version.TryGetInt32(out var number) == false || number != 1)
+        if (version.ValueKind != JsonValueKind.Number || version.TryGetInt32(out var number) == false || number != (deletedElement is null ? 1 : 2))
         {
             return null;
         }
@@ -610,20 +667,27 @@ public sealed class CompanionProfiles
         }
 
         var figures = ReadFigures(figuresElement, profiles);
+        var deleted = deletedElement is { } deletedList ? ReadDeleted(deletedList, profiles) : [];
 
-        return figures is null ? null : new CompanionProfiles(path, logger, profiles, activeProfile, figures, false);
+        if (figures is null || deleted is null)
+        {
+            return null;
+        }
+
+        return new CompanionProfiles(path, logger, profiles, activeProfile, figures, deleted, false);
     }
 
     /// <summary>
-    /// Reads the four properties of the root, each exactly once.
+    /// Reads the properties of the root, each exactly once: four for version 1, five with <c>deleted</c> for version 2.
     /// </summary>
     /// <param name="root">The root object</param>
     /// <param name="version">The version</param>
     /// <param name="active">The active identity</param>
     /// <param name="profiles">The profiles</param>
     /// <param name="figures">The figures</param>
-    /// <returns><see langword="true" /> when the root holds exactly these properties</returns>
-    private static bool TryReadRoot(JsonElement root, out JsonElement version, out JsonElement active, out JsonElement profiles, out JsonElement figures)
+    /// <param name="deleted">The deleted identities, or <see langword="null" /> when the root holds four properties</param>
+    /// <returns><see langword="true" /> when the root holds exactly one of these sets of properties</returns>
+    private static bool TryReadRoot(JsonElement root, out JsonElement version, out JsonElement active, out JsonElement profiles, out JsonElement figures, out JsonElement? deleted)
     {
         var found = ReadProperties(root, "version", "active", "profiles", "figures");
 
@@ -631,10 +695,18 @@ public sealed class CompanionProfiles
         active = default;
         profiles = default;
         figures = default;
+        deleted = null;
 
         if (found is null)
         {
-            return false;
+            found = ReadProperties(root, "version", "active", "profiles", "figures", "deleted");
+
+            if (found is null)
+            {
+                return false;
+            }
+
+            deleted = found[4];
         }
 
         version = found[0];
@@ -643,6 +715,42 @@ public sealed class CompanionProfiles
         figures = found[3];
 
         return true;
+    }
+
+    /// <summary>
+    /// Reads the deleted identities.
+    /// </summary>
+    /// <param name="element">The array</param>
+    /// <param name="profiles">The profiles</param>
+    /// <returns>The deleted identities, or <see langword="null" /> when the array is outside the rules</returns>
+    private static List<KeyValuePair<Guid, bool>>? ReadDeleted(JsonElement element, List<CompanionProfile> profiles)
+    {
+        if (element.ValueKind != JsonValueKind.Array || element.GetArrayLength() > MaxDeletions)
+        {
+            return null;
+        }
+
+        var deleted = new List<KeyValuePair<Guid, bool>>();
+
+        foreach (var item in element.EnumerateArray())
+        {
+            if (item.ValueKind != JsonValueKind.Object || ReadProperties(item, "id", "confirmed") is not { } values || ReadId(values[0]) is not { } id)
+            {
+                return null;
+            }
+
+            if (values[1].ValueKind is not (JsonValueKind.True or JsonValueKind.False)
+                || id == LiveSender.ProfileId
+                || profiles.Any(profile => profile.Id == id)
+                || deleted.Any(entry => entry.Key == id))
+            {
+                return null;
+            }
+
+            deleted.Add(new KeyValuePair<Guid, bool>(id, values[1].GetBoolean()));
+        }
+
+        return deleted;
     }
 
     /// <summary>
@@ -925,6 +1033,15 @@ public sealed class CompanionProfiles
     }
 
     /// <summary>
+    /// Counts the waiting deletions; the caller holds the lock.
+    /// </summary>
+    /// <returns>The number of deleted identities the server has not confirmed</returns>
+    private int CountWaiting()
+    {
+        return _deleted.Count(entry => entry.Value == false);
+    }
+
+    /// <summary>
     /// Records a change of the state to write and wakes the writer; the caller holds the lock.
     /// </summary>
     private void MarkChanged()
@@ -993,7 +1110,7 @@ public sealed class CompanionProfiles
         using (var writer = new Utf8JsonWriter(stream))
         {
             writer.WriteStartObject();
-            writer.WriteNumber("version", 1);
+            writer.WriteNumber("version", _deleted.Count > 0 ? 2 : 1);
             writer.WriteString("active", _active.Id.ToString("D", CultureInfo.InvariantCulture));
             writer.WriteStartArray("profiles");
 
@@ -1017,6 +1134,22 @@ public sealed class CompanionProfiles
             }
 
             writer.WriteEndArray();
+
+            if (_deleted.Count > 0)
+            {
+                writer.WriteStartArray("deleted");
+
+                foreach (var entry in _deleted)
+                {
+                    writer.WriteStartObject();
+                    writer.WriteString("id", entry.Key.ToString("D", CultureInfo.InvariantCulture));
+                    writer.WriteBoolean("confirmed", entry.Value);
+                    writer.WriteEndObject();
+                }
+
+                writer.WriteEndArray();
+            }
+
             writer.WriteEndObject();
         }
 
