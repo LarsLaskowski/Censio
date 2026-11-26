@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -114,11 +115,58 @@ internal sealed partial class SettingsWindow : Window, ISettingsWindow
         FolderHint.Text = texts.GameFolderHint;
         ProfileLabel.Text = texts.ProfileLabel;
         NewProfileButton.Content = texts.NewProfileText;
+        DeleteProfileButton.Content = texts.DeleteProfileText;
         NewProfileLabel.Text = texts.NewProfileNameLabel;
         AutostartBox.Content = texts.StartWithWindowsText;
         LanguageLabel.Text = texts.LanguageLabel;
         SaveButton.Content = texts.SaveText;
         CancelButton.Content = texts.CancelText;
+    }
+
+    /// <summary>
+    /// Fills the list of profiles with the active one selected, the count of waiting deletions and the state of the delete button.
+    /// </summary>
+    /// <param name="view">The view</param>
+    private void ShowProfileControls(SettingsView view)
+    {
+        var wasPopulating = _isPopulating;
+
+        _isPopulating = true;
+
+        try
+        {
+            ProfileBox.ItemsSource = view.ProfileList;
+            ProfileBox.SelectedValue = view.ActiveProfile;
+        }
+        finally
+        {
+            _isPopulating = wasPopulating;
+        }
+
+        var culture = CultureInfo.GetCultureInfo(view.Texts.Language == CompanionLanguage.German ? "de-DE" : "en-US");
+
+        DeleteProfileButton.Content = view.Texts.DeleteProfileText;
+        WaitingDeletionsText.Text = string.Format(CultureInfo.InvariantCulture, view.Texts.WaitingDeletionsFormat, view.WaitingDeletions.ToString("N0", culture));
+        WaitingDeletionsText.Visibility = view.WaitingDeletions > 0 ? Visibility.Visible : Visibility.Collapsed;
+
+        UpdateDeleteButton();
+    }
+
+    /// <summary>
+    /// Enables the delete button for a profile that can be deleted and gives the reason as its tooltip otherwise.
+    /// </summary>
+    private void UpdateDeleteButton()
+    {
+        if (_view is not { } view)
+        {
+            return;
+        }
+
+        var selected = ProfileBox.SelectedValue is Guid id ? id : view.ActiveProfile;
+        var canDelete = view.CanDelete(selected);
+
+        DeleteProfileButton.IsEnabled = canDelete;
+        DeleteProfileButton.ToolTip = canDelete ? null : view.Texts.DeleteProfileDisabledText;
     }
 
     /// <summary>
@@ -173,8 +221,7 @@ internal sealed partial class SettingsWindow : Window, ISettingsWindow
         HoursBox.Text = values.BufferHours;
         MegabytesBox.Text = values.BufferMegabytes;
         FolderBox.Text = values.GameFolder;
-        ProfileBox.ItemsSource = view.ProfileList;
-        ProfileBox.SelectedValue = view.ActiveProfile;
+        ShowProfileControls(view);
         NewProfileBox.Text = string.Empty;
         NewProfileMessage.Text = string.Empty;
         NewProfilePanel.Visibility = Visibility.Collapsed;
@@ -413,6 +460,44 @@ internal sealed partial class SettingsWindow : Window, ISettingsWindow
     }
 
     /// <summary>
+    /// Updates the delete button when another profile is selected.
+    /// </summary>
+    /// <param name="sender">The drop-down</param>
+    /// <param name="eventArgs">The event data</param>
+    private void OnProfileChanged(object sender, SelectionChangedEventArgs eventArgs)
+    {
+        UpdateDeleteButton();
+    }
+
+    /// <summary>
+    /// Asks whether the selected profile is deleted and reports the answer to the session.
+    /// </summary>
+    /// <param name="sender">The button</param>
+    /// <param name="eventArgs">The event data</param>
+    private void OnDeleteProfileClick(object sender, RoutedEventArgs eventArgs)
+    {
+        if (_view is not { } view || ProfileBox.SelectedItem is not CompanionProfile profile || view.CanDelete(profile.Id) == false)
+        {
+            return;
+        }
+
+        var dialog = new ProfileDeletionDialog(view.Texts, profile.Name, view.IsDeletionQueueFull)
+                     {
+                         Owner = this
+                     };
+
+        if (dialog.ShowDialog() == true)
+        {
+            DeleteRequested?.Invoke(this,
+                                    new SettingsDeletion
+                                    {
+                                        Profile = profile.Id,
+                                        IsHistoryDeleted = dialog.IsHistoryDeleted
+                                    });
+        }
+    }
+
+    /// <summary>
     /// Asks the session to save what the user entered.
     /// </summary>
     /// <param name="sender">The button</param>
@@ -464,20 +549,16 @@ internal sealed partial class SettingsWindow : Window, ISettingsWindow
     /// <inheritdoc />
     public event EventHandler<SettingsInput>? SaveRequested;
 
-#pragma warning disable CS0067, S3264
-    // Skeleton: removed with the implementation
     /// <inheritdoc />
     public event EventHandler<SettingsDeletion>? DeleteRequested;
-#pragma warning restore CS0067, S3264
 
-#pragma warning disable RH2003, S1172, S2325
-    // Skeleton: removed with the implementation
     /// <inheritdoc />
     public void ShowProfiles(SettingsView view)
     {
-        throw new NotImplementedException();
+        _view = view;
+
+        ShowProfileControls(view);
     }
-#pragma warning restore RH2003, S1172, S2325
 
     /// <inheritdoc />
     public void ShowView(SettingsView view)

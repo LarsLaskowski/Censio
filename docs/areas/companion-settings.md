@@ -46,6 +46,7 @@ address`, `Server token` (a masked box), `Buffer hours`, `Buffer megabytes`, `Ga
 - A field that has a problem of the file (*Errors from the file*) is enabled in every mode, so that it can be edited
   away. A disabled field keeps its value and is written as shown.
 - `Browse…` opens a folder dialog and puts the picked folder's full path in the game folder field; the field can be typed in too.
+- `Delete profile…` stands right of `New profile…` and deletes the profile selected in the drop-down after the dialog `Delete profile?` asked; it is disabled, with the tooltip `Live and the active profile cannot be deleted.`, while the selection is `Live` or the active profile ([`companion-profiles.md`](companion-profiles.md), *Deleting*). A deletion takes effect at once, without `Save`, and keeps the other unsaved edits. Below the drop-down the line `Deleted profiles whose history the server has not deleted yet: <n>` shows while deletions with the history wait for the server.
 - `New profile…` shows a name box below the drop-down; saving creates the profile and selects it ([`companion-profiles.md`](companion-profiles.md), *Creating and selecting*).
 - The window shows the file's values and, for a missing key, the default. A mode that is `Off` writes no `mode`.
 

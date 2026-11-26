@@ -98,7 +98,7 @@ wording; the Product Manager reads them in the manual test of the release.
 | `server unreachable` | `Server nicht erreichbar` |
 | `token refused` | `Token abgelehnt` |
 | `another Companion is connected` | `anderer Companion verbunden` |
-| `server does not support contract version 2` | `Server unterstützt Vertragsversion 2 nicht` |
+| `server does not support contract version 3` | `Server unterstützt Vertragsversion 3 nicht` |
 | `server does not answer` | `Server antwortet nicht` |
 | `server connection lost` | `Serververbindung verloren` |
 | `invalid server reply` | `ungültige Serverantwort` |
@@ -124,7 +124,7 @@ The pattern `{0} (profile {1})` ends every `Server:` line of a live run: `{0}` i
 | `Server: another Companion is connected, retrying` | `Server: anderer Companion verbunden, neuer Versuch` |
 | `Server: not connected` | `Server: nicht verbunden` |
 | `Server: token refused` | `Server: Token abgelehnt` |
-| `Server: does not support contract version 2` | `Server: unterstützt Vertragsversion 2 nicht` |
+| `Server: does not support contract version 3` | `Server: unterstützt Vertragsversion 3 nicht` |
 | `{0} (profile {1})` | `{0} (Profil {1})` |
 | `Buffer: {0} waiting` | `Puffer: {0} wartend` |
 | `, {0} dropped` | `, {0} verworfen` |
@@ -174,10 +174,25 @@ The pattern `{0} (profile {1})` ends every `Server:` line of a live run: `{0}` i
 | `Profile` | `Profil` |
 | `New profile…` | `Neues Profil…` |
 | `Name of the new profile` | `Name des neuen Profils` |
+| `Delete profile…` | `Profil löschen…` |
 | `Start with Windows` | `Mit Windows starten` |
 | `Language` | `Sprache` |
 | `Save` | `Speichern` |
 | `Cancel` | `Abbrechen` |
+
+#### Profile deletion
+
+`Delete profile…` is in the table above. `Cancel` of the dialog is `CancelText`.
+
+| English | German |
+| ------- | ------ |
+| `Live and the active profile cannot be deleted.` | `Live und das aktive Profil können nicht gelöscht werden.` |
+| `Delete profile?` | `Profil löschen?` |
+| `The profile {0} is removed from this Companion, with the figures linked to it.` | `Das Profil {0} wird aus diesem Companion entfernt, mit den Figuren, die mit ihm verknüpft sind.` |
+| `Also delete its history on the server` | `Auch seinen Verlauf auf dem Server löschen` |
+| `1,000 deletions already wait for the server.` | `Schon 1.000 Löschungen warten auf den Server.` |
+| `Delete` | `Löschen` |
+| `Deleted profiles whose history the server has not deleted yet: {0}` | `Gelöschte Profile, deren Verlauf der Server noch nicht gelöscht hat: {0}` |
 
 #### Messages below the fields
 

@@ -88,18 +88,15 @@ public sealed class SettingsView
                };
     }
 
-#pragma warning disable RH2003, S1172, S2325
-    // Skeleton: removed with the implementation
     /// <summary>
-    /// Gets a value indicating whether a profile can be deleted.
+    /// Determines whether the window can delete a profile.
     /// </summary>
     /// <param name="selected">The identity of the selected profile</param>
-    /// <returns><c>true</c> if the profile can be deleted</returns>
+    /// <returns><see langword="true" /> when the profile is listed and is neither <c>Live</c> nor the active profile</returns>
     public bool CanDelete(Guid selected)
     {
-        throw new NotImplementedException();
+        return CompanionProfiles.IsDeletable(selected, ActiveProfile, ProfileList);
     }
-#pragma warning restore RH2003, S1172, S2325
 
     #endregion // Methods
 }

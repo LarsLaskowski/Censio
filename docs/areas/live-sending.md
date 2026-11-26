@@ -46,7 +46,7 @@ server) and an operator who reads the log rely on it. The connection rules share
 ### Start and hello
 
 - At start, without waiting for the game, the Companion connects and sends one hello per connection with the contract
-  version 2, the Companion's version, the token of the setting (none without `serverToken`), and the identity and the name
+  version 3, the Companion's version, the token of the setting (none without `serverToken`), and the identity and the name
   of a profile ([`contract.md`](contract.md), *Versions and the frozen form*), the profile of *Profiles on the connection*. The connection obeys the rules of
   [`replay-sending.md`](replay-sending.md) (*Connection*): direct, never through a system proxy, no redirect, no `Origin`,
   the system's certificate checks for `wss://`, 30 seconds for the upgrade and for the hello's answer.
@@ -78,6 +78,7 @@ server) and an operator who reads the log rely on it. The connection rules share
   failed` line is logged and no delay is waited. The server frees the Companion's place only when it ends the old session, so
   a `companionConnected` refusal within 5 seconds of the switch is retried after 250 ms, as part of the switch, with no line
   and no step of the reconnect delays; after those 5 seconds the refusal is handled as in *Reconnect*.
+- Profile deletions the player made wait first: after each accepted hello the Companion sends its waiting deletions before the catalog and the buffer, and drops buffered messages of deleted identities instead of sending them ([`companion-profiles.md`](companion-profiles.md), *Deleting*).
 - A switch costs one reconnect and the catalog check of the new connection (*Catalog*; record 0111). No tick is held for it:
   the messages taken meanwhile wait in the buffer.
 
@@ -211,9 +212,9 @@ server) and an operator who reads the log rely on it. The connection rules share
 | `Server: invalid reply, retrying` | A reply that breaks the rules of [`replay-sending.md`](replay-sending.md) (*Limits and errors*), except that the acknowledgement of a catalog upload may be larger (*Limits and errors* below) |
 | `Server: another Companion is connected, retrying` | `helloRefused` `companionConnected`: the server still holds a vanished connection, for up to about 56 seconds ([`ingest.md`](ingest.md), *One Companion and silent connections*) |
 | `Server: token refused` | `helloRefused` `tokenRefused`; not retried |
-| `Server: does not support contract version 2` | `helloRefused` `unsupportedVersion`; not retried |
+| `Server: does not support contract version 3` | `helloRefused` `unsupportedVersion`; not retried |
 
-- `Server: token refused` and `Server: does not support contract version 2` end live sending until the Companion is
+- `Server: token refused` and `Server: does not support contract version 3` end live sending until the Companion is
   restarted: neither is cured without a changed setting or an update, and not retrying keeps the server's block of failing
   hosts out of reach ([`ingest.md`](ingest.md), *Limits per host*). Any other state shows `Server: not connected`.
 - A connection that delivers nothing, also while no message is in flight, is found dead within 60 seconds: the Companion
@@ -279,7 +280,7 @@ running ends local mode's live sending without a line of its own, except the cou
   contract's 16,384 `missingIcons`). The bound counts the received bytes before parsing and ends with that wait, so the
   replies to the icons after it keep 65,536 bytes; a reply above the bound is `Server: invalid reply, retrying`
   (record 0108).
-- A server of release 0.3.0 reads contract version 1 and refuses the hello: `Server: does not support contract version 2`.
+- A server of release 0.3.0 reads contract version 1 and refuses the hello: `Server: does not support contract version 3`.
 
 ### Accepted risks
 

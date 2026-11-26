@@ -64,9 +64,9 @@
 
         <TextBlock x:Name="ProfileLabel" Style="{StaticResource LabelStyle}" />
         <DockPanel LastChildFill="True">
-            <Button x:Name="DeleteProfileButton" DockPanel.Dock="Right" Margin="8,0,0,0" Padding="12,2" ToolTipService.ShowOnDisabled="True" />
+            <Button x:Name="DeleteProfileButton" DockPanel.Dock="Right" Margin="8,0,0,0" Padding="12,2" ToolTipService.ShowOnDisabled="True" Click="OnDeleteProfileClick" />
             <Button x:Name="NewProfileButton" DockPanel.Dock="Right" Margin="8,0,0,0" Padding="12,2" Click="OnNewProfileClick" />
-            <ComboBox x:Name="ProfileBox" DisplayMemberPath="Name" SelectedValuePath="Id" />
+            <ComboBox x:Name="ProfileBox" DisplayMemberPath="Name" SelectedValuePath="Id" SelectionChanged="OnProfileChanged" />
         </DockPanel>
         <TextBlock x:Name="WaitingDeletionsText" Style="{StaticResource MessageStyle}" Foreground="{x:Static SystemColors.ControlTextBrush}" />
         <StackPanel x:Name="NewProfilePanel" Visibility="Collapsed">

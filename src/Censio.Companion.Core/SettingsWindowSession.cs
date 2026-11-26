@@ -98,6 +98,8 @@ public sealed class SettingsWindowSession
 
         window.WindowClosed += OnWindowClosed;
         window.SaveRequested += OnSaveRequested;
+        window.DeleteRequested += OnDeleteRequested;
+        _context.Profiles.DeletionsChanged += OnDeletionsChanged;
         _window = window;
         _document = null;
         _lastView = null;
@@ -277,6 +279,8 @@ public sealed class SettingsWindowSession
                    ProfileList = profiles.Profiles,
                    ActiveProfile = profiles.Active.Id,
                    IsProfilesFileInvalid = profiles.IsFileInvalid,
+                   WaitingDeletions = profiles.WaitingDeletions.Count,
+                   IsDeletionQueueFull = profiles.IsDeletionQueueFull,
                    IsAutostartEnabled = _context.Autostart.IsEnabled,
                    Warnings = CreateWarnings(texts, _context.RunState())
                };
@@ -296,6 +300,8 @@ public sealed class SettingsWindowSession
 
         window.WindowClosed -= OnWindowClosed;
         window.SaveRequested -= OnSaveRequested;
+        window.DeleteRequested -= OnDeleteRequested;
+        _context.Profiles.DeletionsChanged -= OnDeletionsChanged;
 
         if (ReferenceEquals(_window, window))
         {
@@ -303,6 +309,54 @@ public sealed class SettingsWindowSession
             _document = null;
             _lastView = null;
         }
+    }
+
+    /// <summary>
+    /// Shows the profiles again on the window's thread when the deleted identities changed.
+    /// </summary>
+    /// <param name="sender">The profiles</param>
+    /// <param name="eventArgs">The event data</param>
+    private void OnDeletionsChanged(object? sender, EventArgs eventArgs)
+    {
+        _post(ShowProfilesAgain);
+    }
+
+    /// <summary>
+    /// Shows the profiles, the count of waiting deletions and the button state again, while the window is open.
+    /// </summary>
+    private void ShowProfilesAgain()
+    {
+        if (_window is { } window && _lastView is { } view)
+        {
+            var profiles = CreateView(view.Values, view.FileProblem, view.Problems);
+
+            _lastView = profiles;
+
+            window.ShowProfiles(profiles);
+        }
+    }
+
+    /// <summary>
+    /// Deletes a profile the window asked for and shows the profiles again; ignored while a save runs or when the profile cannot be deleted.
+    /// </summary>
+    /// <param name="sender">The window</param>
+    /// <param name="deletion">The deletion</param>
+    private void OnDeleteRequested(object? sender, SettingsDeletion deletion)
+    {
+        if (sender is not ISettingsWindow window || ReferenceEquals(_window, window) == false || _document is null || _isSaving)
+        {
+            return;
+        }
+
+        var profiles = _context.Profiles;
+
+        if (CompanionProfiles.IsDeletable(deletion.Profile, profiles.Active.Id, profiles.Profiles) == false || (deletion.IsHistoryDeleted && profiles.IsDeletionQueueFull))
+        {
+            return;
+        }
+
+        profiles.Delete(deletion.Profile, deletion.IsHistoryDeleted);
+        ShowProfilesAgain();
     }
 
     /// <summary>
