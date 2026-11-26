@@ -180,6 +180,9 @@ after that time is handled as today. Local mode takes the same path.
 else, `IsRestart`; mode `Normal`). `OnStartup` calls `TryAcquire(SingleInstanceGuard.RestartWait)` (10 seconds,
 `new Mutex(false, name)` then `WaitOne`, `AbandonedMutexException` counting as acquired) for a restart, `TryAcquire()`
 otherwise; a restart whose wait ran out logs `Restart failed: the previous Companion did not end` and shuts down.
+Since the old Companion holds the day's log file open (fact 11), `LogFileLoggerProvider.OpenFile` continues in the next
+number (`companion-<date>-<n+1>.log`, at most 9999) once when opening the chosen file fails; a second failure drops the
+line as today (review round 1).
 A restart's `LocalServerSession` gets `PortInUseRetry = SingleInstanceGuard.RestartWait`: a start that returns
 `PortInUse` is started again every 500 ms on the session's `TimeProvider` while less than that time passed since
 `RunAsync` began, showing `Server: starting`, and only then logs and shows `Server: port <port> in use`; without it

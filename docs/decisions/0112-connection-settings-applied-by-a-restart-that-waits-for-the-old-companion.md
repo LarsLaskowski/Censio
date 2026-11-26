@@ -36,4 +36,6 @@ its profiles were written, else leaves it to its process exit, and the new one r
 
 - A replay or recording ends with the restart, and a memory-only buffer loses its messages; the window warns first.
 - A player may start the exe with `--restarted` by hand: it then only waits before it ends like any second start.
-- A new Companion whose wait runs out ends without an icon; the player starts it again.
+- A new Companion whose wait runs out ends without an icon; the player starts it again. Its log line goes to the day's
+  next log file, because the old Companion still holds the day's file open; logging nothing would leave that end
+  unexplained.
