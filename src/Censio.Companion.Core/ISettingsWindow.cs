@@ -33,7 +33,7 @@ public interface ISettingsWindow
     void ShowView(SettingsView view);
 
     /// <summary>
-    /// Shows the profiles: the drop-down with the active profile selected, the count line and the state of the delete button.
+    /// Shows the profiles: the drop-down with the chosen profile kept selected while it is still listed and the active one otherwise, the count line and the state of the delete button.
     /// </summary>
     /// <param name="view">The view</param>
     void ShowProfiles(SettingsView view);

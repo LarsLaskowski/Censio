@@ -124,7 +124,7 @@ internal sealed partial class SettingsWindow : Window, ISettingsWindow
     }
 
     /// <summary>
-    /// Fills the list of profiles with the active one selected, the count of waiting deletions and the state of the delete button.
+    /// Fills the list of profiles with the active one selected, or the chosen one when it is kept and still listed, the count of waiting deletions and the state of the delete button.
     /// </summary>
     /// <param name="view">The view</param>
     /// <param name="isKeepingChoice">Whether a choice in the list that is still offered stays selected instead of the active profile</param>
