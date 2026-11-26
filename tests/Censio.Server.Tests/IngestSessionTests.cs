@@ -114,6 +114,26 @@ public sealed class IngestSessionTests : IDisposable
     private const string ClientRouteLine = "7 MARKERROUTE MARKERFOLDER 1 2 3 4 [180023/1/0 180024/2/1]";
 
     /// <summary>
+    /// The trigger that makes every deletion of a profile fail before its rows are gone.
+    /// </summary>
+    private const string FailProfileDeleteSql = "CREATE TRIGGER \"FailProfileDelete\" BEFORE DELETE ON \"Profiles\" BEGIN SELECT RAISE(ABORT, 'test delete failure'); END;";
+
+    /// <summary>
+    /// A profile identity no message of a test names before its deletion.
+    /// </summary>
+    private const string UnknownProfile = "cccccccc-dddd-4eee-8fff-000000000001";
+
+    /// <summary>
+    /// The line the history retention logs when a profile's rows are gone.
+    /// </summary>
+    private const string HistoryDeletedLine = "The history of a profile was deleted.";
+
+    /// <summary>
+    /// The line the history retention logs when a profile's deletion fails.
+    /// </summary>
+    private const string HistoryDeleteFailedLine = "The history of a profile could not be deleted.";
+
+    /// <summary>
     /// The statement that removes the trigger of <see cref="FailProfilesSql" />.
     /// </summary>
     private const string DropFailProfilesSql = "DROP TRIGGER \"FailProfiles\";";
@@ -1608,6 +1628,98 @@ public sealed class IngestSessionTests : IDisposable
         Assert.Contains("Companion disconnected; 0 messages accepted, 1 refused.", LogMessages(), "The tick should be counted as refused");
         Assert.IsNull(await _store.ReadTickAsync(Guid.Parse(Id1), TestContext.CancellationToken), "The tick should not be stored");
         Assert.IsTrue(_connections.TryTakeCompanion(), "The Companion's place should be released");
+    }
+
+    /// <summary>
+    /// A profile deletion on an accepted connection deletes the named profile as the pages' deletion does (its row gone
+    /// from the store and the state, the retention's line logged) and is acknowledged by its id without a refusal, counted
+    /// as accepted; the hello's profile stays (spec S2, N2, N3).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC6")]
+    public async Task IngestSessionProfileDeletionDeletesAndAcknowledges()
+    {
+        // Arrange
+        string[] messages = [TickOfOtherProfile(Id1), IngestClient.ProfileDeletion(Id2, OtherProfile)];
+
+        // Act
+        var (_, replies) = await RunAcceptedSessionAsync(messages);
+
+        // Assert
+        var expectedProfiles = new[] { $"{IngestClient.Profile} {HelloProfileName}" };
+
+        AssertAcknowledgement(replies[0], Id1, null, null, []);
+        AssertAcknowledgement(replies[1], Id2, null, null, []);
+        Assert.AreSequenceEqual(expectedProfiles, DescribeProfiles(await _store.ListProfilesAsync(TestContext.CancellationToken), null), "The store should no longer list the deleted profile, only the hello's");
+        Assert.AreSequenceEqual(expectedProfiles, DescribeProfiles(_state.Profiles, null), "The state should no longer list the deleted profile, only the hello's");
+        Assert.AreSequenceEqual(new[] { HistoryDeletedLine }, _stateLogger.Entries.Select(entry => entry.Message).ToList(), "The deletion should log the retention's line once, as the pages' deletion does");
+        Assert.Contains("Companion disconnected; 2 messages accepted, 0 refused.", LogMessages(), "The deletion should be counted as accepted");
+        AssertNoMarkerInLog();
+    }
+
+    /// <summary>
+    /// A profile deletion of a profile the server does not know is acknowledged by its id without a refusal, counted as
+    /// accepted, and changes nothing: the profiles stay and no deletion is logged (spec S4, E7).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC6")]
+    public async Task IngestSessionProfileDeletionOfUnknownProfileAcknowledges()
+    {
+        // Arrange
+        string[] messages = [IngestClient.ProfileDeletion(Id1, UnknownProfile)];
+
+        // Act
+        var (_, replies) = await RunAcceptedSessionAsync(messages);
+
+        // Assert
+        var expectedProfiles = new[] { $"{IngestClient.Profile} {HelloProfileName}" };
+
+        AssertAcknowledgement(replies[0], Id1, null, null, []);
+        Assert.AreSequenceEqual(expectedProfiles, DescribeProfiles(await _store.ListProfilesAsync(TestContext.CancellationToken), null), "The store should keep the hello's profile and gain none");
+        Assert.AreSequenceEqual(expectedProfiles, DescribeProfiles(_state.Profiles, null), "The state should keep the hello's profile and gain none");
+        Assert.DoesNotContain(HistoryDeletedLine, _stateLogger.Entries.Select(entry => entry.Message).ToList(), "Nothing should be logged as deleted");
+        Assert.Contains("Companion disconnected; 1 messages accepted, 0 refused.", LogMessages(), "The deletion should be counted as accepted");
+    }
+
+    /// <summary>
+    /// A profile deletion whose store fails is not acknowledged: the connection is closed with 1011 and an empty reason, as
+    /// for a message that cannot be stored, the retention's warning is the only failure line (the session logs no error
+    /// of its own), the deletion counts as refused and the profile stays (spec E5).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC6")]
+    public async Task IngestSessionProfileDeletionFailedCloses1011()
+    {
+        // Arrange
+        await UseDatabaseFileAsync();
+
+        var (run, client, _) = await StartAcceptedSessionAsync();
+
+        await IngestClient.SendAsync(client, TickOfOtherProfile(Id1));
+
+        var (tickReply, _, _) = await IngestClient.ReceiveAsync(client);
+
+        ExecuteOnFile(FailProfileDeleteSql);
+
+        // Act
+        await IngestClient.SendAsync(client, IngestClient.ProfileDeletion(Id2, OtherProfile));
+
+        var (messages, closeStatus, closeDescription) = await IngestClient.ReceiveUntilCloseAsync(client);
+
+        await FinishAsync(client, run);
+
+        // Assert
+        AssertAcknowledgement(tickReply, Id1, null, null, []);
+        Assert.IsEmpty(messages, "The failed deletion should not be acknowledged");
+        Assert.AreEqual(WebSocketCloseStatus.InternalServerError, closeStatus, "The connection should be closed with 1011");
+        Assert.AreEqual(string.Empty, closeDescription, "The close should carry an empty reason");
+        Assert.AreSequenceEqual(new[] { HistoryDeleteFailedLine }, _stateLogger.Entries.Where(entry => entry.Level >= LogLevel.Warning).Select(entry => entry.Message).ToList(), "The retention should log its warning once");
+        Assert.IsEmpty(_logger.Entries.Where(entry => entry.Level >= LogLevel.Error).ToList(), "The session should log no error of its own");
+        Assert.Contains("Companion disconnected; 1 messages accepted, 1 refused.", LogMessages(), "The deletion should be counted as refused");
+        Assert.Contains($"{OtherProfile} <no name>", DescribeProfiles(await _store.ListProfilesAsync(TestContext.CancellationToken), null), "The profile should stay stored");
     }
 
     /// <summary>

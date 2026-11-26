@@ -105,6 +105,17 @@ public static class IngestClient
     }
 
     /// <summary>
+    /// Builds a profile deletion.
+    /// </summary>
+    /// <param name="id">The identity of the message</param>
+    /// <param name="profileId">The identity of the profile whose history is deleted</param>
+    /// <returns>The profile deletion in single-quote notation</returns>
+    public static string ProfileDeletion(string id, string profileId)
+    {
+        return $"{{'type':'profileDeletion','contractVersion':3,'id':'{id}','profileId':'{profileId}'}}";
+    }
+
+    /// <summary>
     /// Builds an icon image.
     /// </summary>
     /// <param name="id">The identity of the message</param>
