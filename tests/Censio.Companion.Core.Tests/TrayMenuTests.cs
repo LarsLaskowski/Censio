@@ -953,7 +953,7 @@ public sealed class TrayMenuTests
     [DataRow(ReplaySendProblemKind.ServerUnreachable, "server unreachable")]
     [DataRow(ReplaySendProblemKind.TokenRefused, "token refused")]
     [DataRow(ReplaySendProblemKind.CompanionConnected, "another Companion is connected")]
-    [DataRow(ReplaySendProblemKind.VersionNotSupported, "server does not support contract version 2")]
+    [DataRow(ReplaySendProblemKind.VersionNotSupported, "server does not support contract version 3")]
     [DataRow(ReplaySendProblemKind.NoAnswer, "server does not answer")]
     [DataRow(ReplaySendProblemKind.ConnectionLost, "server connection lost")]
     [DataRow(ReplaySendProblemKind.InvalidReply, "invalid server reply")]
@@ -976,7 +976,7 @@ public sealed class TrayMenuTests
     }
 
     /// <summary>
-    /// A replay a server refused for its version names contract version 2, the only version this build sends, in the
+    /// A replay a server refused for its version names contract version 3, the only version this build sends, in the
     /// tooltip and in the reason.
     /// </summary>
     [TestMethod]
@@ -995,8 +995,8 @@ public sealed class TrayMenuTests
         var toolTip = TrayMenu.FormatReplayToolTip(CompanionTexts.English, status);
 
         // Assert
-        Assert.AreEqual("Censio Companion: Replay error: server does not support contract version 2", toolTip, "The tooltip should name contract version 2");
-        Assert.AreEqual("server does not support contract version 2", TrayMenu.FormatReplaySendReason(CompanionTexts.English, ReplaySendProblemKind.VersionNotSupported), "The reason should name contract version 2");
+        Assert.AreEqual("Censio Companion: Replay error: server does not support contract version 3", toolTip, "The tooltip should name contract version 3");
+        Assert.AreEqual("server does not support contract version 3", TrayMenu.FormatReplaySendReason(CompanionTexts.English, ReplaySendProblemKind.VersionNotSupported), "The reason should name contract version 3");
     }
 
     /// <summary>
@@ -1645,7 +1645,7 @@ public sealed class TrayMenuTests
     [DataRow(LiveSendState.Retrying, ReplaySendProblemKind.InvalidReply, "Server: invalid reply, retrying")]
     [DataRow(LiveSendState.Retrying, ReplaySendProblemKind.CompanionConnected, "Server: another Companion is connected, retrying")]
     [DataRow(LiveSendState.Stopped, ReplaySendProblemKind.TokenRefused, "Server: token refused")]
-    [DataRow(LiveSendState.Stopped, ReplaySendProblemKind.VersionNotSupported, "Server: does not support contract version 2")]
+    [DataRow(LiveSendState.Stopped, ReplaySendProblemKind.VersionNotSupported, "Server: does not support contract version 3")]
     [DataRow(LiveSendState.Stopped, ReplaySendProblemKind.LocalServerNotRunning, "Server: not connected")]
     [DataRow(LiveSendState.Stopped, null, "Server: not connected")]
     [DataRow(LiveSendState.Retrying, null, "Server: not connected")]
@@ -1793,7 +1793,7 @@ public sealed class TrayMenuTests
     [DataRow(CompanionLanguage.English, LiveSendState.Retrying, ReplaySendProblemKind.InvalidReply, "Server: invalid reply, retrying (profile B)")]
     [DataRow(CompanionLanguage.English, LiveSendState.Retrying, ReplaySendProblemKind.CompanionConnected, "Server: another Companion is connected, retrying (profile B)")]
     [DataRow(CompanionLanguage.English, LiveSendState.Stopped, ReplaySendProblemKind.TokenRefused, "Server: token refused (profile B)")]
-    [DataRow(CompanionLanguage.English, LiveSendState.Stopped, ReplaySendProblemKind.VersionNotSupported, "Server: does not support contract version 2 (profile B)")]
+    [DataRow(CompanionLanguage.English, LiveSendState.Stopped, ReplaySendProblemKind.VersionNotSupported, "Server: does not support contract version 3 (profile B)")]
     [DataRow(CompanionLanguage.English, LiveSendState.Stopped, ReplaySendProblemKind.LocalServerNotRunning, "Server: not connected (profile B)")]
     [DataRow(CompanionLanguage.English, LiveSendState.Stopped, null, "Server: not connected (profile B)")]
     [DataRow(CompanionLanguage.English, LiveSendState.Retrying, null, "Server: not connected (profile B)")]
@@ -1808,7 +1808,7 @@ public sealed class TrayMenuTests
     [DataRow(CompanionLanguage.German, LiveSendState.Retrying, ReplaySendProblemKind.InvalidReply, "Server: ungültige Antwort, neuer Versuch (Profil B)")]
     [DataRow(CompanionLanguage.German, LiveSendState.Retrying, ReplaySendProblemKind.CompanionConnected, "Server: anderer Companion verbunden, neuer Versuch (Profil B)")]
     [DataRow(CompanionLanguage.German, LiveSendState.Stopped, ReplaySendProblemKind.TokenRefused, "Server: Token abgelehnt (Profil B)")]
-    [DataRow(CompanionLanguage.German, LiveSendState.Stopped, ReplaySendProblemKind.VersionNotSupported, "Server: unterstützt Vertragsversion 2 nicht (Profil B)")]
+    [DataRow(CompanionLanguage.German, LiveSendState.Stopped, ReplaySendProblemKind.VersionNotSupported, "Server: unterstützt Vertragsversion 3 nicht (Profil B)")]
     [DataRow(CompanionLanguage.German, LiveSendState.Stopped, ReplaySendProblemKind.LocalServerNotRunning, "Server: nicht verbunden (Profil B)")]
     [DataRow(CompanionLanguage.German, LiveSendState.Stopped, null, "Server: nicht verbunden (Profil B)")]
     [DataRow(CompanionLanguage.German, LiveSendState.Retrying, null, "Server: nicht verbunden (Profil B)")]

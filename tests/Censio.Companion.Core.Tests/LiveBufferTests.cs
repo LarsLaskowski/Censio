@@ -941,6 +941,41 @@ public sealed class LiveBufferTests
     }
 
     /// <summary>
+    /// Dropping the message in flight (its profile was deleted with its history) deletes its file, counts it as dropped,
+    /// so the next take reports it for the log, and the next message comes after it; the message is never returned again
+    /// (feature 251, Deleted identities).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC4")]
+    public async Task LiveBufferDropInFlightDeletesFileAndCounts()
+    {
+        // Arrange
+        var buffer = CreateBuffer(LiveBufferLimits.Defaults);
+
+        Start(buffer);
+        buffer.Add(Id(1), Json(SmallJson, 1));
+        buffer.Add(Id(2), Json(SmallJson, 2));
+
+        var written = await WaitForAsync(() => MessageFiles().Count == 2);
+        var inFlight = await NextAsync(buffer);
+
+        // Act
+        buffer.DropInFlight(inFlight.Id);
+
+        var next = await NextAsync(buffer);
+
+        // Assert
+        Assert.IsTrue(written, "Both messages should be written");
+        Assert.AreEqual(Id(1), inFlight.Id, "The first message should be in flight");
+        Assert.AreEqual(Id(2), next.Id, "The next message should come after the dropped one");
+        Assert.IsTrue(await WaitForAsync(() => StoredIds().SequenceEqual([Id(2)])), "The file of the dropped message should be deleted, the other kept");
+        Assert.AreEqual(1, buffer.Status.Dropped, "The dropped message should be counted as dropped");
+        Assert.AreEqual(1, buffer.Status.Waiting, "Only the next message should wait");
+        Assert.AreEqual(1, buffer.TakeUnloggedDropped(), "The drop should be reported once for the log");
+    }
+
+    /// <summary>
     /// In memory only, the message in flight and the newest message are kept even when together they exceed 16 MiB: the
     /// bound drops neither (E2).
     /// </summary>

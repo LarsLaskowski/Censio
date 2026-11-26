@@ -110,7 +110,7 @@ public sealed class LiveSenderTests : IDisposable
     /// <summary>
     /// The log line of an unsupported contract version.
     /// </summary>
-    private static readonly string[] _versionRefusedLines = ["Live sending refused by the server: server does not support contract version 2; not retried"];
+    private static readonly string[] _versionRefusedLines = ["Live sending refused by the server: server does not support contract version 3; not retried"];
 
     /// <summary>
     /// The log lines of a lost connection followed by a connection.
@@ -1036,7 +1036,7 @@ public sealed class LiveSenderTests : IDisposable
     }
 
     /// <summary>
-    /// A server that does not support contract version 2 stops live sending: the status reads stopped with the problem,
+    /// A server that does not support contract version 3 stops live sending: the status reads stopped with the problem,
     /// the refusal is logged and no attempt follows, also after 60 seconds (E7).
     /// </summary>
     /// <returns>A task that completes when the test is done</returns>

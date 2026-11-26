@@ -257,7 +257,7 @@ public sealed class ReplaySenderTests
 
     /// <summary>
     /// A refused hello reply of contract version 1, as a server of the earlier release sends it, is version not supported
-    /// and logs the text that names version 2.
+    /// and logs the text that names version 3.
     /// </summary>
     /// <returns>A task that completes when the test is done</returns>
     [TestMethod]
@@ -280,7 +280,7 @@ public sealed class ReplaySenderTests
 
         // Assert
         Assert.AreEqual(ReplaySendProblemKind.VersionNotSupported, problem, "The refused hello reply of version 1 should be version not supported");
-        Assert.Contains("Replay refused by the server: server does not support contract version 2", logger.Entries.Select(entry => entry.Message), "The refusal should log the text that names version 2");
+        Assert.Contains("Replay refused by the server: server does not support contract version 3", logger.Entries.Select(entry => entry.Message), "The refusal should log the text that names version 3");
     }
 
     /// <summary>
@@ -806,7 +806,7 @@ public sealed class ReplaySenderTests
     [DataRow("unreachable", "Replay sending failed: server unreachable")]
     [DataRow("tokenRefused", "Replay refused by the server: token refused")]
     [DataRow("companionConnected", "Replay refused by the server: another Companion is connected")]
-    [DataRow("unsupportedVersion", "Replay refused by the server: server does not support contract version 2")]
+    [DataRow("unsupportedVersion", "Replay refused by the server: server does not support contract version 3")]
     [DataRow("noAnswer", "Replay sending failed: server does not answer")]
     [DataRow("connectionLost", "Replay sending failed: server connection lost")]
     [DataRow("invalidReply", "Replay sending failed: invalid server reply")]
