@@ -127,7 +127,8 @@ internal sealed partial class SettingsWindow : Window, ISettingsWindow
     /// Fills the list of profiles with the active one selected, the count of waiting deletions and the state of the delete button.
     /// </summary>
     /// <param name="view">The view</param>
-    private void ShowProfileControls(SettingsView view)
+    /// <param name="isKeepingChoice">Whether a choice in the list that is still offered stays selected instead of the active profile</param>
+    private void ShowProfileControls(SettingsView view, bool isKeepingChoice)
     {
         var wasPopulating = _isPopulating;
 
@@ -138,7 +139,7 @@ internal sealed partial class SettingsWindow : Window, ISettingsWindow
             var chosen = ProfileBox.SelectedValue;
 
             ProfileBox.ItemsSource = view.ProfileList;
-            ProfileBox.SelectedValue = chosen is not null && view.ProfileList.Any(profile => Equals(profile.Id, chosen)) ? chosen : view.ActiveProfile;
+            ProfileBox.SelectedValue = isKeepingChoice && chosen is not null && view.ProfileList.Any(profile => Equals(profile.Id, chosen)) ? chosen : view.ActiveProfile;
         }
         finally
         {
@@ -223,7 +224,7 @@ internal sealed partial class SettingsWindow : Window, ISettingsWindow
         HoursBox.Text = values.BufferHours;
         MegabytesBox.Text = values.BufferMegabytes;
         FolderBox.Text = values.GameFolder;
-        ShowProfileControls(view);
+        ShowProfileControls(view, false);
         NewProfileBox.Text = string.Empty;
         NewProfileMessage.Text = string.Empty;
         NewProfilePanel.Visibility = Visibility.Collapsed;
@@ -559,7 +560,7 @@ internal sealed partial class SettingsWindow : Window, ISettingsWindow
     {
         _view = view;
 
-        ShowProfileControls(view);
+        ShowProfileControls(view, true);
     }
 
     /// <inheritdoc />
