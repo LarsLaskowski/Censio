@@ -125,6 +125,7 @@ public sealed class ScriptedIngestServer : IAsyncDisposable
                    ContractTradeRoutes routes => routes.Id,
                    ContractCatalogUpload upload => upload.Id,
                    ContractIconImage icon => icon.Id,
+                   ContractProfileDeletion deletion => deletion.Id,
                    _ => Guid.Empty
                };
     }

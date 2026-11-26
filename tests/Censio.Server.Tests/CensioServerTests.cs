@@ -694,6 +694,53 @@ public sealed class CensioServerTests
     }
 
     /// <summary>
+    /// A profile the server stores under its name, with messages still in the buffer, deleted with its history while no
+    /// sender runs (<c>Mode</c> <c>Off</c>): the next sender against the real server sends the deletion, none of the
+    /// buffered messages, and the server no longer shows the profile (S3, Deleted identities).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC13")]
+    public async Task CensioServerProfileDeletionInModeOffDropsBufferedMessages()
+    {
+        // Arrange
+        var directory = CreateTemporaryDirectory();
+        var session = await RunSessionOnFreePortAsync(Path.Combine(directory, "Data"), new FakeTimeProvider(new DateTimeOffset(2026, 11, 21, 12, 0, 0, TimeSpan.Zero)));
+        var profiles = CompanionProfiles.Load(Path.Combine(directory, "profiles.json"), NullLogger.Instance);
+        var deleted = profiles.Create("MARKER-Beta");
+
+        await using var buffer = new LiveBuffer(Path.Combine(directory, "Buffer"), LiveBufferLimits.Defaults, TimeProvider.System, NullLogger.Instance);
+
+        _ = buffer.RunAsync(TestContext.CancellationToken);
+
+        var isNamedOnServer = await SendOnceAsync(session, buffer, profiles, CreateLiveTickItem(100));
+        var pageBefore = await ReadRegionsPageAsync(session.Status.Port, deleted.Id);
+
+        AddTick(buffer, deleted.Id, 200);
+        AddTick(buffer, deleted.Id, 300);
+        profiles.Select(LiveSender.ProfileId);
+        profiles.Delete(deleted.Id, true);
+
+        await using var sender = LiveSender.ForLocalServer(session.Status.Port, session.WaitForTokenAsync, buffer, "1.0.0", new ClientWebSocketConnector(TimeProvider.System), TimeProvider.System, NullLogger.Instance);
+
+        sender.UseProfiles(profiles);
+
+        // Act
+        _ = sender.RunAsync(TestContext.CancellationToken);
+
+        var isDrained = await WaitUntilSentAsync(buffer);
+        var pageAfter = await ReadRegionsPageAsync(session.Status.Port, deleted.Id);
+
+        // Assert
+        Assert.IsTrue(isNamedOnServer, "The first tick of the profile should be acknowledged before the deletion");
+        Assert.Contains("MARKER-Beta", pageBefore, "The server should show the profile under its name before the deletion");
+        Assert.IsTrue(isDrained, "No message should wait in the buffer after the next start");
+        Assert.AreEqual(2, buffer.Status.Dropped, "Both buffered ticks of the deleted profile should be dropped");
+        Assert.IsEmpty(profiles.WaitingDeletions, "The server should have confirmed the deletion");
+        Assert.DoesNotContain("MARKER-Beta", pageAfter, "The server should not show the deleted profile any more");
+    }
+
+    /// <summary>
     /// Creates the options of a local server whose content root is the test's base folder.
     /// </summary>
     /// <param name="port">The port</param>
@@ -882,6 +929,20 @@ public sealed class CensioServerTests
     }
 
     /// <summary>
+    /// Adds a live tick of a profile to a buffer, as a run that buffered it under that profile left it.
+    /// </summary>
+    /// <param name="buffer">The buffer</param>
+    /// <param name="profileId">The identity of the profile</param>
+    /// <param name="gameTime">The game time, which identifies the tick</param>
+    private static void AddTick(LiveBuffer buffer, Guid profileId, long gameTime)
+    {
+        var item = CreateLiveTickItem(gameTime);
+        var tick = ContractMessageConverter.ToTick(item.Result.Tick ?? throw new AssertFailedException("The item should hold a tick"), profileId);
+
+        buffer.Add(tick.Id, ContractWriter.Write(tick).Utf8Json);
+    }
+
+    /// <summary>
     /// Creates a runner that replays the fixture at maximum speed into a sender.
     /// </summary>
     /// <param name="sender">The sender</param>
@@ -1042,6 +1103,25 @@ public sealed class CensioServerTests
         }
 
         return buffer.Status.Waiting == 0;
+    }
+
+    /// <summary>
+    /// Runs a live sender in local mode until an item is acknowledged, then disposes it, as a Companion that exits.
+    /// </summary>
+    /// <param name="session">The session of the hosted server</param>
+    /// <param name="buffer">The buffer, running</param>
+    /// <param name="profiles">The profiles</param>
+    /// <param name="item">The item</param>
+    /// <returns>Whether the item was acknowledged</returns>
+    private async Task<bool> SendOnceAsync(LocalServerSession session, LiveBuffer buffer, CompanionProfiles profiles, PipeConnectionItem item)
+    {
+        await using var sender = LiveSender.ForLocalServer(session.Status.Port, session.WaitForTokenAsync, buffer, "1.0.0", new ClientWebSocketConnector(TimeProvider.System), TimeProvider.System, NullLogger.Instance);
+
+        sender.UseProfiles(profiles);
+        _ = sender.RunAsync(TestContext.CancellationToken);
+        sender.Enqueue(item);
+
+        return await WaitUntilSentAsync(buffer);
     }
 
     /// <summary>
