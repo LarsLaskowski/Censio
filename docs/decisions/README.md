@@ -175,4 +175,6 @@ once in the [area document](../areas/README.md) of the record's area, and the re
 | [0112](0112-connection-settings-applied-by-a-restart-that-waits-for-the-old-companion.md) | Connection and game settings are applied by a restart that waits for the old Companion | Accepted | 2026-11-25 |
 | [0113](0113-companion-texts-in-english-and-german-from-one-table.md) | The Companion's own texts come in English and German from one table, chosen by the key `language` | Accepted | 2026-11-25 |
 | [0114](0114-start-with-windows-switched-only-in-the-settings-window.md) | Start with Windows is switched only in the settings window | Accepted | 2026-11-25 |
+| [0115](0115-profile-deleted-in-the-companion-history-on-the-server-by-the-players-choice.md) | A profile is deleted in the Companion, its history on the server only by the player's choice, and its identity filters the buffer | Accepted | 2026-11-26 |
+| [0116](0116-history-deleted-through-the-ingest-connection-with-the-token.md) | A profile's history is also deleted through the ingest connection, after a hello with the token | Accepted | 2026-11-26 |
 <!-- project:end index -->

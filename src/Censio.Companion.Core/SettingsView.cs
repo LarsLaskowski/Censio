@@ -52,6 +52,16 @@ public sealed class SettingsView
     /// </summary>
     public required IReadOnlyList<string> Warnings { get; init; }
 
+    /// <summary>
+    /// Gets the number of deleted profiles whose history the server has not deleted yet.
+    /// </summary>
+    public int WaitingDeletions { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether as many deletions wait as the Companion keeps.
+    /// </summary>
+    public bool IsDeletionQueueFull { get; init; }
+
     #endregion // Properties
 
     #region Methods
@@ -76,6 +86,16 @@ public sealed class SettingsView
                    SettingsField.BufferHours or SettingsField.BufferMegabytes => mode is CompanionSettingsMode.Local or CompanionSettingsMode.Forward,
                    _ => true
                };
+    }
+
+    /// <summary>
+    /// Determines whether the window can delete a profile.
+    /// </summary>
+    /// <param name="selected">The identity of the selected profile</param>
+    /// <returns><see langword="true" /> when the profile is listed and is neither <c>Live</c> nor the active profile</returns>
+    public bool CanDelete(Guid selected)
+    {
+        return CompanionProfiles.IsDeletable(selected, ActiveProfile, ProfileList);
     }
 
     #endregion // Methods

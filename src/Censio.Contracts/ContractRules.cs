@@ -166,6 +166,13 @@ internal sealed class ContractRules
                 }
                 break;
 
+            case ContractProfileDeletion deletion:
+                {
+                    CheckIdentity(deletion.Id);
+                    CheckIdentity(deletion.ProfileId);
+                }
+                break;
+
             case ContractStatus status:
                 {
                     Require(Enum.IsDefined(status.PipeState));

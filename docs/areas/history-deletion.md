@@ -53,6 +53,10 @@ The category and what no line holds are those of [`history.md`](history.md), *Lo
   clean-up has not finished.
 - The deletion is reachable without a login, from a page opened by a trusted host only ([`web-pages.md`](web-pages.md),
   record 0085).
+- A second entry point is the `/ingest` connection: a Companion with the token sends the message `profileDeletion` with the
+  profile's identity ([`contract.md`](contract.md), [`ingest.md`](ingest.md), *Messages after the hello*), and the server
+  deletes as above. The host rule of the pages does not apply to it: the token (or, with the token off, nothing but the
+  refusal of browser upgrades) guards it, and a token holder can delete any profile by its identity (record 0116).
 
 ### Measurements
 

@@ -264,7 +264,16 @@ public sealed class IngestEndpointTests
 
         using var database = opened.Database ?? throw new InvalidOperationException("The in-memory database should open");
 
-        app.MapCensioIngest(IngestAccess.CreateOpen(), new ServerState(new ServerStore(database), NullLogger.Instance));
+        var state = new ServerState(new ServerStore(database), NullLogger.Instance);
+
+        using var history = new HistoryRetention(state, new HistoryStore(database), new FakeTimeProvider(), NullLogger.Instance);
+
+        app.MapCensioIngest(IngestAccess.CreateOpen(),
+                            new IngestStores
+                            {
+                                State = state,
+                                History = history
+                            });
         await app.StartAsync(TestContext.CancellationToken);
 
         using var client = app.GetTestClient();

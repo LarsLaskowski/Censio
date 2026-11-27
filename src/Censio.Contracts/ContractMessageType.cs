@@ -60,7 +60,12 @@ public enum ContractMessageType
     /// <summary>
     /// The trade routes of the game.
     /// </summary>
-    TradeRoutes
+    TradeRoutes,
+
+    /// <summary>
+    /// The deletion of a profile's history on the server.
+    /// </summary>
+    ProfileDeletion
 
     #endregion // Values
 }

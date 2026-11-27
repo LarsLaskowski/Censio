@@ -19,7 +19,7 @@ the window itself in [`companion-settings.md`](companion-settings.md).
   active; at the first start, and while the file is missing, it is `Live`.
 - A missing file is the list with `Live` alone, and is valid. The file is written in the background after a change
   (*Writing*) in every mode, also when no live data is sent.
-- Profiles are created and selected only; they are neither renamed nor deleted in the Companion. A profile's history is
+- Profiles are created, selected and deleted in the Companion (*Deleting*); they are not renamed. A profile's history is
   deleted on the pages ([`history-deletion.md`](history-deletion.md)); the list of the Companion keeps the profile.
 
 ### Creating and selecting
@@ -37,6 +37,33 @@ the window itself in [`companion-settings.md`](companion-settings.md).
   longer knows is sent on the current connection, and the server creates it without a name.
 - The pages list a profile under the name the hello gave; a profile made and used offline appears with its name after the
   next connection.
+
+### Deleting
+
+- In the settings window `Delete profile…` deletes the profile selected in the drop-down ([`companion-settings.md`](companion-settings.md),
+  *Fields*). `CompanionProfiles.IsDeletable` is the one rule: the identity is in the list, is not `Live` and is not the
+  active profile. `Delete` throws `ArgumentException` for any other, which the window and its session prevent first.
+- The dialog `Delete profile?` asks to confirm and offers the box `Also delete its history on the server`, off by default;
+  `Cancel` or closing it changes nothing. A deletion takes effect at once, with no save of the window and no restart; other
+  edits of the open window stay.
+- A deletion removes the profile from the list and every figure link to it (also the link of a session that runs), clears a
+  pending notice, writes the file (*Writing*) and logs `Profile deleted` (Information, no name and no identity). The name
+  of the deleted profile can be used at once for a new one.
+- With the box ticked the identity also goes on the list of *deleted identities*, oldest first, each *waiting* (the server
+  has not answered) or *confirmed*. At most 1,000 identities are kept. With 1,000 waiting the queue is full: the box is
+  disabled, and `Delete` with the history throws `InvalidOperationException`. A new identity beyond 1,000 kept forgets the
+  oldest confirmed one, never a waiting one.
+- A waiting deletion is sent as the message `profileDeletion` ([`contract.md`](contract.md)) by live sending, first after
+  each accepted hello, one at a time, before the catalog and the buffered messages ([`live-sending.md`](live-sending.md)).
+  It stays waiting, also across restarts, until the server answers: a connection lost first keeps it waiting. An
+  accepted acknowledgement confirms it and logs `Profile deletion confirmed by the server`; a refusal confirms it as well and
+  logs `Profile deletion refused by the server: <refusal>` (Warning), since the same message would be refused again. In a
+  run that sends no live data nothing is sent, and the deletion waits for a later run that does.
+- Buffered messages of a deleted identity, waiting or confirmed, are dropped instead of sent, counted as dropped
+  (`Live messages dropped: <n>`); the hello never names a deleted identity but the active profile. Dropping needs a running
+  live sender: with live sending off, the messages stay in the buffer until a later run drops them.
+- The deletion on the pages is another thing: it deletes the server's history and leaves the Companion's list. A profile
+  only the server has is not in the Companion's list and cannot be deleted from it.
 
 ### Figure links
 
@@ -72,9 +99,11 @@ the window itself in [`companion-settings.md`](companion-settings.md).
   `profiles.json.tmp` in the same folder, flushes it and moves it over the file. A failed write logs `Could not save the
   settings: <exception type>`, keeps the state in memory and tries again at the next change. At `Exit` the writer is
   given one second to write the latest state ([`companion.md`](companion.md), *Tray icon and menu*).
-- The format is `{"version":1,"active":"<id>","profiles":[{"id":"<id>","name":"<name>"}],"figures":[{"figure":"<key>","profile":"<id>"}]}`,
+- The format is `{"version":1,"active":"<id>","profiles":[{"id":"<id>","name":"<name>"}],"figures":[{"figure":"<key>","profile":"<id>"}]}`
+  while no identity is deleted, and `"version":2` with a fifth property `"deleted":[{"id":"<id>","confirmed":false}]` otherwise,
   with the writer's non-ASCII and control characters escaped (`\uXXXX`). The largest file the writer produces is
-  567,086 bytes (1,000 profiles of 64 characters each written as 6-byte escapes and 1,000 figures), under the reader's bound.
+  630,718 bytes (1,000 profiles of 64 characters each written as 6-byte escapes, 1,000 figures and 1,000 deleted
+  identities), under the reader's bound.
 
 ## Limits and errors
 
@@ -90,6 +119,13 @@ the window itself in [`companion-settings.md`](companion-settings.md).
   `active` or a figure's profile not in the list; a name that breaks the name rules or repeats another ignoring case, or
   that holds text that is not valid UTF-8; more than 1,000 figures; a figure key that is not 64 lowercase hex characters
   or that repeats.
+- The reader takes version 1 with exactly the four properties and version 2 with exactly five, and in `deleted` it rejects
+  what is not an array, more than 1,000 entries, an entry with a missing, unknown or repeated property, an `id` not in the `D`
+  form, a `confirmed` that is not `true` or `false`, a repeated identity, and the identity of `Live` or of a listed profile
+  (the last three compared as identities, whatever their letter case or surrounding white space).
+- A file the reader rejects also forgets the deleted identities: their waiting deletions are not sent, and buffered messages of those profiles are sent again and recreate the profiles on the server, unnamed.
+- Downgrade: a file of version 2 is rejected by a Companion of an earlier release, which then uses `Live` alone, so the same
+  loss follows there.
 - The Companion does not read the server's profile list: a profile of the server that was created elsewhere is not in the list.
 - A lost or replaced file starts the list again with `Live`; the server keeps the profiles it knows.
 - Not verified on Windows yet: that the notification appears as a Windows 11 notification, and that its click raises the

@@ -15,7 +15,7 @@ public sealed class ContractWriterTests
     /// <summary>
     /// The fixed text of a message that breaks a value rule.
     /// </summary>
-    private const string InvalidText = "Contract message breaks a rule of contract version 2";
+    private const string InvalidText = "Contract message breaks a rule of contract version 3";
 
     /// <summary>
     /// The fixed text of a message above a size bound.
@@ -93,6 +93,8 @@ public sealed class ContractWriterTests
                                                                                                                        ["profile name with a lone surrogate"] = (ContractErrorKind.Invalid, () => Hello("t", "0.3.0", _profileA, "Al" + (char)0xD800)),
                                                                                                                        ["token with a lone surrogate"] = (ContractErrorKind.Invalid, () => Hello(string.Concat((char)0xDC00, "t"), "0.3.0", _profileA, "Alice")),
                                                                                                                        ["profile identity all zero"] = (ContractErrorKind.Invalid, () => Hello("t", "0.3.0", Guid.Empty, "Alice")),
+                                                                                                                       ["profile deletion id all zero"] = (ContractErrorKind.Invalid, () => Deletion(Guid.Empty, _profileA)),
+                                                                                                                       ["profile deletion profile all zero"] = (ContractErrorKind.Invalid, () => Deletion(_id, Guid.Empty)),
                                                                                                                        ["server version empty"] = (ContractErrorKind.Invalid, () => Accepted(string.Empty, null)),
                                                                                                                        ["catalog identity uppercase"] = (ContractErrorKind.Invalid, () => Accepted("0.3.0", Icon.ToUpperInvariant())),
                                                                                                                        ["catalog identity of 63 digits"] = (ContractErrorKind.Invalid, () => Accepted("0.3.0", Icon[..63])),
@@ -402,8 +404,8 @@ public sealed class ContractWriterTests
             yield return new object?[] { Acknowledgement(_id, null, null, Icon, IconTwo), null };
             yield return new object?[] { Acknowledgement(_id, null, null, MissingIcons(ContractReader.MaxMissingIcons)), null };
             yield return new object?[] { Acknowledgement(_id, ContractAcknowledgementRefusal.Malformed, null), "Contract message is malformed" };
-            yield return new object?[] { Acknowledgement(_id, ContractAcknowledgementRefusal.UnsupportedVersion, 1), "Contract version 1 is not supported; supported: 2" };
-            yield return new object?[] { Acknowledgement(_id, ContractAcknowledgementRefusal.UnsupportedVersion, -7), "Contract version -7 is not supported; supported: 2" };
+            yield return new object?[] { Acknowledgement(_id, ContractAcknowledgementRefusal.UnsupportedVersion, 1), "Contract version 1 is not supported; supported: 3" };
+            yield return new object?[] { Acknowledgement(_id, ContractAcknowledgementRefusal.UnsupportedVersion, -7), "Contract version -7 is not supported; supported: 3" };
             yield return new object?[] { Acknowledgement(_id, ContractAcknowledgementRefusal.Invalid, null), InvalidText };
             yield return new object?[] { Acknowledgement(_id, ContractAcknowledgementRefusal.TooLarge, null), TooLargeText };
             yield return new object?[] { Acknowledgement(_id, ContractAcknowledgementRefusal.CatalogMalformed, null), "Catalog document is malformed" };
@@ -420,11 +422,11 @@ public sealed class ContractWriterTests
     {
         get
         {
-            yield return new object[] { Refused(ContractHelloRefusal.UnsupportedVersion, 1, 2), "{\"type\":\"helloRefused\",\"contractVersion\":2,\"reason\":\"unsupportedVersion\",\"receivedVersion\":1,\"supportedVersions\":[2]}" };
-            yield return new object[] { Refused(ContractHelloRefusal.TokenRefused, 2, 2), "{\"type\":\"helloRefused\",\"contractVersion\":2,\"reason\":\"tokenRefused\",\"receivedVersion\":2,\"supportedVersions\":[2]}" };
-            yield return new object[] { Refused(ContractHelloRefusal.CompanionConnected, 2, 2), "{\"type\":\"helloRefused\",\"contractVersion\":2,\"reason\":\"companionConnected\",\"receivedVersion\":2,\"supportedVersions\":[2]}" };
-            yield return new object[] { Hello(null, "0.3.0", _profileA, "Alice"), $"{{\"type\":\"hello\",\"contractVersion\":2,\"token\":null,\"companionVersion\":\"0.3.0\",\"profileId\":\"{ProfileAText}\",\"profileName\":\"Alice\"}}" };
-            yield return new object[] { Hello("secret", "0.3.0", _profileA, "Alice"), $"{{\"type\":\"hello\",\"contractVersion\":2,\"token\":\"secret\",\"companionVersion\":\"0.3.0\",\"profileId\":\"{ProfileAText}\",\"profileName\":\"Alice\"}}" };
+            yield return new object[] { Refused(ContractHelloRefusal.UnsupportedVersion, 1, 3), "{\"type\":\"helloRefused\",\"contractVersion\":3,\"reason\":\"unsupportedVersion\",\"receivedVersion\":1,\"supportedVersions\":[3]}" };
+            yield return new object[] { Refused(ContractHelloRefusal.TokenRefused, 3, 3), "{\"type\":\"helloRefused\",\"contractVersion\":3,\"reason\":\"tokenRefused\",\"receivedVersion\":3,\"supportedVersions\":[3]}" };
+            yield return new object[] { Refused(ContractHelloRefusal.CompanionConnected, 3, 3), "{\"type\":\"helloRefused\",\"contractVersion\":3,\"reason\":\"companionConnected\",\"receivedVersion\":3,\"supportedVersions\":[3]}" };
+            yield return new object[] { Hello(null, "0.3.0", _profileA, "Alice"), $"{{\"type\":\"hello\",\"contractVersion\":3,\"token\":null,\"companionVersion\":\"0.3.0\",\"profileId\":\"{ProfileAText}\",\"profileName\":\"Alice\"}}" };
+            yield return new object[] { Hello("secret", "0.3.0", _profileA, "Alice"), $"{{\"type\":\"hello\",\"contractVersion\":3,\"token\":\"secret\",\"companionVersion\":\"0.3.0\",\"profileId\":\"{ProfileAText}\",\"profileName\":\"Alice\"}}" };
         }
     }
 
@@ -519,6 +521,25 @@ public sealed class ContractWriterTests
         // Assert
         Assert.IsNull(written.Error, $"The message should be written: {expected}");
         Assert.AreEqual(expected, Encoding.UTF8.GetString(written.Utf8Json.Span), "The message should be written in its frozen form");
+    }
+
+    /// <summary>
+    /// A profile deletion is written with its type and version first, then its identity and its profile, and nothing
+    /// else (spec N2).
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC11")]
+    public void ContractWriterWritesProfileDeletion()
+    {
+        // Arrange
+        var deletion = Deletion(_id, _profileA);
+
+        // Act
+        var written = ContractWriter.Write(deletion);
+
+        // Assert
+        Assert.IsNull(written.Error, "The profile deletion should be written");
+        Assert.AreEqual($"{{\"type\":\"profileDeletion\",\"contractVersion\":3,\"id\":\"11111111-2222-4333-8444-555555555555\",\"profileId\":\"{ProfileAText}\"}}", Encoding.UTF8.GetString(written.Utf8Json.Span), "The profile deletion should be written with its identity and its profile only");
     }
 
     /// <summary>
@@ -1117,6 +1138,21 @@ public sealed class ContractWriterTests
                    CompanionVersion = version,
                    ProfileId = profile,
                    ProfileName = name
+               };
+    }
+
+    /// <summary>
+    /// Creates a profile deletion.
+    /// </summary>
+    /// <param name="id">The identity of the message</param>
+    /// <param name="profile">The profile whose history is deleted</param>
+    /// <returns>The profile deletion</returns>
+    private static ContractProfileDeletion Deletion(Guid id, Guid profile)
+    {
+        return new ContractProfileDeletion
+               {
+                   Id = id,
+                   ProfileId = profile
                };
     }
 

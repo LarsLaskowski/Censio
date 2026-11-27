@@ -62,9 +62,9 @@ public sealed partial class IngestSession : IDisposable
     private readonly IngestAdmission _admission;
 
     /// <summary>
-    /// The server state the messages are stored through.
+    /// The stores the messages are stored through.
     /// </summary>
-    private readonly ServerState _state;
+    private readonly IngestStores _stores;
 
     /// <summary>
     /// The time provider.
@@ -156,16 +156,16 @@ public sealed partial class IngestSession : IDisposable
     /// <param name="webSocket">The WebSocket of the connection</param>
     /// <param name="access">The access that checks the token</param>
     /// <param name="admission">The places and the outcome report of the connection</param>
-    /// <param name="state">The server state the messages are stored through</param>
+    /// <param name="stores">The stores the messages are stored through</param>
     /// <param name="timeProvider">The time provider</param>
     /// <param name="logger">The logger</param>
     /// <param name="serverVersion">The version of the server</param>
-    public IngestSession(WebSocket webSocket, IngestAccess access, IngestAdmission admission, ServerState state, TimeProvider timeProvider, ILogger logger, string serverVersion)
+    public IngestSession(WebSocket webSocket, IngestAccess access, IngestAdmission admission, IngestStores stores, TimeProvider timeProvider, ILogger logger, string serverVersion)
     {
         _webSocket = webSocket;
         _access = access;
         _admission = admission;
-        _state = state;
+        _stores = stores;
         _timeProvider = timeProvider;
         _logger = logger;
         _serverVersion = serverVersion;
@@ -242,6 +242,7 @@ public sealed partial class IngestSession : IDisposable
                    ContractSessionEnd end => end.Id,
                    ContractIconImage icon => icon.Id,
                    ContractCatalogUpload upload => upload.Id,
+                   ContractProfileDeletion deletion => deletion.Id,
                    _ => null
                };
     }
@@ -410,7 +411,7 @@ public sealed partial class IngestSession : IDisposable
 
         Volatile.Write(ref _placeTaken, 1);
 
-        var stored = await _state.StoreProfileAsync(hello.ProfileId, hello.ProfileName, _stoppingToken).ConfigureAwait(false);
+        var stored = await _stores.State.StoreProfileAsync(hello.ProfileId, hello.ProfileName, _stoppingToken).ConfigureAwait(false);
 
         if (stored.Outcome == ServerStoreOutcome.Failed)
         {
@@ -425,12 +426,12 @@ public sealed partial class IngestSession : IDisposable
         _helloAccepted = true;
         _admission.RecordAcceptedHello();
         LogCompanionAccepted(_logger);
-        _state.SetCompanionConnected();
+        _stores.State.SetCompanionConnected();
 
         return await SendAsync(new ContractHelloAccepted
                                {
                                    ServerVersion = _serverVersion,
-                                   CatalogIdentity = _state.CompleteCatalogIdentity
+                                   CatalogIdentity = _stores.State.CompleteCatalogIdentity
                                }).ConfigureAwait(false);
     }
 
@@ -509,7 +510,7 @@ public sealed partial class IngestSession : IDisposable
         {
             if (message is ContractStatus status)
             {
-                _state.SetCompanionPipeState(status.PipeState);
+                _stores.State.SetCompanionPipeState(status.PipeState);
                 _acceptedCount++;
 
                 return null;
@@ -566,30 +567,38 @@ public sealed partial class IngestSession : IDisposable
         {
             case ContractTick tick:
                 {
-                    result = await _state.StoreTickAsync(tick, _stoppingToken).ConfigureAwait(false);
+                    result = await _stores.State.StoreTickAsync(tick, _stoppingToken).ConfigureAwait(false);
                 }
                 break;
 
             case ContractTradeRoutes tradeRoutes:
                 {
-                    result = await _state.StoreTradeRoutesAsync(tradeRoutes, _stoppingToken).ConfigureAwait(false);
+                    result = await _stores.State.StoreTradeRoutesAsync(tradeRoutes, _stoppingToken).ConfigureAwait(false);
                 }
                 break;
 
             case ContractIconImage icon:
                 {
-                    result = await _state.StoreIconAsync(icon, _stoppingToken).ConfigureAwait(false);
+                    result = await _stores.State.StoreIconAsync(icon, _stoppingToken).ConfigureAwait(false);
                 }
                 break;
 
             case ContractCatalogUpload upload when catalogDocument is not null:
                 {
-                    var catalog = await _state.StoreCatalogAsync(upload, catalogDocument, _stoppingToken).ConfigureAwait(false);
+                    var catalog = await _stores.State.StoreCatalogAsync(upload, catalogDocument, _stoppingToken).ConfigureAwait(false);
 
                     result = catalog.Result;
                     missingIcons = catalog.MissingIcons;
                 }
                 break;
+
+            case ContractProfileDeletion deletion:
+                {
+                    var outcome = await _stores.History.DeleteProfileAsync(deletion.ProfileId, _stoppingToken).ConfigureAwait(false);
+
+                    // A failed deletion was logged by the retention job itself.
+                    return (outcome is HistoryOutcome.Done or HistoryOutcome.NothingToDo, missingIcons);
+                }
 
             default:
                 {
@@ -842,7 +851,7 @@ public sealed partial class IngestSession : IDisposable
         {
             if (_helloAccepted)
             {
-                _state.SetCompanionDisconnected();
+                _stores.State.SetCompanionDisconnected();
             }
 
             _admission.ReleaseCompanion();

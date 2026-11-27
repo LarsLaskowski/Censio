@@ -2,7 +2,7 @@
 
 ## Scope
 
-The JSON contract version 2 between the Companion and the server: the eleven messages, their wire form, the version rule
+The JSON contract version 3 between the Companion and the server: the twelve messages, their wire form, the version rule
 and the frozen hello, identities, the reader's checks in order, the bounds, the refusal texts and what never crosses.
 The server and the Companion rely on it. The server's endpoint reads and answers these messages ([`ingest.md`](ingest.md));
 a Companion that replays a recording with `--server` sends them ([`replay-sending.md`](replay-sending.md)) and a live Companion does ([`live-sending.md`](live-sending.md)).
@@ -12,7 +12,7 @@ a Companion that replays a recording with `--server` sends them ([`replay-sendin
 ### Wire form
 
 - A message is one UTF-8 JSON object without byte order mark, compact. Its first properties are `type` and
-  `contractVersion` (`2`), then its own properties in the order below. Every property is required and always written; a
+  `contractVersion` (`3`), then its own properties in the order below. Every property is required and always written; a
   value is `null` only where stated. Names are camelCase, enum values camelCase strings.
 - A float is a JSON number in the range of a 32-bit float, written in its shortest form that reads back to the same
   bits (`-0` stays negative zero), or `null` for no value. A number outside that range is never read as a value.
@@ -31,6 +31,7 @@ a Companion that replays a recording with `--server` sends them ([`replay-sendin
 | `iconImage` | Companion to server | `id`, `reference`, `png` (Base64) |
 | `tick` | Companion to server | `id`, `profileId`, `receiveTime`, `gameTime`, `islands` |
 | `tradeRoutes` | Companion to server | `id`, `profileId`, `receiveTime`, `routes` |
+| `profileDeletion` | Companion to server | `id`, `profileId` |
 | `sessionStart`, `sessionEnd` | Companion to server | `id`, `profileId`, `receiveTime` |
 | `status` | Companion to server | `pipeState` (`waitingForGame`, `connected`, `receiving`, `pipeBusy`, `protocolMismatch`, `error`) |
 | `acknowledgement` | server to Companion | `id`, `refusal`, `refusedVersion`, `missingIcons` |
@@ -52,25 +53,27 @@ not cross (*What never crosses*).
 Examples with invented values (shortened where marked):
 
 ```json
-{"type":"hello","contractVersion":2,"token":"example-token","companionVersion":"0.3.0","profileId":"aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee","profileName":"Alice"}
-{"type":"helloAccepted","contractVersion":2,"serverVersion":"0.3.0","catalogIdentity":null}
-{"type":"helloRefused","contractVersion":2,"reason":"unsupportedVersion","receivedVersion":1,"supportedVersions":[2]}
-{"type":"catalogUpload","contractVersion":2,"id":"11111111-2222-4333-8444-555555555555","document":"eyJzY2hlbWFWZXJzaW9uIjox..."}
-{"type":"iconImage","contractVersion":2,"id":"11111111-2222-4333-8444-555555555555","reference":"0f4636c78f65d3639ece5a064b5ae753e3408614a14fb18ab4d7540d2c248543","png":"iVBORw=="}
-{"type":"tick","contractVersion":2,"id":"11111111-2222-4333-8444-555555555555","profileId":"aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee","receiveTime":"2026-11-12T10:20:30.1234567Z","gameTime":42,"islands":[{"sessionGuid":180023,"islandId":1,"areaIndex":0,"sessionId":2,"name":"Isle","entries":[{"productGuid":1010017,"generation":1.5,"consumption":0.25,"delta":1.25,"perfectGeneration":2,"perfectConsumption":0,"buildingCount":3,"maintenance":-20,"income":null,"profit":7,"summedProductivity":300,"averageProductivity":1,"workforceAmounts":[[1010052,40]],"buildingAmounts":[]}]}]}
-{"type":"tradeRoutes","contractVersion":2,"id":"11111111-2222-4333-8444-555555555555","profileId":"aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee","receiveTime":"2026-11-12T10:20:30.1234567Z","routes":[{"id":7,"name":"Wood to the capital","folder":"","majorProblems":0,"minorProblems":1,"ships":2,"lostShips":0,"stations":[{"sessionGuid":180023,"islandId":1,"areaIndex":0},{"sessionGuid":180023,"islandId":2,"areaIndex":0}]}]}
-{"type":"sessionStart","contractVersion":2,"id":"11111111-2222-4333-8444-555555555555","profileId":"aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee","receiveTime":"2026-11-12T10:20:30.1234567Z"}
-{"type":"sessionEnd","contractVersion":2,"id":"66666666-7777-4888-9999-000000000001","profileId":"aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee","receiveTime":"2026-11-12T10:25:00.0000000Z"}
-{"type":"status","contractVersion":2,"pipeState":"receiving"}
-{"type":"acknowledgement","contractVersion":2,"id":"11111111-2222-4333-8444-555555555555","refusal":null,"refusedVersion":null,"missingIcons":["0f4636c78f65d3639ece5a064b5ae753e3408614a14fb18ab4d7540d2c248543"]}
+{"type":"hello","contractVersion":3,"token":"example-token","companionVersion":"0.3.0","profileId":"aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee","profileName":"Alice"}
+{"type":"helloAccepted","contractVersion":3,"serverVersion":"0.3.0","catalogIdentity":null}
+{"type":"helloRefused","contractVersion":3,"reason":"unsupportedVersion","receivedVersion":1,"supportedVersions":[3]}
+{"type":"catalogUpload","contractVersion":3,"id":"11111111-2222-4333-8444-555555555555","document":"eyJzY2hlbWFWZXJzaW9uIjox..."}
+{"type":"iconImage","contractVersion":3,"id":"11111111-2222-4333-8444-555555555555","reference":"0f4636c78f65d3639ece5a064b5ae753e3408614a14fb18ab4d7540d2c248543","png":"iVBORw=="}
+{"type":"tick","contractVersion":3,"id":"11111111-2222-4333-8444-555555555555","profileId":"aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee","receiveTime":"2026-11-12T10:20:30.1234567Z","gameTime":42,"islands":[{"sessionGuid":180023,"islandId":1,"areaIndex":0,"sessionId":2,"name":"Isle","entries":[{"productGuid":1010017,"generation":1.5,"consumption":0.25,"delta":1.25,"perfectGeneration":2,"perfectConsumption":0,"buildingCount":3,"maintenance":-20,"income":null,"profit":7,"summedProductivity":300,"averageProductivity":1,"workforceAmounts":[[1010052,40]],"buildingAmounts":[]}]}]}
+{"type":"tradeRoutes","contractVersion":3,"id":"11111111-2222-4333-8444-555555555555","profileId":"aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee","receiveTime":"2026-11-12T10:20:30.1234567Z","routes":[{"id":7,"name":"Wood to the capital","folder":"","majorProblems":0,"minorProblems":1,"ships":2,"lostShips":0,"stations":[{"sessionGuid":180023,"islandId":1,"areaIndex":0},{"sessionGuid":180023,"islandId":2,"areaIndex":0}]}]}
+{"type":"profileDeletion","contractVersion":3,"id":"11111111-2222-4333-8444-555555555555","profileId":"aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"}
+{"type":"sessionStart","contractVersion":3,"id":"11111111-2222-4333-8444-555555555555","profileId":"aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee","receiveTime":"2026-11-12T10:20:30.1234567Z"}
+{"type":"sessionEnd","contractVersion":3,"id":"66666666-7777-4888-9999-000000000001","profileId":"aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee","receiveTime":"2026-11-12T10:25:00.0000000Z"}
+{"type":"status","contractVersion":3,"pipeState":"receiving"}
+{"type":"acknowledgement","contractVersion":3,"id":"11111111-2222-4333-8444-555555555555","refusal":null,"refusedVersion":null,"missingIcons":["0f4636c78f65d3639ece5a064b5ae753e3408614a14fb18ab4d7540d2c248543"]}
 ```
 
 ### Versions and the frozen form
 
-- The contract version is an exact integer. A message of any version other than `2`, whatever else it holds, is refused
-  as *unsupported version* with the version found: `Contract version <n> is not supported; supported: 2`. Version 1
+- The contract version is an exact integer. A message of any version other than `3`, whatever else it holds, is refused
+  as *unsupported version* with the version found: `Contract version <n> is not supported; supported: 3`. Version 1
   (release 0.3.0) had no `tradeRoutes` message; a Companion of that release and this server refuse each other with both
-  versions named ([record 0096](../decisions/0096-contract-version-2-adds-trade-routes-read-exactly.md)).
+  versions named ([record 0096](../decisions/0096-contract-version-2-adds-trade-routes-read-exactly.md)). Version 2 had no
+  `profileDeletion` message, which version 3 adds ([record 0116](../decisions/0116-history-deleted-through-the-ingest-connection-with-the-token.md)); a Companion and a server of different versions refuse each other the same way.
 - `type` and `contractVersion` are root properties in every version. The hello and the refused hello reply keep exactly
   the properties above, the three reasons included, in every later version. A hello of any version is read for its
   version and then refused as above; a refused hello reply of any version whose form is exactly the frozen one is read
@@ -81,10 +84,10 @@ Examples with invented values (shortened where marked):
 
 ### Identities and acknowledgements
 
-- A tick, a trade-routes message, a session start, a session end, a catalog upload and an icon image carry an `id`: a UUID the Companion assigns
+- A tick, a trade-routes message, a session start, a session end, a profile deletion, a catalog upload and an icon image carry an `id`: a UUID the Companion assigns
   when it takes the message and keeps with it. A resend after a lost acknowledgement carries the same `id`; two
   messages of equal content taken separately carry different ones.
-- A tick, a trade-routes message and a session event carry the identity (`profileId`) of the profile they were taken for, not the name; they are
+- A tick, a trade-routes message, a session event and a profile deletion carry the identity (`profileId`) of the profile they were taken for or that is deleted, not the name; they are
   read with that profile, not with the profile of the connection's hello. The hello carries the profile's name.
 - An acknowledgement names the `id` it answers. Accepted or refused, the Companion may discard the message; no
   acknowledgement means the Companion resends. A refusal carries its kind and `refusedVersion` for the two
@@ -111,7 +114,7 @@ Examples with invented values (shortened where marked):
 ### The reader's checks
 
 The reader (`ContractReader`) takes the bytes of one message and returns the message or a typed refusal, never an
-exception. A refusal of a tick, trade-routes message, session start, session end, catalog upload or icon image that is decided after the
+exception. A refusal of a tick, trade-routes message, session start, session end, profile deletion, catalog upload or icon image that is decided after the
 message was built (the value rules or the catalog document, step 5) also returns that message's `id`, unless it is all zero, so an
 endpoint can acknowledge the refusal by it; every other refusal, and every refusal of a server-to-Companion type,
 returns none. An accepted catalog upload also returns the catalog document it read in step 5 (no second read), and the
@@ -165,7 +168,7 @@ taken from the length and padding of the token, so 23,767,724 characters that wo
 
 ### Value rules (*invalid*)
 
-UUID form; receive time form; a trade-routes message of any number of routes (none included), each with names that are valid UTF-8
+UUID form (a profile deletion's `id` and `profileId` are UUIDs, never all zero); receive time form; a trade-routes message of any number of routes (none included), each with names that are valid UTF-8
 (empty allowed), any int32 counts and any number of stations (none included), repeated route IDs and names allowed; a tick of 1 to 256 islands with distinct keys (session GUID, island ID, area index);
 strictly ascending map GUIDs, which also excludes a repeated GUID; token `null` or not empty; profile name, Companion
 version and server version not empty; `reference` and `catalogIdentity` 64 lowercase hex; `png` not empty and its
@@ -178,8 +181,8 @@ Text that is not the UUID or receive time form is *invalid*, not *malformed*.
 | Kind | Text |
 | ---- | ---- |
 | Malformed | `Contract message is malformed` |
-| Unsupported version | `Contract version <n> is not supported; supported: 2` |
-| Invalid | `Contract message breaks a rule of contract version 2` |
+| Unsupported version | `Contract version <n> is not supported; supported: 3` |
+| Invalid | `Contract message breaks a rule of contract version 3` |
 | Too large | `Contract message exceeds a size bound` |
 | Catalog refused | the catalog's own text (`Catalog document is malformed`, `Catalog schema version <n> is not supported; supported: 1`, `Catalog document breaks a rule of schema version 1`, `Catalog document exceeds a size bound`) |
 
@@ -274,6 +277,7 @@ input.
 - [`decisions/0056`](../decisions/0056-catalog-document-read-strictly-by-exact-schema-version.md) — the catalog document inside an upload.
 - [`decisions/0063`](../decisions/0063-refused-contract-messages-acknowledged-by-id-or-the-connection-closed.md) — the reader returns the `id` of a refused message and the catalog of an accepted upload.
 - [`decisions/0096`](../decisions/0096-contract-version-2-adds-trade-routes-read-exactly.md) — version 2 adds the trade-routes message and is read exactly.
+- [`decisions/0116`](../decisions/0116-history-deleted-through-the-ingest-connection-with-the-token.md) — version 3 adds the profile deletion message.
 
 ## Not here
 

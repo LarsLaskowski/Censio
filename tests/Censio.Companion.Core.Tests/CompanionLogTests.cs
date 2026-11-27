@@ -1,3 +1,4 @@
+using Censio.Contracts;
 using Censio.Pipe;
 using Censio.Server.Tests;
 
@@ -194,6 +195,34 @@ public sealed class CompanionLogTests
                                                     ];
 
         Assert.AreSequenceEqual(expected, logger.Entries.Select(entry => (entry.Level, entry.Message, entry.Exception)).ToArray(), "Each restart line should log its level and its text, without an exception");
+    }
+
+    /// <summary>
+    /// The lines of deleting a profile write their level and their exact text, the refusal's kind its only value, so no
+    /// line holds a profile name or an identity, and no exception (spec N4, N5).
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC10")]
+    public void CompanionLogDeletionLinesHoldNoValue()
+    {
+        // Arrange
+        var logger = new RecordingLogger();
+
+        // Act
+        CompanionLog.ProfileDeleted(logger);
+        CompanionLog.ProfileDeletionConfirmed(logger);
+        CompanionLog.ProfileDeletionRefused(logger, ContractAcknowledgementRefusal.Invalid);
+        CompanionLog.ProfileDeletionRefused(logger, ContractAcknowledgementRefusal.UnsupportedVersion);
+
+        // Assert
+        (LogLevel, string, Exception?)[] expected = [
+                                                        (LogLevel.Information, "Profile deleted", null),
+                                                        (LogLevel.Information, "Profile deletion confirmed by the server", null),
+                                                        (LogLevel.Warning, "Profile deletion refused by the server: Invalid", null),
+                                                        (LogLevel.Warning, "Profile deletion refused by the server: UnsupportedVersion", null),
+                                                    ];
+
+        Assert.AreSequenceEqual(expected, logger.Entries.Select(entry => (entry.Level, entry.Message, entry.Exception)).ToArray(), "Each deletion line should log its level and its text, without an exception");
     }
 
     #endregion // Methods

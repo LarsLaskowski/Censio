@@ -117,10 +117,11 @@ first:
   lists exactly the distinct icon references of its document, sorted, that have no stored icon, a resend included; for
   the other types the list is empty. A later catalog upload replaces the earlier one, whatever its age.
 - A session start or session end the reader accepts is answered the same way and stores nothing.
+- A profile deletion the reader accepts deletes the history of its `profileId` as the pages' button does ([`history-deletion.md`](history-deletion.md), record 0116): when the deletion is done, or the profile is not stored, the message is answered like any stored one. A failed deletion is not acknowledged: the connection is closed with 1011 and an empty reason, as for a message whose storing fails, without a line of its own, since the retention job logs its own warning; the Companion keeps the deletion waiting and sends it again.
 - A message whose storing fails (disk full, file removed) is not acknowledged: the connection is closed with 1011 and an
   empty reason, the error line of *Log lines* is logged and the message counts as refused. The Companion reconnects and
   resends it.
-- A message of one of these six types that the reader refuses as *invalid* or with a catalog kind, whose `id` is a
+- A message of one of these seven types that the reader refuses as *invalid* or with a catalog kind, whose `id` is a
   valid UUID, is answered with an `acknowledgement` naming that `id` and the refusal kind (`invalid`,
   `catalogMalformed`, `catalogUnsupportedVersion`, `catalogInvalid`, `catalogTooLarge`), `refusedVersion` the
   catalog's schema version for `catalogUnsupportedVersion` and `null` otherwise, `missingIcons` empty. The connection
@@ -194,6 +195,7 @@ reply (the cases of *The hello*, step 1 and 3) is not logged.
   It was so before the limits and no bound is added (record 0082); rotating the token ends it.
 - **Plain text.** The token and the data cross the network unencrypted unless a reverse proxy terminates TLS
   (`SECURITY.md`, record 0006).
+- **Deletion by a token holder.** A Companion with the token (or anyone, with the token off) can delete the history of any profile by its identity, and each deletion of a stored profile writes one log line, re-reads the profile list and asks for a sweep, so a tick of a new profile followed by its deletion grows the log by one line per pair without a bound.
 - **Growth by a token holder.** Every stored icon and profile stays, a tick for 7 days and then as hourly rows ([`history.md`](history.md)): a Companion with the token (or anyone, with the token off) can grow the database file, the profile list and a profile's island list (up to 256 new islands per tick) without a bound; the server holds those lists in memory.
 
 ### Memory

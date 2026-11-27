@@ -94,6 +94,10 @@ public static class ContractWriter
                 JsonSerializer.Serialize(writer, tradeRoutes, ContractJsonContext.Default.ContractTradeRoutes);
                 break;
 
+            case ContractProfileDeletion deletion:
+                JsonSerializer.Serialize(writer, deletion, ContractJsonContext.Default.ContractProfileDeletion);
+                break;
+
             default:
                 throw new ArgumentException("The message is of no type of the contract.", nameof(message));
         }

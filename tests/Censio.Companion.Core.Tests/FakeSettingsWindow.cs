@@ -1,8 +1,9 @@
 namespace Censio.Companion.Core.Tests;
 
 /// <summary>
-/// A settings window that records each shown view, each shown outcome and each request to come to the front, raises
-/// <see cref="SaveRequested" /> when the test asks to save and <see cref="WindowClosed" /> when the test closes it.
+/// A settings window that records each shown view, each shown view of the profiles, each shown outcome and each request
+/// to come to the front, raises <see cref="SaveRequested" /> when the test asks to save, <see cref="DeleteRequested" />
+/// when the test asks to delete a profile and <see cref="WindowClosed" /> when the test closes it.
 /// </summary>
 public sealed class FakeSettingsWindow : ISettingsWindow
 {
@@ -17,6 +18,11 @@ public sealed class FakeSettingsWindow : ISettingsWindow
     /// The views shown, in order.
     /// </summary>
     private readonly List<SettingsView> _views = [];
+
+    /// <summary>
+    /// The views shown with <see cref="ShowProfiles" />, in order.
+    /// </summary>
+    private readonly List<SettingsView> _profileViews = [];
 
     /// <summary>
     /// The outcomes shown, in order.
@@ -42,6 +48,20 @@ public sealed class FakeSettingsWindow : ISettingsWindow
             lock (_lock)
             {
                 return [.. _views];
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets the views shown with <see cref="ShowProfiles" />, in order.
+    /// </summary>
+    public IReadOnlyList<SettingsView> ProfileViews
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return [.. _profileViews];
             }
         }
     }
@@ -88,6 +108,15 @@ public sealed class FakeSettingsWindow : ISettingsWindow
     }
 
     /// <summary>
+    /// Asks to delete a profile as the window's dialog would after <c>Delete</c>, raising <see cref="DeleteRequested" />.
+    /// </summary>
+    /// <param name="deletion">The profile and the box of the dialog</param>
+    public void RequestDelete(SettingsDeletion deletion)
+    {
+        DeleteRequested?.Invoke(this, deletion);
+    }
+
+    /// <summary>
     /// Closes the window as its close button or <c>Cancel</c> would, raising <see cref="WindowClosed" />.
     /// </summary>
     public void Close()
@@ -114,6 +143,16 @@ public sealed class FakeSettingsWindow : ISettingsWindow
         SaveRequested?.Invoke(sender, input);
     }
 
+    /// <summary>
+    /// Raises <see cref="DeleteRequested" /> with another sender than this window.
+    /// </summary>
+    /// <param name="sender">The sender</param>
+    /// <param name="deletion">The deletion</param>
+    public void RaiseDeleteRequested(object? sender, SettingsDeletion deletion)
+    {
+        DeleteRequested?.Invoke(sender, deletion);
+    }
+
     #endregion // Methods
 
     #region ISettingsWindow
@@ -125,11 +164,23 @@ public sealed class FakeSettingsWindow : ISettingsWindow
     public event EventHandler<SettingsInput>? SaveRequested;
 
     /// <inheritdoc />
+    public event EventHandler<SettingsDeletion>? DeleteRequested;
+
+    /// <inheritdoc />
     public void ShowView(SettingsView view)
     {
         lock (_lock)
         {
             _views.Add(view);
+        }
+    }
+
+    /// <inheritdoc />
+    public void ShowProfiles(SettingsView view)
+    {
+        lock (_lock)
+        {
+            _profileViews.Add(view);
         }
     }
 

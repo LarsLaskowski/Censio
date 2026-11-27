@@ -578,5 +578,27 @@ public static partial class CompanionLog
     [LoggerMessage(Level = LogLevel.Information, Message = "Profile notice passed to Windows: {Kind}")]
     public static partial void ProfileNoticePassedToWindows(ILogger logger, ProfileNoticeKind kind);
 
+    /// <summary>
+    /// Logs that a profile was deleted.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    [LoggerMessage(Level = LogLevel.Information, Message = "Profile deleted")]
+    public static partial void ProfileDeleted(ILogger logger);
+
+    /// <summary>
+    /// Logs that the server confirmed the deletion of a profile's history.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    [LoggerMessage(Level = LogLevel.Information, Message = "Profile deletion confirmed by the server")]
+    public static partial void ProfileDeletionConfirmed(ILogger logger);
+
+    /// <summary>
+    /// Logs that the server refused the deletion of a profile's history.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    /// <param name="refusal">The refusal</param>
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Profile deletion refused by the server: {Refusal}")]
+    public static partial void ProfileDeletionRefused(ILogger logger, ContractAcknowledgementRefusal refusal);
+
     #endregion // Methods
 }

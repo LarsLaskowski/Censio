@@ -287,6 +287,32 @@ public sealed class LiveBuffer : IAsyncDisposable
     }
 
     /// <summary>
+    /// Removes the message in flight, without an acknowledgement, when it is the one with the identity.
+    /// </summary>
+    /// <param name="id">The identity of the message</param>
+    public void DropInFlight(Guid id)
+    {
+        lock (_gate)
+        {
+            if (_inFlight is not { } item || item.Id != id)
+            {
+                return;
+            }
+
+            _items.Remove(item);
+            _inFlight = null;
+
+            if (item.Json is null)
+            {
+                _deletes.Add(PathOf(item.Sequence));
+            }
+
+            CountDropped(1);
+            Notify();
+        }
+    }
+
+    /// <summary>
     /// Takes the number of dropped messages that were not logged yet.
     /// </summary>
     /// <returns>The number of dropped messages</returns>

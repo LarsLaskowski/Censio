@@ -31,6 +31,11 @@ public sealed class CompanionProfilesTests
     private const string OtherId = "7d0e4c1b-2222-4f3a-9b4c-00000000b003";
 
     /// <summary>
+    /// A second identity no profile of the test files has, confirmed as deleted in the version-2 file.
+    /// </summary>
+    private const string ThirdId = "3c1a9e7f-3333-4b5c-8d6e-00000000c004";
+
+    /// <summary>
     /// The name of the second profile of the test files, a marker no log line may hold.
     /// </summary>
     private const string SecondName = "MARKER-Second";
@@ -75,6 +80,32 @@ public sealed class CompanionProfilesTests
     /// figure A linked to it.
     /// </summary>
     private const string PlannedFile = """{"version":1,"active":"{created}","profiles":[{"id":"b6a1f3e2-7c4d-4e8a-9f21-5d3c0a7e1b94","name":"Live"},{"id":"{created}","name":"Zweit\u00E9"}],"figures":[{"figure":"{key}","profile":"{created}"}]}""";
+
+    /// <summary>
+    /// The deleted entry of the version-2 file that waits for the server.
+    /// </summary>
+    private const string WaitingEntry = """{"id":"{other}","confirmed":false}""";
+
+    /// <summary>
+    /// The deleted entry of the version-2 file that the server confirmed.
+    /// </summary>
+    private const string ConfirmedEntry = """{"id":"{third}","confirmed":true}""";
+
+    /// <summary>
+    /// The fifth property of the version-2 file: one waiting and one confirmed deleted identity, oldest first.
+    /// </summary>
+    private const string DeletedList = $$""","deleted":[{{WaitingEntry}},{{ConfirmedEntry}}]""";
+
+    /// <summary>
+    /// A valid version-2 file: the valid file with one waiting and one confirmed deleted identity.
+    /// </summary>
+    private const string VersionTwoFile = $$"""{"version":2,"active":"{second}","profiles":[{"id":"{live}","name":"Live"},{"id":"{second}","name":"MARKER-Second"}],"figures":[{"figure":"{key}","profile":"{second}"}]{{DeletedList}}}""";
+
+    /// <summary>
+    /// The file the writer writes after <c>Live</c> is selected in the valid file and the second profile is deleted with
+    /// its history.
+    /// </summary>
+    private const string WaitingFile = """{"version":2,"active":"{live}","profiles":[{"id":"{live}","name":"Live"}],"figures":[],"deleted":[{"id":"{second}","confirmed":false}]}""";
 
     #endregion // Constants
 
@@ -1218,6 +1249,505 @@ public sealed class CompanionProfilesTests
     }
 
     /// <summary>
+    /// Deleting a profile removes it and its figure links: it leaves the list, its name is unknown, and a figure linked to
+    /// it counts as not linked at its next session start (spec S1, E13).
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC1")]
+    public void CompanionProfilesDeleteRemovesProfileAndFigureLinks()
+    {
+        // Arrange
+        var profiles = CompanionProfiles.Load(WriteFile(Expand(ValidFile)), _logger);
+
+        profiles.Select(CompanionProfile.Live.Id);
+
+        // Act
+        profiles.Delete(new Guid(SecondId), false);
+
+        // Assert
+        var notice = profiles.ObserveSessionStart(FigureA);
+
+        Assert.AreSequenceEqual([CompanionProfile.Live.Id], profiles.Profiles.Select(profile => profile.Id).ToArray(), "The deleted profile should leave the list");
+        Assert.AreEqual(CompanionProfile.Live.Id, profiles.Active.Id, "The active profile should stay");
+        Assert.IsNull(profiles.NameOf(new Guid(SecondId)), "The deleted profile's name should be unknown");
+        Assert.IsNull(notice, "The figure linked to the deleted profile should count as not linked, so its first session on Live gives no notice");
+        Assert.IsFalse(profiles.IsDeleted(new Guid(SecondId)), "A deletion without the history should put no identity on the deleted list");
+    }
+
+    /// <summary>
+    /// A deletion clears a pending notice, which named the deleted profile, and raises the change once (spec E14).
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC1")]
+    public void CompanionProfilesDeleteClearsPendingNotice()
+    {
+        // Arrange
+        var profiles = CompanionProfiles.Load(WriteFile(Expand(ValidFile)), _logger);
+
+        profiles.Select(CompanionProfile.Live.Id);
+
+        var notice = profiles.ObserveSessionStart(FigureA);
+        var raised = 0;
+
+        profiles.PendingNoticeChanged += (_, _) => raised++;
+
+        // Act
+        profiles.Delete(new Guid(SecondId), false);
+
+        // Assert
+        Assert.AreSequenceEqual([(ProfileNoticeKind.LastUsedWithOther, SecondName)], Describe([notice]), "The session start should have set the notice naming the second profile");
+        Assert.IsNull(profiles.PendingNotice, "The deletion should clear the pending notice");
+        Assert.AreEqual(1, raised, "The change of the notice should be raised once");
+    }
+
+    /// <summary>
+    /// A deletion is written to the file without a save: the file read again lacks the profile and its figure link
+    /// (spec S1, Q5).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC1")]
+    public async Task CompanionProfilesDeleteWritesFileWithoutProfile()
+    {
+        // Arrange
+        var profiles = CompanionProfiles.Load(WriteFile(Expand(ValidFile)), _logger);
+        CompanionProfile? third = null;
+
+        // Act
+        await RunUntilCancelledAsync(profiles,
+                                     running =>
+                                     {
+                                         third = running.Create("Third");
+                                         running.Delete(new Guid(SecondId), false);
+                                     });
+
+        // Assert
+        var reloaded = CompanionProfiles.Load(ProfilesPath, new RecordingLogger());
+        var active = reloaded.Active.Id;
+        var notice = ObserveOnLive(reloaded, FigureA);
+
+        Assert.IsFalse(reloaded.IsFileInvalid, "The written file should be valid");
+        Assert.AreSequenceEqual(["Live", "Third"], reloaded.Profiles.Select(profile => profile.Name).ToArray(), "The file should no longer hold the deleted profile");
+        Assert.AreEqual(third!.Id, active, "The file should keep the active profile");
+        Assert.IsNull(notice, "The file should no longer link the figure to the deleted profile");
+    }
+
+    /// <summary>
+    /// <c>Live</c>, the active profile and an identity outside the list cannot be deleted, with or without the history:
+    /// the deletion throws and changes nothing (spec E1).
+    /// </summary>
+    /// <param name="id">The identity, a placeholder of the test files</param>
+    /// <param name="isHistoryDeleted">Whether the history is deleted too</param>
+    [TestMethod]
+    [TestCategory("AC2")]
+    [DataRow("{live}", false, DisplayName = "Live")]
+    [DataRow("{live}", true, DisplayName = "Live with its history")]
+    [DataRow("{second}", false, DisplayName = "Active profile")]
+    [DataRow("{second}", true, DisplayName = "Active profile with its history")]
+    [DataRow("{other}", true, DisplayName = "Unknown identity")]
+    public void CompanionProfilesDeleteOfLiveOrActiveThrows(string id, bool isHistoryDeleted)
+    {
+        // Arrange
+        var profiles = CompanionProfiles.Load(WriteFile(Expand(ValidFile)), _logger);
+        var identity = new Guid(Expand(id));
+
+        // Act
+        var exception = Assert.ThrowsExactly<ArgumentException>(() => profiles.Delete(identity, isHistoryDeleted), "The deletion should be refused");
+
+        // Assert
+        Assert.IsNotNull(exception, "The refusal should be an argument exception");
+        Assert.AreSequenceEqual([CompanionProfile.Live.Id, new Guid(SecondId)], profiles.Profiles.Select(profile => profile.Id).ToArray(), "The list should stay");
+        Assert.AreEqual(new Guid(SecondId), profiles.Active.Id, "The active profile should stay");
+        Assert.IsEmpty(profiles.WaitingDeletions, "No deletion should wait");
+        Assert.IsFalse(profiles.IsDeleted(identity), "The identity should not be deleted");
+    }
+
+    /// <summary>
+    /// A deletion with the history waits by identity in the file, version 2 with a fifth property, and the profiles loaded
+    /// again hold it as waiting (spec S3, N1).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC5")]
+    public async Task CompanionProfilesDeletionWaitsAcrossLoad()
+    {
+        // Arrange
+        var profiles = CompanionProfiles.Load(WriteFile(Expand(ValidFile)), _logger);
+
+        // Act
+        await RunUntilCancelledAsync(profiles,
+                                     running =>
+                                     {
+                                         running.Select(CompanionProfile.Live.Id);
+                                         running.Delete(new Guid(SecondId), true);
+                                     });
+
+        // Assert
+        var text = await File.ReadAllTextAsync(ProfilesPath, TestContext.CancellationToken);
+        var reloaded = CompanionProfiles.Load(ProfilesPath, new RecordingLogger());
+
+        Assert.AreEqual(Expand(WaitingFile), text, "The file should be version 2 with the deleted identity waiting");
+        Assert.IsFalse(reloaded.IsFileInvalid, "The written file should be valid");
+        Assert.AreSequenceEqual([new Guid(SecondId)], reloaded.WaitingDeletions.ToArray(), "The deletion should wait after the load");
+        Assert.IsTrue(reloaded.IsDeleted(new Guid(SecondId)), "The identity should be deleted after the load");
+        Assert.AreSequenceEqual([CompanionProfile.Live.Id], reloaded.Profiles.Select(profile => profile.Id).ToArray(), "The deleted profile should not be listed");
+    }
+
+    /// <summary>
+    /// A deletion whose file cannot be written stays in memory: it waits, the identity is deleted, and the failed write is
+    /// logged as for any change (spec E3).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC5")]
+    public async Task CompanionProfilesDeletionKeptInMemoryWhenWriteFails()
+    {
+        // Arrange
+        var blocker = Path.Combine(_root, "blocker");
+
+        await File.WriteAllTextAsync(blocker, "a file where the folder should be", TestContext.CancellationToken);
+
+        var profiles = CompanionProfiles.Load(Path.Combine(blocker, "profiles.json"), _logger);
+        var doomed = profiles.Create(SecondName);
+
+        profiles.Select(CompanionProfile.Live.Id);
+
+        // Act
+        await RunUntilCancelledAsync(profiles, running => running.Delete(doomed.Id, true));
+
+        // Assert
+        var warnings = _logger.Entries.Where(entry => entry.Level == LogLevel.Warning).Select(entry => entry.Message).ToList();
+
+        Assert.IsNotEmpty(warnings, "The failed write should be logged");
+        Assert.IsEmpty(warnings.Where(warning => warning.StartsWith(NotSavedLinePrefix, StringComparison.Ordinal) == false).ToList(), "Every warning should be the failed write");
+        Assert.AreSequenceEqual([doomed.Id], profiles.WaitingDeletions.ToArray(), "The deletion should wait in memory");
+        Assert.IsTrue(profiles.IsDeleted(doomed.Id), "The identity should be deleted in memory");
+    }
+
+    /// <summary>
+    /// With 1,000 identities kept, a new deletion with the history forgets the oldest confirmed one and never a waiting
+    /// one, even an older waiting one (spec, Deleted identities, E12).
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public void CompanionProfilesConfirmedDeletionForgottenOldestFirst()
+    {
+        // Arrange
+        var profiles = CompanionProfiles.Load(ProfilesPath, _logger);
+        var waiting = DeleteWithHistory(profiles, 1);
+        var confirmed = DeleteWithHistory(profiles, CompanionProfiles.MaxDeletions - 1);
+
+        ConfirmAll(profiles, confirmed);
+
+        var last = profiles.Create("Last");
+
+        profiles.Select(CompanionProfile.Live.Id);
+
+        // Act
+        profiles.Delete(last.Id, true);
+
+        // Assert
+        Assert.IsTrue(profiles.IsDeleted(waiting[0]), "The older waiting identity should never be forgotten");
+        Assert.IsFalse(profiles.IsDeleted(confirmed[0]), "The oldest confirmed identity should be forgotten to make room");
+        Assert.IsTrue(profiles.IsDeleted(confirmed[1]), "The next confirmed identity should be kept");
+        Assert.IsTrue(profiles.IsDeleted(confirmed[^1]), "The newest confirmed identity should be kept");
+        Assert.IsTrue(profiles.IsDeleted(last.Id), "The new identity should be deleted");
+        Assert.AreSequenceEqual([waiting[0], last.Id], profiles.WaitingDeletions.ToArray(), "The waiting deletions should be the older one and the new one, oldest first");
+    }
+
+    /// <summary>
+    /// With 1,000 deletions waiting, the queue is full and a further deletion with the history is refused and changes
+    /// nothing (spec E12).
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC9")]
+    public void CompanionProfilesDeleteWithHistoryWhenFullThrows()
+    {
+        // Arrange
+        var profiles = CompanionProfiles.Load(ProfilesPath, _logger);
+
+        DeleteWithHistory(profiles, CompanionProfiles.MaxDeletions);
+
+        var next = profiles.Create("Next");
+
+        profiles.Select(CompanionProfile.Live.Id);
+
+        // Act
+        var exception = Assert.ThrowsExactly<InvalidOperationException>(() => profiles.Delete(next.Id, true), "A deletion with the history should be refused while 1,000 wait");
+
+        // Assert
+        Assert.IsNotNull(exception, "The refusal should be an invalid operation");
+        Assert.IsTrue(profiles.IsDeletionQueueFull, "The queue should be full with 1,000 waiting deletions");
+        Assert.HasCount(CompanionProfiles.MaxDeletions, profiles.WaitingDeletions, "The waiting deletions should stay");
+        Assert.AreEqual("Next", profiles.NameOf(next.Id), "The profile should stay listed");
+        Assert.IsFalse(profiles.IsDeleted(next.Id), "The profile should not be deleted");
+    }
+
+    /// <summary>
+    /// While no identity is deleted the writer writes version 1 with its four properties, unchanged: a deletion without
+    /// the history writes the version-1 file without the profile (spec N1).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC10")]
+    public async Task CompanionProfilesWritesVersionOneWithoutDeletions()
+    {
+        // Arrange
+        var profiles = CompanionProfiles.Load(WriteFile(Expand(ValidFile)), _logger);
+
+        // Act
+        await RunUntilCancelledAsync(profiles,
+                                     running =>
+                                     {
+                                         running.Select(CompanionProfile.Live.Id);
+                                         running.Delete(new Guid(SecondId), false);
+                                     });
+
+        // Assert
+        var expected = Expand("""{"version":1,"active":"{live}","profiles":[{"id":"{live}","name":"Live"}],"figures":[]}""");
+
+        Assert.AreEqual(expected, await File.ReadAllTextAsync(ProfilesPath, TestContext.CancellationToken), "The file should be version 1 without the deleted profile");
+    }
+
+    /// <summary>
+    /// A version-2 file is read with its deleted identities, waiting and confirmed, compared as values, so an identity in
+    /// upper case is the same identity (spec N1, Security note i).
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC10")]
+    public void CompanionProfilesReadsVersionTwo()
+    {
+        // Arrange
+        var path = WriteFile(Expand(VersionTwoFile.Replace("{third}", "{thirdUpper}", StringComparison.Ordinal)));
+
+        // Act
+        var profiles = CompanionProfiles.Load(path, _logger);
+
+        // Assert
+        Assert.IsFalse(profiles.IsFileInvalid, "The version-2 file should be valid");
+        Assert.AreSequenceEqual([CompanionProfile.Live.Id, new Guid(SecondId)], profiles.Profiles.Select(profile => profile.Id).ToArray(), "The profiles should be read");
+        Assert.AreEqual(new Guid(SecondId), profiles.Active.Id, "The active profile should be read");
+        Assert.AreSequenceEqual([new Guid(OtherId)], profiles.WaitingDeletions.ToArray(), "The waiting identity should be read, the confirmed one not");
+        Assert.IsTrue(profiles.IsDeleted(new Guid(OtherId)), "The waiting identity should be deleted");
+        Assert.IsTrue(profiles.IsDeleted(new Guid(ThirdId)), "The confirmed identity written in upper case should be deleted");
+        Assert.IsFalse(profiles.IsDeleted(new Guid(SecondId)), "A listed profile should not be deleted");
+        Assert.IsFalse(profiles.IsDeletionQueueFull, "Two identities should not fill the queue");
+        Assert.IsEmpty(_logger.Entries, "A valid file should log nothing");
+    }
+
+    /// <summary>
+    /// A version-2 file whose deleted list breaks a rule is not of its format and fails closed: <c>Live</c> alone, no
+    /// identity deleted, one warning. Identities are compared as parsed values, so <c>Live</c> in upper case, a listed
+    /// profile padded with white space and a repeat in upper case are refused too (spec N1, Security note i).
+    /// </summary>
+    /// <param name="find">The text of the version-2 file to replace</param>
+    /// <param name="replacement">The replacement</param>
+    [TestMethod]
+    [TestCategory("AC10")]
+    [DataRow(DeletedList, ""","deleted":{}""", DisplayName = "Deleted an object")]
+    [DataRow(DeletedList, ""","deleted":[5]""", DisplayName = "Deleted entry a number")]
+    [DataRow(DeletedList, ""","deleted":[{tooMany}]""", DisplayName = "1,001 deleted identities")]
+    [DataRow(DeletedList, "", DisplayName = "Version 2 without deleted")]
+    [DataRow("""{"version":2,""", """{"version":1,""", DisplayName = "Version 1 with deleted")]
+    [DataRow("""{"version":2,""", """{"version":3,""", DisplayName = "Version 3")]
+    [DataRow(WaitingEntry, """{"confirmed":false}""", DisplayName = "Deleted identity missing")]
+    [DataRow(WaitingEntry, """{"id":"{other}"}""", DisplayName = "Confirmed missing")]
+    [DataRow(WaitingEntry, """{"id":"{other}","confirmed":false,"extra":0}""", DisplayName = "Unknown deleted property")]
+    [DataRow(WaitingEntry, """{"id":"{other}","id":"{other}","confirmed":false}""", DisplayName = "Deleted identity twice in an entry")]
+    [DataRow(WaitingEntry, """{"id":"{other}","confirmed":false,"confirmed":false}""", DisplayName = "Confirmed twice in an entry")]
+    [DataRow(WaitingEntry, """{"ID":"{other}","confirmed":false}""", DisplayName = "Deleted property in other case")]
+    [DataRow(WaitingEntry, """{"id":"{otherN}","confirmed":false}""", DisplayName = "Deleted identity not of the form D")]
+    [DataRow(WaitingEntry, """{"id":7,"confirmed":false}""", DisplayName = "Deleted identity a number")]
+    [DataRow(WaitingEntry, """{"id":"{other}","confirmed":0}""", DisplayName = "Confirmed a number")]
+    [DataRow(WaitingEntry, """{"id":"{other}","confirmed":"false"}""", DisplayName = "Confirmed a string")]
+    [DataRow(WaitingEntry, """{"id":"{other}","confirmed":null}""", DisplayName = "Confirmed null")]
+    [DataRow(ConfirmedEntry, """{"id":"{other}","confirmed":true}""", DisplayName = "Deleted identity repeated")]
+    [DataRow(ConfirmedEntry, """{"id":"{otherUpper}","confirmed":true}""", DisplayName = "Deleted identity repeated in upper case")]
+    [DataRow(WaitingEntry, """{"id":"{live}","confirmed":false}""", DisplayName = "Live deleted")]
+    [DataRow(WaitingEntry, """{"id":"{liveUpper}","confirmed":false}""", DisplayName = "Live deleted in upper case")]
+    [DataRow(WaitingEntry, """{"id":"{second}","confirmed":false}""", DisplayName = "Listed profile deleted")]
+    [DataRow(WaitingEntry, """{"id":" {second} ","confirmed":false}""", DisplayName = "Listed profile deleted, padded with white space")]
+    public void CompanionProfilesRejectsInvalidDeletedList(string find, string replacement)
+    {
+        // Arrange
+        var path = WriteFile(Mutate(VersionTwoFile, find, replacement));
+
+        // Act
+        var (profiles, notices) = LoadAndObserveTwoFigures(path);
+
+        // Assert
+        AssertFailedClosed(profiles, notices);
+        Assert.IsFalse(profiles.IsDeleted(new Guid(OtherId)), "A rejected file should delete no identity");
+        Assert.IsEmpty(profiles.WaitingDeletions, "A rejected file should leave no deletion waiting");
+    }
+
+    /// <summary>
+    /// The largest file the writer can write, 1,000 profiles of 32 escaped surrogate pairs, 1,000 figures and 1,000 waiting
+    /// deletions, is 630,718 bytes, within the reader's bound, and reads back valid (spec N1).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC10")]
+    public async Task CompanionProfilesLargestFileUnderBound()
+    {
+        // Arrange
+        var profiles = CompanionProfiles.Load(ProfilesPath, _logger);
+        var names = Enumerable.Range(1, CompanionProfiles.MaxProfiles - 1).Select(WorstCaseName).ToArray();
+        var figures = Enumerable.Range(0, CompanionProfiles.MaxFigures).Select(FigureName).ToArray();
+        Guid[] deleted = [];
+
+        // Act
+        await RunUntilCancelledAsync(profiles,
+                                     running =>
+                                     {
+                                         deleted = DeleteWithHistory(running, CompanionProfiles.MaxDeletions);
+                                         CreateProfiles(running, names);
+                                         ObserveSessions(running, figures);
+                                     });
+
+        // Assert
+        var reloaded = CompanionProfiles.Load(ProfilesPath, new RecordingLogger());
+
+        // The version-1 worst case of 566,706 bytes (CompanionProfilesWorstCaseFileReadsBackValid) plus ,"deleted":[ of 12
+        // bytes, 1,000 entries {"id":"<36>","confirmed":false} of 7 + 36 + 20 = 63 bytes, 999 commas and ]: 566,706 + 12 +
+        // 63,000 + 999 + 1 = 630,718, below the bound of 1,048,576.
+        Assert.AreEqual(630718L, new FileInfo(ProfilesPath).Length, "The largest file should have the computed length");
+        Assert.IsLessThan((long)CompanionProfiles.MaxFileLength, new FileInfo(ProfilesPath).Length, "The largest file should stay under the reader's bound");
+        Assert.IsFalse(reloaded.IsFileInvalid, "The largest file should read back valid");
+        Assert.HasCount(CompanionProfiles.MaxProfiles, reloaded.Profiles, "Every profile should read back");
+        Assert.AreSequenceEqual(deleted, reloaded.WaitingDeletions.ToArray(), "Every waiting deletion should read back in order");
+    }
+
+    /// <summary>
+    /// After a deletion the name of the deleted profile can be used at once for a new profile, in any case (spec E2).
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC15")]
+    public void CompanionProfilesDeletedNameAcceptedAtOnce()
+    {
+        // Arrange
+        var profiles = CompanionProfiles.Load(WriteFile(Expand(ValidFile)), _logger);
+
+        profiles.Select(CompanionProfile.Live.Id);
+
+        // Act
+        profiles.Delete(new Guid(SecondId), true);
+
+        // Assert
+        Assert.IsNull(profiles.CheckNewName(SecondName), "The deleted profile's name should be accepted");
+        Assert.IsNull(profiles.CheckNewName(SecondName.ToLowerInvariant()), "The deleted profile's name should be accepted in another case");
+        Assert.AreEqual(SettingsProblemKind.NameExists, profiles.CheckNewName("Live"), "A listed name should still be refused");
+    }
+
+    /// <summary>
+    /// A deletion with the history raises <see cref="CompanionProfiles.DeletionsChanged" /> once, its handler reading the
+    /// new waiting deletion; a deletion without the history changes no deleted identity and raises nothing (plan,
+    /// Deleting).
+    /// </summary>
+    /// <param name="isHistoryDeleted">Whether the history is deleted too</param>
+    /// <param name="expectedRaised">How often the event should be raised</param>
+    [TestMethod]
+    [TestCategory("AC5")]
+    [DataRow(true, 1, DisplayName = "With the history")]
+    [DataRow(false, 0, DisplayName = "Without the history")]
+    public void CompanionProfilesDeleteRaisesDeletionsChangedOnlyWithHistory(bool isHistoryDeleted, int expectedRaised)
+    {
+        // Arrange
+        var profiles = CompanionProfiles.Load(WriteFile(Expand(ValidFile)), _logger);
+        var read = new List<int>();
+
+        profiles.Select(CompanionProfile.Live.Id);
+        profiles.DeletionsChanged += (_, _) => read.Add(profiles.WaitingDeletions.Count);
+
+        // Act
+        profiles.Delete(new Guid(SecondId), isHistoryDeleted);
+
+        // Assert
+        Assert.AreSequenceEqual(Enumerable.Repeat(1, expectedRaised).ToArray(), read.ToArray(), $"The deletion should raise the event once per change of the deleted identities, its handler reading the new state: {isHistoryDeleted}");
+    }
+
+    /// <summary>
+    /// Confirming a waiting deletion raises <see cref="CompanionProfiles.DeletionsChanged" /> once, its handler reading
+    /// no deletion waiting, and the identity stays deleted (plan, Deleting).
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public void CompanionProfilesConfirmDeletionRaisesDeletionsChanged()
+    {
+        // Arrange
+        var profiles = CompanionProfiles.Load(WriteFile(Expand(VersionTwoFile)), _logger);
+        var read = new List<int>();
+
+        profiles.DeletionsChanged += (_, _) => read.Add(profiles.WaitingDeletions.Count);
+
+        // Act
+        profiles.ConfirmDeletion(new Guid(OtherId));
+
+        // Assert
+        Assert.AreSequenceEqual([0], read.ToArray(), "The confirmation should raise the event once, its handler reading no deletion waiting");
+        Assert.IsTrue(profiles.IsDeleted(new Guid(OtherId)), "The confirmed identity should stay deleted");
+    }
+
+    /// <summary>
+    /// Confirming an identity that does not wait, an already confirmed one, a listed profile's or an unknown one, changes
+    /// nothing: no event, the deleted identities as before, and the file is not written again (plan, Deleting).
+    /// </summary>
+    /// <param name="id">The identity, a placeholder of the test files or a literal one</param>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC7")]
+    [DataRow("{third}", DisplayName = "Already confirmed")]
+    [DataRow("{second}", DisplayName = "Listed profile")]
+    [DataRow("9e3b5a10-4444-4c6d-8e7f-00000000d005", DisplayName = "Unknown identity")]
+    public async Task CompanionProfilesConfirmDeletionWithoutWaitingIdentityChangesNothing(string id)
+    {
+        // Arrange
+        var path = WriteFile(Expand(VersionTwoFile));
+        var profiles = CompanionProfiles.Load(path, _logger);
+        var identity = new Guid(Expand(id));
+        var raised = 0;
+
+        profiles.DeletionsChanged += (_, _) => raised++;
+
+        // Act
+        await RunUntilCancelledAsync(profiles, running => running.ConfirmDeletion(identity));
+
+        // Assert
+        Assert.AreEqual(0, raised, $"The confirmation should raise no event: {id}");
+        Assert.AreSequenceEqual([new Guid(OtherId)], profiles.WaitingDeletions.ToArray(), $"The waiting deletion should stay waiting: {id}");
+        Assert.IsTrue(profiles.IsDeleted(new Guid(ThirdId)), $"The confirmed identity should stay deleted: {id}");
+        Assert.AreEqual(Expand(VersionTwoFile), await File.ReadAllTextAsync(path, TestContext.CancellationToken), $"The file should not be written again: {id}");
+    }
+
+    /// <summary>
+    /// A version-2 file with an empty deleted list is read as valid, with no identity deleted, and the next write is
+    /// version 1 with its four properties (spec N1, plan Approach).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC10")]
+    public async Task CompanionProfilesEmptyDeletedListWrittenAsVersionOne()
+    {
+        // Arrange
+        var path = WriteFile(Mutate(VersionTwoFile, DeletedList, ""","deleted":[]"""));
+        var profiles = CompanionProfiles.Load(path, _logger);
+        var isFileInvalid = profiles.IsFileInvalid;
+        var waiting = profiles.WaitingDeletions.Count;
+
+        // Act
+        await RunUntilCancelledAsync(profiles, running => running.Select(CompanionProfile.Live.Id));
+
+        // Assert
+        var expected = Expand(ValidFile.Replace("""{"version":1,"active":"{second}",""", """{"version":1,"active":"{live}",""", StringComparison.Ordinal));
+
+        Assert.IsFalse(isFileInvalid, "The version-2 file with an empty deleted list should be valid");
+        Assert.AreEqual(0, waiting, "No deletion should wait");
+        Assert.IsFalse(profiles.IsDeleted(new Guid(OtherId)), "No identity should be deleted");
+        Assert.IsEmpty(_logger.Entries, "A valid file should log nothing");
+        Assert.AreEqual(expected, await File.ReadAllTextAsync(path, TestContext.CancellationToken), "The next write should be version 1 with the four properties");
+    }
+
+    /// <summary>
     /// Replaces the placeholders of a test text.
     /// </summary>
     /// <param name="text">The text</param>
@@ -1229,7 +1759,12 @@ public sealed class CompanionProfilesTests
                    .Replace("{secondUpper}", SecondId.ToUpperInvariant(), StringComparison.Ordinal)
                    .Replace("{secondN}", SecondId.Replace("-", string.Empty, StringComparison.Ordinal), StringComparison.Ordinal)
                    .Replace("{second}", SecondId, StringComparison.Ordinal)
+                   .Replace("{otherUpper}", OtherId.ToUpperInvariant(), StringComparison.Ordinal)
+                   .Replace("{otherN}", OtherId.Replace("-", string.Empty, StringComparison.Ordinal), StringComparison.Ordinal)
                    .Replace("{other}", OtherId, StringComparison.Ordinal)
+                   .Replace("{thirdUpper}", ThirdId.ToUpperInvariant(), StringComparison.Ordinal)
+                   .Replace("{third}", ThirdId, StringComparison.Ordinal)
+                   .Replace("{tooMany}", ManyDeletedEntries(CompanionProfiles.MaxDeletions + 1), StringComparison.Ordinal)
                    .Replace("{keyUpper}", FigureKey(FigureA).ToUpperInvariant(), StringComparison.Ordinal)
                    .Replace("{key}", FigureKey(FigureA), StringComparison.Ordinal)
                    .Replace("{nonHex}", new string('g', 64), StringComparison.Ordinal)
@@ -1244,13 +1779,35 @@ public sealed class CompanionProfilesTests
     /// <returns>The changed text</returns>
     private static string Mutate(string find, string replacement)
     {
-        Assert.Contains(find, ValidFile, "The part to replace should be in the valid file");
+        return Mutate(ValidFile, find, replacement);
+    }
 
-        var text = Expand(ValidFile.Replace(find, replacement, StringComparison.Ordinal));
+    /// <summary>
+    /// Replaces a part of a valid test file and fills in the placeholders.
+    /// </summary>
+    /// <param name="file">The valid test file</param>
+    /// <param name="find">The part to replace, which the file must hold</param>
+    /// <param name="replacement">The replacement</param>
+    /// <returns>The changed text</returns>
+    private static string Mutate(string file, string find, string replacement)
+    {
+        Assert.Contains(find, file, "The part to replace should be in the valid file");
 
-        Assert.AreNotEqual(Expand(ValidFile), text, "The case should change the valid file");
+        var text = Expand(file.Replace(find, replacement, StringComparison.Ordinal));
+
+        Assert.AreNotEqual(Expand(file), text, "The case should change the valid file");
 
         return text;
+    }
+
+    /// <summary>
+    /// Builds a number of deleted entries of distinct identities that no test file lists, all waiting.
+    /// </summary>
+    /// <param name="count">The number of entries</param>
+    /// <returns>The entries, separated by commas</returns>
+    private static string ManyDeletedEntries(int count)
+    {
+        return string.Join(',', Enumerable.Range(1, count).Select(index => $$"""{"id":"{{new Guid(index, 0, 0, new byte[8]):D}}","confirmed":false}"""));
     }
 
     /// <summary>
@@ -1317,6 +1874,41 @@ public sealed class CompanionProfilesTests
         foreach (var name in names)
         {
             profiles.Create(name);
+        }
+    }
+
+    /// <summary>
+    /// Creates profiles one by one, selects <c>Live</c> after each and deletes it with its history, so each deletion waits.
+    /// </summary>
+    /// <param name="profiles">The profiles</param>
+    /// <param name="count">The number of deletions</param>
+    /// <returns>The deleted identities, oldest first</returns>
+    private static Guid[] DeleteWithHistory(CompanionProfiles profiles, int count)
+    {
+        var deleted = new Guid[count];
+
+        for (var index = 0; index < count; index++)
+        {
+            var created = profiles.Create("Deleted " + index.ToString(System.Globalization.CultureInfo.InvariantCulture));
+
+            profiles.Select(CompanionProfile.Live.Id);
+            profiles.Delete(created.Id, true);
+            deleted[index] = created.Id;
+        }
+
+        return deleted;
+    }
+
+    /// <summary>
+    /// Confirms waiting deletions.
+    /// </summary>
+    /// <param name="profiles">The profiles</param>
+    /// <param name="ids">The identities</param>
+    private static void ConfirmAll(CompanionProfiles profiles, Guid[] ids)
+    {
+        foreach (var id in ids)
+        {
+            profiles.ConfirmDeletion(id);
         }
     }
 

@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Threading.Channels;
@@ -1144,6 +1145,47 @@ public sealed class SettingsWindowSessionTests
     }
 
     /// <summary>
+    /// A change of the deleted identities while the first view is being read shows no profiles of its own; the first view
+    /// follows once and counts the waiting deletion (S3).
+    /// </summary>
+    /// <returns>A task that completes with the test</returns>
+    [TestMethod]
+    [TestCategory("AC8")]
+    public async Task SettingsWindowSessionDeletionChangeBeforeFirstViewShowsOnlyFirstView()
+    {
+        // Arrange
+        WriteGameFolderSettings();
+
+        var deleted = _profiles.Create(ProfileName);
+
+        _profiles.Select(CompanionProfile.Live.Id);
+
+        var session = CreateSession();
+
+        HoldFolderChecks();
+        session.Open();
+        await _folderCheckStarted.Task.WaitAsync(_guard, TestContext.CancellationToken);
+
+        var window = _windows.Single();
+
+        // Act
+        _profiles.Delete(deleted.Id, true);
+        RunPosted();
+
+        var profileViewsBeforeLoad = window.ProfileViews.Count;
+
+        _folderGate.TrySetResult();
+        await RunPostedUntilAsync(() => CountViews() > 0);
+        RunPosted();
+
+        // Assert
+        Assert.AreEqual(0, profileViewsBeforeLoad, "A deletion change before the first view should show no profiles");
+        Assert.HasCount(1, window.Views, "The first view should be shown once");
+        Assert.IsEmpty(window.ProfileViews, "No profiles should be shown besides the first view");
+        Assert.AreEqual(1, window.Views.Single().WaitingDeletions, "The first view should count the waiting deletion");
+    }
+
+    /// <summary>
     /// A <c>Save</c> before the first view is shown is ignored; a <c>Save</c> after it is handled.
     /// </summary>
     /// <returns>A task that completes with the test</returns>
@@ -1188,8 +1230,8 @@ public sealed class SettingsWindowSessionTests
     }
 
     /// <summary>
-    /// The session acts only on the events its window raises as their sender: a close or a save of another sender, or of
-    /// none, changes nothing.
+    /// The session acts only on the events its window raises as their sender: a close, a save or a deletion of another
+    /// sender, or of none, changes nothing.
     /// </summary>
     /// <returns>A task that completes with the test</returns>
     [TestMethod]
@@ -1199,10 +1241,19 @@ public sealed class SettingsWindowSessionTests
         // Arrange
         WriteSettings(LocalSettings);
 
+        var deletable = _profiles.Create(ProfileName);
+
+        _profiles.Select(CompanionProfile.Live.Id);
+
         var session = CreateSession();
         var window = await OpenAsync(session);
         var view = window.Views.Single();
         var input = CreateInput(view, Change(view.Values, (SettingsField.LocalPort, "0")), SettingsField.LocalPort);
+        var deletion = new SettingsDeletion
+                       {
+                           Profile = deletable.Id,
+                           IsHistoryDeleted = false
+                       };
         var other = new FakeSettingsWindow();
 
         // Act
@@ -1210,16 +1261,27 @@ public sealed class SettingsWindowSessionTests
         window.RaiseWindowClosed(other);
         window.RaiseSaveRequested(null, input);
         window.RaiseSaveRequested(other, input);
+        window.RaiseDeleteRequested(null, deletion);
+        window.RaiseDeleteRequested(other, deletion);
         RunPosted();
 
         var isOpenAfterOthers = session.IsOpen;
+        var profilesAfterOthers = _profiles.Profiles.Select(profile => profile.Id).ToArray();
+        var profileViewsAfterOthers = window.ProfileViews.Count + other.ProfileViews.Count;
         var outcome = await SaveAsync(window, input);
+
+        window.RequestDelete(deletion);
+        RunPosted();
 
         // Assert
         Assert.IsTrue(isOpenAfterOthers, "A close of another sender should keep the window");
+        Assert.AreSequenceEqual([CompanionProfile.Live.Id, deletable.Id], profilesAfterOthers, "A deletion of another sender should keep the profile");
+        Assert.AreEqual(0, profileViewsAfterOthers, "A deletion of another sender should show no profiles");
         Assert.AreEqual(SettingsSaveKind.Refused, outcome.Kind, "The window's own save should be handled");
         Assert.HasCount(1, window.Outcomes, "Only the window's own save should show an outcome");
         Assert.IsEmpty(other.Outcomes, "The other sender should be shown no outcome");
+        Assert.AreSequenceEqual([CompanionProfile.Live.Id], _profiles.Profiles.Select(profile => profile.Id).ToArray(), "The window's own deletion should be handled");
+        Assert.HasCount(1, window.ProfileViews, "The window's own deletion should show the profiles once");
     }
 
     /// <summary>
@@ -1443,6 +1505,238 @@ public sealed class SettingsWindowSessionTests
     }
 
     /// <summary>
+    /// A deletion asked for in the window removes the profile at once, without <c>Save</c>: the window shows the profiles
+    /// again with the active one, and nothing else, so other unsaved edits stay as typed; the settings file stays as it
+    /// was, nothing waits for the server with the box cleared, and the deletion is logged once (S1, E2).
+    /// </summary>
+    /// <returns>A task that completes with the test</returns>
+    [TestMethod]
+    [TestCategory("AC1")]
+    public async Task SettingsWindowSessionDeleteKeepsOtherEditsAndShowsProfiles()
+    {
+        // Arrange
+        WriteSettings(LocalSettings);
+
+        var deleted = _profiles.Create(ProfileName);
+
+        _profiles.Select(CompanionProfile.Live.Id);
+
+        var settingsBefore = await File.ReadAllTextAsync(SettingsPath, TestContext.CancellationToken);
+        var session = CreateSession();
+        var window = await OpenAsync(session);
+
+        // Act
+        window.RequestDelete(new SettingsDeletion
+                             {
+                                 Profile = deleted.Id,
+                                 IsHistoryDeleted = false
+                             });
+
+        await RunPostedUntilAsync(() => window.ProfileViews.Count > 0);
+
+        RunPosted();
+
+        // Assert
+        var shown = window.ProfileViews.Single();
+
+        Assert.AreSequenceEqual([CompanionProfile.Live.Id], _profiles.Profiles.Select(profile => profile.Id).ToArray(), "The deleted profile should leave the list");
+        Assert.AreSequenceEqual([CompanionProfile.Live.Id], shown.ProfileList.Select(profile => profile.Id).ToArray(), "The profiles shown should not hold the deleted profile");
+        Assert.AreEqual(CompanionProfile.Live.Id, shown.ActiveProfile, "The profiles shown should select the active profile");
+        Assert.HasCount(1, window.Views, "The deletion should show no whole view, so the other unsaved edits stay");
+        Assert.IsEmpty(window.Outcomes, "The deletion should show no outcome of a save");
+        Assert.AreEqual(settingsBefore, await File.ReadAllTextAsync(SettingsPath, TestContext.CancellationToken), "The deletion should not write the settings file");
+        Assert.IsEmpty(_profiles.WaitingDeletions, "With the box cleared no deletion should wait for the server");
+        Assert.AreSequenceEqual([(LogLevel.Information, "Profile deleted")], _logger.Entries.Where(entry => entry.Message == "Profile deleted").Select(entry => (entry.Level, entry.Message)).ToArray(), "The deletion should be logged once, at Information");
+    }
+
+    /// <summary>
+    /// <c>Cancel</c> or closing the dialog asks for no deletion, and a deletion the session must not carry out changes
+    /// nothing: one asked for while a save runs, one of <c>Live</c> or of the active profile, and one with the box ticked
+    /// while 1,000 deletions wait; the list, the waiting deletions and the window stay as they were, and nothing is logged
+    /// (S7, E1, E12).
+    /// </summary>
+    /// <param name="kind">The kind of deletion: Saving, Live, Active or QueueFull</param>
+    /// <returns>A task that completes with the test</returns>
+    [TestMethod]
+    [TestCategory("AC1")]
+    [DataRow("Saving", DisplayName = "While a save runs")]
+    [DataRow("Live", DisplayName = "Live")]
+    [DataRow("Active", DisplayName = "Active profile")]
+    [DataRow("QueueFull", DisplayName = "Box ticked, 1,000 waiting")]
+    public async Task SettingsWindowSessionDeleteCancelledChangesNothing(string kind)
+    {
+        // Arrange
+        WriteSettings(new JsonObject
+                      {
+                          ["gameFolder"] = GameFolder
+                      }.ToJsonString());
+
+        var deletion = CreateIgnoredDeletion(kind);
+        var profilesBefore = _profiles.Profiles.Select(profile => profile.Id).ToArray();
+        var waitingBefore = _profiles.WaitingDeletions.ToArray();
+        var session = CreateSession();
+        var window = await OpenAsync(session);
+
+        await StartHeldSaveAsync(kind, window);
+
+        var deletionLinesBefore = CountDeletionLines();
+
+        // Act
+        window.RequestDelete(deletion);
+        RunPosted();
+
+        // Assert
+        Assert.AreSequenceEqual(profilesBefore, _profiles.Profiles.Select(profile => profile.Id).ToArray(), $"The ignored deletion should leave the list as it was: {kind}");
+        Assert.AreSequenceEqual(waitingBefore, _profiles.WaitingDeletions.ToArray(), $"The ignored deletion should add no waiting deletion: {kind}");
+        Assert.IsEmpty(window.ProfileViews, $"The ignored deletion should show the profiles not again: {kind}");
+        Assert.AreEqual(deletionLinesBefore, CountDeletionLines(), $"The ignored deletion should log no deletion: {kind}");
+
+        await FinishHeldSaveAsync(kind, window);
+    }
+
+    /// <summary>
+    /// A deletion asked for before the window showed its first view is ignored: the profile stays, and the first view
+    /// shows it (S7).
+    /// </summary>
+    /// <returns>A task that completes with the test</returns>
+    [TestMethod]
+    [TestCategory("AC1")]
+    public async Task SettingsWindowSessionDeleteBeforeFirstViewIgnored()
+    {
+        // Arrange
+        WriteSettings(LocalSettings);
+
+        var kept = _profiles.Create(ProfileName);
+
+        _profiles.Select(CompanionProfile.Live.Id);
+
+        var session = CreateSession();
+
+        session.Open();
+
+        var window = _windows.Single();
+
+        // Act
+        window.RequestDelete(new SettingsDeletion
+                             {
+                                 Profile = kept.Id,
+                                 IsHistoryDeleted = false
+                             });
+
+        await RunPostedUntilAsync(() => window.Views.Count > 0);
+
+        // Assert
+        Assert.AreSequenceEqual([CompanionProfile.Live.Id, kept.Id], _profiles.Profiles.Select(profile => profile.Id).ToArray(), "The deletion before the first view should leave the list as it was");
+        Assert.AreSequenceEqual([CompanionProfile.Live.Id, kept.Id], window.Views.Single().ProfileList.Select(profile => profile.Id).ToArray(), "The first view should show the profile the ignored deletion named");
+        Assert.AreEqual(0, CountDeletionLines(), "The ignored deletion should log no deletion");
+    }
+
+    /// <summary>
+    /// A change of the deleted identities whose display was posted while the window was open shows nothing once the
+    /// window closed (S3).
+    /// </summary>
+    /// <returns>A task that completes with the test</returns>
+    [TestMethod]
+    [TestCategory("AC8")]
+    public async Task SettingsWindowSessionDeletionChangeAfterCloseShowsNothing()
+    {
+        // Arrange
+        WriteSettings(LocalSettings);
+
+        var deleted = _profiles.Create(ProfileName);
+
+        _profiles.Select(CompanionProfile.Live.Id);
+
+        var session = CreateSession();
+        var window = await OpenAsync(session);
+
+        _profiles.Delete(deleted.Id, true);
+
+        // Act
+        window.Close();
+        RunPosted();
+
+        // Assert
+        Assert.IsFalse(session.IsOpen, "The session should have no window after it closed");
+        Assert.IsEmpty(window.ProfileViews, "The closed window should not show the profiles again");
+        Assert.AreSequenceEqual([deleted.Id], _profiles.WaitingDeletions.ToArray(), "The deletion made outside the window should still wait");
+    }
+
+    /// <summary>
+    /// The views count the deletions that wait for the server: one waiting when the window opens, two after a deletion with
+    /// the box ticked in the window, none once the server confirmed both, shown again while the window is open (S3).
+    /// </summary>
+    /// <returns>A task that completes with the test</returns>
+    [TestMethod]
+    [TestCategory("AC8")]
+    public async Task SettingsWindowSessionShowsWaitingDeletionCount()
+    {
+        // Arrange
+        WriteSettings(LocalSettings);
+
+        var earlier = _profiles.Create("MARKER-Earlier");
+        var later = _profiles.Create(ProfileName);
+
+        _profiles.Select(CompanionProfile.Live.Id);
+        _profiles.Delete(earlier.Id, true);
+
+        var session = CreateSession();
+        var window = await OpenAsync(session);
+        var atOpen = window.Views.Single().WaitingDeletions;
+
+        // Act
+        window.RequestDelete(new SettingsDeletion
+                             {
+                                 Profile = later.Id,
+                                 IsHistoryDeleted = true
+                             });
+
+        await RunPostedUntilAsync(() => window.ProfileViews.Count > 0);
+
+        var afterDelete = window.ProfileViews[^1].WaitingDeletions;
+
+        _profiles.ConfirmDeletion(earlier.Id);
+        _profiles.ConfirmDeletion(later.Id);
+
+        await RunPostedUntilAsync(() => window.ProfileViews[^1].WaitingDeletions == 0);
+
+        // Assert
+        Assert.AreEqual(1, atOpen, "The view at the open should count the deletion that waits");
+        Assert.AreEqual(2, afterDelete, "The profiles shown after a ticked deletion should count both waiting deletions");
+        Assert.AreEqual(0, window.ProfileViews[^1].WaitingDeletions, "The profiles shown after the confirmations should count none");
+        Assert.HasCount(1, window.Views, "The confirmations should show the profiles only, not a whole view");
+    }
+
+    /// <summary>
+    /// The view marks the queue of deletions full with 1,000 waiting, so the window disables the box, and not with 999
+    /// (E12).
+    /// </summary>
+    /// <param name="waiting">The number of waiting deletions</param>
+    /// <param name="expected">Whether the queue should be marked full</param>
+    /// <returns>A task that completes with the test</returns>
+    [TestMethod]
+    [TestCategory("AC9")]
+    [DataRow(CompanionProfiles.MaxDeletions - 1, false, DisplayName = "999 waiting")]
+    [DataRow(CompanionProfiles.MaxDeletions, true, DisplayName = "1,000 waiting")]
+    public async Task SettingsWindowSessionViewMarksDeletionQueueFull(int waiting, bool expected)
+    {
+        // Arrange
+        WriteSettings(LocalSettings);
+        DeleteWithHistory(waiting);
+
+        var session = CreateSession();
+
+        // Act
+        var window = await OpenAsync(session);
+
+        // Assert
+        var view = window.Views.Single();
+
+        Assert.AreEqual(waiting, view.WaitingDeletions, $"The view should count the waiting deletions: {waiting}");
+        Assert.AreEqual(expected, view.IsDeletionQueueFull, $"The view should mark the queue full only with 1,000 waiting: {waiting}");
+    }
+
+    /// <summary>
     /// Creates a completed completion.
     /// </summary>
     /// <returns>The completion</returns>
@@ -1608,6 +1902,97 @@ public sealed class SettingsWindowSessionTests
         _profiles.ObserveSessionEnd();
 
         return _profiles.ObserveSessionStart("MARKER-Figure-B");
+    }
+
+    /// <summary>
+    /// Counts the log entries of deleted profiles so far.
+    /// </summary>
+    /// <returns>The number of entries</returns>
+    private int CountDeletionLines()
+    {
+        return _logger.Entries.Count(entry => entry.Message == "Profile deleted");
+    }
+
+    /// <summary>
+    /// Prepares the profiles for a deletion the session must ignore and returns that deletion.
+    /// </summary>
+    /// <param name="kind">The kind of deletion: Saving, Live, Active or QueueFull</param>
+    /// <returns>The deletion</returns>
+    private SettingsDeletion CreateIgnoredDeletion(string kind)
+    {
+        if (kind == "QueueFull")
+        {
+            DeleteWithHistory(CompanionProfiles.MaxDeletions);
+        }
+
+        var created = _profiles.Create(ProfileName);
+
+        if (kind != "Active")
+        {
+            _profiles.Select(CompanionProfile.Live.Id);
+        }
+
+        return new SettingsDeletion
+               {
+                   Profile = kind == "Live" ? CompanionProfile.Live.Id : created.Id,
+                   IsHistoryDeleted = kind == "QueueFull"
+               };
+    }
+
+    /// <summary>
+    /// Starts a save whose folder check is held, for the kind of deletion asked for while a save runs.
+    /// </summary>
+    /// <param name="kind">The kind of deletion</param>
+    /// <param name="window">The window</param>
+    /// <returns>A task that completes once the held folder check started</returns>
+    private async Task StartHeldSaveAsync(string kind, FakeSettingsWindow window)
+    {
+        if (kind != "Saving")
+        {
+            return;
+        }
+
+        var view = window.Views.Single();
+
+        HoldFolderChecks();
+        window.RequestSave(CreateInput(view, view.Values));
+
+        await _folderCheckStarted.Task.WaitAsync(_guard, TestContext.CancellationToken);
+    }
+
+    /// <summary>
+    /// Lets the held save end and waits for its outcome, for the kind of deletion asked for while a save runs.
+    /// </summary>
+    /// <param name="kind">The kind of deletion</param>
+    /// <param name="window">The window</param>
+    /// <returns>A task that completes once the save showed its outcome</returns>
+    private async Task FinishHeldSaveAsync(string kind, FakeSettingsWindow window)
+    {
+        if (kind != "Saving")
+        {
+            return;
+        }
+
+        _folderGate.TrySetResult();
+
+        await RunPostedUntilAsync(() => window.Outcomes.Count > 0);
+
+        Assert.AreEqual(SettingsSaveKind.Saved, window.Outcomes.Single().Kind, "The held save should end as saved");
+    }
+
+    /// <summary>
+    /// Creates profiles and deletes each with its history, leaving <c>Live</c> active.
+    /// </summary>
+    /// <param name="count">The number of deletions</param>
+    private void DeleteWithHistory(int count)
+    {
+        for (var index = 0; index < count; index++)
+        {
+            var created = _profiles.Create("Deleted " + index.ToString(CultureInfo.InvariantCulture));
+
+            _profiles.Select(CompanionProfile.Live.Id);
+            _profiles.Delete(created.Id, true);
+        }
     }
 
     /// <summary>

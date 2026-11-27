@@ -77,12 +77,12 @@ what the server does with them in [`ingest.md`](ingest.md).
   skip them, and a certificate the system does not trust is `server unreachable`. Over `ws://` the token and the data
   cross the network unencrypted ([`SECURITY.md`](../../SECURITY.md), record 0006).
 - The WebSocket upgrade must complete within 30 seconds.
-- It needs a server with the contract version 2 ingest; the image `0.2.0` has none and answers an HTTP page, and a server
+- It needs a server with the contract version 3 ingest; the image `0.2.0` has none and answers an HTTP page, and a server
   of release 0.3.0 reads version 1 and refuses the hello (*Limits and errors*).
 
 ### Hello and profile
 
-- The Companion sends one hello per run with the contract version 2, the Companion's version, the token of the file
+- The Companion sends one hello per run with the contract version 3, the Companion's version, the token of the file
   (none without `--token-file`), a new profile identity and the profile name `Replay <yyyy-MM-dd HH:mm:ss>`, the local
   time at which the run began, in the invariant culture. A second run creates a second profile; the first stays
   ([`server-state.md`](server-state.md)). No figure name is sent (record 0041).
@@ -162,7 +162,7 @@ below are done by the Companion at once.
 | server unreachable | No WebSocket at the address: unknown host, closed port, an HTTP answer instead of an upgrade, a redirect, a TLS failure, no upgrade within 30 seconds |
 | token refused | The server answered `helloRefused` `tokenRefused` |
 | another Companion is connected | `helloRefused` `companionConnected` |
-| server does not support contract version 2 | `helloRefused` `unsupportedVersion`, a server of release 0.3.0 that reads version 1 among them |
+| server does not support contract version 3 | `helloRefused` `unsupportedVersion`, a server of release 0.3.0 that reads version 1 among them |
 | server does not answer | No `helloAccepted` or `helloRefused` within 30 seconds of the hello, a message the server does not take within 30 seconds, or no acknowledgement within 30 seconds of a message |
 | server connection lost | The connection ends after the hello (a close frame, a failed send or receive, a server that stops) |
 | local server not running | Local mode only: the hosted server did not start (its port is in use, it failed, or the settings are invalid) |

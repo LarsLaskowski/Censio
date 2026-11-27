@@ -1,7 +1,9 @@
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 
 using Censio.Contracts;
+using Censio.GameData;
 using Censio.Pipe;
 using Censio.Pipe.Tests;
 using Censio.Server.Tests;
@@ -12,7 +14,7 @@ namespace Censio.Companion.Core.Tests;
 
 /// <summary>
 /// Tests for the profiles of <see cref="LiveSender" />: the profile of each message, the hello of each connection, the
-/// reconnect of a switch and the notices of a session start.
+/// reconnect of a switch, the notices of a session start, and the deletions of profiles with their history.
 /// </summary>
 [TestClass]
 public sealed class LiveSenderProfileTests : IDisposable
@@ -939,6 +941,598 @@ public sealed class LiveSenderProfileTests : IDisposable
     }
 
     /// <summary>
+    /// A deletion ticked before the run is sent as the first message after the accepted hello, naming the deleted profile
+    /// under a message identity of its own (S3, AC5).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC5")]
+    public async Task LiveSenderProfileDeletionSentAfterHello()
+    {
+        // Arrange
+        var connector = new QueuedIngestConnector();
+        var server = AddServer(connector);
+        var profiles = LoadProfiles();
+        var deleted = profiles.Create(SecondName);
+        var sender = CreateSender(connector, CreateTimeProvider());
+
+        profiles.Select(LiveSender.ProfileId);
+        profiles.Delete(deleted.Id, true);
+        sender.UseProfiles(profiles);
+        sender.Enqueue(TickItem(300, 4));
+
+        // Act
+        StartRun(sender);
+
+        var hello = await AcceptAsync(server);
+        var first = await ReceiveAndAcknowledgeAsync(server);
+
+        // Assert
+        var deletion = Assert.IsInstanceOfType<ContractProfileDeletion>(first, "The first message after the accepted hello should be the waiting deletion");
+
+        Assert.AreEqual(LiveSender.ProfileId, hello.ProfileId, "The hello should name the active profile");
+        Assert.AreEqual(deleted.Id, deletion.ProfileId, "The deletion should name the deleted profile");
+        Assert.AreNotEqual(Guid.Empty, deletion.Id, "The deletion should carry a message identity");
+        Assert.AreNotEqual(deleted.Id, deletion.Id, "The message identity of the deletion should not be the profile's identity");
+    }
+
+    /// <summary>
+    /// On a connection whose hello names another profile than <c>Live</c>, the waiting deletions go first, oldest first and
+    /// each after the acknowledgement of the one before, then the catalog, then the buffered message (S3, AC14).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC14")]
+    public async Task LiveSenderProfileDeletionSentBeforeCatalogAndBuffer()
+    {
+        // Arrange
+        var connector = new QueuedIngestConnector();
+        var server = AddServer(connector);
+        var profiles = LoadProfiles();
+        var older = profiles.Create("MARKER-Deleted Older");
+        var newer = profiles.Create("MARKER-Deleted Newer");
+        var active = profiles.Create(SecondName);
+        var sender = CreateSender(connector, CreateTimeProvider());
+
+        profiles.Delete(older.Id, true);
+        profiles.Delete(newer.Id, true);
+        sender.UseProfiles(profiles);
+        Offer(sender, CatalogTestData.Create("A", 1));
+        sender.Enqueue(TickItem(300, 4));
+
+        // Act
+        StartRun(sender);
+
+        var hello = await AcceptAsync(server);
+        var first = await ReceiveAndAcknowledgeAsync(server);
+        var second = await ReceiveAndAcknowledgeAsync(server);
+        var third = await ReceiveAndAcknowledgeAsync(server);
+        var fourth = await ReceiveAndAcknowledgeAsync(server);
+
+        // Assert
+        Assert.AreEqual(active.Id, hello.ProfileId, "The hello should name the active profile, not Live");
+        Assert.AreEqual(older.Id, Assert.IsInstanceOfType<ContractProfileDeletion>(first, "The first message after the hello should be a deletion").ProfileId, "The older deletion should go first");
+        Assert.AreEqual(newer.Id, Assert.IsInstanceOfType<ContractProfileDeletion>(second, "The second message should be a deletion").ProfileId, "The newer deletion should go second");
+        Assert.IsInstanceOfType<ContractCatalogUpload>(third, "The catalog should go after the deletions");
+        Assert.AreEqual(300L, Assert.IsInstanceOfType<ContractTick>(fourth, "The buffered tick should go after the catalog").GameTime, "The buffered tick should go last");
+    }
+
+    /// <summary>
+    /// A deletion ticked while the connection waits for messages wakes it: the deletion is sent at once, and its accepted
+    /// acknowledgement confirms it on the list, logged once at Information; the connection goes on (S3, AC7).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public async Task LiveSenderProfileDeletionConfirmedOnAcknowledgement()
+    {
+        // Arrange
+        var connector = new QueuedIngestConnector();
+        var server = AddServer(connector);
+        var profiles = LoadProfiles();
+        var deleted = profiles.Create(SecondName);
+        var sender = CreateSender(connector, CreateTimeProvider());
+
+        profiles.Select(LiveSender.ProfileId);
+        sender.UseProfiles(profiles);
+        StartRun(sender);
+        await AcceptAsync(server);
+        await WaitForStatusAsync(LiveSendState.Connected, 1);
+
+        // Act
+        profiles.Delete(deleted.Id, true);
+
+        var sent = await ReceiveAndAcknowledgeAsync(server);
+
+        sender.Enqueue(TickItem(300, 4));
+
+        var tick = await ReceiveAndAcknowledgeAsync(server);
+
+        // Assert
+        Assert.AreEqual(deleted.Id, Assert.IsInstanceOfType<ContractProfileDeletion>(sent, "The deletion ticked while connected should be sent at once").ProfileId, "The deletion should name the deleted profile");
+        Assert.IsEmpty(profiles.WaitingDeletions, "The acknowledged deletion should not wait any more");
+        Assert.IsTrue(profiles.IsDeleted(deleted.Id), "The confirmed identity should stay on the list");
+        Assert.AreEqual(300L, Assert.IsInstanceOfType<ContractTick>(tick, "The tick after the deletion should be sent").GameTime, "The connection should go on with the tick");
+        Assert.AreEqual(1, connector.AttemptCount, "The deletion should not reconnect");
+        Assert.AreSequenceEqual([(LogLevel.Information, "Profile deletion confirmed by the server")], DeletionLines(), "The confirmation should be logged once, at Information");
+    }
+
+    /// <summary>
+    /// A deletion ticked while a message is in flight goes after it; a refusal of the deletion confirms it on the list too,
+    /// with the refusal logged once as a warning (S3, E6, AC7).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public async Task LiveSenderProfileDeletionRefusedLogsAndConfirms()
+    {
+        // Arrange
+        var connector = new QueuedIngestConnector();
+        var server = AddServer(connector);
+        var profiles = LoadProfiles();
+        var deleted = profiles.Create(SecondName);
+        var sender = CreateSender(connector, CreateTimeProvider());
+
+        profiles.Select(LiveSender.ProfileId);
+        sender.UseProfiles(profiles);
+        StartRun(sender);
+        await AcceptAsync(server);
+        sender.Enqueue(TickItem(300, 4));
+
+        var inFlight = await ReceiveContentAsync(server);
+
+        // Act
+        profiles.Delete(deleted.Id, true);
+        await server.AcknowledgeAsync(inFlight, null, TestContext.CancellationToken);
+
+        var sent = await ReceiveContentAsync(server);
+
+        await server.AcknowledgeAsync(sent, ContractAcknowledgementRefusal.Invalid, TestContext.CancellationToken);
+        sender.Enqueue(TickItem(400, 5));
+
+        var next = await ReceiveAndAcknowledgeAsync(server);
+
+        // Assert
+        Assert.AreEqual(300L, Assert.IsInstanceOfType<ContractTick>(inFlight, "The tick should be in flight at the deletion").GameTime, "The tick in flight should be the one enqueued");
+        Assert.AreEqual(deleted.Id, Assert.IsInstanceOfType<ContractProfileDeletion>(sent, "The deletion should go after the message in flight").ProfileId, "The deletion should name the deleted profile");
+        Assert.IsEmpty(profiles.WaitingDeletions, "The refused deletion should not wait any more");
+        Assert.IsTrue(profiles.IsDeleted(deleted.Id), "The refused deletion should stay on the list, so the filter stays");
+        Assert.AreSequenceEqual([(LogLevel.Warning, "Profile deletion refused by the server: Invalid")], DeletionLines(), "The refusal should be logged once as a warning, with no confirmation line");
+        Assert.AreEqual(400L, Assert.IsInstanceOfType<ContractTick>(next, "The tick after the refusal should be sent").GameTime, "The connection should go on after the refusal");
+    }
+
+    /// <summary>
+    /// A connection that ends before the deletion's acknowledgement keeps the deletion waiting; the next connection sends it
+    /// again first, and its acknowledgement confirms it (E4, E5, AC7).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public async Task LiveSenderProfileDeletionKeptWaitingWhenConnectionLost()
+    {
+        // Arrange
+        var timeProvider = CreateTimeProvider();
+        var connector = new QueuedIngestConnector();
+        var first = AddServer(connector);
+        var next = AddServer(connector);
+        var profiles = LoadProfiles();
+        var deleted = profiles.Create(SecondName);
+        var sender = CreateSender(connector, timeProvider);
+
+        profiles.Select(LiveSender.ProfileId);
+        profiles.Delete(deleted.Id, true);
+        sender.UseProfiles(profiles);
+        sender.Enqueue(TickItem(300, 4));
+        StartRun(sender);
+        await AcceptAsync(first);
+
+        var lost = await ReceiveContentAsync(first);
+
+        // Act
+        first.Abort();
+
+        await timeProvider.WaitForDelayAsync(LiveSender.RetryDelays[0], TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+
+        var waitingAfterLoss = profiles.WaitingDeletions.ToArray();
+
+        timeProvider.Advance(LiveSender.RetryDelays[0]);
+        await AcceptAsync(next);
+
+        var resent = await ReceiveAndAcknowledgeAsync(next);
+        var tick = await ReceiveAndAcknowledgeAsync(next);
+
+        // Assert
+        Assert.AreEqual(deleted.Id, Assert.IsInstanceOfType<ContractProfileDeletion>(lost, "The first connection should send the deletion").ProfileId, "The first deletion should name the deleted profile");
+        Assert.AreSequenceEqual([deleted.Id], waitingAfterLoss, "The deletion without an acknowledgement should keep waiting");
+        Assert.AreEqual(deleted.Id, Assert.IsInstanceOfType<ContractProfileDeletion>(resent, "The next connection should send the deletion again first").ProfileId, "The resent deletion should name the deleted profile");
+        Assert.AreEqual(300L, Assert.IsInstanceOfType<ContractTick>(tick, "The buffered tick should follow the deletion").GameTime, "The buffered tick should be sent after the deletion");
+        Assert.IsEmpty(profiles.WaitingDeletions, "The acknowledged deletion should not wait any more");
+    }
+
+    /// <summary>
+    /// The buffered messages of a profile deleted with its history are never sent: after the deletion the connection
+    /// goes on with the next message of another profile, without a reconnect, and each one counts as dropped (S2, E10,
+    /// AC4).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC4")]
+    public async Task LiveSenderProfileDeletionDropsWaitingMessages()
+    {
+        // Arrange
+        var timeProvider = CreateTimeProvider();
+        var connector = new QueuedIngestConnector();
+        var server = AddServer(connector);
+        var buffer = CreateRunningBuffer(timeProvider);
+        var profiles = LoadProfiles();
+        var sender = CreateSender(connector, timeProvider, buffer);
+
+        sender.UseProfiles(profiles);
+
+        var deleted = profiles.Create(SecondName);
+
+        sender.Enqueue(TickItem(100, 2));
+        sender.Enqueue(TickItem(200, 3));
+        profiles.Select(LiveSender.ProfileId);
+        sender.Enqueue(TickItem(300, 4));
+        profiles.Delete(deleted.Id, true);
+
+        // Act
+        StartRun(sender);
+
+        var hello = await AcceptAsync(server);
+        var deletion = await ReceiveAndAcknowledgeAsync(server);
+        var next = await ReceiveAndAcknowledgeAsync(server);
+
+        // Assert
+        var tick = Assert.IsInstanceOfType<ContractTick>(next, "The message after the deletion should be a tick");
+
+        Assert.AreEqual(LiveSender.ProfileId, hello.ProfileId, "The hello should name the active profile");
+        Assert.AreEqual(deleted.Id, Assert.IsInstanceOfType<ContractProfileDeletion>(deletion, "The deletion should be sent first").ProfileId, "The deletion should name the deleted profile");
+        Assert.AreEqual(300L, tick.GameTime, "The ticks of the deleted profile should not be sent");
+        Assert.AreEqual(LiveSender.ProfileId, tick.ProfileId, "The tick sent should be Live's");
+        Assert.AreEqual(2, buffer.Status.Dropped, "Both ticks of the deleted profile should count as dropped");
+        Assert.AreEqual(2, LoggedDropCount(), "The dropped ticks should be logged as dropped messages");
+        Assert.AreEqual(1, connector.AttemptCount, "The dropped messages should not reconnect");
+    }
+
+    /// <summary>
+    /// A confirmed identity still filters the buffer: its buffered message is dropped and no deletion is sent for it again
+    /// (Deleted identities, AC4).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC4")]
+    public async Task LiveSenderProfileDeletionDropsAfterConfirmation()
+    {
+        // Arrange
+        var timeProvider = CreateTimeProvider();
+        var connector = new QueuedIngestConnector();
+        var server = AddServer(connector);
+        var buffer = CreateRunningBuffer(timeProvider);
+        var profiles = LoadProfiles();
+        var sender = CreateSender(connector, timeProvider, buffer);
+
+        sender.UseProfiles(profiles);
+
+        var deleted = profiles.Create(SecondName);
+
+        sender.Enqueue(TickItem(100, 2));
+        profiles.Select(LiveSender.ProfileId);
+        sender.Enqueue(TickItem(300, 4));
+        profiles.Delete(deleted.Id, true);
+        profiles.ConfirmDeletion(deleted.Id);
+
+        // Act
+        StartRun(sender);
+        await AcceptAsync(server);
+
+        var next = await ReceiveAndAcknowledgeAsync(server);
+
+        // Assert
+        Assert.AreEqual(300L, Assert.IsInstanceOfType<ContractTick>(next, "The first message should be the tick of Live, with no deletion sent again").GameTime, "The tick of the deleted profile should not be sent");
+        Assert.AreEqual(1, buffer.Status.Dropped, "The tick of the confirmed profile should count as dropped");
+    }
+
+    /// <summary>
+    /// The message in flight at a lost connection, of a profile deleted with its history before the reconnect, is dropped
+    /// instead of being sent again (Deleted identities, AC4).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC4")]
+    public async Task LiveSenderProfileDeletionDropsResentInFlightMessage()
+    {
+        // Arrange
+        var timeProvider = CreateTimeProvider();
+        var connector = new QueuedIngestConnector();
+        var first = AddServer(connector);
+        var next = AddServer(connector);
+        var buffer = CreateRunningBuffer(timeProvider);
+        var profiles = LoadProfiles();
+        var sender = CreateSender(connector, timeProvider, buffer);
+
+        sender.UseProfiles(profiles);
+
+        var deleted = profiles.Create(SecondName);
+
+        StartRun(sender);
+
+        var firstHello = await AcceptAsync(first);
+
+        sender.Enqueue(TickItem(100, 2));
+
+        var inFlight = await ReceiveContentAsync(first);
+
+        first.Abort();
+        await timeProvider.WaitForDelayAsync(LiveSender.RetryDelays[0], TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+        profiles.Select(LiveSender.ProfileId);
+        sender.Enqueue(TickItem(300, 4));
+
+        // Act
+        profiles.Delete(deleted.Id, true);
+        timeProvider.Advance(LiveSender.RetryDelays[0]);
+
+        var nextHello = await AcceptAsync(next);
+        var deletion = await ReceiveAndAcknowledgeAsync(next);
+        var after = await ReceiveAndAcknowledgeAsync(next);
+
+        // Assert
+        Assert.AreEqual(deleted.Id, firstHello.ProfileId, "The first hello should name the profile deleted later");
+        Assert.AreEqual(deleted.Id, Assert.IsInstanceOfType<ContractTick>(inFlight, "The tick should be in flight at the lost connection").ProfileId, "The tick in flight should be of the profile deleted later");
+        Assert.AreEqual(LiveSender.ProfileId, nextHello.ProfileId, "The next hello should name the active profile");
+        Assert.IsInstanceOfType<ContractProfileDeletion>(deletion, "The next connection should send the deletion first");
+        Assert.AreEqual(300L, Assert.IsInstanceOfType<ContractTick>(after, "The message after the deletion should be a tick").GameTime, "The tick in flight of the deleted profile should not be sent again");
+        Assert.AreEqual(1, buffer.Status.Dropped, "The tick in flight should count as dropped");
+    }
+
+    /// <summary>
+    /// A dropped message counts toward the messages that waited at the hello: a catalog deferred by a connection that failed
+    /// during its upload goes once the waiting messages are sent or dropped, before a message taken after the hello
+    /// (Challenge note 2 of the plan, AC4).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC4")]
+    public async Task LiveSenderProfileDeletionDropReleasesDeferredCatalog()
+    {
+        // Arrange
+        var timeProvider = CreateTimeProvider();
+        var connector = new QueuedIngestConnector();
+        var first = AddServer(connector);
+        var next = AddServer(connector);
+        var buffer = CreateRunningBuffer(timeProvider);
+        var profiles = LoadProfiles();
+        var sender = CreateSender(connector, timeProvider, buffer);
+
+        sender.UseProfiles(profiles);
+
+        var deleted = profiles.Create(SecondName);
+
+        sender.Enqueue(TickItem(100, 2));
+        profiles.Select(LiveSender.ProfileId);
+        sender.Enqueue(TickItem(200, 3));
+        profiles.Delete(deleted.Id, true);
+        profiles.ConfirmDeletion(deleted.Id);
+        Offer(sender, CatalogTestData.Create("A", 1));
+        StartRun(sender);
+        await AcceptAsync(first);
+
+        var failedUpload = await ReceiveContentAsync(first);
+
+        first.Abort();
+        await AdvanceRetryAsync(timeProvider, LiveSender.RetryDelays[0], 1);
+        await AcceptAsync(next);
+
+        // Act
+        var waiting = await ReceiveContentAsync(next);
+
+        sender.Enqueue(TickItem(300, 4));
+        await next.AcknowledgeAsync(waiting, null, TestContext.CancellationToken);
+
+        var afterWaiting = await ReceiveContentAsync(next);
+
+        // Assert
+        Assert.IsInstanceOfType<ContractCatalogUpload>(failedUpload, "The first connection should fail during the catalog");
+        Assert.AreEqual(200L, Assert.IsInstanceOfType<ContractTick>(waiting, "The next connection should send the waiting tick of Live first").GameTime, "The waiting tick of the deleted profile should be dropped");
+        Assert.IsInstanceOfType<ContractCatalogUpload>(afterWaiting, "The deferred catalog should go once the messages that waited at the hello were sent or dropped");
+        Assert.AreEqual(1, buffer.Status.Dropped, "The tick of the deleted profile should count as dropped");
+    }
+
+    /// <summary>
+    /// A profile deleted with its history after a waiting message of it began a switch to it is not named by the next hello,
+    /// which names the active profile (AC4).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC4")]
+    public async Task LiveSenderProfileDeletionHelloNeverNamesDeletedProfile()
+    {
+        // Arrange
+        var timeProvider = CreateTimeProvider();
+        var connector = new QueuedIngestConnector();
+        var first = AddServer(connector);
+        var next = AddServer(connector);
+        var profiles = LoadProfiles();
+        var sender = CreateSender(connector, timeProvider);
+        var closeWait = TimeSpan.FromSeconds(2);
+
+        sender.UseProfiles(profiles);
+
+        var deleted = profiles.Create(SecondName);
+
+        sender.Enqueue(TickItem(100, 2));
+        profiles.Select(LiveSender.ProfileId);
+        sender.Enqueue(TickItem(300, 4));
+        StartRun(sender);
+
+        var firstHello = await AcceptAsync(first);
+        var isClosing = await WaitForAsync(() => timeProvider.Delays.Contains(closeWait));
+
+        // Act
+        profiles.Delete(deleted.Id, true);
+
+        var closed = await first.ReceiveAsync(TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+        var nextHello = await AcceptAsync(next);
+        var deletion = await ReceiveAndAcknowledgeAsync(next);
+        var tick = await ReceiveAndAcknowledgeAsync(next);
+
+        // Assert
+        Assert.AreEqual(LiveSender.ProfileId, firstHello.ProfileId, "The first hello should name the active profile");
+        Assert.IsTrue(isClosing, "The waiting tick of the other profile should begin a switch to it");
+        Assert.IsNull(closed, "The first connection should send nothing before its close");
+        Assert.AreEqual(LiveSender.ProfileId, nextHello.ProfileId, "The next hello should name the active profile, never the deleted one");
+        Assert.AreEqual(LiveSender.ProfileName, nextHello.ProfileName, "The next hello should carry the active profile's name");
+        Assert.AreEqual(deleted.Id, Assert.IsInstanceOfType<ContractProfileDeletion>(deletion, "The next connection should send the deletion first").ProfileId, "The deletion should name the deleted profile");
+        Assert.AreEqual(300L, Assert.IsInstanceOfType<ContractTick>(tick, "The message after the deletion should be a tick").GameTime, "The tick of the deleted profile should not be sent");
+    }
+
+    /// <summary>
+    /// A profile deleted with the history box cleared after a waiting message of it began a switch to it is not named by
+    /// the next hello, which names the active profile; its waiting message is still sent on that connection (S1, E9, AC3).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC3")]
+    public async Task LiveSenderProfileDeletionWithoutHistoryHelloNamesActiveProfile()
+    {
+        // Arrange
+        var timeProvider = CreateTimeProvider();
+        var connector = new QueuedIngestConnector();
+        var first = AddServer(connector);
+        var next = AddServer(connector);
+        var buffer = CreateRunningBuffer(timeProvider);
+        var profiles = LoadProfiles();
+        var sender = CreateSender(connector, timeProvider, buffer);
+        var closeWait = TimeSpan.FromSeconds(2);
+
+        sender.UseProfiles(profiles);
+
+        var deleted = profiles.Create(SecondName);
+
+        sender.Enqueue(TickItem(100, 2));
+        profiles.Select(LiveSender.ProfileId);
+        sender.Enqueue(TickItem(300, 4));
+        StartRun(sender);
+
+        var firstHello = await AcceptAsync(first);
+        var isClosing = await WaitForAsync(() => timeProvider.Delays.Contains(closeWait));
+
+        // Act
+        profiles.Delete(deleted.Id, false);
+
+        var closed = await first.ReceiveAsync(TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+        var nextHello = await AcceptAsync(next);
+        var waiting = await ReceiveAndAcknowledgeAsync(next);
+        var tick = await ReceiveAndAcknowledgeAsync(next);
+
+        // Assert
+        var sent = Assert.IsInstanceOfType<ContractTick>(waiting, "The first message of the next connection should be the waiting tick, with no deletion sent");
+
+        Assert.AreEqual(LiveSender.ProfileId, firstHello.ProfileId, "The first hello should name the active profile");
+        Assert.IsTrue(isClosing, "The waiting tick of the other profile should begin a switch to it");
+        Assert.IsNull(closed, "The first connection should send nothing before its close");
+        Assert.AreEqual(LiveSender.ProfileId, nextHello.ProfileId, "The next hello should name the active profile, never the deleted one");
+        Assert.AreEqual(LiveSender.ProfileName, nextHello.ProfileName, "The next hello should carry the active profile's name, not the deleted one's");
+        Assert.AreEqual(100L, sent.GameTime, "The waiting tick of the deleted profile should be sent");
+        Assert.AreEqual(deleted.Id, sent.ProfileId, "The waiting tick should keep the deleted profile's identity");
+        Assert.AreEqual(300L, Assert.IsInstanceOfType<ContractTick>(tick, "The second message should be the tick of Live").GameTime, "The tick of Live should follow");
+        Assert.AreEqual(2, connector.AttemptCount, "The waiting tick should go out on the connection of the next hello");
+        Assert.AreEqual(0, buffer.Status.Dropped, "The waiting tick of the deleted profile should not be dropped");
+    }
+
+    /// <summary>
+    /// A profile deleted with the history box cleared sends nothing for the deletion: its waiting messages go out on the
+    /// current connection, before the messages of <c>Live</c>, and none is dropped (S1, E9, AC3).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC3")]
+    public async Task LiveSenderProfileDeletionWithoutHistorySendsWaitingMessages()
+    {
+        // Arrange
+        var timeProvider = CreateTimeProvider();
+        var connector = new QueuedIngestConnector();
+        var server = AddServer(connector);
+        var buffer = CreateRunningBuffer(timeProvider);
+        var profiles = LoadProfiles();
+        var sender = CreateSender(connector, timeProvider, buffer);
+
+        sender.UseProfiles(profiles);
+
+        var deleted = profiles.Create(SecondName);
+
+        sender.Enqueue(TickItem(100, 2));
+        profiles.Select(LiveSender.ProfileId);
+        sender.Enqueue(TickItem(300, 4));
+        profiles.Delete(deleted.Id, false);
+
+        // Act
+        StartRun(sender);
+
+        var hello = await AcceptAsync(server);
+        var first = await ReceiveAndAcknowledgeAsync(server);
+        var second = await ReceiveAndAcknowledgeAsync(server);
+
+        // Assert
+        var waiting = Assert.IsInstanceOfType<ContractTick>(first, "The first message after the hello should be the waiting tick, with no deletion sent");
+
+        Assert.AreEqual(LiveSender.ProfileId, hello.ProfileId, "The hello should name the active profile");
+        Assert.AreEqual(100L, waiting.GameTime, "The waiting tick of the deleted profile should be sent first");
+        Assert.AreEqual(deleted.Id, waiting.ProfileId, "The waiting tick should keep the deleted profile's identity");
+        Assert.AreEqual(300L, Assert.IsInstanceOfType<ContractTick>(second, "The second message should be the tick of Live").GameTime, "The tick of Live should follow");
+        Assert.IsFalse(profiles.IsDeleted(deleted.Id), "A deletion without history should not put the identity on the list");
+        Assert.IsEmpty(profiles.WaitingDeletions, "A deletion without history should not wait to be sent");
+        Assert.AreEqual(0, buffer.Status.Dropped, "No waiting message should be dropped");
+        Assert.AreEqual(1, connector.AttemptCount, "The waiting messages should go out on the current connection");
+    }
+
+    /// <summary>
+    /// A waiting deletion the contract writer refuses, the all-zero identity the profiles file accepts, is logged once and
+    /// stays waiting; the next waiting deletion is still sent and confirmed, and the connection goes on.
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    public async Task LiveSenderProfileDeletionNotWrittenKeepsWaitingAndSendsNext()
+    {
+        // Arrange
+        var connector = new QueuedIngestConnector();
+        var server = AddServer(connector);
+        var valid = new Guid("5f0c2a9e-3d71-4b8e-a6c4-91e2d7b03f58");
+        var path = Path.Combine(_root, Guid.NewGuid().ToString("N"), "profiles.json");
+        var live = LiveSender.ProfileId.ToString("D");
+
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        await File.WriteAllTextAsync(path, $$"""{"version":2,"active":"{{live}}","profiles":[{"id":"{{live}}","name":"Live"}],"figures":[],"deleted":[{"id":"00000000-0000-0000-0000-000000000000","confirmed":false},{"id":"{{valid:D}}","confirmed":false}]}""", TestContext.CancellationToken);
+
+        var profiles = CompanionProfiles.Load(path, _profilesLogger);
+        var waitingAtLoad = profiles.WaitingDeletions.ToArray();
+        var sender = CreateSender(connector, CreateTimeProvider());
+
+        sender.UseProfiles(profiles);
+
+        // Act
+        StartRun(sender);
+        await AcceptAsync(server);
+
+        var sent = await ReceiveAndAcknowledgeAsync(server);
+
+        sender.Enqueue(TickItem(300, 4));
+
+        var tick = await ReceiveAndAcknowledgeAsync(server);
+
+        // Assert
+        Assert.AreSequenceEqual([Guid.Empty, valid], waitingAtLoad, "The profiles file should load both waiting deletions, the all-zero one first");
+        Assert.AreEqual(valid, Assert.IsInstanceOfType<ContractProfileDeletion>(sent, "The first message after the hello should be the valid deletion").ProfileId, "Only the valid deletion should be sent");
+        Assert.AreEqual(300L, Assert.IsInstanceOfType<ContractTick>(tick, "The message after the deletion should be the tick").GameTime, "The connection should go on after the refused write");
+        Assert.HasCount(1, Lines().Where(line => line == "Live message not sent: the contract writer refused it").ToList(), "The refused write should be logged once");
+        Assert.AreSequenceEqual([Guid.Empty], profiles.WaitingDeletions.ToArray(), "The deletion the writer refused should keep waiting, the valid one should not");
+        Assert.IsTrue(profiles.IsDeleted(valid), "The confirmed identity should stay on the list");
+        Assert.AreSequenceEqual([(LogLevel.Information, "Profile deletion confirmed by the server")], DeletionLines(), "Only the valid deletion should be confirmed");
+        Assert.AreEqual(1, connector.AttemptCount, "The refused write should not end the connection");
+    }
+
+    /// <summary>
     /// Selects <c>Live</c> again whenever another profile is active.
     /// </summary>
     /// <param name="profiles">The profiles</param>
@@ -948,6 +1542,22 @@ public sealed class LiveSenderProfileTests : IDisposable
         {
             profiles.Select(LiveSender.ProfileId);
         }
+    }
+
+    /// <summary>
+    /// Offers a ready catalog to a sender.
+    /// </summary>
+    /// <param name="sender">The sender</param>
+    /// <param name="data">The catalog data</param>
+    private static void Offer(LiveSender sender, CatalogData data)
+    {
+        var status = new GameCatalogStatus
+                     {
+                         Kind = GameCatalogStatusKind.Ready,
+                         EntryCount = 3
+                     };
+
+        sender.SetCatalog(status, data.Catalog, data.Icons, data.Build);
     }
 
     /// <summary>
@@ -1092,7 +1702,19 @@ public sealed class LiveSenderProfileTests : IDisposable
     /// <returns>The sender</returns>
     private LiveSender CreateSender(QueuedIngestConnector connector, TimeProvider timeProvider)
     {
-        return Track(LiveSender.ForServer(new ForwardServerSetting(_address, Token), CreateRunningBuffer(timeProvider), CompanionVersion, connector, timeProvider, _logger));
+        return CreateSender(connector, timeProvider, CreateRunningBuffer(timeProvider));
+    }
+
+    /// <summary>
+    /// Creates a sender for the server of the tests over a buffer and records its statuses and notices.
+    /// </summary>
+    /// <param name="connector">The connector</param>
+    /// <param name="timeProvider">The time provider</param>
+    /// <param name="buffer">The buffer, running</param>
+    /// <returns>The sender</returns>
+    private LiveSender CreateSender(QueuedIngestConnector connector, TimeProvider timeProvider, LiveBuffer buffer)
+    {
+        return Track(LiveSender.ForServer(new ForwardServerSetting(_address, Token), buffer, CompanionVersion, connector, timeProvider, _logger));
     }
 
     /// <summary>
@@ -1187,6 +1809,26 @@ public sealed class LiveSenderProfileTests : IDisposable
     private List<string> Lines()
     {
         return [.. _logger.Entries.Select(entry => entry.Message)];
+    }
+
+    /// <summary>
+    /// Returns the senders' log entries about profile deletions so far.
+    /// </summary>
+    /// <returns>The level and message of each entry, in order</returns>
+    private (LogLevel Level, string Message)[] DeletionLines()
+    {
+        return [.. _logger.Entries.Where(entry => entry.Message.StartsWith("Profile deletion", StringComparison.Ordinal)).Select(entry => (entry.Level, entry.Message))];
+    }
+
+    /// <summary>
+    /// Returns the sum of the counts the senders logged as dropped messages so far.
+    /// </summary>
+    /// <returns>The number of dropped messages logged</returns>
+    private int LoggedDropCount()
+    {
+        const string prefix = "Live messages dropped: ";
+
+        return Lines().Where(line => line.StartsWith(prefix, StringComparison.Ordinal)).Sum(line => int.Parse(line[prefix.Length..], CultureInfo.InvariantCulture));
     }
 
     /// <summary>
@@ -1314,11 +1956,11 @@ public sealed class LiveSenderProfileTests : IDisposable
     }
 
     /// <summary>
-    /// Receives the next message that is not a status and acknowledges it.
+    /// Receives the next message that is not a status, without acknowledging it.
     /// </summary>
     /// <param name="server">The server</param>
     /// <returns>The message, or <c>null</c> when the connection ended</returns>
-    private async Task<ContractMessage?> ReceiveAndAcknowledgeAsync(ScriptedIngestServer server)
+    private async Task<ContractMessage?> ReceiveContentAsync(ScriptedIngestServer server)
     {
         var message = await server.ReceiveAsync(TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
 
@@ -1326,6 +1968,18 @@ public sealed class LiveSenderProfileTests : IDisposable
         {
             message = await server.ReceiveAsync(TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
         }
+
+        return message;
+    }
+
+    /// <summary>
+    /// Receives the next message that is not a status and acknowledges it.
+    /// </summary>
+    /// <param name="server">The server</param>
+    /// <returns>The message, or <c>null</c> when the connection ended</returns>
+    private async Task<ContractMessage?> ReceiveAndAcknowledgeAsync(ScriptedIngestServer server)
+    {
+        var message = await ReceiveContentAsync(server);
 
         if (message is not null)
         {

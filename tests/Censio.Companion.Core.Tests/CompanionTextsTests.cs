@@ -245,6 +245,56 @@ public sealed class CompanionTextsTests
     }
 
     /// <summary>
+    /// Every text of deleting a profile exists in English and German with the plan's wording: the dialog's text has a
+    /// place for the profile name, the count line one for the count, and none holds an identity (spec N4, N6).
+    /// </summary>
+    /// <param name="name">The name of the text</param>
+    /// <param name="english">The expected English text</param>
+    /// <param name="german">The expected German text</param>
+    [TestMethod]
+    [TestCategory("AC10")]
+    [DataRow(nameof(CompanionTexts.DeleteProfileText), "Delete profile…", "Profil löschen…")]
+    [DataRow(nameof(CompanionTexts.DeleteProfileDisabledText), "Live and the active profile cannot be deleted.", "Live und das aktive Profil können nicht gelöscht werden.")]
+    [DataRow(nameof(CompanionTexts.DeleteProfileTitle), "Delete profile?", "Profil löschen?")]
+    [DataRow(nameof(CompanionTexts.DeleteProfileTextFormat), "The profile {0} is removed from this Companion, with the figures linked to it.", "Das Profil {0} wird aus diesem Companion entfernt, mit den Figuren, die mit ihm verknüpft sind.")]
+    [DataRow(nameof(CompanionTexts.DeleteProfileHistoryText), "Also delete its history on the server", "Auch seinen Verlauf auf dem Server löschen")]
+    [DataRow(nameof(CompanionTexts.DeleteProfileHistoryFullText), "1,000 deletions already wait for the server.", "Schon 1.000 Löschungen warten auf den Server.")]
+    [DataRow(nameof(CompanionTexts.DeleteProfileConfirmText), "Delete", "Löschen")]
+    [DataRow(nameof(CompanionTexts.WaitingDeletionsFormat), "Deleted profiles whose history the server has not deleted yet: {0}", "Gelöschte Profile, deren Verlauf der Server noch nicht gelöscht hat: {0}")]
+    public void CompanionTextsDeletionTextsInBothLanguages(string name, string english, string german)
+    {
+        // Act
+        var englishText = DeletionText(CompanionTexts.English, name);
+        var germanText = DeletionText(CompanionTexts.German, name);
+
+        // Assert
+        Assert.AreEqual(english, englishText, $"The English text should have the plan's wording: {name}");
+        Assert.AreEqual(german, germanText, $"The German text should have the plan's wording: {name}");
+    }
+
+    /// <summary>
+    /// Gives a text of deleting a profile by its name.
+    /// </summary>
+    /// <param name="texts">The texts of one language</param>
+    /// <param name="name">The name of the text</param>
+    /// <returns>The text</returns>
+    private static string DeletionText(CompanionTexts texts, string name)
+    {
+        return name switch
+               {
+                   nameof(CompanionTexts.DeleteProfileText) => texts.DeleteProfileText,
+                   nameof(CompanionTexts.DeleteProfileDisabledText) => texts.DeleteProfileDisabledText,
+                   nameof(CompanionTexts.DeleteProfileTitle) => texts.DeleteProfileTitle,
+                   nameof(CompanionTexts.DeleteProfileTextFormat) => texts.DeleteProfileTextFormat,
+                   nameof(CompanionTexts.DeleteProfileHistoryText) => texts.DeleteProfileHistoryText,
+                   nameof(CompanionTexts.DeleteProfileHistoryFullText) => texts.DeleteProfileHistoryFullText,
+                   nameof(CompanionTexts.DeleteProfileConfirmText) => texts.DeleteProfileConfirmText,
+                   nameof(CompanionTexts.WaitingDeletionsFormat) => texts.WaitingDeletionsFormat,
+                   _ => throw new ArgumentOutOfRangeException(nameof(name), name, "No text of deleting a profile has the name")
+               };
+    }
+
+    /// <summary>
     /// Creates the call of a method of the texts with a value outside its enumeration.
     /// </summary>
     /// <param name="method">The method: For, FormatProblem, FormatNotice or FormatOutcome</param>
