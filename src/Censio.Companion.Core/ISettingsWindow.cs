@@ -22,6 +22,11 @@ public interface ISettingsWindow
     /// </summary>
     event EventHandler<SettingsDeletion>? DeleteRequested;
 
+    /// <summary>
+    /// Occurs when the user asks to rename a profile.
+    /// </summary>
+    event EventHandler<SettingsRename>? RenameRequested;
+
     #endregion // Events
 
     #region Methods

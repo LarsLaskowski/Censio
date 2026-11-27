@@ -147,6 +147,11 @@ public sealed class CompanionTexts
                                                         DeleteProfileHistoryText = "Also delete its history on the server",
                                                         DeleteProfileHistoryFullText = "1,000 deletions already wait for the server.",
                                                         DeleteProfileConfirmText = "Delete",
+                                                        RenameProfileText = "Rename profile…",
+                                                        RenameProfileDisabledText = "Live cannot be renamed.",
+                                                        RenameProfileTitle = "Rename profile",
+                                                        RenameProfileTextFormat = "New name of the profile {0}",
+                                                        RenameProfileConfirmText = "Rename",
                                                         WaitingDeletionsFormat = "Deleted profiles whose history the server has not deleted yet: {0}",
                                                         FileProblemFormat = CompositeFormat.Parse("The settings file could not be read ({0}). Saving replaces it with the values shown."),
                                                         ProfilesFileInvalidText = "The profiles file could not be read. Saving a profile replaces it.",
@@ -293,6 +298,11 @@ public sealed class CompanionTexts
                                                        DeleteProfileHistoryText = "Auch seinen Verlauf auf dem Server löschen",
                                                        DeleteProfileHistoryFullText = "Schon 1.000 Löschungen warten auf den Server.",
                                                        DeleteProfileConfirmText = "Löschen",
+                                                       RenameProfileText = "Profil umbenennen…",
+                                                       RenameProfileDisabledText = "Live kann nicht umbenannt werden.",
+                                                       RenameProfileTitle = "Profil umbenennen",
+                                                       RenameProfileTextFormat = "Neuer Name des Profils {0}",
+                                                       RenameProfileConfirmText = "Umbenennen",
                                                        WaitingDeletionsFormat = "Gelöschte Profile, deren Verlauf der Server noch nicht gelöscht hat: {0}",
                                                        FileProblemFormat = CompositeFormat.Parse("Die Einstellungsdatei konnte nicht gelesen werden ({0}). Beim Speichern wird sie durch die angezeigten Werte ersetzt."),
                                                        ProfilesFileInvalidText = "Die Profildatei konnte nicht gelesen werden. Beim Speichern eines Profils wird sie ersetzt.",
@@ -961,6 +971,31 @@ public sealed class CompanionTexts
     /// Gets the text of the button that confirms the deletion.
     /// </summary>
     public required string DeleteProfileConfirmText { get; init; }
+
+    /// <summary>
+    /// Gets the text of the button that renames a profile.
+    /// </summary>
+    public required string RenameProfileText { get; init; }
+
+    /// <summary>
+    /// Gets the tooltip of the disabled rename button.
+    /// </summary>
+    public required string RenameProfileDisabledText { get; init; }
+
+    /// <summary>
+    /// Gets the title of the dialog that renames a profile.
+    /// </summary>
+    public required string RenameProfileTitle { get; init; }
+
+    /// <summary>
+    /// Gets the format of the label of the dialog, with the profile name.
+    /// </summary>
+    public required string RenameProfileTextFormat { get; init; }
+
+    /// <summary>
+    /// Gets the text of the button that confirms the new name.
+    /// </summary>
+    public required string RenameProfileConfirmText { get; init; }
 
     /// <summary>
     /// Gets the format of the line that counts the waiting deletions, with the count.

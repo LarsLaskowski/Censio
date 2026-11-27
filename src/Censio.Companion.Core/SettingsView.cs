@@ -98,5 +98,32 @@ public sealed class SettingsView
         return CompanionProfiles.IsDeletable(selected, ActiveProfile, ProfileList);
     }
 
+    // Skeleton: removed with the implementation
+#pragma warning disable RH2003, S1172, S2325
+    /// <summary>
+    /// Determines whether the window can rename a profile.
+    /// </summary>
+    /// <param name="selected">The identity of the selected profile</param>
+    /// <returns><see langword="true" /> when the profile is listed and is not <c>Live</c></returns>
+    public bool CanRename(Guid selected)
+    {
+        throw new NotImplementedException();
+    }
+#pragma warning restore RH2003, S1172, S2325
+
+    // Skeleton: removed with the implementation
+#pragma warning disable RH2003, S1172, S2325
+    /// <summary>
+    /// Checks a new name of a listed profile.
+    /// </summary>
+    /// <param name="profile">The identity of the profile</param>
+    /// <param name="name">The new name</param>
+    /// <returns>The problem, or <see langword="null" /> when the profile can get the name</returns>
+    public SettingsProblemKind? CheckRename(Guid profile, string name)
+    {
+        throw new NotImplementedException();
+    }
+#pragma warning restore RH2003, S1172, S2325
+
     #endregion // Methods
 }

@@ -586,6 +586,13 @@ public static partial class CompanionLog
     public static partial void ProfileDeleted(ILogger logger);
 
     /// <summary>
+    /// Logs that a profile was renamed.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    [LoggerMessage(Level = LogLevel.Information, Message = "Profile renamed")]
+    public static partial void ProfileRenamed(ILogger logger);
+
+    /// <summary>
     /// Logs that the server confirmed the deletion of a profile's history.
     /// </summary>
     /// <param name="logger">The logger</param>

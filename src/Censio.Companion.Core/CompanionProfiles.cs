@@ -148,6 +148,14 @@ public sealed class CompanionProfiles
     /// </summary>
     public event EventHandler? DeletionsChanged;
 
+    // Skeleton: removed with the implementation
+#pragma warning disable CS0067, S3264
+    /// <summary>
+    /// Occurs when a profile was renamed.
+    /// </summary>
+    public event EventHandler? Renamed;
+#pragma warning restore CS0067, S3264
+
     #endregion // Events
 
     #region Properties
@@ -330,6 +338,50 @@ public sealed class CompanionProfiles
     {
         return id != LiveSender.ProfileId && id != active && profiles.Any(profile => profile.Id == id);
     }
+
+    // Skeleton: removed with the implementation
+#pragma warning disable RH2003, S1172
+    /// <summary>
+    /// Determines whether a profile can be renamed.
+    /// </summary>
+    /// <param name="id">The identity of the profile</param>
+    /// <param name="profiles">The profiles</param>
+    /// <returns><see langword="true" /> when the profile is in the list and is not <c>Live</c></returns>
+    public static bool IsRenamable(Guid id, IReadOnlyList<CompanionProfile> profiles)
+    {
+        throw new NotImplementedException();
+    }
+#pragma warning restore RH2003, S1172
+
+    // Skeleton: removed with the implementation
+#pragma warning disable RH2003, S1172
+    /// <summary>
+    /// Checks a new name of a listed profile.
+    /// </summary>
+    /// <param name="id">The identity of the profile</param>
+    /// <param name="name">The new name</param>
+    /// <param name="profiles">The profiles</param>
+    /// <returns>The problem, or <see langword="null" /> when the profile can get the name</returns>
+    public static SettingsProblemKind? CheckRename(Guid id, string name, IReadOnlyList<CompanionProfile> profiles)
+    {
+        throw new NotImplementedException();
+    }
+#pragma warning restore RH2003, S1172
+
+    // Skeleton: removed with the implementation
+#pragma warning disable RH2003, S1172, S2325
+    /// <summary>
+    /// Renames a listed profile other than <c>Live</c>.
+    /// </summary>
+    /// <param name="id">The identity of the profile</param>
+    /// <param name="name">The new name, which <see cref="CheckRename(Guid, string, IReadOnlyList{CompanionProfile})" /> accepts</param>
+    /// <returns><see langword="true" /> when the name changed, <see langword="false" /> when it was the same</returns>
+    /// <exception cref="ArgumentException">The profile is <c>Live</c> or not listed, or the name is refused</exception>
+    public bool Rename(Guid id, string name)
+    {
+        throw new NotImplementedException();
+    }
+#pragma warning restore RH2003, S1172, S2325
 
     /// <summary>
     /// Checks the name of a profile to create.
