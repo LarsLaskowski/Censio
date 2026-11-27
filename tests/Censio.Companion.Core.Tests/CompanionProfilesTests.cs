@@ -92,6 +92,48 @@ public sealed class CompanionProfilesTests
     private const string ConfirmedEntry = """{"id":"{third}","confirmed":true}""";
 
     /// <summary>
+    /// The all-zero identity, which the contract refuses.
+    /// </summary>
+    private const string ZeroId = "00000000-0000-0000-0000-000000000000";
+
+    /// <summary>
+    /// The all-zero identity with its first character written as a JSON escape.
+    /// </summary>
+    private const string ZeroEscaped = "\\" + "u00300000000-0000-0000-0000-000000000000";
+
+    /// <summary>
+    /// The text of the version-2 file after which the all-zero profile is listed.
+    /// </summary>
+    private const string ZeroProfileFind = """{"id":"{second}","name":"MARKER-Second"}""";
+
+    /// <summary>
+    /// The second profile followed by a profile of the all-zero identity.
+    /// </summary>
+    private const string ZeroProfileReplacement = $$"""{{ZeroProfileFind}},{"id":"{{ZeroId}}","name":"MARKER-Zero"}""";
+
+    /// <summary>
+    /// The text of the version-2 file that holds the active identity and the profiles.
+    /// </summary>
+    private const string ZeroActiveFind = """:"{second}","profiles":[{"id":"{live}","name":"Live"},{"id":"{second}","name":"MARKER-Second"}]""";
+
+    /// <summary>
+    /// The all-zero profile listed and active.
+    /// </summary>
+    private const string ZeroActiveReplacement = $$"""
+                                                   :"{{ZeroId}}","profiles":[{"id":"{live}","name":"Live"},{"id":"{second}","name":"MARKER-Second"},{"id":"{{ZeroId}}","name":"MARKER-Zero"}]
+                                                   """;
+
+    /// <summary>
+    /// The text of the version-2 file that holds the profiles and the figure.
+    /// </summary>
+    private const string ZeroFigureFind = """{"id":"{second}","name":"MARKER-Second"}],"figures":[{"figure":"{key}","profile":"{second}"}]""";
+
+    /// <summary>
+    /// The all-zero profile listed and the figure linked to it.
+    /// </summary>
+    private const string ZeroFigureReplacement = $$"""{"id":"{second}","name":"MARKER-Second"},{"id":"{{ZeroId}}","name":"MARKER-Zero"}],"figures":[{"figure":"{key}","profile":"{{ZeroId}}"}]""";
+
+    /// <summary>
     /// The fifth property of the version-2 file: one waiting and one confirmed deleted identity, oldest first.
     /// </summary>
     private const string DeletedList = $$""","deleted":[{{WaitingEntry}},{{ConfirmedEntry}}]""";
@@ -1578,6 +1620,40 @@ public sealed class CompanionProfilesTests
         // Assert
         AssertFailedClosed(profiles, notices);
         Assert.IsFalse(profiles.IsDeleted(new Guid(OtherId)), "A rejected file should delete no identity");
+        Assert.IsEmpty(profiles.WaitingDeletions, "A rejected file should leave no deletion waiting");
+    }
+
+    /// <summary>
+    /// A file in which any identity is the all-zero identity, which the contract refuses in every message, is not of its
+    /// format and fails closed like every rejected file: a profile's <c>id</c> (also with that profile active), a figure's
+    /// <c>profile</c> and a deleted <c>id</c>, waiting or confirmed, in the plain form, padded with white space or
+    /// JSON-escaped (issue 254).
+    /// </summary>
+    /// <param name="file">The valid file to change</param>
+    /// <param name="find">The text of the file to replace</param>
+    /// <param name="replacement">The replacement</param>
+    [TestMethod]
+    [TestCategory("AC1")]
+    [DataRow(VersionTwoFile, ZeroProfileFind, ZeroProfileReplacement, DisplayName = "Profile id all zero")]
+    [DataRow(VersionTwoFile, ZeroActiveFind, ZeroActiveReplacement, DisplayName = "Profile id all zero and active")]
+    [DataRow(VersionTwoFile, ZeroFigureFind, ZeroFigureReplacement, DisplayName = "Figure of the all-zero profile")]
+    [DataRow(VersionTwoFile, WaitingEntry, $$"""{"id":"{{ZeroId}}","confirmed":false}""", DisplayName = "Waiting deleted id all zero")]
+    [DataRow(VersionTwoFile, ConfirmedEntry, $$"""{"id":"{{ZeroId}}","confirmed":true}""", DisplayName = "Confirmed deleted id all zero")]
+    [DataRow(VersionTwoFile, WaitingEntry, $$"""{"id":" {{ZeroId}} ","confirmed":false}""", DisplayName = "Deleted id padded with white space")]
+    [DataRow(VersionTwoFile, WaitingEntry, $$"""{"id":"{{ZeroEscaped}}","confirmed":false}""", DisplayName = "Deleted id JSON-escaped")]
+    [DataRow(VersionTwoFile, ZeroProfileFind, $$"""{{ZeroProfileFind}},{"id":"{{ZeroEscaped}}","name":"MARKER-Zero"}""", DisplayName = "Profile id JSON-escaped")]
+    public void CompanionProfilesLoadAllZeroIdentityFailsClosed(string file, string find, string replacement)
+    {
+        // Arrange
+        var path = WriteFile(Mutate(file, find, replacement));
+
+        // Act
+        var (profiles, notices) = LoadAndObserveTwoFigures(path);
+
+        // Assert
+        AssertFailedClosed(profiles, notices);
+        Assert.IsFalse(profiles.IsDeleted(Guid.Empty), "A rejected file should delete no identity, the all-zero one included");
+        Assert.IsFalse(profiles.IsDeleted(new Guid(OtherId)), "A rejected file should delete no listed identity");
         Assert.IsEmpty(profiles.WaitingDeletions, "A rejected file should leave no deletion waiting");
     }
 
