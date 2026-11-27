@@ -273,6 +273,30 @@ public sealed class CompanionTextsTests
     }
 
     /// <summary>
+    /// Every text of renaming a profile exists in English and German with the plan's wording (AC9).
+    /// </summary>
+    /// <param name="name">The name of the text</param>
+    /// <param name="english">The expected English text</param>
+    /// <param name="german">The expected German text</param>
+    [TestMethod]
+    [TestCategory("AC9")]
+    [DataRow(nameof(CompanionTexts.RenameProfileText), "Rename profile…", "Profil umbenennen…")]
+    [DataRow(nameof(CompanionTexts.RenameProfileDisabledText), "Live cannot be renamed.", "Live kann nicht umbenannt werden.")]
+    [DataRow(nameof(CompanionTexts.RenameProfileTitle), "Rename profile", "Profil umbenennen")]
+    [DataRow(nameof(CompanionTexts.RenameProfileTextFormat), "New name of the profile {0}", "Neuer Name des Profils {0}")]
+    [DataRow(nameof(CompanionTexts.RenameProfileConfirmText), "Rename", "Umbenennen")]
+    public void CompanionTextsRenameTextsInBothLanguages(string name, string english, string german)
+    {
+        // Act
+        var englishText = RenameText(CompanionTexts.English, name);
+        var germanText = RenameText(CompanionTexts.German, name);
+
+        // Assert
+        Assert.AreEqual(english, englishText, $"The English text should have the plan's wording: {name}");
+        Assert.AreEqual(german, germanText, $"The German text should have the plan's wording: {name}");
+    }
+
+    /// <summary>
     /// Gives a text of deleting a profile by its name.
     /// </summary>
     /// <param name="texts">The texts of one language</param>
@@ -291,6 +315,25 @@ public sealed class CompanionTextsTests
                    nameof(CompanionTexts.DeleteProfileConfirmText) => texts.DeleteProfileConfirmText,
                    nameof(CompanionTexts.WaitingDeletionsFormat) => texts.WaitingDeletionsFormat,
                    _ => throw new ArgumentOutOfRangeException(nameof(name), name, "No text of deleting a profile has the name")
+               };
+    }
+
+    /// <summary>
+    /// Gives a text of renaming a profile by its name.
+    /// </summary>
+    /// <param name="texts">The texts of one language</param>
+    /// <param name="name">The name of the text</param>
+    /// <returns>The text</returns>
+    private static string RenameText(CompanionTexts texts, string name)
+    {
+        return name switch
+               {
+                   nameof(CompanionTexts.RenameProfileText) => texts.RenameProfileText,
+                   nameof(CompanionTexts.RenameProfileDisabledText) => texts.RenameProfileDisabledText,
+                   nameof(CompanionTexts.RenameProfileTitle) => texts.RenameProfileTitle,
+                   nameof(CompanionTexts.RenameProfileTextFormat) => texts.RenameProfileTextFormat,
+                   nameof(CompanionTexts.RenameProfileConfirmText) => texts.RenameProfileConfirmText,
+                   _ => throw new ArgumentOutOfRangeException(nameof(name), name, "No text of renaming a profile has the name")
                };
     }
 

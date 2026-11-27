@@ -1438,6 +1438,7 @@ public sealed class CompanionProfilesTests
         var activeAfter = profiles.Active.Id;
         var activeProfile = profiles.Active;
         var expectedActive = profiles.Profiles.Single(profile => profile.Id == active);
+        var changesAfterRename = changes;
         var notice = ObserveOnLive(profiles, FigureA);
 
         Assert.IsTrue(isRenamed, "The rename to another name should return true");
@@ -1445,7 +1446,7 @@ public sealed class CompanionProfilesTests
         Assert.AreSequenceEqual(["Live", RenamedName], profiles.Profiles.Select(profile => profile.Name).ToArray(), "Only the name of the profile should change");
         Assert.AreEqual(RenamedName, profiles.NameOf(new Guid(SecondId)), "The new name should be found by the identity");
         Assert.AreEqual(active, activeAfter, "The active profile should stay");
-        Assert.AreEqual(0, changes, "The rename should not raise ActiveChanged");
+        Assert.AreEqual(0, changesAfterRename, "The rename should not raise ActiveChanged");
 
         Assert.AreSame(expectedActive, activeProfile, "The active profile should be the profile of the list");
         Assert.AreSequenceEqual([(ProfileNoticeKind.LastUsedWithOther, RenamedName)], Describe([notice]), "The figure should stay linked to the renamed profile");
@@ -1638,6 +1639,51 @@ public sealed class CompanionProfilesTests
         Assert.HasCount(1, lines, "The rename should be logged once");
         Assert.AreEqual(LogLevel.Information, lines[0].Level, "The rename should be logged at Information");
         Assert.DoesNotContain(entry => entry.Message.Contains(SecondName, StringComparison.Ordinal) || entry.Message.Contains(RenamedName, StringComparison.Ordinal) || entry.Message.Contains(SecondId, StringComparison.OrdinalIgnoreCase), _logger.Entries, "No line should hold the old name, the new name or the identity");
+    }
+
+    /// <summary>
+    /// A rename while no notice is pending raises <see cref="CompanionProfiles.Renamed" /> once and no change of the
+    /// notice (AC4).
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC4")]
+    public void CompanionProfilesRenameWithoutNoticeRaisesOnlyRenamed()
+    {
+        // Arrange
+        var profiles = CompanionProfiles.Load(WriteFile(Expand(ValidFile)), _logger);
+        var raised = new List<string>();
+
+        profiles.PendingNoticeChanged += (_, _) => raised.Add("notice");
+        profiles.Renamed += (_, _) => raised.Add("renamed");
+
+        // Act
+        var isRenamed = profiles.Rename(new Guid(SecondId), RenamedName);
+
+        // Assert
+        Assert.IsTrue(isRenamed, "The rename should return true");
+        Assert.IsNull(profiles.PendingNotice, "No notice should be pending");
+        Assert.AreSequenceEqual(["renamed"], raised.ToArray(), "Only the rename should be raised, once");
+    }
+
+    /// <summary>
+    /// A profile can be renamed when it is listed and is not <c>Live</c> (AC2, AC5).
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC5")]
+    public void CompanionProfilesIsRenamableListedOtherThanLiveOnly()
+    {
+        // Arrange
+        var profiles = CompanionProfiles.Load(WriteFile(Expand(ValidFile)), _logger);
+
+        // Act
+        var second = CompanionProfiles.IsRenamable(new Guid(SecondId), profiles.Profiles);
+        var live = CompanionProfiles.IsRenamable(CompanionProfile.Live.Id, profiles.Profiles);
+        var unlisted = CompanionProfiles.IsRenamable(Guid.NewGuid(), profiles.Profiles);
+
+        // Assert
+        Assert.IsTrue(second, "A listed profile other than Live should be renamable");
+        Assert.IsFalse(live, "Live should not be renamable");
+        Assert.IsFalse(unlisted, "A profile not listed should not be renamable");
     }
 
     /// <summary>
