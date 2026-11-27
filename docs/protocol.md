@@ -23,7 +23,7 @@ Sources:
 
 None is published; anonymised fixtures made from them (one of protocol version 2, one of version 3) lie under `tests/Censio.Pipe.Tests/Fixtures/` (`Censio.Anonymiser`, [`areas/pipe-recording.md`](areas/pipe-recording.md), *Anonymising*). This document states derived facts only: no frame, name or path.
 
-Each statement is marked *confirmed* (the 90-minute recording of 2026-11-07, or all four where stated) or *assumed* (with its source). What a single
+Each statement is marked *confirmed* (the 90-minute recording of 2026-11-07, or all four where stated), *observed* (seen in the game but not in a recording, with its source and why it is inferred) or *assumed* (with its source). What a single
 recording cannot show stays *assumed*.
 
 ## Framing
