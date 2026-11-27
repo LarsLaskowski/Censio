@@ -46,4 +46,5 @@ of that identity. The rules are in [companion-profiles](../areas/companion-profi
   it that still waits could reach the server again, unnamed.
 - A profiles file that cannot be read loses the list with the profiles, as it loses everything else.
 - A profile deleted on the pages stays in the Companion's list; renaming and merging are not part of this decision
-  (renaming is proposed as a follow-up issue).
+  (renaming is record [0117](0117-profile-renamed-in-a-dialog-at-once-the-connection-reopened-with-the-new-name.md),
+  which leaves merging to a follow-up issue).
