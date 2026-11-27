@@ -426,7 +426,12 @@ public sealed class CompanionTextsTests
         return problems.Concat(notices)
                        .Concat(outcomes)
                        .Append(Text("Outcome autostart failed", texts => texts.FormatOutcome(CreateOutcome(SettingsSaveKind.Saved, true))))
-                       .Append(Text("Settings entry", texts => texts.OpenSettingsText));
+                       .Append(Text("Settings entry", texts => texts.OpenSettingsText))
+                       .Append(Text("Rename profile", texts => texts.RenameProfileText))
+                       .Append(Text("Rename profile disabled", texts => texts.RenameProfileDisabledText))
+                       .Append(Text("Rename profile title", texts => texts.RenameProfileTitle))
+                       .Append(Text("Rename profile label", texts => texts.RenameProfileTextFormat))
+                       .Append(Text("Rename profile confirm", texts => texts.RenameProfileConfirmText));
     }
 
     /// <summary>

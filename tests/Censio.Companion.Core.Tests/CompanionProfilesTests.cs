@@ -149,6 +149,11 @@ public sealed class CompanionProfilesTests
     /// </summary>
     private const string WaitingFile = """{"version":2,"active":"{live}","profiles":[{"id":"{live}","name":"Live"}],"figures":[],"deleted":[{"id":"{second}","confirmed":false}]}""";
 
+    /// <summary>
+    /// The new name of a renamed profile, a marker no log line may hold.
+    /// </summary>
+    private const string RenamedName = "MARKER-Renamed";
+
     #endregion // Constants
 
     #region Fields
@@ -1405,6 +1410,237 @@ public sealed class CompanionProfilesTests
     }
 
     /// <summary>
+    /// A rename gives a listed profile other than <c>Live</c>, active or not, the new name and nothing else: identity, place
+    /// in the list, figure links and whether it is active stay, and the active profile stays the profile of the list
+    /// (AC1).
+    /// </summary>
+    /// <param name="isActive">Whether the renamed profile is the active one</param>
+    [TestMethod]
+    [TestCategory("AC1")]
+    [DataRow(true, DisplayName = "Active profile")]
+    [DataRow(false, DisplayName = "Profile that is not active")]
+    public void CompanionProfilesRenameKeepsIdentityOrderLinksAndActive(bool isActive)
+    {
+        // Arrange
+        var profiles = CompanionProfiles.Load(WriteFile(Expand(ValidFile)), _logger);
+        var changes = 0;
+
+        profiles.Select(isActive ? new Guid(SecondId) : CompanionProfile.Live.Id);
+
+        var active = profiles.Active.Id;
+
+        profiles.ActiveChanged += (_, _) => changes++;
+
+        // Act
+        var isRenamed = profiles.Rename(new Guid(SecondId), RenamedName);
+
+        // Assert
+        var activeAfter = profiles.Active.Id;
+        var activeProfile = profiles.Active;
+        var expectedActive = profiles.Profiles.Single(profile => profile.Id == active);
+        var notice = ObserveOnLive(profiles, FigureA);
+
+        Assert.IsTrue(isRenamed, "The rename to another name should return true");
+        Assert.AreSequenceEqual([CompanionProfile.Live.Id, new Guid(SecondId)], profiles.Profiles.Select(profile => profile.Id).ToArray(), "Identity and place in the list should stay");
+        Assert.AreSequenceEqual(["Live", RenamedName], profiles.Profiles.Select(profile => profile.Name).ToArray(), "Only the name of the profile should change");
+        Assert.AreEqual(RenamedName, profiles.NameOf(new Guid(SecondId)), "The new name should be found by the identity");
+        Assert.AreEqual(active, activeAfter, "The active profile should stay");
+        Assert.AreEqual(0, changes, "The rename should not raise ActiveChanged");
+
+        Assert.AreSame(expectedActive, activeProfile, "The active profile should be the profile of the list");
+        Assert.AreSequenceEqual([(ProfileNoticeKind.LastUsedWithOther, RenamedName)], Describe([notice]), "The figure should stay linked to the renamed profile");
+    }
+
+    /// <summary>
+    /// The file written after a rename holds the new name and is read back as written: the profiles, the active profile
+    /// and the figure link (AC1).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC1")]
+    public async Task CompanionProfilesRenameWrittenAndReadBack()
+    {
+        // Arrange
+        var profiles = CompanionProfiles.Load(WriteFile(Expand(ValidFile)), _logger);
+
+        // Act
+        await RunUntilCancelledAsync(profiles, running => running.Rename(new Guid(SecondId), RenamedName));
+
+        // Assert
+        var reloaded = CompanionProfiles.Load(ProfilesPath, new RecordingLogger());
+        var active = reloaded.Active.Id;
+        var notice = ObserveOnLive(reloaded, FigureA);
+
+        Assert.IsFalse(reloaded.IsFileInvalid, "The written file should be valid");
+        Assert.AreSequenceEqual([CompanionProfile.Live.Id, new Guid(SecondId)], reloaded.Profiles.Select(profile => profile.Id).ToArray(), "The file should keep the profiles in order");
+        Assert.AreSequenceEqual(["Live", RenamedName], reloaded.Profiles.Select(profile => profile.Name).ToArray(), "The file should hold the new name");
+        Assert.AreEqual(new Guid(SecondId), active, "The file should keep the active profile");
+        Assert.AreSequenceEqual([(ProfileNoticeKind.LastUsedWithOther, RenamedName)], Describe([notice]), "The file should keep the figure link");
+    }
+
+    /// <summary>
+    /// The check of a new name of a profile gives the problem of the name as for a new profile, <c>NameExists</c> only for
+    /// the name of another profile ignoring case, and never <c>ProfilesFull</c>, with 1,000 profiles listed (AC2).
+    /// </summary>
+    /// <param name="name">The name before the code unit is appended</param>
+    /// <param name="appended">The code unit appended to the name, or <c>-1</c> for none</param>
+    /// <param name="fillers">The number of profiles created besides <c>Live</c>, the renamed one and <c>Other</c></param>
+    /// <param name="expected">The problem, or <c>null</c> when the profile can get the name</param>
+    [TestMethod]
+    [TestCategory("AC2")]
+    [DataRow("", -1, 0, SettingsProblemKind.NameBlank, DisplayName = "Blank")]
+    [DataRow("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", -1, 0, SettingsProblemKind.NameTooLong, DisplayName = "65 characters")]
+    [DataRow("Lone", 0xD800, 0, SettingsProblemKind.NameInvalidCharacters, DisplayName = "Lone U+D800")]
+    [DataRow("OTHER", -1, 0, SettingsProblemKind.NameExists, DisplayName = "Name of another profile in other case")]
+    [DataRow("TARGET", -1, 0, null, DisplayName = "Own name in other case")]
+    [DataRow("Renamed", -1, CompanionProfiles.MaxProfiles - 3, null, DisplayName = "1,000 profiles")]
+    public void CompanionProfilesCheckRenameGivesProblemOfName(string name, int appended, int fillers, SettingsProblemKind? expected)
+    {
+        // Arrange
+        var profiles = CompanionProfiles.Load(ProfilesPath, _logger);
+        var target = profiles.Create("Target");
+
+        profiles.Create("Other");
+        CreateProfiles(profiles, fillers);
+
+        var checkedName = appended < 0 ? name : name + (char)appended;
+
+        // Act
+        var problem = CompanionProfiles.CheckRename(target.Id, checkedName, profiles.Profiles);
+
+        // Assert
+        Assert.HasCount(fillers + 3, profiles.Profiles, "The profiles should be created");
+        Assert.AreEqual(expected, problem, "The new name should get the problem of its case");
+    }
+
+    /// <summary>
+    /// A rename of <c>Live</c>, of an identity not listed and with a name <c>CheckRename</c> refuses throws an argument
+    /// exception whose message quotes neither the name nor the identity, and changes nothing: the list, the file, the
+    /// events and the log (AC2).
+    /// </summary>
+    /// <param name="kind">The case: Live, Unknown, Blank or Exists</param>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC2")]
+    [DataRow("Live", DisplayName = "Live")]
+    [DataRow("Unknown", DisplayName = "Identity not listed")]
+    [DataRow("Blank", DisplayName = "Blank name")]
+    [DataRow("Exists", DisplayName = "Name of another profile")]
+    public async Task CompanionProfilesRenameRefusedThrowsAndChangesNothing(string kind)
+    {
+        // Arrange
+        var profiles = CompanionProfiles.Load(WriteFile(Expand(ValidFile)), _logger);
+        var id = kind switch
+                 {
+                     "Live" => CompanionProfile.Live.Id,
+                     "Unknown" => new Guid(OtherId),
+                     _ => new Guid(SecondId)
+                 };
+        var name = kind switch
+                   {
+                       "Blank" => string.Empty,
+                       "Exists" => "LIVE",
+                       _ => RenamedName
+                   };
+        var events = 0;
+        ArgumentException? exception = null;
+
+        profiles.ActiveChanged += (_, _) => events++;
+        profiles.PendingNoticeChanged += (_, _) => events++;
+        profiles.Renamed += (_, _) => events++;
+
+        // Act
+        await RunWriterWithoutChangeAsync(profiles, false, running => exception = Assert.ThrowsExactly<ArgumentException>(() => running.Rename(id, name), "The rename should be refused"));
+
+        // Assert
+        Assert.IsNotNull(exception, "The refusal should be an argument exception");
+        Assert.DoesNotContain(RenamedName, exception.Message, $"The message should not quote the name: {kind}");
+        Assert.IsFalse(exception.Message.Contains(id.ToString(), StringComparison.OrdinalIgnoreCase), $"The message should not quote the identity: {kind}");
+        Assert.AreSequenceEqual([CompanionProfile.Live.Id, new Guid(SecondId)], profiles.Profiles.Select(profile => profile.Id).ToArray(), $"The list should stay: {kind}");
+        Assert.AreSequenceEqual(["Live", SecondName], profiles.Profiles.Select(profile => profile.Name).ToArray(), $"The names should stay: {kind}");
+        Assert.AreEqual(0, events, $"The refusal should raise no event: {kind}");
+        Assert.IsFalse(File.Exists(ProfilesPath), $"The refusal should write no file: {kind}");
+        Assert.IsEmpty(_logger.Entries, $"The refusal should log nothing: {kind}");
+    }
+
+    /// <summary>
+    /// A rename to the identical name returns <c>false</c> and changes nothing: no file write, no event, no log line, and
+    /// the pending notice stays (AC3).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC3")]
+    public async Task CompanionProfilesRenameSameNameChangesNothing()
+    {
+        // Arrange
+        var profiles = CompanionProfiles.Load(WriteFile(Expand(ValidFile)), _logger);
+
+        profiles.Select(CompanionProfile.Live.Id);
+
+        var notice = profiles.ObserveSessionStart(FigureA);
+        var events = 0;
+        var isRenamed = true;
+
+        profiles.ActiveChanged += (_, _) => events++;
+        profiles.PendingNoticeChanged += (_, _) => events++;
+        profiles.Renamed += (_, _) => events++;
+
+        // Act
+        await RunWriterWithoutChangeAsync(profiles, true, running => isRenamed = running.Rename(new Guid(SecondId), SecondName));
+
+        // Assert
+        Assert.IsFalse(isRenamed, "The rename to the identical name should return false");
+        Assert.AreEqual(0, events, "The rename to the identical name should raise no event");
+        Assert.IsFalse(File.Exists(ProfilesPath), "The rename to the identical name should write no file");
+        Assert.AreSame(notice, profiles.PendingNotice, "The pending notice should stay");
+        Assert.IsEmpty(_logger.Entries, "The rename to the identical name should log nothing");
+    }
+
+    /// <summary>
+    /// A rename that changes the name clears a pending notice, raising <see cref="CompanionProfiles.PendingNoticeChanged" />,
+    /// then raises <see cref="CompanionProfiles.Renamed" /> once, and logs <c>Profile renamed</c> at Information with
+    /// neither name nor identity (AC4).
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC4")]
+    public void CompanionProfilesRenameClearsNoticeRaisesRenamedAndLogsWithoutName()
+    {
+        // Arrange
+        var profiles = CompanionProfiles.Load(WriteFile(Expand(ValidFile)), _logger);
+
+        profiles.Select(CompanionProfile.Live.Id);
+        profiles.ObserveSessionStart(FigureA);
+
+        var raised = new List<string>();
+        var read = new List<ProfileNotice?>();
+
+        profiles.PendingNoticeChanged += (_, _) =>
+                                         {
+                                             raised.Add("notice");
+                                             read.Add(profiles.PendingNotice);
+                                         };
+        profiles.Renamed += (_, _) => raised.Add("renamed");
+
+        var before = profiles.PendingNotice;
+
+        // Act
+        var isRenamed = profiles.Rename(new Guid(SecondId), RenamedName);
+
+        // Assert
+        var lines = _logger.Entries.Where(entry => entry.Message == "Profile renamed").ToArray();
+
+        Assert.IsNotNull(before, "A notice should be pending before the rename");
+        Assert.IsTrue(isRenamed, "The rename should return true");
+        Assert.IsNull(profiles.PendingNotice, "The rename should clear the pending notice");
+        Assert.AreSequenceEqual(["notice", "renamed"], raised.ToArray(), "The change of the notice should be raised once, then the rename once");
+        Assert.HasCount(1, read, "The notice should be raised once");
+        Assert.IsNull(read[0], "The handler of the notice should read it cleared");
+        Assert.HasCount(1, lines, "The rename should be logged once");
+        Assert.AreEqual(LogLevel.Information, lines[0].Level, "The rename should be logged at Information");
+        Assert.DoesNotContain(entry => entry.Message.Contains(SecondName, StringComparison.Ordinal) || entry.Message.Contains(RenamedName, StringComparison.Ordinal) || entry.Message.Contains(SecondId, StringComparison.OrdinalIgnoreCase), _logger.Entries, "No line should hold the old name, the new name or the identity");
+    }
+
+    /// <summary>
     /// A deletion with the history waits by identity in the file, version 2 with a fifth property, and the profiles loaded
     /// again hold it as waiting (spec S3, N1).
     /// </summary>
@@ -2267,6 +2503,47 @@ public sealed class CompanionProfilesTests
         Assert.AreEqual(LogLevel.Warning, lines[0].Level, "The line should be a warning");
         Assert.StartsWith(InvalidLinePrefix, lines[0].Message, "The line should name the invalid profiles file");
         Assert.IsEmpty(values.Where(value => lines[0].Message.Contains(value, StringComparison.OrdinalIgnoreCase)).ToList(), "The line should quote no value of the file");
+    }
+
+    /// <summary>
+    /// Deletes the file, starts the writer, waits until it wrote the file again when it must, deletes it, makes a change that must write nothing, cancels
+    /// the writer and waits until it completed.
+    /// </summary>
+    /// <param name="profiles">The profiles</param>
+    /// <param name="isWriting">Whether the writer writes the state it holds at its start, which the test waits for</param>
+    /// <param name="change">The change</param>
+    /// <returns>A task that completes when the writer completed</returns>
+    private async Task RunWriterWithoutChangeAsync(CompanionProfiles profiles, bool isWriting, Action<CompanionProfiles> change)
+    {
+        using var stop = new CancellationTokenSource();
+
+        File.Delete(ProfilesPath);
+
+        var run = profiles.RunAsync(stop.Token);
+        var polls = 0;
+
+        while (isWriting && File.Exists(ProfilesPath) == false && polls < 1000)
+        {
+            await Task.Delay(10, TestContext.CancellationToken);
+
+            polls++;
+        }
+
+        Assert.AreEqual(isWriting, File.Exists(ProfilesPath), "The writer should write the state it holds at its start only when the profiles changed before");
+
+        File.Delete(ProfilesPath);
+        change(profiles);
+
+        await stop.CancelAsync();
+
+        try
+        {
+            await run.WaitAsync(_guard, TestContext.CancellationToken);
+        }
+        catch (OperationCanceledException) when (stop.IsCancellationRequested)
+        {
+            // The writer may end with the cancellation.
+        }
     }
 
     /// <summary>

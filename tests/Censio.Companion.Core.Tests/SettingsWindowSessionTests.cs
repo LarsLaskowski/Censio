@@ -34,6 +34,11 @@ public sealed class SettingsWindowSessionTests
     private const string ProfileName = "MARKER-Profile";
 
     /// <summary>
+    /// The new name of a renamed profile, a marker no log line may hold.
+    /// </summary>
+    private const string RenamedName = "MARKER-Renamed";
+
+    /// <summary>
     /// A settings file in local mode on port 6000.
     /// </summary>
     private const string LocalSettings = """{"mode":"local","localPort":6000}""";
@@ -1632,6 +1637,116 @@ public sealed class SettingsWindowSessionTests
     }
 
     /// <summary>
+    /// A rename asked for in the window renames the profile at once, without <c>Save</c>: the window shows the profiles
+    /// again once with the new name and nothing else, so other unsaved edits stay as typed; the settings file stays as
+    /// it was and the rename is logged once (AC6).
+    /// </summary>
+    /// <returns>A task that completes with the test</returns>
+    [TestMethod]
+    [TestCategory("AC6")]
+    public async Task SettingsWindowSessionRenameRenamesAndShowsProfiles()
+    {
+        // Arrange
+        WriteSettings(LocalSettings);
+
+        var renamed = _profiles.Create(ProfileName);
+
+        _profiles.Select(CompanionProfile.Live.Id);
+
+        var settingsBefore = await File.ReadAllTextAsync(SettingsPath, TestContext.CancellationToken);
+        var session = CreateSession();
+        var window = await OpenAsync(session);
+
+        // Act
+        window.RequestRename(new SettingsRename
+                             {
+                                 Profile = renamed.Id,
+                                 Name = RenamedName
+                             });
+
+        await RunPostedUntilAsync(() => window.ProfileViews.Count > 0);
+
+        RunPosted();
+
+        // Assert
+        var shown = window.ProfileViews.Single();
+
+        Assert.AreEqual(RenamedName, _profiles.NameOf(renamed.Id), "The profile should carry the new name");
+        Assert.AreSequenceEqual(["Live", RenamedName], shown.ProfileList.Select(profile => profile.Name).ToArray(), "The profiles shown should hold the new name in the same place");
+        Assert.AreEqual(CompanionProfile.Live.Id, shown.ActiveProfile, "The profiles shown should select the active profile");
+        Assert.HasCount(1, window.Views, "The rename should show no whole view, so the other unsaved edits stay");
+        Assert.IsEmpty(window.Outcomes, "The rename should show no outcome of a save");
+        Assert.AreEqual(settingsBefore, await File.ReadAllTextAsync(SettingsPath, TestContext.CancellationToken), "The rename should not write the settings file");
+        Assert.AreEqual(1, CountRenameLines(), "The rename should be logged once");
+    }
+
+    /// <summary>
+    /// A rename the session must not carry out changes nothing and shows nothing: one of another sender, one asked for
+    /// before the first view or while a save runs, one of <c>Live</c>, one with a name <c>CheckRename</c> refuses, and
+    /// one after the window closed; a valid rename of another profile afterwards is handled, except after the close
+    /// (AC6).
+    /// </summary>
+    /// <param name="kind">The kind of request: OtherSender, BeforeFirstView, Saving, Live, Refused or AfterClose</param>
+    /// <param name="isControlHandled">Whether a valid rename of another profile afterwards is handled</param>
+    /// <returns>A task that completes with the test</returns>
+    [TestMethod]
+    [TestCategory("AC6")]
+    [DataRow("OtherSender", true, DisplayName = "Other sender")]
+    [DataRow("BeforeFirstView", true, DisplayName = "Before the first view")]
+    [DataRow("Saving", true, DisplayName = "While a save runs")]
+    [DataRow("Live", true, DisplayName = "Live")]
+    [DataRow("Refused", true, DisplayName = "Refused name")]
+    [DataRow("AfterClose", false, DisplayName = "After the window closed")]
+    public async Task SettingsWindowSessionRenameIgnored(string kind, bool isControlHandled)
+    {
+        // Arrange
+        WriteSettings(new JsonObject
+                      {
+                          ["gameFolder"] = GameFolder
+                      }.ToJsonString());
+
+        var target = _profiles.Create(ProfileName);
+        var control = _profiles.Create("MARKER-Control");
+
+        _profiles.Select(CompanionProfile.Live.Id);
+
+        var namesBefore = _profiles.Profiles.Select(profile => profile.Name).ToArray();
+        var session = CreateSession();
+        var window = await OpenForRenameAsync(session, kind);
+
+        await StartHeldSaveAsync(kind, window);
+
+        var rename = new SettingsRename
+                     {
+                         Profile = kind == "Live" ? CompanionProfile.Live.Id : target.Id,
+                         Name = kind == "Refused" ? string.Empty : RenamedName
+                     };
+
+        // Act
+        RaiseRename(kind, window, rename);
+        RunPosted();
+
+        var namesAfterIgnored = _profiles.Profiles.Select(profile => profile.Name).ToArray();
+        var profileViewsAfterIgnored = window.ProfileViews.Count;
+        var linesAfterIgnored = CountRenameLines();
+
+        await FinishRenameAsync(kind, window);
+
+        window.RequestRename(new SettingsRename
+                             {
+                                 Profile = control.Id,
+                                 Name = "MARKER-Controlled"
+                             });
+        RunPosted();
+
+        // Assert
+        Assert.AreSequenceEqual(namesBefore, namesAfterIgnored, $"The ignored rename should leave the names as they were: {kind}");
+        Assert.AreEqual(0, profileViewsAfterIgnored, $"The ignored rename should show the profiles not again: {kind}");
+        Assert.AreEqual(0, linesAfterIgnored, $"The ignored rename should log no rename: {kind}");
+        Assert.AreEqual(isControlHandled ? "MARKER-Controlled" : "MARKER-Control", _profiles.NameOf(control.Id), $"A valid rename afterwards should be handled only while the window is open: {kind}");
+    }
+
+    /// <summary>
     /// A change of the deleted identities whose display was posted while the window was open shows nothing once the
     /// window closed (S3).
     /// </summary>
@@ -1734,6 +1849,29 @@ public sealed class SettingsWindowSessionTests
 
         Assert.AreEqual(waiting, view.WaitingDeletions, $"The view should count the waiting deletions: {waiting}");
         Assert.AreEqual(expected, view.IsDeletionQueueFull, $"The view should mark the queue full only with 1,000 waiting: {waiting}");
+    }
+
+    /// <summary>
+    /// Raises a rename as the window, or for the kinds that ask, as another sender; <c>AfterClose</c> closes the window first.
+    /// </summary>
+    /// <param name="kind">The kind of request</param>
+    /// <param name="window">The window</param>
+    /// <param name="rename">The rename</param>
+    private static void RaiseRename(string kind, FakeSettingsWindow window, SettingsRename rename)
+    {
+        if (kind == "OtherSender")
+        {
+            window.RaiseRenameRequested(new FakeSettingsWindow(), rename);
+
+            return;
+        }
+
+        if (kind == "AfterClose")
+        {
+            window.Close();
+        }
+
+        window.RequestRename(rename);
     }
 
     /// <summary>
@@ -1902,6 +2040,50 @@ public sealed class SettingsWindowSessionTests
         _profiles.ObserveSessionEnd();
 
         return _profiles.ObserveSessionStart("MARKER-Figure-B");
+    }
+
+    /// <summary>
+    /// Counts the log entries of renamed profiles so far.
+    /// </summary>
+    /// <returns>The number of entries</returns>
+    private int CountRenameLines()
+    {
+        return _logger.Entries.Count(entry => entry.Message == "Profile renamed");
+    }
+
+    /// <summary>
+    /// Opens the window for a kind of ignored rename: after its first view, or, for <c>BeforeFirstView</c>, without
+    /// waiting for it.
+    /// </summary>
+    /// <param name="session">The session</param>
+    /// <param name="kind">The kind of request</param>
+    /// <returns>The window</returns>
+    private async Task<FakeSettingsWindow> OpenForRenameAsync(SettingsWindowSession session, string kind)
+    {
+        if (kind != "BeforeFirstView")
+        {
+            return await OpenAsync(session);
+        }
+
+        session.Open();
+
+        return _windows.Single();
+    }
+
+    /// <summary>
+    /// Ends what a kind of ignored rename left running: the held save, or the load of the first view.
+    /// </summary>
+    /// <param name="kind">The kind of request</param>
+    /// <param name="window">The window</param>
+    /// <returns>A task that completes when nothing runs any more</returns>
+    private async Task FinishRenameAsync(string kind, FakeSettingsWindow window)
+    {
+        if (kind == "BeforeFirstView")
+        {
+            await RunPostedUntilAsync(() => window.Views.Count > 0);
+        }
+
+        await FinishHeldSaveAsync(kind, window);
     }
 
     /// <summary>

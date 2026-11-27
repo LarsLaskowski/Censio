@@ -56,6 +56,16 @@ public sealed class LiveSenderProfileTests : IDisposable
     /// </summary>
     private const int MaxPolls = 500;
 
+    /// <summary>
+    /// The new name of a renamed profile, a marker no log line may hold.
+    /// </summary>
+    private const string RenamedName = "MARKER-Renamed";
+
+    /// <summary>
+    /// The number of ten-millisecond polls of a condition that must not come true before it counts as never reached.
+    /// </summary>
+    private const int NegativePolls = 40;
+
     #endregion // Constants
 
     #region Fields
@@ -857,6 +867,252 @@ public sealed class LiveSenderProfileTests : IDisposable
         Assert.AreEqual(LiveSender.ProfileId, Assert.IsInstanceOfType<ContractTick>(first, "The first tick should be sent").ProfileId, "The first tick should carry Live");
         Assert.AreEqual(LiveSender.ProfileId, Assert.IsInstanceOfType<ContractTick>(second, "The second tick should be sent").ProfileId, "The second tick should carry Live");
         Assert.AreEqual(1, connector.AttemptCount, "Changes back to the connection's profile should not reconnect");
+    }
+
+    /// <summary>
+    /// A rename of the profile the connection's hello named ends the connection with the close handshake and opens a
+    /// new one, whose hello names the same identity with the new name, handled as a switch: connecting, no failure line, no
+    /// retry delay, and a refusal because the old session is still connected tried again (AC7).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public async Task LiveSenderProfileRenameOfConnectionProfileReconnectsWithNewName()
+    {
+        // Arrange
+        var timeProvider = CreateTimeProvider();
+        var connector = new QueuedIngestConnector();
+        var first = AddServer(connector);
+        var refusing = AddServer(connector);
+        var accepting = AddServer(connector);
+        var profiles = LoadProfiles();
+        var renamed = profiles.Create(SecondName);
+        var sender = CreateSender(connector, timeProvider);
+
+        sender.UseProfiles(profiles);
+        StartRun(sender);
+
+        var firstHello = await AcceptAsync(first);
+
+        await WaitForStatusAsync(LiveSendState.Connected, 1);
+
+        var closing = first.ReceiveAsync(TestContext.CancellationToken);
+
+        // Act
+        profiles.Rename(renamed.Id, RenamedName);
+
+        await connector.WaitForAttemptsAsync(2, TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+
+        var isClosedAtNewAttempt = first.IsClosedByClient;
+        var afterClose = await closing.WaitAsync(_guard, TestContext.CancellationToken);
+
+        await RefuseHelloAsync(refusing, ContractHelloRefusal.CompanionConnected);
+        await AdvanceRetryAsync(timeProvider, LiveSender.SwitchRetryDelay, 1);
+
+        var hello = await AcceptAsync(accepting);
+
+        await WaitForStatusAsync(LiveSendState.Connected, 2);
+
+        // Assert
+        Assert.AreEqual(SecondName, firstHello.ProfileName, "The first hello should name the profile by its old name");
+        Assert.IsTrue(isClosedAtNewAttempt, "The old connection should be closed with a close frame before the new connection");
+        Assert.IsNull(afterClose, "The old connection should send nothing more before its close");
+        Assert.AreEqual(renamed.Id, hello.ProfileId, "The new hello should name the same identity");
+        Assert.AreEqual(RenamedName, hello.ProfileName, "The new hello should name the profile by the new name");
+        Assert.AreEqual(3, connector.AttemptCount, "The rename should make one new connection and the refusal one more");
+        Assert.IsEmpty(Lines().Where(line => line.StartsWith(FailedLinePrefix, StringComparison.Ordinal)).ToList(), "The rename should log no failure");
+        Assert.IsEmpty(Statuses().Where(status => status.State == LiveSendState.Retrying).ToList(), "The rename should show no retrying status");
+        Assert.DoesNotContain(LiveSender.RetryDelays[0], timeProvider.Delays, "The rename should wait no retry delay");
+    }
+
+    /// <summary>
+    /// A rename of the profile of a connection made for the buffered messages of a profile that is not the active one
+    /// ends that connection, and the new hello names that profile with the new name, not the active one (AC7).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public async Task LiveSenderProfileRenameOfBufferedConnectionProfileNamesThatProfile()
+    {
+        // Arrange
+        var connector = new QueuedIngestConnector();
+        var servers = new[] { AddServer(connector), AddServer(connector), AddServer(connector) };
+        var profiles = LoadProfiles();
+        var sender = CreateSender(connector, CreateTimeProvider());
+        var (buffered, _, active) = PrepareBufferedProfiles(sender, profiles, true);
+
+        StartRun(sender);
+
+        var connected = await ConnectAsync(servers, true);
+        var closing = connected.ReceiveAsync(TestContext.CancellationToken);
+
+        // Act
+        profiles.Rename(buffered.Id, RenamedName);
+
+        var afterClose = await closing.WaitAsync(_guard, TestContext.CancellationToken);
+        var hello = await AcceptAsync(servers[2]);
+
+        // Assert
+        Assert.AreSame(servers[1], connected, "The buffered messages should have been sent on the second connection");
+        Assert.IsNull(afterClose, "The connection of the renamed profile should be closed");
+        Assert.AreEqual(buffered.Id, hello.ProfileId, "The new hello should name the buffered profile, not the active one");
+        Assert.AreNotEqual(active.Id, hello.ProfileId, "The new hello should not name the active profile");
+        Assert.AreEqual(RenamedName, hello.ProfileName, "The new hello should name the buffered profile by the new name");
+        Assert.IsEmpty(Statuses().Where(status => status.State == LiveSendState.Retrying).ToList(), "The rename should show no retrying status");
+    }
+
+    /// <summary>
+    /// A rename of any other profile keeps the connection: of the connection of the active profile, a second profile
+    /// renamed; of a connection for the buffered messages of a profile that is not the active one, the active profile or
+    /// a third profile renamed (AC7).
+    /// </summary>
+    /// <param name="isBufferedConnection">Whether the connection is made for buffered messages of a profile that is not active</param>
+    /// <param name="renamedKind">The renamed profile: Buffered, Active or Third</param>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC7")]
+    [DataRow(false, "Buffered", DisplayName = "Connection of the active profile, a second profile renamed")]
+    [DataRow(true, "Active", DisplayName = "Connection for buffered messages, the active profile renamed")]
+    [DataRow(true, "Third", DisplayName = "Connection for buffered messages, a third profile renamed")]
+    public async Task LiveSenderProfileRenameOfOtherProfileKeepsConnection(bool isBufferedConnection, string renamedKind)
+    {
+        // Arrange
+        var connector = new QueuedIngestConnector();
+        var servers = new[] { AddServer(connector), AddServer(connector), AddServer(connector) };
+        var profiles = LoadProfiles();
+        var sender = CreateSender(connector, CreateTimeProvider());
+        var (buffered, third, active) = PrepareBufferedProfiles(sender, profiles, isBufferedConnection);
+
+        StartRun(sender);
+
+        var connected = await ConnectAsync(servers, isBufferedConnection);
+        var attempts = connector.AttemptCount;
+        var renamed = renamedKind switch
+                      {
+                          "Buffered" => buffered,
+                          "Active" => active,
+                          _ => third
+                      };
+
+        // Act
+        profiles.Rename(renamed.Id, RenamedName);
+
+        var isReconnected = await WaitBrieflyAsync(() => connector.AttemptCount > attempts || connected.IsClosedByClient);
+
+        // Assert
+        Assert.IsFalse(isReconnected, $"The rename of {renamedKind} should keep the connection");
+        Assert.AreEqual(isBufferedConnection ? 2 : 1, connector.AttemptCount, $"The rename of {renamedKind} should make no new connection");
+    }
+
+    /// <summary>
+    /// A rename made while no connection is accepted, retrying after a failure or before the sender runs, is in the next
+    /// accepted hello, which names the new name, and the new connection is not switched again (AC8).
+    /// </summary>
+    /// <param name="kind">The state of the sender: Retrying or BeforeRun</param>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC8")]
+    [DataRow("Retrying", DisplayName = "While retrying")]
+    [DataRow("BeforeRun", DisplayName = "Before the sender runs")]
+    public async Task LiveSenderProfileRenameWhileOfflineNextHelloNamesNewName(string kind)
+    {
+        // Arrange
+        var timeProvider = CreateTimeProvider();
+        var connector = new QueuedIngestConnector();
+
+        PrepareOfflineConnector(kind, connector);
+
+        var server = AddServer(connector);
+        var profiles = LoadProfiles();
+        var renamed = profiles.Create(SecondName);
+        var sender = CreateSender(connector, timeProvider);
+
+        sender.UseProfiles(profiles);
+
+        // Act
+        await RenameOfflineAsync(kind, sender, timeProvider, profiles, renamed.Id);
+
+        var hello = await AcceptAsync(server);
+
+        await WaitForStatusAsync(LiveSendState.Connected, 1);
+
+        var isReconnected = await WaitBrieflyAsync(() => connector.AttemptCount > (kind == "Retrying" ? 2 : 1));
+
+        // Assert
+        Assert.AreEqual(renamed.Id, hello.ProfileId, $"The hello should name the same identity: {kind}");
+        Assert.AreEqual(RenamedName, hello.ProfileName, $"The hello should name the new name: {kind}");
+        Assert.IsFalse(isReconnected, $"The connection that names the new name should not be switched again: {kind}");
+    }
+
+    /// <summary>
+    /// The buffered messages of a renamed profile other than the active one, taken before the rename, are sent on a
+    /// connection whose hello names the new name (AC8).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC8")]
+    public async Task LiveSenderProfileRenameBufferedOtherProfileSentUnderNewName()
+    {
+        // Arrange
+        var connector = new QueuedIngestConnector();
+        var servers = new[] { AddServer(connector), AddServer(connector) };
+        var profiles = LoadProfiles();
+        var sender = CreateSender(connector, CreateTimeProvider());
+        var (buffered, _, _) = PrepareBufferedProfiles(sender, profiles, true);
+
+        profiles.Rename(buffered.Id, RenamedName);
+
+        // Act
+        StartRun(sender);
+
+        var firstHello = await AcceptAsync(servers[0]);
+        var firstContent = await servers[0].ReceiveAsync(TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+        var hello = await AcceptAsync(servers[1]);
+        var sent = await ReceiveAndAcknowledgeAsync(servers[1]);
+
+        // Assert
+        Assert.AreNotEqual(buffered.Id, firstHello.ProfileId, "The first hello should name the active profile");
+        Assert.IsNull(firstContent, "The connection of the active profile should send nothing before the waiting message of the other");
+        Assert.AreEqual(buffered.Id, hello.ProfileId, "The hello should name the profile of the buffered message");
+        Assert.AreEqual(RenamedName, hello.ProfileName, "The hello should name the profile by the new name");
+        Assert.AreEqual(buffered.Id, Assert.IsInstanceOfType<ContractTick>(sent, "The buffered tick should be sent").ProfileId, "The buffered tick should keep its profile");
+    }
+
+    /// <summary>
+    /// A rename made while a switch is under way, in the close handshake or in the retry delay after a refusal because the
+    /// old session is still connected, is in the hello that follows, which carries the name the list holds when it is
+    /// built (AC8).
+    /// </summary>
+    /// <param name="kind">Where the rename is made: CloseHandshake or RetryDelay</param>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC8")]
+    [DataRow("CloseHandshake", DisplayName = "During the close handshake")]
+    [DataRow("RetryDelay", DisplayName = "During the retry delay after a refusal")]
+    public async Task LiveSenderProfileRenameDuringSwitchHelloNamesNewestName(string kind)
+    {
+        // Arrange
+        var timeProvider = CreateTimeProvider();
+        var connector = new QueuedIngestConnector();
+        var servers = new[] { AddServer(connector), AddServer(connector), AddServer(connector) };
+        var profiles = LoadProfiles();
+        var sender = CreateSender(connector, timeProvider);
+        var (buffered, _, _) = PrepareBufferedProfiles(sender, profiles, true);
+
+        StartRun(sender);
+        await AcceptAsync(servers[0]);
+        await HoldSwitchAsync(kind, timeProvider, servers);
+
+        // Act
+        profiles.Rename(buffered.Id, RenamedName);
+
+        await ReleaseSwitchAsync(kind, timeProvider, servers);
+
+        var hello = await AcceptAsync(servers[kind == "CloseHandshake" ? 1 : 2]);
+
+        // Assert
+        Assert.AreEqual(buffered.Id, hello.ProfileId, $"The hello should name the profile of the buffered message: {kind}");
+        Assert.AreEqual(RenamedName, hello.ProfileName, $"The hello should carry the name the list holds when it is built: {kind}");
     }
 
     /// <summary>
@@ -1682,6 +1938,158 @@ public sealed class LiveSenderProfileTests : IDisposable
     private static PipeConnectionItem TickItem(long gameTime, int receiveSeconds)
     {
         return Item(PipeTickResult.FromTick(CreateTick(gameTime, receiveSeconds)), receiveSeconds + 1);
+    }
+
+    /// <summary>
+    /// Creates the profiles of a rename test and queues a tick of the first one: the buffered profile <c>B</c> is
+    /// active when the tick is taken, the third profile <c>T</c> and then the active profile <c>A</c> are created after
+    /// it. Without buffered messages only the three profiles are created.
+    /// </summary>
+    /// <param name="sender">The sender</param>
+    /// <param name="profiles">The profiles</param>
+    /// <param name="isTickQueued">Whether a tick of <c>B</c> is queued</param>
+    /// <returns>The profiles <c>B</c>, <c>T</c> and <c>A</c></returns>
+    private static (CompanionProfile Buffered, CompanionProfile Third, CompanionProfile Active) PrepareBufferedProfiles(LiveSender sender, CompanionProfiles profiles, bool isTickQueued)
+    {
+        sender.UseProfiles(profiles);
+
+        var buffered = profiles.Create("MARKER-Buffered");
+
+        if (isTickQueued)
+        {
+            sender.Enqueue(TickItem(100, 2));
+        }
+
+        var third = profiles.Create("MARKER-Third");
+        var active = profiles.Create("MARKER-Active");
+
+        return (buffered, third, active);
+    }
+
+    /// <summary>
+    /// Queues a failed attempt for the state of the sender that expects one.
+    /// </summary>
+    /// <param name="kind">The state of the sender: Retrying or BeforeRun</param>
+    /// <param name="connector">The connector</param>
+    private static void PrepareOfflineConnector(string kind, QueuedIngestConnector connector)
+    {
+        if (kind == "Retrying")
+        {
+            connector.Enqueue(null);
+        }
+    }
+
+    /// <summary>
+    /// Accepts the hello of the connection of the active profile and, for buffered messages, the hello of the connection
+    /// that sends them, and receives the buffered tick.
+    /// </summary>
+    /// <param name="servers">The scripted servers, in the order of the attempts</param>
+    /// <param name="isBufferedConnection">Whether the buffered messages of another profile are sent</param>
+    /// <returns>The server that holds the connection afterwards</returns>
+    private async Task<ScriptedIngestServer> ConnectAsync(ScriptedIngestServer[] servers, bool isBufferedConnection)
+    {
+        await AcceptAsync(servers[0]);
+
+        if (isBufferedConnection == false)
+        {
+            await WaitForStatusAsync(LiveSendState.Connected, 1);
+
+            return servers[0];
+        }
+
+        await servers[0].ReceiveAsync(TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+        await AcceptAsync(servers[1]);
+        await ReceiveAndAcknowledgeAsync(servers[1]);
+
+        return servers[1];
+    }
+
+    /// <summary>
+    /// Polls a condition that is expected not to come true, ten milliseconds apart, for a short time.
+    /// </summary>
+    /// <param name="condition">The condition</param>
+    /// <returns>Whether the condition came true</returns>
+    private async Task<bool> WaitBrieflyAsync(Func<bool> condition)
+    {
+        var polls = 0;
+
+        while (condition() == false && polls < NegativePolls)
+        {
+            await Task.Delay(10, TestContext.CancellationToken);
+
+            polls++;
+        }
+
+        return condition();
+    }
+
+    /// <summary>
+    /// Renames a profile while the sender accepts no connection and lets the sender go on: before it runs, or in the retry
+    /// delay after its first failed attempt.
+    /// </summary>
+    /// <param name="kind">The state of the sender: Retrying or BeforeRun</param>
+    /// <param name="sender">The sender</param>
+    /// <param name="timeProvider">The time provider</param>
+    /// <param name="profiles">The profiles</param>
+    /// <param name="id">The identity of the profile to rename</param>
+    /// <returns>A task that completes when the rename is made and the sender runs</returns>
+    private async Task RenameOfflineAsync(string kind, LiveSender sender, RecordingTimeProvider timeProvider, CompanionProfiles profiles, Guid id)
+    {
+        if (kind == "BeforeRun")
+        {
+            profiles.Rename(id, RenamedName);
+            StartRun(sender);
+
+            return;
+        }
+
+        StartRun(sender);
+
+        await timeProvider.WaitForDelaysAsync(LiveSender.RetryDelays[0], 1, TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+
+        profiles.Rename(id, RenamedName);
+        timeProvider.Advance(LiveSender.RetryDelays[0]);
+    }
+
+    /// <summary>
+    /// Brings the switch to the buffered profile to the point where a rename is made: the close handshake of the first
+    /// connection is under way, or the hello of the second connection was refused and the retry delay waits.
+    /// </summary>
+    /// <param name="kind">The point: CloseHandshake or RetryDelay</param>
+    /// <param name="timeProvider">The time provider</param>
+    /// <param name="servers">The scripted servers, in the order of the attempts</param>
+    /// <returns>A task that completes at that point</returns>
+    private async Task HoldSwitchAsync(string kind, RecordingTimeProvider timeProvider, ScriptedIngestServer[] servers)
+    {
+        if (kind == "CloseHandshake")
+        {
+            await timeProvider.WaitForDelaysAsync(TimeSpan.FromSeconds(2), 1, TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+
+            return;
+        }
+
+        await servers[0].ReceiveAsync(TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+        await RefuseHelloAsync(servers[1], ContractHelloRefusal.CompanionConnected);
+        await timeProvider.WaitForDelaysAsync(LiveSender.SwitchRetryDelay, 1, TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+    }
+
+    /// <summary>
+    /// Lets the switch go on after the rename: the first server answers the close, or the retry delay ends.
+    /// </summary>
+    /// <param name="kind">The point: CloseHandshake or RetryDelay</param>
+    /// <param name="timeProvider">The time provider</param>
+    /// <param name="servers">The scripted servers, in the order of the attempts</param>
+    /// <returns>A task that completes when the switch can go on</returns>
+    private async Task ReleaseSwitchAsync(string kind, RecordingTimeProvider timeProvider, ScriptedIngestServer[] servers)
+    {
+        if (kind == "CloseHandshake")
+        {
+            await servers[0].ReceiveAsync(TestContext.CancellationToken).WaitAsync(_guard, TestContext.CancellationToken);
+
+            return;
+        }
+
+        timeProvider.Advance(LiveSender.SwitchRetryDelay);
     }
 
     /// <summary>
