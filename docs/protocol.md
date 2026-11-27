@@ -32,6 +32,13 @@ The frame prefix, the string and number encodings, the type byte and the trailin
 [`areas/pipe.md`](areas/pipe.md) (*Frame layout*, *Message types*). *Confirmed*: all 794 frames follow that layout;
 no island frame has trailing bytes, and no float is NaN.
 
+- Characters in names (figure, island, route and folder names): *observed* (issue #138): an apostrophe in a name arrives
+  as `_`; inferred, because Censio's reading writes no `_` (a string is decoded as UTF-8 and passes on unchanged). The
+  game may send the typographic `’` and replace it. *Assumed* (third-party capture, and the Product Manager's report of
+  trade-route names): a non-ASCII character such as ä, ö, ü or ß is written as `_` too; the recordings have no
+  non-ASCII byte in any string, so they confirm neither this nor the opposite. A `_` can stand for several
+  characters and for itself, so the character cannot be restored.
+
 ## Messages
 
 ### Version
@@ -44,8 +51,7 @@ no island frame has trailing bytes, and no float is NaN.
 
 - Payload: the name of the player figure. *Confirmed* (all four recordings): the text is 6 or 18 bytes long and carries
   no structure the reader uses; it is the same in every recording of one figure, also across two savegames of that
-  figure, so it is no savegame key (record 0041). Two figures send different texts. *Assumed* (third-party capture): a non-ASCII character is written as `_`; the recording
-  has no non-ASCII byte in any string, so it confirms neither this nor the opposite.
+  figure, so it is no savegame key (record 0041). Two figures send different texts. For non-ASCII characters in the name see *Framing*.
 
 ### SessionEnd
 

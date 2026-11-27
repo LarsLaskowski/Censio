@@ -203,7 +203,9 @@ Until more fixtures from real recordings test the reader (two anonymised fixture
   ([`../protocol.md`](../protocol.md)); a single recording cannot show a single reader or the units of the rates.
 - Strings are decoded as UTF-8 although the reference names no encoding; Windows-1252 would garble non-ASCII bytes.
   That the game writes `_` for umlauts rests on a third-party capture (`Dealwatch/Tabularium117`'s
-  `docs/protocol.md`, a file of that repository, not ours), not on our own; our recording has no non-ASCII byte.
+  `docs/protocol.md`, a file of that repository, not ours), not on our own; our recording has no non-ASCII byte. An
+  apostrophe also arrives as `_` ([`../protocol.md`](../protocol.md), *Framing*); Censio cannot restore the
+  character, since `_` stands for several characters and for itself.
 - Whether the game ever sends duplicate map keys is unknown; none was seen in one recording.
 - A game update that changes the format without a new protocol version is misread as long as every field still
   fits; one that bumps the version beyond 3 is refused with a protocol-mismatch error.
