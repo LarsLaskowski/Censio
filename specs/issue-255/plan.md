@@ -6,10 +6,8 @@ Security areas touched: Parsing of external input (`CompanionProfiles`: the name
 
 ## Problem / root cause
 
-The Companion can create, select and delete profiles but not rename one (`docs/areas/companion-profiles.md:22`, "they
-are not renamed"; no rename member in `CompanionProfiles.cs`). The issue asks for the rules — what the user sees
-meanwhile and offline — and for merging to be considered. The rules are stated in the area documents (the lasting
-"spec" of a bug-fix run) and record 0117; merging goes to a follow-up issue (*Out of scope*).
+Profiles cannot be renamed (`companion-profiles.md:22`; no rename member in `CompanionProfiles.cs`). The rules, the
+offline case included, go into the area documents and record 0117; merging goes to a follow-up issue.
 
 ## Verified facts
 
@@ -20,12 +18,8 @@ meanwhile and offline — and for merging to be considered. The rules are stated
 | 3 | A switch is keyed by identity only, so today a rename of the connected profile would not reconnect. | `LiveSender.cs:1103` (`profiles.Active.Id == _connectionProfile`), `:165` (`Guid _connectionProfile`) | confirmed |
 | 4 | Buffered messages carry only the profile identity; the hello for them takes the name from the list when it is sent. | `LiveSender.cs:1236-1247` (`profiles.NameOf(id)` in `IsOfOtherProfile`), `ProfileOf` `:524` | confirmed |
 | 5 | `CompanionProfile` is immutable (`init`); `Select` compares the active profile by reference. | `CompanionProfile.cs`; `CompanionProfiles.cs:409` | confirmed |
-| 6 | The tray menu reads `Active.Name` each time it opens. | `TrayIcon.cs:98-101`, `:185` | confirmed |
-| 7 | `ActiveChanged` has one subscriber, the live sender. | `LiveSender.cs:353`; grep of `src` | confirmed |
 | 8 | A replay never sends under `Live`: it makes its own profile `Replay <time>`. | `replay-sending.md:86` | confirmed |
-| 9 | A file that cannot be used, or a missing one, gives `Live` alone under the name `Live`. | `CompanionProfiles.cs:624-627` | confirmed |
 | 10 | The window's delete flow takes effect at once through `DeleteRequested`, ignored while a save runs. | `SettingsWindowSession.cs:344-360`, `SettingsWindow.xaml.cs:480-501` | confirmed |
-| 11 | Records 0111 and 0115 are unreleased (no tag contains them), so they are edited in place. | `git tag --contains bada5d0` / `7125c16`: empty; tags up to `v0.4.0` | confirmed |
 
 ## Acceptance criteria
 
@@ -53,10 +47,13 @@ meanwhile and offline — and for merging to be considered. The rules are stated
   handshake and opens a new one whose hello names the same identity with the new name, handled as a switch (`Server:
   connecting`, no `Live sending failed` line, no delay step; a `companionConnected` refusal within 5 seconds retried).
   When that profile is not the active one (a connection for buffered messages), the new hello names that profile, not
-  the active one. A rename of any other profile keeps the connection.
+  the active one. A rename of any other profile keeps the connection, also a connection for buffered messages of a
+  profile that is not the active one when the active profile or a third profile is renamed.
 - AC8: Offline: after a rename made while no connection is accepted (retrying, or before the sender runs), the next
   accepted hello names the new name; buffered messages of a renamed profile other than the active one, taken before the
-  rename, are sent on a connection whose hello names the new name.
+  rename, are sent on a connection whose hello names the new name. A rename made while a switch is under way (close
+  handshake, token read, the 250 ms retry delay) is in the hello that follows: the hello carries the name the list
+  holds when the hello is built.
 - AC9: The texts, exactly: `Rename profile…` / `Profil umbenennen…`; `Live cannot be renamed.` / `Live kann nicht
   umbenannt werden.`; `Rename profile` / `Profil umbenennen`; `New name of the profile {0}` / `Neuer Name des Profils
   {0}`; `Rename` / `Umbenennen`.
@@ -73,8 +70,8 @@ meanwhile and offline — and for merging to be considered. The rules are stated
 | AC4 | `CompanionProfilesRenameClearsNoticeRaisesRenamedAndLogsWithoutName` | `tests/Censio.Companion.Core.Tests/CompanionProfilesTests.cs` |
 | AC5 | `SettingsViewCanRenameAllButLiveAndUnknown`, `SettingsViewCheckRenameGivesProblemOfProfiles` | `tests/Censio.Companion.Core.Tests/SettingsViewTests.cs` |
 | AC6 | `SettingsWindowSessionRenameRenamesAndShowsProfiles`, `SettingsWindowSessionRenameIgnored` (data rows: other sender, before first view, during save, `Live`, refused name, after close) | `tests/Censio.Companion.Core.Tests/SettingsWindowSessionTests.cs` |
-| AC7 | `LiveSenderProfileRenameOfConnectionProfileReconnectsWithNewName`, `LiveSenderProfileRenameOfBufferedConnectionProfileNamesThatProfile`, `LiveSenderProfileRenameOfOtherProfileKeepsConnection` | `tests/Censio.Companion.Core.Tests/LiveSenderProfileTests.cs` |
-| AC8 | `LiveSenderProfileRenameWhileOfflineNextHelloNamesNewName`, `LiveSenderProfileRenameBufferedOtherProfileSentUnderNewName` | `tests/Censio.Companion.Core.Tests/LiveSenderProfileTests.cs` |
+| AC7 | `LiveSenderProfileRenameOfConnectionProfileReconnectsWithNewName`, `LiveSenderProfileRenameOfBufferedConnectionProfileNamesThatProfile`, `LiveSenderProfileRenameOfOtherProfileKeepsConnection` (data rows: connection of the active profile and a second profile renamed; connection for buffered messages of non-active `B` and the active profile renamed; the same and a third profile renamed) | `tests/Censio.Companion.Core.Tests/LiveSenderProfileTests.cs` |
+| AC8 | `LiveSenderProfileRenameWhileOfflineNextHelloNamesNewName`, `LiveSenderProfileRenameBufferedOtherProfileSentUnderNewName`, `LiveSenderProfileRenameDuringSwitchHelloNamesNewestName` (data rows: the switched-to buffered profile renamed during the close handshake; renamed during the retry delay after a `companionConnected` refusal) | `tests/Censio.Companion.Core.Tests/LiveSenderProfileTests.cs` |
 | AC9 | `CompanionTextsRenameTextsInBothLanguages` | `tests/Censio.Companion.Core.Tests/CompanionTextsTests.cs` |
 | AC10 | check: the Reviewer reads both sections in step 8 | — |
 
@@ -87,13 +84,25 @@ meanwhile and offline — and for merging to be considered. The rules are stated
    with the same `Id` and assigns `_active` to it when it was active (never through `Activate`, which moves figure
    links), clears the notice and calls `MarkChanged`; outside the lock it logs `CompanionLog.ProfileRenamed`, raises
    `PendingNoticeChanged` when the notice changed, then `Renamed`.
-2. **`LiveSender`.** `UseProfiles` subscribes `Renamed` to the same wake-up as `ActiveChanged` (`OnActiveChanged`; the
-   counter's doc says "changes of the active profile or of a name"). A new run-only field `_connectionName` is set in
-   `ChooseHelloProfile` with `_connectionProfile`. `IsSwitchDue` keeps its identity check and adds: when
-   `profiles.NameOf(_connectionProfile)` is not null and differs ordinally from `_connectionName`, it sets
-   `_helloProfile` to that profile with the new name when `_connectionProfile` is not the active one (else `null`),
-   sets `_isSwitching` and returns `true`. A connection whose profile left the list (deleted) is not switched by this
-   check. The switch path (close handshake, `TryContinueSwitchAsync`) is reused unchanged.
+2. **`LiveSender`.** Renames get their own counter and completion, apart from `_activeVersion`/`_activeChanged`:
+   `UseProfiles` subscribes `Renamed` to a new `OnRenamed` that raises `_renameVersion` and completes `_renamed` (under
+   `_lock`, like `OnActiveChanged`); `GetRenameView` reads both. `StartTurnAsync` also returns the rename completion,
+   and `NextOrFailureAsync` wakes on it as on the other three. Run-only fields `_seenRenameVersion` and
+   `_connectionName` join `_seenActiveVersion` and `_connectionProfile`.
+   - `ChooseHelloProfile` captures both versions under the lock first, then reads the names: for a `_helloProfile` it
+     builds the hello profile from `profiles.NameOf(named.Id)` read at that moment (dropping `_helloProfile` when that
+     is `null` or the identity is deleted, as today), for the active one from `profiles.Active`; `_connectionName` is
+     the name actually sent. A rename after the capture raises the version and is compared by name later, so at worst
+     it finds the name already sent and does nothing.
+   - `IsSwitchDue(activeVersion, renameVersion)`, in this order: note whether each version moved and set both seen
+     values; (1) only when the active version moved and `Active.Id != _connectionProfile`: `_helloProfile = null`,
+     switch (today's rule, which takes precedence); (2) only when the rename version moved and
+     `profiles.NameOf(_connectionProfile)` is not null and differs ordinally from `_connectionName`: `_helloProfile` =
+     that identity with the new name when it is not the active one, else `null`, switch; otherwise `false`. The name
+     check thus never sits behind the early `return false` of an unchanged active identity, and a rename never runs the
+     identity check, so a connection for buffered messages of `B` survives renames of `A` or `C`. A connection whose
+     profile left the list is not switched by (2). The switch path (close handshake, `TryContinueSwitchAsync`) is
+     reused unchanged.
 3. **Window session.** `SettingsRename` carries the request; `ISettingsWindow.RenameRequested` is subscribed in `Open`
    and removed in `OnWindowClosed`; a private `OnRenameRequested` mirrors `OnDeleteRequested` (same guards, then
    `IsRenamable` and `CheckRename` over the current list), calls `Rename`, then `ShowProfilesAgain`.
@@ -113,17 +122,14 @@ Early draft PR: no
 
 ## Options considered
 
-See record 0117: a name box applied by `Save` (lost: `Save` also activates the selected profile); the server following
-only the next natural hello (lost: the old name stays for a whole connection); a contract rename message (lost: a
-contract version for what a reconnect does); `Live` renamable (lost: texts name it and a lost file restores `Live`);
-a rename onto another profile's name merging the two (lost: a server-side merge of histories, follow-up issue).
+Record 0117, options 1–7 (two chosen, five lost with their reasons there).
 
 ## Affected projects and types
 
 | Project | Type / file | Change |
 | ------- | ----------- | ------ |
 | `Censio.Companion.Core` | `CompanionProfiles` | `IsRenamable`, `CheckRename`, `Rename`, event `Renamed`, helper `IsNameTaken` |
-| `Censio.Companion.Core` | `LiveSender` | `Renamed` subscription, `_connectionName`, `IsSwitchDue` |
+| `Censio.Companion.Core` | `LiveSender` | `OnRenamed` with its counter and completion, `GetRenameView`, `_seenRenameVersion`, `_connectionName`, `ChooseHelloProfile`, `IsSwitchDue`, `StartTurnAsync`, `NextOrFailureAsync` (all private) |
 | `Censio.Companion.Core` | `SettingsRename` (new), `ISettingsWindow`, `SettingsView`, `SettingsWindowSession` | the rename request |
 | `Censio.Companion.Core` | `CompanionTexts`, `CompanionLog` | five texts per language, `ProfileRenamed` |
 | `Censio.Companion` | `SettingsWindow.xaml(.cs)`, `RenameProfileDialog.xaml(.cs)` (new) | button and dialog |
@@ -177,21 +183,20 @@ All by the Dev, once the code is green:
   the German *Einstellungsfenster* and *Profile* (**Umbenennen**); the "Not yet tried on Windows" line of *Settings
   window* names the rename dialog too (both languages).
 - `README.md`: *Profiles* paragraph and the settings-window sentence (line 20) mention renaming, English and German.
-- `docs/ARCHITECTURE.md`: none — no flow or guarantee changes (the hello already names the profile).
-- `.squad/project.md`: none — `SettingsWindow` and `CompanionProfiles` already stand in their areas, and the new dialog is
-  covered by "`SettingsWindow` with … profile names"; the Reviewer confirms.
+- `docs/ARCHITECTURE.md`, `.squad/project.md`: none (no flow or guarantee changes; the dialog falls under
+  `SettingsWindow`'s entry).
 
 ## Architecture check
 
-No guarantee of `.squad/project.md` is touched: the token, the buffer and its order, retention and deletion stay as
-they are. A rename reconnect reuses the switch path, so no tick is dropped (messages wait in the buffer).
+No guarantee of `.squad/project.md` is touched; the reconnect reuses the switch path, so no tick is dropped.
 
 ## Security considerations
 
 - [x] Limits: the name is at most 64 UTF-16 code units, judged on the decoded string as for a new name; the file's
   1 MiB bound is unchanged (the largest file stays the one 1,000 escaped 64-character names give).
-- [x] Exceptions: `Rename`'s `ArgumentException` never reaches the user — the dialog and the session check first; a
-  write failure is the existing `Could not save the settings: <exception type>` log line.
+- [x] Exceptions: `Rename`'s `ArgumentException` never reaches the user — the dialog and the session check first; its
+  messages are fixed texts that quote neither the name nor the identity, as `Create` and `Delete` do; a write failure
+  is the existing `Could not save the settings: <exception type>` log line.
 - The new name is the player's text: shown in the window and dialog (WPF text, no markup), written to `profiles.json`
   and sent in the hello, never logged (AC4).
 
@@ -200,10 +205,30 @@ they are. A rename reconnect reuses the switch path, so no tick is dropped (mess
 - `docs/decisions/0117-profile-renamed-in-a-dialog-at-once-the-connection-reopened-with-the-new-name.md` (Proposed),
   indexed; records 0111 and 0115 (unreleased) now point to it instead of saying renaming is not done.
 
+## Challenge
+
+- **1 (major) — renames shared the active-profile counter, so on a connection for buffered messages of a non-active
+  `B` any rename ran the identity check and ended `B`'s connection.** Accepted. Renames get their own counter and
+  completion; the identity check runs only when the active version moved, the name check only when the rename version
+  moved (Approach step 2, counter wording corrected). AC7 now states that `B`'s connection survives renames of the
+  active and of a third profile, with data rows in `LiveSenderProfileRenameOfOtherProfileKeepsConnection`.
+- **2 (minor) — the name check must not sit behind the early `return false` for an unchanged active identity.**
+  Accepted. `IsSwitchDue` states its order: both versions noted, identity check (only on an active change, switch only
+  for another identity), then name check (only on a rename), then `false`.
+- **3 (minor) — `_helloProfile` kept the name read at switch time, so a rename during the switch was lost.** Accepted.
+  `ChooseHelloProfile` reads `profiles.NameOf(named.Id)` when it builds the hello and sets `_connectionName` from the
+  name sent, the versions captured before the read; AC8 states it, tested by
+  `LiveSenderProfileRenameDuringSwitchHelloNamesNewestName`.
+
+## Security review
+
+- **Non-blocking (fix now): `Rename`'s `ArgumentException` messages.** Fixed: *Security considerations* states they are
+  fixed texts quoting neither name nor identity, as `Create` and `Delete` do. Security's point on `IsSwitchDue` is
+  objection 1 and resolved with it.
+
 ## Out of scope / follow-ups
 
 - Merging two profiles — proposed issue: title `[Companion] Merge two profiles`, body: "Split from #255 (record 0117,
   option 7). A player who fed one playthrough into two profiles wants one history. Merging moves one profile's ticks,
   hourly sums, trade routes and held state into another on the server and needs a contract message and a server
   operation; the Companion's names stay distinct ignoring case. Decide whether it is wanted and specify it."
-- Renaming a profile only the server has (deleted in the Companion with its history kept): not possible, as deleting it.
