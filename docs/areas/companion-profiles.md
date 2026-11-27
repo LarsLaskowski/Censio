@@ -115,13 +115,14 @@ the window itself in [`companion-settings.md`](companion-settings.md).
   is not JSON, is not an object, has a byte order mark, a comment or a trailing comma, or breaks the format: a missing,
   unknown or repeated property (compared case-sensitively on the unescaped name) at the root, in a profile or in a figure;
   a `version` other than the number 1 (`1.0` and `1e0` too); an `active`, `id` or `profile` that is not an identity in the
-  `D` form (either letter case); a repeated identity; no profile, more than 1,000 profiles or no `Live` entry; the
+  `D` form (either letter case) or is the all-zero identity `00000000-0000-0000-0000-000000000000` (the contract refuses
+  it, [`contract.md`](contract.md), so a profile or a deletion under it could never be sent); a repeated identity; no profile, more than 1,000 profiles or no `Live` entry; the
   `active` or a figure's profile not in the list; a name that breaks the name rules or repeats another ignoring case, or
   that holds text that is not valid UTF-8; more than 1,000 figures; a figure key that is not 64 lowercase hex characters
   or that repeats.
 - The reader takes version 1 with exactly the four properties and version 2 with exactly five, and in `deleted` it rejects
   what is not an array, more than 1,000 entries, an entry with a missing, unknown or repeated property, an `id` not in the `D`
-  form, a `confirmed` that is not `true` or `false`, a repeated identity, and the identity of `Live` or of a listed profile
+  form or all zero, a `confirmed` that is not `true` or `false`, a repeated identity, and the identity of `Live` or of a listed profile
   (the last three compared as identities, whatever their letter case or surrounding white space).
 - A file the reader rejects also forgets the deleted identities: their waiting deletions are not sent, and buffered messages of those profiles are sent again and recreate the profiles on the server, unnamed.
 - Downgrade: a file of version 2 is rejected by a Companion of an earlier release, which then uses `Live` alone, so the same

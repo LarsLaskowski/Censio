@@ -781,13 +781,13 @@ public sealed class CompanionProfiles
     }
 
     /// <summary>
-    /// Reads an identity written as a string of the form <c>D</c>.
+    /// Reads an identity written as a string of the form <c>D</c> that is not all zero.
     /// </summary>
     /// <param name="element">The element</param>
-    /// <returns>The identity, or <see langword="null" /> when the element is no such string</returns>
+    /// <returns>The identity, or <see langword="null" /> when the element is no such string or the identity is all zero</returns>
     private static Guid? ReadId(JsonElement element)
     {
-        return element.ValueKind == JsonValueKind.String && Guid.TryParseExact(element.GetString(), "D", out var id) ? id : null;
+        return element.ValueKind == JsonValueKind.String && Guid.TryParseExact(element.GetString(), "D", out var id) && id != Guid.Empty ? id : null;
     }
 
     /// <summary>
