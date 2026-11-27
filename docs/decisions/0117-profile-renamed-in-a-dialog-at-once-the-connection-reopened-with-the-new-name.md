@@ -1,6 +1,6 @@
 # 0117: A profile is renamed in a dialog of the settings window at once, and a live connection under it is reopened with the new name
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-27
 - **Area:** companion-profiles
 - **Source:** Issue #255
