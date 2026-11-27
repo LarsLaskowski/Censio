@@ -139,3 +139,23 @@ No guarantee of `.squad/project.md` or `docs/ARCHITECTURE.md` is touched: the re
 ## Out of scope / follow-ups
 
 - The unreachable write-refusal branch of `SendDeletionsAsync` stays; removing defensive code is not this issue.
+
+## Challenge notes
+
+I challenged specs/issue-254/plan.md in plan mode and it holds up. I found no major objection and one minor one.
+
+**What I checked against the code:**
+- **Root cause:** `ReadId` (/home/user/Censio/src/Censio.Companion.Core/CompanionProfiles.cs:788-791) is the only identity reader for the four fields: `active` (:664), deleted `id` (:737), profile `id` (:809) and figure `profile` (:856). No other identity parse exists in Companion.Core, so there is no sibling path the plan misses.
+- **Prior art:** `LiveBufferFile.ReadHeader` already rejects `id == Guid.Empty` (/home/user/Censio/src/Censio.Companion.Core/LiveBufferFile.cs:126).
+- **Contract:** `ContractRules` calls `CheckIdentity` on a deletion's `Id` and `ProfileId` (/home/user/Censio/src/Censio.Contracts/ContractRules.cs:171-172).
+- **Fail-closed path:** `Read` returns `null`, then `CreateInvalid("not of its format")` (CompanionProfiles.cs:283, 636-641). `AssertFailedClosed` (/home/user/Censio/tests/Censio.Companion.Core.Tests/CompanionProfilesTests.cs:2181-2194) asserts exactly one warning, `Live` alone and active, and no notice, which matches AC1.
+- **Padded form:** the row "Listed profile deleted, padded with white space" (CompanionProfilesTests.cs:1569) shows the padded text parses today.
+- **Test to replace:** `LiveSenderProfileDeletionNotWrittenKeepsWaitingAndSendsNext` (/home/user/Censio/tests/Censio.Companion.Core.Tests/LiveSenderProfileTests.cs:1495-1533) is built on the bug. Its first assert, that both waiting deletions load, fails after the fix, so replacing it is right.
+- **Need, scope, options:** a code change is needed, not `RESULT: NO CHANGE`. Putting the guard on the parsed value in `ReadId` is the least invasive fix. Rejecting the whole file matches record 0033 and the reader's other rules. The plan names the planned doc edits to the second and third bullets of *Limits and errors* (docs/areas/companion-profiles.md:117-125), and their current text matches what the plan quotes.
+- **Tier:** standard fits.
+
+**Objections:**
+
+1. **minor** — Replacing the LiveSender test removes the only test of the refused-deletion branch of `SendDeletionsAsync` (/home/user/Censio/src/Censio.Companion.Core/LiveSender.cs:1316-1321). The only other test with "Live message not sent: the contract writer refused it" is LiveSenderTests.cs:523, which covers a different path. The plan says this branch is "unchanged code, so the coverage gate on changed lines is not affected", but it does not say the branch becomes untested and cannot be reached. Once the fix is in, no listed or deleted identity can be all zero, so the branch is dead code that counts against overall line coverage.
+   - Why minor: it does not change what gets built; it only makes the coverage effect explicit for the Dev and Reviewer.
+   - Instruction for *Challenge notes*: "The Dev checks that the overall line-coverage threshold of the *Coverage gate* still passes now that the write-refusal branch of `SendDeletionsAsync` (LiveSender.cs:1316-1321) has no test. The replacement test's doc comment says the file is refused, not that a deletion is refused at sending. The Reviewer does not count the dead branch as a missed test."
