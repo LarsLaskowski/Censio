@@ -994,6 +994,8 @@ public sealed class LiveSenderProfileTests : IDisposable
                           _ => third
                       };
 
+        _ = connected.ReceiveAsync(TestContext.CancellationToken);
+
         // Act
         profiles.Rename(renamed.Id, RenamedName);
 
@@ -1033,6 +1035,8 @@ public sealed class LiveSenderProfileTests : IDisposable
         await RenameOfflineAsync(kind, sender, timeProvider, profiles, renamed.Id);
 
         var hello = await AcceptAsync(server);
+
+        _ = server.ReceiveAsync(TestContext.CancellationToken);
 
         await WaitForStatusAsync(LiveSendState.Connected, 1);
 
