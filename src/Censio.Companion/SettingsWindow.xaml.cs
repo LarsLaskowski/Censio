@@ -116,6 +116,7 @@ internal sealed partial class SettingsWindow : Window, ISettingsWindow
         ProfileLabel.Text = texts.ProfileLabel;
         NewProfileButton.Content = texts.NewProfileText;
         DeleteProfileButton.Content = texts.DeleteProfileText;
+        RenameProfileButton.Content = texts.RenameProfileText;
         NewProfileLabel.Text = texts.NewProfileNameLabel;
         AutostartBox.Content = texts.StartWithWindowsText;
         LanguageLabel.Text = texts.LanguageLabel;
@@ -149,6 +150,7 @@ internal sealed partial class SettingsWindow : Window, ISettingsWindow
         var culture = CultureInfo.GetCultureInfo(view.Texts.Language == CompanionLanguage.German ? "de-DE" : "en-US");
 
         DeleteProfileButton.Content = view.Texts.DeleteProfileText;
+        RenameProfileButton.Content = view.Texts.RenameProfileText;
         WaitingDeletionsText.Text = string.Format(CultureInfo.InvariantCulture, view.Texts.WaitingDeletionsFormat, view.WaitingDeletions.ToString("N0", culture));
         WaitingDeletionsText.Visibility = view.WaitingDeletions > 0 ? Visibility.Visible : Visibility.Collapsed;
 
@@ -156,7 +158,7 @@ internal sealed partial class SettingsWindow : Window, ISettingsWindow
     }
 
     /// <summary>
-    /// Enables the delete button for a profile that can be deleted and gives the reason as its tooltip otherwise.
+    /// Enables the delete and rename buttons for a profile that can be deleted or renamed and gives the reason as the tooltip otherwise.
     /// </summary>
     private void UpdateDeleteButton()
     {
@@ -170,6 +172,11 @@ internal sealed partial class SettingsWindow : Window, ISettingsWindow
 
         DeleteProfileButton.IsEnabled = canDelete;
         DeleteProfileButton.ToolTip = canDelete ? null : view.Texts.DeleteProfileDisabledText;
+
+        var canRename = view.CanRename(selected);
+
+        RenameProfileButton.IsEnabled = canRename;
+        RenameProfileButton.ToolTip = canRename ? null : view.Texts.RenameProfileDisabledText;
     }
 
     /// <summary>
@@ -463,7 +470,7 @@ internal sealed partial class SettingsWindow : Window, ISettingsWindow
     }
 
     /// <summary>
-    /// Updates the delete button when another profile is selected.
+    /// Updates the delete and rename buttons when another profile is selected.
     /// </summary>
     /// <param name="sender">The drop-down</param>
     /// <param name="eventArgs">The event data</param>
@@ -496,6 +503,34 @@ internal sealed partial class SettingsWindow : Window, ISettingsWindow
                                     {
                                         Profile = profile.Id,
                                         IsHistoryDeleted = dialog.IsHistoryDeleted
+                                    });
+        }
+    }
+
+    /// <summary>
+    /// Asks for the new name of the selected profile and reports it to the session.
+    /// </summary>
+    /// <param name="sender">The button</param>
+    /// <param name="eventArgs">The event data</param>
+    private void OnRenameProfileClick(object sender, RoutedEventArgs eventArgs)
+    {
+        if (_view is not { } view || ProfileBox.SelectedItem is not CompanionProfile profile || view.CanRename(profile.Id) == false)
+        {
+            return;
+        }
+
+        var dialog = new RenameProfileDialog(view.Texts, view, profile)
+                     {
+                         Owner = this
+                     };
+
+        if (dialog.ShowDialog() == true)
+        {
+            RenameRequested?.Invoke(this,
+                                    new SettingsRename
+                                    {
+                                        Profile = profile.Id,
+                                        Name = dialog.NewName
                                     });
         }
     }
@@ -555,11 +590,8 @@ internal sealed partial class SettingsWindow : Window, ISettingsWindow
     /// <inheritdoc />
     public event EventHandler<SettingsDeletion>? DeleteRequested;
 
-    // Skeleton: removed with the implementation
-#pragma warning disable CS0067
     /// <inheritdoc />
     public event EventHandler<SettingsRename>? RenameRequested;
-#pragma warning restore CS0067
 
     /// <inheritdoc />
     public void ShowProfiles(SettingsView view)

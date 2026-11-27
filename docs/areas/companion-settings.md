@@ -46,7 +46,8 @@ address`, `Server token` (a masked box), `Buffer hours`, `Buffer megabytes`, `Ga
 - A field that has a problem of the file (*Errors from the file*) is enabled in every mode, so that it can be edited
   away. A disabled field keeps its value and is written as shown.
 - `Browse…` opens a folder dialog and puts the picked folder's full path in the game folder field; the field can be typed in too.
-- `Delete profile…` stands right of `New profile…` and deletes the profile selected in the drop-down after the dialog `Delete profile?` asked; it is disabled, with the tooltip `Live and the active profile cannot be deleted.`, while the selection is `Live` or the active profile ([`companion-profiles.md`](companion-profiles.md), *Deleting*). A deletion takes effect at once, without `Save`, and keeps the other unsaved edits. Below the drop-down the line `Deleted profiles whose history the server has not deleted yet: <n>` shows while deletions with the history wait for the server.
+- `Rename profile…` stands right of `New profile…` and renames the profile selected in the drop-down in the dialog `Rename profile` (the label `New name of the profile <name>`, a box holding the current name, `Rename` and `Cancel`); it is disabled, with the tooltip `Live cannot be renamed.`, while the selection is `Live` ([`companion-profiles.md`](companion-profiles.md), *Renaming*). A rename takes effect at once, without `Save`, and keeps the other unsaved edits; a name `CheckRename` refuses shows its message in the dialog, which stays open.
+- `Delete profile…` stands right of `Rename profile…` and deletes the profile selected in the drop-down after the dialog `Delete profile?` asked; it is disabled, with the tooltip `Live and the active profile cannot be deleted.`, while the selection is `Live` or the active profile ([`companion-profiles.md`](companion-profiles.md), *Deleting*). A deletion takes effect at once, without `Save`, and keeps the other unsaved edits. Below the drop-down the line `Deleted profiles whose history the server has not deleted yet: <n>` shows while deletions with the history wait for the server.
 - `New profile…` shows a name box below the drop-down; saving creates the profile and selects it ([`companion-profiles.md`](companion-profiles.md), *Creating and selecting*).
 - The window shows the file's values and, for a missing key, the default. A mode that is `Off` writes no `mode`.
 
@@ -72,6 +73,9 @@ hours, megabytes, token or game folder is no problem (the default, no token, the
 | new profile name | not equal to another profile's name ignoring case | `A profile of this name exists.` |
 | new profile name | well-formed text without a control character | `The name holds characters that cannot be used.` |
 | new profile name | fewer than 1,000 profiles | `No more profiles can be created.` |
+
+The name in the dialog `Rename profile` takes the rules of the new profile name except this one, with the messages shown in the dialog.
+
 
 - A whole number is written as decimal digits only (`5`, `05`); `5.0`, `"5"`, a sign and white space are refused.
 - The folder checks run on `Save` and when the window opens, off the tray thread; a typed UNC folder is probed over the

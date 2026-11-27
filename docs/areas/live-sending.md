@@ -78,6 +78,7 @@ server) and an operator who reads the log rely on it. The connection rules share
   failed` line is logged and no delay is waited. The server frees the Companion's place only when it ends the old session, so
   a `companionConnected` refusal within 5 seconds of the switch is retried after 250 ms, as part of the switch, with no line
   and no step of the reconnect delays; after those 5 seconds the refusal is handled as in *Reconnect*.
+- A rename of the profile the connection's hello named reconnects as a switch (the same close handshake, `Server: connecting`, no failure line, no delay, the 5-second retry): the new hello names the same identity with the new name, also when that profile is not the active one (a connection for buffered messages). A rename of any other profile keeps the connection. A rename made while no connection is accepted, or while a switch is under way, is in the next hello: it carries the name the list holds when it is built ([`companion-profiles.md`](companion-profiles.md), *Renaming*).
 - Profile deletions the player made wait first: after each accepted hello the Companion sends its waiting deletions before the catalog and the buffer, and drops buffered messages of deleted identities instead of sending them ([`companion-profiles.md`](companion-profiles.md), *Deleting*).
 - A switch costs one reconnect and the catalog check of the new connection (*Catalog*; record 0111). No tick is held for it:
   the messages taken meanwhile wait in the buffer.

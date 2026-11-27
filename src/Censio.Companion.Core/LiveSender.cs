@@ -150,6 +150,16 @@ public sealed class LiveSender : IAsyncDisposable
     private TaskCompletionSource _activeChanged = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     /// <summary>
+    /// The number of renames of a profile.
+    /// </summary>
+    private int _renameVersion;
+
+    /// <summary>
+    /// The completion that the next rename of a profile sets.
+    /// </summary>
+    private TaskCompletionSource _renamed = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    /// <summary>
     /// The completion that the next change of the deleted identities sets.
     /// </summary>
     private TaskCompletionSource _deletionsChanged = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -168,6 +178,16 @@ public sealed class LiveSender : IAsyncDisposable
     /// The number of changes of the active profile the current connection has seen; only the run reads and writes it.
     /// </summary>
     private int _seenActiveVersion;
+
+    /// <summary>
+    /// The number of renames the current connection has seen; only the run reads and writes it.
+    /// </summary>
+    private int _seenRenameVersion;
+
+    /// <summary>
+    /// The name of the profile the hello of the current connection sent; only the run reads and writes it.
+    /// </summary>
+    private string _connectionName = string.Empty;
 
     /// <summary>
     /// Whether the attempt ends with a profile switch; only the run reads and writes it.
@@ -352,6 +372,7 @@ public sealed class LiveSender : IAsyncDisposable
 
         profiles.ActiveChanged += (_, _) => OnActiveChanged();
         profiles.DeletionsChanged += (_, _) => OnDeletionsChanged();
+        profiles.Renamed += (_, _) => OnRenamed();
     }
 
     /// <summary>
@@ -640,6 +661,23 @@ public sealed class LiveSender : IAsyncDisposable
     }
 
     /// <summary>
+    /// Notes a rename of a profile and wakes the send loop.
+    /// </summary>
+    private void OnRenamed()
+    {
+        TaskCompletionSource renamed;
+
+        lock (_lock)
+        {
+            _renameVersion++;
+            renamed = _renamed;
+            _renamed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        }
+
+        renamed.TrySetResult();
+    }
+
+    /// <summary>
     /// Notes a change of the deleted identities and wakes the send loop.
     /// </summary>
     private void OnDeletionsChanged()
@@ -676,6 +714,18 @@ public sealed class LiveSender : IAsyncDisposable
         lock (_lock)
         {
             return (_activeVersion, _activeChanged.Task);
+        }
+    }
+
+    /// <summary>
+    /// Reads the number of renames and the completion of the next one.
+    /// </summary>
+    /// <returns>The number and the completion</returns>
+    private (int Version, Task Changed) GetRenameView()
+    {
+        lock (_lock)
+        {
+            return (_renameVersion, _renamed.Task);
         }
     }
 
@@ -994,15 +1044,7 @@ public sealed class LiveSender : IAsyncDisposable
 
             client.Failed += (_, problem) => failed.TrySetResult(problem);
 
-            var profile = ChooseHelloProfile();
-            var hello = new ContractHello
-                        {
-                            Token = token,
-                            CompanionVersion = _companionVersion,
-                            ProfileId = profile.Id,
-                            ProfileName = profile.Name
-                        };
-            var refusal = await client.OpenAsync(_target.Address, hello, cancellationToken).ConfigureAwait(false);
+            var refusal = await client.OpenAsync(_target.Address, CreateHello(token), cancellationToken).ConfigureAwait(false);
 
             if (refusal is not null)
             {
@@ -1012,16 +1054,7 @@ public sealed class LiveSender : IAsyncDisposable
             accepted = _timeProvider.GetUtcNow();
             _switchedAt = null;
 
-            lock (_lock)
-            {
-                _notify = client.NotifyState;
-
-                if (_state is { } known)
-                {
-                    client.NotifyState(known);
-                }
-            }
-
+            AttachStateNotification(client);
             SetStatus(LiveSendState.Connected, null);
             CompanionLog.LiveSendConnected(_logger);
 
@@ -1061,7 +1094,42 @@ public sealed class LiveSender : IAsyncDisposable
     }
 
     /// <summary>
-    /// Chooses the profile the hello names and notes the changes of the active profile the connection starts with.
+    /// Creates the hello of a connection for the profile that <see cref="ChooseHelloProfile" /> chooses.
+    /// </summary>
+    /// <param name="token">The token, or <see langword="null" /> when the target needs none</param>
+    /// <returns>The hello</returns>
+    private ContractHello CreateHello(string? token)
+    {
+        var profile = ChooseHelloProfile();
+
+        return new ContractHello
+               {
+                   Token = token,
+                   CompanionVersion = _companionVersion,
+                   ProfileId = profile.Id,
+                   ProfileName = profile.Name
+               };
+    }
+
+    /// <summary>
+    /// Lets the client notify the known state of the game and sends that state at once.
+    /// </summary>
+    /// <param name="client">The client of the accepted connection</param>
+    private void AttachStateNotification(IngestClient client)
+    {
+        lock (_lock)
+        {
+            _notify = client.NotifyState;
+
+            if (_state is { } known)
+            {
+                client.NotifyState(known);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Chooses the profile the hello names and notes the changes of the active profile and the renames the connection starts with.
     /// </summary>
     /// <returns>The profile</returns>
     private CompanionProfile ChooseHelloProfile()
@@ -1072,43 +1140,78 @@ public sealed class LiveSender : IAsyncDisposable
         {
             profiles = _profiles;
             _seenActiveVersion = _activeVersion;
+            _seenRenameVersion = _renameVersion;
         }
 
-        if (profiles is not null && _helloProfile is { } named && (profiles.IsDeleted(named.Id) || profiles.NameOf(named.Id) is null))
+        CompanionProfile profile;
+
+        if (profiles is null)
+        {
+            profile = CompanionProfile.Live;
+        }
+        else if (_helloProfile is { } named && profiles.IsDeleted(named.Id) == false && profiles.NameOf(named.Id) is { } name)
+        {
+            profile = new CompanionProfile
+                      {
+                          Id = named.Id,
+                          Name = name
+                      };
+            _helloProfile = profile;
+        }
+        else
         {
             _helloProfile = null;
+            profile = profiles.Active;
         }
 
-        var profile = profiles is null ? CompanionProfile.Live : _helloProfile ?? profiles.Active;
-
         _connectionProfile = profile.Id;
+        _connectionName = profile.Name;
 
         return profile;
     }
 
     /// <summary>
-    /// Decides whether a change of the active profile ends the connection.
+    /// Decides whether a change of the active profile or a rename ends the connection.
     /// </summary>
-    /// <param name="version">The number of changes of the active profile</param>
-    /// <returns><see langword="true" /> when the connection names another profile than the active one</returns>
-    private bool IsSwitchDue(int version)
+    /// <param name="activeVersion">The number of changes of the active profile</param>
+    /// <param name="renameVersion">The number of renames</param>
+    /// <returns><see langword="true" /> when the connection names another profile than the active one, or the connection's profile has another name</returns>
+    private bool IsSwitchDue(int activeVersion, int renameVersion)
     {
-        if (_profiles is not { } profiles || version == _seenActiveVersion)
+        if (_profiles is not { } profiles)
         {
             return false;
         }
 
-        _seenActiveVersion = version;
+        var isActiveMoved = activeVersion != _seenActiveVersion;
+        var isRenameMoved = renameVersion != _seenRenameVersion;
 
-        if (profiles.Active.Id == _connectionProfile)
+        _seenActiveVersion = activeVersion;
+        _seenRenameVersion = renameVersion;
+
+        if (isActiveMoved && profiles.Active.Id != _connectionProfile)
         {
-            return false;
+            _helloProfile = null;
+            _isSwitching = true;
+
+            return true;
         }
 
-        _helloProfile = null;
-        _isSwitching = true;
+        if (isRenameMoved && profiles.NameOf(_connectionProfile) is { } name && string.Equals(name, _connectionName, StringComparison.Ordinal) == false)
+        {
+            _helloProfile = profiles.Active.Id == _connectionProfile
+                                ? null
+                                : new CompanionProfile
+                                  {
+                                      Id = _connectionProfile,
+                                      Name = name
+                                  };
+            _isSwitching = true;
 
-        return true;
+            return true;
+        }
+
+        return false;
     }
 
     /// <summary>
@@ -1149,7 +1252,7 @@ public sealed class LiveSender : IAsyncDisposable
                 continue;
             }
 
-            var next = await NextOrFailureAsync(failed, view.Changed, turn.ActiveChanged, turn.DeletionsChanged, cancellationToken).ConfigureAwait(false);
+            var next = await NextOrFailureAsync(failed, view.Changed, turn.ActiveChanged, turn.RenameChanged, turn.DeletionsChanged, cancellationToken).ConfigureAwait(false);
 
             if (next is null)
             {
@@ -1186,24 +1289,25 @@ public sealed class LiveSender : IAsyncDisposable
     /// <param name="failed">The completion that the failure of the client sets</param>
     /// <param name="tried">The deletions tried on this connection</param>
     /// <param name="cancellationToken">The token that ends the run</param>
-    /// <returns>The problem that ended the connection, and the completions of the next change of the active profile and of the deleted identities</returns>
-    private async Task<(ReplaySendProblemKind? Problem, Task ActiveChanged, Task DeletionsChanged)> StartTurnAsync(IngestClient client, TaskCompletionSource<ReplaySendProblemKind> failed, HashSet<Guid> tried, CancellationToken cancellationToken)
+    /// <returns>The problem that ended the connection, and the completions of the next change of the active profile, of the next rename and of the deleted identities</returns>
+    private async Task<(ReplaySendProblemKind? Problem, Task ActiveChanged, Task RenameChanged, Task DeletionsChanged)> StartTurnAsync(IngestClient client, TaskCompletionSource<ReplaySendProblemKind> failed, HashSet<Guid> tried, CancellationToken cancellationToken)
     {
         var (activeVersion, activeChanged) = GetActiveView();
+        var (renameVersion, renameChanged) = GetRenameView();
 
         var deletionsChanged = GetDeletionsView();
 
         if (failed.Task.IsCompleted)
         {
-            return (failed.Task.Result, activeChanged, deletionsChanged);
+            return (failed.Task.Result, activeChanged, renameChanged, deletionsChanged);
         }
 
-        if (IsSwitchDue(activeVersion))
+        if (IsSwitchDue(activeVersion, renameVersion))
         {
-            return (ReplaySendProblemKind.ConnectionLost, activeChanged, deletionsChanged);
+            return (ReplaySendProblemKind.ConnectionLost, activeChanged, renameChanged, deletionsChanged);
         }
 
-        return (await SendDeletionsAsync(client, tried, cancellationToken).ConfigureAwait(false), activeChanged, deletionsChanged);
+        return (await SendDeletionsAsync(client, tried, cancellationToken).ConfigureAwait(false), activeChanged, renameChanged, deletionsChanged);
     }
 
     /// <summary>
@@ -1483,16 +1587,17 @@ public sealed class LiveSender : IAsyncDisposable
     /// <param name="failed">The completion that the failure of the client sets</param>
     /// <param name="changed">The completion that the next change of the offered catalog sets</param>
     /// <param name="activeChanged">The completion that the next change of the active profile sets</param>
+    /// <param name="renameChanged">The completion that the next rename of a profile sets</param>
     /// <param name="deletionsChanged">The completion that the next change of the deleted identities sets</param>
     /// <param name="cancellationToken">The token that ends the run</param>
     /// <returns>The message, or <see langword="null" /> when the connection failed or the catalog or the active profile changed first</returns>
-    private async Task<LiveBufferEntry?> NextOrFailureAsync(TaskCompletionSource<ReplaySendProblemKind> failed, Task changed, Task activeChanged, Task deletionsChanged, CancellationToken cancellationToken)
+    private async Task<LiveBufferEntry?> NextOrFailureAsync(TaskCompletionSource<ReplaySendProblemKind> failed, Task changed, Task activeChanged, Task renameChanged, Task deletionsChanged, CancellationToken cancellationToken)
     {
         using var waitCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
         var next = _buffer.NextAsync(waitCancellation.Token);
 
-        await Task.WhenAny(next, failed.Task, changed, activeChanged, deletionsChanged).ConfigureAwait(false);
+        await Task.WhenAny(next, failed.Task, changed, activeChanged, renameChanged, deletionsChanged).ConfigureAwait(false);
 
         if (next.IsCompletedSuccessfully)
         {

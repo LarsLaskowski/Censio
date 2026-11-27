@@ -19,7 +19,7 @@ the window itself in [`companion-settings.md`](companion-settings.md).
   active; at the first start, and while the file is missing, it is `Live`.
 - A missing file is the list with `Live` alone, and is valid. The file is written in the background after a change
   (*Writing*) in every mode, also when no live data is sent.
-- Profiles are created, selected and deleted in the Companion (*Deleting*); they are not renamed. A profile's history is
+- Profiles are created, selected, renamed (*Renaming*) and deleted in the Companion (*Deleting*). A profile's history is
   deleted on the pages ([`history-deletion.md`](history-deletion.md)); the list of the Companion keeps the profile.
 
 ### Creating and selecting
@@ -37,6 +37,27 @@ the window itself in [`companion-settings.md`](companion-settings.md).
   longer knows is sent on the current connection, and the server creates it without a name.
 - The pages list a profile under the name the hello gave; a profile made and used offline appears with its name after the
   next connection.
+
+### Renaming
+
+- In the settings window `Rename profile…` renames the profile selected in the drop-down in the dialog `Rename profile`
+  ([`companion-settings.md`](companion-settings.md), *Fields*). `CompanionProfiles.IsRenamable` is the one rule: the
+  identity is in the list and is not `Live`; the active profile can be renamed. `Rename` throws `ArgumentException` for
+  any other identity and for a name `CheckRename` refuses, which the dialog and the session check first, and then changes
+  nothing.
+- The name takes the rules of a new name (*Creating and selecting*) except the count: `CheckRename` gives the problem of
+  `CheckName`, `NameExists` for the name of another profile ignoring case, and never `ProfilesFull`. The profile's own
+  name in another letter case is accepted.
+- A rename to the identical name (ordinal) returns `false` and changes nothing: no write, no event, no log line, the
+  pending notice stays. Any other rename gives the profile the new name, keeps its identity, its place in the list, its
+  figure links and whether it is active, clears a pending notice, writes the file (*Writing*), logs `Profile renamed`
+  (Information; neither a name nor an identity) and raises `Renamed` once. It takes effect at once, without `Save`.
+- The pages learn the name only from a hello ([`live-sending.md`](live-sending.md), *Profiles on the connection*): a
+  Companion connected under the renamed profile reconnects once as for a switch and names the new name; otherwise the
+  next hello that names the profile does, so a rename made offline reaches the server with the next accepted connection.
+  Messages that wait in the buffer carry only the identity and are sent under the name the list holds when their hello is
+  built. The tray menu's `Server:` line shows the name at its next opening.
+- Merging two profiles is not done ([`decisions/0117-profile-renamed-in-a-dialog-at-once-the-connection-reopened-with-the-new-name.md`](../decisions/0117-profile-renamed-in-a-dialog-at-once-the-connection-reopened-with-the-new-name.md)).
 
 ### Deleting
 
@@ -89,7 +110,7 @@ the window itself in [`companion-settings.md`](companion-settings.md).
   (the time asked of Windows). A click opens the settings window as the menu entry does.
 - A notice never holds a tick: ticks go on to the active profile `B`. A notice that is ignored links the figure to `B`; a
   switch in the window during the session moves the link to the newly selected profile.
-- A notice stays pending until the session ends or a profile is selected or created. Each session start sets it (to none when the figure shows no notice, and with a profiles file that cannot be used); `ObserveSessionEnd`, a selection and a creation clear it. While it is pending the tray menu shows it as an enabled entry with the text of the notification, directly above `Settings…`; a click opens the settings window. Windows may hold the notification back while a game runs full screen (Focus assist, *Do not disturb*), so the entry keeps the notice. The tray icon shows its *notice* look meanwhile (blue square with a white `i`), unless the state is a problem; it is refreshed when the pending notice changes ([`companion.md`](companion.md)).
+- A notice stays pending until the session ends or a profile is selected, created or renamed. Each session start sets it (to none when the figure shows no notice, and with a profiles file that cannot be used); `ObserveSessionEnd`, a selection, a creation and a rename that changes a name clear it. While it is pending the tray menu shows it as an enabled entry with the text of the notification, directly above `Settings…`; a click opens the settings window. Windows may hold the notification back while a game runs full screen (Focus assist, *Do not disturb*), so the entry keeps the notice. The tray icon shows its *notice* look meanwhile (blue square with a white `i`), unless the state is a problem; it is refreshed when the pending notice changes ([`companion.md`](companion.md)).
 - The log says `Profile notice raised: <kind>` when the notice is raised, before it goes to the tray, and `Profile notice passed to Windows: <kind>` when the tray icon passed the notification to Windows (not when the icon is already disposed); the kind is `LastUsedWithOther` or `NewFigure`, never the profile name or the text ([`companion-log.md`](companion-log.md)).
 - The notification and the click are not verified on a Windows machine yet (*Limits and errors*).
 
@@ -144,6 +165,7 @@ the window itself in [`companion-settings.md`](companion-settings.md).
 ## Related decisions
 
 - [`decisions/0111-profiles-kept-by-the-companion-each-hello-names-the-next-messages-profile.md`](../decisions/0111-profiles-kept-by-the-companion-each-hello-names-the-next-messages-profile.md) — the list is kept locally, each hello names the next message's profile.
+- [`decisions/0117-profile-renamed-in-a-dialog-at-once-the-connection-reopened-with-the-new-name.md`](../decisions/0117-profile-renamed-in-a-dialog-at-once-the-connection-reopened-with-the-new-name.md) — a profile is renamed in a dialog at once, the connection of the renamed profile is reopened with the new name.
 - [`decisions/0041-profile-selected-in-the-companion-figure-name-only-a-hint.md`](../decisions/0041-profile-selected-in-the-companion-figure-name-only-a-hint.md) — the profile is selected in the Companion, the figure name is only a hint.
 
 ## Not here
