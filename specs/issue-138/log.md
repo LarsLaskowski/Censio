@@ -15,3 +15,4 @@ are quoted in full.
 | 2026-11-27 17:45 | 8 Review | Reviewer | VERDICT: BLOCKING 0 \| NON-BLOCKING 1 on 393cadef08384130d5d1b9f7dc3851d3a4562785 — protocol.md:29 marker sentence lacks *observed* (verbatim fix offered) (opus/medium · 46,652 tokens · 6 tool uses · 39 s · 12 in · 3,404 out · 170,396 cache read · 40,320 cache write · 151,904 weighted) |
 | 2026-11-27 17:46 | 7 Gate stamp | Orchestrator | PASS on fe356c5aca2539c8ba94f51bcce72ac6a21f0e73 (tier trivial, verbatim): Format check pass; decision-check.py pass; scope-check.py pass |
 | 2026-11-27 17:46 | 8 Verbatim fix | Orchestrator | verbatim: [NON-BLOCKING, verbatim] docs/protocol.md:26 (commit fe356c5) |
+| 2026-11-27 17:46 | 9 PR approval | Orchestrator | approved by checklist |
