@@ -42,7 +42,8 @@ sent it: GUIDs are raw numbers where the catalog has no name for them; icons are
 - **Area names** (the `Name` column) pass the rule of the log ([`companion-log.md`](companion-log.md)): each control character, format character, line
   separator, paragraph separator (the categories Cc, Cf, Zl, Zp) and unpaired surrogate is shown as one `?`, nothing
   else is changed (combining marks, right-to-left letters and spaces stay as sent), and an area name is never cut, also
-  at the longest pipe string of 255 bytes. Each cell is its own text, so a name cannot reorder another cell.
+  at the longest pipe string of 255 bytes. Each cell is its own text, so a name cannot reorder another cell. A `_` in a
+  name comes from the game and is shown as sent.
 - **Update:** the window follows each closed tick, each change of the status text, and the next local midnight (when
   `Last tick:` changes from `HH:mm:ss` to the dated form). At most one update waits at a time; with ticks closing faster
   than the window shows them (a replay with `--speed max`) intermediate ticks may be skipped and the window always ends
