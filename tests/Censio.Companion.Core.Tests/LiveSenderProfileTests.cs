@@ -1488,12 +1488,14 @@ public sealed class LiveSenderProfileTests : IDisposable
     }
 
     /// <summary>
-    /// A waiting deletion the contract writer refuses, the all-zero identity the profiles file accepts, is logged once and
-    /// stays waiting; the next waiting deletion is still sent and confirmed, and the connection goes on.
+    /// A version-2 profiles file whose deleted list holds the all-zero identity beside a valid waiting one is refused by
+    /// the reader as a whole: no deletion is sent, the contract writer refuses nothing, the hello names <c>Live</c> and a
+    /// tick enqueued after the hello goes out on that connection (issue 254).
     /// </summary>
     /// <returns>A task that completes when the test is done</returns>
     [TestMethod]
-    public async Task LiveSenderProfileDeletionNotWrittenKeepsWaitingAndSendsNext()
+    [TestCategory("AC2")]
+    public async Task LiveSenderProfileAllZeroDeletionFileSendsNoDeletion()
     {
         // Arrange
         var connector = new QueuedIngestConnector();
@@ -1506,30 +1508,27 @@ public sealed class LiveSenderProfileTests : IDisposable
         await File.WriteAllTextAsync(path, $$"""{"version":2,"active":"{{live}}","profiles":[{"id":"{{live}}","name":"Live"}],"figures":[],"deleted":[{"id":"00000000-0000-0000-0000-000000000000","confirmed":false},{"id":"{{valid:D}}","confirmed":false}]}""", TestContext.CancellationToken);
 
         var profiles = CompanionProfiles.Load(path, _profilesLogger);
-        var waitingAtLoad = profiles.WaitingDeletions.ToArray();
         var sender = CreateSender(connector, CreateTimeProvider());
 
         sender.UseProfiles(profiles);
 
         // Act
         StartRun(sender);
-        await AcceptAsync(server);
 
-        var sent = await ReceiveAndAcknowledgeAsync(server);
+        var hello = await AcceptAsync(server);
 
         sender.Enqueue(TickItem(300, 4));
 
         var tick = await ReceiveAndAcknowledgeAsync(server);
 
         // Assert
-        Assert.AreSequenceEqual([Guid.Empty, valid], waitingAtLoad, "The profiles file should load both waiting deletions, the all-zero one first");
-        Assert.AreEqual(valid, Assert.IsInstanceOfType<ContractProfileDeletion>(sent, "The first message after the hello should be the valid deletion").ProfileId, "Only the valid deletion should be sent");
-        Assert.AreEqual(300L, Assert.IsInstanceOfType<ContractTick>(tick, "The message after the deletion should be the tick").GameTime, "The connection should go on after the refused write");
-        Assert.HasCount(1, Lines().Where(line => line == "Live message not sent: the contract writer refused it").ToList(), "The refused write should be logged once");
-        Assert.AreSequenceEqual([Guid.Empty], profiles.WaitingDeletions.ToArray(), "The deletion the writer refused should keep waiting, the valid one should not");
-        Assert.IsTrue(profiles.IsDeleted(valid), "The confirmed identity should stay on the list");
-        Assert.AreSequenceEqual([(LogLevel.Information, "Profile deletion confirmed by the server")], DeletionLines(), "Only the valid deletion should be confirmed");
-        Assert.AreEqual(1, connector.AttemptCount, "The refused write should not end the connection");
+        Assert.IsTrue(profiles.IsFileInvalid, "The file with the all-zero identity should be refused as a whole");
+        Assert.IsEmpty(profiles.WaitingDeletions, "No deletion should wait after the refused file");
+        Assert.AreEqual(LiveSender.ProfileId, hello.ProfileId, "The hello should name Live");
+        Assert.AreEqual(300L, Assert.IsInstanceOfType<ContractTick>(tick, "The first message after the hello should be the tick, no deletion").GameTime, "The tick should be sent on the connection");
+        Assert.IsEmpty(Lines().Where(line => line == "Live message not sent: the contract writer refused it").ToList(), "The writer should refuse nothing");
+        Assert.IsEmpty(DeletionLines(), "No deletion should be sent or confirmed");
+        Assert.AreEqual(1, connector.AttemptCount, "The tick should go out on the first connection");
     }
 
     /// <summary>
