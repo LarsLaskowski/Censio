@@ -53,7 +53,7 @@ the server rely on it. The retention, the fold and the reads of the history are 
      by the later stamp; an entry of the same good under it adds every count and sum, its entry count included; a pair of the
      same kind and GUID adds its amount sum; what the kept point lacks moves over, and the folded tick identities of the
      source's point move to the kept point, so a resent folded tick stays recognised. The source's remaining rows of the
-     point are deleted. Only the pairs of point numbers of the shared hours are read into memory, two numbers per hour.
+     point are deleted. The pairs of point numbers of the shared hours are kept in a temporary table of the transaction, two numbers per hour; no row is read into the server's memory.
   5. Trade routes: the source's set replaces the target's when the target has none or the source's receive time is later;
      otherwise (equal receive times included) the target's stays and the source's is deleted.
   6. The source's profile row is deleted.
