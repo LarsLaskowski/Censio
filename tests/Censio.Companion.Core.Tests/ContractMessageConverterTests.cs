@@ -234,6 +234,52 @@ public sealed class ContractMessageConverterTests
     }
 
     /// <summary>
+    /// A message written again under another profile differs from the original only in its profile: its message identity,
+    /// receive time and every other value stay, so the server sees a resent message; a status carries no profile and gives
+    /// <see langword="null" /> (spec AC4).
+    /// </summary>
+    /// <param name="kind">The kind of the message: tick, tradeRoutes, sessionStart, sessionEnd or status</param>
+    [TestMethod]
+    [TestCategory("AC4")]
+    [DataRow("tick", DisplayName = "Tick")]
+    [DataRow("tradeRoutes", DisplayName = "Trade routes")]
+    [DataRow("sessionStart", DisplayName = "Session start")]
+    [DataRow("sessionEnd", DisplayName = "Session end")]
+    [DataRow("status", DisplayName = "Status")]
+    public void ContractMessageConverterWithProfileReplacesOnlyProfile(string kind)
+    {
+        // Arrange
+        var other = Guid.Parse("bbbbbbbb-cccc-4ddd-8eee-ffffffffffff");
+        ContractMessage message = kind switch
+                                  {
+                                      "tick" => ContractMessageConverter.ToTick(CreateFullTick(), _profile),
+                                      "tradeRoutes" => ContractMessageConverter.ToTradeRoutes(CreateTradeRoutes(), _profile, _time),
+                                      "sessionStart" => ContractMessageConverter.ToSessionStart(_profile, _time),
+                                      "sessionEnd" => ContractMessageConverter.ToSessionEnd(_profile, _time),
+                                      _ => ContractMessageConverter.ToStatus(PipeConnectionState.Receiving)
+                                  };
+
+        // Act
+        var result = ContractMessageConverter.WithProfile(message, other);
+
+        // Assert
+        if (kind == "status")
+        {
+            Assert.IsNull(result, "A status carries no profile and should give no message");
+
+            return;
+        }
+
+        Assert.IsNotNull(result, $"The message should be written again under the profile: {kind}");
+        Assert.AreEqual(message.GetType(), result.GetType(), $"The kind of the message should stay: {kind}");
+
+        var expected = WrittenText(message).Replace(_profile.ToString("D"), other.ToString("D"), StringComparison.Ordinal);
+
+        Assert.AreNotEqual(expected, WrittenText(message), $"The original should name its profile, or the comparison proves nothing: {kind}");
+        Assert.AreEqual(expected, WrittenText(result), $"Only the profile should change, the message identity and every value stay: {kind}");
+    }
+
+    /// <summary>
     /// Writes a message and reads it back, asserting neither step refuses it.
     /// </summary>
     /// <typeparam name="T">The expected message type</typeparam>
@@ -510,6 +556,16 @@ public sealed class ContractMessageConverterTests
     private static string DescribeContractRoutes(ContractTradeRoutes message)
     {
         return string.Join(";", message.Routes.Select(route => $"{route.Id}/{route.Name.Length}:{route.Name}/{route.Folder.Length}:{route.Folder}/{route.MajorProblems},{route.MinorProblems},{route.Ships},{route.LostShips}[{string.Join(" ", route.Stations.Select(station => $"{station.SessionGuid}/{station.IslandId}/{station.AreaIndex}"))}]"));
+    }
+
+    /// <summary>
+    /// Writes a message as the contract writer does.
+    /// </summary>
+    /// <param name="message">The message</param>
+    /// <returns>The JSON text</returns>
+    private static string WrittenText(ContractMessage message)
+    {
+        return System.Text.Encoding.UTF8.GetString(ContractWriter.Write(message).Utf8Json.Span);
     }
 
     /// <summary>
