@@ -173,6 +173,15 @@ internal sealed class ContractRules
                 }
                 break;
 
+            case ContractProfileMerge merge:
+                {
+                    CheckIdentity(merge.Id);
+                    CheckIdentity(merge.ProfileId);
+                    CheckIdentity(merge.TargetProfileId);
+                    Require(merge.ProfileId != merge.TargetProfileId);
+                }
+                break;
+
             case ContractStatus status:
                 {
                     Require(Enum.IsDefined(status.PipeState));

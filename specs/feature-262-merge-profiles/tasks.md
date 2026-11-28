@@ -6,7 +6,7 @@ Plan: [plan.md](plan.md)
 | - | ----- | ---- | ----- | -------- | ---------- | ----- | ---- |
 | 1 | G1 | Skeleton: `ContractProfileMerge` (`Id`, `ProfileId`, `TargetProfileId`, `Type`), `ContractMessageType.ProfileMerge` | `src/Censio.Contracts/ContractProfileMerge.cs`, `src/Censio.Contracts/ContractMessageType.cs` | AC6 | — | Dev | [x] |
 | 2 | G1 | Tests first: reader and writer of `profileMerge` | `tests/Censio.Contracts.Tests/ContractReaderTests.cs`, `tests/Censio.Contracts.Tests/ContractWriterTests.cs` | AC6 | 1 | Tester | [x] |
-| 3 | G1 | Implement: rules, reader, writer, JSON context | `src/Censio.Contracts/` | AC6 | 2 | Dev | [ ] |
+| 3 | G1 | Implement: rules, reader, writer, JSON context | `src/Censio.Contracts/` | AC6 | 2 | Dev | [x] |
 | 4 | G2 | Skeleton: `MergeProfileAsync` of `ServerStore`, `ServerState`, `HistoryRetention` | `src/Censio.Server.Data/ServerStore.cs`, `src/Censio.Server/ServerState.cs`, `src/Censio.Server/HistoryRetention.cs` | AC7, AC8, AC9 | 3 | Dev | [ ] |
 | 5 | G2 | Tests first: store, state, retention, ingest, pages, end to end; adapt `IngestClient` | `tests/Censio.Server.Data.Tests/ServerStoreMergeTests.cs`, `tests/Censio.Server.Tests/` | AC7, AC8, AC9 | 4 | Tester | [ ] |
 | 6 | G2 | Implement: the merge transaction with `HourlyPointMerge`, the shared re-read, logs, `IngestSession` case | `src/Censio.Server.Data/`, `src/Censio.Server/` | AC7, AC8, AC9 | 5 | Dev | [ ] |
