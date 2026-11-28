@@ -614,5 +614,20 @@ public static partial class CompanionLog
     [LoggerMessage(Level = LogLevel.Warning, Message = "Profile deletion refused by the server: {Refusal}")]
     public static partial void ProfileDeletionRefused(ILogger logger, ContractAcknowledgementRefusal refusal);
 
+    /// <summary>
+    /// Logs that the server confirmed the merge of a profile's history.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    [LoggerMessage(Level = LogLevel.Information, Message = "Profile merge confirmed by the server")]
+    public static partial void ProfileMergeConfirmed(ILogger logger);
+
+    /// <summary>
+    /// Logs that the server refused the merge of a profile's history.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    /// <param name="refusal">The refusal</param>
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Profile merge refused by the server: {Refusal}")]
+    public static partial void ProfileMergeRefused(ILogger logger, ContractAcknowledgementRefusal refusal);
+
     #endregion // Methods
 }

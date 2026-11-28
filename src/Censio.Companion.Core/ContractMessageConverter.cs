@@ -123,6 +123,20 @@ public static class ContractMessageConverter
                };
     }
 
+    // Skeleton: removed with the implementation
+#pragma warning disable S1172, RH2003
+    /// <summary>
+    /// Writes a message again under another profile.
+    /// </summary>
+    /// <param name="message">The message</param>
+    /// <param name="profileId">The identity of the profile</param>
+    /// <returns>The message under the profile, or <see langword="null" /> when the message carries no profile</returns>
+    public static ContractMessage? WithProfile(ContractMessage message, Guid profileId)
+    {
+        throw new NotImplementedException();
+    }
+#pragma warning restore S1172, RH2003
+
     /// <summary>
     /// Converts a pipe island into a contract island.
     /// </summary>
