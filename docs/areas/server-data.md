@@ -137,6 +137,8 @@ bit for bit, negative zero included, and a missing value never reads back as zer
   points a fresh tombstone as their profile, so no read by profile returns them and a read of a tick by its identity
   gives none; an unknown profile changes nothing, and the catalog, the icons and the other profiles are untouched. Steps
   of their own then remove the rows ([`history-deletion.md`](history-deletion.md)).
+- **Merging a profile.** One write transaction moves the source's islands, ticks, hourly points and trade routes to the target,
+  combines what both hold and removes the source's row; no tombstone is made ([`history-deletion.md`](history-deletion.md), *Merging a profile*).
 - **Catalog.** Storing a catalog replaces an earlier one; it reads back byte for byte with its identity.
 - **Icons.** Storing an icon whose reference is stored changes nothing and is reported as already stored. The query for
   missing icons takes a list of references and returns those with no stored icon, each once, ordinally sorted. It passes

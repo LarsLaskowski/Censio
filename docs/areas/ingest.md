@@ -118,6 +118,7 @@ first:
   the other types the list is empty. A later catalog upload replaces the earlier one, whatever its age.
 - A session start or session end the reader accepts is answered the same way and stores nothing.
 - A profile deletion the reader accepts deletes the history of its `profileId` as the pages' button does ([`history-deletion.md`](history-deletion.md), record 0116): when the deletion is done, or the profile is not stored, the message is answered like any stored one. A failed deletion is not acknowledged: the connection is closed with 1011 and an empty reason, as for a message whose storing fails, without a line of its own, since the retention job logs its own warning; the Companion keeps the deletion waiting and sends it again.
+- A profile merge the reader accepts moves the history of its `profileId` into its `targetProfileId` ([`history-deletion.md`](history-deletion.md), *Merging a profile*, record 0119) and is answered and closed on failure exactly as a deletion is: done, or the source not stored, is acknowledged; a failed merge closes the connection with 1011 and the Companion sends it again.
 - A message whose storing fails (disk full, file removed) is not acknowledged: the connection is closed with 1011 and an
   empty reason, the error line of *Log lines* is logged and the message counts as refused. The Companion reconnects and
   resends it.
@@ -195,6 +196,7 @@ reply (the cases of *The hello*, step 1 and 3) is not logged.
   It was so before the limits and no bound is added (record 0082); rotating the token ends it.
 - **Plain text.** The token and the data cross the network unencrypted unless a reverse proxy terminates TLS
   (`SECURITY.md`, record 0006).
+- **Merge by a token holder.** A Companion with the token (or anyone, with the token off) can merge the history of any profile into any identity, also one the server does not know; a merge of a stored source writes one log line and re-reads the profile list, so a pair of ticks and merges grows the log by one line per pair without a bound.
 - **Deletion by a token holder.** A Companion with the token (or anyone, with the token off) can delete the history of any profile by its identity, and each deletion of a stored profile writes one log line, re-reads the profile list and asks for a sweep, so a tick of a new profile followed by its deletion grows the log by one line per pair without a bound.
 - **Growth by a token holder.** Every stored icon and profile stays, a tick for 7 days and then as hourly rows ([`history.md`](history.md)): a Companion with the token (or anyone, with the token off) can grow the database file, the profile list and a profile's island list (up to 256 new islands per tick) without a bound; the server holds those lists in memory.
 
