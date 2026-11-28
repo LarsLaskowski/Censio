@@ -178,4 +178,6 @@ once in the [area document](../areas/README.md) of the record's area, and the re
 | [0115](0115-profile-deleted-in-the-companion-history-on-the-server-by-the-players-choice.md) | A profile is deleted in the Companion, its history on the server only by the player's choice, and its identity filters the buffer | Accepted | 2026-11-26 |
 | [0116](0116-history-deleted-through-the-ingest-connection-with-the-token.md) | A profile's history is also deleted through the ingest connection, after a hello with the token | Accepted | 2026-11-26 |
 | [0117](0117-profile-renamed-in-a-dialog-at-once-the-connection-reopened-with-the-new-name.md) | A profile is renamed in a dialog of the settings window at once, and a live connection under it is reopened with the new name | Accepted | 2026-11-27 |
+| [0118](0118-profile-merged-in-the-companion-one-ordered-queue-with-the-deletions.md) | A profile is merged into another in the Companion, the merge waits in one ordered queue with the deletions, and buffered messages follow it | Accepted | 2026-11-28 |
+| [0119](0119-history-merged-through-the-ingest-connection-in-one-transaction.md) | A profile's history is merged into another through the ingest connection, in one write transaction | Accepted | 2026-11-28 |
 <!-- project:end index -->

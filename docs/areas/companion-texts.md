@@ -176,6 +176,7 @@ The pattern `{0} (profile {1})` ends every `Server:` line of a live run: `{0}` i
 | `Name of the new profile` | `Name des neuen Profils` |
 | `Rename profile…` | `Profil umbenennen…` |
 | `Delete profile…` | `Profil löschen…` |
+| `Merge profile…` | `Profil zusammenführen…` |
 | `Start with Windows` | `Mit Windows starten` |
 | `Language` | `Sprache` |
 | `Save` | `Speichern` |
@@ -202,9 +203,22 @@ The pattern `{0} (profile {1})` ends every `Server:` line of a live run: `{0}` i
 | `Delete profile?` | `Profil löschen?` |
 | `The profile {0} is removed from this Companion, with the figures linked to it.` | `Das Profil {0} wird aus diesem Companion entfernt, mit den Figuren, die mit ihm verknüpft sind.` |
 | `Also delete its history on the server` | `Auch seinen Verlauf auf dem Server löschen` |
-| `1,000 deletions already wait for the server.` | `Schon 1.000 Löschungen warten auf den Server.` |
+| `1,000 changes already wait for the server.` | `Schon 1.000 Änderungen warten auf den Server.` |
 | `Delete` | `Löschen` |
 | `Deleted profiles whose history the server has not deleted yet: {0}` | `Gelöschte Profile, deren Verlauf der Server noch nicht gelöscht hat: {0}` |
+
+#### Profile merging
+
+`Merge profile…` is in the table above. `Cancel` of the dialog is `CancelText`. The queue-full text of the dialog `Delete profile?` (above) is the one shown in this dialog.
+
+| English | German |
+| ------- | ------ |
+| `Live and the active profile cannot be merged into another.` | `Live und das aktive Profil können nicht in ein anderes Profil überführt werden.` |
+| `Merge profile` | `Profil zusammenführen` |
+| `Move the profile {0} into:` | `Das Profil {0} überführen in:` |
+| `The profile {0} is removed from this Companion; its figures and its history on the server move to the profile chosen. This cannot be undone.` | `Das Profil {0} wird aus diesem Companion entfernt; seine Figuren und sein Verlauf auf dem Server gehen auf das gewählte Profil über. Das lässt sich nicht rückgängig machen.` |
+| `Merge` | `Zusammenführen` |
+| `Merged profiles whose history the server has not moved yet: {0}` | `Zusammengeführte Profile, deren Verlauf der Server noch nicht übernommen hat: {0}` |
 
 #### Messages below the fields
 

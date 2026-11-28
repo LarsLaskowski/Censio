@@ -34,7 +34,8 @@ as the connection that named it lasts. The Companion may be offline, in mode `Of
    hello would send to the server again.
 7. **A rename to another profile's name merges the two** — merging moves one history into another on the server (ticks,
    hourly sums, trade routes, the held state) and needs a contract message and a server operation of its own; the
-   names stay distinct ignoring case, and merging is left to a follow-up issue.
+   names stay distinct ignoring case, and merging is left to a follow-up issue (record
+   [0118](0118-profile-merged-in-the-companion-one-ordered-queue-with-the-deletions.md)).
 
 ## Decision
 

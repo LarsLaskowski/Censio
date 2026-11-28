@@ -32,7 +32,7 @@ English and German. The sparklines and trend arrows of the tables are in [`web-t
   tick lacks, from the history in the range.
 - The good segment of the address is parsed like the session segment: an integer of at most ten ASCII digits with an
   optional leading minus. An address whose profile, island or good segment is malformed, or whose profile or island is
-  unknown, shows `Not found.` as the other data pages do; so does a profile deleted while the page is open. A well-formed
+  unknown, shows `Not found.` as the other data pages do; so does a profile deleted or merged while the page is open. A well-formed
   good the island never carried opens its page with the empty-chart text (*States of a chart*).
 - **The controls** (`TrendControls`) are one row above the charts of a good's page and under the heading `Overview` of an
   island's page: first a group of four toggle buttons for the range (accessible name `Period` / `Zeitraum`), then a group of

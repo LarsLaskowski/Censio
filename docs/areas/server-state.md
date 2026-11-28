@@ -98,6 +98,16 @@ itself is in [`server-data.md`](server-data.md), what the ingest answers in [`in
 - A tick or a trade-routes message of the deleted profile that arrives later creates it again without a name
   ([`history-deletion.md`](history-deletion.md)); the deletion has removed its trade routes with the rest.
 
+### Merging profiles
+
+- A merge ([`history-deletion.md`](history-deletion.md), *Merging a profile*) takes the write gate and, once the store reports it
+  done, reads the profiles as a deletion does. The source is neither listed, held nor marked, and the pages treat it as a
+  deleted profile (`Not found.`); the target stays listed and its held state is read again, so its pages show both
+  histories without a reload. The followers are told that the source and the target changed and that the target's trade
+  routes did. A source that is gone changes nothing and tells no one.
+- When that read fails, the error line of *Logging* is logged, the source is dropped from the list, the held states and the
+  marks, and the target from the held states and the marks only: it stays listed and is read on demand until its next tick.
+
 ### Catalog
 
 - The server keeps one catalog, the one last uploaded, for every profile; an older upload replaces a newer one.

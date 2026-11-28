@@ -112,11 +112,11 @@ series read.
   clean-up of a deleted profile ([`history-deletion.md`](history-deletion.md), *Deleting a profile*) waits for the part in progress and lets none start until it has
   truncated the write-ahead log. On the in-memory database every transaction also takes the write gate, so the ingest waits
   at most for one part (*Measurements*).
-- **A fold or a deletion between two parts.** A fold can remove a tick whose time a read already holds. The tick's point then
+- **A fold, a deletion or a merge between two parts.** A fold can remove a tick whose time a read already holds. The tick's point then
   has no value (a gap in the drawing), and the hourly point that now holds the tick was read in an earlier part, or did not
   exist when the times were read, so it does not count it: the drawing misses the tick and never shows it twice. This
   concerns only a profile whose range reaches back 7 days (idle, or a replayed old recording), and the next read draws
-  the hour as one mean. The points of a profile deleted between two parts have no value in the same way.
+  the hour as one mean. The points of a profile deleted between two parts have no value in the same way; the hour of a profile merged between two parts may be drawn partly from the merged history and is drawn whole by the next read.
 
 ### Retention
 

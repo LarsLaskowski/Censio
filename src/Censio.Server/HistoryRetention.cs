@@ -170,6 +170,35 @@ public sealed partial class HistoryRetention : IDisposable
     }
 
     /// <summary>
+    /// Merges the history of a profile into another profile's; it asks for no sweep, since no row is hidden.
+    /// </summary>
+    /// <param name="profileId">The identity of the profile whose history is moved (the source)</param>
+    /// <param name="targetProfileId">The identity of the profile that receives the history</param>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>The outcome</returns>
+    public async Task<HistoryOutcome> MergeProfileAsync(Guid profileId, Guid targetProfileId, CancellationToken cancellationToken)
+    {
+        var result = await _state.MergeProfileAsync(profileId, targetProfileId, cancellationToken).ConfigureAwait(false);
+
+        switch (result.Outcome)
+        {
+            case HistoryOutcome.Done:
+                {
+                    LogMerged(_logger);
+                }
+                break;
+
+            case HistoryOutcome.Failed:
+                {
+                    LogMergeFailed(_logger, result.Failure!);
+                }
+                break;
+        }
+
+        return result.Outcome;
+    }
+
+    /// <summary>
     /// Logs the result of a run that folded ticks.
     /// </summary>
     /// <param name="logger">The logger</param>
@@ -200,6 +229,21 @@ public sealed partial class HistoryRetention : IDisposable
     /// <param name="exception">The exception behind the failure</param>
     [LoggerMessage(Level = LogLevel.Warning, Message = "The history of a profile could not be deleted.")]
     private static partial void LogDeleteFailed(ILogger logger, Exception exception);
+
+    /// <summary>
+    /// Logs a merge whose rows are moved.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    [LoggerMessage(Level = LogLevel.Information, Message = "The history of a profile was merged into another.")]
+    private static partial void LogMerged(ILogger logger);
+
+    /// <summary>
+    /// Logs a failed merge.
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    /// <param name="exception">The exception behind the failure</param>
+    [LoggerMessage(Level = LogLevel.Warning, Message = "The history of a profile could not be merged into another.")]
+    private static partial void LogMergeFailed(ILogger logger, Exception exception);
 
     /// <summary>
     /// Logs a finished clean-up.

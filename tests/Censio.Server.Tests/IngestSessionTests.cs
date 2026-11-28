@@ -134,6 +134,16 @@ public sealed class IngestSessionTests : IDisposable
     private const string HistoryDeleteFailedLine = "The history of a profile could not be deleted.";
 
     /// <summary>
+    /// The line the retention logs for a merge that is done.
+    /// </summary>
+    private const string HistoryMergedLine = "The history of a profile was merged into another.";
+
+    /// <summary>
+    /// The line the retention logs for a merge that failed.
+    /// </summary>
+    private const string HistoryMergeFailedLine = "The history of a profile could not be merged into another.";
+
+    /// <summary>
     /// The statement that removes the trigger of <see cref="FailProfilesSql" />.
     /// </summary>
     private const string DropFailProfilesSql = "DROP TRIGGER \"FailProfiles\";";
@@ -1720,6 +1730,101 @@ public sealed class IngestSessionTests : IDisposable
         Assert.IsEmpty(_logger.Entries.Where(entry => entry.Level >= LogLevel.Error).ToList(), "The session should log no error of its own");
         Assert.Contains("Companion disconnected; 1 messages accepted, 1 refused.", LogMessages(), "The deletion should be counted as refused");
         Assert.Contains($"{OtherProfile} <no name>", DescribeProfiles(await _store.ListProfilesAsync(TestContext.CancellationToken), null), "The profile should stay stored");
+    }
+
+    /// <summary>
+    /// A profile merge on an accepted connection moves the named profile's history to the target as the retention does
+    /// (the source gone from the store and the state, its tick read under the target, the retention's line logged) and
+    /// is acknowledged by its id without a refusal, counted as accepted; the hello's profile keeps its name (spec AC7).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public async Task IngestSessionProfileMergeMergesAndAcknowledges()
+    {
+        // Arrange
+        string[] messages = [TickOfOtherProfile(Id1), IngestClient.ProfileMerge(Id2, OtherProfile, IngestClient.Profile)];
+
+        // Act
+        var (_, replies) = await RunAcceptedSessionAsync(messages);
+
+        // Assert
+        var expectedProfiles = new[] { $"{IngestClient.Profile} {HelloProfileName}" };
+        var moved = await _store.ReadTickAsync(Guid.Parse(Id1), TestContext.CancellationToken);
+
+        AssertAcknowledgement(replies[0], Id1, null, null, []);
+        AssertAcknowledgement(replies[1], Id2, null, null, []);
+        Assert.AreSequenceEqual(expectedProfiles, DescribeProfiles(await _store.ListProfilesAsync(TestContext.CancellationToken), null), "The store should list only the target, under the hello's name");
+        Assert.AreSequenceEqual(expectedProfiles, DescribeProfiles(_state.Profiles, null), "The state should list only the target, under the hello's name");
+        Assert.AreEqual(Guid.Parse(IngestClient.Profile), moved?.ProfileId, "The merged profile's tick should be read under the target");
+        Assert.AreSequenceEqual(new[] { HistoryMergedLine }, _stateLogger.Entries.Select(entry => entry.Message).ToList(), "The merge should log the retention's line once");
+        Assert.Contains("Companion disconnected; 2 messages accepted, 0 refused.", LogMessages(), "The merge should be counted as accepted");
+        AssertNoMarkerInLog();
+    }
+
+    /// <summary>
+    /// A profile merge of a source the server does not know is acknowledged by its id without a refusal, counted as
+    /// accepted, and changes nothing: the profiles stay and no merge is logged (spec AC7).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public async Task IngestSessionProfileMergeOfUnknownSourceAcknowledged()
+    {
+        // Arrange
+        string[] messages = [IngestClient.ProfileMerge(Id1, UnknownProfile, IngestClient.Profile)];
+
+        // Act
+        var (_, replies) = await RunAcceptedSessionAsync(messages);
+
+        // Assert
+        var expectedProfiles = new[] { $"{IngestClient.Profile} {HelloProfileName}" };
+
+        AssertAcknowledgement(replies[0], Id1, null, null, []);
+        Assert.AreSequenceEqual(expectedProfiles, DescribeProfiles(await _store.ListProfilesAsync(TestContext.CancellationToken), null), "The store should keep the hello's profile and gain none");
+        Assert.AreSequenceEqual(expectedProfiles, DescribeProfiles(_state.Profiles, null), "The state should keep the hello's profile and gain none");
+        Assert.DoesNotContain(HistoryMergedLine, _stateLogger.Entries.Select(entry => entry.Message).ToList(), "Nothing should be logged as merged");
+        Assert.Contains("Companion disconnected; 1 messages accepted, 0 refused.", LogMessages(), "The merge should be counted as accepted");
+    }
+
+    /// <summary>
+    /// A profile merge whose store fails is not acknowledged: the connection is closed with 1011 and an empty reason, the
+    /// retention's warning is the only failure line, the merge counts as refused and the source keeps its history (spec
+    /// AC7).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public async Task IngestSessionProfileMergeFailedCloses1011()
+    {
+        // Arrange
+        await UseDatabaseFileAsync();
+
+        var (run, client, _) = await StartAcceptedSessionAsync();
+
+        await IngestClient.SendAsync(client, TickOfOtherProfile(Id1));
+
+        var (tickReply, _, _) = await IngestClient.ReceiveAsync(client);
+
+        ExecuteOnFile(FailProfileDeleteSql);
+
+        // Act
+        await IngestClient.SendAsync(client, IngestClient.ProfileMerge(Id2, OtherProfile, IngestClient.Profile));
+
+        var (messages, closeStatus, closeDescription) = await IngestClient.ReceiveUntilCloseAsync(client);
+
+        await FinishAsync(client, run);
+
+        // Assert
+        AssertAcknowledgement(tickReply, Id1, null, null, []);
+        Assert.IsEmpty(messages, "The failed merge should not be acknowledged");
+        Assert.AreEqual(WebSocketCloseStatus.InternalServerError, closeStatus, "The connection should be closed with 1011");
+        Assert.AreEqual(string.Empty, closeDescription, "The close should carry an empty reason");
+        Assert.AreSequenceEqual(new[] { HistoryMergeFailedLine }, _stateLogger.Entries.Where(entry => entry.Level >= LogLevel.Warning).Select(entry => entry.Message).ToList(), "The retention should log its warning once");
+        Assert.IsEmpty(_logger.Entries.Where(entry => entry.Level >= LogLevel.Error).ToList(), "The session should log no error of its own");
+        Assert.Contains("Companion disconnected; 1 messages accepted, 1 refused.", LogMessages(), "The merge should be counted as refused");
+        Assert.Contains($"{OtherProfile} <no name>", DescribeProfiles(await _store.ListProfilesAsync(TestContext.CancellationToken), null), "The source should stay stored");
+        Assert.AreEqual(Guid.Parse(OtherProfile), (await _store.ReadTickAsync(Guid.Parse(Id1), TestContext.CancellationToken))?.ProfileId, "The source's tick should stay under the source");
     }
 
     /// <summary>

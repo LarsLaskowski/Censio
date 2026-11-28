@@ -19,7 +19,7 @@ the window itself in [`companion-settings.md`](companion-settings.md).
   active; at the first start, and while the file is missing, it is `Live`.
 - A missing file is the list with `Live` alone, and is valid. The file is written in the background after a change
   (*Writing*) in every mode, also when no live data is sent.
-- Profiles are created, selected, renamed (*Renaming*) and deleted in the Companion (*Deleting*). A profile's history is
+- Profiles are created, selected, renamed (*Renaming*), deleted (*Deleting*) and merged (*Merging*) in the Companion. A profile's history is
   deleted on the pages ([`history-deletion.md`](history-deletion.md)); the list of the Companion keeps the profile.
 
 ### Creating and selecting
@@ -57,7 +57,6 @@ the window itself in [`companion-settings.md`](companion-settings.md).
   next hello that names the profile does, so a rename made offline reaches the server with the next accepted connection.
   Messages that wait in the buffer carry only the identity and are sent under the name the list holds when their hello is
   built. The tray menu's `Server:` line shows the name at its next opening.
-- Merging two profiles is not done ([`decisions/0117-profile-renamed-in-a-dialog-at-once-the-connection-reopened-with-the-new-name.md`](../decisions/0117-profile-renamed-in-a-dialog-at-once-the-connection-reopened-with-the-new-name.md)).
 
 ### Deleting
 
@@ -70,21 +69,56 @@ the window itself in [`companion-settings.md`](companion-settings.md).
 - A deletion removes the profile from the list and every figure link to it (also the link of a session that runs), clears a
   pending notice, writes the file (*Writing*) and logs `Profile deleted` (Information, no name and no identity). The name
   of the deleted profile can be used at once for a new one.
-- With the box ticked the identity also goes on the list of *deleted identities*, oldest first, each *waiting* (the server
-  has not answered) or *confirmed*. At most 1,000 identities are kept. With 1,000 waiting the queue is full: the box is
-  disabled, and `Delete` with the history throws `InvalidOperationException`. A new identity beyond 1,000 kept forgets the
-  oldest confirmed one, never a waiting one.
+- With the box ticked the identity also goes on the list of *removals*, oldest first, each *waiting* (the server
+  has not answered) or *confirmed*; merges (*Merging*) are entries of the same list, so deletions and merges are one
+  sequence in the order the player made them. At most 1,000 entries are kept. With 1,000 waiting the queue is full
+  (`IsDeletionQueueFull` counts the waiting merges too): the box is disabled, and `Delete` with the history throws
+  `InvalidOperationException`. A new entry beyond 1,000 kept forgets the oldest confirmed one, never a waiting one.
+  `WaitingDeletions` lists the waiting deletions only, `WaitingRemovals` every waiting entry in order.
 - A waiting deletion is sent as the message `profileDeletion` ([`contract.md`](contract.md)) by live sending, first after
-  each accepted hello, one at a time, before the catalog and the buffered messages ([`live-sending.md`](live-sending.md)).
+  each accepted hello, one at a time in the order of the sequence, before the catalog and the buffered messages
+  ([`live-sending.md`](live-sending.md)). A removal that cannot be written ends the sending of removals on that
+  connection, so no later entry overtakes it.
   It stays waiting, also across restarts, until the server answers: a connection lost first keeps it waiting. An
   accepted acknowledgement confirms it and logs `Profile deletion confirmed by the server`; a refusal confirms it as well and
   logs `Profile deletion refused by the server: <refusal>` (Warning), since the same message would be refused again. In a
   run that sends no live data nothing is sent, and the deletion waits for a later run that does.
-- Buffered messages of a deleted identity, waiting or confirmed, are dropped instead of sent, counted as dropped
+- Buffered messages of a deleted identity, waiting or confirmed (`IsDeleted`, true for deletion entries only), are dropped instead of sent, counted as dropped
   (`Live messages dropped: <n>`); the hello never names a deleted identity but the active profile. Dropping needs a running
   live sender: with live sending off, the messages stay in the buffer until a later run drops them.
 - The deletion on the pages is another thing: it deletes the server's history and leaves the Companion's list. A profile
   only the server has is not in the Companion's list and cannot be deleted from it.
+
+### Merging
+
+- In the settings window `Merge profile…` merges the profile selected in the drop-down into another one chosen in the
+  dialog `Merge profile` ([`companion-settings.md`](companion-settings.md), *Fields*). `CompanionProfiles.IsMergeable` is
+  the one rule: the source is deletable (*Deleting*: listed, not `Live`, not active) and the target is another listed
+  profile, `Live` and the active profile included. `Merge` throws `ArgumentException` for any other pair and
+  `InvalidOperationException` while 1,000 removals wait; both are prevented by the window and its session, and change
+  nothing.
+- A merge takes effect at once, without `Save` and without a restart, other edits of the open window staying. It removes
+  the source from the list, moves its figure links to the target, clears a pending notice, appends a waiting entry with the
+  source and the target to the list of removals (*Deleting*), writes the file (*Writing*) and logs `Profile merged`
+  (Information; neither a name nor an identity). The target keeps its name and its identity. `WaitingMerges` lists the
+  identities of the waiting merges; the window shows their count below the drop-down.
+- Live sending sends the waiting merge as the message `profileMerge` ([`contract.md`](contract.md)), in the sequence of the
+  deletions (*Deleting*). It stays waiting, also across restarts, until the server answers. An accepted acknowledgement
+  confirms it and logs `Profile merge confirmed by the server`; a refusal confirms it as well and logs `Profile merge
+  refused by the server: <refusal>` (Warning); the list stays merged and the server keeps both profiles. A merge the server
+  already did and is sent again finds the source gone and is acknowledged. In a run that sends no live data it waits for a
+  later run that does.
+- The order matters: `A` merged into `B`, then `B` deleted with its history, then a restart, reaches the server as the
+  merge and then the deletion, so the history of `A` is deleted with that of `B`.
+- A buffered message of a merged identity is sent as a message of the identity `ResolveProfile` gives: it follows the merge
+  entries, waiting or confirmed, through later merges (`A` into `B`, `B` into `C` gives `C`), at most as many steps as
+  there are merge entries, and fails closed beyond them (the message is dropped as one of a deleted identity). A resolved
+  identity that was deleted drops the message; another identity is written into the message again, which keeps its message identity,
+  and no hello names a merged identity. A merge of the identity of the current connection does not reconnect at the
+  acknowledgement: the next message resolves to another profile and switches the connection with a hello naming that
+  profile ([`live-sending.md`](live-sending.md), *Profiles on the connection*). Messages of a merged identity arriving after
+  the server has merged it recreate it unnamed there. `B` deleted without its history: the messages of `A` go under
+  `B`'s identity, which the server lists unnamed if it does not know it.
 
 ### Figure links
 
@@ -122,9 +156,11 @@ the window itself in [`companion-settings.md`](companion-settings.md).
   given one second to write the latest state ([`companion.md`](companion.md), *Tray icon and menu*).
 - The format is `{"version":1,"active":"<id>","profiles":[{"id":"<id>","name":"<name>"}],"figures":[{"figure":"<key>","profile":"<id>"}]}`
   while no identity is deleted, and `"version":2` with a fifth property `"deleted":[{"id":"<id>","confirmed":false}]` otherwise,
-  with the writer's non-ASCII and control characters escaped (`\uXXXX`). The largest file the writer produces is
-  630,718 bytes (1,000 profiles of 64 characters each written as 6-byte escapes, 1,000 figures and 1,000 deleted
-  identities), under the reader's bound.
+  with the writer's non-ASCII and control characters escaped (`\uXXXX`); a merge is written as
+  `{"id":"<id>","target":"<id>","confirmed":false}` in that property order, in the same array in the order the player made
+  the entries, version 2 as before. The largest file the writer produces is 630,718 bytes (1,000 profiles of 64 characters each written as 6-byte escapes,
+  1,000 figures and 1,000 deleted identities) and 678,718 bytes with 1,000 waiting merges (48 bytes more each for the
+  target), under the reader's bound.
 
 ## Limits and errors
 
@@ -142,10 +178,12 @@ the window itself in [`companion-settings.md`](companion-settings.md).
   that holds text that is not valid UTF-8; more than 1,000 figures; a figure key that is not 64 lowercase hex characters
   or that repeats.
 - The reader takes version 1 with exactly the four properties and version 2 with exactly five, and in `deleted` it rejects
-  what is not an array, more than 1,000 entries, an entry with a missing, unknown or repeated property, an `id` not in the `D`
-  form or all zero, a `confirmed` that is not `true` or `false`, a repeated identity, and the identity of `Live` or of a listed profile
-  (the last three compared as identities, whatever their letter case or surrounding white space).
-- A file the reader rejects also forgets the deleted identities: their waiting deletions are not sent, and buffered messages of those profiles are sent again and recreate the profiles on the server, unnamed.
+  what is not an array, more than 1,000 entries, an entry without exactly `id` and `confirmed` or `id`, `target` and
+  `confirmed` (a missing, unknown or repeated property), an `id` or `target` not in the `D` form or all zero, a `confirmed`
+  that is not `true` or `false`, a repeated identity, the identity of `Live` or of a listed profile, and a `target` equal to
+  its own `id` or to the `id` of an earlier entry, which also rules out every loop of merges (all compared as identities,
+  whatever their letter case or surrounding white space).
+- A file the reader rejects also forgets the deleted identities and the merges: their waiting deletions and merges are not sent, and buffered messages of those profiles are sent again and recreate the profiles on the server, unnamed.
 - Downgrade: a file of version 2 is rejected by a Companion of an earlier release, which then uses `Live` alone, so the same
   loss follows there.
 - The Companion does not read the server's profile list: a profile of the server that was created elsewhere is not in the list.
@@ -166,6 +204,7 @@ the window itself in [`companion-settings.md`](companion-settings.md).
 
 - [`decisions/0111-profiles-kept-by-the-companion-each-hello-names-the-next-messages-profile.md`](../decisions/0111-profiles-kept-by-the-companion-each-hello-names-the-next-messages-profile.md) — the list is kept locally, each hello names the next message's profile.
 - [`decisions/0117-profile-renamed-in-a-dialog-at-once-the-connection-reopened-with-the-new-name.md`](../decisions/0117-profile-renamed-in-a-dialog-at-once-the-connection-reopened-with-the-new-name.md) — a profile is renamed in a dialog at once, the connection of the renamed profile is reopened with the new name.
+- [`decisions/0118-profile-merged-in-the-companion-one-ordered-queue-with-the-deletions.md`](../decisions/0118-profile-merged-in-the-companion-one-ordered-queue-with-the-deletions.md) — a profile is merged in the Companion, the merges and the deletions are one ordered queue.
 - [`decisions/0041-profile-selected-in-the-companion-figure-name-only-a-hint.md`](../decisions/0041-profile-selected-in-the-companion-figure-name-only-a-hint.md) — the profile is selected in the Companion, the figure name is only a hint.
 
 ## Not here

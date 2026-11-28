@@ -62,6 +62,11 @@ public sealed class SettingsView
     /// </summary>
     public bool IsDeletionQueueFull { get; init; }
 
+    /// <summary>
+    /// Gets the number of merged profiles whose history the server has not moved yet.
+    /// </summary>
+    public int WaitingMerges { get; init; }
+
     #endregion // Properties
 
     #region Methods
@@ -96,6 +101,26 @@ public sealed class SettingsView
     public bool CanDelete(Guid selected)
     {
         return CompanionProfiles.IsDeletable(selected, ActiveProfile, ProfileList);
+    }
+
+    /// <summary>
+    /// Determines whether the window can merge a profile into another.
+    /// </summary>
+    /// <param name="selected">The identity of the selected profile</param>
+    /// <returns><see langword="true" /> when the profile is listed and is neither <c>Live</c> nor the active profile</returns>
+    public bool CanMerge(Guid selected)
+    {
+        return CanDelete(selected);
+    }
+
+    /// <summary>
+    /// Gets the profiles a profile can be merged into.
+    /// </summary>
+    /// <param name="selected">The identity of the selected profile</param>
+    /// <returns>Every other listed profile, in list order</returns>
+    public IReadOnlyList<CompanionProfile> MergeTargets(Guid selected)
+    {
+        return [.. ProfileList.Where(profile => profile.Id != selected)];
     }
 
     /// <summary>

@@ -98,6 +98,10 @@ public static class ContractWriter
                 JsonSerializer.Serialize(writer, deletion, ContractJsonContext.Default.ContractProfileDeletion);
                 break;
 
+            case ContractProfileMerge merge:
+                JsonSerializer.Serialize(writer, merge, ContractJsonContext.Default.ContractProfileMerge);
+                break;
+
             default:
                 throw new ArgumentException("The message is of no type of the contract.", nameof(message));
         }

@@ -65,7 +65,12 @@ public enum ContractMessageType
     /// <summary>
     /// The deletion of a profile's history on the server.
     /// </summary>
-    ProfileDeletion
+    ProfileDeletion,
+
+    /// <summary>
+    /// The merge of a profile's history into another profile's on the server.
+    /// </summary>
+    ProfileMerge
 
     #endregion // Values
 }

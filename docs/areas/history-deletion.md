@@ -2,8 +2,9 @@
 
 ## Scope
 
-Deleting a profile's history: what is removed, the tombstone, the removal steps, secure delete and the truncating
-checkpoint, the residue of older versions, a deletion's log lines, its failures and its measurements. Operators who run
+Deleting a profile's history and merging it into another profile's: what is removed, the tombstone, the removal steps,
+secure delete and the truncating checkpoint, the residue of older versions, what a merge moves and combines, the log
+lines, the failures and the measurements of both. Operators who run
 the server rely on it. The retention, the fold and the reads of the history are in [`history.md`](history.md).
 
 ## Behavior
@@ -35,6 +36,39 @@ the server rely on it. The retention, the fold and the reads of the history are 
   space of the file; those stay until the operator runs `VACUUM` with the server stopped ([`USER_GUIDE.md`](../USER_GUIDE.md)).
   The file never shrinks by retention or deletion; the space is reused by new data.
 
+### Merging a profile
+
+- The message `profileMerge` of a Companion with the token ([`contract.md`](contract.md), [`ingest.md`](ingest.md)) moves
+  the whole history of the source profile into the target identity and removes the source. The target keeps its name and
+  identity; the pages offer no merge. Nothing is read into memory whole: every step is a statement of the database.
+  One write transaction does all of it, under the write gate, so a failure changes nothing:
+  1. A source that is not stored changes nothing and is acknowledged. A target that is not stored gets a profile row
+     without a name, listed as `Unnamed profile` until a hello names it.
+  2. The source's islands are upserted into the target's by key (session GUID, island ID, area index); the name and the
+     stamp (receive time, then tick number) are taken from the source when its stamp is not older. The source's islands are
+     then deleted.
+  3. The source's ticks get the target as profile; their numbers, so the storing order, stay.
+  4. The source's hourly points of an hour the target lacks get the target as profile. For an hour both hold, the tick
+     count is added and the game-time range becomes the union. Below the kept point an island of both is one island, named
+     by the later stamp; an entry of the same good under it adds every count and sum, its entry count included; a pair of the
+     same kind and GUID adds its amount sum; what the kept point lacks moves over, and the folded tick identities of the
+     source's point move to the kept point, so a resent folded tick stays recognised. The source's remaining rows of the
+     point are deleted. The pairs of point numbers of the shared hours are kept in a temporary table of the transaction, two numbers per hour; no row is read into the server's memory.
+  5. Trade routes: the source's set replaces the target's when the target has none or the source's receive time is later;
+     otherwise (equal receive times included) the target's stays and the source's is deleted.
+  6. The source's profile row is deleted.
+- The ticks that moved fold by the target's latest tick at the next fold run: the one hour of the target's latest tick stays
+  unfolded, and the source's latest hour no longer does ([`history.md`](history.md)). A trend read split by the merge may
+  draw the hour partly from the merged history, counts nothing twice and draws it whole at the next read.
+- The server's state reads the profiles and held states again and tells the followers ([`server-state.md`](server-state.md),
+  *Merging profiles*). A merge asks for no sweep: nothing is deleted that must be cleared from the file. The removed profile
+  row and trade-route set are overwritten by secure delete only; the clean-up guarantee of a deletion (*Deleting a profile*)
+  is not given for a merge, which keeps the history.
+- A merge that fails changes nothing; the connection is closed with 1011 and the Companion sends the merge again. Past the
+  Companion's 30 seconds of waiting for the acknowledgement the server still ends the merge whole under its stopping token;
+  the ingest of every Companion waits behind the write gate meanwhile, the unanswered messages are sent again with their
+  identities (stored once), and the sent-again merge finds the source gone and is acknowledged.
+
 ### Log lines
 
 The category and what no line holds are those of [`history.md`](history.md), *Log lines*.
@@ -43,6 +77,8 @@ The category and what no line holds are those of [`history.md`](history.md), *Lo
 | ----- | ---- | ---- |
 | Information | `The history of a profile was deleted.` | the rows of a deletion are gone |
 | Warning | `The history of a profile could not be deleted.` with the exception | a deletion failed before its rows were gone |
+| Information | `The history of a profile was merged into another.` | the history of a profile was moved |
+| Warning | `The history of a profile could not be merged into another.` with the exception | a merge failed and changed nothing |
 | Information | `The deleted history was cleared from the database file.` | the clean-up finished |
 | Warning | `The deleted history could not yet be cleared from the database file; the next retention run tries again.` (with the exception unless a read blocked it) | a removal step or the truncation failed, or a read blocks it |
 
@@ -56,7 +92,8 @@ The category and what no line holds are those of [`history.md`](history.md), *Lo
 - A second entry point is the `/ingest` connection: a Companion with the token sends the message `profileDeletion` with the
   profile's identity ([`contract.md`](contract.md), [`ingest.md`](ingest.md), *Messages after the hello*), and the server
   deletes as above. The host rule of the pages does not apply to it: the token (or, with the token off, nothing but the
-  refusal of browser upgrades) guards it, and a token holder can delete any profile by its identity (record 0116).
+  refusal of browser upgrades) guards it, and a token holder can delete any profile by its identity (record 0116) and
+  merge any stored profile into any identity (record 0119).
 
 ### Measurements
 
@@ -73,6 +110,21 @@ before the index of the tick entries by good (record 0087).
 | The deletion's first transaction, a year of hourly points (8,684, built from the 167 real hours of the 7-day run) and 20,190 unfolded ticks | 1,133, 1,130 and 1,134 ms |
 | By a throwaway test outside the repository through the real `ServerStore`: the deletion's first transaction for a profile with a full set of trade routes at the contract's bounds (53,453 rows) and no ticks | 94, 46 and 58 ms |
 
+Merges, through the real `ServerStore` over a database file, three runs each (the merge's own measurement, after the index
+of the tick entries by good):
+
+| What | Result |
+| ---- | ------ |
+| (a) A source with a year of hourly points (8,684) and 20,190 unfolded ticks, into a target holding none of those hours | 1.66 to 1.90 s |
+| (b) Two profiles each with 7 days of fixture ticks, folded, 168 shared hours | 1.42 to 1.50 s |
+| (c) Two profiles holding the same year of hourly points built from the fixture hours, every hour shared | 54.2 to 54.8 s |
+| (d) Both profiles with a full set of trade routes at the contract's bounds, the source's later | 55 to 68 ms |
+
+A shared hour costs about 6.3 ms, so a merge takes at most 3 s up to about 450 shared hours. One Companion writes one profile
+at a time, so two profiles share only the hours in which the player switched, far fewer than that. Beyond it the time grows
+with the shared hours (a whole year shared: case (c), about 55 s); past about 4,700 shared hours the Companion's 30 seconds
+end first (*Merging a profile*, last point).
+
 The tick rows of the deletion's measurement over a year were written as rows of the tick table alone, since the first
 transaction changes only the profile of those rows and of the hourly points; no figure here extends beyond those sizes.
 
@@ -81,6 +133,7 @@ transaction changes only the profile of those rows and of the hourly points; no 
 - [`decisions/0021-sqlite-history-with-retention.md`](../decisions/0021-sqlite-history-with-retention.md) — full resolution for 7 days, then hourly values kept without limit, deletion per profile.
 - [`decisions/0084-profile-deleted-in-steps-and-cleared-from-the-file.md`](../decisions/0084-profile-deleted-in-steps-and-cleared-from-the-file.md) — a profile is gone at once for its readers, its rows are removed in steps, the file is cleared of them.
 - [`decisions/0085-deletion-only-from-pages-opened-by-a-trusted-host.md`](../decisions/0085-deletion-only-from-pages-opened-by-a-trusted-host.md) — the deletion needs a page opened by a trusted host.
+- [`decisions/0119-history-merged-through-the-ingest-connection-in-one-transaction.md`](../decisions/0119-history-merged-through-the-ingest-connection-in-one-transaction.md) — a history is merged through the ingest connection in one transaction.
 
 ## Not here
 

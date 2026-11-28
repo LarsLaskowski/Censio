@@ -537,6 +537,39 @@ public sealed partial class ServerState : IProfileStateSource
     }
 
     /// <summary>
+    /// Merges the history of a profile into another profile's and rebuilds the held profiles and the profile list.
+    /// </summary>
+    /// <param name="profileId">The identity of the profile whose history is moved (the source)</param>
+    /// <param name="targetProfileId">The identity of the profile that receives the history</param>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>The result of the merge</returns>
+    public async Task<HistoryResult> MergeProfileAsync(Guid profileId, Guid targetProfileId, CancellationToken cancellationToken)
+    {
+        await _writeGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+
+        try
+        {
+            var result = await _store.MergeProfileAsync(profileId, targetProfileId, cancellationToken).ConfigureAwait(false);
+
+            if (result.Outcome != HistoryOutcome.Done)
+            {
+                return result;
+            }
+
+            await ApplyRemovalAsync(profileId, targetProfileId).ConfigureAwait(false);
+            Notify(ServerStateChangeKind.Profile, profileId);
+            Notify(ServerStateChangeKind.Profile, targetProfileId);
+            Notify(ServerStateChangeKind.TradeRoutes, targetProfileId);
+
+            return result;
+        }
+        finally
+        {
+            _writeGate.Release();
+        }
+    }
+
+    /// <summary>
     /// Deletes a profile with its history and rebuilds the held profiles and the profile list.
     /// </summary>
     /// <param name="profileId">The profile identity</param>
@@ -555,35 +588,7 @@ public sealed partial class ServerState : IProfileStateSource
                 return result;
             }
 
-            var snapshot = GetSnapshot();
-            var profiles = snapshot.Profiles;
-            var held = snapshot.Held;
-
-            try
-            {
-                // The rows are gone, so the deletion counts as done and the re-read is not cancelled
-                var read = await ReadProfilesAsync(_store, CancellationToken.None).ConfigureAwait(false);
-
-                profiles = read.Profiles;
-                held = read.Held;
-                _sequence = read.Sequence;
-                _markedProfiles.Clear();
-            }
-            catch (SqliteException exception)
-            {
-                LogStateReadFailed(_logger, exception);
-
-                profiles = [.. profiles.Where(profile => profile.Id != profileId)];
-                held = held.Where(pair => pair.Key != profileId).ToDictionary();
-                _markedProfiles.Remove(profileId);
-            }
-
-            Swap(new ServerStateSnapshot
-                 {
-                     Profiles = profiles,
-                     Held = held,
-                     Catalog = snapshot.Catalog
-                 });
+            await ApplyRemovalAsync(profileId, null).ConfigureAwait(false);
             Notify(ServerStateChangeKind.Profile, profileId);
 
             return result;
@@ -844,6 +849,52 @@ public sealed partial class ServerState : IProfileStateSource
     }
 
     /// <summary>
+    /// Re-reads the profile list and the held states after rows were removed or moved; when the read fails, the removed
+    /// profile is dropped from the list, the held states and the marks, and the kept profile from the held states and the
+    /// marks, so the pages read it on demand until its next tick. The caller holds the write gate.
+    /// </summary>
+    /// <param name="removed">The identity of the profile whose row is gone</param>
+    /// <param name="kept">The identity of the profile that received its history, or <see langword="null"/></param>
+    /// <returns>A task that represents the asynchronous operation</returns>
+    private async Task ApplyRemovalAsync(Guid removed, Guid? kept)
+    {
+        var snapshot = GetSnapshot();
+        var profiles = snapshot.Profiles;
+        var held = snapshot.Held;
+
+        try
+        {
+            // The rows are gone, so the change counts as done and the re-read is not cancelled
+            var read = await ReadProfilesAsync(_store, CancellationToken.None).ConfigureAwait(false);
+
+            profiles = read.Profiles;
+            held = read.Held;
+            _sequence = read.Sequence;
+            _markedProfiles.Clear();
+        }
+        catch (SqliteException exception)
+        {
+            LogStateReadFailed(_logger, exception);
+
+            profiles = [.. profiles.Where(profile => profile.Id != removed)];
+            held = held.Where(pair => pair.Key != removed && pair.Key != kept).ToDictionary();
+            _markedProfiles.Remove(removed);
+
+            if (kept is { } keptId)
+            {
+                _markedProfiles.Remove(keptId);
+            }
+        }
+
+        Swap(new ServerStateSnapshot
+             {
+                 Profiles = profiles,
+                 Held = held,
+                 Catalog = snapshot.Catalog
+             });
+    }
+
+    /// <summary>
     /// Tells each follower of a change on a thread-pool work item of its own.
     /// </summary>
     /// <param name="kind">The kind of the change</param>
@@ -924,42 +975,7 @@ public sealed partial class ServerState : IProfileStateSource
 
         if (held.TryGetValue(tick.ProfileId, out var current))
         {
-            if (receiveTicks >= current.ReceiveTicks)
-            {
-                return Replace(held,
-                               tick.ProfileId,
-                               new HeldProfileState
-                               {
-                                   State = new StoredProfileState
-                                           {
-                                               Profile = current.State.Profile,
-                                               LatestTick = tick,
-                                               Islands = MergeIslands(current.State.Islands, tick),
-                                               LatestTradeRoutes = current.State.LatestTradeRoutes
-                                           },
-                                   ReceiveTicks = receiveTicks,
-                                   Sequence = ++_sequence
-                               });
-            }
-
-            var listed = await TryListIslandsAsync(tick.ProfileId).ConfigureAwait(false);
-
-            return listed is null
-                       ? held
-                       : Replace(held,
-                                 tick.ProfileId,
-                                 new HeldProfileState
-                                 {
-                                     State = new StoredProfileState
-                                             {
-                                                 Profile = current.State.Profile,
-                                                 LatestTick = current.State.LatestTick,
-                                                 Islands = listed,
-                                                 LatestTradeRoutes = current.State.LatestTradeRoutes
-                                             },
-                                     ReceiveTicks = current.ReceiveTicks,
-                                     Sequence = current.Sequence
-                                 });
+            return await HoldKnownTickAsync(tick, held, current).ConfigureAwait(false);
         }
 
         if (_markedProfiles.Contains(tick.ProfileId))
@@ -996,6 +1012,55 @@ public sealed partial class ServerState : IProfileStateSource
                          ReceiveTicks = receiveTicks,
                          Sequence = ++_sequence
                      });
+    }
+
+    /// <summary>
+    /// Decides how a stored tick changes the held state of a profile that is already held.
+    /// </summary>
+    /// <param name="tick">The stored tick</param>
+    /// <param name="held">The held states</param>
+    /// <param name="current">The held state of the tick's profile</param>
+    /// <returns>The new held states</returns>
+    private async Task<IReadOnlyDictionary<Guid, HeldProfileState>> HoldKnownTickAsync(ContractTick tick, IReadOnlyDictionary<Guid, HeldProfileState> held, HeldProfileState current)
+    {
+        var receiveTicks = tick.ReceiveTime.UtcTicks;
+
+        if (receiveTicks >= current.ReceiveTicks)
+        {
+            return Replace(held,
+                           tick.ProfileId,
+                           new HeldProfileState
+                           {
+                               State = new StoredProfileState
+                                       {
+                                           Profile = current.State.Profile,
+                                           LatestTick = tick,
+                                           Islands = MergeIslands(current.State.Islands, tick),
+                                           LatestTradeRoutes = current.State.LatestTradeRoutes
+                                       },
+                               ReceiveTicks = receiveTicks,
+                               Sequence = ++_sequence
+                           });
+        }
+
+        var listed = await TryListIslandsAsync(tick.ProfileId).ConfigureAwait(false);
+
+        return listed is null
+                   ? held
+                   : Replace(held,
+                             tick.ProfileId,
+                             new HeldProfileState
+                             {
+                                 State = new StoredProfileState
+                                         {
+                                             Profile = current.State.Profile,
+                                             LatestTick = current.State.LatestTick,
+                                             Islands = listed,
+                                             LatestTradeRoutes = current.State.LatestTradeRoutes
+                                         },
+                                 ReceiveTicks = current.ReceiveTicks,
+                                 Sequence = current.Sequence
+                             });
     }
 
     /// <summary>

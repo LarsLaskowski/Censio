@@ -524,6 +524,30 @@ public sealed class ContractWriterTests
     }
 
     /// <summary>
+    /// A profile merge is written with its type and version first, then its identity, its source profile and its target
+    /// profile, and nothing else (spec AC6).
+    /// </summary>
+    [TestMethod]
+    [TestCategory("AC6")]
+    public void ContractWriterProfileMergeWritesWireForm()
+    {
+        // Arrange
+        var merge = new ContractProfileMerge
+                    {
+                        Id = _id,
+                        ProfileId = _profileA,
+                        TargetProfileId = _profileB
+                    };
+
+        // Act
+        var written = ContractWriter.Write(merge);
+
+        // Assert
+        Assert.IsNull(written.Error, "The profile merge should be written");
+        Assert.AreEqual("{\"type\":\"profileMerge\",\"contractVersion\":3,\"id\":\"11111111-2222-4333-8444-555555555555\",\"profileId\":\"aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee\",\"targetProfileId\":\"bbbbbbbb-cccc-4ddd-8eee-ffffffffffff\"}", Encoding.UTF8.GetString(written.Utf8Json.Span), "The profile merge should be written with its identity, source and target only");
+    }
+
+    /// <summary>
     /// A profile deletion is written with its type and version first, then its identity and its profile, and nothing
     /// else (spec N2).
     /// </summary>

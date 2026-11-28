@@ -182,6 +182,7 @@ public static class ContractReader
                      ContractIconImage iconImage => iconImage.Id,
                      ContractTradeRoutes tradeRoutes => tradeRoutes.Id,
                      ContractProfileDeletion profileDeletion => profileDeletion.Id,
+                     ContractProfileMerge profileMerge => profileMerge.Id,
                      _ => Guid.Empty
                  };
 
@@ -212,6 +213,7 @@ public static class ContractReader
                        ContractMessageType.Acknowledgement => JsonSerializer.Deserialize(utf8Json, ContractJsonContext.Default.ContractAcknowledgement),
                        ContractMessageType.TradeRoutes => JsonSerializer.Deserialize(utf8Json, ContractJsonContext.Default.ContractTradeRoutes),
                        ContractMessageType.ProfileDeletion => JsonSerializer.Deserialize(utf8Json, ContractJsonContext.Default.ContractProfileDeletion),
+                       ContractMessageType.ProfileMerge => JsonSerializer.Deserialize(utf8Json, ContractJsonContext.Default.ContractProfileMerge),
                        _ => null
                    };
         }

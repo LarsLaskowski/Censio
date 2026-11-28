@@ -145,13 +145,20 @@ public sealed class CompanionTexts
                                                         DeleteProfileTitle = "Delete profile?",
                                                         DeleteProfileTextFormat = "The profile {0} is removed from this Companion, with the figures linked to it.",
                                                         DeleteProfileHistoryText = "Also delete its history on the server",
-                                                        DeleteProfileHistoryFullText = "1,000 deletions already wait for the server.",
                                                         DeleteProfileConfirmText = "Delete",
                                                         RenameProfileText = "Rename profile…",
                                                         RenameProfileDisabledText = "Live cannot be renamed.",
                                                         RenameProfileTitle = "Rename profile",
                                                         RenameProfileTextFormat = "New name of the profile {0}",
                                                         RenameProfileConfirmText = "Rename",
+                                                        MergeProfileText = "Merge profile…",
+                                                        MergeProfileDisabledText = "Live and the active profile cannot be merged into another.",
+                                                        MergeProfileTitle = "Merge profile",
+                                                        MergeProfileTargetFormat = "Move the profile {0} into:",
+                                                        MergeProfileTextFormat = "The profile {0} is removed from this Companion; its figures and its history on the server move to the profile chosen. This cannot be undone.",
+                                                        MergeProfileConfirmText = "Merge",
+                                                        WaitingMergesFormat = "Merged profiles whose history the server has not moved yet: {0}",
+                                                        ChangesQueueFullText = "1,000 changes already wait for the server.",
                                                         WaitingDeletionsFormat = "Deleted profiles whose history the server has not deleted yet: {0}",
                                                         FileProblemFormat = CompositeFormat.Parse("The settings file could not be read ({0}). Saving replaces it with the values shown."),
                                                         ProfilesFileInvalidText = "The profiles file could not be read. Saving a profile replaces it.",
@@ -296,13 +303,20 @@ public sealed class CompanionTexts
                                                        DeleteProfileTitle = "Profil löschen?",
                                                        DeleteProfileTextFormat = "Das Profil {0} wird aus diesem Companion entfernt, mit den Figuren, die mit ihm verknüpft sind.",
                                                        DeleteProfileHistoryText = "Auch seinen Verlauf auf dem Server löschen",
-                                                       DeleteProfileHistoryFullText = "Schon 1.000 Löschungen warten auf den Server.",
                                                        DeleteProfileConfirmText = "Löschen",
                                                        RenameProfileText = "Profil umbenennen…",
                                                        RenameProfileDisabledText = "Live kann nicht umbenannt werden.",
                                                        RenameProfileTitle = "Profil umbenennen",
                                                        RenameProfileTextFormat = "Neuer Name des Profils {0}",
                                                        RenameProfileConfirmText = "Umbenennen",
+                                                       MergeProfileText = "Profil zusammenführen…",
+                                                       MergeProfileDisabledText = "Live und das aktive Profil können nicht in ein anderes Profil überführt werden.",
+                                                       MergeProfileTitle = "Profil zusammenführen",
+                                                       MergeProfileTargetFormat = "Das Profil {0} überführen in:",
+                                                       MergeProfileTextFormat = "Das Profil {0} wird aus diesem Companion entfernt; seine Figuren und sein Verlauf auf dem Server gehen auf das gewählte Profil über. Das lässt sich nicht rückgängig machen.",
+                                                       MergeProfileConfirmText = "Zusammenführen",
+                                                       WaitingMergesFormat = "Zusammengeführte Profile, deren Verlauf der Server noch nicht übernommen hat: {0}",
+                                                       ChangesQueueFullText = "Schon 1.000 Änderungen warten auf den Server.",
                                                        WaitingDeletionsFormat = "Gelöschte Profile, deren Verlauf der Server noch nicht gelöscht hat: {0}",
                                                        FileProblemFormat = CompositeFormat.Parse("Die Einstellungsdatei konnte nicht gelesen werden ({0}). Beim Speichern wird sie durch die angezeigten Werte ersetzt."),
                                                        ProfilesFileInvalidText = "Die Profildatei konnte nicht gelesen werden. Beim Speichern eines Profils wird sie ersetzt.",
@@ -963,11 +977,6 @@ public sealed class CompanionTexts
     public required string DeleteProfileHistoryText { get; init; }
 
     /// <summary>
-    /// Gets the text shown below the disabled box when the queue is full.
-    /// </summary>
-    public required string DeleteProfileHistoryFullText { get; init; }
-
-    /// <summary>
     /// Gets the text of the button that confirms the deletion.
     /// </summary>
     public required string DeleteProfileConfirmText { get; init; }
@@ -1001,6 +1010,46 @@ public sealed class CompanionTexts
     /// Gets the format of the line that counts the waiting deletions, with the count.
     /// </summary>
     public required string WaitingDeletionsFormat { get; init; }
+
+    /// <summary>
+    /// Gets the text of the button that merges a profile into another.
+    /// </summary>
+    public required string MergeProfileText { get; init; }
+
+    /// <summary>
+    /// Gets the tooltip of the disabled merge button.
+    /// </summary>
+    public required string MergeProfileDisabledText { get; init; }
+
+    /// <summary>
+    /// Gets the title of the dialog that merges a profile.
+    /// </summary>
+    public required string MergeProfileTitle { get; init; }
+
+    /// <summary>
+    /// Gets the format of the text above the choice of the target, with the profile name.
+    /// </summary>
+    public required string MergeProfileTargetFormat { get; init; }
+
+    /// <summary>
+    /// Gets the format of the explanation of the dialog, with the profile name.
+    /// </summary>
+    public required string MergeProfileTextFormat { get; init; }
+
+    /// <summary>
+    /// Gets the text of the button that confirms the merge.
+    /// </summary>
+    public required string MergeProfileConfirmText { get; init; }
+
+    /// <summary>
+    /// Gets the format of the line that counts the waiting merges, with the count.
+    /// </summary>
+    public required string WaitingMergesFormat { get; init; }
+
+    /// <summary>
+    /// Gets the text shown when as many changes wait for the server as the Companion keeps.
+    /// </summary>
+    public required string ChangesQueueFullText { get; init; }
 
     /// <summary>
     /// Gets the format of the banner of a settings file that could not be read, with the reason.

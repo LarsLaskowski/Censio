@@ -124,6 +124,47 @@ public static class ContractMessageConverter
     }
 
     /// <summary>
+    /// Writes a message again under another profile.
+    /// </summary>
+    /// <param name="message">The message</param>
+    /// <param name="profileId">The identity of the profile</param>
+    /// <returns>The message under the profile, or <see langword="null" /> when the message carries no profile</returns>
+    public static ContractMessage? WithProfile(ContractMessage message, Guid profileId)
+    {
+        return message switch
+               {
+                   ContractTick tick => new ContractTick
+                                        {
+                                            Id = tick.Id,
+                                            ProfileId = profileId,
+                                            ReceiveTime = tick.ReceiveTime,
+                                            GameTime = tick.GameTime,
+                                            Islands = tick.Islands
+                                        },
+                   ContractTradeRoutes routes => new ContractTradeRoutes
+                                                 {
+                                                     Id = routes.Id,
+                                                     ProfileId = profileId,
+                                                     ReceiveTime = routes.ReceiveTime,
+                                                     Routes = routes.Routes
+                                                 },
+                   ContractSessionStart start => new ContractSessionStart
+                                                 {
+                                                     Id = start.Id,
+                                                     ProfileId = profileId,
+                                                     ReceiveTime = start.ReceiveTime
+                                                 },
+                   ContractSessionEnd end => new ContractSessionEnd
+                                             {
+                                                 Id = end.Id,
+                                                 ProfileId = profileId,
+                                                 ReceiveTime = end.ReceiveTime
+                                             },
+                   _ => null
+               };
+    }
+
+    /// <summary>
     /// Converts a pipe island into a contract island.
     /// </summary>
     /// <param name="island">The pipe island</param>
