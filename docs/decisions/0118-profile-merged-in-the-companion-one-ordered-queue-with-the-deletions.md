@@ -1,6 +1,6 @@
 # 0118: A profile is merged into another in the Companion, the merge waits in one ordered queue with the deletions, and buffered messages follow it
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-28
 - **Area:** companion-profiles
 - **Source:** Issue #262

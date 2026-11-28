@@ -1,6 +1,6 @@
 # 0119: A profile's history is merged into another through the ingest connection, in one write transaction
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-28
 - **Area:** history-deletion
 - **Source:** Issue #262
