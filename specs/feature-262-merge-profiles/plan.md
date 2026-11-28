@@ -239,3 +239,61 @@ only their profile is resolved. No guarantee of `.squad/project.md` is weakened.
 ## Out of scope / follow-ups
 
 The spec's *Out of scope*; a merge on the pages becomes an issue only if asked for.
+
+## Security notes
+
+Security plan review: specs/feature-262-merge-profiles (spec.md + plan.md), mode plan
+
+**Verdict: approved, with no blocking findings and 5 non-blocking ones.** `standard` is the right tier. The merge adds a new operation behind the existing ingest token and browser-upgrade refusal (records 0019, 0064, 0116). It creates, changes or removes no security control, and the risk that any token holder can merge any profile is accepted in record 0119 and spec N6.
+
+**What I checked and found sound**
+- **A dropped connection does not undo a merge.** The deletion runs under the server's stopping token, not the connection's (`src/Censio.Server/IngestSession.cs:597`), and the plan has the merge handled the same way. So if the Companion stops waiting after 30 s, the merge still finishes; the resend then finds the source gone and is acknowledged (E6).
+- **A merge cannot bring back a deleted history.** A deleted profile has no row in `Profiles`, and its ticks and hourly points carry a random tombstone identity (`docs/areas/history-deletion.md`). A merge whose source was deleted on the pages is therefore `NothingToDo`, and a merge into a deleted target creates a fresh unnamed row. The tombstoned rows are never touched.
+- **Database access.** The raw SQL in this store is parameterised through `StoreAccess.CreateCommand` (`ServerStore.cs:107,137,528`). The plan reads only the pairs of point numbers into memory, which is bounded by retention and small; that is acceptable for N4.
+- **Logging.** None of the plan's log lines carry a name or an identity; `ProfileMergeRefused` logs only the refusal enum.
+- **`IngestSession` cases.** The unknown-type default branch acknowledges without storing (`IngestSession.cs:603-605`), and `GetId` returns `null` by default (`:246`). A missing `ContractProfileMerge` case would therefore silently acknowledge merges that never ran. The plan's three `IngestSessionProfileMerge*` tests cover this.
+- **`profiles.json` reader.** I read `CompanionProfiles.Load`/`ReadDeleted`/`ReadProperties`/`ReadId` (`src/Censio.Companion.Core/CompanionProfiles.cs:262-294, 811-876`):
+  - It parses with `JsonDocument.Parse`, default options: no comments, no trailing commas.
+  - Property names are matched ordinal and exactly once.
+  - Identities go through `Guid.TryParseExact(…, "D")`.
+
+**[NON-BLOCKING] 1. The *Network exposure* area is touched but not listed.**
+- The `.squad/project.md` Network exposure line names "the history deletion (`DeletionHostRule` on the pages, the token through `/ingest`)".
+- With `Censio:Ingest:RequireToken` set to `false`, the merge is a second history-changing action that anyone who reaches `/ingest` can use, the same way as the deletion. N6 ("The pages offer no merge") is itself a claim about this area.
+- Smallest fix: add "Network exposure (`/ingest` merges history, `DeletionHostRule` unchanged)" to the plan's *Security areas touched*. Extend the plan's `.squad/project.md` update so the Network exposure line reads "the history deletion (`DeletionHostRule` on the pages, the token through `/ingest`) and the history merge (the token through `/ingest`)".
+- Recommendation: fix now
+
+**[NON-BLOCKING] 2. `SECURITY.md` is missing from *Documentation updates*, verbatim.**
+- `SECURITY.md:36` lists what a token holder, and anyone when the token is off, can do through `/ingest`. `SECURITY.md:51` lists the deletion through `/ingest` in scope. After this change both leave out the merge.
+- Add `SECURITY.md` to the plan's *Documentation updates* with these three replacements:
+  - **`SECURITY.md:36`, sentence 1.** Replace "a Companion with the token can also delete the history of any profile by its identity, as the settings window does when a profile is deleted with its history (`docs/areas/history-deletion.md`)." with "a Companion with the token can also delete the history of any profile by its identity, as the settings window does when a profile is deleted with its history, and merge the history of any profile into any identity, as the settings window does when a profile is merged (`docs/areas/history-deletion.md`)."
+  - **`SECURITY.md:36`, sentence 2.** Replace "fill its database file and delete the history of any profile, so switch it off" with "fill its database file, delete the history of any profile and merge it into another, so switch it off".
+  - **`SECURITY.md:51`.** Replace "the deletion of a profile's history from a data page and its host rule (`AllowedHosts`), and through `/ingest` with the token" with "the deletion of a profile's history from a data page and its host rule (`AllowedHosts`), and through `/ingest` with the token, and the merge of a profile's history into another through `/ingest` with the token".
+- Recommendation: fix now
+
+**[NON-BLOCKING] 3. The `profiles.json` reader rules for merge entries miss an ordering case and identity spelling variants.**
+- **What the reader accepts as one identity.** I ran a probe through the scratchpad project `/tmp/claude-0/-home-user-Censio/19d301d8-944d-51f7-be2e-0b04cb3e38e8/scratchpad/guidprobe` (`dotnet run`, SDK 11.0.100). It printed:
+  `[AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE] -> True aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee`
+  `[ aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee ] -> True aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee`
+  and a JSON string `"aaaaaaaa-…"` came back from `GetString()` as `aaaaaaaa-…`.
+- So "D form" in this reader accepts uppercase, surrounding whitespace and JSON escapes. Any rule written as a string comparison can be bypassed: target equals source, repeated source, loop, or source listed.
+- **The ordering gap.** The plan rejects loops by following each chain, but it does not reject a merge whose target is the id of an *earlier* entry (an earlier deletion, or an earlier merge's source). The Companion can never write that: a target must be listed at merge time, and an earlier entry's id has already left the list for good.
+- If such a file were read, the server would get the merge after the target was already removed. It would recreate the target unnamed (E9) with the source's history, while the Companion resolves or drops the buffered messages differently.
+- That one rule ("a merge's target is not the id of any earlier entry") also makes every loop impossible, in linear time.
+- Smallest fix: compare parsed `Guid` values only, and add that rule to *Companion profiles (G3)*. Add these data rows to `CompanionProfilesLoadRejectsMalformedMerge`:
+  - target the uppercase or whitespace-padded form of its own id;
+  - target equal to an earlier deletion's id;
+  - target equal to an earlier merge's source.
+- Recommendation: fix now
+
+**[NON-BLOCKING] 4. The measurement leaves out the merge's longest path.**
+- *Measurement* case (a) moves a year into a target that holds none of those hours, so no hours are combined. Case (b) combines only 168 shared hours.
+- The per-pair combine of E10 (`HourlyPointMerge`, several statements per shared hour) is never measured at a year (8,684 shared hours). That is the merge's longest hold of the write gate, during which ingest waits (N3).
+- Beyond the Companion's 30 s acknowledgement wait (fact 13), the Companion reconnects and is refused `companionConnected` until the session ends. It converges, because of the stopping token above, but the 3 s bound would be stated without covering this case.
+- Smallest fix: add case (c), two profiles that each hold the same year of hourly points built from the fixture hours, all hours shared, three runs, to *Measurement* and to the AC10 table.
+- Recommendation: fix now
+
+**[NON-BLOCKING] 5. The dialog shows the profile name inside a label.**
+- *Window (G5)* calls `Move the profile <name> into:` "the label" of the drop-down. As a WPF `Label`, its text becomes an access-key text, and the first `_` of a profile name (which `CheckName` allows) is swallowed.
+- `ProfileDeletionDialog.xaml:11` uses a `TextBlock`. Smallest fix: state in G5 that the name text is a `TextBlock`, as in `ProfileDeletionDialog`.
+- Recommendation: fix now
