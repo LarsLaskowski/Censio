@@ -623,32 +623,7 @@ public sealed class ServerStore
             receiveTicks = reader.GetInt64(1);
         }
 
-        var stations = new Dictionary<long, List<ContractTradeRouteStation>>();
-
-        using (var command = StoreAccess.CreateCommand(connection,
-                                                       "SELECT s.\"TradeRouteId\", s.\"SessionGuid\", s.\"IslandId\", s.\"AreaIndex\" FROM \"TradeRouteStations\" s JOIN \"TradeRoutes\" r ON r.\"Id\" = s.\"TradeRouteId\" WHERE r.\"ProfileId\" = $profile ORDER BY r.\"Position\", s.\"Position\";",
-                                                       (ProfileParameter, profileId)))
-        {
-            using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
-
-            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-            {
-                var routeRow = reader.GetInt64(0);
-
-                if (stations.TryGetValue(routeRow, out var list) == false)
-                {
-                    list = [];
-                    stations.Add(routeRow, list);
-                }
-
-                list.Add(new ContractTradeRouteStation
-                         {
-                             SessionGuid = reader.GetInt32(1),
-                             IslandId = reader.GetByte(2),
-                             AreaIndex = reader.GetByte(3)
-                         });
-            }
-        }
+        var stations = await ReadTradeRouteStationsAsync(connection, profileId, cancellationToken).ConfigureAwait(false);
 
         var routes = new List<ContractTradeRoute>();
 
@@ -681,6 +656,45 @@ public sealed class ServerStore
                    ReceiveTime = new DateTimeOffset(receiveTicks, TimeSpan.Zero),
                    Routes = routes
                };
+    }
+
+    /// <summary>
+    /// Reads the stations of the trade routes of a profile on an opened connection.
+    /// </summary>
+    /// <param name="connection">The opened connection</param>
+    /// <param name="profileId">The profile identity</param>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>The stations by trade route row</returns>
+    private static async Task<Dictionary<long, List<ContractTradeRouteStation>>> ReadTradeRouteStationsAsync(SqliteConnection connection, Guid profileId, CancellationToken cancellationToken)
+    {
+        var stations = new Dictionary<long, List<ContractTradeRouteStation>>();
+
+        using (var command = StoreAccess.CreateCommand(connection,
+                                                       "SELECT s.\"TradeRouteId\", s.\"SessionGuid\", s.\"IslandId\", s.\"AreaIndex\" FROM \"TradeRouteStations\" s JOIN \"TradeRoutes\" r ON r.\"Id\" = s.\"TradeRouteId\" WHERE r.\"ProfileId\" = $profile ORDER BY r.\"Position\", s.\"Position\";",
+                                                       (ProfileParameter, profileId)))
+        {
+            using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+
+            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            {
+                var routeRow = reader.GetInt64(0);
+
+                if (stations.TryGetValue(routeRow, out var list) == false)
+                {
+                    list = [];
+                    stations.Add(routeRow, list);
+                }
+
+                list.Add(new ContractTradeRouteStation
+                         {
+                             SessionGuid = reader.GetInt32(1),
+                             IslandId = reader.GetByte(2),
+                             AreaIndex = reader.GetByte(3)
+                         });
+            }
+        }
+
+        return stations;
     }
 
     /// <summary>

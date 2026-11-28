@@ -975,42 +975,7 @@ public sealed partial class ServerState : IProfileStateSource
 
         if (held.TryGetValue(tick.ProfileId, out var current))
         {
-            if (receiveTicks >= current.ReceiveTicks)
-            {
-                return Replace(held,
-                               tick.ProfileId,
-                               new HeldProfileState
-                               {
-                                   State = new StoredProfileState
-                                           {
-                                               Profile = current.State.Profile,
-                                               LatestTick = tick,
-                                               Islands = MergeIslands(current.State.Islands, tick),
-                                               LatestTradeRoutes = current.State.LatestTradeRoutes
-                                           },
-                                   ReceiveTicks = receiveTicks,
-                                   Sequence = ++_sequence
-                               });
-            }
-
-            var listed = await TryListIslandsAsync(tick.ProfileId).ConfigureAwait(false);
-
-            return listed is null
-                       ? held
-                       : Replace(held,
-                                 tick.ProfileId,
-                                 new HeldProfileState
-                                 {
-                                     State = new StoredProfileState
-                                             {
-                                                 Profile = current.State.Profile,
-                                                 LatestTick = current.State.LatestTick,
-                                                 Islands = listed,
-                                                 LatestTradeRoutes = current.State.LatestTradeRoutes
-                                             },
-                                     ReceiveTicks = current.ReceiveTicks,
-                                     Sequence = current.Sequence
-                                 });
+            return await HoldKnownTickAsync(tick, held, current).ConfigureAwait(false);
         }
 
         if (_markedProfiles.Contains(tick.ProfileId))
@@ -1047,6 +1012,55 @@ public sealed partial class ServerState : IProfileStateSource
                          ReceiveTicks = receiveTicks,
                          Sequence = ++_sequence
                      });
+    }
+
+    /// <summary>
+    /// Decides how a stored tick changes the held state of a profile that is already held.
+    /// </summary>
+    /// <param name="tick">The stored tick</param>
+    /// <param name="held">The held states</param>
+    /// <param name="current">The held state of the tick's profile</param>
+    /// <returns>The new held states</returns>
+    private async Task<IReadOnlyDictionary<Guid, HeldProfileState>> HoldKnownTickAsync(ContractTick tick, IReadOnlyDictionary<Guid, HeldProfileState> held, HeldProfileState current)
+    {
+        var receiveTicks = tick.ReceiveTime.UtcTicks;
+
+        if (receiveTicks >= current.ReceiveTicks)
+        {
+            return Replace(held,
+                           tick.ProfileId,
+                           new HeldProfileState
+                           {
+                               State = new StoredProfileState
+                                       {
+                                           Profile = current.State.Profile,
+                                           LatestTick = tick,
+                                           Islands = MergeIslands(current.State.Islands, tick),
+                                           LatestTradeRoutes = current.State.LatestTradeRoutes
+                                       },
+                               ReceiveTicks = receiveTicks,
+                               Sequence = ++_sequence
+                           });
+        }
+
+        var listed = await TryListIslandsAsync(tick.ProfileId).ConfigureAwait(false);
+
+        return listed is null
+                   ? held
+                   : Replace(held,
+                             tick.ProfileId,
+                             new HeldProfileState
+                             {
+                                 State = new StoredProfileState
+                                         {
+                                             Profile = current.State.Profile,
+                                             LatestTick = current.State.LatestTick,
+                                             Islands = listed,
+                                             LatestTradeRoutes = current.State.LatestTradeRoutes
+                                         },
+                                 ReceiveTicks = current.ReceiveTicks,
+                                 Sequence = current.Sequence
+                             });
     }
 
     /// <summary>
