@@ -43,3 +43,4 @@ are quoted in full.
 | 2026-11-28 09:54 | 5 Tests first skipped (G6) | Orchestrator | skipped — G6 adds no production behaviour; documentation only |
 | 2026-11-28 09:58 | 6 Implement (G6) | Dev | Documentation written (area documents, README, USER_GUIDE, ARCHITECTURE, SECURITY, index); figure-check/config-check/decision-check/scope-check pass; analyzer: only the two RH2008 for the Code Officer (sonnet/medium · 71,298 tokens · 37 tool uses · 221 s · 74 in · 24,909 out · 5,301,848 cache read · 70,841 cache write · 743,355 weighted · continued) |
 | 2026-11-28 09:58 | 6 Orchestrator project.md | Orchestrator | Wrote the plan's two .squad/project.md edits (ContractProfileMerge in the ingest line, the history merge in Network exposure) |
+| 2026-11-28 09:58 | 6 Coverage skipped (G6) | Orchestrator | G6 is documentation only; the Dev's G5 run passed the Coverage gate (98.1%); the stamp at step 7 runs the gates on the whole change |
