@@ -297,3 +297,46 @@ Security plan review: specs/feature-262-merge-profiles (spec.md + plan.md), mode
 - *Window (G5)* calls `Move the profile <name> into:` "the label" of the drop-down. As a WPF `Label`, its text becomes an access-key text, and the first `_` of a profile name (which `CheckName` allows) is swallowed.
 - `ProfileDeletionDialog.xaml:11` uses a `TextBlock`. Smallest fix: state in G5 that the name text is a `TextBlock`, as in `ProfileDeletionDialog`.
 - Recommendation: fix now
+
+## Challenge notes
+
+Plan challenge for specs/feature-262-merge-profiles (/home/user/Censio/specs/feature-262-merge-profiles/plan.md, spec.md, tasks.md). I checked these plan claims in the code and they hold: facts 2–10 and 15, the unique keys in CensioDbContext.cs:28-187, the fold upserts (HistoryFolder.cs:32-68, which match the way E10 combines rows), the trade-route dedupe (ServerStore.cs:278) and the buffered send flow (LiveSender.cs:1262-1281). The design holds. The objections are all minor.
+
+**Minor 1 – the order of deletions and merges can break on a write error.**
+- Evidence: `SendDeletionsAsync` logs a write error and moves on to the next entry, which stays waiting (LiveSender.cs:1420-1425, `LiveMessageNotWritten` then `continue`).
+- Effect: once deletions and merges share one queue, a merge `A`→`B` skipped this way lets the deletion of `B` go out first. The merge then finds `B` missing on the server and recreates it unnamed with `A`'s history, which is exactly the case E4 and AC3 rule out.
+- Instruction for the Dev: in `SendRemovalsAsync`, a removal that cannot be written ends the sending of removals on this connection (`return null`, no later entry sent) instead of `continue`.
+- Why minor: the Dev can apply this without changing the plan.
+
+**Minor 2 – the measurement leaves out the costly path.**
+- Evidence: `HourlyPointMerge.CombineAsync` runs several statements for each shared hour, but case (b) measures only 168 shared hours. Case (a) has no shared hours, so it is just relabelling, which the deletion measured at about 1.13 s (history-deletion.md:73).
+- Effect: one fixture point holds 682 entries and about 1,250 pairs, and removing one takes a median of 3.2 ms (history-deletion.md:70). A year of shared hours (8,684) could hold the write gate well past the Companion's 30 s wait for an acknowledgement (fact 13). Trade-route sets at the bounds (53,453 rows) are not measured at all.
+- Instruction for the Dev: add case (c), both profiles holding the same year of hourly points, every hour shared. Add case (d), both profiles with a full trade-route set at the contract's bounds and the source's set later.
+- If (c) goes over 3 s, run each combine statement once over all shared point pairs (for example from a temporary table of point numbers) rather than once per pair. Report the result to the Lead as the plan's record 0119, option 4 already says.
+- Why minor: the plan's fallback (the Lead decides) still applies.
+
+**Minor 3 – the session does not check the target.**
+- Evidence: `OnDeleteRequested` checks only `IsDeletable` and the full queue (SettingsWindowSession.cs:355). `Merge` throws `ArgumentException` for a target that is not listed or equals the source, and the plan's *Security considerations* rely on "the session's checks".
+- Instruction for the Dev: `OnMergeRequested` checks `CompanionProfiles.IsMergeable(profile, target, active, profiles)` and the full queue.
+- Instruction for the Tester: add data rows "target not listed" and "target equal to source" to `SettingsWindowSessionMergeIgnored`.
+- Why minor: it is one check and two test rows.
+
+**Minor 4 – the reconnect after a merge of the connection's own profile (E8).**
+- Evidence: the plan sets `_helloProfile` to null after the acknowledgement, so the next hello names the active profile. If the next buffered message belongs to the target, `IsOfOtherProfile` (LiveSender.cs:1338-1356) then switches a second time.
+- Spec: E8 asks that the new hello names the profile of the next message after the merge.
+- Instruction for the Tester: `LiveSenderMergeOfConnectionProfileReconnectsAsSwitch` asserts that the hello after the merge names the profile of the next buffered message. Use one data row where that message belongs to the target and one where it belongs to the active profile.
+- Instruction for the Dev: pick `_helloProfile` so that this holds. One option is to set it to the resolved target when that target is listed and a buffered message of it waits.
+- Why minor: the behaviour is close; only the hello choice changes.
+
+**Minor 5 – a failed re-read leaves the target's state stale.**
+- Evidence: the deletion's fallback (ServerState.cs:571-577) only drops the removed profile, and the plan's shared `ApplyRemovalAsync` copies that.
+- Effect: the target's held state keeps its old latest tick and islands until its next tick. AC8 ("the target's pages show both histories without a reload") then fails on this path.
+- Instruction for the Dev: on a failed read, also drop the target from the held states and the marks, or state in `server-state.md` that it stays stale until its next tick.
+- Instruction for the Tester: `ServerStateMergeProfileReadFailureDropsSource` asserts that the target is still listed.
+- Why minor: either fix is a small change.
+
+**Minor 6 – folding after a merge is not documented.**
+- Evidence: the fold horizon is per profile (HistoryStore.cs:42 `LatestReceiveSql`, history.md:123-127): the hour of a profile's latest tick is never folded.
+- Effect: a source's unfolded ticks older than 7 days, kept only because they were the source's latest, can be folded at the next run under the target.
+- Instruction for the Dev: the *Merging a profile* section of `history-deletion.md` states that the merged ticks fold by the target's latest tick at the next fold run.
+- Why minor: documentation only.
