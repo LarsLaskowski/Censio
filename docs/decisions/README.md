@@ -177,4 +177,5 @@ once in the [area document](../areas/README.md) of the record's area, and the re
 | [0114](0114-start-with-windows-switched-only-in-the-settings-window.md) | Start with Windows is switched only in the settings window | Accepted | 2026-11-25 |
 | [0115](0115-profile-deleted-in-the-companion-history-on-the-server-by-the-players-choice.md) | A profile is deleted in the Companion, its history on the server only by the player's choice, and its identity filters the buffer | Accepted | 2026-11-26 |
 | [0116](0116-history-deleted-through-the-ingest-connection-with-the-token.md) | A profile's history is also deleted through the ingest connection, after a hello with the token | Accepted | 2026-11-26 |
+| [0117](0117-profile-renamed-in-a-dialog-at-once-the-connection-reopened-with-the-new-name.md) | A profile is renamed in a dialog of the settings window at once, and a live connection under it is reopened with the new name | Accepted | 2026-11-27 |
 <!-- project:end index -->

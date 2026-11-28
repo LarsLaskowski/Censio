@@ -98,5 +98,26 @@ public sealed class SettingsView
         return CompanionProfiles.IsDeletable(selected, ActiveProfile, ProfileList);
     }
 
+    /// <summary>
+    /// Determines whether the window can rename a profile.
+    /// </summary>
+    /// <param name="selected">The identity of the selected profile</param>
+    /// <returns><see langword="true" /> when the profile is listed and is not <c>Live</c></returns>
+    public bool CanRename(Guid selected)
+    {
+        return CompanionProfiles.IsRenamable(selected, ProfileList);
+    }
+
+    /// <summary>
+    /// Checks a new name of a listed profile.
+    /// </summary>
+    /// <param name="profile">The identity of the profile</param>
+    /// <param name="name">The new name</param>
+    /// <returns>The problem, or <see langword="null" /> when the profile can get the name</returns>
+    public SettingsProblemKind? CheckRename(Guid profile, string name)
+    {
+        return CompanionProfiles.CheckRename(profile, name, ProfileList);
+    }
+
     #endregion // Methods
 }

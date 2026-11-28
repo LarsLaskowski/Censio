@@ -143,6 +143,56 @@ public sealed class SettingsViewTests
     }
 
     /// <summary>
+    /// <c>Rename profile…</c> is refused for <c>Live</c> and for an identity the list does not hold, and allowed for every
+    /// other listed profile, the active one included (AC5).
+    /// </summary>
+    /// <param name="selected">The identity selected in the drop-down</param>
+    /// <param name="expected">Whether the profile can be renamed</param>
+    [TestMethod]
+    [TestCategory("AC5")]
+    [DataRow(LiveId, false, DisplayName = "Live")]
+    [DataRow(ActiveId, true, DisplayName = "Active profile")]
+    [DataRow(OtherId, true, DisplayName = "Other listed profile")]
+    [DataRow(UnlistedId, false, DisplayName = "Identity not listed")]
+    public void SettingsViewCanRenameAllButLiveAndUnknown(string selected, bool expected)
+    {
+        // Arrange
+        var view = CreateProfilesView([CompanionProfile.Live, CreateProfile(ActiveId, "Active"), CreateProfile(OtherId, "Other")], new Guid(ActiveId));
+
+        // Act
+        var canRename = view.CanRename(new Guid(selected));
+
+        // Assert
+        Assert.AreEqual(expected, canRename, $"Renaming {selected} should be allowed only for a listed profile other than Live");
+    }
+
+    /// <summary>
+    /// The check of a new name of a profile gives what <see cref="CompanionProfiles.CheckRename" /> gives over the view's
+    /// profile list (AC5).
+    /// </summary>
+    /// <param name="name">The new name</param>
+    /// <param name="expected">The problem, or <c>null</c> when the profile can get the name</param>
+    [TestMethod]
+    [TestCategory("AC5")]
+    [DataRow("", SettingsProblemKind.NameBlank, DisplayName = "Blank")]
+    [DataRow("OTHER", SettingsProblemKind.NameExists, DisplayName = "Name of another profile in other case")]
+    [DataRow("ACTIVE", null, DisplayName = "Own name in other case")]
+    [DataRow("Fresh", null, DisplayName = "New name")]
+    public void SettingsViewCheckRenameGivesProblemOfProfiles(string name, SettingsProblemKind? expected)
+    {
+        // Arrange
+        var profiles = new[] { CompanionProfile.Live, CreateProfile(ActiveId, "Active"), CreateProfile(OtherId, "Other") };
+        var view = CreateProfilesView(profiles, new Guid(ActiveId));
+
+        // Act
+        var problem = view.CheckRename(new Guid(ActiveId), name);
+
+        // Assert
+        Assert.AreEqual(expected, problem, "The view should give the problem of the profile list");
+        Assert.AreEqual(CompanionProfiles.CheckRename(new Guid(ActiveId), name, profiles), problem, "The view should give what the profiles give");
+    }
+
+    /// <summary>
     /// Creates a profile.
     /// </summary>
     /// <param name="id">The identity in the form D</param>

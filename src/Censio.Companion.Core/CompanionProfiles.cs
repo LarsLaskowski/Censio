@@ -148,6 +148,11 @@ public sealed class CompanionProfiles
     /// </summary>
     public event EventHandler? DeletionsChanged;
 
+    /// <summary>
+    /// Occurs when a profile was renamed.
+    /// </summary>
+    public event EventHandler? Renamed;
+
     #endregion // Events
 
     #region Properties
@@ -332,6 +337,88 @@ public sealed class CompanionProfiles
     }
 
     /// <summary>
+    /// Determines whether a profile can be renamed.
+    /// </summary>
+    /// <param name="id">The identity of the profile</param>
+    /// <param name="profiles">The profiles</param>
+    /// <returns><see langword="true" /> when the profile is in the list and is not <c>Live</c></returns>
+    public static bool IsRenamable(Guid id, IReadOnlyList<CompanionProfile> profiles)
+    {
+        return id != LiveSender.ProfileId && profiles.Any(profile => profile.Id == id);
+    }
+
+    /// <summary>
+    /// Checks a new name of a listed profile.
+    /// </summary>
+    /// <param name="id">The identity of the profile</param>
+    /// <param name="name">The new name</param>
+    /// <param name="profiles">The profiles</param>
+    /// <returns>The problem, or <see langword="null" /> when the profile can get the name</returns>
+    public static SettingsProblemKind? CheckRename(Guid id, string name, IReadOnlyList<CompanionProfile> profiles)
+    {
+        if (CheckName(name) is { } problem)
+        {
+            return problem;
+        }
+
+        return IsNameTaken(name, id, profiles) ? SettingsProblemKind.NameExists : null;
+    }
+
+    /// <summary>
+    /// Renames a listed profile other than <c>Live</c>.
+    /// </summary>
+    /// <param name="id">The identity of the profile</param>
+    /// <param name="name">The new name, which <see cref="CheckRename(Guid, string, IReadOnlyList{CompanionProfile})" /> accepts</param>
+    /// <returns><see langword="true" /> when the name changed, <see langword="false" /> when it was the same</returns>
+    /// <exception cref="ArgumentException">The profile is <c>Live</c> or not listed, or the name is refused</exception>
+    public bool Rename(Guid id, string name)
+    {
+        bool isNoticeChanged;
+
+        lock (_lock)
+        {
+            if (IsRenamable(id, _profiles) == false)
+            {
+                throw new ArgumentException("The profile cannot be renamed", nameof(id));
+            }
+
+            if (CheckRename(id, name, _profiles) is not null)
+            {
+                throw new ArgumentException("The name cannot be used", nameof(name));
+            }
+
+            var index = _profiles.FindIndex(profile => profile.Id == id);
+
+            if (string.Equals(_profiles[index].Name, name, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            var isActive = _profiles[index].Id == _active.Id;
+
+            _profiles[index] = new CompanionProfile
+                               {
+                                   Id = id,
+                                   Name = name
+                               };
+
+            if (isActive)
+            {
+                _active = _profiles[index];
+            }
+
+            isNoticeChanged = ReplaceNotice(null);
+            MarkChanged();
+        }
+
+        CompanionLog.ProfileRenamed(_logger);
+        RaisePendingNoticeChanged(isNoticeChanged);
+        Renamed?.Invoke(this, EventArgs.Empty);
+
+        return true;
+    }
+
+    /// <summary>
     /// Checks the name of a profile to create.
     /// </summary>
     /// <param name="name">The name</param>
@@ -350,9 +437,7 @@ public sealed class CompanionProfiles
                 return SettingsProblemKind.ProfilesFull;
             }
 
-            return _profiles.Any(profile => string.Equals(profile.Name, name, StringComparison.OrdinalIgnoreCase))
-                       ? SettingsProblemKind.NameExists
-                       : null;
+            return IsNameTaken(name, Guid.Empty, _profiles) ? SettingsProblemKind.NameExists : null;
         }
     }
 
@@ -914,6 +999,18 @@ public sealed class CompanionProfiles
                    Kind = kind,
                    ProfileName = profileName
                };
+    }
+
+    /// <summary>
+    /// Determines whether the name belongs to a profile other than the excepted one, ignoring case.
+    /// </summary>
+    /// <param name="name">The name</param>
+    /// <param name="except">The identity of the profile that is skipped</param>
+    /// <param name="profiles">The profiles</param>
+    /// <returns><see langword="true" /> when another profile has the name</returns>
+    private static bool IsNameTaken(string name, Guid except, IReadOnlyList<CompanionProfile> profiles)
+    {
+        return profiles.Any(profile => profile.Id != except && string.Equals(profile.Name, name, StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>

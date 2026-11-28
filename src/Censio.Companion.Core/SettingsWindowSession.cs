@@ -99,6 +99,7 @@ public sealed class SettingsWindowSession
         window.WindowClosed += OnWindowClosed;
         window.SaveRequested += OnSaveRequested;
         window.DeleteRequested += OnDeleteRequested;
+        window.RenameRequested += OnRenameRequested;
         _context.Profiles.DeletionsChanged += OnDeletionsChanged;
         _window = window;
         _document = null;
@@ -301,6 +302,7 @@ public sealed class SettingsWindowSession
         window.WindowClosed -= OnWindowClosed;
         window.SaveRequested -= OnSaveRequested;
         window.DeleteRequested -= OnDeleteRequested;
+        window.RenameRequested -= OnRenameRequested;
         _context.Profiles.DeletionsChanged -= OnDeletionsChanged;
 
         if (ReferenceEquals(_window, window))
@@ -356,6 +358,29 @@ public sealed class SettingsWindowSession
         }
 
         profiles.Delete(deletion.Profile, deletion.IsHistoryDeleted);
+        ShowProfilesAgain();
+    }
+
+    /// <summary>
+    /// Renames a profile the window asked for and shows the profiles again; ignored while a save runs or when the profile cannot get the name.
+    /// </summary>
+    /// <param name="sender">The window</param>
+    /// <param name="rename">The rename</param>
+    private void OnRenameRequested(object? sender, SettingsRename rename)
+    {
+        if (sender is not ISettingsWindow window || ReferenceEquals(_window, window) == false || _document is null || _isSaving)
+        {
+            return;
+        }
+
+        var profiles = _context.Profiles;
+
+        if (CompanionProfiles.IsRenamable(rename.Profile, profiles.Profiles) == false || CompanionProfiles.CheckRename(rename.Profile, rename.Name, profiles.Profiles) is not null)
+        {
+            return;
+        }
+
+        profiles.Rename(rename.Profile, rename.Name);
         ShowProfilesAgain();
     }
 

@@ -3,7 +3,7 @@ namespace Censio.Companion.Core.Tests;
 /// <summary>
 /// A settings window that records each shown view, each shown view of the profiles, each shown outcome and each request
 /// to come to the front, raises <see cref="SaveRequested" /> when the test asks to save, <see cref="DeleteRequested" />
-/// when the test asks to delete a profile and <see cref="WindowClosed" /> when the test closes it.
+/// when the test asks to delete or rename a profile and <see cref="WindowClosed" /> when the test closes it.
 /// </summary>
 public sealed class FakeSettingsWindow : ISettingsWindow
 {
@@ -117,6 +117,15 @@ public sealed class FakeSettingsWindow : ISettingsWindow
     }
 
     /// <summary>
+    /// Asks to rename a profile as the window's dialog would after <c>Rename</c>, raising <see cref="RenameRequested" />.
+    /// </summary>
+    /// <param name="rename">The profile and its new name</param>
+    public void RequestRename(SettingsRename rename)
+    {
+        RenameRequested?.Invoke(this, rename);
+    }
+
+    /// <summary>
     /// Closes the window as its close button or <c>Cancel</c> would, raising <see cref="WindowClosed" />.
     /// </summary>
     public void Close()
@@ -153,6 +162,16 @@ public sealed class FakeSettingsWindow : ISettingsWindow
         DeleteRequested?.Invoke(sender, deletion);
     }
 
+    /// <summary>
+    /// Raises <see cref="RenameRequested" /> with another sender than this window.
+    /// </summary>
+    /// <param name="sender">The sender</param>
+    /// <param name="rename">The rename</param>
+    public void RaiseRenameRequested(object? sender, SettingsRename rename)
+    {
+        RenameRequested?.Invoke(sender, rename);
+    }
+
     #endregion // Methods
 
     #region ISettingsWindow
@@ -165,6 +184,9 @@ public sealed class FakeSettingsWindow : ISettingsWindow
 
     /// <inheritdoc />
     public event EventHandler<SettingsDeletion>? DeleteRequested;
+
+    /// <inheritdoc />
+    public event EventHandler<SettingsRename>? RenameRequested;
 
     /// <inheritdoc />
     public void ShowView(SettingsView view)

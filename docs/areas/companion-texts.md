@@ -174,11 +174,23 @@ The pattern `{0} (profile {1})` ends every `Server:` line of a live run: `{0}` i
 | `Profile` | `Profil` |
 | `New profile…` | `Neues Profil…` |
 | `Name of the new profile` | `Name des neuen Profils` |
+| `Rename profile…` | `Profil umbenennen…` |
 | `Delete profile…` | `Profil löschen…` |
 | `Start with Windows` | `Mit Windows starten` |
 | `Language` | `Sprache` |
 | `Save` | `Speichern` |
 | `Cancel` | `Abbrechen` |
+
+#### Profile renaming
+
+`Rename profile…` is in the table above. `Cancel` of the dialog is `CancelText`.
+
+| English | German |
+| ------- | ------ |
+| `Live cannot be renamed.` | `Live kann nicht umbenannt werden.` |
+| `Rename profile` | `Profil umbenennen` |
+| `New name of the profile {0}` | `Neuer Name des Profils {0}` |
+| `Rename` | `Umbenennen` |
 
 #### Profile deletion
 
