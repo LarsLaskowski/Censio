@@ -210,6 +210,7 @@ public sealed class CompanionProfilesMergeTests
         var lines = _logger.Entries.Skip(logged).ToList();
 
         var pending = profiles.PendingNotice;
+        var activeAfter = profiles.Active.Id;
 
         profiles.ObserveSessionEnd();
         profiles.Select(target == "live" ? other : CompanionProfile.Live.Id);
@@ -219,7 +220,7 @@ public sealed class CompanionProfilesMergeTests
         Assert.IsNotNull(notice, "The session of the figure on Live should have set a notice naming the source, or the check of the cleared notice proves nothing");
         Assert.IsNull(pending, "The merge should clear the pending notice");
         Assert.DoesNotContain(source, profiles.Profiles.Select(profile => profile.Id).ToList(), "The merged profile should leave the list");
-        Assert.AreEqual(activeBefore, profiles.Active.Id, "The active profile should stay");
+        Assert.AreEqual(activeBefore, activeAfter, "The active profile should stay");
         Assert.IsNull(profiles.NameOf(source), "The merged profile's name should be unknown");
         Assert.AreSequenceEqual([(ProfileNoticeKind.LastUsedWithOther, profiles.NameOf(targetId) ?? string.Empty)], Describe([movedNotice]), "The figure linked to the merged profile should be linked to the target");
         Assert.AreSequenceEqual([(LogLevel.Information, MergedLine)], lines.Select(line => (line.Level, line.Message)).ToList(), "The merge should log one line without a name or identity");
@@ -460,7 +461,7 @@ public sealed class CompanionProfilesMergeTests
     {
         // Arrange
         var profiles = CompanionProfiles.Load(ProfilesPath, _logger);
-        Guid[] removed = new Guid[4];
+        var removed = new Guid[4];
         var target = Guid.Empty;
 
         // Act
