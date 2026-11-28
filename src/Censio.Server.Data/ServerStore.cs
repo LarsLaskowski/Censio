@@ -18,6 +18,16 @@ public sealed class ServerStore
     /// </summary>
     private const string ProfileParameter = "$profile";
 
+    /// <summary>
+    /// The name of the source profile parameter of the merge statements.
+    /// </summary>
+    private const string SourceParameter = "$source";
+
+    /// <summary>
+    /// The name of the target profile parameter of the merge statements.
+    /// </summary>
+    private const string TargetParameter = "$target";
+
     #endregion // Constants
 
     #region Fields
@@ -156,10 +166,9 @@ public sealed class ServerStore
                                       cancellationToken);
     }
 
-    // Skeleton: removed with the implementation
-#pragma warning disable S1172, S2325, RH2003
     /// <summary>
-    /// Merges the history of a profile into another profile's.
+    /// Merges the history of a profile into another profile's in one transaction: islands, ticks, hourly points, trade routes
+    /// and the profile row of the source move to the target, which is created without a name when it is not stored.
     /// </summary>
     /// <param name="profileId">The identity of the profile whose history is moved (the source)</param>
     /// <param name="targetProfileId">The identity of the profile that receives the history</param>
@@ -167,9 +176,41 @@ public sealed class ServerStore
     /// <returns>The result of the merge</returns>
     public Task<HistoryResult> MergeProfileAsync(Guid profileId, Guid targetProfileId, CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        return StoreAccess.WriteAsync(_database,
+                                      async connection =>
+                                      {
+                                          using var exists = StoreAccess.CreateCommand(connection, "SELECT 1 FROM \"Profiles\" WHERE \"Id\" = $id;", ("$id", profileId));
+
+                                          if (await exists.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is null)
+                                          {
+                                              return new HistoryResult(HistoryOutcome.NothingToDo, null, null);
+                                          }
+
+                                          var parameters = new (string Name, object Value)[] { (SourceParameter, profileId), (TargetParameter, targetProfileId) };
+
+                                          await StoreAccess.ExecuteAsync(connection, "INSERT OR IGNORE INTO \"Profiles\" (\"Id\", \"Name\") VALUES ($target, NULL);", cancellationToken, (TargetParameter, targetProfileId)).ConfigureAwait(false);
+                                          await StoreAccess.ExecuteAsync(connection,
+                                                                         "INSERT INTO \"Islands\" (\"ProfileId\", \"SessionGuid\", \"IslandId\", \"AreaIndex\", \"Name\", \"NameReceiveTicks\", \"NameTickNumber\") "
+                                                                         + "SELECT $target, \"SessionGuid\", \"IslandId\", \"AreaIndex\", \"Name\", \"NameReceiveTicks\", \"NameTickNumber\" FROM \"Islands\" WHERE \"ProfileId\" = $source "
+                                                                         + "ON CONFLICT (\"ProfileId\", \"SessionGuid\", \"IslandId\", \"AreaIndex\") DO UPDATE SET \"Name\" = excluded.\"Name\", \"NameReceiveTicks\" = excluded.\"NameReceiveTicks\", \"NameTickNumber\" = excluded.\"NameTickNumber\" "
+                                                                         + "WHERE (excluded.\"NameReceiveTicks\", excluded.\"NameTickNumber\") >= (\"Islands\".\"NameReceiveTicks\", \"Islands\".\"NameTickNumber\");",
+                                                                         cancellationToken,
+                                                                         parameters).ConfigureAwait(false);
+                                          await StoreAccess.ExecuteAsync(connection, "DELETE FROM \"Islands\" WHERE \"ProfileId\" = $source;", cancellationToken, (SourceParameter, profileId)).ConfigureAwait(false);
+                                          await StoreAccess.ExecuteAsync(connection, "UPDATE \"Ticks\" SET \"ProfileId\" = $target WHERE \"ProfileId\" = $source;", cancellationToken, parameters).ConfigureAwait(false);
+                                          await StoreAccess.ExecuteAsync(connection,
+                                                                         "UPDATE \"HourlyPoints\" SET \"ProfileId\" = $target WHERE \"ProfileId\" = $source AND \"HourTicks\" NOT IN (SELECT \"HourTicks\" FROM \"HourlyPoints\" WHERE \"ProfileId\" = $target);",
+                                                                         cancellationToken,
+                                                                         parameters).ConfigureAwait(false);
+                                          await HourlyPointMerge.CombineAsync(connection, profileId, targetProfileId, cancellationToken).ConfigureAwait(false);
+                                          await MergeTradeRoutesAsync(connection, profileId, targetProfileId, cancellationToken).ConfigureAwait(false);
+                                          await StoreAccess.ExecuteAsync(connection, "DELETE FROM \"Profiles\" WHERE \"Id\" = $source;", cancellationToken, (SourceParameter, profileId)).ConfigureAwait(false);
+
+                                          return new HistoryResult(HistoryOutcome.Done, null, null);
+                                      },
+                                      exception => new HistoryResult(HistoryOutcome.Failed, exception, null),
+                                      cancellationToken);
     }
-#pragma warning restore S1172, S2325, RH2003
 
     /// <summary>
     /// Reads a tick.
@@ -464,6 +505,35 @@ public sealed class ServerStore
         await StoreAccess.ExecuteAsync(connection, "DELETE FROM \"TradeRouteStations\" WHERE \"TradeRouteId\" IN (SELECT \"Id\" FROM \"TradeRoutes\" WHERE \"ProfileId\" = $id);", cancellationToken, ("$id", profileId)).ConfigureAwait(false);
         await StoreAccess.ExecuteAsync(connection, "DELETE FROM \"TradeRoutes\" WHERE \"ProfileId\" = $id;", cancellationToken, ("$id", profileId)).ConfigureAwait(false);
         await StoreAccess.ExecuteAsync(connection, "DELETE FROM \"TradeRouteSets\" WHERE \"ProfileId\" = $id;", cancellationToken, ("$id", profileId)).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Moves the trade routes of the source to the target when the target has none or the source's set was received later,
+    /// and drops the source's set otherwise.
+    /// </summary>
+    /// <param name="connection">The opened connection, inside a write transaction</param>
+    /// <param name="sourceProfileId">The identity of the source profile</param>
+    /// <param name="targetProfileId">The identity of the target profile</param>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>A task that represents the asynchronous operation</returns>
+    private static async Task MergeTradeRoutesAsync(SqliteConnection connection, Guid sourceProfileId, Guid targetProfileId, CancellationToken cancellationToken)
+    {
+        using var keep = StoreAccess.CreateCommand(connection,
+                                                   "SELECT EXISTS (SELECT 1 FROM \"TradeRouteSets\" s WHERE s.\"ProfileId\" = $source AND NOT EXISTS (SELECT 1 FROM \"TradeRouteSets\" t WHERE t.\"ProfileId\" = $target AND t.\"ReceiveTicks\" >= s.\"ReceiveTicks\"));",
+                                                   (SourceParameter, sourceProfileId),
+                                                   (TargetParameter, targetProfileId));
+        var isSourceKept = (long)(await keep.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false))! != 0;
+
+        if (isSourceKept == false)
+        {
+            await DeleteTradeRoutesAsync(connection, sourceProfileId, cancellationToken).ConfigureAwait(false);
+
+            return;
+        }
+
+        await DeleteTradeRoutesAsync(connection, targetProfileId, cancellationToken).ConfigureAwait(false);
+        await StoreAccess.ExecuteAsync(connection, "UPDATE \"TradeRouteSets\" SET \"ProfileId\" = $target WHERE \"ProfileId\" = $source;", cancellationToken, (SourceParameter, sourceProfileId), (TargetParameter, targetProfileId)).ConfigureAwait(false);
+        await StoreAccess.ExecuteAsync(connection, "UPDATE \"TradeRoutes\" SET \"ProfileId\" = $target WHERE \"ProfileId\" = $source;", cancellationToken, (SourceParameter, sourceProfileId), (TargetParameter, targetProfileId)).ConfigureAwait(false);
     }
 
     /// <summary>

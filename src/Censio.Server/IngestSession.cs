@@ -243,6 +243,7 @@ public sealed partial class IngestSession : IDisposable
                    ContractIconImage icon => icon.Id,
                    ContractCatalogUpload upload => upload.Id,
                    ContractProfileDeletion deletion => deletion.Id,
+                   ContractProfileMerge merge => merge.Id,
                    _ => null
                };
     }
@@ -597,6 +598,14 @@ public sealed partial class IngestSession : IDisposable
                     var outcome = await _stores.History.DeleteProfileAsync(deletion.ProfileId, _stoppingToken).ConfigureAwait(false);
 
                     // A failed deletion was logged by the retention job itself.
+                    return (outcome is HistoryOutcome.Done or HistoryOutcome.NothingToDo, missingIcons);
+                }
+
+            case ContractProfileMerge merge:
+                {
+                    var outcome = await _stores.History.MergeProfileAsync(merge.ProfileId, merge.TargetProfileId, _stoppingToken).ConfigureAwait(false);
+
+                    // A failed merge was logged by the retention job itself.
                     return (outcome is HistoryOutcome.Done or HistoryOutcome.NothingToDo, missingIcons);
                 }
 
