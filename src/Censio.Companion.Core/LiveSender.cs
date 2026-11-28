@@ -519,22 +519,14 @@ public sealed class LiveSender : IAsyncDisposable
     }
 
     /// <summary>
-    /// Finds the oldest waiting deletion not tried yet.
+    /// Finds the oldest waiting removal not tried yet.
     /// </summary>
     /// <param name="profiles">The profiles</param>
     /// <param name="tried">The identities tried on this connection</param>
-    /// <returns>The identity, or <see langword="null" /> when none is left</returns>
-    private static Guid? FirstUntried(CompanionProfiles profiles, HashSet<Guid> tried)
+    /// <returns>The removal, or <see langword="null" /> when none is left</returns>
+    private static ProfileRemoval? FirstUntried(CompanionProfiles profiles, HashSet<Guid> tried)
     {
-        foreach (var id in profiles.WaitingDeletions)
-        {
-            if (tried.Contains(id) == false)
-            {
-                return id;
-            }
-        }
-
-        return null;
+        return profiles.WaitingRemovals.FirstOrDefault(removal => tried.Contains(removal.Id) == false);
     }
 
     /// <summary>
@@ -1259,21 +1251,21 @@ public sealed class LiveSender : IAsyncDisposable
                 continue;
             }
 
-            var profile = ProfileOf(next.Utf8Json);
+            var resolved = ResolveBuffered(next);
 
-            if (DropIfDeleted(next, profile))
+            if (resolved.IsDropped)
             {
                 acknowledged++;
 
                 continue;
             }
 
-            if (IsOfOtherProfile(profile))
+            if (IsOfOtherProfile(resolved.Profile))
             {
                 return ReplaySendProblemKind.ConnectionLost;
             }
 
-            if (await SendBufferedAsync(client, next, cancellationToken).ConfigureAwait(false) is { } sendProblem)
+            if (await SendBufferedAsync(client, next.Id, resolved.Utf8Json, cancellationToken).ConfigureAwait(false) is { } sendProblem)
             {
                 return sendProblem;
             }
@@ -1283,7 +1275,7 @@ public sealed class LiveSender : IAsyncDisposable
     }
 
     /// <summary>
-    /// Starts a turn of the send loop: checks the failure of the connection and a due switch, then sends the waiting deletions.
+    /// Starts a turn of the send loop: checks the failure of the connection and a due switch, then sends the waiting removals.
     /// </summary>
     /// <param name="client">The client of the accepted connection</param>
     /// <param name="failed">The completion that the failure of the client sets</param>
@@ -1307,22 +1299,57 @@ public sealed class LiveSender : IAsyncDisposable
             return (ReplaySendProblemKind.ConnectionLost, activeChanged, renameChanged, deletionsChanged);
         }
 
-        return (await SendDeletionsAsync(client, tried, cancellationToken).ConfigureAwait(false), activeChanged, renameChanged, deletionsChanged);
+        return (await SendRemovalsAsync(client, tried, cancellationToken).ConfigureAwait(false), activeChanged, renameChanged, deletionsChanged);
     }
 
     /// <summary>
-    /// Drops the message in flight when its profile was deleted with its history.
+    /// Follows the merges of the profile of a buffered message: drops the message when the profile was deleted or the merges do not end,
+    /// writes it again under the profile that holds the history now when that is another one.
     /// </summary>
     /// <param name="entry">The message</param>
-    /// <param name="profile">The profile of the message, or <see langword="null" /> when it names none</param>
-    /// <returns><see langword="true" /> when the message was dropped</returns>
-    private bool DropIfDeleted(LiveBufferEntry entry, Guid? profile)
+    /// <returns>Whether the message was dropped, the profile it belongs to now, and the message to send</returns>
+    private (bool IsDropped, Guid? Profile, ReadOnlyMemory<byte> Utf8Json) ResolveBuffered(LiveBufferEntry entry)
     {
-        if (_profiles is not { } profiles || profile is not { } id || profiles.IsDeleted(id) == false)
+        var profile = ProfileOf(entry.Utf8Json);
+
+        if (_profiles is not { } profiles || profile is not { } id)
         {
-            return false;
+            return (false, profile, entry.Utf8Json);
         }
 
+        var resolved = profiles.ResolveProfile(id);
+
+        if (resolved is not { } target || profiles.IsDeleted(target))
+        {
+            return (DropInFlight(entry), null, default);
+        }
+
+        if (target == id)
+        {
+            return (false, profile, entry.Utf8Json);
+        }
+
+        var message = ContractReader.Read(entry.Utf8Json.Span).Message;
+        var moved = message is null ? null : ContractMessageConverter.WithProfile(message, target);
+        var written = moved is null ? null : ContractWriter.Write(moved);
+
+        if (written is null || written.Error is not null)
+        {
+            CompanionLog.LiveMessageNotWritten(_logger);
+
+            return (DropInFlight(entry), null, default);
+        }
+
+        return (false, target, written.Utf8Json);
+    }
+
+    /// <summary>
+    /// Drops the message in flight and logs the dropped messages.
+    /// </summary>
+    /// <param name="entry">The message</param>
+    /// <returns><see langword="true" /></returns>
+    private bool DropInFlight(LiveBufferEntry entry)
+    {
         _buffer.DropInFlight(entry.Id);
         LogDropped();
 
@@ -1394,76 +1421,117 @@ public sealed class LiveSender : IAsyncDisposable
     }
 
     /// <summary>
-    /// Sends the waiting deletions of profile histories not yet tried on this connection, one at a time.
+    /// Sends the waiting removals of profile histories (deletions and merges) not yet tried on this connection, one at a time in
+    /// queue order; a removal that cannot be written ends the sending of removals on this connection.
     /// </summary>
     /// <param name="client">The client of the accepted connection</param>
     /// <param name="tried">The identities tried on this connection</param>
     /// <param name="cancellationToken">The token that ends the run</param>
     /// <returns>The problem that ended the connection, or <see langword="null" /> when none</returns>
-    private async Task<ReplaySendProblemKind?> SendDeletionsAsync(IngestClient client, HashSet<Guid> tried, CancellationToken cancellationToken)
+    private async Task<ReplaySendProblemKind?> SendRemovalsAsync(IngestClient client, HashSet<Guid> tried, CancellationToken cancellationToken)
     {
         if (_profiles is not { } profiles)
         {
             return null;
         }
 
-        while (FirstUntried(profiles, tried) is { } id)
+        while (FirstUntried(profiles, tried) is { } removal)
         {
-            tried.Add(id);
+            tried.Add(removal.Id);
 
-            var message = new ContractProfileDeletion
-                          {
-                              Id = Guid.NewGuid(),
-                              ProfileId = id
-                          };
+            var id = Guid.NewGuid();
+            ContractMessage message = removal.Target is { } target
+                                          ? new ContractProfileMerge
+                                            {
+                                                Id = id,
+                                                ProfileId = removal.Id,
+                                                TargetProfileId = target
+                                            }
+                                          : new ContractProfileDeletion
+                                            {
+                                                Id = id,
+                                                ProfileId = removal.Id
+                                            };
             var written = ContractWriter.Write(message);
 
             if (written.Error is not null)
             {
                 CompanionLog.LiveMessageNotWritten(_logger);
 
-                continue;
+                return null;
             }
 
-            var acknowledgement = await client.SendAsync(written.Utf8Json, message.Id, cancellationToken).ConfigureAwait(false);
+            var acknowledgement = await client.SendAsync(written.Utf8Json, id, cancellationToken).ConfigureAwait(false);
 
             if (acknowledgement is null)
             {
                 return client.Failure ?? ReplaySendProblemKind.ConnectionLost;
             }
 
-            profiles.ConfirmDeletion(id);
-
-            if (acknowledgement.Refusal is { } refusal)
-            {
-                CompanionLog.ProfileDeletionRefused(_logger, refusal);
-            }
-            else
-            {
-                CompanionLog.ProfileDeletionConfirmed(_logger);
-            }
+            ConfirmRemoval(profiles, removal, acknowledgement.Refusal);
         }
 
         return null;
     }
 
     /// <summary>
+    /// Confirms an acknowledged removal and logs its outcome.
+    /// </summary>
+    /// <param name="profiles">The profiles</param>
+    /// <param name="removal">The removal</param>
+    /// <param name="refusal">The refusal of the acknowledgement, or <see langword="null" /> when the server accepted</param>
+    private void ConfirmRemoval(CompanionProfiles profiles, ProfileRemoval removal, ContractAcknowledgementRefusal? refusal)
+    {
+        var isMerge = removal.Target is not null;
+
+        if (isMerge)
+        {
+            profiles.ConfirmMerge(removal.Id);
+        }
+        else
+        {
+            profiles.ConfirmDeletion(removal.Id);
+        }
+
+        if (refusal is { } refused)
+        {
+            if (isMerge)
+            {
+                CompanionLog.ProfileMergeRefused(_logger, refused);
+            }
+            else
+            {
+                CompanionLog.ProfileDeletionRefused(_logger, refused);
+            }
+        }
+        else if (isMerge)
+        {
+            CompanionLog.ProfileMergeConfirmed(_logger);
+        }
+        else
+        {
+            CompanionLog.ProfileDeletionConfirmed(_logger);
+        }
+    }
+
+    /// <summary>
     /// Sends a message of the buffer and waits for its acknowledgement.
     /// </summary>
     /// <param name="client">The client of the accepted connection</param>
-    /// <param name="next">The message</param>
+    /// <param name="id">The identity of the message</param>
+    /// <param name="utf8Json">The message to send, under the profile it belongs to now</param>
     /// <param name="cancellationToken">The token that ends the run</param>
     /// <returns>The problem that ended the connection, or <see langword="null" /> when the message was acknowledged</returns>
-    private async Task<ReplaySendProblemKind?> SendBufferedAsync(IngestClient client, LiveBufferEntry next, CancellationToken cancellationToken)
+    private async Task<ReplaySendProblemKind?> SendBufferedAsync(IngestClient client, Guid id, ReadOnlyMemory<byte> utf8Json, CancellationToken cancellationToken)
     {
-        var acknowledgement = await client.SendAsync(next.Utf8Json, next.Id, cancellationToken).ConfigureAwait(false);
+        var acknowledgement = await client.SendAsync(utf8Json, id, cancellationToken).ConfigureAwait(false);
 
         if (acknowledgement is null)
         {
             return client.Failure ?? ReplaySendProblemKind.ConnectionLost;
         }
 
-        _buffer.Acknowledge(next.Id);
+        _buffer.Acknowledge(id);
 
         if (acknowledgement.Refusal is { } refusal)
         {
