@@ -26,7 +26,7 @@ internal sealed partial class ProfileDeletionDialog : Window
         MessageText.Text = string.Format(CultureInfo.InvariantCulture, texts.DeleteProfileTextFormat, profileName);
         HistoryBox.Content = texts.DeleteProfileHistoryText;
         HistoryBox.IsEnabled = isQueueFull == false;
-        HistoryFullText.Text = texts.DeleteProfileHistoryFullText;
+        HistoryFullText.Text = texts.ChangesQueueFullText;
         HistoryFullText.Visibility = isQueueFull ? Visibility.Visible : Visibility.Collapsed;
         DeleteButton.Content = texts.DeleteProfileConfirmText;
         CancelButton.Content = texts.CancelText;

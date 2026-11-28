@@ -145,7 +145,6 @@ public sealed class CompanionTexts
                                                         DeleteProfileTitle = "Delete profile?",
                                                         DeleteProfileTextFormat = "The profile {0} is removed from this Companion, with the figures linked to it.",
                                                         DeleteProfileHistoryText = "Also delete its history on the server",
-                                                        DeleteProfileHistoryFullText = "1,000 deletions already wait for the server.",
                                                         DeleteProfileConfirmText = "Delete",
                                                         RenameProfileText = "Rename profile…",
                                                         RenameProfileDisabledText = "Live cannot be renamed.",
@@ -304,7 +303,6 @@ public sealed class CompanionTexts
                                                        DeleteProfileTitle = "Profil löschen?",
                                                        DeleteProfileTextFormat = "Das Profil {0} wird aus diesem Companion entfernt, mit den Figuren, die mit ihm verknüpft sind.",
                                                        DeleteProfileHistoryText = "Auch seinen Verlauf auf dem Server löschen",
-                                                       DeleteProfileHistoryFullText = "Schon 1.000 Löschungen warten auf den Server.",
                                                        DeleteProfileConfirmText = "Löschen",
                                                        RenameProfileText = "Profil umbenennen…",
                                                        RenameProfileDisabledText = "Live kann nicht umbenannt werden.",
@@ -977,11 +975,6 @@ public sealed class CompanionTexts
     /// Gets the text of the box that also deletes the history on the server.
     /// </summary>
     public required string DeleteProfileHistoryText { get; init; }
-
-    /// <summary>
-    /// Gets the text shown below the disabled box when the queue is full.
-    /// </summary>
-    public required string DeleteProfileHistoryFullText { get; init; }
 
     /// <summary>
     /// Gets the text of the button that confirms the deletion.

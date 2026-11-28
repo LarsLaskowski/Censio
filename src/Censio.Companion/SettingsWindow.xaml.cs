@@ -116,6 +116,7 @@ internal sealed partial class SettingsWindow : Window, ISettingsWindow
         ProfileLabel.Text = texts.ProfileLabel;
         NewProfileButton.Content = texts.NewProfileText;
         DeleteProfileButton.Content = texts.DeleteProfileText;
+        MergeProfileButton.Content = texts.MergeProfileText;
         RenameProfileButton.Content = texts.RenameProfileText;
         NewProfileLabel.Text = texts.NewProfileNameLabel;
         AutostartBox.Content = texts.StartWithWindowsText;
@@ -150,9 +151,12 @@ internal sealed partial class SettingsWindow : Window, ISettingsWindow
         var culture = CultureInfo.GetCultureInfo(view.Texts.Language == CompanionLanguage.German ? "de-DE" : "en-US");
 
         DeleteProfileButton.Content = view.Texts.DeleteProfileText;
+        MergeProfileButton.Content = view.Texts.MergeProfileText;
         RenameProfileButton.Content = view.Texts.RenameProfileText;
         WaitingDeletionsText.Text = string.Format(CultureInfo.InvariantCulture, view.Texts.WaitingDeletionsFormat, view.WaitingDeletions.ToString("N0", culture));
         WaitingDeletionsText.Visibility = view.WaitingDeletions > 0 ? Visibility.Visible : Visibility.Collapsed;
+        WaitingMergesText.Text = string.Format(CultureInfo.InvariantCulture, view.Texts.WaitingMergesFormat, view.WaitingMerges.ToString("N0", culture));
+        WaitingMergesText.Visibility = view.WaitingMerges > 0 ? Visibility.Visible : Visibility.Collapsed;
 
         UpdateDeleteButton();
     }
@@ -172,6 +176,11 @@ internal sealed partial class SettingsWindow : Window, ISettingsWindow
 
         DeleteProfileButton.IsEnabled = canDelete;
         DeleteProfileButton.ToolTip = canDelete ? null : view.Texts.DeleteProfileDisabledText;
+
+        var canMerge = view.CanMerge(selected);
+
+        MergeProfileButton.IsEnabled = canMerge;
+        MergeProfileButton.ToolTip = canMerge ? null : view.Texts.MergeProfileDisabledText;
 
         var canRename = view.CanRename(selected);
 
@@ -508,6 +517,34 @@ internal sealed partial class SettingsWindow : Window, ISettingsWindow
     }
 
     /// <summary>
+    /// Asks into which profile the selected profile is merged and reports the answer to the session.
+    /// </summary>
+    /// <param name="sender">The button</param>
+    /// <param name="eventArgs">The event data</param>
+    private void OnMergeProfileClick(object sender, RoutedEventArgs eventArgs)
+    {
+        if (_view is not { } view || ProfileBox.SelectedItem is not CompanionProfile profile || view.CanMerge(profile.Id) == false)
+        {
+            return;
+        }
+
+        var dialog = new ProfileMergeDialog(view.Texts, profile.Name, view.MergeTargets(profile.Id), view.IsDeletionQueueFull)
+                     {
+                         Owner = this
+                     };
+
+        if (dialog.ShowDialog() == true && dialog.Target is { } target)
+        {
+            MergeRequested?.Invoke(this,
+                                   new SettingsMerge
+                                   {
+                                       Profile = profile.Id,
+                                       Target = target.Id
+                                   });
+        }
+    }
+
+    /// <summary>
     /// Asks for the new name of the selected profile and reports it to the session.
     /// </summary>
     /// <param name="sender">The button</param>
@@ -593,11 +630,8 @@ internal sealed partial class SettingsWindow : Window, ISettingsWindow
     /// <inheritdoc />
     public event EventHandler<SettingsRename>? RenameRequested;
 
-    // Skeleton: removed with the implementation
-#pragma warning disable CS0067
     /// <inheritdoc />
     public event EventHandler<SettingsMerge>? MergeRequested;
-#pragma warning restore CS0067
 
     /// <inheritdoc />
     public void ShowProfiles(SettingsView view)

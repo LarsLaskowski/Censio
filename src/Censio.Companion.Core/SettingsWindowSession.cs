@@ -100,6 +100,7 @@ public sealed class SettingsWindowSession
         window.SaveRequested += OnSaveRequested;
         window.DeleteRequested += OnDeleteRequested;
         window.RenameRequested += OnRenameRequested;
+        window.MergeRequested += OnMergeRequested;
         _context.Profiles.DeletionsChanged += OnDeletionsChanged;
         _window = window;
         _document = null;
@@ -282,6 +283,7 @@ public sealed class SettingsWindowSession
                    IsProfilesFileInvalid = profiles.IsFileInvalid,
                    WaitingDeletions = profiles.WaitingDeletions.Count,
                    IsDeletionQueueFull = profiles.IsDeletionQueueFull,
+                   WaitingMerges = profiles.WaitingMerges.Count,
                    IsAutostartEnabled = _context.Autostart.IsEnabled,
                    Warnings = CreateWarnings(texts, _context.RunState())
                };
@@ -303,6 +305,7 @@ public sealed class SettingsWindowSession
         window.SaveRequested -= OnSaveRequested;
         window.DeleteRequested -= OnDeleteRequested;
         window.RenameRequested -= OnRenameRequested;
+        window.MergeRequested -= OnMergeRequested;
         _context.Profiles.DeletionsChanged -= OnDeletionsChanged;
 
         if (ReferenceEquals(_window, window))
@@ -359,6 +362,28 @@ public sealed class SettingsWindowSession
 
         profiles.Delete(deletion.Profile, deletion.IsHistoryDeleted);
         ShowProfilesAgain();
+    }
+
+    /// <summary>
+    /// Merges a profile into another as the window asked, the profiles are shown again through the change of the removals; ignored while a save runs, when the profile cannot be merged into the target or when the queue is full.
+    /// </summary>
+    /// <param name="sender">The window</param>
+    /// <param name="merge">The merge</param>
+    private void OnMergeRequested(object? sender, SettingsMerge merge)
+    {
+        if (sender is not ISettingsWindow window || ReferenceEquals(_window, window) == false || _document is null || _isSaving)
+        {
+            return;
+        }
+
+        var profiles = _context.Profiles;
+
+        if (CompanionProfiles.IsMergeable(merge.Profile, merge.Target, profiles.Active.Id, profiles.Profiles) == false || profiles.IsDeletionQueueFull)
+        {
+            return;
+        }
+
+        profiles.Merge(merge.Profile, merge.Target);
     }
 
     /// <summary>
