@@ -154,6 +154,41 @@ internal sealed class ContractRules
                 }
                 break;
 
+            case ContractStatus status:
+                {
+                    Require(Enum.IsDefined(status.PipeState));
+                }
+                break;
+
+            case ContractAcknowledgement acknowledgement:
+                {
+                    CheckAcknowledgement(acknowledgement);
+                }
+                break;
+
+            default:
+                {
+                    CheckSessionMessage(message);
+                }
+                break;
+        }
+
+        if (_tooLarge)
+        {
+            return ContractErrorKind.TooLarge;
+        }
+
+        return _invalid ? ContractErrorKind.Invalid : null;
+    }
+
+    /// <summary>
+    /// Checks a session event or a profile message, and refuses every other message type.
+    /// </summary>
+    /// <param name="message">The message</param>
+    private void CheckSessionMessage(ContractMessage message)
+    {
+        switch (message)
+        {
             case ContractSessionStart start:
                 {
                     CheckSessionEvent(start.Id, start.ProfileId, start.ReceiveTime);
@@ -182,31 +217,12 @@ internal sealed class ContractRules
                 }
                 break;
 
-            case ContractStatus status:
-                {
-                    Require(Enum.IsDefined(status.PipeState));
-                }
-                break;
-
-            case ContractAcknowledgement acknowledgement:
-                {
-                    CheckAcknowledgement(acknowledgement);
-                }
-                break;
-
             default:
                 {
                     _invalid = true;
                 }
                 break;
         }
-
-        if (_tooLarge)
-        {
-            return ContractErrorKind.TooLarge;
-        }
-
-        return _invalid ? ContractErrorKind.Invalid : null;
     }
 
     /// <summary>
