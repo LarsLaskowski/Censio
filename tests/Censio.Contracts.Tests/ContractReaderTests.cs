@@ -158,6 +158,16 @@ public sealed class ContractReaderTests
     private const string ProfileDeletionNotation = $"{{'type':'profileDeletion','contractVersion':3,'id':'{Id}','profileId':'{Profile}'}}";
 
     /// <summary>
+    /// The identity of the profile that receives a merge.
+    /// </summary>
+    private const string MergeTarget = "bbbbbbbb-cccc-4ddd-8eee-ffffffffffff";
+
+    /// <summary>
+    /// A valid profile merge in single-quote notation.
+    /// </summary>
+    private const string ProfileMergeNotation = $"{{'type':'profileMerge','contractVersion':3,'id':'{Id}','profileId':'{Profile}','targetProfileId':'{MergeTarget}'}}";
+
+    /// <summary>
     /// The identity <see cref="Profile" /> in upper case.
     /// </summary>
     private const string UpperCaseIdentity = "AAAAAAAA-BBBB-4CCC-8DDD-EEEEEEEEEEEE";
@@ -643,6 +653,65 @@ public sealed class ContractReaderTests
     {
         // Arrange
         var json = Encoding.UTF8.GetBytes(Substitute(ProfileDeletionNotation, find, replace));
+
+        // Act
+        var result = ContractReader.Read(json);
+
+        // Assert
+        AssertRefusal(result, kind, text, label);
+        Assert.AreEqual(refusedId, result.RefusedId?.ToString("D", CultureInfo.InvariantCulture), $"The refusal should return the id of its row: {label}");
+    }
+
+    /// <summary>
+    /// A profile merge of contract version 3, in the order of its frozen form or in another order, is read with its
+    /// identity, its source profile and its target profile (spec AC6).
+    /// </summary>
+    /// <param name="notation">The message in single-quote notation</param>
+    [TestMethod]
+    [TestCategory("AC6")]
+    [DataRow(ProfileMergeNotation)]
+    [DataRow($"{{'targetProfileId':'{MergeTarget}','profileId':'{Profile}','id':'{Id}','contractVersion':3,'type':'profileMerge'}}")]
+    public void ContractReaderProfileMergeReadsAllProperties(string notation)
+    {
+        // Arrange
+        var json = Utf8(notation);
+
+        // Act
+        var result = ContractReader.Read(json);
+
+        // Assert
+        var merge = AssertRead<ContractProfileMerge>(result, notation);
+
+        Assert.AreEqual(ContractMessageType.ProfileMerge, merge.Type, $"The message should be a profile merge: {notation}");
+        Assert.AreEqual(Guid.Parse(Id, CultureInfo.InvariantCulture), merge.Id, $"The identity should be read: {notation}");
+        Assert.AreEqual(Guid.Parse(Profile, CultureInfo.InvariantCulture), merge.ProfileId, $"The source profile should be read: {notation}");
+        Assert.AreEqual(Guid.Parse(MergeTarget, CultureInfo.InvariantCulture), merge.TargetProfileId, $"The target profile should be read: {notation}");
+        Assert.IsNull(result.RefusedId, $"A read message should return no refused id: {notation}");
+    }
+
+    /// <summary>
+    /// A profile merge breaking a rule is refused: equal identities, an all-zero identity, source or target are invalid,
+    /// a missing target or an added property is malformed; a broken source, target or pair returns the message's id so
+    /// the server acknowledges it with the refusal, a broken identity does not (spec AC6, E7).
+    /// </summary>
+    /// <param name="label">The name of the case</param>
+    /// <param name="find">The text of <see cref="ProfileMergeNotation" /> that is replaced</param>
+    /// <param name="replace">The text that breaks the message</param>
+    /// <param name="kind">The kind it is refused with</param>
+    /// <param name="text">The text it is refused with</param>
+    /// <param name="refusedId">The refused id as text, or <see langword="null" /> when none is returned</param>
+    [TestMethod]
+    [TestCategory("AC6")]
+    [DataRow("equal identities", $"'targetProfileId':'{MergeTarget}'", $"'targetProfileId':'{Profile}'", ContractErrorKind.Invalid, InvalidText, Id)]
+    [DataRow("id all zero", Id, ZeroId, ContractErrorKind.Invalid, InvalidText, null)]
+    [DataRow("profile all zero", $"'profileId':'{Profile}'", $"'profileId':'{ZeroId}'", ContractErrorKind.Invalid, InvalidText, Id)]
+    [DataRow("target all zero", MergeTarget, ZeroId, ContractErrorKind.Invalid, InvalidText, Id)]
+    [DataRow("target missing", $",'targetProfileId':'{MergeTarget}'", "", ContractErrorKind.Malformed, MalformedText, null)]
+    [DataRow("unknown property", $"'targetProfileId':'{MergeTarget}'", $"'targetProfileId':'{MergeTarget}','profileName':'Alice'", ContractErrorKind.Malformed, MalformedText, null)]
+    public void ContractReaderProfileMergeInvalidRefused(string label, string find, string replace, ContractErrorKind kind, string text, string? refusedId)
+    {
+        // Arrange
+        var json = Encoding.UTF8.GetBytes(Substitute(ProfileMergeNotation, find, replace));
 
         // Act
         var result = ContractReader.Read(json);
