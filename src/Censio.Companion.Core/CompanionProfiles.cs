@@ -75,9 +75,9 @@ public sealed class CompanionProfiles
     private readonly List<KeyValuePair<string, Guid>> _figures;
 
     /// <summary>
-    /// The identities of the profiles deleted with their history, the oldest first, each with whether the server confirmed it.
+    /// The removals whose history the server settles, deletions and merges in the order they were made, the oldest first.
     /// </summary>
-    private readonly List<KeyValuePair<Guid, bool>> _deleted;
+    private readonly List<ProfileRemoval> _deleted;
 
     /// <summary>
     /// The active profile.
@@ -116,9 +116,9 @@ public sealed class CompanionProfiles
     /// <param name="profiles">The profiles</param>
     /// <param name="active">The active profile</param>
     /// <param name="figures">The figure links, the oldest first</param>
-    /// <param name="deleted">The deleted identities, the oldest first, each with whether it is confirmed</param>
+    /// <param name="deleted">The removals, the oldest first</param>
     /// <param name="isFileInvalid">Whether the file could not be used</param>
-    private CompanionProfiles(string path, ILogger logger, List<CompanionProfile> profiles, CompanionProfile active, List<KeyValuePair<string, Guid>> figures, List<KeyValuePair<Guid, bool>> deleted, bool isFileInvalid)
+    private CompanionProfiles(string path, ILogger logger, List<CompanionProfile> profiles, CompanionProfile active, List<KeyValuePair<string, Guid>> figures, List<ProfileRemoval> deleted, bool isFileInvalid)
     {
         _path = path;
         _logger = logger;
@@ -230,13 +230,13 @@ public sealed class CompanionProfiles
         {
             lock (_lock)
             {
-                return [.. _deleted.Where(entry => entry.Value == false).Select(entry => entry.Key)];
+                return [.. _deleted.Where(entry => entry.IsConfirmed == false && entry.Target is null).Select(entry => entry.Id)];
             }
         }
     }
 
     /// <summary>
-    /// Gets a value indicating whether as many deletions wait as <see cref="MaxDeletions" /> allows.
+    /// Gets a value indicating whether as many removals, deletions and merges, wait as <see cref="MaxDeletions" /> allows.
     /// </summary>
     public bool IsDeletionQueueFull
     {
@@ -258,7 +258,7 @@ public sealed class CompanionProfiles
         {
             lock (_lock)
             {
-                return [];
+                return [.. _deleted.Where(entry => entry.IsConfirmed == false)];
             }
         }
     }
@@ -272,7 +272,7 @@ public sealed class CompanionProfiles
         {
             lock (_lock)
             {
-                return [];
+                return [.. _deleted.Where(entry => entry.IsConfirmed == false && entry.Target is not null).Select(entry => entry.Id)];
             }
         }
     }
@@ -364,8 +364,6 @@ public sealed class CompanionProfiles
         return id != LiveSender.ProfileId && id != active && profiles.Any(profile => profile.Id == id);
     }
 
-    // Skeleton: removed with the implementation
-#pragma warning disable S1172, RH2003
     /// <summary>
     /// Determines whether a profile can be merged into another.
     /// </summary>
@@ -376,9 +374,8 @@ public sealed class CompanionProfiles
     /// <returns><see langword="true" /> when the profile is deletable and the target is another listed profile</returns>
     public static bool IsMergeable(Guid id, Guid target, Guid active, IReadOnlyList<CompanionProfile> profiles)
     {
-        throw new NotImplementedException();
+        return IsDeletable(id, active, profiles) && target != id && profiles.Any(profile => profile.Id == target);
     }
-#pragma warning restore S1172, RH2003
 
     /// <summary>
     /// Determines whether a profile can be renamed.
@@ -589,10 +586,14 @@ public sealed class CompanionProfiles
             {
                 if (_deleted.Count >= MaxDeletions)
                 {
-                    _deleted.RemoveAt(_deleted.FindIndex(entry => entry.Value));
+                    _deleted.RemoveAt(_deleted.FindIndex(entry => entry.IsConfirmed));
                 }
 
-                _deleted.Add(new KeyValuePair<Guid, bool>(id, false));
+                _deleted.Add(new ProfileRemoval
+                             {
+                                 Id = id,
+                                 IsConfirmed = false
+                             });
             }
 
             MarkChanged();
@@ -616,7 +617,7 @@ public sealed class CompanionProfiles
     {
         lock (_lock)
         {
-            return _deleted.Any(entry => entry.Key == id);
+            return _deleted.Any(entry => entry.Id == id && entry.Target is null);
         }
     }
 
@@ -626,32 +627,62 @@ public sealed class CompanionProfiles
     /// <param name="id">The identity of the profile</param>
     public void ConfirmDeletion(Guid id)
     {
-        lock (_lock)
-        {
-            var index = _deleted.FindIndex(entry => entry.Key == id && entry.Value == false);
-
-            if (index < 0)
-            {
-                return;
-            }
-
-            _deleted[index] = new KeyValuePair<Guid, bool>(id, true);
-            MarkChanged();
-        }
-
-        DeletionsChanged?.Invoke(this, EventArgs.Empty);
+        Confirm(id, false);
     }
 
-    // Skeleton: removed with the implementation
-#pragma warning disable S1172, S2325, RH2003
     /// <summary>
     /// Merges a profile into another: removes it and queues the move of its history.
     /// </summary>
     /// <param name="id">The identity of the profile whose history is moved</param>
     /// <param name="target">The identity of the profile that receives the history</param>
+    /// <exception cref="ArgumentException">The profile cannot be merged into the target</exception>
+    /// <exception cref="InvalidOperationException">The queue is full</exception>
     public void Merge(Guid id, Guid target)
     {
-        throw new NotImplementedException();
+        bool isNoticeChanged;
+
+        lock (_lock)
+        {
+            if (IsMergeable(id, target, _active.Id, _profiles) == false)
+            {
+                throw new ArgumentException("The profile cannot be merged", nameof(id));
+            }
+
+            if (CountWaiting() >= MaxDeletions)
+            {
+                throw new InvalidOperationException("The queue of removals is full");
+            }
+
+            _profiles.RemoveAll(profile => profile.Id == id);
+
+            for (var index = 0; index < _figures.Count; index++)
+            {
+                if (_figures[index].Value == id)
+                {
+                    _figures[index] = new KeyValuePair<string, Guid>(_figures[index].Key, target);
+                }
+            }
+
+            isNoticeChanged = ReplaceNotice(null);
+
+            if (_deleted.Count >= MaxDeletions)
+            {
+                _deleted.RemoveAt(_deleted.FindIndex(entry => entry.IsConfirmed));
+            }
+
+            _deleted.Add(new ProfileRemoval
+                         {
+                             Id = id,
+                             Target = target,
+                             IsConfirmed = false
+                         });
+
+            MarkChanged();
+        }
+
+        CompanionLog.ProfileMerged(_logger);
+        RaisePendingNoticeChanged(isNoticeChanged);
+        DeletionsChanged?.Invoke(this, EventArgs.Empty);
     }
 
     /// <summary>
@@ -660,7 +691,7 @@ public sealed class CompanionProfiles
     /// <param name="id">The identity of the merged profile</param>
     public void ConfirmMerge(Guid id)
     {
-        throw new NotImplementedException();
+        Confirm(id, true);
     }
 
     /// <summary>
@@ -670,9 +701,26 @@ public sealed class CompanionProfiles
     /// <returns>The identity reached, or <see langword="null" /> when the merges do not end</returns>
     public Guid? ResolveProfile(Guid id)
     {
-        throw new NotImplementedException();
+        lock (_lock)
+        {
+            var current = id;
+            var steps = _deleted.Count(entry => entry.Target is not null);
+
+            for (var step = 0; step <= steps; step++)
+            {
+                var merge = _deleted.Find(entry => entry.Id == current && entry.Target is not null);
+
+                if (merge?.Target is not { } next)
+                {
+                    return current;
+                }
+
+                current = next;
+            }
+
+            return null;
+        }
     }
-#pragma warning restore S1172, S2325, RH2003
 
     /// <summary>
     /// Gets the name of a profile.
@@ -879,39 +927,90 @@ public sealed class CompanionProfiles
     }
 
     /// <summary>
-    /// Reads the deleted identities.
+    /// Reads the removals.
     /// </summary>
     /// <param name="element">The array</param>
     /// <param name="profiles">The profiles</param>
-    /// <returns>The deleted identities, or <see langword="null" /> when the array is outside the rules</returns>
-    private static List<KeyValuePair<Guid, bool>>? ReadDeleted(JsonElement element, List<CompanionProfile> profiles)
+    /// <returns>The removals, or <see langword="null" /> when the array is outside the rules</returns>
+    private static List<ProfileRemoval>? ReadDeleted(JsonElement element, List<CompanionProfile> profiles)
     {
         if (element.ValueKind != JsonValueKind.Array || element.GetArrayLength() > MaxDeletions)
         {
             return null;
         }
 
-        var deleted = new List<KeyValuePair<Guid, bool>>();
+        var deleted = new List<ProfileRemoval>();
 
         foreach (var item in element.EnumerateArray())
         {
-            if (item.ValueKind != JsonValueKind.Object || ReadProperties(item, "id", "confirmed") is not { } values || ReadId(values[0]) is not { } id)
+            var removal = ReadRemoval(item, profiles, deleted);
+
+            if (removal is null)
             {
                 return null;
             }
 
-            if (values[1].ValueKind is not (JsonValueKind.True or JsonValueKind.False)
-                || id == LiveSender.ProfileId
-                || profiles.Any(profile => profile.Id == id)
-                || deleted.Any(entry => entry.Key == id))
-            {
-                return null;
-            }
-
-            deleted.Add(new KeyValuePair<Guid, bool>(id, values[1].GetBoolean()));
+            deleted.Add(removal);
         }
 
         return deleted;
+    }
+
+    /// <summary>
+    /// Reads one removal: a deletion of <c>id</c> and <c>confirmed</c>, or a merge of <c>id</c>, <c>target</c> and <c>confirmed</c>.
+    /// </summary>
+    /// <param name="item">The object</param>
+    /// <param name="profiles">The profiles</param>
+    /// <param name="earlier">The removals read before</param>
+    /// <returns>The removal, or <see langword="null" /> when the object is outside the rules</returns>
+    private static ProfileRemoval? ReadRemoval(JsonElement item, List<CompanionProfile> profiles, List<ProfileRemoval> earlier)
+    {
+        if (item.ValueKind != JsonValueKind.Object)
+        {
+            return null;
+        }
+
+        var isMerge = false;
+        var values = ReadProperties(item, "id", "confirmed");
+
+        if (values is null)
+        {
+            values = ReadProperties(item, "id", "target", "confirmed");
+            isMerge = true;
+        }
+
+        if (values is null || ReadId(values[0]) is not { } id)
+        {
+            return null;
+        }
+
+        var confirmed = values[^1];
+        Guid? target = null;
+
+        if (isMerge)
+        {
+            target = ReadId(values[1]);
+
+            if (target is not { } targetId || targetId == id || earlier.Any(entry => entry.Id == targetId))
+            {
+                return null;
+            }
+        }
+
+        if (confirmed.ValueKind is not (JsonValueKind.True or JsonValueKind.False)
+            || id == LiveSender.ProfileId
+            || profiles.Any(profile => profile.Id == id)
+            || earlier.Any(entry => entry.Id == id))
+        {
+            return null;
+        }
+
+        return new ProfileRemoval
+               {
+                   Id = id,
+                   Target = target,
+                   IsConfirmed = confirmed.GetBoolean()
+               };
     }
 
     /// <summary>
@@ -1206,12 +1305,40 @@ public sealed class CompanionProfiles
     }
 
     /// <summary>
-    /// Counts the waiting deletions; the caller holds the lock.
+    /// Counts the waiting removals; the caller holds the lock.
     /// </summary>
-    /// <returns>The number of deleted identities the server has not confirmed</returns>
+    /// <returns>The number of deletions and merges the server has not confirmed</returns>
     private int CountWaiting()
     {
-        return _deleted.Count(entry => entry.Value == false);
+        return _deleted.Count(entry => entry.IsConfirmed == false);
+    }
+
+    /// <summary>
+    /// Marks a waiting deletion or merge as confirmed by the server.
+    /// </summary>
+    /// <param name="id">The identity of the profile</param>
+    /// <param name="isMerge">Whether the removal is a merge</param>
+    private void Confirm(Guid id, bool isMerge)
+    {
+        lock (_lock)
+        {
+            var index = _deleted.FindIndex(entry => entry.Id == id && entry.IsConfirmed == false && (entry.Target is not null) == isMerge);
+
+            if (index < 0)
+            {
+                return;
+            }
+
+            _deleted[index] = new ProfileRemoval
+                              {
+                                  Id = id,
+                                  Target = _deleted[index].Target,
+                                  IsConfirmed = true
+                              };
+            MarkChanged();
+        }
+
+        DeletionsChanged?.Invoke(this, EventArgs.Empty);
     }
 
     /// <summary>
@@ -1315,8 +1442,14 @@ public sealed class CompanionProfiles
                 foreach (var entry in _deleted)
                 {
                     writer.WriteStartObject();
-                    writer.WriteString("id", entry.Key.ToString("D", CultureInfo.InvariantCulture));
-                    writer.WriteBoolean("confirmed", entry.Value);
+                    writer.WriteString("id", entry.Id.ToString("D", CultureInfo.InvariantCulture));
+
+                    if (entry.Target is { } target)
+                    {
+                        writer.WriteString("target", target.ToString("D", CultureInfo.InvariantCulture));
+                    }
+
+                    writer.WriteBoolean("confirmed", entry.IsConfirmed);
                     writer.WriteEndObject();
                 }
 
