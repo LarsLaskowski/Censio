@@ -3,7 +3,7 @@ namespace Censio.Companion.Core.Tests;
 /// <summary>
 /// A settings window that records each shown view, each shown view of the profiles, each shown outcome and each request
 /// to come to the front, raises <see cref="SaveRequested" /> when the test asks to save, <see cref="DeleteRequested" />
-/// when the test asks to delete or rename a profile and <see cref="WindowClosed" /> when the test closes it.
+/// when the test asks to delete or rename a profile, <see cref="MergeRequested" /> when it asks to merge one and <see cref="WindowClosed" /> when the test closes it.
 /// </summary>
 public sealed class FakeSettingsWindow : ISettingsWindow
 {
@@ -126,6 +126,15 @@ public sealed class FakeSettingsWindow : ISettingsWindow
     }
 
     /// <summary>
+    /// Asks to merge a profile as the window's dialog would after <c>Merge</c>, raising <see cref="MergeRequested" />.
+    /// </summary>
+    /// <param name="merge">The profile and the target</param>
+    public void RequestMerge(SettingsMerge merge)
+    {
+        MergeRequested?.Invoke(this, merge);
+    }
+
+    /// <summary>
     /// Closes the window as its close button or <c>Cancel</c> would, raising <see cref="WindowClosed" />.
     /// </summary>
     public void Close()
@@ -172,6 +181,16 @@ public sealed class FakeSettingsWindow : ISettingsWindow
         RenameRequested?.Invoke(sender, rename);
     }
 
+    /// <summary>
+    /// Raises <see cref="MergeRequested" /> with another sender than this window.
+    /// </summary>
+    /// <param name="sender">The sender</param>
+    /// <param name="merge">The merge</param>
+    public void RaiseMergeRequested(object? sender, SettingsMerge merge)
+    {
+        MergeRequested?.Invoke(sender, merge);
+    }
+
     #endregion // Methods
 
     #region ISettingsWindow
@@ -188,11 +207,8 @@ public sealed class FakeSettingsWindow : ISettingsWindow
     /// <inheritdoc />
     public event EventHandler<SettingsRename>? RenameRequested;
 
-    // Skeleton: removed with the implementation
-#pragma warning disable CS0067
     /// <inheritdoc />
     public event EventHandler<SettingsMerge>? MergeRequested;
-#pragma warning restore CS0067
 
     /// <inheritdoc />
     public void ShowView(SettingsView view)

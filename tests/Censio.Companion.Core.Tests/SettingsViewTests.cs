@@ -143,6 +143,52 @@ public sealed class SettingsViewTests
     }
 
     /// <summary>
+    /// <c>Merge profile…</c> follows the deletion's rule: refused for <c>Live</c>, for the active profile and for an
+    /// identity the list does not hold, allowed for another listed profile (E1).
+    /// </summary>
+    /// <param name="selected">The identity selected in the drop-down</param>
+    /// <param name="expected">Whether the profile can be merged</param>
+    [TestMethod]
+    [TestCategory("AC2")]
+    [DataRow(LiveId, false, DisplayName = "Live")]
+    [DataRow(ActiveId, false, DisplayName = "Active profile")]
+    [DataRow(OtherId, true, DisplayName = "Other listed profile")]
+    [DataRow(UnlistedId, false, DisplayName = "Identity not listed")]
+    public void SettingsViewCanMergeAllButLiveActiveAndUnknown(string selected, bool expected)
+    {
+        // Arrange
+        var view = CreateProfilesView([CompanionProfile.Live, CreateProfile(ActiveId, "Active"), CreateProfile(OtherId, "Other")], new Guid(ActiveId));
+
+        // Act
+        var canMerge = view.CanMerge(new Guid(selected));
+
+        // Assert
+        Assert.AreEqual(expected, canMerge, $"Merging {selected} should be allowed only for a listed profile that is neither Live nor active");
+    }
+
+    /// <summary>
+    /// The targets of a merge are every other listed profile in list order, <c>Live</c> and the active profile included
+    /// and the selected profile left out (S1).
+    /// </summary>
+    /// <param name="selected">The identity selected in the drop-down</param>
+    /// <param name="expected">The identities of the targets, in order</param>
+    [TestMethod]
+    [TestCategory("AC2")]
+    [DataRow(OtherId, new[] { LiveId, ActiveId, UnlistedId }, DisplayName = "Middle of the list")]
+    [DataRow(UnlistedId, new[] { LiveId, ActiveId, OtherId }, DisplayName = "End of the list")]
+    public void SettingsViewMergeTargetsListOthersInListOrder(string selected, string[] expected)
+    {
+        // Arrange
+        var view = CreateProfilesView([CompanionProfile.Live, CreateProfile(ActiveId, "Active"), CreateProfile(OtherId, "Other"), CreateProfile(UnlistedId, "Last")], new Guid(ActiveId));
+
+        // Act
+        var targets = view.MergeTargets(new Guid(selected)).Select(profile => profile.Id).ToArray();
+
+        // Assert
+        Assert.AreSequenceEqual(expected.Select(id => new Guid(id)).ToArray(), targets, $"The targets of {selected} should be every other profile in list order");
+    }
+
+    /// <summary>
     /// <c>Rename profile…</c> is refused for <c>Live</c> and for an identity the list does not hold, and allowed for every
     /// other listed profile, the active one included (AC5).
     /// </summary>

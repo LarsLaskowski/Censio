@@ -258,7 +258,6 @@ public sealed class CompanionTextsTests
     [DataRow(nameof(CompanionTexts.DeleteProfileTitle), "Delete profile?", "Profil löschen?")]
     [DataRow(nameof(CompanionTexts.DeleteProfileTextFormat), "The profile {0} is removed from this Companion, with the figures linked to it.", "Das Profil {0} wird aus diesem Companion entfernt, mit den Figuren, die mit ihm verknüpft sind.")]
     [DataRow(nameof(CompanionTexts.DeleteProfileHistoryText), "Also delete its history on the server", "Auch seinen Verlauf auf dem Server löschen")]
-    [DataRow(nameof(CompanionTexts.DeleteProfileHistoryFullText), "1,000 deletions already wait for the server.", "Schon 1.000 Löschungen warten auf den Server.")]
     [DataRow(nameof(CompanionTexts.DeleteProfileConfirmText), "Delete", "Löschen")]
     [DataRow(nameof(CompanionTexts.WaitingDeletionsFormat), "Deleted profiles whose history the server has not deleted yet: {0}", "Gelöschte Profile, deren Verlauf der Server noch nicht gelöscht hat: {0}")]
     public void CompanionTextsDeletionTextsInBothLanguages(string name, string english, string german)
@@ -270,6 +269,34 @@ public sealed class CompanionTextsTests
         // Assert
         Assert.AreEqual(english, englishText, $"The English text should have the plan's wording: {name}");
         Assert.AreEqual(german, germanText, $"The German text should have the plan's wording: {name}");
+    }
+
+    /// <summary>
+    /// Every text of merging a profile, and the text of a full queue of changes, exists in English and German with the
+    /// spec's wording (<c>Texts</c> table, AC2).
+    /// </summary>
+    /// <param name="name">The name of the text</param>
+    /// <param name="english">The expected English text</param>
+    /// <param name="german">The expected German text</param>
+    [TestMethod]
+    [TestCategory("AC2")]
+    [DataRow(nameof(CompanionTexts.MergeProfileText), "Merge profile…", "Profil zusammenführen…")]
+    [DataRow(nameof(CompanionTexts.MergeProfileDisabledText), "Live and the active profile cannot be merged into another.", "Live und das aktive Profil können nicht in ein anderes Profil überführt werden.")]
+    [DataRow(nameof(CompanionTexts.MergeProfileTitle), "Merge profile", "Profil zusammenführen")]
+    [DataRow(nameof(CompanionTexts.MergeProfileTargetFormat), "Move the profile {0} into:", "Das Profil {0} überführen in:")]
+    [DataRow(nameof(CompanionTexts.MergeProfileTextFormat), "The profile {0} is removed from this Companion; its figures and its history on the server move to the profile chosen. This cannot be undone.", "Das Profil {0} wird aus diesem Companion entfernt; seine Figuren und sein Verlauf auf dem Server gehen auf das gewählte Profil über. Das lässt sich nicht rückgängig machen.")]
+    [DataRow(nameof(CompanionTexts.MergeProfileConfirmText), "Merge", "Zusammenführen")]
+    [DataRow(nameof(CompanionTexts.WaitingMergesFormat), "Merged profiles whose history the server has not moved yet: {0}", "Zusammengeführte Profile, deren Verlauf der Server noch nicht übernommen hat: {0}")]
+    [DataRow(nameof(CompanionTexts.ChangesQueueFullText), "1,000 changes already wait for the server.", "Schon 1.000 Änderungen warten auf den Server.")]
+    public void CompanionTextsMergeTextsInBothLanguages(string name, string english, string german)
+    {
+        // Act
+        var englishText = MergeText(CompanionTexts.English, name);
+        var germanText = MergeText(CompanionTexts.German, name);
+
+        // Assert
+        Assert.AreEqual(english, englishText, $"The English text should have the spec's wording: {name}");
+        Assert.AreEqual(german, germanText, $"The German text should have the spec's wording: {name}");
     }
 
     /// <summary>
@@ -311,10 +338,31 @@ public sealed class CompanionTextsTests
                    nameof(CompanionTexts.DeleteProfileTitle) => texts.DeleteProfileTitle,
                    nameof(CompanionTexts.DeleteProfileTextFormat) => texts.DeleteProfileTextFormat,
                    nameof(CompanionTexts.DeleteProfileHistoryText) => texts.DeleteProfileHistoryText,
-                   nameof(CompanionTexts.DeleteProfileHistoryFullText) => texts.DeleteProfileHistoryFullText,
                    nameof(CompanionTexts.DeleteProfileConfirmText) => texts.DeleteProfileConfirmText,
                    nameof(CompanionTexts.WaitingDeletionsFormat) => texts.WaitingDeletionsFormat,
                    _ => throw new ArgumentOutOfRangeException(nameof(name), name, "No text of deleting a profile has the name")
+               };
+    }
+
+    /// <summary>
+    /// Gives a text of merging a profile by its name.
+    /// </summary>
+    /// <param name="texts">The texts of one language</param>
+    /// <param name="name">The name of the text</param>
+    /// <returns>The text</returns>
+    private static string MergeText(CompanionTexts texts, string name)
+    {
+        return name switch
+               {
+                   nameof(CompanionTexts.MergeProfileText) => texts.MergeProfileText,
+                   nameof(CompanionTexts.MergeProfileDisabledText) => texts.MergeProfileDisabledText,
+                   nameof(CompanionTexts.MergeProfileTitle) => texts.MergeProfileTitle,
+                   nameof(CompanionTexts.MergeProfileTargetFormat) => texts.MergeProfileTargetFormat,
+                   nameof(CompanionTexts.MergeProfileTextFormat) => texts.MergeProfileTextFormat,
+                   nameof(CompanionTexts.MergeProfileConfirmText) => texts.MergeProfileConfirmText,
+                   nameof(CompanionTexts.WaitingMergesFormat) => texts.WaitingMergesFormat,
+                   nameof(CompanionTexts.ChangesQueueFullText) => texts.ChangesQueueFullText,
+                   _ => throw new ArgumentOutOfRangeException(nameof(name), name, "No text of merging a profile has the name")
                };
     }
 

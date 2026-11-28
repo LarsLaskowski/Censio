@@ -1637,6 +1637,104 @@ public sealed class SettingsWindowSessionTests
     }
 
     /// <summary>
+    /// A merge asked for in the window merges at once, without <c>Save</c>: the window shows the profiles again once
+    /// without the source and with the waiting merge counted, and nothing else, so the last view's values stay; the
+    /// settings file stays as it was and the merge is logged once (S1, E2).
+    /// </summary>
+    /// <returns>A task that completes with the test</returns>
+    [TestMethod]
+    [TestCategory("AC2")]
+    public async Task SettingsWindowSessionMergeMergesAndShowsProfiles()
+    {
+        // Arrange
+        WriteSettings(LocalSettings);
+
+        var source = _profiles.Create(ProfileName);
+
+        _profiles.Select(CompanionProfile.Live.Id);
+
+        var settingsBefore = await File.ReadAllTextAsync(SettingsPath, TestContext.CancellationToken);
+        var session = CreateSession();
+        var window = await OpenAsync(session);
+        var view = window.Views.Single();
+
+        // Act
+        window.RequestMerge(new SettingsMerge
+                            {
+                                Profile = source.Id,
+                                Target = CompanionProfile.Live.Id
+                            });
+
+        await RunPostedUntilAsync(() => window.ProfileViews.Count > 0);
+
+        RunPosted();
+
+        // Assert
+        var shown = window.ProfileViews.Single();
+
+        Assert.AreSequenceEqual([CompanionProfile.Live.Id], _profiles.Profiles.Select(profile => profile.Id).ToArray(), "The merged profile should leave the list");
+        Assert.AreSequenceEqual([source.Id], _profiles.WaitingMerges.ToArray(), "The merge should wait for the server");
+        Assert.AreSequenceEqual([CompanionProfile.Live.Id], shown.ProfileList.Select(profile => profile.Id).ToArray(), "The profiles shown should not hold the merged profile");
+        Assert.AreEqual(1, shown.WaitingMerges, "The profiles shown should count the waiting merge");
+        Assert.AreEqual(CompanionProfile.Live.Id, shown.ActiveProfile, "The profiles shown should select the active profile");
+        Assert.AreSame(view.Values, shown.Values, "The profiles shown should keep the values of the last view");
+        Assert.HasCount(1, window.Views, "The merge should show no whole view");
+        Assert.IsEmpty(window.Outcomes, "The merge should show no outcome of a save");
+        Assert.AreEqual(settingsBefore, await File.ReadAllTextAsync(SettingsPath, TestContext.CancellationToken), "The merge should not write the settings file");
+        Assert.AreEqual(1, CountMergeLines(), "The merge should be logged once");
+    }
+
+    /// <summary>
+    /// A merge the session must not carry out changes nothing: one of another sender, one before the first view, one
+    /// while a save runs, one of <c>Live</c> or of the active profile, one into a profile the list does not hold or into
+    /// itself, one while 1,000 changes wait, and one after the window closed; the list, the waiting merges and the window
+    /// stay as they were, and nothing is logged (S7, E1, E3).
+    /// </summary>
+    /// <param name="kind">The kind of merge</param>
+    /// <returns>A task that completes with the test</returns>
+    [TestMethod]
+    [TestCategory("AC2")]
+    [DataRow("OtherSender", DisplayName = "Other sender")]
+    [DataRow("BeforeFirstView", DisplayName = "Before the first view")]
+    [DataRow("Saving", DisplayName = "While a save runs")]
+    [DataRow("Live", DisplayName = "Live")]
+    [DataRow("Active", DisplayName = "Active profile")]
+    [DataRow("TargetNotListed", DisplayName = "Target not listed")]
+    [DataRow("TargetIsSource", DisplayName = "Target equal to source")]
+    [DataRow("QueueFull", DisplayName = "1,000 changes waiting")]
+    [DataRow("AfterClose", DisplayName = "After close")]
+    public async Task SettingsWindowSessionMergeIgnored(string kind)
+    {
+        // Arrange
+        WriteSettings(new JsonObject
+                      {
+                          ["gameFolder"] = GameFolder
+                      }.ToJsonString());
+
+        var merge = CreateIgnoredMerge(kind);
+        var profilesBefore = _profiles.Profiles.Select(profile => profile.Id).ToArray();
+        var waitingBefore = _profiles.WaitingMerges.ToArray();
+        var session = CreateSession();
+        var window = await OpenIgnoredMergeWindowAsync(kind, session);
+
+        await StartHeldSaveAsync(kind, window);
+
+        var mergeLinesBefore = CountMergeLines();
+
+        // Act
+        RaiseIgnoredMerge(kind, window, merge);
+        RunPosted();
+
+        // Assert
+        Assert.AreSequenceEqual(profilesBefore, _profiles.Profiles.Select(profile => profile.Id).ToArray(), $"The ignored merge should leave the list as it was: {kind}");
+        Assert.AreSequenceEqual(waitingBefore, _profiles.WaitingMerges.ToArray(), $"The ignored merge should add no waiting merge: {kind}");
+        Assert.IsEmpty(window.ProfileViews, $"The ignored merge should show the profiles not again: {kind}");
+        Assert.AreEqual(mergeLinesBefore, CountMergeLines(), $"The ignored merge should log no merge: {kind}");
+
+        await FinishHeldSaveAsync(kind, window);
+    }
+
+    /// <summary>
     /// A rename asked for in the window renames the profile at once, without <c>Save</c>: the window shows the profiles
     /// again once with the new name and nothing else, so other unsaved edits stay as typed; the settings file stays as
     /// it was and the rename is logged once (AC6).
@@ -2093,6 +2191,102 @@ public sealed class SettingsWindowSessionTests
     private int CountDeletionLines()
     {
         return _logger.Entries.Count(entry => entry.Message == "Profile deleted");
+    }
+
+    /// <summary>
+    /// Counts the log entries of merged profiles so far.
+    /// </summary>
+    /// <returns>The number of entries</returns>
+    private int CountMergeLines()
+    {
+        return _logger.Entries.Count(entry => entry.Message == "Profile merged");
+    }
+
+    /// <summary>
+    /// Prepares the profiles for a merge the session must ignore and returns that merge.
+    /// </summary>
+    /// <param name="kind">The kind of merge</param>
+    /// <returns>The merge</returns>
+    private SettingsMerge CreateIgnoredMerge(string kind)
+    {
+        if (kind == "QueueFull")
+        {
+            DeleteWithHistory(CompanionProfiles.MaxDeletions);
+        }
+
+        var created = _profiles.Create(ProfileName);
+
+        if (kind != "Active")
+        {
+            _profiles.Select(CompanionProfile.Live.Id);
+        }
+
+        return kind switch
+               {
+                   "Live" => new SettingsMerge
+                             {
+                                 Profile = CompanionProfile.Live.Id,
+                                 Target = created.Id
+                             },
+                   "TargetNotListed" => new SettingsMerge
+                                        {
+                                            Profile = created.Id,
+                                            Target = Guid.NewGuid()
+                                        },
+                   "TargetIsSource" => new SettingsMerge
+                                       {
+                                           Profile = created.Id,
+                                           Target = created.Id
+                                       },
+                   _ => new SettingsMerge
+                        {
+                            Profile = created.Id,
+                            Target = CompanionProfile.Live.Id
+                        }
+               };
+    }
+
+    /// <summary>
+    /// Opens the window for a merge the session must ignore: without its first view for <c>BeforeFirstView</c>.
+    /// </summary>
+    /// <param name="kind">The kind of merge</param>
+    /// <param name="session">The session</param>
+    /// <returns>The window</returns>
+    private async Task<FakeSettingsWindow> OpenIgnoredMergeWindowAsync(string kind, SettingsWindowSession session)
+    {
+        if (kind != "BeforeFirstView")
+        {
+            return await OpenAsync(session);
+        }
+
+        session.Open();
+
+        return _windows.Single();
+    }
+
+    /// <summary>
+    /// Raises the merge the way the kind says: from another sender, after a close, or from the window itself.
+    /// </summary>
+    /// <param name="kind">The kind of merge</param>
+    /// <param name="window">The window</param>
+    /// <param name="merge">The merge</param>
+    private void RaiseIgnoredMerge(string kind, FakeSettingsWindow window, SettingsMerge merge)
+    {
+        if (kind == "OtherSender")
+        {
+            window.RaiseMergeRequested(null, merge);
+            window.RaiseMergeRequested(new FakeSettingsWindow(), merge);
+
+            return;
+        }
+
+        if (kind == "AfterClose")
+        {
+            window.Close();
+            RunPosted();
+        }
+
+        window.RequestMerge(merge);
     }
 
     /// <summary>
