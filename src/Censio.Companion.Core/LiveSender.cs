@@ -519,14 +519,16 @@ public sealed class LiveSender : IAsyncDisposable
     }
 
     /// <summary>
-    /// Finds the oldest waiting removal not tried yet.
+    /// Finds the oldest waiting removal when it was not tried yet; a tried one that still waits could not be written and blocks the later ones on this connection.
     /// </summary>
     /// <param name="profiles">The profiles</param>
     /// <param name="tried">The identities tried on this connection</param>
-    /// <returns>The removal, or <see langword="null" /> when none is left</returns>
+    /// <returns>The removal, or <see langword="null" /> when none is left or the oldest was tried</returns>
     private static ProfileRemoval? FirstUntried(CompanionProfiles profiles, HashSet<Guid> tried)
     {
-        return profiles.WaitingRemovals.FirstOrDefault(removal => tried.Contains(removal.Id) == false);
+        var waiting = profiles.WaitingRemovals;
+
+        return waiting.Count > 0 && tried.Contains(waiting[0].Id) == false ? waiting[0] : null;
     }
 
     /// <summary>
