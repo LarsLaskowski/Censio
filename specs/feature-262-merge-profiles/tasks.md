@@ -1,0 +1,24 @@
+# Tasks: Merge two profiles
+
+Plan: [plan.md](plan.md)
+
+| # | Group | Task | Files | Criteria | Depends on | Owner | Done |
+| - | ----- | ---- | ----- | -------- | ---------- | ----- | ---- |
+| 1 | G1 | Skeleton: `ContractProfileMerge` (`Id`, `ProfileId`, `TargetProfileId`, `Type`), `ContractMessageType.ProfileMerge` | `src/Censio.Contracts/ContractProfileMerge.cs`, `src/Censio.Contracts/ContractMessageType.cs` | AC6 | — | Dev | [ ] |
+| 2 | G1 | Tests first: reader and writer of `profileMerge` | `tests/Censio.Contracts.Tests/ContractReaderTests.cs`, `tests/Censio.Contracts.Tests/ContractWriterTests.cs` | AC6 | 1 | Tester | [ ] |
+| 3 | G1 | Implement: rules, reader, writer, JSON context | `src/Censio.Contracts/` | AC6 | 2 | Dev | [ ] |
+| 4 | G2 | Skeleton: `MergeProfileAsync` of `ServerStore`, `ServerState`, `HistoryRetention` | `src/Censio.Server.Data/ServerStore.cs`, `src/Censio.Server/ServerState.cs`, `src/Censio.Server/HistoryRetention.cs` | AC7, AC8, AC9 | 3 | Dev | [ ] |
+| 5 | G2 | Tests first: store, state, retention, ingest, pages, end to end; adapt `IngestClient` | `tests/Censio.Server.Data.Tests/ServerStoreMergeTests.cs`, `tests/Censio.Server.Tests/` | AC7, AC8, AC9 | 4 | Tester | [ ] |
+| 6 | G2 | Implement: the merge transaction with `HourlyPointMerge`, the shared re-read, logs, `IngestSession` case | `src/Censio.Server.Data/`, `src/Censio.Server/` | AC7, AC8, AC9 | 5 | Dev | [ ] |
+| 7 | G2 | Measure the merge (plan, *Measurement*) and report the table | throwaway test outside the repository | AC10 | 6 | Dev | [ ] |
+| 8 | G3 | Skeleton: `ProfileRemoval` (`Id`, `Target`, `IsConfirmed`), `CompanionProfiles` `WaitingRemovals`, `WaitingMerges`, `IsMergeable`, `Merge`, `ConfirmMerge`, `ResolveProfile`, `CompanionLog.ProfileMerged` | `src/Censio.Companion.Core/ProfileRemoval.cs`, `src/Censio.Companion.Core/CompanionProfiles.cs`, `src/Censio.Companion.Core/CompanionLog.cs` | AC1, AC5 | 3 | Dev | [ ] |
+| 9 | G3 | Tests first: merging, the queue, resolving, the file | `tests/Censio.Companion.Core.Tests/CompanionProfilesMergeTests.cs` | AC1, AC3, AC4, AC5 | 8 | Tester | [ ] |
+| 10 | G3 | Implement: the ordered queue, `Merge`, `ConfirmMerge`, `ResolveProfile`, reader and writer | `src/Censio.Companion.Core/CompanionProfiles.cs`, `src/Censio.Companion.Core/CompanionLog.cs` | AC1, AC5 | 9 | Dev | [ ] |
+| 11 | G4 | Skeleton: `ContractMessageConverter.WithProfile`, `CompanionLog.ProfileMergeConfirmed`, `CompanionLog.ProfileMergeRefused` | `src/Censio.Companion.Core/ContractMessageConverter.cs`, `src/Censio.Companion.Core/CompanionLog.cs` | AC3, AC4 | 10 | Dev | [ ] |
+| 12 | G4 | Tests first: sending merges and resolved messages; adapt `ScriptedIngestServer` | `tests/Censio.Companion.Core.Tests/LiveSenderMergeTests.cs`, `tests/Censio.Companion.Core.Tests/ContractMessageConverterTests.cs`, `tests/Censio.Companion.Core.Tests/ScriptedIngestServer.cs` | AC3, AC4 | 11 | Tester | [ ] |
+| 13 | G4 | Implement: `SendRemovalsAsync`, the resolution of buffered messages, the reconnect | `src/Censio.Companion.Core/LiveSender.cs`, `src/Censio.Companion.Core/ContractMessageConverter.cs` | AC3, AC4 | 12 | Dev | [ ] |
+| 14 | G5 | Skeleton: `SettingsMerge` (`Profile`, `Target`), `ISettingsWindow.MergeRequested`, `SettingsView` `WaitingMerges`, `CanMerge`, `MergeTargets`, `CompanionTexts` `MergeProfileText`, `MergeProfileDisabledText`, `MergeProfileTitle`, `MergeProfileTargetFormat`, `MergeProfileTextFormat`, `MergeProfileConfirmText`, `WaitingMergesFormat`, `ChangesQueueFullText` | `src/Censio.Companion.Core/SettingsMerge.cs`, `src/Censio.Companion.Core/ISettingsWindow.cs`, `src/Censio.Companion.Core/SettingsView.cs`, `src/Censio.Companion.Core/CompanionTexts.cs` | AC2 | 13 | Dev | [ ] |
+| 15 | G5 | Tests first: view, session, texts; adapt `FakeSettingsWindow` and the queue-full row | `tests/Censio.Companion.Core.Tests/SettingsViewTests.cs`, `tests/Censio.Companion.Core.Tests/SettingsWindowSessionTests.cs`, `tests/Censio.Companion.Core.Tests/CompanionTextsTests.cs`, `tests/Censio.Companion.Core.Tests/FakeSettingsWindow.cs` | AC2 | 14 | Tester | [ ] |
+| 16 | G5 | Implement: session and view; the Windows dialog, button and line | `src/Censio.Companion.Core/`, `src/Censio.Companion/ProfileMergeDialog.xaml`, `src/Censio.Companion/ProfileMergeDialog.xaml.cs`, `src/Censio.Companion/SettingsWindow.xaml`, `src/Censio.Companion/SettingsWindow.xaml.cs`, `src/Censio.Companion/ProfileDeletionDialog.xaml.cs` | AC2 | 15 | Dev | [ ] |
+| 17 | G6 | No new API. Documentation: area documents and index row, README, user guide, ARCHITECTURE (plan, *Documentation updates*), the measurement table | `docs/areas/`, `README.md`, `docs/USER_GUIDE.md`, `docs/ARCHITECTURE.md` | AC10, AC11 | 7, 16 | Dev | [ ] |
+| 18 | G6 | `.squad/project.md` ingest line, from the text the Dev reports | `.squad/project.md` | — | 17 | Orchestrator | [ ] |

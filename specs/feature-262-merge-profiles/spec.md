@@ -1,7 +1,7 @@
 # Spec: Merge two profiles
 
 Source: Issue #262
-Status: Draft
+Status: Approved by Lead
 
 ## Problem
 
@@ -165,8 +165,8 @@ option 7), and no contract message moves a history ([contract](../../docs/areas/
   languages; `companion-log.md`: the three Companion lines.
 - `live-sending.md`: merges sent with the deletions after the hello; buffered messages of a merged identity; the hello.
 - `contract.md`: the thirteenth message `profileMerge`; `ingest.md`: how the server answers it and the accepted risk.
-- `history-merging.md` (new): what a merge moves and combines, its failure, its log lines and its measurement;
-  `server-state.md`: a subsection *Merging profiles* beside *Deleting a profile*; `web-pages.md`: the pages after a merge.
+- `history-deletion.md`, widened: a section *Merging a profile* (what moves and combines, failure, log, measurement);
+  `server-state.md`: a subsection *Merging profiles* beside *Deleting a profile*, with the pages after a merge.
 - `history.md`: *The trend reads* names a merge beside a fold and a deletion between two parts (E14).
 - `server-data.md`: *Storing and reading* gets a merge bullet beside *Deleting a profile*; `web-charts.md`: a profile
   merged while its page is open shows `Not found.` as a deleted one does.
