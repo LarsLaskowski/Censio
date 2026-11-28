@@ -536,6 +536,21 @@ public sealed partial class ServerState : IProfileStateSource
         }
     }
 
+    // Skeleton: removed with the implementation
+#pragma warning disable S1172, S2325, RH2003
+    /// <summary>
+    /// Merges the history of a profile into another profile's and rebuilds the held profiles and the profile list.
+    /// </summary>
+    /// <param name="profileId">The identity of the profile whose history is moved (the source)</param>
+    /// <param name="targetProfileId">The identity of the profile that receives the history</param>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>The result of the merge</returns>
+    public Task<HistoryResult> MergeProfileAsync(Guid profileId, Guid targetProfileId, CancellationToken cancellationToken)
+    {
+        throw new NotImplementedException();
+    }
+#pragma warning restore S1172, S2325, RH2003
+
     /// <summary>
     /// Deletes a profile with its history and rebuilds the held profiles and the profile list.
     /// </summary>
