@@ -68,6 +68,26 @@ public sealed class HistoryRetentionTests
     private const string DeleteFailedLine = "The history of a profile could not be deleted.";
 
     /// <summary>
+    /// The name of the profile a merge moves history into.
+    /// </summary>
+    private const string MergeTargetName = "Merge target 5d18";
+
+    /// <summary>
+    /// The island name of the profile a merge moves history into.
+    /// </summary>
+    private const string MergeTargetIsland = "Merge target island 7b42";
+
+    /// <summary>
+    /// The line the retention logs for a merge that is done.
+    /// </summary>
+    private const string MergedLine = "The history of a profile was merged into another.";
+
+    /// <summary>
+    /// The line the retention logs for a merge that failed.
+    /// </summary>
+    private const string MergeFailedLine = "The history of a profile could not be merged into another.";
+
+    /// <summary>
     /// The text of an entry without an exception, in the descriptions.
     /// </summary>
     private const string NoException = "<none>";
@@ -777,6 +797,67 @@ public sealed class HistoryRetentionTests
         Assert.AreEqual(HistoryOutcome.Failed, outcome, "The failed deletion should be reported as failed");
         Assert.AreSequenceEqual(new[] { Describe(LogLevel.Warning, DeleteFailedLine, typeof(SqliteException)) }, DescribeEntries(), "The failed deletion should log the warning with its exception and no name");
         Assert.Contains(profileId, state.Profiles.Select(profile => profile.Id).ToList(), "The profile should stay listed");
+    }
+
+    /// <summary>
+    /// A merge logs its line at Information, without a name, an identity or an exception, moves the history to the target
+    /// in the state and leaves the target listed under its name (spec AC9, N5).
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC9")]
+    public async Task HistoryRetentionMergeProfileLogsWithoutName()
+    {
+        // Arrange
+        var (state, history, _) = await OpenAsync();
+
+        var sourceId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+
+        await state.StoreProfileAsync(sourceId, DeletedProfileName, TestContext.CancellationToken);
+        await state.StoreProfileAsync(targetId, MergeTargetName, TestContext.CancellationToken);
+        await StoreTicksAsync(state, Tick(sourceId, _hour.AddHours(6), DeletedIslandName), Tick(targetId, _hour.AddHours(5), MergeTargetIsland));
+
+        using var retention = new HistoryRetention(state, history, new FakeTimeProvider(_foldTime), _logger);
+
+        // Act
+        var outcome = await retention.MergeProfileAsync(sourceId, targetId, TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(HistoryOutcome.Done, outcome, "The merge should be done");
+        Assert.AreSequenceEqual(new[] { Describe(LogLevel.Information, MergedLine, null) }, DescribeEntries(), "The merge should log its line once, without a name, an identity or an exception");
+        Assert.AreSequenceEqual(new[] { targetId }, state.Profiles.Select(profile => profile.Id).ToList(), "Only the target should be listed");
+    }
+
+    /// <summary>
+    /// A merge that fails logs the warning with its exception and no name, reports failed and leaves both profiles
+    /// listed (spec AC9, N5).
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC9")]
+    public async Task HistoryRetentionMergeProfileFailedLogsWarning()
+    {
+        // Arrange
+        var (state, history, databaseFile) = await OpenAsync();
+
+        var sourceId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+
+        await state.StoreProfileAsync(sourceId, DeletedProfileName, TestContext.CancellationToken);
+        await state.StoreProfileAsync(targetId, MergeTargetName, TestContext.CancellationToken);
+        await StoreTicksAsync(state, Tick(sourceId, _hour.AddHours(6), DeletedIslandName), Tick(targetId, _hour.AddHours(5), MergeTargetIsland));
+        Execute(databaseFile, CreateFailingDeleteTriggerSql);
+
+        using var retention = new HistoryRetention(state, history, new FakeTimeProvider(_foldTime), _logger);
+
+        // Act
+        var outcome = await retention.MergeProfileAsync(sourceId, targetId, TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreEqual(HistoryOutcome.Failed, outcome, "The failed merge should be reported as failed");
+        Assert.AreSequenceEqual(new[] { Describe(LogLevel.Warning, MergeFailedLine, typeof(SqliteException)) }, DescribeEntries(), "The failed merge should log the warning with its exception and no name");
+        Assert.AreSequenceEqual(new[] { sourceId, targetId }.Order().ToList(), state.Profiles.Select(profile => profile.Id).Order().ToList(), "Both profiles should stay listed");
     }
 
     /// <summary>

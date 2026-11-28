@@ -466,6 +466,33 @@ public sealed class RegionsTests
     }
 
     /// <summary>
+    /// A page that shows a profile shows the not-found text and no table once that profile is merged into another.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC8")]
+    public async Task RegionsMergedProfileShowsNotFound()
+    {
+        // Arrange
+        await using var host = await PageTestHost.CreateAsync(TestContext.CancellationToken);
+
+        await StoreNamedProfileAsync(host, _firstProfile, FirstProfileName, 0);
+        await StoreNamedProfileAsync(host, _secondProfile, SecondProfileName, 10);
+
+        var page = await RenderReadyAsync(host, _firstProfile, UiLanguage.English);
+        var retention = host.Context.Services.GetRequiredService<HistoryRetention>();
+
+        // Act
+        var outcome = await retention.MergeProfileAsync(_firstProfile, _secondProfile, TestContext.CancellationToken);
+
+        // Assert
+        await page.WaitForAssertionAsync(() => Assert.Contains("Not found.", PageTestHost.Text(page), "The page of the merged profile should show the not-found text"), PageTestHost.WaitBound);
+
+        Assert.AreEqual(HistoryOutcome.Done, outcome, "The merge should be done");
+        Assert.IsEmpty(page.FindAll("table"), "The page of the merged profile should show no table");
+    }
+
+    /// <summary>
     /// The overview lists the profile's regions ordered by name with their island count and key figures, each region a
     /// link to its island list.
     /// </summary>

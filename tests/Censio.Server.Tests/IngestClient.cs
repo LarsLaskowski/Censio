@@ -116,6 +116,18 @@ public static class IngestClient
     }
 
     /// <summary>
+    /// Builds a profile merge.
+    /// </summary>
+    /// <param name="id">The identity of the message</param>
+    /// <param name="profileId">The identity of the profile whose history is merged (the source)</param>
+    /// <param name="targetProfileId">The identity of the profile that receives the history</param>
+    /// <returns>The profile merge in single-quote notation</returns>
+    public static string ProfileMerge(string id, string profileId, string targetProfileId)
+    {
+        return $"{{'type':'profileMerge','contractVersion':3,'id':'{id}','profileId':'{profileId}','targetProfileId':'{targetProfileId}'}}";
+    }
+
+    /// <summary>
     /// Builds an icon image.
     /// </summary>
     /// <param name="id">The identity of the message</param>

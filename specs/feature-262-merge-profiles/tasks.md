@@ -8,7 +8,7 @@ Plan: [plan.md](plan.md)
 | 2 | G1 | Tests first: reader and writer of `profileMerge` | `tests/Censio.Contracts.Tests/ContractReaderTests.cs`, `tests/Censio.Contracts.Tests/ContractWriterTests.cs` | AC6 | 1 | Tester | [x] |
 | 3 | G1 | Implement: rules, reader, writer, JSON context | `src/Censio.Contracts/` | AC6 | 2 | Dev | [x] |
 | 4 | G2 | Skeleton: `MergeProfileAsync` of `ServerStore`, `ServerState`, `HistoryRetention` | `src/Censio.Server.Data/ServerStore.cs`, `src/Censio.Server/ServerState.cs`, `src/Censio.Server/HistoryRetention.cs` | AC7, AC8, AC9 | 3 | Dev | [x] |
-| 5 | G2 | Tests first: store, state, retention, ingest, pages, end to end; adapt `IngestClient` | `tests/Censio.Server.Data.Tests/ServerStoreMergeTests.cs`, `tests/Censio.Server.Tests/` | AC7, AC8, AC9 | 4 | Tester | [ ] |
+| 5 | G2 | Tests first: store, state, retention, ingest, pages, end to end; adapt `IngestClient` | `tests/Censio.Server.Data.Tests/ServerStoreMergeTests.cs`, `tests/Censio.Server.Tests/` | AC7, AC8, AC9 | 4 | Tester | [x] |
 | 6 | G2 | Implement: the merge transaction with `HourlyPointMerge`, the shared re-read, logs, `IngestSession` case | `src/Censio.Server.Data/`, `src/Censio.Server/` | AC7, AC8, AC9 | 5 | Dev | [ ] |
 | 7 | G2 | Measure the merge (plan, *Measurement*) and report the table | throwaway test outside the repository | AC10 | 6 | Dev | [ ] |
 | 8 | G3 | Skeleton: `ProfileRemoval` (`Id`, `Target`, `IsConfirmed`), `CompanionProfiles` `WaitingRemovals`, `WaitingMerges`, `IsMergeable`, `Merge`, `ConfirmMerge`, `ResolveProfile`, `CompanionLog.ProfileMerged` | `src/Censio.Companion.Core/ProfileRemoval.cs`, `src/Censio.Companion.Core/CompanionProfiles.cs`, `src/Censio.Companion.Core/CompanionLog.cs` | AC1, AC5 | 3 | Dev | [ ] |

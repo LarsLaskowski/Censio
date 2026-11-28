@@ -199,6 +199,11 @@ public sealed class ServerStateTests
     private static readonly string[] _expectedOlderTickIslands = ["1/1/0 Name of the latest tick", "2/2/0 Island only of an older tick"];
 
     /// <summary>
+    /// The islands <see cref="ServerStateMergeProfileRereadsAndNotifies" /> expects, in the order of their text.
+    /// </summary>
+    private static readonly string[] _expectedMergedIslands = ["1/1/0 Island of the target", "2/2/0 Island of the source"];
+
+    /// <summary>
     /// The islands <see cref="ServerStateStoreTickAfterDeletionCreatesUnnamedProfile" /> expects.
     /// </summary>
     private static readonly string[] _expectedIslandsAfterDeletion = [$"2/2/0 {IslandAfterDeletion}"];
@@ -1849,6 +1854,94 @@ public sealed class ServerStateTests
         Assert.AreSequenceEqual(new[] { profiles[1], profiles[2] }.Order().ToList(), heldBefore, "The two newest profiles should be held before the deletion, or the comparison below would prove less");
         Assert.AreEqual(profiles[1], state.NewestProfile, "The profile with the next newest tick should be the newest profile");
         Assert.AreSequenceEqual(new[] { profiles[0], profiles[1] }.Order().ToList(), state.HeldProfiles.Order().ToList(), "The two remaining profiles should be held");
+    }
+
+    /// <summary>
+    /// Merging a held profile into a held one lists only the target, drops the source's held state (a page shows it as
+    /// not found), reads the target again so it holds the source's newer latest tick, the islands and the later set of
+    /// trade routes of both, and tells the followers that both profiles changed and that the target's trade routes did
+    /// (spec AC8).
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC8")]
+    public async Task ServerStateMergeProfileRereadsAndNotifies()
+    {
+        // Arrange
+        var (store, state) = await OpenRestoredAsync(null);
+
+        var sourceId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+        var newerTick = CreateTick(sourceId, 20, CreateIsland(2, "Island of the source", CreateEntry(2)));
+        var newerRoutes = CreateEveryValueTradeRoutes(sourceId, 20);
+
+        await state.StoreProfileAsync(sourceId, ProfileName, TestContext.CancellationToken);
+        await state.StoreProfileAsync(targetId, OtherProfileName, TestContext.CancellationToken);
+        await StoreTicksAsync(state, CreateTick(targetId, 10, CreateIsland(1, "Island of the target", CreateEntry(1))), newerTick);
+        await StoreTradeRoutesAsync(state, newerRoutes, CreateTradeRoutes(targetId, 10, CreateRoute(1, "Route of the target", string.Empty, [0, 0, 1, 0])));
+
+        var heldBefore = state.HeldProfiles.Order().ToList();
+        var (notices, told) = Follow(state, 3);
+
+        // Act
+        var result = await state.MergeProfileAsync(sourceId, targetId, TestContext.CancellationToken);
+
+        // Assert
+        await told.WaitAsync(_waitBound, TestContext.CancellationToken);
+
+        var held = GetHeld(state, targetId);
+        var expectedNotices = new[] { DescribeNotice(ServerStateChangeKind.Profile, sourceId), DescribeNotice(ServerStateChangeKind.Profile, targetId), DescribeNotice(ServerStateChangeKind.TradeRoutes, targetId) };
+
+        Assert.AreSequenceEqual(new[] { sourceId, targetId }.Order().ToList(), heldBefore, "Both profiles should be held before the merge, or the checks below would prove less");
+        Assert.AreEqual(HistoryOutcome.Done, result.Outcome, "The merge of a stored profile should be done");
+        Assert.AreSequenceEqual(new[] { DescribeProfile(targetId, OtherProfileName) }, DescribeProfiles(state.Profiles), "Only the target should be listed, under its own name");
+        Assert.AreSequenceEqual(new[] { targetId }, state.HeldProfiles.ToList(), "Only the target should stay held");
+        Assert.IsFalse(state.TryGetHeld(sourceId, out _), "The source should give no held state");
+        Assert.IsNull(await ReadStateAsync(state, sourceId), "The source should read as no state, so a page shows it as not found");
+        Assert.AreEqual(newerTick.Id, held?.LatestTick?.Id, "The target should hold the source's newer tick as its latest");
+        Assert.AreSequenceEqual(_expectedMergedIslands, DescribeIslands(held?.Islands ?? []).Order(StringComparer.Ordinal).ToList(), "The target should hold the islands of both profiles");
+        Assert.AreSequenceEqual(DescribeTradeRoutes(newerRoutes).Skip(1).ToList(), DescribeTradeRoutes(held?.LatestTradeRoutes).Skip(1).ToList(), "The target should hold the later set of trade routes");
+        Assert.AreSequenceEqual(DescribeState(await store.ReadProfileStateAsync(targetId, TestContext.CancellationToken)), DescribeState(held), "The held state should be the stored one");
+        Assert.AreSequenceEqual(expectedNotices.Order(StringComparer.Ordinal).ToList(), notices.Order(StringComparer.Ordinal).ToList(), "The followers should be told of both profiles and of the target's trade routes");
+    }
+
+    /// <summary>
+    /// A merge whose rows are moved but whose re-read of the held profiles fails still counts as done: the failed state
+    /// read is logged, the source is dropped from the profile list and the held states, the target stays listed but is
+    /// not held, so a page reads it on demand.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous test</returns>
+    [TestMethod]
+    [TestCategory("AC8")]
+    public async Task ServerStateMergeProfileReadFailureDropsSource()
+    {
+        // Arrange
+        var databaseFile = CreateDatabaseFile();
+        var (_, state) = await OpenRestoredAsync(databaseFile);
+
+        var sourceId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+
+        await state.StoreProfileAsync(sourceId, ProfileName, TestContext.CancellationToken);
+        await state.StoreProfileAsync(targetId, OtherProfileName, TestContext.CancellationToken);
+        await StoreTicksAsync(state,
+                              CreateTick(sourceId, 1, CreateIsland(1, IslandName, CreateEntry(1))),
+                              CreateTick(targetId, 2, CreateIsland(2, "Island of the target", CreateEntry(2))));
+        ExecutePooled(databaseFile, BreakIslandReadsSql);
+
+        var heldBefore = state.HeldProfiles.Order().ToList();
+
+        // Act
+        var result = await state.MergeProfileAsync(sourceId, targetId, TestContext.CancellationToken);
+
+        // Assert
+        Assert.AreSequenceEqual(new[] { sourceId, targetId }.Order().ToList(), heldBefore, "Both profiles should be held before the merge, or the checks below would prove less");
+        Assert.AreEqual(HistoryOutcome.Done, result.Outcome, "A merge whose rows moved should be done although the re-read failed");
+        Assert.AreSequenceEqual(new[] { DescribeProfile(targetId, OtherProfileName) }, DescribeProfiles(state.Profiles), "Only the target should be listed");
+        Assert.IsEmpty(state.HeldProfiles, "Neither profile should stay held");
+        Assert.IsFalse(state.TryGetHeld(sourceId, out _), "The source should give no held state");
+        Assert.IsFalse(state.TryGetHeld(targetId, out _), "The target should give no held state");
+        Assert.Contains(ReadFailureLine, _logger.Entries.Select(entry => entry.Message).ToList(), "The failed state read should be logged");
     }
 
     /// <summary>

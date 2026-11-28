@@ -741,6 +741,66 @@ public sealed class CensioServerTests
     }
 
     /// <summary>
+    /// A profile merge sent over a real ingest connection of the hosted server moves the source's history to the target:
+    /// the connection acknowledges it, the source's page shows the not-found text, and the target's page shows the
+    /// regions of both profiles under the target's name (spec AC7, AC8).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC7")]
+    public async Task CensioServerMergeFromCompanionMovesHistory()
+    {
+        // Arrange
+        const string firstId = "11111111-2222-4333-8444-555555555551";
+        const string secondId = "11111111-2222-4333-8444-555555555552";
+        const string mergeId = "11111111-2222-4333-8444-555555555553";
+        const string sourceProfile = "bbbbbbbb-cccc-4ddd-8eee-ffffffffffff";
+
+        var directory = CreateTemporaryDirectory();
+        var session = await RunSessionOnFreePortAsync(Path.Combine(directory, "Data"), new FakeTimeProvider(new DateTimeOffset(2026, 11, 21, 12, 0, 0, TimeSpan.Zero)));
+        var token = await session.WaitForTokenAsync(TestContext.CancellationToken);
+        var sourceTick = IngestClient.Tick(secondId).Replace(IngestClient.Profile, sourceProfile, StringComparison.Ordinal).Replace("180023", "180024", StringComparison.Ordinal);
+
+        using var socket = new ClientWebSocket();
+
+        socket.Options.Proxy = null;
+
+        await socket.ConnectAsync(new Uri($"ws://127.0.0.1:{session.Status.Port.ToString(CultureInfo.InvariantCulture)}{IngestEndpoint.Path}"), TestContext.CancellationToken);
+        await IngestClient.SendAsync(socket, IngestClient.Hello(token));
+
+        var (hello, _, _) = await IngestClient.ReceiveAsync(socket);
+
+        await IngestClient.SendAsync(socket, IngestClient.Tick(firstId));
+
+        var (firstReply, _, _) = await IngestClient.ReceiveAsync(socket);
+
+        await IngestClient.SendAsync(socket, sourceTick);
+
+        var (secondReply, _, _) = await IngestClient.ReceiveAsync(socket);
+
+        var targetBefore = await ReadRegionsPageAsync(session.Status.Port, Guid.Parse(IngestClient.Profile));
+        var sourceBefore = await ReadRegionsPageAsync(session.Status.Port, Guid.Parse(sourceProfile));
+
+        // Act
+        await IngestClient.SendAsync(socket, IngestClient.ProfileMerge(mergeId, sourceProfile, IngestClient.Profile));
+
+        var (mergeReply, _, _) = await IngestClient.ReceiveAsync(socket);
+
+        var targetAfter = await ReadRegionsPageAsync(session.Status.Port, Guid.Parse(IngestClient.Profile));
+        var sourceAfter = await ReadRegionsPageAsync(session.Status.Port, Guid.Parse(sourceProfile));
+
+        // Assert
+        Assert.IsInstanceOfType<ContractHelloAccepted>(hello, "The hello should be accepted");
+        Assert.IsInstanceOfType<ContractAcknowledgement>(firstReply, "The first tick should be acknowledged");
+        Assert.IsInstanceOfType<ContractAcknowledgement>(secondReply, "The source's tick should be acknowledged");
+        Assert.DoesNotContain("Not found.", sourceBefore, "The source's page should show its regions before the merge");
+        Assert.AreEqual(mergeId, Assert.IsInstanceOfType<ContractAcknowledgement>(mergeReply, "The merge should be acknowledged").Id.ToString("D"), "The acknowledgement should carry the merge's identity");
+        Assert.Contains("Not found.", sourceAfter, "The source's page should show the not-found text after the merge");
+        Assert.Contains("MARKERPROFILE", targetAfter, "The target's page should show its name");
+        Assert.AreEqual(CountOccurrences(targetBefore, "<tr") + 1, CountOccurrences(targetAfter, "<tr"), "The target's page should list the region of the source as well");
+    }
+
+    /// <summary>
     /// Creates the options of a local server whose content root is the test's base folder.
     /// </summary>
     /// <param name="port">The port</param>
@@ -837,6 +897,17 @@ public sealed class CensioServerTests
         {
             return false;
         }
+    }
+
+    /// <summary>
+    /// Counts the non-overlapping occurrences of a text.
+    /// </summary>
+    /// <param name="text">The text searched</param>
+    /// <param name="value">The value searched for</param>
+    /// <returns>The number of occurrences</returns>
+    private static int CountOccurrences(string text, string value)
+    {
+        return (text.Length - text.Replace(value, string.Empty, StringComparison.Ordinal).Length) / value.Length;
     }
 
     /// <summary>
