@@ -33,7 +33,7 @@ option 7), and no contract message moves a history ([contract](../../docs/areas/
 - E1: The selection is `Live` or the active profile: `Merge profile…` is disabled with the tooltip
   `Live and the active profile cannot be merged into another.`. The target may be any other profile, `Live` and the
   active one included.
-- E2: `Cancel` or closing the dialog changes nothing.
+- E2: `Cancel` or closing the dialog: no change.
 - E3: 1,000 deletions and merges wait for the server together: `Merge` in the dialog and the box of the dialog
   `Delete profile?` are disabled, each with the text `1,000 changes already wait for the server.` (replacing
   `1,000 deletions already wait for the server.`). `CompanionProfiles.IsDeletionQueueFull` counts the waiting merges too.
@@ -49,8 +49,8 @@ option 7), and no contract message moves a history ([contract](../../docs/areas/
 - E6: The connection is lost before the answer: the merge stays waiting and is sent again; a merge the server already
   did finds the merged profile gone and is acknowledged without a change.
 - E7: A `profileMerge` whose two identities are equal, or either is the all-zero identity, is refused as `invalid`.
-- E8: The current connection was opened for the merged profile (buffered messages of `Roma`): the merge ends it as a
-  profile switch does, and the new hello names the profile of the next message after the merge.
+- E8: The current connection was opened for the merged profile (buffered messages of `Roma`): the merge ends it at its
+  next message as a profile switch does, and the new hello names that message's profile.
 - E9: The target is not stored on the server (never sent anything, deleted on the pages): the merged history continues
   under the target's identity, listed as `Unnamed profile` until a hello names it.
 - E10: Both profiles hold the same island (same session GUID, island ID, area index) or an hourly point of the same hour:
@@ -108,7 +108,7 @@ option 7), and no contract message moves a history ([contract](../../docs/areas/
 - AC5: `profiles.json` writes waiting and confirmed merges with source and target in one sequence with the deletions and
   reads that sequence back in the same order, interleaved; the reader rejects a malformed merge entry (missing, unknown
   or repeated property; a source or target not in `D` form or all zero; a source that is `Live`, listed, repeated or
-  deleted; a target equal to its source; merges that form a loop, such as `A` into `B` and `B` into `A`) and the file
+  deleted; a target equal to its source or to an earlier entry's identity; merges that form a loop, such as `A` into `B` and `B` into `A`) and the file
   stays within 1 MiB at every bound (N1, N2).
 - AC6: The contract reads and writes `profileMerge` (`id`, `profileId`, `targetProfileId`), answered by
   `acknowledgement`, and refuses E7 as `invalid` (S2, E7).

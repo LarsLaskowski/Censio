@@ -2,7 +2,7 @@
 
 Source: Issue #262 | [spec.md](spec.md)
 Tier: standard — a new behavior across Companion, contract and server that reuses the token guard of the deletion and creates, changes or removes no security control.
-Security areas touched: Ingest token and Companion authentication (`IngestSession` handles the new message type); Server database (`ServerStore.MergeProfileAsync`, `ServerState`); Parsing of external input (`ContractReader`, `ContractRules`, `CompanionProfiles`); File paths the Companion writes (`CompanionProfiles`, `profiles.json`); Logging and showing external data (`CompanionLog`, `SettingsWindow` and the new dialog showing profile names); Outbound calls (`LiveSender.ForServer` sends the new message)
+Security areas touched: Ingest token and Companion authentication (`IngestSession` handles the new message type); Server database (`ServerStore.MergeProfileAsync`, `ServerState`); Parsing of external input (`ContractReader`, `ContractRules`, `CompanionProfiles`); File paths the Companion writes (`CompanionProfiles`, `profiles.json`); Logging and showing external data (`CompanionLog`, `SettingsWindow` and the new dialog showing profile names); Outbound calls (`LiveSender.ForServer` sends the new message); Network exposure (`/ingest` merges history, `DeletionHostRule` unchanged)
 Plan size: the change spans five projects, a file format, a contract message and a database operation; the signatures and the per-criterion tests need the room.
 
 ## Problem / root cause
@@ -36,13 +36,13 @@ Every test carries `[TestCategory("AC<n>")]`.
 | AC | Test(s) | Test file |
 | -- | ------- | --------- |
 | AC1 | `CompanionProfilesMergeMovesLinksAndRemovesSource` (list, links, notice cleared, `Profile merged` without name or identity, `DeletionsChanged` once, one waiting merge; data rows: target `Live`, target the active profile, target another), `CompanionProfilesMergeRefusedThrowsAndChangesNothing` (data rows: source `Live`, source active, source unknown, target unknown, target equal to source), `CompanionProfilesMergeWithFullQueueThrowsAndChangesNothing` (500 deletions and 500 merges waiting), `CompanionProfilesIsDeletionQueueFullCountsMerges` | `tests/Censio.Companion.Core.Tests/CompanionProfilesMergeTests.cs` |
-| AC2 | `SettingsViewCanMergeAllButLiveActiveAndUnknown`, `SettingsViewMergeTargetsListOthersInListOrder`; `SettingsWindowSessionMergeMergesAndShowsProfiles` (the view's `WaitingMerges`, the unsaved values of the last view kept), `SettingsWindowSessionMergeIgnored` (data rows: other sender, before first view, during save, `Live`, active, full queue, after close); `CompanionTextsMergeTextsInBothLanguages` (every row of the spec's *Texts*, `ChangesQueueFullText` included); the window and the dialog: check (Reviewer, step 8) | `SettingsViewTests.cs`, `SettingsWindowSessionTests.cs`, `CompanionTextsTests.cs` (all `tests/Censio.Companion.Core.Tests/`) |
+| AC2 | `SettingsViewCanMergeAllButLiveActiveAndUnknown`, `SettingsViewMergeTargetsListOthersInListOrder`; `SettingsWindowSessionMergeMergesAndShowsProfiles` (the view's `WaitingMerges`, the unsaved values of the last view kept), `SettingsWindowSessionMergeIgnored` (data rows: other sender, before first view, during save, `Live`, active, target not listed, target equal to source, full queue, after close); `CompanionTextsMergeTextsInBothLanguages` (every row of the spec's *Texts*, `ChangesQueueFullText` included); the window and the dialog: check (Reviewer, step 8) | `SettingsViewTests.cs`, `SettingsWindowSessionTests.cs`, `CompanionTextsTests.cs` (all `tests/Censio.Companion.Core.Tests/`) |
 | AC3 | `LiveSenderMergeSentAfterHelloBeforeCatalogAndBuffer` (`profileMerge` with both identities, confirmed, `Profile merge confirmed by the server`), `LiveSenderMergeRefusedConfirmsAndWarns`, `LiveSenderMergeLostConnectionKeepsWaitingAndResends`, `LiveSenderMergeAndDeletionSentInOrderMade` (data rows: merge `A` into `B` then delete `B`; delete `C` then merge `A` into `B`; each also after a reload of `profiles.json` and a new sender); `CompanionProfilesMergeWaitsAcrossReload` | `LiveSenderMergeTests.cs`; `CompanionProfilesMergeTests.cs` |
-| AC4 | `LiveSenderMergeBufferedMessageSentUnderTarget` (data rows: tick, trade routes, session start, session end; same message identity, hello names the target), `LiveSenderMergeChainResolvesToLastTarget`, `LiveSenderMergeTargetDeletedDropsBufferedMessage`, `LiveSenderMergeOfConnectionProfileReconnectsAsSwitch`; `CompanionProfilesResolveProfileFollowsMerges` (data rows: not merged, merged, chain of two, target deleted); `ContractMessageConverterWithProfileReplacesOnlyProfile` (data rows: the four kinds; `null` for a status) | `LiveSenderMergeTests.cs`, `CompanionProfilesMergeTests.cs`, `ContractMessageConverterTests.cs` |
-| AC5 | `CompanionProfilesMergeWrittenAndReadBackInOrder` (deletions and merges interleaved, waiting and confirmed, the entry text `{"id":"…","target":"…","confirmed":false}`), `CompanionProfilesLoadRejectsMalformedMerge` (data rows: unknown property, repeated `target`, target not `D` form, target all zero, target equal to its id, source `Live`, source listed, source repeated as a deletion, loop of two, loop of three), `CompanionProfilesLargestFileWithMergesUnderBound` (678,718 bytes) | `CompanionProfilesMergeTests.cs` |
+| AC4 | `LiveSenderMergeBufferedMessageSentUnderTarget` (data rows: tick, trade routes, session start, session end; same message identity, hello names the target), `LiveSenderMergeChainResolvesToLastTarget`, `LiveSenderMergeTargetDeletedDropsBufferedMessage`, `LiveSenderMergeOfConnectionProfileReconnectsAsSwitch` (the hello after the merge names the next buffered message's profile; data rows: that message of the target, of the active profile); `LiveSenderMergeWriteErrorStopsLaterRemovals`; `CompanionProfilesResolveProfileFollowsMerges` (data rows: not merged, merged, chain of two, target deleted); `ContractMessageConverterWithProfileReplacesOnlyProfile` (data rows: the four kinds; `null` for a status) | `LiveSenderMergeTests.cs`, `CompanionProfilesMergeTests.cs`, `ContractMessageConverterTests.cs` |
+| AC5 | `CompanionProfilesMergeWrittenAndReadBackInOrder` (deletions and merges interleaved, waiting and confirmed, the entry text `{"id":"…","target":"…","confirmed":false}`), `CompanionProfilesLoadRejectsMalformedMerge` (data rows: unknown property, repeated `target`, target not `D` form, target all zero, target equal to its id, target the upper-case or white-space-padded form of its id, target equal to an earlier deletion's id, target equal to an earlier merge's source, source `Live`, source listed, source repeated as a deletion, loop of two, loop of three), `CompanionProfilesLargestFileWithMergesUnderBound` (678,718 bytes) | `CompanionProfilesMergeTests.cs` |
 | AC6 | `ContractReaderProfileMergeReadsAllProperties`, `ContractReaderProfileMergeInvalidRefused` (data rows: equal identities, all-zero `id`, `profileId`, `targetProfileId`, missing `targetProfileId`, unknown property); `ContractWriterProfileMergeWritesWireForm` (the example line of `contract.md`) | `tests/Censio.Contracts.Tests/ContractReaderTests.cs`, `ContractWriterTests.cs` |
 | AC7 | `ServerStoreMergeMovesTicksIslandsAndRemovesSource` (target name kept, storing order kept, island names by the later stamp), `ServerStoreMergeCombinesHourlyPointsOfSameHour` (counts, every sum, `EntryCount`, pair `AmountSum`, game-time range, hourly island names; a resent folded tick of the source reported as stored), `ServerStoreMergeKeepsLaterTradeRouteSet` (data rows: source later, target later, equal, source only, target only), `ServerStoreMergeIntoUnstoredTargetCreatesUnnamed`, `ServerStoreMergeOfUnstoredSourceChangesNothing`, `ServerStoreMergeFailureChangesNothing` (the store made to fail as the deletion's failure tests do); `IngestSessionProfileMergeMergesAndAcknowledges`, `IngestSessionProfileMergeOfUnknownSourceAcknowledged`, `IngestSessionProfileMergeFailedClosesWith1011`; `CensioServerMergeFromCompanionMovesHistory` (a Companion merges and the server lists the target only); N4: check (Reviewer: set-wise statements, no rows read into memory but point pairs) | `tests/Censio.Server.Data.Tests/ServerStoreMergeTests.cs`; `tests/Censio.Server.Tests/IngestSessionTests.cs`, `CensioServerTests.cs` |
-| AC8 | `ServerStateMergeProfileRereadsAndNotifies` (source neither listed nor held, target held with the newer latest tick, notices `Profile` for both and `TradeRoutes` for the target), `ServerStateMergeProfileReadFailureDropsSource`; `RegionsMergedProfileShowsNotFound`; `ServerStoreMergeResentTickReportedAsStored` (data rows: resent under the target; under the source after the merge recreates it unnamed, E13); E14: check (Reviewer, step 8: one transaction, each part reads in its own) | `tests/Censio.Server.Tests/ServerStateTests.cs`, `RegionsTests.cs`; `ServerStoreMergeTests.cs` |
+| AC8 | `ServerStateMergeProfileRereadsAndNotifies` (source neither listed nor held, target held with the newer latest tick, notices `Profile` for both and `TradeRoutes` for the target), `ServerStateMergeProfileReadFailureDropsSource` (the target still listed, not held); `RegionsMergedProfileShowsNotFound`; `ServerStoreMergeResentTickReportedAsStored` (data rows: resent under the target; under the source after the merge recreates it unnamed, E13); E14: check (Reviewer, step 8: one transaction, each part reads in its own) | `tests/Censio.Server.Tests/ServerStateTests.cs`, `RegionsTests.cs`; `ServerStoreMergeTests.cs` |
 | AC9 | `HistoryRetentionMergeProfileLogsWithoutName`, `HistoryRetentionMergeProfileFailedLogsWarning`; the Companion lines are asserted in the AC1 and AC3 tests | `tests/Censio.Server.Tests/HistoryRetentionTests.cs` |
 | AC10 | check: the Dev measures (*Measurement*) and records the table in `history-deletion.md`; the Reviewer reads it in step 8 | — |
 | AC11 | check: the Reviewer reads the README and user guide sections, English and German, in step 8 | — |
@@ -76,7 +76,8 @@ Memory: no history row is read into memory; the point pairs are two numbers per 
 
 `ServerState.MergeProfileAsync` takes the write gate and, once the store reports `Done`, re-reads as the deletion does
 through one private helper both share (`ApplyRemovalAsync(Guid removed, CancellationToken)`; on a failed read the
-source is dropped from list, held states and marks), then notifies `Profile` for source and target and `TradeRoutes`
+source is dropped from list, held states and marks, and the target from held states and marks, so the pages read it
+on demand until its next tick; the target stays listed), then notifies `Profile` for source and target and `TradeRoutes`
 for the target. `HistoryRetention.MergeProfileAsync` logs `The history of a profile was merged into another.`
 (Information) or `The history of a profile could not be merged into another.` (Warning, exception) beside the deletion's
 lines; it asks for no sweep. `IngestSession` handles `ContractProfileMerge` as the deletion: `Done` or `NothingToDo`
@@ -84,8 +85,11 @@ acknowledged, `Failed` closes with 1011 without a line of its own.
 
 **Measurement (AC10).** Through the real `ServerStore` over a database file, three runs each: (a) a source with a year of
 hourly points (8,684) and 20,190 unfolded ticks into a target holding none of those hours; (b) two profiles each with 7
-days of fixture ticks folded (168 shared hours). Bound: 3 s per merge (fact 14). A run over the bound: the Dev reports
-it and the Lead decides (record 0119, option 4).
+days of fixture ticks folded (168 shared hours); (c) two profiles holding the same year of hourly points built from the
+fixture hours, every hour shared; (d) both profiles with a full trade-route set at the contract's bounds, the source's
+later. Bound: 3 s per merge (fact 14). Over the bound in (c): the Dev first runs each combine statement once over all
+shared point pairs (a temporary table of point-number pairs) instead of once per pair; still over it, or over in another
+case: the Dev reports it and the Lead decides (record 0119, option 4).
 
 **Companion profiles (G3).** `_deleted` becomes `List<ProfileRemoval>` (identity, optional target, confirmed), one
 ordered queue; a merge entry is written as `{"id":"…","target":"…","confirmed":false}` (that property order) inside
@@ -97,24 +101,29 @@ writes, logs `Profile merged` and raises `DeletionsChanged`. `IsDeletionQueueFul
 `ResolveProfile` follows merge entries, waiting or confirmed, at most as many steps as there are merge entries, and
 gives `null` beyond (unreachable once the reader rejects loops: one uncovered line accepted). The reader takes an entry
 with exactly `id`/`confirmed` or `id`/`target`/`confirmed`, applies today's `id` rules across all entries, requires a
-target in `D` form, not zero, not its own `id`, and rejects a loop by following each merge's chain.
+target in `D` form, not zero, not its own `id` and not the `id` of any earlier entry (deletion or merge), which also
+rules out every loop. Every identity rule compares parsed `Guid` values, never strings, since `TryParseExact("D")`
+accepts upper case, surrounding white space and JSON escapes.
 
 **Live sending (G4).** `FirstUntried` walks `WaitingRemovals` in order; `SendRemovalsAsync` (renamed from
 `SendDeletionsAsync`) sends a `ContractProfileDeletion` or a `ContractProfileMerge`, confirms, and logs the deletion's
 lines or `Profile merge confirmed by the server` / `Profile merge refused by the server: <refusal>` (Warning). After the
-acknowledgement of a merge whose source is the connection's profile it ends the connection as a switch (`_helloProfile`
-null, `_isSwitching`). For a buffered message `ProfileOf` keeps the read message; its profile goes through
+acknowledgement of a merge whose source is the connection's profile it keeps the connection: the next message resolves to
+another profile and `IsOfOtherProfile` switches with a hello naming that message's profile (E8), as for any message of
+another profile. A removal that cannot be written ends the sending of removals on this connection (no later entry is
+sent, the order holds) instead of today's `continue`. For a buffered message `ProfileOf` keeps the read message; its profile goes through
 `ResolveProfile`: `null` or a deleted identity drops it as today; another identity is written again by
 `ContractMessageConverter.WithProfile` and `ContractWriter.Write` (a write error logs `LiveMessageNotWritten` and drops
 it) and sent with the same message identity; `IsOfOtherProfile` and the hello take the resolved identity. One message is
 read and written at a time.
 
 **Window (G5).** `Merge profile…` right of `Delete profile…`, enabled by `SettingsView.CanMerge` (the deletion's rule),
-tooltip `MergeProfileDisabledText`. Dialog `ProfileMergeDialog`, laid out as `ProfileDeletionDialog`: title, the label
-`Move the profile <name> into:` with a drop-down of `MergeTargets` (no preselection; `Merge` disabled until one is
+tooltip `MergeProfileDisabledText`. Dialog `ProfileMergeDialog`, laid out as `ProfileDeletionDialog`: title, the text
+`Move the profile <name> into:` in a `TextBlock` (never a `Label`, whose access key would swallow an `_` of the name) with a drop-down of `MergeTargets` (no preselection; `Merge` disabled until one is
 chosen), the explanation paragraph, the queue-full text when full (then `Merge` disabled), buttons `Merge` and
 `Cancel`. The line `Merged profiles whose history the server has not moved yet: <n>` follows the deletion line and shows
 while `WaitingMerges` > 0. `ChangesQueueFullText` replaces `DeleteProfileHistoryFullText` in both dialogs.
+`SettingsWindowSession.OnMergeRequested` checks `CompanionProfiles.IsMergeable` and the full queue before `Merge`.
 
 ## Options considered
 
@@ -212,8 +221,22 @@ All by the Dev, once the code is green, except where named:
   server.` / `Schon 1.000 Änderungen warten auf den Server.`;
 - `docs/ARCHITECTURE.md`: line 22 (`Censio.Server.Data`: "the deletion or merge of a profile"), line 64 (one sentence on
   the merge, linking record 0119), line 105 (the Companion also merges through `/ingest`);
-- `.squad/project.md (+2 words)`: in the ingest security line `ContractProfileDeletion` becomes `ContractProfileDeletion`,
-  `ContractProfileMerge` — the Dev reports the text, the orchestrator writes it.
+- `SECURITY.md`, verbatim: line 36 "a Companion with the token can also delete the history of any profile by its identity,
+  as the settings window does when a profile is deleted with its history (`docs/areas/history-deletion.md`)." becomes "a
+  Companion with the token can also delete the history of any profile by its identity, as the settings window does when a
+  profile is deleted with its history, and merge the history of any profile into any identity, as the settings window
+  does when a profile is merged (`docs/areas/history-deletion.md`)."; line 36 "fill its database file and delete the
+  history of any profile, so switch it off" becomes "fill its database file, delete the history of any profile and merge
+  it into another, so switch it off"; line 51 "the deletion of a profile's history from a data page and its host rule
+  (`AllowedHosts`), and through `/ingest` with the token" becomes "the deletion of a profile's history from a data page
+  and its host rule (`AllowedHosts`), and through `/ingest` with the token, and the merge of a profile's history into
+  another through `/ingest` with the token";
+- `history-deletion.md` (*Merging a profile*) also states that the merged ticks fold by the target's latest tick at the
+  next fold run (the source's latest hour is no longer kept unfolded);
+- `.squad/project.md (+12 words)`: in the ingest security line `ContractProfileDeletion` becomes `ContractProfileDeletion`,
+  `ContractProfileMerge`; in the Network exposure line "the history deletion (`DeletionHostRule` on the pages, the token
+  through `/ingest`)" becomes "the history deletion (`DeletionHostRule` on the pages, the token through `/ingest`) and
+  the history merge (the token through `/ingest`)" — the Dev reports the text, the orchestrator writes it.
 No changelog file exists; the release-notes label is the orchestrator's (step 10).
 
 ## Architecture check
@@ -240,103 +263,28 @@ only their profile is resolved. No guarantee of `.squad/project.md` is weakened.
 
 The spec's *Out of scope*; a merge on the pages becomes an issue only if asked for.
 
-## Security notes
+## Security review
 
-Security plan review: specs/feature-262-merge-profiles (spec.md + plan.md), mode plan
+Security approved with five non-blocking notes, each marked `fix now`; all are taken:
+1. Network exposure not listed: added to *Security areas touched*; the Network exposure line of `.squad/project.md` is in
+   *Documentation updates*.
+2. `SECURITY.md` missing: the three replacements stand verbatim in *Documentation updates*.
+3. Reader identity variants and the ordering gap: *Companion profiles (G3)* compares parsed `Guid` values and rejects a
+   target equal to an earlier entry's id (which also excludes loops); the three data rows are in AC5. Spec AC5 names
+   the rule.
+4. Longest path not measured: case (c) added to *Measurement*, with the set-wise fallback before the Lead's decision.
+5. Name in a `Label`: G5 requires a `TextBlock`.
 
-**Verdict: approved, with no blocking findings and 5 non-blocking ones.** `standard` is the right tier. The merge adds a new operation behind the existing ingest token and browser-upgrade refusal (records 0019, 0064, 0116). It creates, changes or removes no security control, and the risk that any token holder can merge any profile is accepted in record 0119 and spec N6.
+## Challenge
 
-**What I checked and found sound**
-- **A dropped connection does not undo a merge.** The deletion runs under the server's stopping token, not the connection's (`src/Censio.Server/IngestSession.cs:597`), and the plan has the merge handled the same way. So if the Companion stops waiting after 30 s, the merge still finishes; the resend then finds the source gone and is acknowledged (E6).
-- **A merge cannot bring back a deleted history.** A deleted profile has no row in `Profiles`, and its ticks and hourly points carry a random tombstone identity (`docs/areas/history-deletion.md`). A merge whose source was deleted on the pages is therefore `NothingToDo`, and a merge into a deleted target creates a fresh unnamed row. The tombstoned rows are never touched.
-- **Database access.** The raw SQL in this store is parameterised through `StoreAccess.CreateCommand` (`ServerStore.cs:107,137,528`). The plan reads only the pairs of point numbers into memory, which is bounded by retention and small; that is acceptable for N4.
-- **Logging.** None of the plan's log lines carry a name or an identity; `ProfileMergeRefused` logs only the refusal enum.
-- **`IngestSession` cases.** The unknown-type default branch acknowledges without storing (`IngestSession.cs:603-605`), and `GetId` returns `null` by default (`:246`). A missing `ContractProfileMerge` case would therefore silently acknowledge merges that never ran. The plan's three `IngestSessionProfileMerge*` tests cover this.
-- **`profiles.json` reader.** I read `CompanionProfiles.Load`/`ReadDeleted`/`ReadProperties`/`ReadId` (`src/Censio.Companion.Core/CompanionProfiles.cs:262-294, 811-876`):
-  - It parses with `JsonDocument.Parse`, default options: no comments, no trailing commas.
-  - Property names are matched ordinal and exactly once.
-  - Identities go through `Guid.TryParseExact(…, "D")`.
-
-**[NON-BLOCKING] 1. The *Network exposure* area is touched but not listed.**
-- The `.squad/project.md` Network exposure line names "the history deletion (`DeletionHostRule` on the pages, the token through `/ingest`)".
-- With `Censio:Ingest:RequireToken` set to `false`, the merge is a second history-changing action that anyone who reaches `/ingest` can use, the same way as the deletion. N6 ("The pages offer no merge") is itself a claim about this area.
-- Smallest fix: add "Network exposure (`/ingest` merges history, `DeletionHostRule` unchanged)" to the plan's *Security areas touched*. Extend the plan's `.squad/project.md` update so the Network exposure line reads "the history deletion (`DeletionHostRule` on the pages, the token through `/ingest`) and the history merge (the token through `/ingest`)".
-- Recommendation: fix now
-
-**[NON-BLOCKING] 2. `SECURITY.md` is missing from *Documentation updates*, verbatim.**
-- `SECURITY.md:36` lists what a token holder, and anyone when the token is off, can do through `/ingest`. `SECURITY.md:51` lists the deletion through `/ingest` in scope. After this change both leave out the merge.
-- Add `SECURITY.md` to the plan's *Documentation updates* with these three replacements:
-  - **`SECURITY.md:36`, sentence 1.** Replace "a Companion with the token can also delete the history of any profile by its identity, as the settings window does when a profile is deleted with its history (`docs/areas/history-deletion.md`)." with "a Companion with the token can also delete the history of any profile by its identity, as the settings window does when a profile is deleted with its history, and merge the history of any profile into any identity, as the settings window does when a profile is merged (`docs/areas/history-deletion.md`)."
-  - **`SECURITY.md:36`, sentence 2.** Replace "fill its database file and delete the history of any profile, so switch it off" with "fill its database file, delete the history of any profile and merge it into another, so switch it off".
-  - **`SECURITY.md:51`.** Replace "the deletion of a profile's history from a data page and its host rule (`AllowedHosts`), and through `/ingest` with the token" with "the deletion of a profile's history from a data page and its host rule (`AllowedHosts`), and through `/ingest` with the token, and the merge of a profile's history into another through `/ingest` with the token".
-- Recommendation: fix now
-
-**[NON-BLOCKING] 3. The `profiles.json` reader rules for merge entries miss an ordering case and identity spelling variants.**
-- **What the reader accepts as one identity.** I ran a probe through the scratchpad project `/tmp/claude-0/-home-user-Censio/19d301d8-944d-51f7-be2e-0b04cb3e38e8/scratchpad/guidprobe` (`dotnet run`, SDK 11.0.100). It printed:
-  `[AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE] -> True aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee`
-  `[ aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee ] -> True aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee`
-  and a JSON string `"aaaaaaaa-…"` came back from `GetString()` as `aaaaaaaa-…`.
-- So "D form" in this reader accepts uppercase, surrounding whitespace and JSON escapes. Any rule written as a string comparison can be bypassed: target equals source, repeated source, loop, or source listed.
-- **The ordering gap.** The plan rejects loops by following each chain, but it does not reject a merge whose target is the id of an *earlier* entry (an earlier deletion, or an earlier merge's source). The Companion can never write that: a target must be listed at merge time, and an earlier entry's id has already left the list for good.
-- If such a file were read, the server would get the merge after the target was already removed. It would recreate the target unnamed (E9) with the source's history, while the Companion resolves or drops the buffered messages differently.
-- That one rule ("a merge's target is not the id of any earlier entry") also makes every loop impossible, in linear time.
-- Smallest fix: compare parsed `Guid` values only, and add that rule to *Companion profiles (G3)*. Add these data rows to `CompanionProfilesLoadRejectsMalformedMerge`:
-  - target the uppercase or whitespace-padded form of its own id;
-  - target equal to an earlier deletion's id;
-  - target equal to an earlier merge's source.
-- Recommendation: fix now
-
-**[NON-BLOCKING] 4. The measurement leaves out the merge's longest path.**
-- *Measurement* case (a) moves a year into a target that holds none of those hours, so no hours are combined. Case (b) combines only 168 shared hours.
-- The per-pair combine of E10 (`HourlyPointMerge`, several statements per shared hour) is never measured at a year (8,684 shared hours). That is the merge's longest hold of the write gate, during which ingest waits (N3).
-- Beyond the Companion's 30 s acknowledgement wait (fact 13), the Companion reconnects and is refused `companionConnected` until the session ends. It converges, because of the stopping token above, but the 3 s bound would be stated without covering this case.
-- Smallest fix: add case (c), two profiles that each hold the same year of hourly points built from the fixture hours, all hours shared, three runs, to *Measurement* and to the AC10 table.
-- Recommendation: fix now
-
-**[NON-BLOCKING] 5. The dialog shows the profile name inside a label.**
-- *Window (G5)* calls `Move the profile <name> into:` "the label" of the drop-down. As a WPF `Label`, its text becomes an access-key text, and the first `_` of a profile name (which `CheckName` allows) is swallowed.
-- `ProfileDeletionDialog.xaml:11` uses a `TextBlock`. Smallest fix: state in G5 that the name text is a `TextBlock`, as in `ProfileDeletionDialog`.
-- Recommendation: fix now
-
-## Challenge notes
-
-Plan challenge for specs/feature-262-merge-profiles (/home/user/Censio/specs/feature-262-merge-profiles/plan.md, spec.md, tasks.md). I checked these plan claims in the code and they hold: facts 2–10 and 15, the unique keys in CensioDbContext.cs:28-187, the fold upserts (HistoryFolder.cs:32-68, which match the way E10 combines rows), the trade-route dedupe (ServerStore.cs:278) and the buffered send flow (LiveSender.cs:1262-1281). The design holds. The objections are all minor.
-
-**Minor 1 – the order of deletions and merges can break on a write error.**
-- Evidence: `SendDeletionsAsync` logs a write error and moves on to the next entry, which stays waiting (LiveSender.cs:1420-1425, `LiveMessageNotWritten` then `continue`).
-- Effect: once deletions and merges share one queue, a merge `A`→`B` skipped this way lets the deletion of `B` go out first. The merge then finds `B` missing on the server and recreates it unnamed with `A`'s history, which is exactly the case E4 and AC3 rule out.
-- Instruction for the Dev: in `SendRemovalsAsync`, a removal that cannot be written ends the sending of removals on this connection (`return null`, no later entry sent) instead of `continue`.
-- Why minor: the Dev can apply this without changing the plan.
-
-**Minor 2 – the measurement leaves out the costly path.**
-- Evidence: `HourlyPointMerge.CombineAsync` runs several statements for each shared hour, but case (b) measures only 168 shared hours. Case (a) has no shared hours, so it is just relabelling, which the deletion measured at about 1.13 s (history-deletion.md:73).
-- Effect: one fixture point holds 682 entries and about 1,250 pairs, and removing one takes a median of 3.2 ms (history-deletion.md:70). A year of shared hours (8,684) could hold the write gate well past the Companion's 30 s wait for an acknowledgement (fact 13). Trade-route sets at the bounds (53,453 rows) are not measured at all.
-- Instruction for the Dev: add case (c), both profiles holding the same year of hourly points, every hour shared. Add case (d), both profiles with a full trade-route set at the contract's bounds and the source's set later.
-- If (c) goes over 3 s, run each combine statement once over all shared point pairs (for example from a temporary table of point numbers) rather than once per pair. Report the result to the Lead as the plan's record 0119, option 4 already says.
-- Why minor: the plan's fallback (the Lead decides) still applies.
-
-**Minor 3 – the session does not check the target.**
-- Evidence: `OnDeleteRequested` checks only `IsDeletable` and the full queue (SettingsWindowSession.cs:355). `Merge` throws `ArgumentException` for a target that is not listed or equals the source, and the plan's *Security considerations* rely on "the session's checks".
-- Instruction for the Dev: `OnMergeRequested` checks `CompanionProfiles.IsMergeable(profile, target, active, profiles)` and the full queue.
-- Instruction for the Tester: add data rows "target not listed" and "target equal to source" to `SettingsWindowSessionMergeIgnored`.
-- Why minor: it is one check and two test rows.
-
-**Minor 4 – the reconnect after a merge of the connection's own profile (E8).**
-- Evidence: the plan sets `_helloProfile` to null after the acknowledgement, so the next hello names the active profile. If the next buffered message belongs to the target, `IsOfOtherProfile` (LiveSender.cs:1338-1356) then switches a second time.
-- Spec: E8 asks that the new hello names the profile of the next message after the merge.
-- Instruction for the Tester: `LiveSenderMergeOfConnectionProfileReconnectsAsSwitch` asserts that the hello after the merge names the profile of the next buffered message. Use one data row where that message belongs to the target and one where it belongs to the active profile.
-- Instruction for the Dev: pick `_helloProfile` so that this holds. One option is to set it to the resolved target when that target is listed and a buffered message of it waits.
-- Why minor: the behaviour is close; only the hello choice changes.
-
-**Minor 5 – a failed re-read leaves the target's state stale.**
-- Evidence: the deletion's fallback (ServerState.cs:571-577) only drops the removed profile, and the plan's shared `ApplyRemovalAsync` copies that.
-- Effect: the target's held state keeps its old latest tick and islands until its next tick. AC8 ("the target's pages show both histories without a reload") then fails on this path.
-- Instruction for the Dev: on a failed read, also drop the target from the held states and the marks, or state in `server-state.md` that it stays stale until its next tick.
-- Instruction for the Tester: `ServerStateMergeProfileReadFailureDropsSource` asserts that the target is still listed.
-- Why minor: either fix is a small change.
-
-**Minor 6 – folding after a merge is not documented.**
-- Evidence: the fold horizon is per profile (HistoryStore.cs:42 `LatestReceiveSql`, history.md:123-127): the hour of a profile's latest tick is never folded.
-- Effect: a source's unfolded ticks older than 7 days, kept only because they were the source's latest, can be folded at the next run under the target.
-- Instruction for the Dev: the *Merging a profile* section of `history-deletion.md` states that the merged ticks fold by the target's latest tick at the next fold run.
-- Why minor: documentation only.
+The plan challenge raised six minor objections and no major one; all accepted:
+1. Order broken by a write error: G4 ends the sending of removals at a removal that cannot be written; test
+   `LiveSenderMergeWriteErrorStopsLaterRemovals` (AC4 row).
+2. Costly path unmeasured: cases (c) and (d) in *Measurement*, with the set-wise fallback.
+3. Session does not check the target: G5 checks `IsMergeable` and the queue; two data rows in
+   `SettingsWindowSessionMergeIgnored`.
+4. Hello after a merge of the connection's profile: no reconnect at the acknowledgement; the next message switches with a
+   hello naming its profile; two data rows. Spec E8 says "at its next message".
+5. Stale target after a failed re-read: the target is dropped from the held states and marks (read on demand until its
+   next tick); the test asserts it stays listed and is not held.
+6. Folding after a merge: the sentence is in *Documentation updates*.
