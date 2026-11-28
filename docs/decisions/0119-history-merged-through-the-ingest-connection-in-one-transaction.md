@@ -40,5 +40,10 @@ its profile list and held states again as after a deletion. The rules are in
 - A token holder can merge any stored profile into any identity, as one can delete any (accepted as in record 0116).
 - A merge keeps the history, so no clean-up of the database file follows it; the rows it removes are overwritten by
   secure delete only.
-- Ingest writes wait for a merge; its duration is measured and its bound stated in the area document. A bound that a
-  merge cannot meet would bring option 4 back.
+- Ingest writes wait for a merge; its duration grows with the hours both profiles hold. Measured: at most 3 s up to
+  about 450 shared hours, which covers the histories one Companion writes (it sends one profile at a time, so two
+  profiles share only the hours of a switch); two profiles sharing a whole year take about 55 s. Accepted rather than
+  option 4: that size needs two profiles fed in the same hours all year, and beyond the Companion's 30 s wait the merge
+  still ends whole, the waiting messages are sent again and stored once, and the resent merge is acknowledged without a
+  change. Option 4 would leave the shared hours incomplete for readers on every merge to spare a case that hardly occurs.
+  The figures are in the area document.

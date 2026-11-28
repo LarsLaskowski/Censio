@@ -26,7 +26,7 @@ See [spec.md](spec.md), *Problem*.
 | 11 | An island's name follows the later stamp (`NameReceiveTicks`, `NameTickNumber`), in the profile's list and in an hourly point | `TickWriter.cs:106-108`, `HistoryFolder.cs:38-40` | confirmed |
 | 12 | A resent tick is recognised by its identity across profiles (unique index), folded or not | fact 10; `docs/areas/server-data.md` *Tick* | confirmed |
 | 13 | The Companion waits 30 seconds for an acknowledgement | `docs/areas/live-sending.md` status table | confirmed |
-| 14 | A merge takes at most 3 s for each case of *Measurement* | to verify: Dev, step 6, throwaway test outside the repository through the real `ServerStore` | unverified |
+| 14 | A merge takes at most 3 s in cases (a), (b) and (d) of *Measurement*; case (c) grows linearly with the shared hours | Dev, step 6, real `ServerStore`, Release, 3 runs: (a) 1.7–1.9 s, (b) 1.4–1.5 s, (d) ~60 ms, (c) 54.2–54.8 s (about 6.3 ms per shared fixture hour) | confirmed |
 | 15 | The largest `profiles.json` with 1,000 merge entries is 678,718 bytes | arithmetic: the test's 630,718 (`CompanionProfilesTests.cs:1968-1972`) plus 48 bytes `"target":"<36>",` per entry; the AC5 test asserts it | confirmed |
 
 ## Tests per criterion
@@ -87,9 +87,13 @@ acknowledged, `Failed` closes with 1011 without a line of its own.
 hourly points (8,684) and 20,190 unfolded ticks into a target holding none of those hours; (b) two profiles each with 7
 days of fixture ticks folded (168 shared hours); (c) two profiles holding the same year of hourly points built from the
 fixture hours, every hour shared; (d) both profiles with a full trade-route set at the contract's bounds, the source's
-later. Bound: 3 s per merge (fact 14). Over the bound in (c): the Dev first runs each combine statement once over all
-shared point pairs (a temporary table of point-number pairs) instead of once per pair; still over it, or over in another
-case: the Dev reports it and the Lead decides (record 0119, option 4).
+later. Bound: 3 s per merge up to about 450 shared hours (fact 14), which covers the histories one Companion writes,
+since it sends one profile at a time and two profiles share only the hours in which the player switched; beyond, the
+merge grows by about 6.3 ms per shared fixture hour, a year shared in full about 55 s (case (c), set-wise already). Past
+about 4,700 shared hours the Companion's 30 s wait ends first: the server finishes the merge under its stopping token, the ingest of every
+Companion waits behind the write gate and its unanswered messages are sent again with their identities (stored once),
+and the resent merge finds the source gone and is acknowledged (E6). `history-deletion.md` records the four cases, the
+per-shared-hour rate and this sequence (Lead, mode `decide`; record 0119).
 
 **Companion profiles (G3).** `_deleted` becomes `List<ProfileRemoval>` (identity, optional target, confirmed), one
 ordered queue; a merge entry is written as `{"id":"…","target":"…","confirmed":false}` (that property order) inside
@@ -204,7 +208,8 @@ Windows shell, excluded already (`.squad/stack.md`, *Coverage gate*).
 - `docs/areas/contract.md (+90 words)`: the row, the example line, "thirteen messages", identity rules.
 - `docs/areas/ingest.md (+70 words)`: the answer and the accepted risk beside the deletion's.
 - `docs/areas/history-deletion.md (+550 words)`: scope widened; *Merging a profile* (steps 1–6, failure, log lines,
-  measurement table).
+  measurement table with the four cases, the rate per shared hour and the sequence beyond the Companion's 30 s wait, as
+  *Measurement* states).
 - `docs/areas/server-state.md (+90 words)`: *Merging profiles* beside *Deleting a profile*.
 - `docs/areas/server-data.md (+50 words)`: a *Merge* bullet beside the deletion.
 - `docs/areas/history.md (+20 words)`: "a fold, a deletion or a merge between two parts".
