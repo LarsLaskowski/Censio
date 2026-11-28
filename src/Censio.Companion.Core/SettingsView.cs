@@ -62,6 +62,11 @@ public sealed class SettingsView
     /// </summary>
     public bool IsDeletionQueueFull { get; init; }
 
+    /// <summary>
+    /// Gets the number of merged profiles whose history the server has not moved yet.
+    /// </summary>
+    public int WaitingMerges { get; init; }
+
     #endregion // Properties
 
     #region Methods
@@ -97,6 +102,29 @@ public sealed class SettingsView
     {
         return CompanionProfiles.IsDeletable(selected, ActiveProfile, ProfileList);
     }
+
+    // Skeleton: removed with the implementation
+#pragma warning disable S1172, S2325, RH2003
+    /// <summary>
+    /// Determines whether the window can merge a profile into another.
+    /// </summary>
+    /// <param name="selected">The identity of the selected profile</param>
+    /// <returns><see langword="true" /> when the profile is listed and is neither <c>Live</c> nor the active profile</returns>
+    public bool CanMerge(Guid selected)
+    {
+        throw new NotImplementedException();
+    }
+
+    /// <summary>
+    /// Gets the profiles a profile can be merged into.
+    /// </summary>
+    /// <param name="selected">The identity of the selected profile</param>
+    /// <returns>Every other listed profile, in list order</returns>
+    public IReadOnlyList<CompanionProfile> MergeTargets(Guid selected)
+    {
+        throw new NotImplementedException();
+    }
+#pragma warning restore S1172, S2325, RH2003
 
     /// <summary>
     /// Determines whether the window can rename a profile.

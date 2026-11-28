@@ -27,6 +27,11 @@ public interface ISettingsWindow
     /// </summary>
     event EventHandler<SettingsRename>? RenameRequested;
 
+    /// <summary>
+    /// Occurs when the user asks to merge a profile into another.
+    /// </summary>
+    event EventHandler<SettingsMerge>? MergeRequested;
+
     #endregion // Events
 
     #region Methods

@@ -593,6 +593,12 @@ internal sealed partial class SettingsWindow : Window, ISettingsWindow
     /// <inheritdoc />
     public event EventHandler<SettingsRename>? RenameRequested;
 
+    // Skeleton: removed with the implementation
+#pragma warning disable CS0067
+    /// <inheritdoc />
+    public event EventHandler<SettingsMerge>? MergeRequested;
+#pragma warning restore CS0067
+
     /// <inheritdoc />
     public void ShowProfiles(SettingsView view)
     {
