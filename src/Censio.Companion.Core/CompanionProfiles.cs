@@ -249,6 +249,34 @@ public sealed class CompanionProfiles
         }
     }
 
+    /// <summary>
+    /// Gets the removals the server has not confirmed yet, oldest first.
+    /// </summary>
+    public IReadOnlyList<ProfileRemoval> WaitingRemovals
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return [];
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets the identities of the merged profiles whose history the server has not moved yet, oldest first.
+    /// </summary>
+    public IReadOnlyList<Guid> WaitingMerges
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return [];
+            }
+        }
+    }
+
     #endregion // Properties
 
     #region Methods
@@ -335,6 +363,22 @@ public sealed class CompanionProfiles
     {
         return id != LiveSender.ProfileId && id != active && profiles.Any(profile => profile.Id == id);
     }
+
+    // Skeleton: removed with the implementation
+#pragma warning disable S1172, RH2003
+    /// <summary>
+    /// Determines whether a profile can be merged into another.
+    /// </summary>
+    /// <param name="id">The identity of the profile whose history is moved</param>
+    /// <param name="target">The identity of the profile that receives the history</param>
+    /// <param name="active">The identity of the active profile</param>
+    /// <param name="profiles">The profiles</param>
+    /// <returns><see langword="true" /> when the profile is deletable and the target is another listed profile</returns>
+    public static bool IsMergeable(Guid id, Guid target, Guid active, IReadOnlyList<CompanionProfile> profiles)
+    {
+        throw new NotImplementedException();
+    }
+#pragma warning restore S1172, RH2003
 
     /// <summary>
     /// Determines whether a profile can be renamed.
@@ -597,6 +641,38 @@ public sealed class CompanionProfiles
 
         DeletionsChanged?.Invoke(this, EventArgs.Empty);
     }
+
+    // Skeleton: removed with the implementation
+#pragma warning disable S1172, S2325, RH2003
+    /// <summary>
+    /// Merges a profile into another: removes it and queues the move of its history.
+    /// </summary>
+    /// <param name="id">The identity of the profile whose history is moved</param>
+    /// <param name="target">The identity of the profile that receives the history</param>
+    public void Merge(Guid id, Guid target)
+    {
+        throw new NotImplementedException();
+    }
+
+    /// <summary>
+    /// Marks a waiting merge as confirmed by the server.
+    /// </summary>
+    /// <param name="id">The identity of the merged profile</param>
+    public void ConfirmMerge(Guid id)
+    {
+        throw new NotImplementedException();
+    }
+
+    /// <summary>
+    /// Follows the merges of a profile to the profile that holds its history now.
+    /// </summary>
+    /// <param name="id">The identity of the profile</param>
+    /// <returns>The identity reached, or <see langword="null" /> when the merges do not end</returns>
+    public Guid? ResolveProfile(Guid id)
+    {
+        throw new NotImplementedException();
+    }
+#pragma warning restore S1172, S2325, RH2003
 
     /// <summary>
     /// Gets the name of a profile.
