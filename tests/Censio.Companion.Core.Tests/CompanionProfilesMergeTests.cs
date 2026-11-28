@@ -325,6 +325,42 @@ public sealed class CompanionProfilesMergeTests
     }
 
     /// <summary>
+    /// A merge while 1,000 removals are kept but not all wait forgets the oldest confirmed removal, never a waiting one:
+    /// the merge waits last and the kept entries stay 1,000 (spec AC1, N2).
+    /// </summary>
+    /// <returns>A task that completes when the test is done</returns>
+    [TestMethod]
+    [TestCategory("AC1")]
+    public async Task CompanionProfilesMergeWithFullQueueDropsOldestConfirmed()
+    {
+        // Arrange
+        var profiles = CompanionProfiles.Load(ProfilesPath, _logger);
+        var waiting = MergeIntoLive(profiles, 1);
+        var confirmed = MergeIntoLive(profiles, CompanionProfiles.MaxDeletions - 1);
+
+        foreach (var id in confirmed)
+        {
+            profiles.ConfirmMerge(id);
+        }
+
+        var next = profiles.Create(SourceName);
+
+        profiles.Select(CompanionProfile.Live.Id);
+
+        // Act
+        await RunUntilCancelledAsync(profiles, running => running.Merge(next.Id, CompanionProfile.Live.Id));
+
+        // Assert
+        var text = await File.ReadAllTextAsync(ProfilesPath, TestContext.CancellationToken);
+
+        Assert.AreEqual(confirmed[0], profiles.ResolveProfile(confirmed[0]), "The oldest confirmed merge should be forgotten to make room");
+        Assert.AreEqual(CompanionProfile.Live.Id, profiles.ResolveProfile(confirmed[1]), "The next confirmed merge should be kept");
+        Assert.AreEqual(CompanionProfile.Live.Id, profiles.ResolveProfile(confirmed[^1]), "The newest confirmed merge should be kept");
+        Assert.AreSequenceEqual([waiting[0], next.Id], profiles.WaitingMerges.ToArray(), "The older waiting merge should never be forgotten, and the new merge should wait last");
+        Assert.AreEqual(CompanionProfiles.MaxDeletions, text.Split("\"confirmed\":").Length - 1, "The kept removals should stay at the bound");
+    }
+
+    /// <summary>
     /// The queue is full when 999 deletions and one merge wait: a merge counts like a deletion (spec AC1, E3).
     /// </summary>
     [TestMethod]

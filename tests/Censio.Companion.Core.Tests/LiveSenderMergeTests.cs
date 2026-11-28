@@ -383,7 +383,7 @@ public sealed class LiveSenderMergeTests : IDisposable
 
         // Assert
         Assert.AreSequenceEqual(expected, new[] { Describe(first), Describe(second) }, $"The removals should be sent in the order they were made: {scenario}, reloaded {isReloaded}");
-        Assert.IsEmpty(profiles.WaitingRemovals, "Both removals should be confirmed");
+        await WaitUntilAsync(() => profiles.WaitingRemovals.Count == 0, "Both removals should be confirmed");
     }
 
     /// <summary>
@@ -819,6 +819,26 @@ public sealed class LiveSenderMergeTests : IDisposable
                 _statusWaiters.Remove(waiter);
             }
         }
+    }
+
+    /// <summary>
+    /// Polls a condition, ten milliseconds apart, until it holds or the real-time guard runs out, and asserts that it holds.
+    /// </summary>
+    /// <param name="condition">The condition</param>
+    /// <param name="description">What the condition says, as the assert message</param>
+    /// <returns>A task that completes when the condition holds</returns>
+    private async Task WaitUntilAsync(Func<bool> condition, string description)
+    {
+        var polls = 0;
+
+        while (condition() == false && polls < (int)(_guard.TotalMilliseconds / 10))
+        {
+            await Task.Delay(10, TestContext.CancellationToken);
+
+            polls++;
+        }
+
+        Assert.IsTrue(condition(), description);
     }
 
     /// <summary>
